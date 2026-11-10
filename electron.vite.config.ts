@@ -69,7 +69,7 @@ export default defineConfig({
     plugins: [notices(false)],
     build: {
       rolldownOptions: {
-        input: { index: resolve('src/main/index.ts'), daemon: resolve('src/daemon/main.ts'), cli: resolve('src/cli/main.ts'), hook: resolve('src/cli/hook.ts') },
+        input: { index: resolve('src/main/index.ts'), daemon: resolve('src/daemon/main.ts'), cli: resolve('src/cli/main.ts'), hook: resolve('src/cli/hook.ts'), ptyhost: resolve('src/ptyhost/main.ts') },
       },
     },
   },

@@ -13,6 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, rotateLog } from '../shared/conn.ts'
+import { HostPty, ptyOn, ptyQuit } from './ptyHost.ts'
 import { API, HIDDEN, recorded, type Tab } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
@@ -99,6 +100,7 @@ if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
+await core.ptyAdopt() // R6: terminals that outlived the last daemon (settings.ptyHost), before the rest start again
 core.restoreAll()
 flowResume() // workflow runs back at their blocks
 scanWidgets()
@@ -558,7 +560,7 @@ const api: Record<string, Handler> = {
   flowGet: p => flowGet(p),
   flowForget: p => flowForget(p),
   flowTick: p => flowTick(p.now), // tests move the clock
-  shutdown: () => void setTimeout(shutdown, 50),
+  shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
@@ -670,7 +672,7 @@ for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw
 // accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
 // yours Laki starts); S6: voice (its dictionary rewrites what you dictate and send), Laki AI's own (ai.context is its
 // instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action)
-const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|inHooks|voice|ai|readerTools|keys|cmdKeys)$/
+const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -1095,8 +1097,10 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
     })
 })
 
-function shutdown() {
-  log('shutting down')
+// keep (R6): the pty host's terminals aren't ended: the next daemon takes them back (core.ptyAdopt)
+function shutdown(keep: unknown = false) {
+  const kept = keep === true && ptyOn() // a signal's name otherwise
+  log(kept ? 'shutting down, the terminals kept' : 'shutting down')
   ticks.stopAll()
   hookStop()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
@@ -1112,7 +1116,8 @@ function shutdown() {
   } catch (e) {
     log('keeping shells', e) // the stop goes on
   }
-  for (const s of core.sessions.values()) s.kill()
+  for (const s of core.sessions.values()) if (!kept || !(s.pty instanceof HostPty)) s.kill()
+  if (!kept) ptyQuit() // a stop ends the terminals, the host's too
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })
   rmSync(lockPath, { force: true })

@@ -14,7 +14,10 @@ import { PROGRAM_REPLY, ProgramRecords } from './program.ts'
 
 export type Client = { id: number; send(msg: unknown): void }
 
-type IPty = ReturnType<typeof pty.spawn>
+// what a Session needs of its terminal: node-pty's, or the pty host's (ptyHost.ts' HostPty, whose group signals the
+// whole job there: this process isn't its parent's)
+export type Pty = { pid: number; write(d: string): void; resize(cols: number, rows: number): void; kill(signal?: string): void; onData(f: (d: string) => void): unknown; onExit(f: (e: { exitCode: number; signal?: number }) => void): unknown; group?(signal: string): void }
+type PtyOpts = { file: string; args: string[]; cwd: string; env: Record<string, string>; cols: number; rows: number }
 
 const SCROLLBACK = 5000
 const PROGRAM_SETTLE = 2000 // a report has stood this long before it's compared: a hook and a report of one change never come at once
@@ -65,7 +68,8 @@ function keepLinks(ser: any, core: any) {
 
 export class Session {
   readonly tab: string
-  readonly pty: IPty
+  readonly pty: Pty
+  private muted = false // R6: an adopted terminal's earlier output drawn again (replay): its old queries get no answer, its old hooks and reports aren't heard twice
   readonly term: InstanceType<typeof headless.Terminal>
   private ser = new serializeAddon.SerializeAddon()
   private clients = new Map<Client, { ready: boolean; pending: string[]; size?: [number, number] }>() // size: the client's own
@@ -88,7 +92,7 @@ export class Session {
   tabToken = '' // S12: this start's token, LAKI_TAB_TOKEN in its env: a call with it is this tab's (core.ts tabOfToken)
   hookKey = '' // this start's key, LAKI_HOOK in its env: what its hooks carry (core.ts spawnTab, hookOk)
 
-  constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number }) {
+  constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number; pty?: (o: PtyOpts) => Pty }) {
     this.tab = tab
     const cols = opts.cols || 120
     const rows = opts.rows || 32
@@ -96,15 +100,15 @@ export class Session {
     this.term.loadAddon(this.ser as any)
     keepLinks(this.ser, (this.term as any)._core)
     this.term.onTitleChange(t => (this.title = t))
-    this.term.parser.registerOscHandler(7717, d => (this.onHook(d), true))
+    this.term.parser.registerOscHandler(7717, d => (this.muted || this.onHook(d), true))
     this.term.parser.registerOscHandler(7501, d => (this.programReport(d), true))
     this.term.parser.registerOscHandler(133, d => (d.startsWith('A') && this.program.prompt(), false)) // a new prompt
     this.term.parser.registerEscHandler({ final: 'c' }, () => (this.program.clear(), false)) // RIS
     // headless replies go to the PTY only while no client answers instead
     this.term.onData(d => {
-      if (!this.responder && !this.exited) this.pty.write(d)
+      if (!this.responder && !this.exited && !this.muted) this.pty.write(d)
     })
-    this.pty = pty.spawn(file, args, { name: 'xterm-256color', cols, rows, cwd: opts.cwd, env: opts.env })
+    this.pty = opts.pty ? opts.pty({ file, args, cwd: opts.cwd, env: opts.env, cols, rows }) : pty.spawn(file, args, { name: 'xterm-256color', cols, rows, cwd: opts.cwd, env: opts.env })
     this.pty.onData(d => this.output(d))
     this.pty.onExit(({ exitCode: code, signal }) => {
       const exitCode = signal ? 128 + signal : code // killed: not a clean exit
@@ -119,11 +123,17 @@ export class Session {
   }
 
   private programReport(d: string) {
-    if (!this.agent || this.exited) return
+    if (!this.agent || this.exited || this.muted) return
     if (d.trim() === '?') return void (this.programAsked || ((this.programAsked = true), this.pty.write(PROGRAM_REPLY))) // only here: xterm.js has no OSC 7501, so never twice; S11: once a start (a loop of queries would be a loop of writes)
     if (!this.program.report(d)) return
     clearTimeout(this.settle) // one timer however many reports
     this.settle = setTimeout(() => this.onProgram(), PROGRAM_SETTLE)
+  }
+
+  // R6: what a terminal that outlived the daemon printed before (the pty host's buffer), into the mirror only
+  replay(d: string) {
+    this.muted = true
+    this.term.write(d, () => (this.muted = false))
   }
 
   output(d: string) {
@@ -284,19 +294,23 @@ export class Session {
     // one still there 5 s later (it traps SIGHUP) gets SIGKILL: freeing its memory is the point
     setTimeout(() => {
       if (this.exited) return
-      try {
-        process.kill(-this.pty.pid, 'SIGKILL')
-      } catch {}
+      this.signal('SIGKILL')
     }, 5000).unref()
   }
 
   private hup() {
     if (this.exited) return
-    try {
-      process.kill(-this.pty.pid, 'SIGHUP') // the whole job: node-pty makes the child a session leader
-    } catch {}
+    this.signal('SIGHUP')
+    if (this.pty.group) return
     try {
       this.pty.kill('SIGHUP')
+    } catch {}
+  }
+  // the whole job: node-pty makes the child a session leader
+  private signal(sig: 'SIGHUP' | 'SIGKILL') {
+    try {
+      if (this.pty.group) this.pty.group(sig)
+      else process.kill(-this.pty.pid, sig)
     } catch {}
   }
 

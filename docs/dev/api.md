@@ -32,7 +32,7 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
   `keepAwake` at each view (`changed()`): while a tab of an agent (`tracked`, or a shell's `runs`) is running or waiting,
   one `caffeinate -i -w <daemon pid>` (the screen may sleep; it ends with the daemon, a crash too); none found (not a
   Mac): said once. Tested with `test/fakes/caffeinate` in `test/resources.test.ts`;
-- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
+- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown` (`keep: true`: the pty host's terminals go on, R6), `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
 - `worktreeList` (`project`: `git worktree list --porcelain`, each on a branch, its folder there, not the project's own
   nor any Laki workspace's, archived too, by realpath; this Mac's git projects) and `worktreeImport` (`project`, `paths`:
   each one listed as a workspace as it is, its folder's name its id, the project's `main` its base; no setup, nothing

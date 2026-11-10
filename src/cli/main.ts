@@ -24,7 +24,7 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
+const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -218,7 +218,7 @@ async function main() {
       return
     }
     case 'stop':
-      return rpc('shutdown', { from: caller() }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
+      return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
     case 'serve':
       return serve(rest)
     case 'remote': {

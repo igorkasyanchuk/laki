@@ -224,6 +224,7 @@ export type AppSettings = Paint & {
   copyUntracked?: boolean // and the untracked ones (unset: off)
   cloneDeps?: boolean // F7: dependency folders cloned whole
   spareWorktree?: boolean // F7: a spare worktree per project
+  ptyHost?: boolean // R6: terminals in a pty host
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
   prBots?: string[] // review bots whose threads go to the agent (unset: PR_BOTS)
@@ -1289,6 +1290,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.radar === true} onChange={v => set({ radar: v })}>
                   <Says title="Collision radar" hint="Off: a worktree's ⋯ › Workspace › Check overlaps looks once, when you ask. On: every 15 seconds it compares what each worktree changes with the project's other worktrees and with what landed on its base since it branched, and where two change the same lines both rows get a mark. Lockfiles don't count" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.ptyHost} onChange={v => set({ ptyHost: v })}>
+                  <Says title="Terminals outlive the daemon (experimental)" hint="New tabs' terminals run in a small process of their own, so a daemon that crashes or restarts finds agents and shells still running, their screens as they were. Tabs open now move there as they restart. Quit Laki Completely and laki stop still end them (laki stop --keep doesn't)" />
                 </Switch>
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />

@@ -2467,7 +2467,7 @@ laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over
 laki open                                               # the app
 laki mcp                                                # an MCP server on stdio (below)
-laki stop                                               # stop the daemon (agents resume when it starts again)
+laki stop [--keep]                                      # stop the daemon (agents resume when it starts again); --keep: terminals in the pty host go on
 laki daemon                                             # run the daemon in the foreground
 laki serve --tailscale                                  # headless: the daemon and remote access (headless.md)
 laki remote | remote stop                               # remote access's link (and PIN) | stop it
@@ -2630,6 +2630,11 @@ codex its last one in that folder. Any other program that was running (a dev ser
 prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was
 running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
 a log out). After a crash, shells start fresh, and nothing comes back over SSH.
+
+With *Terminals outlive the daemon* on (Settings › Git & worktrees › In the background; experimental), none of that is
+needed for tabs started since: their terminals run in a small process of their own, and a daemon that crashed, was
+restarted from the yellow bar or stopped with `laki stop --keep` finds agents and shells still running, mid-turn too,
+their screens as they were. A plain `laki stop` and *Quit Laki Completely* still end them.
 
 ## Managed policy (teams)
 

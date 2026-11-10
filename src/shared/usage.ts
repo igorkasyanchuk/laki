@@ -107,7 +107,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
                                               and cost; laki ai alone: the conversation
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
-  laki daemon | stop                          run the daemon in the foreground | stop it
+  laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
   laki serve --tailscale [--pin | --funnel] | --cloudflare --mail <you@x.com> | --cloudflare --pin | --cloudflare --open --hours <n ≤ 24>  [--hours n]
                                               headless: the daemon and remote access, until stopped (docs/headless.md);
                                               its link opens once, its PIN prints on a terminal only (else laki remote)

@@ -31,6 +31,7 @@ version it builds, with the date. -->
 - *Simple row* (Settings › Appearance › Sidebar rows, off by default): a workspace's row is its name and one next-step chip; the other marks show on hover.
 - Laki's own theme pair, *Laki* and *Laki Light* (the mark's orange as the accent), first in Get started's themes; the default theme is unchanged.
 - Empty pages show what they will hold: faint sample rows on Schedule, Workflows, Notes and My Desk; the Reader's empty chat offers three prompts that fill the box.
+- *Terminals outlive the daemon* (Settings › Git & worktrees › In the background, experimental, off): new tabs' terminals run in a small process of their own, so a daemon that crashes or is restarted after an update finds agents and shells still running, their screens as they were. `laki stop --keep` leaves them too.
 - Safer: an agent's `laki` calls carry its tab's own token, so a process it detaches (setsid, a background job) is still that agent's; a sandboxed Claude can't read the daemon's token.
 - Accessibility: every button has a name for a screen reader, a status mark says its state in words, the side panel's tabs move with ← →, and a column's resize edge takes the arrow keys (Enter resets).
 - Files copied into a new worktree (`.worktreeinclude`, *Copy ignored files*) are cloned where the disk can (APFS): no extra space until one is changed.

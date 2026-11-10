@@ -163,6 +163,7 @@ export const FIND: [string, string, string?][] = [
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
   ['git', 'Clone dependency folders into new worktrees', 'node_modules venv vendor target pods gradle apfs clonefile reflink fast copy'],
+  ['git', 'Terminals outlive the daemon (experimental)', 'pty host terminal survive crash restart daemon update keep running'],
   ['git', 'Keep a spare worktree', 'spare ready instant fast new workspace worktree prepared'],
   ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
   ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],

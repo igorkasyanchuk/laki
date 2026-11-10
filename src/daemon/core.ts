@@ -12,7 +12,7 @@ import { type Perm, permOf } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { priorOf, readJson } from '../shared/conn.ts'
+import { priorOf, readJson, writeAtomic } from '../shared/conn.ts'
 import { type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
@@ -27,6 +27,8 @@ import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
+import { HostPty, ptyForget, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
+import { ptySock } from '../ptyhost/proto.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
@@ -283,9 +285,10 @@ export function hookFiles(h: Hooks): Record<string, string> {
   // S12: the daemon's own token (daemon.json) isn't a sandboxed claude's to read: its Bash commands (denyRead) and its
   // Read tool (the deny rule); its laki calls go with its tab's token. ponytail: claude's sandbox only (codex's
   // workspace-write reads everything), and an agent with no sandbox still reads it
-  const tokenFile = join(dir, 'daemon.json')
-  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])], ...(local && { filesystem: { denyRead: [tokenFile] } }) } }
-  const boxed = (gated: boolean) => ({ ...box, ...(local && { permissions: { ...settings(gated).permissions, deny: [`Read(/${tokenFile})`] } }) })
+  // R6: nor the pty host's socket and the starts' keys kept for it (pty.json)
+  const secret = [join(dir, 'daemon.json'), join(dir, 'pty.json'), ptySock()]
+  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])], ...(local && { filesystem: { denyRead: secret } }) } }
+  const boxed = (gated: boolean) => ({ ...box, ...(local && { permissions: { ...settings(gated).permissions, deny: secret.map(f => `Read(/${f})`) } }) })
   const two = [false, true]
   const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && boxed(gated)) }, null, 2)]))))
   return {
@@ -1571,7 +1574,8 @@ export function gitWrites(path?: string, files = false): string[] {
   }
 }
 
-export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string }
+// adopt: a terminal that outlived the daemon (ptyAdopt): nothing is started, its start's keys are the ones it has
+export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string; adopt?: { pty: HostPty; cols: number; rows: number; hook: string; token: string } }
 
 // S8: claude tabs started with no tool gate on (their PreToolUse hook doesn't wait for one): once a gate is on, the view
 // marks them (ungated) and gateRestart starts the idle ones again, their chats resumed. ponytail: a closed tab's id stays
@@ -1615,12 +1619,13 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   let args: string[]
   // what its hooks carry, new each start: an SSH host's escape codes (hostTab), a local one's laki hook (LAKI_HOOK,
   // main.ts' hookWho): another tab's process can't report this one's turns
-  const hookKey = randomBytes(12).toString('hex')
+  const hookKey = o.adopt?.hook ?? randomBytes(12).toString('hex')
   // S12: and what its laki calls carry (conn.ts' rpc): the daemon knows the tab by it, whatever its process tree became.
   // None on a host (no CLI there reaches this daemon)
-  const tabToken = ws.host ? '' : randomBytes(32).toString('hex')
+  const tabToken = o.adopt ? o.adopt.token : ws.host ? '' : randomBytes(32).toString('hex')
   let argEnv: Record<string, string> | undefined // an agent's values (agentCmd)
-  if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
+  if (o.adopt) args = []
+  else if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
   else if (tab.kind === 'shell') args = ['-l']
   else {
     const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, o.prompt, !!o.resume) : undefined
@@ -1632,7 +1637,16 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize })
+  const viaHost = !!state.settings?.ptyHost && ptyOn() // R6: its terminal in the pty host, where it outlives this daemon
+  const ptyId = `${tab.id}.${randomBytes(6).toString('hex')}`
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
+  // R6: in the pty host, its start's keys are kept (pty.json, 0600) for the daemon that finds it there after this one
+  if (s.pty instanceof HostPty) {
+    const id = s.pty.id
+    ptyKept[tab.id] = { id, hook: hookKey, token: tabToken }
+    ptySave()
+    s.pty.onExit(() => ptyKept[tab.id]?.id === id && (delete ptyKept[tab.id], ptySave()))
+  }
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   s.hookKey = hookKey
   s.tabToken = tabToken
@@ -1690,6 +1704,45 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   }
   changed()
   return s
+}
+
+// R6: terminals that outlive the daemon (settings.ptyHost; docs/dev/agents.md). The pty host keeps them; pty.json says
+// whose each is and its start's keys (LAKI_HOOK, LAKI_TAB_TOKEN: in the program's environment, which lives on), so its
+// hooks and laki calls are still its own. ptyAdopt, before restoreAll: every live one of a tab that's still here gets
+// its Session back, the mirror drawn from the host's buffer; the rest are ended. restoreAll leaves those tabs alone.
+// ponytail: a turn's state isn't kept: an adopted agent reads idle until its next hook (a tool call's says running)
+type PtyKept = Record<string, { id: string; hook: string; token: string }>
+const ptyFile = join(dir, 'pty.json')
+let ptyKept: PtyKept = {}
+const ptySave = () => writeAtomic(ptyFile, JSON.stringify(ptyKept), 0o600)
+export async function ptyAdopt() {
+  if (!state.settings?.ptyHost) return
+  try {
+    await ptyUp()
+    const was = readJson<PtyKept>(ptyFile) ?? {}
+    for (const p of await ptyList()) {
+      const [tabId, k] = Object.entries(was).find(([, v]) => v.id === p.id) ?? []
+      const tab = state.tabs.find(t => t.id === tabId)
+      const ws = tab && state.workspaces.find(w => w.id === tab.workspace)
+      if (!tab || !k || !ws || ws.archived || p.exit !== undefined) {
+        ptyForget(p.id)
+        continue
+      }
+      try {
+        const hp = new HostPty(p.id)
+        spawnTab(tab, { adopt: { pty: hp, cols: p.cols, rows: p.rows, hook: k.hook, token: k.token } }).replay(await hp.attach())
+        log(`${tab.id}: its terminal outlived the daemon (pid ${p.pid})`)
+      } catch (e) {
+        log(`${tab.id}: its terminal not taken back: ${(e as Error).message}`)
+        sessions.delete(tab.id)
+        ptyForget(p.id)
+      }
+    }
+    for (const id of Object.keys(ptyKept)) if (!sessions.has(id)) delete ptyKept[id]
+    ptySave()
+  } catch (e) {
+    log(`pty host: ${(e as Error).message}`) // none: terminals are this daemon's own, as before
+  }
 }
 
 const RESUME_FAIL = 30000 // ms: a resume of a chat that isn't there fails at once
@@ -2069,6 +2122,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 // own: Laki's own call (widgetDev), the only one that writes widgetDevAgent
 export function settingsSet(o: Settings, own = false) {
   policySettings(o as Record<string, unknown>) // a managed one only as the policy has it
+  if (o.ptyHost && !state.settings?.ptyHost) void ptyUp().catch((e: Error) => log(`pty host: ${(e as Error).message}`)) // R6: new terminals go there from now on
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
@@ -3124,11 +3178,12 @@ export const queued = new Set<string>()
 const dormant = new Set<string>() // queued ones nextRestore skips
 export function restoreAll() {
   for (const f of readdirSync(runDir)) if (/\.(setup|go|err)$/.test(f)) rmSync(join(runDir, f), { force: true }) // hostTab's too
-  state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell' || (t.kind === 'dev' && t.again))
+  state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell' || (t.kind === 'dev' && t.again) || sessions.has(t.id)) // sessions: ptyAdopt's, still running
   const after = (Number(state.settings?.sleepAfter ?? SLEEP_AFTER) || 0) * 60_000
   for (const ws of state.workspaces)
     if (!ws.archived)
       for (const t of tabsOf(ws.id)) {
+        if (sessions.has(t.id)) continue // R6: its terminal outlived the daemon
         queued.add(t.id), asleep.add(t.id)
         if (projectArchived(ws.project) || (after && tracked(t) && !t.queue?.length && Date.now() - (t.usedAt ?? 0) > after)) dormant.add(t.id) // an archived project's: until it's back
       }

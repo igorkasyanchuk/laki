@@ -2059,7 +2059,7 @@ export function App() {
     // an error from before this ask (an earlier check's): looked again first; one from a step of its own stops it
     if (upd.status === 'error') return void (idleGo.current.startsWith(`${idleAsk.at}:`) ? off(`Update when idle stopped: ${upd.error}`) : once('check', () => bridge!.update!('check')))
     if ((upd.checked ?? 0) < idleAsk.at && !upd.latest) return void once('check', () => bridge!.update!('check')) // looked for since it was asked
-    if (staleDaemon(view!)) return void (!busy() && once('daemon', () => api.call('shutdown'))) // the new app: main starts the new daemon
+    if (staleDaemon(view!)) return void (!busy() && once('daemon', () => api.call('shutdown', { keep: true }))) // the new app: main starts the new daemon; keep (R6): the pty host's terminals go on
     off(upd.held ? `Laki ${upd.held.version} waits for your update delay` : 'Laki is up to date')
   }, [idleAsk, upd, view])
   useEffect(() => {
@@ -3443,7 +3443,7 @@ export function App() {
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
-        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown', { keep: true })} />}
         {connected && view.diskFull && (
           <div className="stale-bar" role="alert">
             <Icon name="alertCircle" size={16} />
