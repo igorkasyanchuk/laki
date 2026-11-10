@@ -327,3 +327,70 @@ test("U4: Welcome's sample repo: made once with a failing test, a project marked
   assert.equal(existsSync(p.path), false)
   assert.equal(await rig.rpc('sampleRm'), false)
 })
+
+test("U5: the Ship sheet: its draft from the chat; only the files picked are committed; the PR's words, draft, base and reviewers go to gh; Commit only stops there", async t => {
+  const rig = await fresh(t)
+  const remote = join(rig.home, 'remote.git')
+  execFileSync('git', ['init', '-q', '--bare', remote], { env: rig.env })
+  execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: rig.repo, env: rig.env })
+  execFileSync('git', ['push', '-q', 'origin', 'HEAD:main'], { cwd: rig.repo, env: rig.env })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'CSV export' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const line = (o: object) => JSON.stringify(o) + '\n'
+  writeFileSync(join(dir, 'chat-s.jsonl'), line({ type: 'user', message: { content: 'Add a CSV export to the table' } }) + line({ type: 'assistant', message: { content: [{ type: 'text', text: 'Looking.' }, { type: 'tool_use', name: 'Read', input: { file_path: 'table.ts' } }] } }) + line({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done: Export › CSV.' }] } }))
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-s' } })
+  await until(async () => (await rig.rpc('chatRead', { tab: tab.id })).said?.length === 4, 'its chat read')
+  writeFileSync(join(ws.path, 'a.txt'), 'a\n')
+  writeFileSync(join(ws.path, 'b.txt'), 'b\n')
+  execFileSync('git', ['rm', '-q', 'README.md'], { cwd: ws.path, env: rig.env })
+
+  // the draft: its name (none: its first prompt's words), the first prompt and the last answer; each uncommitted file once
+  let d = await rig.rpc('shipDraft', { ws: ws.id })
+  assert.deepEqual([d.title, d.message, d.ahead, d.base], ['Add a CSV export to the table', 'Add a CSV export to the table', 0, 'main'])
+  await rig.rpc('wsSet', { id: ws.id, name: 'CSV export' })
+  d = await rig.rpc('shipDraft', { ws: ws.id })
+  assert.equal(d.title, 'CSV export')
+  assert.equal(d.body, '## Task\n\nAdd a CSV export to the table\n\n## Summary\n\nDone: Export › CSV.')
+  assert.deepEqual(d.files.map((f: any) => [f.path, f.status, f.add, f.del]), [['README.md', 'D', 0, 1], ['a.txt', 'A', 1, 0], ['b.txt', 'A', 1, 0]])
+  await assert.rejects(rig.rpc('shipDraft', { ws: ws.id, from: { tab: tab.id } }), /Ship sheet's draft/) // an agent's: refused
+
+  // what's refused before anything runs
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: ['../x'] }), /not a path inside the workspace/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: ['nope.txt'] }), /not one of the workspace's uncommitted changes/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: [] }), /no files picked/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', reviewers: ['--x'] }), /reviewer --x\?/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', base: '-x' }), /base -x\?/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'merge' }), /mode merge\?/)
+
+  // a.txt and README.md's removal in, b.txt left uncommitted; gh asked with the sheet's words
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, `pr-${ws.branch.replace(/\//g, '_')}.json`), 'no pull requests found') // gh pr view fails: create runs
+  const done = async (id: string) => {
+    const x = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === id)), 'ship done', 15000)
+    assert.equal(x.code, 0, await rig.screen(id))
+  }
+  const s = await rig.rpc('ship', { ws: ws.id, message: 'Add CSV export', files: ['a.txt', 'README.md'], title: 'CSV export', body: 'Adds Export › CSV', draft: true, base: 'main', reviewers: ['@ann', 'org/team'] })
+  await done(s.id)
+  const tree = (r: string) => execFileSync('git', ['ls-tree', '--name-only', r], { cwd: remote, encoding: 'utf8' }).trim().split('\n')
+  assert.deepEqual(tree(ws.branch), ['a.txt'])
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: ws.path, encoding: 'utf8' }), '?? b.txt\n')
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), new RegExp(`^gh pr create --title CSV export --body Adds Export › CSV --draft --reviewer ann,org/team --head ${ws.branch} --base main$`, 'm'))
+
+  // Commit only: committed here, not pushed, no PR asked for
+  const prs = (readFileSync(rig.env.FAKE_LOG, 'utf8').match(/^gh pr create/gm) ?? []).length
+  const c = await rig.rpc('ship', { ws: ws.id, message: 'Add b', mode: 'commit' })
+  await done(c.id)
+  assert.equal(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'Add b')
+  assert.deepEqual(tree(ws.branch), ['a.txt'])
+  assert.equal((readFileSync(rig.env.FAKE_LOG, 'utf8').match(/^gh pr create/gm) ?? []).length, prs)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'commit' }), /nothing to commit/)
+  // Push: the commit goes up, still no PR
+  const u = await rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'push' })
+  await done(u.id)
+  assert.deepEqual(tree(ws.branch), ['a.txt', 'b.txt'])
+  assert.equal((readFileSync(rig.env.FAKE_LOG, 'utf8').match(/^gh pr create/gm) ?? []).length, prs)
+  assert.equal((await rig.rpc('shipDraft', { ws: ws.id })).ahead, 2)
+})

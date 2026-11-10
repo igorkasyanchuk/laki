@@ -6,7 +6,7 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type AccountView, type Account, type WorkspaceView, aiOn, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type GateHeld, type Project, prIn, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
+import { type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type GateHeld, type Project, prIn, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
@@ -27,6 +27,7 @@ import { ComparePage } from './Compare'
 import { spanText, type Collision } from '../../shared/overlap'
 import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
+import { ShipSheet } from './Ship'
 import { type ComponentType, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
@@ -689,17 +690,20 @@ export function Dialogs({ app }: { app: AppCtx }) {
       {dialog === 'palette' && <Palette items={paletteItems(app)} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
       <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (
-        <Prompt
-          title={`Ship ${ws.id}`}
+        <ShipSheet
+          ws={ws}
+          title={`Ship ${wsName(ws)}`}
           busy={checking === `ship:${ws.id}` ? 'Checking…' : undefined}
-          // what it does, said before it does it (a git action: this is its confirmation): the changes, the push, the PR
-          hint={`${ws.stat ? `${ws.stat.files} file${ws.stat.files === 1 ? '' : 's'} changed (+${ws.stat.add} −${ws.stat.del})${ws.stat.dirty ? `, ${ws.stat.dirty} not committed yet` : ''}: ` : ''}git add -A and commit, push ${ws.branch} to origin (git push -u), then a PR into ${ws.base ?? 'its base'} (gh pr create --fill), in a ship tab`}
-          placeholder="Commit message"
+          land={prAllows(projOf(ws)?.config, 'land')}
+          call={call}
           onClose={() => setDialog(null)}
-          onSubmit={async message => {
-            const t = await gated(ws, 'ship', force => call<TabView | { held: GateHeld[] }>('ship', { ws: ws.id, message, force }))
+          onShip={async ({ autoLand, autoFix, ...a }) => {
+            const t = await gated(ws, 'ship', force => call<TabView | { held: GateHeld[] }>('ship', { ws: ws.id, ...a, force }))
+            if (!t || !('id' in t)) return
+            // the PR's switches as the sheet left them (a PR the ship opens takes them)
+            if (a.mode === 'pr') for (const [k, v] of [['autoLand', autoLand], ['autoFix', autoFix]] as const) if (!!ws[k] !== v) call('wsSet', { id: ws.id, [k]: v }).catch(() => {})
             setDialog(null)
-            if (t && 'id' in t) selectTab(t)
+            selectTab(t)
           }}
         />
       )}

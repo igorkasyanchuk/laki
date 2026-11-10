@@ -34,7 +34,7 @@ import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } f
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
-import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { archiveBack, archiveDrop, archiveKeep, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -4609,21 +4609,86 @@ const SWAPPED = [
 ].join('\n')
 const swapped = async (ws: Workspace, links: string[]) => (links.length ? (await exec(ws, 'sh', ['-c', SWAPPED, 'sh', ...links])).stdout.split('\n').filter(Boolean) : [])
 
-export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
+// U5: the Ship sheet's, all optional (laki ship's flags; none: as before, every change, gh pr create --fill). files: the
+// changed paths to commit (treeOf's, the others stay uncommitted); mode: stop after the commit or the push; title and
+// body: the PR's (else gh's --fill); base: the PR's base branch; reviewers: GitHub logins or org/team names
+export type ShipOpts = GateOpts & { files?: string[]; title?: string; body?: string; draft?: boolean; base?: string; reviewers?: string[]; mode?: 'commit' | 'push' | 'pr' }
+const NAME_OK = /^[A-Za-z0-9][\w.-]*(\/[A-Za-z0-9][\w.-]*)?$/
+// what treeOf's tree changes against HEAD, each path once (no renames: a rename is its old path gone and its new one)
+async function changedIn(ws: Workspace, tree: string) {
+  const ns = (await git(ws, 'diff-tree', '-r', '-z', '--no-renames', '--name-status', 'HEAD', tree)).split('\0')
+  const num = (await git(ws, 'diff-tree', '-r', '-z', '--no-renames', '--numstat', 'HEAD', tree)).split('\0')
+  const out = new Map<string, { path: string; status: string; add: number; del: number }>()
+  for (let i = 0; i + 1 < ns.length; i += 2) if (ns[i]) out.set(ns[i + 1], { path: ns[i + 1], status: ns[i].trim()[0], add: 0, del: 0 })
+  for (const l of num) {
+    const [add, del, ...p] = l.trim().split('\t')
+    const f = out.get(p.join('\t'))
+    if (f) (f.add = Number(add) || 0), (f.del = Number(del) || 0)
+  }
+  return [...out.values()]
+}
+// files: a tree of HEAD with only those paths taken from tree (each checked inside the workspace, and changed)
+async function treePick(ws: Workspace, tree: string, files: string[]) {
+  const all = new Set((await changedIn(ws, tree)).map(f => f.path))
+  for (const f of files) {
+    inside(ws, f)
+    if (!all.has(f)) throw new Error(`${f}: not one of the workspace's uncommitted changes`)
+  }
+  const idx = await turnIndex(ws, 'pick')
+  await gAt(ws, idx, ['read-tree', 'HEAD'])
+  const kept = (await git(ws, 'ls-tree', '-r', '-z', tree, '--', ...files)).split('\0').filter(Boolean)
+  const there = new Set<string>()
+  // ponytail: one update-index call for every path picked; an argument list past the OS's limit (thousands) fails
+  const info = kept.flatMap(l => (m => (there.add(m[4]), ['--cacheinfo', `${m[1]},${m[3]},${m[4]}`]))(/^(\d+) (\w+) (\w+)\t(.*)$/s.exec(l)!))
+  if (info.length) await gAt(ws, idx, ['update-index', '--add', ...info])
+  const gone = files.filter(f => !there.has(f))
+  if (gone.length) await gAt(ws, idx, ['update-index', '--force-remove', '--', ...gone])
+  return (await gAt(ws, idx, ['write-tree'])).trim()
+}
+
+// U5: the Ship sheet's start: what ship would commit (each uncommitted file, +/−), the commits already on the branch,
+// and words to start from (no model asked): the PR's title from the workspace's name, its body from the first prompt
+// and the agent's last answer
+export async function shipDraft(ref: string) {
+  const ws = findWs(ref)
+  if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
+  const tree = await treeOf(ws, true)
+  const files = await changedIn(ws, tree)
+  const ahead = Number((await git(ws, 'rev-list', '--count', `${ws.base}..HEAD`).catch(() => '0')).trim()) || 0
+  const tab = state.tabs.find(t => t.workspace === ws.id && t.kind === 'agent' && t.resumeId)
+  const said = tab ? ((() => { try { return chatRead({ tab: tab.id }).said ?? [] } catch { return [] } })()) : []
+  const cut = (t = '', n: number) => (t = t.trim()).length > n ? `${t.slice(0, n).trimEnd()}…` : t
+  const first = said.find(x => x.who === 'you')?.text
+  const last = said.findLast(x => x.who === 'agent')?.text
+  const title = ws.name ?? (first ? taskTitle(first, 10) : ws.id)
+  const body = [first && `## Task\n\n${cut(first, 1500)}`, last && `## Summary\n\n${cut(last, 2500)}`].filter(Boolean).join('\n\n')
+  return { title, message: title, body, files, ahead, base: ws.base.replace(/^origin\//, ''), branch: ws.branch }
+}
+
+export async function ship(ref: string, message: string, o: ShipOpts = {}): Promise<Tab | { held: GateHeld[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
   if (!message?.trim()) throw new Error('a commit message is needed')
+  const mode = o.mode ?? 'pr'
+  if (!['commit', 'push', 'pr'].includes(mode)) throw new Error(`mode ${mode}? commit, push or pr`)
+  const reviewers = (o.reviewers ?? []).map(r => String(r).trim().replace(/^@/, '')).filter(Boolean)
+  for (const r of reviewers) if (!NAME_OK.test(r)) throw new Error(`reviewer ${r}? a GitHub login or org/team`)
+  const files = o.files?.map(String)
+  if (files && !files.length) throw new Error('no files picked to commit')
+  const prBase = o.base?.trim().replace(/^origin\//, '')
+  if (prBase !== undefined && (!prBase || prBase.startsWith('-') || !/^[\w./-]+$/.test(prBase))) throw new Error(`base ${prBase || '(none)'}? a branch name`)
   // nothing to commit and no commit the base hasn't: gh would open no PR (no commits between them), so said here, before
   // any gate runs
   const pk = await wsPeek(ws.id)
   if (pk.dirty === 0 && pk.ahead === 0) throw new Error(`nothing to ship: no changes, and no commits that ${ws.base} doesn't have`)
+  if (mode === 'commit' && pk.dirty === 0) throw new Error('nothing to commit: no uncommitted changes')
   const h = await gated('ship', ws, o)
   if (h) return h
   // gh asks which repo a PR goes to when origin's network has two (a fork and its parent) and none was picked (gh repo
   // set-default, git's remote.<name>.gh-resolved): origin's, as the PR scans take it; one you picked stays yours.
   // --head always: without it gh pr create runs git status in the worktree (and would push). Picked, the branch is
   // origin's, where Ship pushed it: <its owner>:<branch>, as gh wants a fork's
-  const lab = (await gitlab.forgeOf(ws)) === 'gitlab' // GitLab's: glab mr create (gitlab.ts SHIP_MR)
+  const lab = (await gitlab.forgeOf(ws)) === 'gitlab' // GitLab's: glab mr create (gitlab.ts shipMr)
   const picked = lab ? '' : (await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')).trim()
   const origin = lab ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => '')) || undefined
   const repo = picked ? undefined : origin
@@ -4631,10 +4696,11 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   const head = picked && origin ? `${origin.split('/').at(-2)}:${ws.branch}` : ws.branch
   // into the workspace's base (off origin/main: main), where origin has that branch; a base that's only here: the
   // repo's default branch, as gh picks it (glab is told either way, as before)
-  const base = ws.base.replace(/^origin\//, '')
-  const B = !lab && (await hasRef(ws, `refs/remotes/origin/${base}`)) ? ' --base "$LAKI_BASE"' : ''
+  const base = prBase || ws.base.replace(/^origin\//, '')
+  const B = !lab && (prBase || (await hasRef(ws, `refs/remotes/origin/${base}`))) ? ' --base "$LAKI_BASE"' : ''
   // git add -A here would go into a nested repo (noNested), so what treeOf stages, a host's worktree there
-  const tree = await treeOf(ws, true)
+  const all = await treeOf(ws, true)
+  const tree = files ? await treePick(ws, all, files) : all
   const index = await turnIndex(ws, 'ship')
   await exec(ws, 'cp', [await turnIndex(ws), index]) // now: a turn's treeOf rewrites that one
   const links = await gitlinks(ws, 'ls-tree', '-r', '-z', tree)
@@ -4652,14 +4718,19 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
     'n=${GIT_CONFIG_COUNT:-0}; export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false"',
     'git read-tree --reset "$LAKI_TREE"',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
-    'git push -u origin "$LAKI_BRANCH"',
-    // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send a
-    // git status of gh's or glab's in. Theirs reads Laki's instead (turnsTidy clears it), its stat data kept
-    'export GIT_INDEX_FILE="$LAKI_INDEX"',
-    lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R} --head "$LAKI_HEAD"${B}`,
+    ...(mode === 'commit' ? [] : ['git push -u origin "$LAKI_BRANCH"']),
+    ...(mode !== 'pr'
+      ? []
+      : [
+          // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send a
+          // git status of gh's or glab's in. Theirs reads Laki's instead (turnsTidy clears it), its stat data kept
+          'export GIT_INDEX_FILE="$LAKI_INDEX"',
+          lab ? gitlab.shipMr({ title: !!o.title?.trim(), draft: o.draft, reviewers: !!reviewers.length }) : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create ${o.title?.trim() ? '--title "$LAKI_TITLE" --body "$LAKI_BODY"' : '--fill'}${o.draft ? ' --draft' : ''}${reviewers.length ? ' --reviewer "$LAKI_REVIEWERS"' : ''}${R} --head "$LAKI_HEAD"${B}`,
+        ]),
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, LAKI_TREE: tree, LAKI_INDEX: index, ...(lab ? { LAKI_BASE: base } : { LAKI_HEAD: head, ...(B && { LAKI_BASE: base }) }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const words: Record<string, string> = o.title?.trim() ? { LAKI_TITLE: o.title.trim(), LAKI_BODY: o.body ?? '' } : {}
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, LAKI_TREE: tree, LAKI_INDEX: index, ...words, ...(reviewers.length && { LAKI_REVIEWERS: reviewers.join(',') }), ...(lab ? { LAKI_BASE: base } : { LAKI_HEAD: head, ...(B && { LAKI_BASE: base }) }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

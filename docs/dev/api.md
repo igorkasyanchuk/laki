@@ -202,7 +202,13 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - worktree actions: `diff` (git's text but its last newline: a hunk to revert must match; `from`: the merge base, or
   `HEAD` when it has none with its base: deleted), `baseBranches` and `wsBase` (Changes' base: a worktree's local and
   origin's branches, `gone`; a new `Workspace.base`, local else `origin/<b>`, its own branch refused, agent-refused),
-  `run`, `ship`; Changes'
+  `run`, `ship` (U5, the Ship sheet's, all optional: `files`, the paths to commit, each `inside` and one of
+  `treeOf`'s changes against HEAD (no renames), the commit's tree HEAD's with only those taken from it, the rest left
+  uncommitted; `title`/`body` gh's `--title`/`--body` (glab's `--description`) instead of `--fill`; `draft`; `base`,
+  the PR's (said: always passed); `reviewers`, logins or org/team, `--reviewer`; `mode` `commit` or `push` stops the
+  script there), `shipDraft` (the sheet's start: `treeOf`'s files with +/−, `ahead` of the base, a `title` from the
+  name, else the first prompt's words, a `body` from the first prompt and the agent's last answer, no model asked;
+  agent-refused: it quotes the chat); Changes'
   Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
   as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
   indexes into its body; a forward patch from the worktree to the base, `git apply --check` then `git apply`: a temp

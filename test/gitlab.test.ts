@@ -95,6 +95,12 @@ test('GitLab: Ship pushes and opens the MR with glab; an issue by number and the
   assert.match(log(rig), new RegExp(`^glab mr create --fill --yes --source-branch ${ws.branch} --target-branch main$`, 'm'))
   assert.ok(!log(rig).includes('gh pr create'))
   assert.equal((await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr, 'the new MR')).forge, 'gitlab')
+  // U5: the Ship sheet's title, description, draft, base and reviewers, glab's flags
+  const ws2 = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'cart-2' })
+  writeFileSync(join(ws2.path, 'cart2.ts'), 'fixed\n')
+  const tab2 = await rig.rpc('ship', { ws: ws2.id, message: 'Fix it', title: 'Cart totals', body: 'Rounds once', draft: true, base: 'main', reviewers: ['ann'] })
+  assert.equal((await until(async () => (x => x.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab2.id)), 'ship done', 15000)).code, 0, await rig.screen(tab2.id))
+  assert.match(log(rig), new RegExp(`^glab mr create --title Cart totals --description Rounds once --yes --source-branch ${ws2.branch} --target-branch main --draft --reviewer ann$`, 'm'))
   // self-hosted: glab signed in to gitlab.acme.dev, not to code.acme.dev
   writeFileSync(join(lab, 'host'), 'gitlab.acme.dev')
   const forge = async (url: string, name: string) => {

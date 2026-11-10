@@ -555,9 +555,14 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
   *Open in* for one of its folders (Xcode for the iOS repo, Cursor for the web one), else Settings › Open in's
   default; Settings › Open in › *Per project* shows and changes each project's;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
-- ship: commit, push and open a PR, in a *ship* tab (nothing uncommitted and no commit the base lacks: *nothing to
-  ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo; into the workspace's base branch when
-  origin has it, else the repo's default);
+- ship: the Ship sheet, then commit, push and open a PR, in a *ship* tab (nothing uncommitted and no commit the base
+  lacks: *nothing to ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo; into the workspace's
+  base branch when origin has it, else the repo's default). The sheet: on the left the uncommitted files, each with a
+  box (unticked ones stay uncommitted) and its +/−, a click shows its diff; on the right the commit message, the PR's
+  title and body (from the workspace's name, its first prompt and the agent's last answer, no model asked), its base
+  branch and reviewers, and *Draft*, *Merge when green*, *Send CI failures to the agent*. A line on top says how the
+  Done check went, the Collision radar's overlaps and how far behind its base it is. *Commit only*, *Push* (commit and
+  push) or *Open PR* (⌘↵);
 - search: the command palette (⌘K);
 - ⋯: the next step first (One next step, below), then split right/down, fork, archive, delete;
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
@@ -2606,6 +2611,8 @@ laki schedule add app --when "every day at 2am except weekends" --name "Nightly 
 # review, then wrap up
 laki diff fix-login | less
 laki ship fix-login -m "Fix the login redirect"
+# or only two files, as a draft PR with its own title
+laki ship fix-login -m "Fix the redirect" --files src/login.ts,test/login.test.ts --title "Fix the login redirect" --draft
 laki archive fix-login
 ```
 

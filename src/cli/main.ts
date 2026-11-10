@@ -23,6 +23,7 @@ const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
+const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
 const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
@@ -39,6 +40,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
   else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
+  else if (!textOnly && args[0] === 'ship' && ['--title', '--body', '--files', '--draft'].includes(a)) a === '--draft' ? (flags.draft = true) : a === '--files' ? shipFiles.push(...(argv[++i] ?? '').split(',').filter(Boolean)) : (flags[k] = argv[++i] ?? '') // laki ship's only
   else if (!textOnly && args[0] === 'limits' && a === '--agent') flags.agent = argv[++i] ?? '' // laki limits' only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
   else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
@@ -581,7 +583,8 @@ async function main() {
     }
     case 'ship': {
       // --force: past the extensions' gates; yours only (the daemon refuses it from an agent's tab)
-      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller() })
+      const str = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined)
+      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller(), title: str('title'), body: str('body'), draft: !!flags.draft, base: str('base'), ...(shipFiles.length && { files: shipFiles }) })
       if (t.held) held('ship', t)
       return out(t, `shipping in tab ${t.name} (${t.id})`)
     }

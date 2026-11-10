@@ -138,6 +138,13 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await clickText('.palette-item', 'Merge #63')
       await answer('Squash and merge')
     }, async () => /gh pr merge/.test(fakeLog())],
+    // U5: the Ship sheet on dark-mode (notes.txt uncommitted): its file with a box, the PR's title drafted, Open PR
+    ['ship-sheet', async () => {
+      await key('Escape')()
+      await click(row(ws.dark.id))()
+      await waitFor(() => has('.tabbar [aria-label^="Ship:"]'), 'the Ship button')
+      await click('.tabbar [aria-label^="Ship:"]')()
+    }, async () => (await hasText('.ship-file', 'notes.txt')) && (await js<string>("document.querySelector('.ship-form input')?.value ?? ''")) !== '' && (await hasText('.ship button.primary', 'Open PR'))],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
       for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})
@@ -166,7 +173,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
     out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }) })
     writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
-    if (name === 'palette' || name === 'get-started') await key('Escape')()
+    if (name === 'palette' || name === 'get-started' || name === 'ship-sheet') await key('Escape')()
   }
   writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2))
   app.exit(out.every(s => s.ok) ? 0 : 1)

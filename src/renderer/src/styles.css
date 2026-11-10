@@ -3457,3 +3457,21 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .sp-change { content-visibility: auto; contain-intrinsic-block-size: auto 34px; }
 .rd-agent { content-visibility: auto; contain-intrinsic-block-size: auto 120px; }
 .board-card { content-visibility: auto; contain-intrinsic-block-size: auto 96px; }
+
+/* U5: the Ship sheet: the files on the left, the words and switches on the right */
+.ship { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.ship-banner { padding: 6px 8px; border-radius: 6px; background: var(--bg2, rgba(127, 127, 127, 0.08)); }
+.ship-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; min-height: 0; overflow: hidden; }
+.ship-files { overflow: auto; max-height: 52vh; display: flex; flex-direction: column; gap: 2px; }
+.ship-head { display: flex; gap: 4px; align-items: center; padding-bottom: 4px; }
+.ship-file { display: flex; gap: 6px; align-items: center; }
+.ship-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ship-diff { max-height: 260px; overflow: auto; margin: 2px 0 6px 22px; }
+.ship-form { display: flex; flex-direction: column; gap: 4px; }
+.ship-form textarea { resize: vertical; font: inherit; }
+.ship-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ship-pair label { display: flex; flex-direction: column; gap: 2px; }
+.modal.wide:has(> .ship) { width: 860px; }
+.ship input[type='checkbox'] { width: auto; flex: none; margin: 0; padding: 0; }
+.ship label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 6px; }
+.ship-file .st { flex: none; width: 1.2em; text-align: center; }

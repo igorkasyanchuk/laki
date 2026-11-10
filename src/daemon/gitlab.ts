@@ -103,4 +103,6 @@ export async function glabIssues(at: At) {
   return (Array.isArray(list) ? list : []).map((x: any) => ({ number: Number(x.iid), title: String(x.title ?? ''), url: String(x.web_url ?? ''), assignees: (Array.isArray(x.assignees) ? x.assignees : []).map((a: any) => String(a?.username ?? '')), prs: [] as { number: number; url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] }))
 }
 // Ship's last line: the branch's MR, else a new one filled from its commits
-export const SHIP_MR = 'glab mr view "$LAKI_BRANCH" >/dev/null 2>&1 || glab mr create --fill --yes --source-branch "$LAKI_BRANCH" --target-branch "$LAKI_BASE"' // into the workspace's base
+// into the workspace's base (or the Ship sheet's); its title and description, draft and reviewers when the sheet gave them
+export const shipMr = (o: { title?: boolean; draft?: boolean; reviewers?: boolean } = {}) =>
+  `glab mr view "$LAKI_BRANCH" >/dev/null 2>&1 || glab mr create ${o.title ? '--title "$LAKI_TITLE" --description "$LAKI_BODY"' : '--fill'} --yes --source-branch "$LAKI_BRANCH" --target-branch "$LAKI_BASE"${o.draft ? ' --draft' : ''}${o.reviewers ? ' --reviewer "$LAKI_REVIEWERS"' : ''}`

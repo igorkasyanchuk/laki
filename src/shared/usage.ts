@@ -60,7 +60,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
                                               the simulator's hands, in points (needs idb); describe: its elements
-  laki diff <ws> [--uncommitted] | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--force]
+  laki diff <ws> [--uncommitted] | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--title <t>] [--body <b>] [--draft] [--base <branch>] [--files a,b] [--force]
                                               diff: against its base (--uncommitted: only what isn't committed);
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text [--expect-url <url|/path>]
@@ -254,9 +254,11 @@ or one under it); on any other page it's refused and nothing is done, so a page 
 
   laki run a1b2
   laki run a1b2 test`,
-  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). Nothing uncommitted and no commit its base doesn't have: refused, nothing to ship. A fork with no gh repo set-default: the PR opens on origin's repo. An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
+  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). Nothing uncommitted and no commit its base doesn't have: refused, nothing to ship. A fork with no gh repo set-default: the PR opens on origin's repo. An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab). --title and --body: the PR's (else gh's --fill, from the commits); --draft: a draft PR; --base: the PR's base branch; --files: only those changed files are committed (paths in the worktree, comma-separated), the rest stay uncommitted.
 
-  laki ship a1b2 -m "Add CSV export"`,
+  laki ship a1b2 -m "Add CSV export"
+  laki ship a1b2 -m "Add CSV export" --title "CSV export" --body "Adds Export ▾ › CSV" --draft
+  laki ship a1b2 -m "Fix the parser" --files src/parse.ts,test/parse.test.ts`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
 late is skipped). --where: new (a worktree each run), same (a worktree its first run makes, every run after
 there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a run into a workspace it shares

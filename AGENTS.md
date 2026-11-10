@@ -176,7 +176,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/dir.ts` | the data folder, `dir` (`dataDir()`), in a module of its own: out of core's import cycle |
 | `src/daemon/hosts.ts` | SSH hosts (one ssh connection per host, `exec`/`sshIn` there, a tab's ssh) and cloud workspaces |
 | `src/daemon/pr.ts` | branches followed, PR scans, `autoPR` and the PR switches' messages, merge when green, the side panel's PR calls |
-| `src/daemon/gitlab.ts` | GitLab through glab: `forgeOf` (a project's origin), its MR as a `PR` (`forge: 'gitlab'`), pipeline jobs as checks, the MR actions, issues, Ship's `SHIP_MR` |
+| `src/daemon/gitlab.ts` | GitLab through glab: `forgeOf` (a project's origin), its MR as a `PR` (`forge: 'gitlab'`), pipeline jobs as checks, the MR actions, issues, Ship's `shipMr` |
 | `src/daemon/files.ts` | the diff against the base and its size, Changes' revert and redo, the side panel's files |
 | `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
 | `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
@@ -238,6 +238,7 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/TabBar.tsx` | the tab bar: `TabList` (the tabs), `TabStrip` (under or beside the terminals, settings.tabsAt), `TabBar` (the bar over the terminals and its buttons) and `layoutOf`: the Layout menu, `applyLayout` |
 | `src/renderer/src/Sidebar.tsx` | the sidebar: `Sidebar` (the `<aside>`: its head, the picked rows' bar, Needs you, Pinned, each project's workspaces and groups, the timers, the foot) and `sideOf`: what its rows are made of (`wsRow`, `sepRow`, the ones being made, the peek card App shows over everything, several picked at once, the timers' and + menus), in AppCtx |
 | `src/renderer/src/Dialogs.tsx` | the pages and dialogs App's `dialog` opens: `Pages` in the main area (Settings, Help, the AI page, the board, New workspace, the lazy ones: Specs, Workflows, Notes, To-dos) and `Dialogs` over everything (Ship, Check overlaps, the timers', renames, a project's notes, the palette), each reading AppCtx |
+| `src/renderer/src/Ship.tsx` | the Ship sheet (U5): the uncommitted files with boxes and their diffs, the commit's and the PR's words (`shipDraft`'s), base, reviewers, Draft, Merge when green, Send CI failures; Commit only, Push, Open PR (⌘↵) |
 | `src/renderer/src/Extension.tsx` | an extension's page, the one place to make, change and set one up: its preview (live or its sample), settings, the inspector, Laki AI's chat (starters, Undo to here), Undo, Try it live, Turn on; New extension |
 | `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab and floated simulator windows (`?window=new`, `ai`, `tab`, `sim`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/shared/browserBudget.ts` | the memory budget's step: which hidden Browsers page goes (`unloadStep`, main measures and guards) |

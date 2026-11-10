@@ -154,7 +154,7 @@
   --hostname` accepts, asked once a daemon; anything else, a path too, GitHub's), then `glabPR`: `glab mr view <branch
   or !n> --output json` and its head pipeline's jobs (`glab api projects/:id/pipelines/<id>/jobs?per_page=100`, `jobsOf`) in the
   same `PR` shape with `forge: 'gitlab'` (the renderer's `prNo`/`prName`: `!n`, MR). `noMR` is gh's *no pull requests
-  found*. Ship's last line `SHIP_MR`, `fromIssue` `glabIssue`, `issueList` `glabIssues`, `prAct`/`merge`/`prDraft`
+  found*. Ship's last line `shipMr`, `fromIssue` `glabIssue`, `issueList` `glabIssues`, `prAct`/`merge`/`prDraft`
   `glabAct`/`glabDraft`; `prFile` fetches `merge-requests/<n>/head`. GitHub's only (`githubOnly` says so, or nothing):
   line comments, reviews, `prSay`, `prDiff`, `prThreads`, `prTalk`, Viewed (`prFiles`), `prFromSaid`, `autoPR`, labels.
   ponytail: `mine` isn't asked (Approve shows on your own MR; GitLab refuses it). `test/gitlab.test.ts`, `fakes/glab`. No PR on the
