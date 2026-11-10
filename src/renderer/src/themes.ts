@@ -1171,6 +1171,21 @@ const flat = (top: string, under: string) => {
   const a = top.length > 7 ? parseInt(top.slice(7, 9), 16) / 255 : 1
   return '#' + rgbOf(top).map((v, i) => Math.round(v * a + rgbOf(under)[i] * (1 - a)).toString(16).padStart(2, '0')).join('')
 }
+// V8: the floating surface (styles.css --surface-*): the panel at SURFACE% over a blur of what's behind. What's behind
+// is the window (its background, the sidebar) or a busy terminal, blurred to its background with a quarter of its text;
+// a theme whose text or hints wouldn't read at that gets more of its panel, up to solid
+export const SURFACE = 72
+export function surfaceAlpha(panel: string, bg: string, side: string, fg: string, muted: string) {
+  if (![panel, bg, side, fg, muted].every(c => /^#[\da-f]{6}([\da-f]{2})?$/i.test(c))) return SURFACE
+  const under = [bg, side, fg].map(x => flat(x.slice(0, 7) + '40', bg.slice(0, 7))).concat(bg.slice(0, 7), flat(side, bg.slice(0, 7)))
+  for (let a = SURFACE; a < 100; a += 4) {
+    const on = under.map(u => flat(alpha(panel.slice(0, 7), a), u))
+    if (on.every(b => contrast(fg.slice(0, 7), b) >= 4.5 && contrast(muted.slice(0, 7), b) >= 4.5)) return a
+  }
+  return 100
+}
+// looks that draw solid things (paper, print, a bitmap screen): their floats stay solid (html.opaque)
+export const OPAQUE_LOOKS = new Set(['brutal', 'blueprint', 'classic', 'retro', 'eink', 'receipt', 'gazette', 'greenbar', 'notebook', 'manuscript', 'kraft', 'riso', 'comic', 'chalk', 'pellet', 'overworld', 'bauhaus'])
 // text on an accent: black or white, whichever reads better
 export const onAccent = (hex: string) => (contrast(hex, '#000000') >= contrast(hex, '#ffffff') ? '#000000' : '#ffffff')
 // a color as text on these backgrounds: darker on a light one (lighter on a dark one), its hue kept, until it reads (4.5:1)
@@ -1274,6 +1289,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   st.colorScheme = ''
   root.dataset.look = o.design === 'frosted' ? 'frosted' : t.look ?? '' // Design's Frosted: its shapes over any theme's, the theme's colors kept
   root.dataset.motion = o.motion ?? 'low'
+  root.classList.toggle('opaque', OPAQUE_LOOKS.has(root.dataset.look)) // V8: its floats solid
   gateRules({ look: root.dataset.look, motion: root.dataset.motion })
   const icons = lookOf(o)
   setIconLook(icons)
@@ -1314,6 +1330,12 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // and on the sidebar (a project's name in some looks), see-through over the window's background
   const bgs = [...ends, t.c?.panel ?? rootVar('--panel'), ...(/^#[\da-f]{6}([\da-f]{2})?$/i.test(side) ? ends.map(e => flat(side, e)) : [])]
   if (/^#[\da-f]{6}$/i.test(accent) && bgs.every(b => /^#[\da-f]{6}$/i.test(b))) st.setProperty('--accent-ink', readable(accent, bgs, o.highContrast ? 7 : 4.5))
+  // V8: the floating surface's strength, where its text needs more than 72% (a light theme's panel over a dark terminal)
+  {
+    const cv = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
+    const a = surfaceAlpha(cv('panel', '--panel'), cv('bg', '--bg'), cv('side', '--side'), cv('fg', '--fg'), cv('muted', '--muted'))
+    if (a !== SURFACE) st.setProperty('--surface-a', `${a}%`)
+  }
   // labels on a waiting or error fill (the restart bar, a count, Delete)
   if (t.c) st.setProperty('--on-waiting', onAccent(t.c.waiting)), st.setProperty('--on-error', onAccent(t.c.error))
   if (o.glass) {

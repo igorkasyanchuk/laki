@@ -796,6 +796,16 @@ fixed`, so a copy takes no room) and puts an inert copy back with `.leaving` (12
 high's), removed by a timer. The side panel is in the flow: it only comes in. Motion: Off (`html[data-motion='none']`)
 and the system's Reduce motion end it all (`exits` and `fresh` check both).
 
+The floating surface (V8): styles.css' `--surface-a`, `--surface-bg` (the panel at 72%), `--surface-blur` (`blur(24px)
+saturate(1.6)`), `--surface-edge` (a 0.5px hairline of the text's color) and `--surface-lift` (`--lift-1` and `--lift-3`),
+on one `:is(.menu, .modal, .finder, .tip, .help-card, .toast, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek,
+.nw-start-pop, .pi-complete, .key-strip)` rule placed before their own rules (they keep what's theirs: a peek's colored
+edge, a tooltip's small corners); a new float joins the list, never a list's row (`backdrop-filter` costs per pixel).
+themes.ts `surfaceAlpha` raises `--surface-a` in 4% steps where a theme's text or hints wouldn't reach 4.5:1 over the
+window, the sidebar or a blurred busy terminal (`test/contrast.test.ts`); `OPAQUE_LOOKS` sets `html.opaque` (solid),
+as do glass (components.css' own near-solid floats: a backdrop-filter over vibrancy flickers) and Reduce transparency.
+The dim behind a dialog (`.overlay`) is 28% black.
+
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);

@@ -103,9 +103,21 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.equal(props.get('--ui-font'), `"Futura", ${UI_FALLBACK}`)
   assert.ok(classes.has('glass'))
   assert.equal(transparent(), false) // nothing shows through the terminals
-  assert.equal(html.dataset.motion, 'low') // Animations unset: the usual
+  assert.equal(html.dataset.motion, 'low') // Motion unset: the usual
   applyTheme({ theme: 'circuit', motion: 'none' })
   assert.equal(html.dataset.motion, 'none')
+
+  // V8: a look that draws solid things keeps its floats solid; a theme's floats get more of the panel where its text needs it
+  applyTheme('brutalist')
+  assert.ok(classes.has('opaque'))
+  applyTheme('kraft')
+  assert.ok(classes.has('opaque'))
+  applyTheme('circuit')
+  assert.ok(!classes.has('opaque'))
+  const { surfaceAlpha, SURFACE } = await import('../src/renderer/src/themes.ts')
+  assert.equal(surfaceAlpha('#211d1a', '#171412', '#1c1917', '#ece6df', '#a39a90'), SURFACE) // Laki's
+  assert.equal(surfaceAlpha('#161a21', '#0e1014', '#12151b', '#d5d9e3', '#7f8798'), 84) // Midnight's hints are near the line
+  assert.ok(surfaceAlpha('#ffffff', '#000000', '#000000', '#000000', '#777777') > SURFACE) // a white panel over black: dark text needs it solider
 
   // the Frosted design: its shapes over a look theme's, the theme's colors kept, always glass; a window with no blur stays solid
   applyTheme({ theme: 'kraft', design: 'frosted' })

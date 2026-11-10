@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { MATERIAL, THEMES, contrast as ratio, materialInk, readable } from '../src/renderer/src/themes.ts'
+import { MATERIAL, SURFACE, THEMES, contrast as ratio, materialInk, readable, surfaceAlpha } from '../src/renderer/src/themes.ts'
 
 // what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
 // 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
@@ -67,6 +67,14 @@ test('contrast: every theme is readable', () => {
     const a = Math.round((MATERIAL / 100) * 255).toString(16).padStart(2, '0') // its own alpha dropped (applyTheme)
     for (const w of ['#ffffff', '#000000']) on(`material over ${w}: fg`, ink.fg, [over(c.side.slice(0, 7) + a, w)], 4.5), on(`material over ${w}: muted`, ink.muted, [over(c.side.slice(0, 7) + a, w)], 4.5)
     need('material: hints under the text', ink.fg, ink.muted, 1.1) // both made to read: less apart than on a solid sidebar
+    // V8's floating surface: the panel at its strength over the window, the sidebar and a blurred busy terminal (a
+    // quarter of its text over its background); the text and hints on it pass AA
+    const sa = surfaceAlpha(c.panel, c.bg, c.side, c.fg, c.muted)
+    assert.ok(sa >= SURFACE && sa <= 100)
+    const top = c.panel.slice(0, 7) + Math.round((sa / 100) * 255).toString(16).padStart(2, '0')
+    const under = [c.bg, over(c.side, c.bg), ...[c.bg, c.side, c.fg].map(x => over(x.slice(0, 7) + '40', c.bg))]
+    on('surface: fg', c.fg, under.map(u => over(top, u)), 4.5)
+    on('surface: muted', c.muted, under.map(u => over(top, u)), 4.5)
   }
   assert.deepEqual(bad, [])
 })
