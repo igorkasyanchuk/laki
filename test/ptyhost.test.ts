@@ -35,6 +35,10 @@ async function client(home: string) {
   const text = (id: string) => got.filter(x => x.ev === 'data' && x.id === id).map(x => x.d).join('')
   return { s, got, post, ask, text }
 }
+// a client once the host takes it: the host may not have seen the last one go yet (it takes one at a time), and a
+// connection it closes is tried again at once, not waited on
+const own = async (home: string) =>
+  (await until(() => client(home).then(c => Promise.race([c.ask({ op: 'hello' }).then(() => c, () => false as const), new Promise<false>(r => c.s.once('close', () => r(false)))])), 'a connection of its own')) as Awaited<ReturnType<typeof client>>
 
 test('the pty host: a socket of the user alone; spawn, write, resize, attach from an offset, kill, list, forget; ops it has no name for are nothing; quit', async t => {
   const home = mkdtempSync(join(tmpdir(), 'laki-pty-'))
@@ -61,8 +65,7 @@ test('the pty host: a socket of the user alone; spawn, write, resize, attach fro
   // it prints next
   const was = a.text('one')
   a.s.destroy()
-  const b = await until(() => client(home).then(c => c.ask({ op: 'hello' }).then(() => c, () => false as const)), 'a connection of its own')
-  if (!b) return
+  const b = await own(home)
   const all = await b.ask({ op: 'attach', id: 'one', from: 0 })
   assert.equal(all.d, was)
   assert.deepEqual([all.pid, all.cols, all.rows, all.exit, all.cut], [pid, 100, 30, undefined, false])
@@ -110,7 +113,7 @@ test('the pty host: with no terminal and no daemon it ends by itself; one of ano
   pty.ptyClose()
   await until(() => !pty.ptyOn(), 'the connection closed')
   assert.equal(pty.ptyPid(), old.pid)
-  const raw2 = await client(home)
+  const raw2 = await own(home)
   raw2.post({ op: 'forget', id: 'busy' })
   await raw2.ask({ op: 'list' })
   raw2.s.destroy()
