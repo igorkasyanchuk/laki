@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chmodSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, running, sleep, until } from './helpers.ts'
+import { fresh, running, sleep, until, viewed } from './helpers.ts'
 
 test('resources lists each tab and its processes; an idle agent sleeps, and a message or a look resumes its chat', async t => {
   const rig = await fresh(t)
@@ -112,6 +112,13 @@ test('keepAwake: caffeinate while an agent works or waits for you, stopped once 
 
 test('whenDone: once what was going is done, a countdown, then the Mac sleeps and the setting goes off', async t => {
   const rig = await fresh(t, { env: { LAKI_WHEN_DONE_MS: '600' } })
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const going = async () => {
+    const n = app.events.length
+    await rig.rpc('hook', { tab: tab.id, state: 'running' })
+    await viewed(app, n, tab.id, 'running') // whenDone saw it going (changed()'s 30 ms)
+  }
   const pm = join(rig.home, 'pmset.log')
   writeFileSync(join(rig.home, 'bin', 'pmset'), `#!/bin/sh\necho "$*" >> ${pm}\n`)
   chmodSync(join(rig.home, 'bin', 'pmset'), 0o755)
@@ -125,14 +132,12 @@ test('whenDone: once what was going is done, a countdown, then the Mac sleeps an
   await rig.rpc('settingsSet', { whenDone: 'sleep' })
   await sleep(1000)
   assert.throws(ran) // set with nothing going: it waits for the next thing that goes
-  await rig.rpc('hook', { tab: tab.id, state: 'running' })
-  await sleep(200)
+  await going()
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
   const v = await until(async () => (await rig.rpc('state')).whenDone, 'the countdown')
   assert.equal(v.act, 'sleep')
   await rig.rpc('hook', { tab: tab.id, state: 'running' }) // something goes again: no countdown
-  await until(async () => !(await rig.rpc('state')).whenDone, 'cancelled by work')
-  await sleep(200)
+  await until(async () => !(await rig.rpc('state')).whenDone, 'cancelled by work') // seen going: armed
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
   await until(async () => (await rig.rpc('state')).whenDone, 'the countdown again')
   await until(() => { try { return ran() === 'sleepnow' } catch { return false } }, 'pmset sleepnow')
@@ -140,8 +145,7 @@ test('whenDone: once what was going is done, a countdown, then the Mac sleeps an
   assert.equal((await rig.rpc('state')).whenDone, undefined)
 
   await rig.rpc('settingsSet', { whenDone: 'sleep' })
-  await rig.rpc('hook', { tab: tab.id, state: 'running' })
-  await sleep(200) // a view sees it going (they're 30 ms apart)
+  await going()
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
   await until(async () => (await rig.rpc('state')).whenDone, 'armed again')
   await rig.rpc('settingsSet', { whenDone: 'off' }) // Cancel

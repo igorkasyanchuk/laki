@@ -801,7 +801,7 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   writeFileSync(join(ws.path, 'blob.bin'), Buffer.from([0, 1, 2, 10, 10])) // binary: no lines
   assert.deepEqual(await until(async () => ((s => s?.files === 3 && s)(await stat())), 'the stat'), { add: 4, del: 0, files: 3, dirty: 3, made: 2, gone: 0 }) // 2 new files
   assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), { dirty: 3 }) // not archived: it'd lose them
-  assert.deepEqual(await rig.rpc('wsPeek', { id: ws.id }), { dirty: 3, ahead: 0, unpushed: 0 }) // what Delete's question says
+  assert.deepEqual(await rig.rpc('wsPeek', { id: ws.id }), { dirty: 3, ahead: 0, unpushed: 0, files: ['README.md', 'blob.bin', 'new.txt'] }) // what Delete's question says, the files named
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived, undefined)
   execFileSync('git', ['add', '-A'], { cwd: ws.path })
   execFileSync('git', ['commit', '-qm', 'work'], { cwd: ws.path, env: rig.env }) // its author: Linux has no user@host.local to fall back on

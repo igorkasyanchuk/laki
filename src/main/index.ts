@@ -12,6 +12,7 @@ import { appToken, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
+import { AGENT_BROWSER, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, local, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -21,13 +22,13 @@ delete process.env.LAKI_TAB_TOKEN // S12: opened from a Laki tab (open passes th
 const dev = !!process.env.ELECTRON_RENDERER_URL
 // the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
 const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''
-const appPage = (url: string | undefined) => !!url && (dev ? URL.canParse(url) && new URL(url).origin === devOrigin : url.startsWith('file:'))
-const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => e.sender.getType() === 'window' && e.senderFrame === e.sender.mainFrame && appPage(e.senderFrame?.url)
+const appPage = (url: string | undefined) => isAppPage(url, devOrigin)
+const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => senderOk({ type: e.sender.getType(), main: e.senderFrame === e.sender.mainFrame, url: e.senderFrame?.url }, devOrigin)
 // from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
 // tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
 type Page = 'new' | 'ai' | 'tab' | 'voice'
 const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: Page[]) =>
-  fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : URL.canParse(e.senderFrame!.url) && new URL(e.senderFrame!.url).searchParams.get('window') === p)))
+  fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : pageIs(e.senderFrame?.url, p))))
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
 // none reach a launch from Finder or the Dock
 const capture = app.commandLine.getSwitchValue('laki-capture')
@@ -46,7 +47,25 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const click = (sel: string) => () => js(`document.querySelector(${JSON.stringify(sel)})?.click()`)
   const link = (url: string) => async () => w.webContents.send('deep-link', url)
   const key = (k: string, meta = false) => () => js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, metaKey: ${meta}, bubbles: true, cancelable: true }))`)
-  const steps: [string, (() => Promise<unknown>) | null, string][] = [
+  // E3's flows: what you'd do, by its words (a menu's item, a dialog's button), a right click where you'd make one
+  const q = JSON.stringify
+  const hasText = (sel: string, words: string) => js<boolean>(`[...document.querySelectorAll(${q(sel)})].some(e => e.textContent.includes(${q(words)}))`)
+  const clickText = (sel: string, words: string) => js(`[...document.querySelectorAll(${q(sel)})].find(e => e.textContent.includes(${q(words)}))?.click()`)
+  const ctx = (sel: string) => js(`(e => e && e.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: e.getBoundingClientRect().x + 12, clientY: e.getBoundingClientRect().y + 6 })))(document.querySelector(${q(sel)}))`)
+  const typeIn = (sel: string, text: string) => js(`(e => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ${q(text)}); e.dispatchEvent(new Event('input', { bubbles: true })) })(document.querySelector(${q(sel)}))`)
+  const nap = (ms: number) => new Promise(r => setTimeout(r, ms))
+  const waitFor = async (f: () => Promise<unknown>, what: string, ms = 8000) => {
+    for (const at = Date.now(); !(await f()); await nap(100)) if (Date.now() - at > ms) throw new Error(`no ${what} after ${ms / 1000} s`)
+  }
+  const pick = async (sel: string, item: string) => (await waitFor(() => has(sel), sel), await ctx(sel), await waitFor(() => hasText('.menu-item', item), `${item} in the menu`), await clickText('.menu-item', item))
+  const answer = async (button: string) => (await waitFor(() => hasText('.ask-box button', button), `the dialog's ${button}`), await clickText('.ask-box button', button))
+  const named = async (n: string) => (await rpc<View>('state')).workspaces.find(x => x.name === n || x.id === n)!
+  const row = (id: string) => `[data-row="ws:${id}"]`
+  const fakeLog = () => (f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))(join(process.env.HOME ?? '', 'fake.log'))
+  const ws: Record<string, View['workspaces'][number]> = {}
+  const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
+  const checkout = () => join(ws.co.path, 'src/checkout.js')
+  const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
     ['projects', null, '.sidebar .ws'],
     ['reader', click('.reader-switch button:last-child'), '.reader'],
     ['review', click('.review-tab'), '.full-review'],
@@ -57,6 +76,63 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     ['palette', key('k', true), '.palette-input'],
+    // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
+    ['flow-archive-asks', async () => {
+      await key('Escape')()
+      ws.dark = await named('dark-mode')
+      writeFileSync(join(ws.dark.path, 'notes.txt'), 'mine\n')
+      await pick(row(ws.dark.id), 'Archive workspace')
+    }, () => hasText('.ask-box', 'notes.txt')],
+    ['flow-archived', () => answer('Archive'), async () => (await has('.toast-undo')) && !(await has(row(ws.dark.id)))],
+    ['flow-archive-undo', click('.toast-undo'), async () => (await has(row(ws.dark.id))) && !(await named('dark-mode')).archived],
+    // (c) the Review tab: a file reverted, then Undo
+    ['flow-revert', async () => {
+      ws.cart = await named('fix-cart-total')
+      await click(row(ws.cart.id))()
+      if (!(await has('.full-review'))) await click('.review-tab')()
+      await pick('.full-review .sp-row[data-tip^="src/cart.js "]', 'Revert this file')
+      await answer('Revert')
+    }, async () => (await has('.toast-undo')) && !cart().includes('Math.round')],
+    ['flow-revert-undo', click('.toast-undo'), async () => cart().includes('Math.round')],
+    // (d) F1: a kept turn (one made here when the demo's agent kept none), rewound, then the rewind undone
+    ['flow-rewind', async () => {
+      if (await has('.full-review')) await click('.review-tab')()
+      ws.co = await named('checkout-flow')
+      await click(row(ws.co.id))()
+      const tab = (await rpc<View>('state')).tabs.find(t => t.workspace === ws.co.id && t.kind === 'agent')!
+      if (!(await rpc<unknown[]>('turnList', { tab: tab.id })).length) {
+        await rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'add pay()' } }) // a turn as claude's hooks say it
+        await nap(300)
+        writeFileSync(checkout(), 'export const pay = () => true\n')
+        await rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
+        await waitFor(async () => (await rpc<unknown[]>('turnList', { tab: tab.id })).length, 'a kept turn')
+      }
+      await waitFor(() => has('.turn-dot'), 'its turn strip')
+      await js(`[...document.querySelectorAll('.turn-dot')].at(-1).click()`)
+      await waitFor(() => hasText('.menu-item', 'Rewind files'), 'Rewind in its menu')
+      await clickText('.menu-item', 'Rewind files')
+      await answer('Rewind')
+    }, async () => !existsSync(checkout()) && (await has('.turn-dot.rewind'))],
+    ['flow-rewind-undo', async () => {
+      await js(`document.querySelector('.turn-dot.rewind').click()`)
+      await waitFor(() => hasText('.menu-item', 'Undo this rewind'), 'Undo in its menu')
+      await clickText('.menu-item', 'Undo this rewind')
+      await answer('Undo the rewind')
+    }, async () => existsSync(checkout())],
+    // (e) a green PR merged from ⌘K: the fake gh's log has the merge
+    ['flow-merge', async () => {
+      const w = await named('checkout-flow')
+      writeFileSync(join(process.env.HOME ?? '', 'gh', `pr-${w.branch!.replace(/\//g, '_')}.json`), JSON.stringify({ number: 63, state: 'OPEN', url: 'https://github.com/acme/shop/pull/63', title: 'One-page checkout', author: { login: 'ann' }, isDraft: false, headRefOid: 'fed321', reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviews: [], body: '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }))
+      await rpc('prRefresh', {}).catch(() => {})
+      await waitFor(async () => (await named('checkout-flow')).pr?.checks === 'pass', 'its PR green', 20000)
+      await click(row(w.id))()
+      await key('k', true)()
+      await waitFor(() => has('.palette-input'), 'the palette')
+      await typeIn('.palette-input', 'Merge')
+      await waitFor(() => hasText('.palette-item', 'Merge #63'), 'Merge #63 in ⌘K')
+      await clickText('.palette-item', 'Merge #63')
+      await answer('Squash and merge')
+    }, async () => /gh pr merge/.test(fakeLog())],
   ]
   const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
   for (const [i, [name, go, sel]] of steps.entries()) {
@@ -65,16 +141,18 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     let why: string | undefined
     try {
       await go?.()
-      while (!(await has(sel)) && !(await has('.boom')) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
+      const ok = () => (typeof sel === 'string' ? has(sel) : sel())
+      while (!(await ok()) && !(await has('.boom')) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
       if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
-      else if (!(await has(sel))) why = `no ${sel} after 8 s`
+      else if (!(await ok())) why = typeof sel === 'string' ? `no ${sel} after 8 s` : 'not done after 8 s'
       else if (errors.length > seen) why = `console: ${errors.slice(seen).join(' | ').slice(0, 300)}`
-      await new Promise(r => setTimeout(r, 250)) // drawn
-      writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG())
     } catch (e) {
       why = (e as Error).message
     }
+    await new Promise(r => setTimeout(r, 250)) // drawn
+    writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
     out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }) })
+    writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
     if (name === 'palette') await key('Escape')()
   }
   writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2))
@@ -153,10 +231,7 @@ ipcMain.on('deep-link-ready', e => {
 })
 // the preview pane's <webview>: it starts on this Mac's localhost and can go to any website (the address bar, links),
 // in its own session, without node or a preload (and, with no allowpopups, without popups)
-const PREVIEW = 'persist:preview'
-const AGENT_BROWSER = 'agent-browser' // S12: the agent browser's hidden windows: in memory, never the Preview's cookies
-const BROWSER = 'persist:browser' // the sidebar's Browsers: any site, its sign-ins kept between runs
-const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
+// (PREVIEW, BROWSER, AGENT_BROWSER, local: guards.ts)
 // Google turns away sign-in in an app's web view ("This browser or app may not be secure"): on its sign-in pages a
 // Browsers page says it's Firefox (its user agent, without Chrome's client hints), which Google lets in. Turned
 // down anyway (its rejected page), the sign-in opens in your own browser. ponytail: navigator.userAgentData still
@@ -181,7 +256,7 @@ app.on('web-contents-created', (_e, wc) => {
   wc.on('will-attach-webview', (e, prefs, params) => {
     delete prefs.preload
     Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, experimentalFeatures: false }) // whatever the tag's webpreferences said
-    if (params.partition === BROWSER ? !/^(https?:\/\/|about:blank$)/.test(params.src) : !local(params.src) || params.partition !== PREVIEW) e.preventDefault()
+    if (!webviewOk(params.partition, params.src)) e.preventDefault()
   })
   // a Browsers page's link to a new tab opens in that page; a window.open popup (a sign-in's: Google, GitHub) gets a
   // small window of its own, in the same session with its opener kept, sandboxed, no node (else it can't hand back)
@@ -192,16 +267,16 @@ app.on('web-contents-created', (_e, wc) => {
     const tooMany = () => ((opened = [...opened.filter(t => Date.now() - t < 10000), Date.now()]), opened.length > 5)
     guest.setWindowOpenHandler(({ url, disposition }) => {
       if ((disposition === 'new-window' || disposition === 'foreground-tab' || disposition === 'background-tab') && tooMany()) return { action: 'deny' }
-      if (disposition === 'new-window' && /^(https?:\/\/|about:blank$)/.test(url))
+      if (disposition === 'new-window' && (web(url) || url === 'about:blank'))
         return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } } }
       // a new tab (a middle click or ⌘-click: in the background; target=_blank: in front) is a Browsers workspace of its
       // own, which the app makes (browser-tab); anything else loads here (a failed load shows in the page)
-      if (/^https?:\/\//.test(url))
+      if (web(url))
         disposition === 'background-tab' || disposition === 'foreground-tab' ? wc.send('browser-tab', url, disposition === 'foreground-tab') : guest.loadURL(url).catch(() => {})
       return { action: 'deny' }
     })
     // the popup itself opens no more windows: its links to a new one load in it
-    guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
+    guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (web(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
     guest.on('context-menu', (_e, p) => (p.isEditable && (g.typed = true), pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))) // a field's menu has Paste
     // what the memory budget mustn't unload (browser-guard), seen from here, not told by the page
     const g: Guest = { typed: false, media: 0, downloads: 0 }
@@ -252,7 +327,7 @@ ipcMain.handle('browser-guard', async (e, id: unknown) => {
 function pageMenu(g: Electron.WebContents, p: Electron.ContextMenuParams, app: Electron.WebContents) {
   const items: MenuItemConstructorOptions[] = []
   const add = (...x: MenuItemConstructorOptions[]) => items.push(...x, { type: 'separator' })
-  if (/^https?:\/\//.test(p.linkURL))
+  if (web(p.linkURL))
     add(
       { label: 'Open Link in New Tab', click: () => app.send('browser-tab', p.linkURL, false) },
       { label: 'Open Link in Your Browser', click: () => shell.openExternal(p.linkURL) },
@@ -1590,9 +1665,10 @@ ipcMain.handle('capture-rect', async (e, r: { x: unknown; y: unknown; width: unk
 // a part of the screen for a prompt (the Desk's Build with AI): screenshot's, the PNG back in base64; null: cancelled
 ipcMain.handle('shoot', e => (!win || e.sender !== win.webContents ? null : new Promise<string | null>(done => screenshot(true, undefined, done, () => done(null)))))
 ipcMain.on('open-external', (e, url: string) => {
-  if (!from(e, 'new', 'ai', 'tab') || typeof url !== 'string') return
-  if (/^https?:\/\//.test(url)) shell.openExternal(url)
-  else if (typeof url === 'string' && url.startsWith('laki:')) openLink(url) // the AI window's link to a tab: the app window, there
+  if (!from(e, 'new', 'ai', 'tab')) return
+  const to = externalOf(url)
+  if (to === 'web') shell.openExternal(url)
+  else if (to === 'laki') openLink(url) // the AI window's link to a tab: the app window, there
 })
 // a terminal's ⌘-clicked file:// link (claude's paths), the app window's only: { rel } for a file inside root (the
 // workspace: the app's preview), a folder in Finder, a document in its app; anything that could run (an app, a script, no

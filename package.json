@@ -23,6 +23,7 @@
     "check": "npm run typecheck && npm run test:fast",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
     "test:ui": "node --experimental-strip-types --no-warnings scripts/ui-smoke.ts",
+    "test:cov": "node --experimental-strip-types --no-warnings scripts/cov.ts",
     "test:fast": "node --experimental-strip-types --no-warnings --test $(grep -L 'fresh(' test/*.test.ts)",
     "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",
     "pack": "electron-vite build && electron-builder --dir --publish never",

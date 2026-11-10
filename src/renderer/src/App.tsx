@@ -1537,7 +1537,7 @@ export function App() {
   }
   // what Delete takes with it, said first, a line each: where it is, uncommitted files, commits not pushed, its PR, agents
   // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
-  type Peek = { dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[] }
+  type Peek = { dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[]; files?: string[] }
   // and what git status doesn't count (the daemon's `unsaved`): uncommitted work inside a submodule, ignored files your
   // checkout hasn't got the same. Archive's second question (wsArchive's { dirty }) lists them too
   const few = (a: string[]) => `${a.slice(0, 3).join(', ')}${a.length > 3 ? ` and ${a.length - 3} more` : ''}`
@@ -1563,7 +1563,7 @@ export function App() {
     const facts: Fact[] = [{ label: 'Project', icon: 'folder', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
     if (w.kind === 'worktree') facts.push({ label: 'Branch', icon: 'gitBranch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
     facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
-    if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty ? (stops ? 'warn' : 'bad') : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept in the stopped codespace' : 'lost'}` : 'none uncommitted' })
+    if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty ? (stops ? 'warn' : 'bad') : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}${pk.files?.length ? ` (${few(pk.files)})` : ''}: ${stops ? 'kept in the stopped codespace' : 'lost'}` : 'none uncommitted' })
     facts.push(...peekFacts(pk, stops))
     if (pk.ahead) facts.push({ label: 'Commits', icon: 'gitCommit', tone: pk.unpushed ? 'warn' : 'ok', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (pr) facts.push({ label: pr.forge === 'gitlab' ? 'MR' : 'PR', icon: merged ? 'gitMerge' : 'pr', pr: prState(pr), chip: merged ? 'Merged' : pr.draft && open ? 'Draft' : open ? 'Open' : 'Closed', value: `${prNo(pr)}${pr.title ? ` · ${pr.title}` : ''} (stays on ${forgeName(pr)})` })

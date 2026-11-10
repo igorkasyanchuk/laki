@@ -3033,7 +3033,7 @@ export async function wsRm(ref: string) {
 // what deleting a worktree workspace takes with it, for the app's question: its uncommitted paths (the folder goes), its
 // commits not in the base and, of those, the ones on no remote (the branch keeps them); a git that fails, or a local one,
 // says nothing of it. subs, ignored: unsaved's, only when there are some
-export async function wsPeek(ref: string): Promise<{ dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[] }> {
+export async function wsPeek(ref: string): Promise<{ dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[]; files?: string[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree' || ws.archived || away(ws) || state.projects.find(p => p.id === ws.project)?.git === false || !(ws.host || existsSync(ws.path))) return {}
   const count = (args: string[]) => git(ws, ...args).then(s => Number(s) || 0, () => undefined)
@@ -3042,7 +3042,8 @@ export async function wsPeek(ref: string): Promise<{ dirty?: number; ahead?: num
     count(['rev-list', '--count', `${ws.base}..HEAD`]),
     count(['rev-list', '--count', 'HEAD', '--not', ws.base, '--remotes']),
   ])
-  return { dirty: left?.dirty, ahead, unpushed, ...(left?.subs.length && { subs: left.subs }), ...(left?.ignored.length && { ignored: left.ignored }) }
+  const files = left?.files.filter(f => !left.subs.includes(f)).slice(0, 10) // E3: the dialog names them (a submodule's line is subs')
+  return { dirty: left?.dirty, ahead, unpushed, ...(left?.subs.length && { subs: left.subs }), ...(left?.ignored.length && { ignored: left.ignored }), ...(files?.length && { files }) }
 }
 
 // what goes with a removed worktree: `dirty`, git status' lines (untracked ones whatever your status.showUntrackedFiles
@@ -3096,7 +3097,8 @@ export async function unsaved(ws: Workspace) {
     const path = l.slice(l.indexOf('\t') + 1)
     if (!subs.includes(path) && (await exec(ws, 'sh', ['-c', SUB_STATUS, 'sh', l.split(' ')[1], path], { timeout: 30000 }).then(r => r.stdout.trim(), () => '?'))) subs.push(path)
   }
-  return { dirty: lines.length - mine.length, subs, ignored }
+  const files = lines.filter(l => !l.startsWith('!! ')).map(l => l.replace(/^\S{1,2}\s+/, '').replace(/^.* -> /, '').replace(/\/$/, '')) // XY, then the path (git()'s trim took the first line's space); a rename's new name
+  return { dirty: lines.length - mine.length, subs, ignored, files }
 }
 // wsArchive's { dirty } in words, for a log: why it stays
 export const unsavedWhy = (r: { dirty?: number; subs?: string[]; ignored?: string[] }) =>

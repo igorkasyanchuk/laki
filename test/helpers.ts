@@ -43,6 +43,8 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
 }
 // a daemon event a connected window (connect's) got, or gets: no sleep, a clear message when it never comes
 export const seen = <E extends { ev?: string }>(app: { events: E[] }, is: (e: E) => unknown, what = 'an event', ms?: number) => until(() => app.events.find(is), what, ms)
+// E3: a view sent after from (app.events.length before the change) with that tab's status: changed()'s 30 ms passed
+export const viewed = (app: { events: any[] }, from: number, tab: string, status: string) => until(() => app.events.slice(from).some(e => e.ev === 'state' && e.view.tabs.some((x: any) => x.id === tab && x.status === status)), `a view with ${tab} ${status}`)
 
 export type Rig = Awaited<ReturnType<typeof fresh>>
 // links and my-prs (test/widgets: extensions that came with Laki before 0.44), copied into this rig as a folder of yours

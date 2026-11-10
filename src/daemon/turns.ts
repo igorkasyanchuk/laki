@@ -247,7 +247,7 @@ async function turnEnded(tab: Tab, ws: Workspace) {
     const r = rtOf(tab.id)
     const files = before && before !== after ? await filesOf(ws, before, after) : []
     c.turn = files.length ? { before: before!, after, files } : undefined
-    if (files.length) void turnKeep(ws, { tab: tab.id, name: tab.name, prompt: firstLine(r.asked), started: c.at, before: before!, after, files, cost: costOf(tab) }).catch(e => said(ws, e))
+    if (files.length) await turnKeep(ws, { tab: tab.id, name: tab.name, prompt: firstLine(r.asked), started: c.at, before: before!, after, files, cost: costOf(tab) }).catch(e => said(ws, e)) // kept before the view says the turn changed: the strip under the tab asks then (E3's flow caught it missing)
     c.at = undefined
     r.changes = files.length ? { at: Date.now(), add: files.reduce((n, f) => n + f.add, 0), del: files.reduce((n, f) => n + f.del, 0), n: files.length, files: files.slice(0, TURN_FILES) } : undefined
     changed()

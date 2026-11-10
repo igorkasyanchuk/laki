@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Archiving a workspace with uncommitted changes names the files that would go, and a turn's dot under its tab shows as soon as the turn ends.
 - Plan limits now come from what Claude Code and Codex report themselves; Laki no longer asks Anthropic's or OpenAI's servers with your sign-in unless you turn on *Ask … for plan limits* in Settings › Appearance (Gemini's need it).
 - Safer: an agent's prompt and note no longer reach every program it starts, the agent browser keeps its cookies apart from the Preview's, and a repo's `.laki.json` env can't set git's ssh command, Python's, Ruby's, Perl's or npm's start-up hooks.
 - Safer remote access: the link's key is in its `#` part (never sent to a server or kept in a log), the page's connection sends its token in its first message, and a phone can't expose a port, schedule a task, share a tab for good or change a project's scripts. A webhook delivery sent twice runs once.

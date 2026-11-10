@@ -8,7 +8,7 @@ import { createServer, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { fresh, type Rig, sleep, until } from './helpers.ts'
+import { fresh, type Rig, sleep, until, viewed } from './helpers.ts'
 
 const fakes = fileURLToPath(new URL('fakes', import.meta.url))
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
@@ -20,6 +20,8 @@ const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd,
 
 test('ports: a kill refused (gone, not yours), one already ended; sleep skips a tab whose port is in its tree; limits; resources', async t => {
   const rig = await fresh(t)
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
   const d = join(rig.home, 'fake')
   mkdirSync(d)
   // ps and lsof as the files in $HOME/fake say, else the real ones
@@ -104,16 +106,18 @@ exec /usr/sbin/lsof "$@"
   assert.equal((await rig.tab(ws.id)).limit, ten.getTime() + 86400000)
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
   assert.equal((await rig.tab(ws.id)).limit, undefined)
+  let n = app.events.length
   await rig.rpc('hook', { tab: tab.id, state: 'running' })
   await assert.rejects(rig.rpc('tabSleep', { tab: tab.id }), /claude is busy: it can sleep once its turn ends$/)
 
   // sleep: a turn that just ended (no view since) isn't quiet yet; a port of its own keeps it up; then it sleeps, once
   await rig.rpc('settingsSet', { sleepAfter: 1 })
   const later = () => Date.now() + 3 * 3600e3
-  await sleep(80) // a view sees it running
+  await viewed(app, n, tab.id, 'running')
+  n = app.events.length
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
   assert.deepEqual(await rig.rpc('sleepTick', { now: Date.now() + 30e3 }), [])
-  await sleep(80)
+  await viewed(app, n, tab.id, 'idle')
   assert.deepEqual(await rig.rpc('sleepTick', { now: later() }), []) // :5555 is the agent's
   rmSync(join(d, 'lsof-scan'))
   await until(async () => !(await wsOf(rig, ws.id)).ports.length, 'ports gone')
@@ -491,8 +495,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   for (const r of held) r.writeHead(200).end(JSON.stringify({ event: 'message', id: 'm1', message: na[2] }))
   held = null
   await first
-  await sleep(300)
-  assert.match(await rig.screen(a.id), /picked: Yes/)
+  await until(async () => /picked: Yes/.test(await rig.screen(a.id)), 'Yes went in')
   assert.doesNotMatch(await rig.screen(a.id), /picked: No/)
 
   // a's next menu answered here before any tick: the tick lets its nonce go, b's stays
