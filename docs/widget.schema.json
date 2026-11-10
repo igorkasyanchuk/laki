@@ -70,7 +70,7 @@
             "panel",
             "row"
           ],
-          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)"
+          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)"
         },
         {
           "type": "array",
@@ -85,7 +85,7 @@
               "panel",
               "row"
             ],
-            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)"
+            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)"
           }
         }
       ],

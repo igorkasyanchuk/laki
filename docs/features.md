@@ -106,7 +106,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
-  opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
+  opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the side panel's Info.
 - **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
@@ -128,7 +128,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 102 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), and your own CSS for
   the rest; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
-- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
+- **Extensions** (`laki ext`, or `laki widget`: the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often: any you make from a starter, with Laki AI on the extension's own page, an agent's
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and at the start of the status bar (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if

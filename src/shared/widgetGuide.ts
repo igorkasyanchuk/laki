@@ -65,7 +65,7 @@ number; put the words in \`tip\`. Add them only when the user asks.
   between fetches (default ${WIDGET_EVERY}). \`view\`: the full view's size, \`s\`, \`m\` (default) or \`l\`. The user can change them.
 - \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
   ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one), \`panel\` (a
-  tab of the right panel, its full view as wide as the panel), \`row\` (per workspace only: a mark on each workspace's
+  tab of the side panel, its full view as wide as the panel), \`row\` (per workspace only: a mark on each workspace's
   row in the sidebar, its \`badge\` (else \`label\`) filled from that workspace's data, its \`tip\` on hover, \`click\`
   runs there; every live workspace's is fetched, so keep it cheap).
 - \`config\`: the settings the user fills in: a default (text, \`true\`/\`false\`, a number) or \`{ "type": text | number |

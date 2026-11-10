@@ -33,7 +33,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
 // Find a setting (the nav's search box): each setting's title as the page writes it, its section, words it goes by.
 // A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
 export const FIND: [string, string, string?][] = [
-  ['general', 'New workspaces start', 'default agent preset'],
+  ['general', 'New workspaces start', 'default agent profile preset'],
   ['git', 'Branch prefix', 'git worktree'],
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
@@ -227,7 +227,7 @@ export const HELP: Record<string, SettingHelp> = {
     when: 'Projects with fast, trustworthy scripts, where a "done" that breaks the build costs you a round trip.',
     cost: "The scripts' time after each turn; a review is one more agent call. Tries stop after 3 failures in a row.",
   },
-  "A second agent's review": {
+  'Second opinion': {
     what: "After the Done check's scripts pass, another agent reads the diff and lists real problems. You see its notes; the working agent gets them only when you send them.",
     when: 'Bigger changes, or an agent you trust less, where a second pair of eyes is worth a short wait.',
     cost: 'One agent call per checked turn, on your plan or API key.',

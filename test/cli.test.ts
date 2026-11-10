@@ -111,7 +111,7 @@ test('cli: help, usage errors, open', async t => {
   for (const a of [['help', 'new'], ['new', '--help']]) {
     const r = await rig.cli(...a)
     assert.equal(r.code, 0, r.err)
-    assert.match(r.out, /^  laki new <project\|\.>[\s\S]*--fan claude,codex[\s\S]*laki new \. --prompt/)
+    assert.match(r.out, /^  laki new <project\|\.>[\s\S]*--race claude,codex[\s\S]*laki new \. --prompt/)
     assert.doesNotMatch(r.out, /laki ai /) // not a command where new is an alternative
   }
   let h = await rig.cli('widget', 'new', '-h')

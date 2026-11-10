@@ -233,7 +233,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     a({ id: 'openPort', label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
     a({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
     if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
-    if (git) a({ id: 'review', label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
+    if (git) a({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })
     a({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })
     if (tab) a({ id: 'copyTab', label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
     if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { id: 'floatTab', label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { id: 'floatTab', label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })

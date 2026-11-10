@@ -35,7 +35,7 @@ const SPEC: J = {
     },
   ],
 }
-const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)' }
+const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)' }
 
 // an action offered where you work (its object form's menu fields; actionMenu reads them, manifestCheck checks them)
 export const ACTION_SHOWS = ['palette', 'workspace', 'tab', 'file', 'prompt'] as const

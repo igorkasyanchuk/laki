@@ -215,7 +215,7 @@ const WHERE: [string, string][] = [
   ['.ws', "a workspace's row (.ws.sel: the selected one)"],
   ['.tabbar, .tab', 'the tab bar, a tab (.tab.sel)'],
   ['.status', 'the status bar'],
-  ['.side-panel', 'the right panel'],
+  ['.side-panel', 'the side panel'],
   ['.menu, .menu-item', 'menus'],
   ['.tip', 'tooltips'],
   ['.rail', 'the rail on the left'],

@@ -24,7 +24,7 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
-const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
+const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
 const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -49,7 +49,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
-  else args.push(a)
+  else args.push(!args.length && (a === 'ext' || a === 'exts') ? 'widget' : a) // U9: laki ext is laki widget
 }
 const json = !!flags.json
 // all of stdin as text (decoded whole: a character split across chunks stays one)
@@ -192,7 +192,7 @@ const asks = (a?: string) => (a === '--help' || a === '-h') && (textFrom < 0 || 
 function help(cmd: string | undefined, rest: string[]): boolean {
   const topic = cmd === undefined ? [] : asks(cmd) || cmd === 'help' ? rest.filter(a => !asks(a)) : asks(rest[0]) ? [cmd] : asks(rest[1]) ? [cmd, rest[0]] : null
   if (!topic) return false
-  const text = topic.length ? helpFor(topic[0], topic[1]) : USAGE
+  const text = topic.length ? helpFor(topic[0] === 'ext' || topic[0] === 'exts' ? 'widget' : topic[0], topic[1]) : USAGE
   if (text === null) throw new Error(`no command ${topic[0]}: laki help lists them`)
   console.log(text)
   return true
@@ -308,6 +308,7 @@ async function main() {
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       if (tabs.length && o.startAt !== undefined) throw new Error('--tab starts its tabs now: not with --at or --after-limit (add them with laki tab once it starts)')
       // a race: the same prompt to each preset, a worktree each
+      if (flags.race && !flags.fan) flags.fan = flags.race // U9: --race is --fan
       if (flags.fan) {
         if (tabs.length) throw new Error('--tab: one workspace at a time, not with --fan')
         const presets = String(flags.fan).split(',').map(p => p.trim()).filter(Boolean)

@@ -710,7 +710,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
       {overlapsAt &&
         (w =>
           w && (
-            <Modal title={`Overlaps · ${wsName(w)}`} onClose={() => setOverlapsAt(null)}>
+            <Modal title={`Collision radar · ${wsName(w)}`} onClose={() => setOverlapsAt(null)}>
               {overlapsAt.err ? (
                 <p className="warn small">{overlapsAt.err}</p>
               ) : !overlapsAt.list ? (

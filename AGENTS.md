@@ -296,6 +296,6 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
   this Mac's, so `pack:x64` adds `@lydell/node-pty-darwin-x64` (`scripts/x64-pty.ts`: the tarball package-lock.json pins,
   checked against its integrity; it's in `optionalDependencies` too) before `electron-builder --x64`.
   Nothing else is native. The CLI's `open` and the scripts pick `dist/mac-arm64` or `dist/mac` by architecture.
-- **User-facing text** is short and plain. When adding commands or keys, update `docs/guide.md` (keys, CLI),
+- **User-facing text** is short and plain, one word per thing (`docs/glossary.md`; `test/terms.test.ts` keeps the retired ones out of Help and Settings). When adding commands or keys, update `docs/guide.md` (keys, CLI),
   `README.md` when it's a main one, and the CLI's usage (`src/shared/usage.ts`, which the agent skill quotes).
 - **Commits** end with the `Co-Authored-By` trailer. Never push.

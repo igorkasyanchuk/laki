@@ -14,7 +14,7 @@ export const PLACES: [WidgetPlace, string, string][] = [
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
   ['desk', 'My Desk', 'A tile on the My Desk page, sized there'],
-  ['panel', 'Right panel', 'A tab of the right panel (⌥⌘B), beside Info and Files'],
+  ['panel', 'Side panel', 'A tab of the side panel (⌥⌘B), beside Info and Files'],
   ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
 ]
 export const BARS: WidgetPlace[] = ['side', 'top', 'status']

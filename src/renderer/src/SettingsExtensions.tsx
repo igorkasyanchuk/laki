@@ -384,7 +384,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         {fetches && (
           <>
             <Switch className="switch-row" on={!w.hide?.refresh} onChange={on => void api.set(w.id, { hide: { refresh: !on } })}>
-              <Says title="Show a refresh button" hint="Its ↻ in the sidebar, on the Desk and in its full view. Its right click has Fetch now either way" />
+              <Says title="Show a refresh button" hint="Its ↻ in the sidebar, on My Desk and in its full view. Its right click has Fetch now either way" />
             </Switch>
             <Switch className="switch-row" on={!w.hide?.at} onChange={on => void api.set(w.id, { hide: { at: !on } })}>
               <Says title="Show when it was fetched" hint={'Its "fetched 2 min ago" and "checked …" lines. This page shows it either way'} />

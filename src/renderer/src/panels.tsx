@@ -296,7 +296,7 @@ export const STEPS: Step[] = [
   { id: 'ship', title: 'Ship a PR or archive', hint: 'Ship: commit, push and open a PR in one go; or archive a workspace that is done', go: 'Ship' },
 ]
 export const MORE_STEPS: (Step & { when?: (s: { workflows?: boolean; remote?: boolean }) => boolean })[] = [
-  { id: 'widgets', title: 'Make an extension', hint: 'Small live pages in the sidebar or on the Desk: from a starter, or Laki AI makes one for you', go: 'Extensions' },
+  { id: 'widgets', title: 'Make an extension', hint: 'Small live pages in the sidebar or on My Desk: from a starter, or Laki AI makes one for you', go: 'Extensions' },
   { id: 'actions', title: 'Set up actions', hint: 'The Run menu: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },

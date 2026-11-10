@@ -18,7 +18,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
                                     tab, a PR the prompt names is only related (its own PR is its PR)
-            [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
+            [--race claude,codex]   a race: the same prompt to each, a worktree each (Compare in the app); --fan too
             [--no-setup]            without the project's setup script (.worktreeinclude's files still copied)
             [--tab <agent[:model]|command>]   another tab there, again and again: an agent or profile (no prompt:
                                     laki send gives it one) or a command in a terminal tab (an agent's: asked in the
@@ -81,7 +81,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow on <workflow> [project]           turn on again one paused after 5 failed runs in a row (events and its schedules start it again)
   laki flow trash | restore <trash-id>        the workflows deleted in the last 30 days | put one back
   laki flow check [file.md… | folder]        check workflow files, no daemon (none given: ./.laki/workflows); exit 1 on a problem
-  laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
+  laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch (laki ext: the same, every widget command)
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
   laki widget what <id> [--full <file>]       what turning it on runs, and its files' hash; --full: a file it cut, whole
   laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
@@ -137,7 +137,7 @@ script (laki run <ws> setup runs it later). --at starts its agent later, --after
   laki new shop --at "tomorrow 9am" --prompt "…"  made now, its agent starts at 9
   laki new shop --pr 118 --prompt "Fix the failing test"
   laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
-  laki new shop --fan claude,codex --prompt "…"        a race: one worktree each
+  laki new shop --race claude,codex --prompt "…"       a race: one worktree each
   laki new shop --no-setup --perm acceptEdits --fast --prompt "…"   no setup script; edits without asking, fast
   laki new . --name api --prompt "…" --tab codex --tab "npm run dev"   a worker with a second agent and its dev server
   laki new shop --group Reviews --template review --prompt "#118"   under Reviews, through your review template
@@ -313,7 +313,7 @@ their tools, and change where one shows and its settings (laki widget set; not a
 access); turning one on is the user's. Places: side, top, status, rail, foot, desk, panel, row (per workspace). To make
 one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
 
-  laki widget set prs --place desk --size 3x2      a tile on the Desk, 3 cells across, 2 down
+  laki widget set prs --place desk --size 3x2      a tile on My Desk, 3 cells across, 2 down
   laki widget set prs --every 10 repo=acme/api      fetch every 10 minutes, its repo setting
   laki widget tools                             what the user's extensions let you do, each tool's input
   laki widget tool <id> <action> '{"query":"…"}'   in a tab, for its workspace; Laki may ask the user first

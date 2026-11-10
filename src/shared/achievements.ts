@@ -21,7 +21,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'project', group: 'Getting started', title: 'Add a project', how: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", icon: 'folderPlus', go: 'project', rpc: 'projectAdd' },
   { id: 'workspace', group: 'Getting started', title: 'Start a workspace', how: 'An agent and a prompt in a worktree of its own (⌘N)', icon: 'plus', go: 'new', rpc: 'wsNew' },
   { id: 'answer', group: 'Getting started', title: 'Answer an agent with a click', how: 'When an agent asks, its choices show as buttons over the terminal', icon: 'message', rpc: 'answer' },
-  { id: 'changes', group: 'Getting started', title: 'Look at the changes', how: "The right panel's Changes: a workspace's diff, file by file", icon: 'diff', go: 'panel:changes' },
+  { id: 'changes', group: 'Getting started', title: 'Look at the changes', how: "The side panel's Changes: a workspace's diff, file by file", icon: 'diff', go: 'panel:changes' },
   { id: 'ship', group: 'Getting started', title: 'Ship it', how: "The toolbar's Ship: commit, push and open a PR in one go", icon: 'ship', go: 'ship', rpc: 'ship' },
   { id: 'tab', group: 'Getting started', title: 'Open another tab', how: "The tab bar's + (⌘⇧N): another agent or a shell beside the first", icon: 'terminal', go: 'newtab', rpc: 'tabNew' },
   { id: 'settings', group: 'Getting started', title: 'Look around Settings', how: 'Themes, fonts, notifications, your agents (⌘,)', icon: 'gear', go: 'settings', page: 'settings' },

@@ -1383,7 +1383,7 @@ export function SettingsPage(p: {
                 </label>
               </div>
               </Group>
-              <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the info panel opens it">
+              <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the side panel's Info opens it">
                 <FolderField value={s.storageDir} label="Folder for storage" placeholder="Laki's data folder: ~/.laki/storage" onChange={v => set({ storageDir: v })} />
                 {p.storage && <StorageUse api={p.storage} dir={s.storageDir} />}
                 <div className="setting-box">
@@ -2407,7 +2407,7 @@ export function SettingsPage(p: {
               <h2>Pull requests</h2>
               <p className="muted small">
                 The status bar's <b>fix CI</b>, <b>review</b> and <b>fix conflicts</b> switches, on for a workspace with a PR, send these to its agent
-                (when it's idle), and so do the info panel's send buttons. <code className="var">{'{{pr}}'}</code> is the PR's number, <code className="var">{'{{url}}'}</code> its link,{' '}
+                (when it's idle), and so do the side panel's Info send buttons. <code className="var">{'{{pr}}'}</code> is the PR's number, <code className="var">{'{{url}}'}</code> its link,{' '}
                 <code className="var">{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
               <p className="muted small">Merge, merge when green, approve and close are each project's to allow: its section here, under Pull requests (merge when green is off until you turn it on).</p>

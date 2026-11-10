@@ -278,7 +278,7 @@ selected workspace's PR is in the status bar.
 - **Needs you**, at the sidebar's top (above Pinned and the projects; hidden when empty, a click on its head folds it):
   every agent waiting for you, the oldest first, then the ones done while you looked away, the newest first. A waiting
   one's card shows what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a
-  click answers it there. A done one's shows its answer's first line and diff size, *Review* (the right panel's
+  click answers it there. A done one's shows its answer's first line and diff size, *Changes* (the side panel's
   Changes) and *Seen* (clears its ●). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
   dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
   tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
@@ -684,7 +684,7 @@ email address only, unless you leave the email out on purpose (below).
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
 *Merged*; with its last answer, its PR and checks, and its turn's time when timers are on (Terminals and Browsers
 aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on hover) to open, archive or delete it;
-*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots and files in, they go with it) for a project, then ▷ (or drag it onto another
+*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *Backlog* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots and files in, they go with it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
 **AI** (on unless Settings › *AI* turns it off, where you pick how it runs; *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
@@ -1167,7 +1167,7 @@ mark, its author's picture and the other marks to one size.
 
 ### Extensions
 
-Extensions (also called widgets or plugins: one and the same) are small live pages. The SDK, in one page:
+Extensions (`laki ext` or `laki widget` in the CLI, `widget.json` on disk: one and the same) are small live pages. The SDK, in one page:
 [extensions.md](extensions.md).
 
 Settings › Extensions lists them: a search finds one by its name, id, place or project, and one that needs a look (its
@@ -1175,8 +1175,8 @@ last fetch failed, a setting it needs is empty, its log has an error from the la
 red dot. ⌘K has *UI kit*, *Icons* and *New extension from a starter…* too.
 
 Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
-*Sidebar foot*, *My Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
-bar left of its buttons, the status bar's right end, a tab of the right panel (⌥⌘B), or a mark on each workspace's row
+*Sidebar foot*, *My Desk*, *Side panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
+bar left of its buttons, the status bar's right end, a tab of the side panel (⌥⌘B), or a mark on each workspace's row
 (a per-workspace one: its count for that workspace, its tip on hover); the
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, at the status bar's start)
 or at the status bar's start (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
@@ -1692,7 +1692,7 @@ greyed out, what you'd likely send next, guessed from your last message and the 
 typed into Claude Code's terminal yourself, the newest first, never an agent's or Laki's own. A pick fills the box to
 edit; nothing is sent until you send it.
 
-*Side chat* (a Claude Code or Codex tab's right click, the right panel's *Side chat* tab): a quick question about what
+*Side chat* (a Claude Code or Codex tab's right click, the side panel's *Side chat* tab): a quick question about what
 the agent is doing ("why a new hook?") answered beside it while it keeps working; its own chat stays as it is. Claude
 Code's is answered by a copy of its chat (forked, reading files but changing nothing), Codex's by Laki AI's model from
 its chat so far. *Send to main chat* under an answer gives it to the agent when its turn ends; + starts the side chat
@@ -1758,7 +1758,7 @@ step* turns it off.
 
 "Done" usually means the agent stopped talking. With a project's Done check, it means its work passed. Tick what runs
 in the project's settings › *Done check*: its *format*, *lint* and *test* scripts (the ones Run ▾ has, set under
-Scripts), and *A second agent's review* (Claude Code or Codex). As an agent's turn ends having changed files, Laki
+Scripts), and *Second opinion* (a second agent, Claude Code or Codex). As an agent's turn ends having changed files, Laki
 runs the ticked scripts in the worktree (format, then lint, then test; the first that fails stops it), then, if they
 pass, the reviewer reads the diff (no tools, not even Codex's shell, none of your MCP servers) and lists real problems. The scripts run
 as you, on whatever the agent changed: an agent you only let edit files can make them run anything, so turn it on where

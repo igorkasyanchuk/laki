@@ -2,7 +2,7 @@
 // and ⌘J's rule) in text.ts' needsSorted order: waiting ones first, the oldest first; then done ones, the newest first;
 // a done one older than settings.staleAfter (isStale) under a folded Earlier row (laki.needsEarlier), dimmed. A waiting
 // agent's card answers it (its menu's options, or Allow / Deny for a permission prompt with none read); a done one's
-// says what it answered, Review opens Changes (only with changes to look at: the scan's stat, else an agent's tab that
+// says what it answered, Changes opens Changes (only with changes to look at: the scan's stat, else an agent's tab that
 // isn't a shell's), Seen clears its ●; Earlier's Seen all clears them all. Each card's chevron shows or hides that
 // detail (open but for a stale one); anywhere else on a card opens the tab, whatever its state. With a card focused,
 // 1–9 answer and Enter opens.
@@ -165,7 +165,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
               </span>
             )}
             <span className="spacer" />
-            {!t.failed && !!w.branch && changed && <button onClick={() => api.review(t)}>Review</button>}
+            {!t.failed && !!w.branch && changed && <button onClick={() => api.review(t)}>Changes</button>}
             {t.failed && <button className="on" data-tip={t.failed} onClick={() => api.keep(t)}>Continue</button>}
             {t.failed && <button onClick={() => api.dismiss(t)}>Dismiss</button>}
             {!t.failed && <button onClick={() => api.seen(t)}>Seen</button>}

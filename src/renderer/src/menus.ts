@@ -46,7 +46,7 @@ export function menusOf(app: AppBase) {
   const wsOwn = (w: WorkspaceView): MenuItem[] => [
     { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
     ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
-    { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
+    { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the side panel', run: () => (setWsId(w.id), showInfo(true)) },
     ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
     ...(w.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (w.host ? `${w.host}:` : '') + shortPath(w.path), tip: (w.host ? `${w.host}:` : '') + w.path, run: () => copy((w.host ? `${w.host}:` : '') + w.path) } as MenuItem] : []),
     ...(canOverlap(w) ? [{ label: 'Check overlaps…', icon: 'gitCompare', key: 'o', tip: "Where its changes meet another worktree's of the project, or what its base gained since it branched", run: () => checkOverlaps(w) } as MenuItem] : []),
@@ -143,7 +143,7 @@ export function menusOf(app: AppBase) {
           ? [{ label: `Continue in ${other === 'codex' ? 'Codex' : 'Claude Code'}`, icon: 'agent', tip: `A ${other === 'codex' ? 'Codex' : 'Claude Code'} tab beside it that reads this chat and the changes so far, then carries on: for a usage limit or a stuck agent. This one stays`, run: () => void call<{ tab: string; name: string }>('tabHandover', { tab: t!.id, to: other }).then(r => (selectTab({ id: r.tab, workspace: t!.workspace }), done(`${r.name} takes over from ${t!.name}`)), () => {}) } as MenuItem]
           : []
       })(ts.length === 1 ? ts[0] : undefined)),
-      ...(ts.length === 1 && ts[0].kind === 'agent' ? [{ label: 'Side chat', icon: 'messages', tip: 'Ask about what it does in the right panel while it works: its own chat stays as it is', run: () => (selectTab(ts[0].id), showPanel('side')) } as MenuItem] : []),
+      ...(ts.length === 1 && ts[0].kind === 'agent' ? [{ label: 'Side chat', icon: 'messages', tip: 'Ask about what it does in the side panel while it works: its own chat stays as it is', run: () => (selectTab(ts[0].id), showPanel('side')) } as MenuItem] : []),
       ...(ended.length ? [{ label: 'Restart', icon: 'restore', tip: 'Starts it again (an agent resumes its chat)', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
       ...(ts.length === 1 && accountsOf(ts[0].preset).length > 1 && !view?.workspaces.find(w => w.id === ts[0].workspace)?.host
         ? [{ label: 'Restart on another account', icon: 'restore', tip: 'The same chat, resumed on another sign-in (Settings › Agents & profiles)', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]

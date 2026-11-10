@@ -77,7 +77,7 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'files', label: 'Files', icon: 'file' },
   { id: 'changes', label: 'Changes', icon: 'changes' },
   { id: 'commits', label: 'Commits', icon: 'gitCommit' },
-  { id: 'review', label: 'Review', icon: 'review' },
+  { id: 'review', label: 'PR comments', icon: 'review' },
   { id: 'preview', label: 'Preview', icon: 'globe' },
   { id: 'device', label: 'Simulator', icon: 'phone' },
   { id: 'side', label: 'Side chat', icon: 'messages' },

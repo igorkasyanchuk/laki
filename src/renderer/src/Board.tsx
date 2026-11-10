@@ -1,5 +1,5 @@
 // The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by what it needs next (nextStep.ts
-// boardCol, the row chip's and ⌘G's rules: Working, Answer, Review, Fix, Merge, Done), and To do: prompts waiting for a workspace. Start, or a drag
+// boardCol, the row chip's and ⌘G's rules: Working, Answer, Review, Fix, Merge, Done), and Backlog: prompts waiting for a workspace. Start, or a drag
 // onto another column, makes one with the default agent; a click on a card opens its workspace, a right click (or ⋯)
 // is its menu: open, archive, delete; Done's ⋯ archives the merged ones. A to-do takes screenshots and files pasted or dropped
 // in: their paths go after its text as it starts.
@@ -73,7 +73,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
       <div className="board">
         <section className="board-col">
           <h3>
-            To do <span className="board-count">{todos.length || ''}</span>
+            Backlog <span className="board-count">{todos.length || ''}</span>
           </h3>
           {todos.map(t => (
             <div key={t.id} className={`board-card todo ${starting.includes(t.id) ? 'busy' : ''}`} draggable onDragStart={e => e.dataTransfer.setData(TODO, t.id)}>
