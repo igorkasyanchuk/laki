@@ -920,7 +920,7 @@ ipcMain.on('glass', (e, on: boolean, light?: boolean | null, frosted?: boolean, 
 // V9: macOS's accent color (System Settings › Appearance) for Settings › Appearance › Accent color: System; none off a
 // Mac (the option is hidden there). A change goes to the app's own windows ('accent'); themes.ts paints them again
 const sysAccent = () => (mac ? `#${systemPreferences.getAccentColor().slice(0, 6)}` : null)
-ipcMain.handle('accent', e => (from(e, 'new', 'ai', 'tab') ? sysAccent() : null))
+ipcMain.handle('accent', e => (from(e, 'new', 'ai', 'tab', 'quick') ? sysAccent() : null))
 const accentNow = () => {
   const c = sysAccent()
   for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('accent', c)
@@ -1422,7 +1422,7 @@ function quickWin(prompt?: string) {
   w.on('closed', () => quickW === w && (quickW = null))
 }
 ipcMain.on('quick-more', (e, text: unknown) => {
-  if (!quickW || e.sender !== quickW.webContents) return
+  if (!quickW || e.sender !== quickW.webContents || !fromApp(e)) return
   quickW.close()
   newWsWin(typeof text === 'string' ? text.slice(0, 20000) : undefined)
 })
@@ -1441,7 +1441,7 @@ ipcMain.handle('quick-shot', e => {
   )
 })
 ipcMain.on('quick-height', (e, h: unknown) => {
-  if (!quickW || quickW.isDestroyed() || e.sender !== quickW.webContents || typeof h !== 'number' || !Number.isFinite(h)) return
+  if (!quickW || quickW.isDestroyed() || e.sender !== quickW.webContents || !fromApp(e) || typeof h !== 'number' || !Number.isFinite(h)) return
   quickW.setContentSize(quickW.getContentSize()[0], Math.round(Math.min(Math.max(h, 100), 520)))
 })
 // the bubbles' Ask Laki AI: the AI page alone (?window=ai), a chat in a panel like the new-workspace one; one at a time

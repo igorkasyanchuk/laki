@@ -268,12 +268,12 @@ fork's is a `held` run (no workspace, a `scheduled` event; `scheduleRelease`, th
 only), then the gap since `last` and the runs today (logged skips), then `runSchedule`'s `event`: its words before
 what it did (`r.event`), `fillEvent` (shared/fence.ts: `{{event.url}}`, `.number`, `.branch` inline when plain, the
 title fenced under `untrusted`'s line, never inline; none named: *What started it: …* appended) and a PR's event's
-workspace linked to it (wsNew `linked`, guessed). ponytail: an incoming webhook doesn't feed them yet; an SSH host's
+workspace linked to it (wsNew `linked`, guessed); no other PR is guessed from the prompt (wsNew `outside`: the title may name any). ponytail: an incoming webhook doesn't feed them yet; an SSH host's
 project isn't read.
 
 A run's workspaces (T5, `ws: new` only): after a run starts, `keepTidy` archives the task's run workspaces past `keep`
 (unset 5, 0 all), oldest first, only when nothing is lost: wsArchive's `ifClean` (R1), no open PR, not pinned, no
-agent running or waiting; the rest are counted in `kept` (the row's *2 older runs kept: they have work*). `emptyGone`
+agent running or waiting; one tidy at a time per task (`tidying`); the rest are counted in `kept` (the row's *2 older runs kept: they have work*). `emptyGone`
 (unset: on): a run whose agent ended `done` with no diff against its base, nothing uncommitted and no PR (its stat read
 fresh: `wsStat`'s `fresh`) is archived then, and its log entry says so. Archive only: the branch and Restore stay.
 
@@ -282,7 +282,7 @@ A failed run (T6, `settle`, not Run now's): a transient one (`TRANSIENT`: the ne
 counts. At its agent's plan limit (`limitOf`: claude's, codex's usage at or past `usageAt`, `resetOf`'s reset) a run
 waits for the reset (`again`, why `limit`: *its plan limit reset: …*) if that's before its `deadline` (its next time,
 that day's `catchUntil`), else *skipped: plan limit*. `fails` counts failed runs in a row (a failed start, an agent that
-ended on an error, a workflow run that failed; a wait, a skip and Run now don't; `done` resets it); at 3 the task is off
+ended on an error, a workflow run that failed; a wait, a plan limit's end, a skip and Run now don't; `done` resets it); at 3 the task is off
 with `pausedWhy` and `pausedField` (`fieldOf`: base, ws, preset, widget, workflow), a `scheduled` event and a phone push
 once. The page shows it on top with *Fix*: its form, at that field. An edit that leaves it on clears them.
 

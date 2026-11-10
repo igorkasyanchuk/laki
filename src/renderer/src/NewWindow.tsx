@@ -191,7 +191,9 @@ export function NewWindow() {
 // keyboard again); Esc closes; a failed send keeps the text. The mic and a screenshot (⌘⇧M, ⌘⇧S); More: the whole
 // new-workspace page with the text, its project, agent and template pickers
 type Target = { kind: 'new'; project: string; label: string } | { kind: 'send'; tab: string; label: string } | { kind: 'ai'; label: string }
-function targetsOf(view: View): Target[] {
+// a target by what it is, not where it is in the list: one picked stays picked as the list changes
+const keyOf = (t: Target) => (t.kind === 'send' ? `send:${t.tab}` : t.kind)
+function targetsOf(view: View, keep?: string): Target[] {
   const last = load<LastNew>(LAST_NEW, {})
   const projects = view.projects.filter(p => !p.kind && !p.archived)
   const proj = projects.find(p => p.id === last.project) ?? projects[0]
@@ -199,7 +201,7 @@ function targetsOf(view: View): Target[] {
   return [
     ...(proj ? [{ kind: 'new' as const, project: proj.id, label: `New workspace in ${proj.name}` }] : []),
     ...view.tabs
-      .filter(t => t.kind === 'agent' && live.has(t.workspace) && (t.status === 'waiting' || t.status === 'idle'))
+      .filter(t => t.kind === 'agent' && live.has(t.workspace) && (t.status === 'waiting' || t.status === 'idle' || keep === `send:${t.id}`)) // the one picked stays while it works (Send queues for it)
       .map(t => ({ kind: 'send' as const, tab: t.id, label: `${t.name} · ${(w => w?.name || w?.id || '')(view.workspaces.find(w => w.id === t.workspace))}` })),
     ...(aiOn(view.settings) ? [{ kind: 'ai' as const, label: 'Laki AI' }] : []),
   ]
@@ -209,7 +211,7 @@ export function QuickWindow() {
   const view = useView()
   const [text, setText] = useState(new URLSearchParams(location.search).get('prompt') ?? '')
   const [images, setImages] = useState<Img[]>([])
-  const [pick, setPick] = useState(0)
+  const [pick, setPick] = useState<string>() // keyOf the picked target (none: the first)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -224,15 +226,15 @@ export function QuickWindow() {
     return () => o.disconnect()
   }, [!!view])
   if (!view) return null
-  const targets = targetsOf(view)
-  const at = Math.min(pick, Math.max(0, targets.length - 1))
+  const targets = targetsOf(view, pick)
+  const at = Math.max(0, targets.findIndex(x => keyOf(x) === pick)) // gone (its workspace archived): the first
   const t = targets[at]
-  const turn = (d: number) => targets.length && setPick((at + d + targets.length) % targets.length)
+  const turn = (d: number) => targets.length && setPick(keyOf(targets[(at + d + targets.length) % targets.length]))
   // "@word " at the start: the target whose name has it, the word taken out
   const change = (v: string) => {
     const m = /^@(\S+)\s/.exec(v)
     const i = m ? targets.findIndex(x => squash(x.label).includes(squash(m[1]))) : -1
-    if (i >= 0) return setPick(i), setText(v.slice(m![0].length))
+    if (i >= 0) return setPick(keyOf(targets[i])), setText(v.slice(m![0].length))
     setText(v)
   }
   const mic = () => {

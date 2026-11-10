@@ -188,7 +188,7 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   const given = Object.fromEntries(SCHEDULE_IN.filter(k => o[k] !== undefined).map(k => [k, o[k]]))
   if (old && Object.keys(given).every(k => k === 'group' || (k === 'on' && given.on === false))) {
     // off, a group and archive take no checks: a task whose workspace or preset is gone can still be stopped or moved
-    if (given.on === false) Object.assign(old, { on: false, next: undefined })
+    if (given.on === false) Object.assign(old, { on: false, next: undefined }), delete old.again // off: no retry or later start either
     if (given.group !== undefined) groupSet(old, given.group)
     if (o.archived !== undefined) archiveSet(old, o.archived)
     save()
@@ -346,14 +346,18 @@ async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string;
   }
   if (o.kind === 'prs') {
     type P = { number: number; isDraft?: boolean; reviewDecision?: string; statusCheckRollup?: { conclusion?: string; state?: string }[] }
-    const prs = JSON.parse((await run('gh', ['pr', 'list', '--state', 'open', '--limit', '100', '--json', 'number,isDraft,reviewDecision,statusCheckRollup'], { cwd: p.path, timeout: 60000 })).stdout || '[]') as P[]
+    const args = ['pr', 'list', '--state', 'open', '--limit', '100', '--json', 'number,isDraft,reviewDecision,statusCheckRollup']
+    ghCount(args)
+    const prs = JSON.parse((await run('gh', args, { cwd: p.path, timeout: 60000 })).stdout || '[]') as P[]
     const failing = (x: P) => (x.statusCheckRollup ?? []).some(c => /^(FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE)$/.test(c.conclusion || c.state || ''))
     const hit = prs.filter(x => (o.what === 'any' ? true : o.what === 'failing' ? failing(x) : !x.isDraft && x.reviewDecision === 'REVIEW_REQUIRED'))
     if (!hit.length) return { skip: o.what === 'failing' ? 'no PR with failing checks' : o.what === 'review' ? 'no PR waiting for review' : 'no open PR', check: '' }
     return { check: hit.map(x => `#${x.number}`).join(' ') }
   }
   if (o.kind === 'issues') {
-    const issues = JSON.parse((await run('gh', ['issue', 'list', '--state', 'open', '--limit', '50', '--json', 'number,createdAt', ...(o.label ? ['--label', o.label] : [])], { cwd: p.path, timeout: 60000 })).stdout || '[]') as { number: number; createdAt?: string }[]
+    const args = ['issue', 'list', '--state', 'open', '--limit', '50', '--json', 'number,createdAt', ...(o.label ? ['--label', o.label] : [])]
+    ghCount(args)
+    const issues = JSON.parse((await run('gh', args, { cwd: p.path, timeout: 60000 })).stdout || '[]') as { number: number; createdAt?: string }[]
     const fresh = issues.filter(x => Date.parse(x.createdAt ?? '') > since)
     if (!fresh.length) return { skip: `no new issues${o.label ? ` labeled ${o.label}` : ''}`, check: '' }
     return { check: fresh.map(x => `#${x.number}`).join(' ') }
@@ -428,7 +432,7 @@ async function eventsOf(s: Schedule, p: Project, ask: Ask): Promise<TaskEventIn[
       marks.pr = Math.max(m?.pr ?? 0, ...prs.map(x => x.number))
       out = prs.filter(x => x.number > (m?.pr ?? Infinity) && whose(x.author?.login)).map(x => ev(x, `pr:${x.number}`, `PR #${x.number} opened`))
     } else {
-      marks.reviews = {}
+      marks.reviews = Object.fromEntries(Object.entries(m?.reviews ?? {}).sort((a, b) => Number(b[0]) - Number(a[0])).slice(0, 100)) // a PR off the top 30 for a while keeps its mark
       for (const x of prs) {
         const r = [...(x.latestReviews ?? [])].filter(y => y.submittedAt).sort((a, b) => a.submittedAt!.localeCompare(b.submittedAt!)).pop()
         if (!r) continue
@@ -536,6 +540,8 @@ const TRANSIENT = /network|unable to access|could not read from remote|could not
 // the form's field to fix (Fix on the page)
 const fieldOf = (why: string) => (/\bbase\b/i.test(why) ? 'base' : /extension/i.test(why) ? 'widget' : /workflow/i.test(why) ? 'workflow' : /preset|pick an agent/i.test(why) ? 'preset' : /workspace|is archived|isn't in/i.test(why) ? 'ws' : undefined)
 const live = (s: Schedule) => state.schedules?.find(x => x.id === s.id)
+// on, or a once task that's due (scheduleTick turns it off as it runs): one that may still try again or wait for a reset
+const going = (s: Schedule) => !s.archived && (s.on || (!!s.rule.once && !s.next))
 function failedRun(s: Schedule, why: string) {
   const cur = live(s)
   if (!cur?.on) return
@@ -558,7 +564,7 @@ function settle(s: Schedule, r: ScheduleRun, o: { asked?: boolean; again?: boole
   if (r.ok) return void (r.state === 'done' && goodRun(s))
   if (r.what.startsWith('skipped:')) return
   const cur = live(s)
-  if (cur?.on && !o.again && TRANSIENT.test(r.what)) {
+  if (cur && going(cur) && !o.again && TRANSIENT.test(r.what)) {
     cur.again = { at: now + RETRY_MS, why: 'retry', ...(o.event && { event: o.event }) }
     r.retry = cur.again.at
     r.what += ` (it tries again at ${hhmm(r.retry)})`
@@ -598,12 +604,18 @@ const archiveRun = (w: Workspace, why: string) =>
     held => (held ? false : (wsLog(w, `archived: ${why}`), true)),
     e => (log(`scheduled run ${w.id} not archived: ${firstLine(e)}`), false),
   )
-async function keepTidy(s: Schedule) {
+const tidying = new Map<string, Promise<void>>() // a task's tidy at a time: two runs starting together don't archive one twice
+const keepTidy = (s: Schedule) => {
+  const p = (tidying.get(s.id) ?? Promise.resolve()).then(() => tidy(s))
+  tidying.set(s.id, p)
+  return p.finally(() => tidying.get(s.id) === p && tidying.delete(s.id))
+}
+async function tidy(s: Schedule) {
   const keep = s.keep ?? KEEP
   if (s.ws !== 'new' || s.workflow || s.widget || !keep) return
   const mine = state.workspaces.filter(w => w.schedule === s.id && !w.archived && w.kind === 'worktree').sort((a, b) => b.created - a.created)
   let kept = 0
-  for (const w of mine.slice(keep).reverse()) if (keeps(w) || !(await archiveRun(w, `its scheduled task keeps its last ${keep} runs`))) kept++
+  for (const w of mine.slice(keep).reverse()) if (!w.archived && (keeps(w) || !(await archiveRun(w, `its scheduled task keeps its last ${keep} runs`)))) kept++
   const cur = live(s)
   if (!cur || (cur.kept ?? 0) === kept) return
   if (kept) cur.kept = kept
@@ -685,7 +697,7 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       if (s.ws === 'same' && sameMaking.has(s.id)) throw new Error('skipped: its first run is still making its workspace')
       if (s.ws === 'same') sameMaking.add(s.id)
       const pr = o.event?.kind.startsWith('pr.') && plain(o.event.url) // T4: a PR's event: the PR is its workspace's link
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }), ...(pr && { linked: pr, guessed: true }) }).finally(() => sameMaking.delete(s.id))
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }), ...(pr && { linked: pr, guessed: true }), ...(o.event && { outside: true }) }).finally(() => sameMaking.delete(s.id))
       // on the task as it is now: one edited while its workspace was made is another object (scheduleSet replaces it), and
       // one moved elsewhere meanwhile takes none
       const cur = state.schedules?.find(x => x.id === s.id)
@@ -805,7 +817,7 @@ export async function scheduleTick(now = Date.now()) {
     else await runSchedule(s, now)
   }
   // T6: a retry (5 minutes after a transient failure) or a start at a plan limit's reset, when due
-  for (const s of (state.schedules ?? []).filter(x => x.again && x.again.at <= now && x.on && !x.archived)) {
+  for (const s of (state.schedules ?? []).filter(x => x.again && x.again.at <= now && going(x))) {
     const a = s.again!
     delete s.again
     save()
@@ -857,7 +869,7 @@ const lowBattery = async () => {
 // end again (it resumed, it ended again). A workflow's: its run's end (scheduleFlowEnded); an extension's: at once
 const OUTCOME_MS = 24 * 3600e3
 const runOfTab = (tab: string, now = Date.now()) => state.runs?.find(r => r.tab === tab && r.state !== undefined && now - r.at < OUTCOME_MS)
-async function runEnded(tab: Tab, st: RunState, text?: string) {
+async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) { // limit: it ended at a plan limit (T6: not a failure that counts)
   if (!runOfTab(tab.id)) return
   const endedAt = Date.now()
   const d = await wsStat({ ws: tab.workspace, fresh: true }).catch(() => null) // first: the entry changes at once, whole
@@ -873,14 +885,14 @@ async function runEnded(tab: Tab, st: RunState, text?: string) {
   ranTold(r, was)
   const s = state.schedules?.find(x => x.id === r.schedule)
   if (s && st !== was && !r.asked) {
-    if (st === 'failed') failedRun(s, `its agent ended on an error${said ? `: ${said}` : ''}`) // T6: counts; a wait doesn't
+    if (st === 'failed' && !limit) failedRun(s, `its agent ended on an error${said ? `: ${said}` : ''}`) // T6: counts; a wait or a plan limit doesn't
     if (st === 'done') goodRun(s)
   }
   if (st === 'done' && was !== 'done') await emptyGone(r, d) // T5
 }
 // main.ts, as the daemon starts (not as this module loads: core's sets may not be there yet, load-order.test)
 export function runOutcomes() {
-  turnEnds.add((tab, o) => void setTimeout(() => void runEnded(tab, o.failed || o.limit ? 'failed' : 'done', o.last).catch(e => log(`run ${tab.id}: ${e.message}`)), 1500).unref?.()) // its usage meter is read a second after the end
+  turnEnds.add((tab, o) => void setTimeout(() => void runEnded(tab, o.failed || o.limit ? 'failed' : 'done', o.last, !!o.limit && !o.failed).catch(e => log(`run ${tab.id}: ${e.message}`)), 1500).unref?.()) // its usage meter is read a second after the end
   turnWaits.add((tab, o) => void runEnded(tab, 'waiting', o.question).catch(e => log(`run ${tab.id}: ${e.message}`)))
 }
 // a workflow's run ended (workflow.ts' end): its task's log entry says how
