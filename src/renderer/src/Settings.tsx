@@ -160,7 +160,8 @@ export type AppSettings = Paint & {
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
   remoteMail?: string // the one address remote access lets in
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
-  remoteAuth?: 'email' | 'pin' | 'tailscale' // remote access by Cloudflare's email code (unset too), Laki's PIN, or your tailnet
+  remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // remote access by Cloudflare's email code (unset too), Laki's PIN, your tailnet, or My domain (a PIN always)
+  remoteHost?: string // My domain's word (unset: laki)
   remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // Tailscale: a PIN as well
   remoteFunnel?: boolean // Tailscale: Funnel, the internet (a PIN always)
@@ -2334,8 +2335,8 @@ export function SettingsPage(p: {
             <RemoteSection
               other={p.tunnels && (() => openSec('tunnels'))}
               api={p.remote}
-              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel }}
-              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
+              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel, host: s.remoteHost ?? '', domain: s.tunnel?.name?.trim() && s.tunnel.domain?.trim() ? s.tunnel.domain.trim().toLowerCase() : undefined }}
+              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }), ...(o.host !== undefined && { remoteHost: o.host }) })}
             />
           )}
           {on('needs') && (

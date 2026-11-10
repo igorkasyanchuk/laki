@@ -2,7 +2,7 @@
 // app (cloudflared or tailscale). core.ts imports it, and its users import it directly.
 
 import { spawn } from 'node:child_process'
-import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
@@ -292,6 +292,7 @@ async function namedStart(ws: string, port: number, given: string, live: () => b
   const taken = () => {
     const o = [...tunnels.values()].find(t => t.host === host)
     if (o) throw new Error(`${host} is taken: ${o.ws}'s :${o.port}`)
+    if (remote?.host === host) throw new Error(`${host} is taken: remote access's (My domain)`)
   }
   taken()
   await cfReady(false)
@@ -322,7 +323,7 @@ async function routeDns(name: string, host: string) {
     throw new Error(`cloudflared couldn't route ${host} to ${name}: ${out.split('\n').filter(l => /ERR|error|failed/i.test(l)).pop()?.trim() ?? firstLine(e)}`)
   })
 }
-type Connector = { cf: Cf; key: string; ready: Promise<void> }
+type Connector = { cf: Cf; key: string; ready: Promise<void>; up?: boolean }
 let conn: Connector | undefined
 let connTries = 0
 let connTimer: ReturnType<typeof setTimeout> | undefined
@@ -334,12 +335,16 @@ function connect(): Promise<void> {
   const list = [...tunnels.values()].filter(t => t.host && (!n || !t.via || t.via === n.name)).sort((a, b) => a.host!.localeCompare(b.host!))
   for (const t of tunnels.values())
     if (t.host && n && t.via && t.via !== n.name) Object.assign(t, { url: undefined, down: `its DNS record goes to your tunnel ${t.via}, not ${n.name}: stop it, remove that record in Cloudflare's dashboard and expose it again` }), changed()
-  const key = JSON.stringify([n?.name, list.map(t => [t.host, t.port])])
+  // remote access on My domain (D1): the daemon itself, on this connector too, while its record goes to this tunnel
+  const far = remote?.host && n && remote.named === n.name ? remote : undefined
+  if (remote?.host && !far) Object.assign(remote, { down: n ? `its DNS record goes to your tunnel ${remote.named}, not ${n.name}: stop remote access and start it again` : 'no named tunnel set: Settings › Tunnels' }), changed()
+  const ins = [...list.map(t => [t.host!, `http://localhost:${t.port}`]), ...(far ? [[far.host!, `http://127.0.0.1:${daemonPort}`]] : [])]
+  const key = JSON.stringify([n?.name, ins])
   if (conn?.key === key) return conn.ready
   clearTimeout(connTimer)
   conn?.cf.stop()
   conn = undefined
-  if (!list.length) return Promise.resolve()
+  if (!ins.length) return Promise.resolve()
   if (!n) {
     for (const t of list) t.down = 'no named tunnel set: Settings › Tunnels'
     changed()
@@ -348,7 +353,7 @@ function connect(): Promise<void> {
   const folder = join(dir, 'cloudflared')
   mkdirSync(folder, { recursive: true, mode: 0o700 })
   const file = join(folder, 'ingress.yml')
-  writeFileSync(file, `# Laki's permanent tunnels (Settings › Tunnels): written each time one starts or stops\ningress:\n${list.map(t => `  - hostname: ${t.host}\n    service: http://localhost:${t.port}\n`).join('')}  - service: http_status:404\n`, { mode: 0o600 })
+  writeFileSync(file, `# Laki's permanent tunnels (Settings › Tunnels): written each time one starts or stops\ningress:\n${ins.map(([h, to]) => `  - hostname: ${h}\n    service: ${to}\n`).join('')}  - service: http_status:404\n`, { mode: 0o600 })
   const me = {} as Connector
   const { cf, url } = publisher('cloudflared', 'cloudflared', ['tunnel', '--no-autoupdate', '--config', file, 'run', n.name], /Registered tunnel connection/, why => connDown(me, `cloudflared ended (${why})`), ['Permanent tunnels', 'tunnel:named'])
   Object.assign(me, {
@@ -359,6 +364,8 @@ function connect(): Promise<void> {
         if (conn !== me || up === undefined) return
         connTries = 0
         for (const t of list) if (tunnels.get(keyOf(t)) === t) Object.assign(t, { url: `https://${t.host}`, down: undefined })
+        me.up = true
+        if (far && remote === far) far.down = undefined // up: the page reconnects at its own address
         keep()
         changed()
       },
@@ -377,6 +384,7 @@ function connDown(me: Connector, why: string) {
   conn = undefined
   if (connTries < AGAIN.length) log(`permanent tunnels: ${why}; starting cloudflared again`)
   for (const t of tunnels.values()) if (t.host) t.down = why
+  if (remote?.host) remote.down = why
   changed()
   connTimer = setTimeout(() => void connect().catch(() => {}), AGAIN[Math.min(connTries++, AGAIN.length - 1)])
   connTimer.unref?.()
@@ -425,6 +433,7 @@ function drop(t: TunnelRun) {
 // for good
 export function stopTunnels(ws?: string, permanent = false) {
   for (const t of [...tunnels.values()]) if ((!ws || t.ws === ws) && (!permanent || t.host)) drop(t)
+  if (permanent && !ws && remote?.host) remoteStop() // the connector's stop: remote access on My domain went with it
 }
 
 // shutdown: every cloudflared stopped, state.tunnels kept for the next start (tunnelsBack)
@@ -563,35 +572,62 @@ async function shareServe(q: IncomingMessage, r: ServerResponse) {
   r.writeHead(200, { ...head, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp }).end(sharePage({ id: s.id, title: s.title, sub: s.sub, body: s.body, v: s.v, nonce }))
 }
 
-// ---------- remote access: this daemon, and the app's page it serves (main.ts), at a trycloudflare.com URL for the
-// one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own (open:
-// no email, asked for in so many words (Settings' typed confirm), the token the only lock: anyone with the link; pin:
-// no email either, the link's key and a PIN Laki shows here, typed on the page (remotePin), give the page its token,
-// and a wrong PIN settings.remoteTries times stops it). It ends after the hours asked for (remoteTick; 0: forever, no
-// until), on remoteStop, or with the daemon; a new token each time, so a stopped link is dead.
+// ---------- remote access: this daemon, and the app's page it serves (main.ts), at an address of its own: a quick
+// tunnel (a random trycloudflare.com URL, new each start) for the one email in Settings (Cloudflare Access sends it a
+// one-time code), and the link carries a token of its own (open: no email, asked for in so many words (Settings' typed
+// confirm), the token the only lock: anyone with the link; pin: no email either, the link's key and a PIN Laki shows
+// here, typed on the page (remotePin), give the page its token, and a wrong PIN settings.remoteTries times stops it).
+// Or a stable one (a bookmark keeps working): your tailnet (tailscale serve), or My domain (D1: a hostname of your named
+// tunnel, settings.tunnel, through the permanent tunnels' connector; with a PIN always: cloudflared can't set a Cloudflare
+// Access policy, that's the dashboard's). It ends after the hours asked for (remoteTick; 0: forever, no until), on
+// remoteStop or a wrong PIN's stop: those are final. Its cloudflared or tailscale ending on its own, or the daemon's
+// restart, starts it again (D2: AGAIN apart, then a minute each time; state.remote: how, until when, the page's token's
+// hash): a quick tunnel at a new address, with a new link (the old one is dead); a stable one as it was, so the page
+// reconnects by itself.
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // token: the link's, good once, for remotePin only (L3): it gives the page access, the token it connects with (pin: with
-// the PIN), and is dead then (used); left: wrong tries left
-type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number }
+// the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
+// left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
+// again (remoteAgain), its address before, why it's down
+type RemoteRun = { mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout> }
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
-export const remoteToken = () => (remote?.used ? remote.access : undefined)
+const hashOf = (t: string) => createHash('sha256').update(t).digest('hex')
+// the page's token (remote access's origin only): the one remotePin gave, while it runs
+export const accessOk = (t: unknown) => !!remote?.used && !!remote.access && typeof t === 'string' && !!t && same(hashOf(t), remote.access)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
+const newPin = () => String(randomInt(0, 1e6)).padStart(6, '0')
+const hex = () => randomBytes(32).toString('hex')
+
+// state.json's copy (D2): how it runs and until when, and the page's token's hash once it has one (a stable address's
+// page reconnects with it after a restart); never a token or the PIN
+function keepRemote() {
+  const r = remote
+  if (!r) return
+  state.remote = { mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }) }
+  save()
+}
+const forget = () => state.remote && (delete state.remote, save())
 
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
-// funnel: tailscale funnel, on the internet, so with a PIN only
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean }): Promise<Remote | undefined> {
+// funnel: tailscale funnel, on the internet, so with a PIN only. host (D1, via cloudflare): My domain, that word (or
+// hostname) under settings.tunnel's domain ('': laki), a PIN always
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean; host?: string }): Promise<Remote | undefined> {
   policyRemote() // a managed policy may turn it off
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   if (o.via !== undefined && o.via !== 'cloudflare' && o.via !== 'tailscale') throw new Error(`through cloudflare or tailscale, not ${o.via}`)
   const ts = o.via === 'tailscale'
-  const pin = o.pin === true // Laki's PIN, no email
+  if (o.host !== undefined && (ts || typeof o.host !== 'string')) throw new Error('My domain is through cloudflare: a name under your named tunnel’s domain')
+  const n = o.host === undefined ? undefined : named()
+  if (o.host !== undefined && !n) throw new Error('My domain: set your named tunnel and its domain in Settings › Tunnels first')
+  const host = n && hostOf(o.host || 'laki', n.domain)
+  const pin = o.pin === true || !!host // Laki's PIN, no email; My domain's always
   const funnel = ts && o.funnel === true
   if (funnel && !pin) throw new Error('Funnel puts it on the internet: only with a PIN')
   const open = !ts && !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
@@ -600,34 +636,131 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   if (open && (!hours || hours > 24)) throw new Error('without an email, 24 hours at most: anyone with the link gets in')
   if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
+  if (host) {
+    const t = [...tunnels.values()].find(x => x.host === host)
+    if (t) throw new Error(`${host} is taken: ${t.ws}'s :${t.port} (Expose to the world)`)
+  }
   await reaping.catch(() => {})
   const { bin, peers } = ts ? await tsReady() : (await cfReady(!!mail), { bin: '', peers: 0 })
+  if (host) await routeDns(n!.name, host) // its DNS record: made once, this tunnel's (never over another's)
   if (remote) return remoteView() // started meanwhile
-  const target = `http://127.0.0.1:${daemonPort}`
-  const ended = (why: string) => (log(`remote access ended (${why})`), remoteStop())
-  const { cf, url } = ts ? tailscale(bin, target, ended, ['Remote access', 'remote'], funnel) : cloudflare(target, mail ? [mail] : [], ended, ['Remote access', 'remote'])
-  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), access: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const, funnel, peers }) }
-  if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), left: triesOf() })
+  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: hex(), access: '', tries: 0, ...(open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel, peers }), ...(host && { host, named: n!.name }) }
+  if (pin) Object.assign(r, { pin: newPin(), left: triesOf() })
   remote = r
   changed()
   try {
-    r.url = await url
+    r.url = await remoteUp(r, bin)
   } catch (e) {
     if (remote === r) remoteStop()
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
+  keepRemote()
   log(`remote access at ${r.url} for ${ts ? `${funnel ? 'the internet (Tailscale Funnel)' : `the tailnet's devices (${peers} more online)`} with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }
 
+// its address: cloudflared's or tailscale's (a child of its own, remoteAgain when it ends), or My domain's through the
+// permanent tunnels' connector (connect: its ingress has it; it starts itself again). bin: tailscale's, from
+// remoteStart's check (else checked here: a restart's)
+async function remoteUp(r: RemoteRun, bin?: string): Promise<string | undefined> {
+  const target = `http://127.0.0.1:${daemonPort}`
+  if (r.host) {
+    await connect()
+    if (remote === r && conn) await conn.ready // started again meanwhile (a tunnel's change): this one has it too
+    if (remote !== r) return undefined
+    if (!conn?.up || !conn.key.includes(JSON.stringify(r.host))) throw new Error(r.down ?? "cloudflared's connector isn't up")
+    return `https://${r.host}`
+  }
+  const what = r.via ? `tailscale ${r.funnel ? 'funnel' : 'serve'}` : 'cloudflared'
+  const ended = (why: string) => remoteAgain(r, `${what} ended (${why})`)
+  if (r.via && !bin) {
+    const ts = await tsReady()
+    bin = ts.bin
+    r.peers = ts.peers
+  }
+  if (remote !== r) return undefined
+  const p = r.via ? tailscale(bin!, target, ended, ['Remote access', 'remote'], r.funnel) : cloudflare(target, r.mail ? [r.mail] : [], ended, ['Remote access', 'remote'])
+  r.cf = p.cf
+  return p.url
+}
+
+// D2: down on its own (its process ended, or a restart's start failed): started again, AGAIN apart, then once a minute
+function remoteAgain(r: RemoteRun, why: string) {
+  if (remote !== r) return
+  if (r.tries < AGAIN.length) log(`remote access: ${why}; starting it again`) // then quiet: down says why
+  Object.assign(r, { was: r.url ?? r.was, url: undefined, down: why, cf: undefined, moved: false })
+  changed()
+  clearTimeout(r.timer)
+  r.timer = setTimeout(() => {
+    if (remote !== r) return
+    void remoteUp(r).then(
+      u => remoteAt(r, u),
+      e => remoteAgain(r, firstLine(e)),
+    )
+  }, AGAIN[Math.min(r.tries++, AGAIN.length - 1)])
+  r.timer.unref?.()
+}
+// up again at u: the same address (stable: Tailscale, My domain) goes on as it was, and the page reconnects; a quick
+// tunnel's new one has a new link (and PIN): the old one's page is at an origin that's gone
+function remoteAt(r: RemoteRun, u: string | undefined) {
+  if (remote !== r || !u) return
+  const was = r.was
+  Object.assign(r, { url: u, down: undefined, tries: 0, moved: !!was && was !== u })
+  if (r.moved) {
+    Object.assign(r, { token: hex(), access: '', used: false, ...(r.pin && { pin: newPin(), left: triesOf() }) })
+    log(`remote access: back at ${u} (was ${was}): a new link`)
+    broadcast({ ev: 'remote', text: 'Remote access is back at a new address: open its new link from Settings › Remote access (the old one has ended).' })
+  } else log(`remote access: back at ${u}`)
+  keepRemote()
+  changed()
+}
+
+// as the daemon starts (main.ts, before tunnelsBack): remote access state.json kept, started again unless its time has
+// passed. Stable, its page's token still good; a link not opened yet: a new one (and PIN), as the old one's key went
+// with the daemon
+export function remoteBack(now = Date.now()) {
+  const s = state.remote
+  if (!s || remote) return
+  try {
+    policyRemote()
+  } catch {
+    return forget()
+  }
+  const ts = s.via === 'tailscale'
+  const mail = typeof s.mail === 'string' ? s.mail : ''
+  if ((s.until && s.until <= now) || (!ts && !s.pin && !s.open && !s.host && !ONE_MAIL.test(mail)) || (s.host !== undefined && (typeof s.host !== 'string' || typeof s.named !== 'string'))) return forget()
+  const r: RemoteRun = { mail: ts || s.pin || s.open ? '' : mail, until: typeof s.until === 'number' ? s.until : undefined, token: hex(), access: typeof s.access === 'string' ? s.access : '', used: typeof s.access === 'string', tries: 0, was: typeof s.url === 'string' ? s.url : undefined, down: 'starting again after a restart', ...(s.open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel: !!s.funnel }), ...(s.host && { host: s.host, named: s.named }) }
+  if (s.pin || s.host) Object.assign(r, { pin: newPin(), left: triesOf() })
+  remote = r
+  log('remote access: starting again after a restart')
+  changed()
+  void reaping
+    .catch(() => {})
+    .then(() => remoteUp(r))
+    .then(
+      u => remoteAt(r, u),
+      e => remoteAgain(r, firstLine(e)),
+    )
+}
+
+// stopped for good: by you, a wrong PIN's stop, its time up
 export function remoteStop() {
   const r = remote
   if (!r) return
   remote = undefined
-  r.cf.stop()
+  clearTimeout(r.timer)
+  r.cf?.stop()
+  if (r.host) void connect().catch(() => {}) // My domain's off the connector's ingress
+  forget()
   changed()
+}
+// shutdown: its process stopped, state.remote kept for the next start (remoteBack)
+export function remoteDown() {
+  const r = remote
+  remote = undefined
+  if (r) clearTimeout(r.timer), r.cf?.stop()
 }
 
 // a secret compared in constant time (none wanted: no; main.ts' tokens too), as bytes: a multibyte one as long in
@@ -644,7 +777,13 @@ export function same(a: string, b: string | undefined) {
 export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolean; left?: number; token?: string } | { token: string } {
   const r = remote
   if (!r || r.used || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
-  const use = () => ((r.used = true), changed(), r.access)
+  const use = () => {
+    const t = hex()
+    Object.assign(r, { used: true, access: hashOf(t) })
+    keepRemote()
+    changed()
+    return t
+  }
   if (!r.pin) return { need: false, token: use() }
   if (p.pin === undefined) return { need: true, left: r.left }
   if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return { token: use() }
@@ -659,14 +798,38 @@ export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolea
   throw new Error('Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.')
 }
 
-// remote access past its time ends (main.ts asks every 15 s; tests move the clock)
-export function remoteTick(now = Date.now()) {
-  if (remote?.until && now >= remote.until) return remoteStop()
-  // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note
+// remote access past its time ends (main.ts asks every 15 s; tests move the clock). The timer's own ask (no now) also
+// sees a Mac that slept (a minute or more since the last): a cloudflared address is fetched, and started again if it
+// doesn't answer (Cloudflare's 5xx for a tunnel that's gone). Not Tailscale's: this Mac can't reach its own tailnet
+// address, and its process ending says so already
+let lastTick = 0
+export function remoteTick(now?: number) {
+  const at = now ?? Date.now()
+  const woke = now === undefined && lastTick > 0 && at - lastTick > 60000
+  if (now === undefined) lastTick = at
+  if (remote?.until && at >= remote.until) return log('remote access ended: its time is up'), remoteStop()
   const r = remote
+  if (woke && r?.url && !r.via) void awake(r)
+  // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note
   if (r?.via === 'tailscale' && !r.funnel)
     tsReady().then(
       ({ peers }) => r === remote && peers !== r.peers && ((r.peers = peers), changed()),
       () => {},
     )
+}
+async function awake(r: RemoteRun) {
+  const up = await fetch(r.url!, { redirect: 'manual', signal: AbortSignal.timeout(15000) }).then(
+    x => x.status < 500,
+    () => false,
+  )
+  if (up || remote !== r || !r.url) return
+  const why = 'not reachable after the Mac slept'
+  if (r.host) {
+    const c = conn
+    if (c) c.cf.stop(), connDown(c, why)
+    return
+  }
+  const cf = r.cf
+  remoteAgain(r, why) // before the stop: its close then isn't an end of its own
+  cf?.stop()
 }

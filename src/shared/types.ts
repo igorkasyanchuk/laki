@@ -586,7 +586,8 @@ export type Settings = {
   aiGlow?: boolean // Settings › AI: a glow over what Laki AI looks at (a tab's pane, else the window), on unless false
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
-  remoteAuth?: 'email' | 'pin' | 'tailscale' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); tailscale, your tailnet (tailscale serve)
+  remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); both at a quick tunnel's address; tailscale, your tailnet (tailscale serve); domain, My domain (D1: settings.tunnel's named tunnel, a PIN always)
+  remoteHost?: string // domain: the word under the named tunnel's domain (unset: laki)
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // tailscale: a PIN as well
   remoteFunnel?: boolean // tailscale: tailscale funnel, the internet (a PIN always)
@@ -888,7 +889,12 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+// host: My domain's (D1: a hostname of your named tunnel, a PIN always); down: why it's starting again (D2: no url
+// meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
+// state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
+// its last address; what remoteBack starts again. Never a token or the PIN
+export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)
@@ -915,7 +921,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { digest?: Digest; projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; updatesOn?: boolean; dnd?: { since: number; until: number; prs: Record<string, string>; log: { kind: 'done' | 'wait'; tab: string; text: string }[] } /* U8: Do not disturb (core.ts dndSet) */; tunnels?: SavedTunnel[]; modelNeeds?: Record<string, string> } // modelNeeds: a model the installed claude is too old for, the version it needs (accounts.ts); cfgTrust: projects from before .laki.json's trust were trusted as they were, once; updatesOn: an updateCheck saved off turned back on, once (load, 0.33); flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
+export type State = { digest?: Digest; projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; updatesOn?: boolean; dnd?: { since: number; until: number; prs: Record<string, string>; log: { kind: 'done' | 'wait'; tab: string; text: string }[] } /* U8: Do not disturb (core.ts dndSet) */; tunnels?: SavedTunnel[]; remote?: SavedRemote; modelNeeds?: Record<string, string> } // modelNeeds: a model the installed claude is too old for, the version it needs (accounts.ts); cfgTrust: projects from before .laki.json's trust were trusted as they were, once; updatesOn: an updateCheck saved off turned back on, once (load, 0.33); flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 

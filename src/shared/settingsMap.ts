@@ -212,7 +212,7 @@ export const FIND: [string, string, string?][] = [
   ['tunnels', 'Webhooks', 'webhook webhooks inbound post github linear signature secret hmac trigger workflow event issue label'],
   ['tunnels', 'Expose to the internet', 'webhook public url tunnel cloudflare tailscale funnel'],
   ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
-  ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
+  ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server address my domain stable bookmark pin'],
   ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
   ['simulator', 'Emulator window', 'android emulator window headless no-window one instance avd'],
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],

@@ -396,20 +396,26 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string }
+export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
-type RemoteAuth = 'email' | 'pin' | 'tailscale'
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean }
-const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)'], ['tailscale', 'Tailscale']]
+type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
+// domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string }
+const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)']] // a quick tunnel's
+// D1: where it's published; a quick tunnel's address is new each start, the other two stay (a bookmark keeps working)
+type Address = 'tailscale' | 'domain' | 'quick'
+const ADDRESSES: [Address, string][] = [['tailscale', 'Tailscale'], ['domain', 'My domain'], ['quick', 'Quick tunnel']]
 // other: Settings › Tunnels (none where that isn't shown)
 export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void; other?: () => void }) {
-  const { mail, auth, tries, funnel } = opts
+  const { mail, auth, tries, funnel, host, domain } = opts
   const ts = auth === 'tailscale'
-  const pin = auth === 'pin' || (ts && (opts.tsPin || funnel)) // Funnel: on the internet, so a PIN always
+  const dom = auth === 'domain'
+  const address: Address = ts ? 'tailscale' : dom ? 'domain' : 'quick'
+  const pin = auth === 'pin' || dom || (ts && (opts.tsPin || funnel)) // Funnel: on the internet, so a PIN always; My domain: no Cloudflare sign-in Laki can set
   const [hours, setHours] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -424,7 +430,7 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(forHours, mail.trim(), open, pin, ts ? 'tailscale' : undefined, ts && funnel).then(() => setSure(''), fail) // the next start without an email asks again
+    await api.start(forHours, mail.trim(), open, pin, ts ? 'tailscale' : undefined, ts && funnel, dom ? host.trim() : undefined).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -436,12 +442,14 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
       <h2>Remote access</h2>
       <TwoWays here="remote" other={other} />
       <p className="muted small">
-        This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
-        random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
+        This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. With a quick tunnel, cloudflared publishes Laki's
+        daemon at a random trycloudflare.com address, new each start; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
         its own (without an email, that key is the only lock). With a PIN instead, there's no Cloudflare sign-in: the page asks for a PIN Laki shows
         here, and a wrong one (twice, unless you pick otherwise) stops remote access. The link opens once, in one tab. It stops after the time you pick (or never: Forever; without an email, 24 hours at most), when you
-        stop it, or with the daemon, and a stopped link never works again. With Tailscale, tailscale serve publishes it on this Mac's name in your
-        tailnet instead: only your tailnet's devices reach it, with the link's key.
+        stop it, and a stopped link never works again; if its tunnel drops or Laki restarts, it starts again by itself. With Tailscale, tailscale serve
+        publishes it on this Mac's name in your tailnet instead: only your tailnet's devices reach it, with the link's key. With My domain, it's at a name of
+        yours on your named tunnel (Settings › Tunnels), with a PIN. Tailscale and My domain keep their address, so a bookmark keeps working; a quick
+        tunnel's changes every time.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
       {r?.link ? (
@@ -457,6 +465,19 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             <p className={r.used ? 'warn-soft small' : 'muted small'}>
               {r.used ? 'Opened: the link works once, in one tab, and that tab stays in. For another device, stop remote access and start it again.' : 'The link opens once, in one tab: the page keeps its own key after that.'}
             </p>
+            {r.down ? (
+              <p className="warn-soft small">Reconnecting ({r.down}): it starts again by itself{r.host || r.via ? ', at the same address' : ', at a new address'}.</p>
+            ) : r.was ? (
+              <p className="warn-soft small">Back at a new address: the old link has ended. Open this one on your phone.</p>
+            ) : (
+              (r.host || r.via) && <p className="muted small">A stable address: a bookmark of it keeps working, and the page reconnects by itself if it drops.</p>
+            )}
+            {r.host && (
+              <p className="muted small">
+                For Cloudflare's email sign-in as well, add an Access policy in Cloudflare's dashboard: Zero Trust › Access controls › Applications › Create new
+                application › Self-hosted, public hostname <code>{r.host}</code>, an Allow rule for your email.
+              </p>
+            )}
             {r.via === 'tailscale' && (
               <p className={r.peers === 0 && !r.funnel ? 'warn-soft small' : 'muted small'}>
                 {r.peers === 0 && !r.funnel ? 'No other device is on your tailnet right now, and this Mac can’t open its own Tailscale link (macOS keeps its tailnet address to itself). Put Tailscale on your phone or another computer, sign in with the same account, then open the link there.' : `Open it on ${r.funnel ? 'any device' : 'another device in your tailnet'}: this Mac can’t open its own Tailscale link. The first visit can take a few seconds (its HTTPS certificate).`}
@@ -508,15 +529,52 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
       ) : (
         <form className="remote-form" onSubmit={e => (e.preventDefault(), start())}>
           <div className="field">
-            <span>Sign in with</span>
-            <div className="seg" role="radiogroup" aria-label="Sign in with">
-              {AUTHS.map(([v, label]) => (
-                <button key={v} type="button" role="radio" aria-checked={auth === v} className={auth === v ? 'on' : ''} onClick={() => set({ auth: v })}>
+            <span>Address</span>
+            <div className="seg" role="radiogroup" aria-label="Address">
+              {ADDRESSES.map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={address === v}
+                  className={address === v ? 'on' : ''}
+                  disabled={v === 'domain' && !domain && !dom}
+                  title={v === 'tailscale' ? 'Recommended when Tailscale is on this Mac: stable and private' : v === 'domain' ? (domain ? `A name under ${domain}, on your named tunnel: stable` : 'Set up your named tunnel in Settings › Tunnels first') : 'A random trycloudflare.com address, new each start'}
+                  onClick={() => set({ auth: v === 'quick' ? (auth === 'pin' ? 'pin' : 'email') : v })}
+                >
                   {label}
                 </button>
               ))}
             </div>
+            <span className="muted small">{address === 'quick' ? 'Its address changes every time it starts: a bookmark stops working.' : 'Its address stays the same: a bookmark keeps working.'}</span>
           </div>
+          {address === 'quick' && (
+            <div className="field">
+              <span>Sign in with</span>
+              <div className="seg" role="radiogroup" aria-label="Sign in with">
+                {AUTHS.map(([v, label]) => (
+                  <button key={v} type="button" role="radio" aria-checked={auth === v} className={auth === v ? 'on' : ''} onClick={() => set({ auth: v })}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {dom && (
+            <>
+              <label>
+                <span>
+                  Name <span className="muted">· under {domain ?? 'your domain'} (Settings › Tunnels), with a PIN</span>
+                </span>
+                <input value={host} spellCheck={false} placeholder="laki" onChange={e => set({ host: e.target.value })} />
+              </label>
+              <p className="muted small">
+                At https://{host.trim() || 'laki'}.{domain ?? 'your-domain'}, through your named tunnel's cloudflared. Laki can't set a Cloudflare sign-in for it, so the
+                page asks for a PIN; for Cloudflare's email code too, add an Access policy in Cloudflare's dashboard (Zero Trust › Access controls › Applications ›
+                Self-hosted).
+              </p>
+            </>
+          )}
           {ts && (
             <p className="muted small">
               tailscale serve publishes it at https://&lt;this Mac&gt;.&lt;your tailnet&gt;.ts.net, for your tailnet's devices only; open it on your

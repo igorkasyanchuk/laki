@@ -676,7 +676,20 @@ email address only, unless you leave the email out on purpose (below).
   browser page opens to pick your Cloudflare account). Settings › *Remote access* and Help say so too.
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
   link ended (remote access stopped or started again: open the newest one), or the Mac is out of reach.
-- With Tailscale instead (*Sign in with* › *Tailscale*): `tailscale serve` publishes it at
+- *Address*: *Tailscale* (recommended when it's on this Mac: stable and private), *My domain* (once your named
+  tunnel is set up in Settings › *Tunnels*) or *Quick tunnel* (a random trycloudflare.com address, new each start).
+  Tailscale and My domain keep their address, so a bookmark on your phone keeps working; a quick tunnel's changes
+  every time. *My domain* is at `https://<name>.<your domain>` (the name: `laki` unless you type another), through
+  your named tunnel's cloudflared (Expose's permanent tunnels share it), with Laki's PIN always: cloudflared can't
+  set a Cloudflare sign-in for it. For Cloudflare's email code as well, add an Access policy in Cloudflare's
+  dashboard (Zero Trust › Access controls › Applications › Create new application › Self-hosted, that hostname,
+  an Allow rule for your email). `laki serve --domain [name]` does the same headless.
+- If its cloudflared or tailscale ends on its own, or Laki's daemon restarts, it starts again by itself (a few
+  seconds apart, then once a minute), with the same time left; Settings says *Reconnecting* meanwhile. At a stable
+  address the page on your phone reconnects by itself; a quick tunnel comes back at a new address with a new link
+  (and PIN), and Laki says so. After the Mac sleeps, Laki checks its address answers and starts it again if not.
+  Stopping it yourself, a wrong PIN's stop or its time running out is final.
+- With Tailscale instead (*Address* › *Tailscale*): `tailscale serve` publishes it at
   `https://<this Mac>.<your tailnet>.ts.net`, for your tailnet's devices only, with the link's key; *Ask for a PIN as
   well* adds Laki's PIN, and *Funnel* (`tailscale funnel`) puts it on the public internet, always with a PIN (Funnel
   must be on for your tailnet). Open the link on your phone or another computer: this Mac can't open its own Tailscale
@@ -686,8 +699,8 @@ email address only, unless you leave the email out on purpose (below).
   separate tabs), the panels and Settings take the whole screen, and a row of keys a phone keyboard lacks
   (⌨ to show it, Esc, Tab, ⇧Tab, ⌃C, arrows, Enter) sits above the status bar. A terminal takes the size of the
   last screen that typed in it or came to the front, so coming back to the Mac gives it the Mac's size again.
-- It stops on its own when the time is up, when you stop it, or with the daemon. Each start makes a new key, so
-  an old link never works again.
+- It stops on its own when the time is up, or when you stop it. Each start makes a new key, so an old link never
+  works again.
 
 **Board** (the columns icon on the rail, or at the start of the status bar without it, *Board* in ⌘K, `laki://board`): every workspace as a card in
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,

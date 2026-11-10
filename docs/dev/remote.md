@@ -159,15 +159,39 @@ first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the acce
 `fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from
 `/rpc` is a dead link, no answer or a 5xx is the Mac out of reach; App shows it on the splash and in the status bar
 (the `problem` event). Retries back off to 10 s. `page` serves the HTML `no-store`, so a tab brought back or Back
-goes through the sign-in instead of loading from the cache with every other request turned away. It ends by
-`remoteStop`, at `until` (`remoteTick`, every 15 s), when cloudflared exits, or at shutdown.
+goes through the sign-in instead of loading from the cache with every other request turned away. It ends for good by
+`remoteStop` (you, Resources' Stop, a wrong PIN's stop) or at `until` (`remoteTick`, every 15 s): `state.remote` goes.
+
+My domain (D1, `remoteStart`'s `host`, Settings' *Address* › *My domain*: `remoteAuth: 'domain'`, `remoteHost`): a word
+(`''`: `laki`) under `settings.tunnel`'s domain (`hostOf`), its DNS record by `routeDns` at each start, then on the
+permanent tunnels' connector (`connect`: its ingress gets `hostname: <host>` → `http://127.0.0.1:<daemon port>`
+beside Expose's, `far`; a record of another named tunnel's leaves it out, `down` says so). Always with a PIN: cloudflared
+alone can't make a Cloudflare Access application (that's the dashboard's or the API's: Zero Trust › Access controls ›
+Applications › Self-hosted), so Laki's PIN is the lock and Settings says how to add Access for the email too. Its
+origin is `https://<host>`, the same every start; `remoteOrigin` is it while it runs, as a quick one's. A tunnel can't
+take its host (`namedStart`'s `taken`) and the other way round. `remoteUp` waits for the connector (`up`, its `key`
+having the host). Resources' *Permanent tunnels* stop (`stopTunnels(undefined, true)`) stops it too.
+
+Started again (D2): its cloudflared or tailscale ending on its own (`publisher`'s `ended`) is `remoteAgain`: `was`,
+`down`, AGAIN's delays then a minute each, `remoteUp` again; My domain's connector restarts itself (`connDown` sets
+`down`). `remoteAt`: the same address goes on as it was (the page's token, `access`, still good: `api.ts` retries and
+reconnects); a new one (a quick tunnel's) gets a new link key, PIN and `used: false` (the old page's origin is gone),
+`was` in the view (`moved`) and a `remote` event. `access` is the hash (sha256) of the page's token, never the token:
+`remotePin`'s `use` makes it, `accessOk` compares (main.ts' `tokenOk`). `keepRemote` writes `state.remote`
+(`SavedRemote`: mail, open, pin, via, funnel, host, named, until, `access` once used, the last url; no token or PIN) at
+each start, use and return; `remoteBack` (main.ts, after `reapChildren`, before `tunnelsBack`) starts it again unless
+`until` passed or a managed policy turned it off, with a new link key and PIN (the old key went with the daemon), so a
+stable address's page reconnects with its token. `remoteDown` (shutdown) stops the process and keeps `state.remote`.
+The timer's `remoteTick` (no `now`) notes a gap over a minute (the Mac slept): `awake` fetches the cloudflared address
+(a 5xx or no answer: started again: a quick one's `remoteAgain`, My domain's `connDown`); not Tailscale's, which this
+Mac can't reach.
 
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
 `connect-src 'self'` lets the page reach its own daemon over `wss://`.
 
-Through Tailscale (`via: 'tailscale'`, Settings' *Sign in with* › *Tailscale*, `remoteAuth`; `remoteTsPin`, `remoteFunnel`): `tailscale serve
+Through Tailscale (`via: 'tailscale'`, Settings' *Address* › *Tailscale*, `remoteAuth`; `remoteTsPin`, `remoteFunnel`): `tailscale serve
 --https=443 http://127.0.0.1:<port>` (`funnel`: `tailscale funnel`, the internet, refused without `pin`) in the foreground (`publisher`, the same child-process shape as `cloudflare()`:
 its URL, `TAILNET_URL`, from its output; stopping it unpublishes), after `tsReady` (`tailscaleBin`: PATH, else the
 Mac app's `TAILSCALE_APP`; `status --json` Running; its online `Peer`s as the view's `peers`: 0 is Settings' warning, since a Mac can't reach its own tailnet address). No email; `open` never; a PIN if asked. The origin and token

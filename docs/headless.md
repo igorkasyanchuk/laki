@@ -40,6 +40,7 @@ Pick one:
 | `--tailscale --funnel` | anyone on the internet with the link and the PIN (Tailscale Funnel; a PIN always) | the same, and Funnel on for the tailnet (its policy's `funnel` attribute) |
 | `--cloudflare --mail you@example.com` | that email only, after a one-time code from Cloudflare | `cloudflared` 2026.9.3+ |
 | `--cloudflare --pin` | anyone with the link and the PIN (2 wrong PINs stop it) | `cloudflared` |
+| `--domain [name]` | anyone with the link and the PIN, at `https://<name>.<your domain>` (`laki` unless named): the same address every start | `cloudflared`, your named tunnel set up (Settings › Tunnels, or `tunnel` in the settings) |
 
 `--hours n` (1, 2, 4, 8, 12, 24, 48 or 72) stops it after that long; the default is until stopped. `--cloudflare --open`
 (anyone with the link) needs `--hours`, 24 at most.

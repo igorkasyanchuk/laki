@@ -448,7 +448,8 @@ test('a tunnel a killed daemon left running is stopped as the next daemon starts
   assert.doesNotMatch(log(), new RegExp(`cloudflared ${port} stopped`))
   await rig.start()
   await until(() => log().includes(`cloudflared ${port} stopped`), 'the old cloudflared stopped')
-  assert.ok(!existsSync(kids) || JSON.parse(readFileSync(kids, 'utf8')).length === 0)
+  // D2: remote access then starts again (a cloudflared of its own): the old one's gone from the list
+  await until(() => !existsSync(kids) || !JSON.parse(readFileSync(kids, 'utf8')).some((k: { pid: number }) => k.pid === cf), 'the old one off the list')
 })
 
 test('refused WebSockets: the first logged, the rest counted, not a line each (L15)', async t => {

@@ -218,6 +218,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   if (!view?.remote) {
     // the way Settings has it: Laki's PIN, or the saved email
     if (settings.remoteAuth === 'tailscale') a({ label: `Start remote access ${settings.remoteFunnel ? 'on the internet (Tailscale Funnel)' : 'on your tailnet'}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, via: 'tailscale', pin: !!(settings.remoteTsPin || settings.remoteFunnel), funnel: !!settings.remoteFunnel }).catch(() => {}), setDialog({ section: 'remote' })) })
+    else if (settings.remoteAuth === 'domain') a({ label: 'Start remote access on your domain, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, host: settings.remoteHost ?? '' }).catch(() => {}), setDialog({ section: 'remote' })) })
     else if (settings.remoteAuth === 'pin') a({ label: 'Start remote access with a PIN, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, pin: true }).catch(() => {}), setDialog({ section: 'remote' })) })
     else if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
     a({ id: 'remote', label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })

@@ -128,7 +128,7 @@ const { same } = remoteMod
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
 // ponytail: any program of the same user can read daemon.json's token: a Keychain item or a peer check if that matters
 // M5: remote access's Origin takes its token only: ours with it would skip the caller check (whoCalls) as a phone's page
-const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (!!o && o === remoteMod.remoteOrigin() ? same(t, remoteMod.remoteToken()) : same(t, token) || same(t, appToken))
+const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (!!o && o === remoteMod.remoteOrigin() ? remoteMod.accessOk(t) : same(t, token) || same(t, appToken))
 const isApp = (t: string | null | undefined, o: string | undefined) => !!t && !(!!o && o === remoteMod.remoteOrigin()) && same(t, appToken)
 // the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
@@ -1177,7 +1177,7 @@ void remoteMod
   .reapChildren()
   .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
   .then(() => listening) // tunnelsBack skips the daemon's own port: known once it listens
-  .then(() => remoteMod.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
+  .then(() => (remoteMod.remoteBack(), remoteMod.tunnelsBack())) // then the ones state.json kept (remote access first: My domain's on the tunnels' connector): after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
@@ -1250,7 +1250,7 @@ function shutdown(keep: unknown = false) {
   hookStop()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
-  remoteMod.remoteStop()
+  remoteMod.remoteDown() // kept in state.json too (D2)
   flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   hostsMod.stopHosts()
