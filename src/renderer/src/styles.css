@@ -76,10 +76,17 @@ html.has-bg body::before { content: ''; position: fixed; inset: calc(var(--bg-bl
 html.side-clear body { background: transparent; }
 html.side-clear .main { background: var(--app-bg, var(--bg)); }
 html.side-clear .narrow .sidebar { background: var(--panel); } /* a drawer over the main area: solid */
-/* Sidebar see-through without glass: over the desktop, its hovers, lines and selection are tints of the text color,
+/* Sidebar see-through without glass: over the desktop, its hovers and lines are tints of the text color (a row's selection, V6's, is one already),
    never solid blocks of the theme's (glass does the whole window: themes.ts) */
 html.side-clear:not(.glass) :is(.sidebar, .rail) { --hover: color-mix(in srgb, var(--fg) 9%, transparent); --line: color-mix(in srgb, var(--fg) 14%, transparent); }
-html.side-clear:not(.glass) .sidebar .ws.sel { background-color: color-mix(in srgb, var(--sel) 70%, transparent); }
+/* V5's translucent sidebar (themes.ts material; not on a phone or in Focus): the sidebar's tint once, over the whole
+   window, under the rail, the sidebar and the status bar alike; the main area a card on it, inset from the sidebar */
+html.material .app:not([data-dz], .narrow, .full) { background: var(--side); }
+html.material .app:not([data-dz], .narrow, .full) :is(.rail, .sidebar, .status.wide) { background: none; }
+html.material .app:not([data-dz], .narrow, .full) .sidebar { border-right: none; }
+html.material .app:not([data-dz], .narrow, .full) :is(.rail, .sidebar, .status.wide) { --fg: var(--side-fg); --muted: var(--side-muted); } /* made to read over any wallpaper (themes.ts materialInk; set with html.material) */
+html.material .app:not([data-dz], .narrow, .full) .status.wide { border-top: none; }
+html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) var(--sp-4) var(--sp-2) var(--sp-4); border: 0.5px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--lift-2); overflow: hidden; }
 button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
 button:hover { background: var(--hover); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }

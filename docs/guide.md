@@ -2102,8 +2102,10 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it; every theme's rows, lines, hovers and
   selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
-  (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Sidebar see-through*
-  (a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, like macOS's own sidebars, their
+  (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Translucent sidebar* (macOS, the Classic
+  design; on by default: the sidebar and the rail over macOS's sidebar material, the main area a card on it, their words
+  made to read over any wallpaper) and *Sidebar see-through* (with it on, how much shows through, Auto by default; off
+  macOS a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, their
   hovers, lines and selection tints as with glass; the rest stays solid), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
   one by name; the ☆ on a card's corner makes it a favorite: *Favorites*, a group of its own above the rest, and still in the full list): Laki and Laki Light (a new install's, as the system is light or dark), Midnight (the default of an install from before), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,

@@ -102,6 +102,7 @@ export const FIND: [string, string, string?][] = [
   ['layout', 'Sidebar', 'status guide line divider indent row height space spacing gap between rows projects project row height font size bigger dotted dashed text size icon size avatar github style compact extended cards'],
   ['layout', 'Button labels', 'sidebar schedule scheduled board settings video timer words buttons and bars'],
   ['extras', 'Glass', 'transparent see-through blur vibrancy'],
+  ['extras', 'Translucent sidebar', 'material vibrancy macos native card blur desktop see-through'],
   ['extras', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
   ['extras', 'Background image', 'wallpaper picture photo backdrop dim blur'],
   ['extras', 'Glow', 'glass colors'],

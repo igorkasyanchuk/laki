@@ -445,6 +445,12 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
   (a clear body, `.main` alone on `--app-bg`; glass in the app too: the sidebar's slider is over the desktop, not the Window one's background) and the window's blur (`blurred`; the new-workspace window never: `NewWindow`'s paint); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:
   flicker, stale tooltips, rectangles around menus); the window's own blur is native
+  (V5) *Translucent sidebar* (`translucent`, on unless false; `themes.ts` `material`: macOS's app, the Classic design, no
+  glass, not Reduce transparency): `sideClear` there is its tint (unset or 0: `MATERIAL`, 85% of the sidebar's color, its
+  own alpha dropped), main's vibrancy the `sidebar` material (`glass`'s 4th argument, `side`; glass keeps `under-window`),
+  `html.material`: the tint once on `.app`, the rail, sidebar and status bar clear over it, `.main` a card (inset, `--r-panel`,
+  a hairline, `--lift-2`); `--side-fg`/`--side-muted` (`materialInk`: `readable` over the tint on white and on black, the
+  worst a wallpaper can be; `test/contrast.test.ts` checks every theme) for the words there. A Mac with it off: solid.
   (`setVibrancy` over IPC, App's `glassed`; `themes.ts` `LESS_CLEAR`: macOS's Reduce transparency turns glass and `sideClear` off in `applyTheme` and `blurred`, Settings notes it under Glass; `MORE_CONTRAST`, Increase contrast: `--muted` and `--line` halfway to `--fg`; the Paint's `highContrast`, Appearance's *High contrast mode*, off unless true: most of the way, and `--accent-ink` `readable` at 7:1; App repaints as either changes). `main.tsx` loads the fonts
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB), and a

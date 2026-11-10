@@ -2045,7 +2045,7 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={glassy} disabled={s.design === 'frosted'} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
                   <Says title="Glass" hint={s.design === 'frosted' ? 'Always on in the Frosted design' : 'A see-through window: the desktop shows through, blurred'} />
                 </Switch>
-                {(glassy || (s.sideClear ?? 0) > 0) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
+                {(glassy || (s.sideClear ?? 0) > 0 || (s.translucent !== false && /Mac/.test(navigator.userAgent))) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
                   <div className="muted small">macOS's Reduce transparency is on, so the window stays solid: turn it off in System Settings › Accessibility › Display.</div>
                 )}
                 {glassy && (
@@ -2083,9 +2083,15 @@ export function SettingsPage(p: {
                     </Switch>
                   </>
                 )}
-                {!glassy && (
+                {!glassy && /Mac/.test(navigator.userAgent) && bridge && (
+                  // V5: the sidebar over macOS's sidebar material, the main area a card on it (themes.ts material)
+                  <Switch className="switch-row" on={s.translucent !== false} disabled={!!s.design && s.design !== 'classic'} onChange={v => paint({ translucent: v })}>
+                    <Says title="Translucent sidebar" hint={s.design && s.design !== 'classic' ? 'With the Classic design (Layout › Design)' : "The sidebar and the rail over macOS's sidebar material, the terminals a card on it"} />
+                  </Switch>
+                )}
+                {!glassy && (!/Mac/.test(navigator.userAgent) || !bridge || (s.translucent !== false && (!s.design || s.design === 'classic'))) && (
                   <div className="sliders">
-                    <Says title="Sidebar see-through" hint="The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off" />
+                    <Says title="Sidebar see-through" hint={/Mac/.test(navigator.userAgent) && bridge ? 'How much of the desktop shows through. Auto: as much as keeps its words readable over any wallpaper' : "The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off"} />
                     <label className="slider-row">
                       <span>Sidebar</span>
                       <input
@@ -2098,7 +2104,7 @@ export function SettingsPage(p: {
                         style={{ '--p': s.sideClear ?? 0 } as CSSProperties}
                         onChange={e => paint({ sideClear: Number(e.target.value) })}
                       />
-                      <span className="slider-val">{s.sideClear ?? 0}%</span>
+                      <span className="slider-val">{!s.sideClear && /Mac/.test(navigator.userAgent) && bridge ? 'Auto' : `${s.sideClear ?? 0}%`}</span>
                     </label>
                   </div>
                 )}

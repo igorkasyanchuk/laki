@@ -1119,8 +1119,8 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'translucent', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1136,7 +1136,19 @@ export const LESS_CLEAR = '(prefers-reduced-transparency: reduce)'
 export const MORE_CONTRAST = '(prefers-contrast: more)'
 const asked = (q: string) => !!globalThis.matchMedia?.(q).matches
 // the window's own blur (main's vibrancy): glass, or a see-through sidebar without it
-export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || (o.sideClear ?? 0) > 0)
+export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || material(o) || (!macApp() && (o.sideClear ?? 0) > 0))
+// V5: Settings › Appearance › Translucent sidebar (on unless false; macOS's app only, the Classic design, not with glass
+// or Reduce transparency): the sidebar and the rail over macOS's sidebar material, the main area a card on it (html.material)
+const macApp = () => !!(globalThis as { laki?: unknown }).laki && /Mac/.test(globalThis.navigator?.userAgent ?? '')
+export const material = (o: Paint) => !o.glass && o.translucent !== false && (!o.design || o.design === 'classic') && macApp() && !asked(LESS_CLEAR) // a Design frames the window its own way
+export const MATERIAL = 85 // its tint of the sidebar's color (%): the wallpaper only tints it
+// the sidebar's words on it (--side-fg, --side-muted): its text and hints made to pass AA over the brightest and the
+// darkest wallpaper (white, black) under that tint; undefined for a color that isn't hex
+export const materialInk = (side: string, fg: string, muted: string, tint = MATERIAL) => {
+  if (![side, fg, muted].every(c => /^#[\da-f]{6}([\da-f]{2})?$/i.test(c))) return
+  const on = ['#ffffff', '#000000'].map(w => flat(alpha(side.slice(0, 7), tint), w))
+  return { fg: readable(fg.slice(0, 7), on), muted: readable(muted.slice(0, 7), on) }
+}
 // a color at pct% strength (of its own alpha, if it has one): #rrggbbaa from a hex (xterm reads only that), else color-mix
 function alpha(c: string, pct: number) {
   const m = /^(#[\da-f]{6})([\da-f]{2})?$/i.exec(c)
@@ -1254,7 +1266,7 @@ if (typeof matchMedia === 'function') matchMedia(DARK).addEventListener('change'
 
 export function applyTheme(p: string | Paint = '', solid = false) {
   last = [p, solid]
-  const o: Paint = { ...paintOf(typeof p === 'string' ? { theme: p } : p), ...((solid || asked(LESS_CLEAR)) && { glass: false, sideClear: 0 }) }
+  const o: Paint = { ...paintOf(typeof p === 'string' ? { theme: p } : p), ...((solid || asked(LESS_CLEAR)) && { glass: false, sideClear: 0, translucent: false }) }
   const t = THEMES.find(x => x.id === themeFor(o, asked(DARK))) ?? THEMES[0]
   const root = document.documentElement
   const st = root.style
@@ -1271,7 +1283,10 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   root.classList.toggle('glass', !!o.glass)
   // Settings' Sidebar see-through, without glass; only in the app (window.laki): a browser has no blur behind the page
   const app = !!(globalThis as { laki?: unknown }).laki
-  const clear = o.glass || !app ? 0 : Math.min(100, Math.max(0, o.sideClear ?? 0))
+  const mat = material(o)
+  const own = Math.min(100, Math.max(0, o.sideClear ?? 0))
+  const clear = o.glass || !app ? 0 : mat ? own || 100 - MATERIAL : macApp() ? 0 : own // a Mac's switch off: solid
+  root.classList.toggle('material', mat && clear > 0) // the main area a card over it (styles.css)
   // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
@@ -1338,7 +1353,8 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   }
   if (clear) {
     // the sidebar and the rail over the window's blur, the rest solid (styles.css' html.side-clear)
-    const side = t.c?.side ?? rootVar('--side')
+    // V5: on the material, the sidebar's color solid under its tint (a gradient theme's is see-through over its gradient)
+    const side = (c => (mat ? c.slice(0, 7) : c))(t.c?.side ?? rootVar('--side'))
     st.setProperty('--side', alpha(side, 100 - clear))
     st.setProperty('--rail-bg', rail(side, 100 - clear))
   }
@@ -1348,6 +1364,13 @@ export function applyTheme(p: string | Paint = '', solid = false) {
     const fg = t.c?.fg ?? rootVar('--fg')
     st.setProperty('--muted', `color-mix(in srgb, ${t.c?.muted ?? rootVar('--muted')} ${o.highContrast ? 30 : 50}%, ${fg})`)
     st.setProperty('--line', `color-mix(in srgb, ${st.getPropertyValue('--line') || t.c?.line || rootVar('--line')} ${o.highContrast ? 40 : 55}%, ${fg})`)
+  }
+  if (mat && clear) {
+    // V5: the words on the material (styles.css' html.material), always both set; High contrast's own hints, stronger, stay
+    const fg = t.c?.fg ?? rootVar('--fg'), muted = t.c?.muted ?? rootVar('--muted')
+    const ink = materialInk(t.c?.side ?? rootVar('--side'), fg, muted, 100 - clear)
+    st.setProperty('--side-fg', ink?.fg ?? fg)
+    st.setProperty('--side-muted', st.getPropertyValue('--muted') || (ink?.muted ?? muted))
   }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t

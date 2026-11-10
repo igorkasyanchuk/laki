@@ -884,7 +884,8 @@ export function App() {
     // the window's own blur, light or dark as the theme is
     const blur = blurred(paint), light = paint.themeAuto ? undefined : !!THEMES.find(t => t.id === paint.theme)?.light // B3: following the system, the blur does too
     const float = paint.design === 'frosted' // the traffic lights inside the floating sidebar
-    if (glassed.current !== `${blur} ${light} ${float}`) (glassed.current = `${blur} ${light} ${float}`), bridge?.glass?.(blur, light, float)
+    const side = blur && !paint.glass // V5: macOS's sidebar material, not glass's whole-window one
+    if (glassed.current !== `${blur} ${light} ${float} ${side}`) (glassed.current = `${blur} ${light} ${float} ${side}`), bridge?.glass?.(blur, light, float, side)
     painted.current = theme
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
