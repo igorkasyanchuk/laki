@@ -467,8 +467,8 @@ tmux) used to count as you. A token per tab makes an agent's caller a fact the d
   inherited `LAKI_TAB_TOKEN` as they start. A **shell** tab's token only lets the call in:
   who typed there is still looked up (`peerOf`, `treeAgent`), since an agent's `ps` can read a shell's environment. The
   main token from a process found in a tab stays an agent's, so reading daemon.json gains nothing while it's in the tree.
-- **The sandbox.** A sandboxed claude's generated settings deny reads of `<data>/daemon.json`: its Bash commands
-  (`sandbox.filesystem.denyRead`) and its Read tool (a `Read(//…)` deny rule). Its `laki` calls run outside the sandbox
+- **The sandbox.** A sandboxed claude's generated settings deny reads of the data folder (S6, `docs/dev/agents.md`):
+  its Bash commands (`sandbox.filesystem.denyRead`, `allowRead` for what it needs) and its Read tool (`Read(//…)` deny rules). Its `laki` calls run outside the sandbox
   with the tab's token. ponytail: codex's sandbox reads everything, and an agent with no sandbox can still read the
   file, drop its environment and leave its tree: then it's you, as before.
 - **SSH hosts** have no token (no CLI there reaches the daemon). **Remote access** keeps its own token and origin.

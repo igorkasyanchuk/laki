@@ -311,7 +311,10 @@ model_reasoning_effort="…"`, opencode its inline config (above), the others `-
 `sandbox` (`SANDBOX`, a profile's *Sandbox*, the tab's over it, kept for restarts and forks; `sandboxOff`: none with
 bypass permissions, its mode or its flags, refused by `modelCheck`, `tabSpec` and `presetSave` as `SANDBOX_NO`, and an
 agent's `sandbox: false` by main.ts' `agentNo`): claude's `--settings` gets `-sandbox` (`sandbox.enabled`,
-`autoAllowBashIfSandboxed`, `excludedCommands`: `laki *` and `LAKI_CLI`, so the CLI reaches the daemon) and `--add-dir`,
+`autoAllowBashIfSandboxed`, `excludedCommands`: `laki *` and `LAKI_CLI`, so the CLI reaches the daemon; S6: the data
+folder in `filesystem.denyRead`, `allowRead` giving back `images/`, `files/`, the storage folders and `worktrees/` when
+they're in it, and the Read tool's deny rules each other entry of it plus `DATA_SECRETS`: claude's allow rules can't
+carve out of a deny; hooks and the status line run outside the sandbox, `laki` calls with the tab's token) and `--add-dir`,
 first (it takes every word up to a flag), for each folder `git commit` writes in (`gitWrites`, from `.git` and
 `commondir`, realpath'd: a worktree's own folder, the index and HEAD, and the shared `objects`, `refs` and `logs`; never
 the shared `hooks` or `config`, which git runs outside the sandbox, Laki's own git included; the repo itself, a local

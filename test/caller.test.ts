@@ -413,8 +413,8 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
   // a sandboxed claude's settings: daemon.json out of its Bash commands' reach and its Read tool's
   const box = JSON.parse(readFileSync(join(rig.data, 'claude-settings-sandbox.json'), 'utf8'))
   const secret = [join(rig.data, 'daemon.json'), join(rig.data, 'pty.json'), join(rig.data, 'pty.sock')] // R6: the pty host's too
-  assert.deepEqual(box.sandbox.filesystem.denyRead, secret)
-  assert.deepEqual(box.permissions.deny, secret.map(f => `Read(/${f})`))
+  assert.ok(box.sandbox.filesystem.denyRead.includes(rig.data), 'the whole data folder (S6: presets.test.ts)')
+  for (const f of secret) assert.ok(box.permissions.deny.includes(`Read(/${f})`), f)
   assert.ok(box.permissions.allow.length > 0, 'its allow rules kept')
   assert.equal(JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8')).permissions.deny, undefined)
   // the start ends: its token with it

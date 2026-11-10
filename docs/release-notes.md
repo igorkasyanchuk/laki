@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Safer: a sandboxed Claude can't read Laki's data folder (its keys, state and accounts), only pasted images and files, storage folders and worktrees.
 - Safer: a repo's extension is checked by its files' contents before every run, so an edit that keeps its size and date still turns it off.
 - Safer: an agent can't open a page it wrote in a browser, and its *Expose to the world* asks you first; a project's *Expose* list (who gets in) now holds for every tunnel to it, yours too.
 - Safer: agents can no longer read or change your notes and To-dos, Laki AI's key, the `laki` command on PATH, remote access or Settings › Resources; their deletes of a spec, a note or an extension ask you first.

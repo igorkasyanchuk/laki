@@ -310,6 +310,13 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   assert.deepEqual(dirs(c.args), writes(cw))
   assert.equal(c.args[0], '--add-dir')
   assert.ok(!('sandbox' in JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8'))))
+  // S6: Laki's data folder out of its reach, but pasted images and files, the storage folders and worktrees (its own);
+  // its Read tool: each other entry (an allow can't carve a deny), the secrets made later too
+  assert.deepEqual(box.sandbox.filesystem.denyRead, [rig.data])
+  assert.deepEqual(box.sandbox.filesystem.allowRead, ['images', 'files', 'storage', 'worktrees'].map(d => join(rig.data, d)))
+  for (const f of ['daemon.json', 'state.json', 'tap-key', 'ai-key', 'accounts', 'hooks', 'pty.json']) assert.ok(box.permissions.deny.includes(`Read(/${join(rig.data, f)}/**)`) && box.permissions.deny.includes(`Read(/${join(rig.data, f)})`), f)
+  for (const d of ['images', 'files', 'storage', 'worktrees']) assert.ok(!box.permissions.deny.some((r: string) => r.startsWith(`Read(/${join(rig.data, d)}`)), d)
+  assert.ok(cw.path.startsWith(join(rig.data, 'worktrees')), 'its worktree: in an allowed folder')
   // codex: workspace-write, those folders writable, the network on; with its own mode, only those two
   const xw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true })
   const x = await argsOf(xw)

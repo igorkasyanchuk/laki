@@ -253,6 +253,8 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // the daemon on 127.0.0.1) and nothing asked for a sandboxed command
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
+// S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles)
+const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -282,13 +284,18 @@ export function hookFiles(h: Hooks): Record<string, string> {
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
-  // S12: the daemon's own token (daemon.json) isn't a sandboxed claude's to read: its Bash commands (denyRead) and its
-  // Read tool (the deny rule); its laki calls go with its tab's token. ponytail: claude's sandbox only (codex's
-  // workspace-write reads everything), and an agent with no sandbox still reads it
-  // R6: nor the pty host's socket and the starts' keys kept for it (pty.json)
-  const secret = [join(dir, 'daemon.json'), join(dir, 'pty.json'), ptySock()]
-  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])], ...(local && { filesystem: { denyRead: secret } }) } }
-  const boxed = (gated: boolean) => ({ ...box, ...(local && { permissions: { ...settings(gated).permissions, deny: secret.map(f => `Read(/${f})`) } }) })
+  // S12, S6: Laki's data folder isn't a sandboxed claude's to read (daemon.json's token, the phone's tap-key, Laki AI's
+  // key, state.json, accounts, the pty host's pty.json and socket): its Bash commands (denyRead, the narrower allowRead
+  // wins) and its Read tool (deny rules: an allow can't carve one out, so each entry but the allowed by name). Allowed
+  // back: pasted images and files, the storage folders and worktrees when they're in it (its own cwd). Its laki calls
+  // and hooks run outside the sandbox, with its tab's token and key. ponytail: every workspace's storage folder and
+  // worktree (one settings file for all), and the Read tool's list is the folder's entries as the file is written
+  // (DATA_SECRETS for ones made later); claude's sandbox only (codex's workspace-write reads everything)
+  const allow = [join(dir, 'images'), join(dir, 'files'), storageRoot(), join(dir, 'worktrees')].filter(d => d.startsWith(`${dir}/`))
+  const sock = ptySock().startsWith(`${dir}/`) ? [] : [ptySock()]
+  const hidden = [...new Set([...DATA_SECRETS, ...(() => { try { return readdirSync(dir) } catch { return [] } })()])].map(n => join(dir, n)).filter(f => !allow.some(a => f === a || a.startsWith(`${f}/`)))
+  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])], ...(local && { filesystem: { denyRead: [dir, ...sock], allowRead: allow } }) } }
+  const boxed = (gated: boolean) => ({ ...box, ...(local && { permissions: { ...settings(gated).permissions, deny: [...hidden, ...sock].sort().flatMap(f => [`Read(/${f})`, `Read(/${f}/**)`]) } }) })
   const two = [false, true]
   const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && boxed(gated)) }, null, 2)]))))
   return {
@@ -2142,7 +2149,7 @@ export function settingsSet(o: Settings, own = false) {
   changed()
   if ('diffStat' in o || 'fullReview' in o) void scanStats() // its numbers now, not at the next scan
   if ('radar' in o) void scanOverlaps()
-  if ('statusBridge' in o) writeHooks() // claude's settings files with or without the status line
+  if ('statusBridge' in o || 'storageDir' in o) writeHooks() // claude's settings files with or without the status line; S6: the sandbox's storage folder
   if (dirs(state.settings) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's (an agent's) too
   return state.settings
 }
