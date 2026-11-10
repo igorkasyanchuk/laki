@@ -3309,6 +3309,11 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 }
 html.away :is(.sidebar, .side-panel, .overlay, .menu, .modal, .toast, .needs-cards > div, .needs-cards > button, .ws.needs, .ws.v-new, .tab.v-new, .glyph.g-pop) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
 
+/* V9: the window behind another app (html.away: main's 'front'): the accent's fills, the picked row and the focus ring
+   go to a neutral, as AppKit's do when a window isn't key. The accent as text (links: --accent-ink, resolved on <html>)
+   and the status colors (running, waiting, error) stay: they're information. On .app: applyTheme's are <html>'s own */
+html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --accent-fg: var(--fg); --sel: color-mix(in srgb, var(--fg) 10%, var(--panel)); }
+
 /* hold ⌘ (KeyOverlay.tsx): a veil, a badge at each element's top right, a strip of the keys with nothing on screen */
 .key-overlay { position: fixed; inset: 0; z-index: calc(var(--z-pop) + 10); pointer-events: none; background: color-mix(in srgb, var(--bg) 35%, transparent); animation: m-fade 0.12s ease-out; }
 .key-badge { position: absolute; transform: translate(-70%, -35%); padding: 1px var(--sp-3); border-radius: var(--r-s); font: 600 var(--fs-1)/16px var(--mono); color: var(--accent-fg, #fff); background: var(--accent); box-shadow: var(--lift-1); white-space: nowrap; }

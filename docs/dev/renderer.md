@@ -796,6 +796,17 @@ fixed`, so a copy takes no room) and puts an inert copy back with `.leaving` (12
 high's), removed by a timer. The side panel is in the flow: it only comes in. Motion: Off (`html[data-motion='none']`)
 and the system's Reduce motion end it all (`exits` and `fresh` check both).
 
+The system accent and the inactive window (V9): Settings › Appearance › Accent color: System is `accent: 'system'`
+(its button only in the Mac app: themes.ts `macApp`). main's `accent` IPC (`from(e, 'new', 'ai', 'tab')`) answers
+`systemPreferences.getAccentColor()` as `#rrggbb` (null off a Mac), and its change (macOS's
+`AppleColorPreferencesChangedNotification`; Electron's `accent-color-changed` on Windows) goes to the app's own windows
+as `accent`. themes.ts asks once as it loads and keeps it (`setSystemAccent`, `systemAccent`), painting the last
+`applyTheme` again when that one asked for System; until it's known, the theme's. It's then a picked accent: its
+`--accent-fg` and `--accent-ink` as for any. ponytail: terminals' cursor takes a new system accent at their next
+repaint (the paint key is the settings'). Behind another app (`html.away`, main's `front`), styles.css' `html.away .app`
+sets `--accent`, `--accent-fg` and `--sel` to neutrals of the text's color: fills, the picked row and focus rings go
+grey; `--accent-ink` (resolved on `<html>`) and the status colors stay. ui-smoke's `inactive` step sends `front` false.
+
 The floating surface (V8): styles.css' `--surface-a`, `--surface-bg` (the panel at 72%), `--surface-blur` (`blur(24px)
 saturate(1.6)`), `--surface-edge` (a 0.5px hairline of the text's color) and `--surface-lift` (`--lift-1` and `--lift-3`),
 on one `:is(.menu, .modal, .finder, .tip, .help-card, .toast, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek,

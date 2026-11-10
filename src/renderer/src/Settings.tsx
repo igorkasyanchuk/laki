@@ -11,7 +11,7 @@ import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, BG, GLASS, type Paint, paintKey, paintOf, preview, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
+import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, askText, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
@@ -1647,10 +1647,15 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
-                <label>
+                <label data-tip={macApp() ? "System: your Mac's accent color (System Settings › Appearance), as it changes" : undefined}>
                   Accent color
                   <span className="row-buttons">
-                    <input type="color" className="color-pick" value={s.accent || THEMES.find(t => t.id === (s.theme || 'default'))?.c?.accent || '#7aa2f7'} onChange={e => paint({ accent: e.target.value })} />
+                    <input type="color" className="color-pick" value={(s.accent === 'system' ? systemAccent() : s.accent) || THEMES.find(t => t.id === (s.theme || 'default'))?.c?.accent || '#7aa2f7'} onChange={e => paint({ accent: e.target.value })} />
+                    {macApp() && s.accent !== 'system' && (
+                      <button type="button" onClick={() => paint({ accent: 'system' })}>
+                        System
+                      </button>
+                    )}
                     {s.accent && (
                       <button type="button" onClick={() => paint({ accent: '' })}>
                         Theme's

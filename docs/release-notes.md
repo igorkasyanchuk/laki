@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- On a Mac, Settings › Appearance › Accent color › *System* follows macOS's accent color as you change it. Behind another app, Laki's accent fills, selected row and focus rings turn grey as macOS's own apps do; status colors stay.
 - Menus, ⌘K, dialogs, tooltips, popovers and toasts share one floating surface: the panel's color over a soft blur of what's behind, a hairline edge and two shadows, and a lighter dim behind dialogs. Solid with Reduce transparency, with glass, and in looks drawn on paper or a bitmap screen (Brutalist, Blueprint, Classic and others).
 - The window moves a little: menus, ⌘K and dialogs scale in and fade out, a new workspace row or tab grows in, rows, tabs and buttons give when pressed, a workspace that needs you breathes softly so you see it from the corner of your eye, and one that finishes ticks once. Settings › Appearance › *Motion* (was *Animations*): *Off* stops it all, as macOS's Reduce motion does.
 - On macOS the sidebar is translucent: the rail and sidebar sit on macOS's sidebar material, and the terminals and pages are a rounded card on top, with the status bar under it. Words on the sidebar stay readable over any wallpaper. Turn it off in Settings › Appearance › Extras › *Translucent sidebar* (Classic design; off with Reduce transparency).

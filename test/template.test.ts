@@ -138,6 +138,19 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   applyTheme('aurora')
   assert.deepEqual([props.get('--term-bg'), transparent()], ['#00000000', true])
 
+  // V9: Accent color: System takes macOS's (main's 'accent'), its text color as a picked one's; unknown (off a Mac): the theme's
+  const { setSystemAccent } = await import('../src/renderer/src/themes.ts')
+  applyTheme({ theme: 'kraft', accent: 'system' })
+  assert.equal(props.get('--accent'), kraft.c!.accent)
+  setSystemAccent('#ff2d55') // paints again, as the system's changes
+  assert.deepEqual([props.get('--accent'), props.get('--accent-fg')], ['#ff2d55', '#000000'])
+  setSystemAccent('#007aff')
+  assert.equal(props.get('--accent'), '#007aff')
+  applyTheme({ theme: 'kraft' })
+  setSystemAccent('#ff9500') // not asked for: the theme's stays
+  assert.equal(props.get('--accent'), kraft.c!.accent)
+  setSystemAccent(null)
+
   // Appearance's accent (text on it black or white, whichever reads) and corners, over the theme's; a bad color is skipped
   applyTheme({ theme: 'kraft', accent: '#ffe066', radius: '0px' })
   assert.deepEqual([props.get('--accent'), props.get('--accent-fg'), props.get('--radius'), props.get('--rs'), props.get('--bg')], ['#ffe066', '#000000', '0px', '0px', '#dcc39a'])

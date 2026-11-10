@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('laki', {
   openFile: (path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
+  accent: (): Promise<string | null> => ipcRenderer.invoke('accent'), // V9: macOS's accent color, #rrggbb (null off a Mac)
+  onAccent: (cb: (c: string | null) => void) => void ipcRenderer.on('accent', (_e, c: string | null) => cb(c)), // as it changes
   glass: (on: boolean, light?: boolean, float?: boolean, side?: boolean) => ipcRenderer.send('glass', on, light, float, side), // the window's blur behind see-through backgrounds
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon

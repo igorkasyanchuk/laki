@@ -83,6 +83,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     ['palette', key('k', true), '.palette-input'],
+    // V9: behind another app the accent's fills and the picked row go neutral (the status colors don't); then back
+    ['inactive', async () => (await key('Escape')(), w.webContents.send('front', false)), () => js<boolean>("document.documentElement.classList.contains('away') && getComputedStyle(document.querySelector('.app')).getPropertyValue('--accent').trim() !== getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()")],
+    ['active', async () => w.webContents.send('front', true), () => js<boolean>("!document.documentElement.classList.contains('away')")],
     // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
     ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
@@ -886,6 +889,16 @@ ipcMain.on('glass', (e, on: boolean, light?: boolean | null, frosted?: boolean, 
   win?.setVibrancy(on ? (side === true ? 'sidebar' : 'under-window') : null) // V5's translucent sidebar: the sidebar material
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })
+// V9: macOS's accent color (System Settings › Appearance) for Settings › Appearance › Accent color: System; none off a
+// Mac (the option is hidden there). A change goes to the app's own windows ('accent'); themes.ts paints them again
+const sysAccent = () => (mac ? `#${systemPreferences.getAccentColor().slice(0, 6)}` : null)
+ipcMain.handle('accent', e => (from(e, 'new', 'ai', 'tab') ? sysAccent() : null))
+const accentNow = () => {
+  const c = sysAccent()
+  for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('accent', c)
+}
+if (mac) systemPreferences.subscribeNotification('AppleColorPreferencesChangedNotification', accentNow) // macOS posts this one; Electron's accent-color-changed is Windows'
+systemPreferences.on('accent-color-changed', accentNow)
 // Settings' Dock icon: the window's renderer draws it (a PNG data URL), kept in userData so the next start (an
 // update too) shows it at once, before the window loads. ponytail: the bundle's own still shows in Finder and in a
 // pinned Dock tile while Laki isn't running (changing the bundle would break its signature)

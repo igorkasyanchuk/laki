@@ -1139,7 +1139,7 @@ const asked = (q: string) => !!globalThis.matchMedia?.(q).matches
 export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || material(o) || ((o.sideClear ?? 0) > 0 && !(macApp() && o.translucent === false)))
 // V5: Settings › Appearance › Translucent sidebar (on unless false; macOS's app only, the Classic design, not with glass
 // or Reduce transparency): the sidebar and the rail over macOS's sidebar material, the main area a card on it (html.material)
-const macApp = () => !!(globalThis as { laki?: unknown }).laki && /Mac/.test(globalThis.navigator?.userAgent ?? '')
+export const macApp = () => !!(globalThis as { laki?: unknown }).laki && /Mac/.test(globalThis.navigator?.userAgent ?? '')
 export const material = (o: Paint) => !o.glass && o.translucent !== false && (!o.design || o.design === 'classic') && macApp() && !asked(LESS_CLEAR) // a Design frames the window its own way
 export const MATERIAL = 85 // its tint of the sidebar's color (%): the wallpaper only tints it
 // the sidebar's words on it (--side-fg, --side-muted): its text and hints made to pass AA over the brightest and the
@@ -1277,6 +1277,19 @@ export const themeFor = (p: Pick<Paint, 'theme' | 'themeAuto' | 'themeLight' | '
 }
 // every window that painted (the app's, the new-workspace, AI and floated ones) paints again as the system turns
 let last: [string | Paint, boolean] | undefined
+// V9: Settings › Appearance › Accent color: System (accent 'system'): macOS's own, from main ('accent'), painted again as
+// it changes; until it's known (off a Mac: never), the theme's
+let sysAccent: string | null = null
+export const systemAccent = () => sysAccent
+export function setSystemAccent(c: string | null) {
+  sysAccent = c && /^#[\da-f]{6}$/i.test(c) ? c : null
+  if (last && typeof last[0] !== 'string' && last[0].accent === 'system') applyTheme(...last)
+}
+{
+  const b = (globalThis as { laki?: { accent?: () => Promise<string | null>; onAccent?: (cb: (c: string | null) => void) => void } }).laki
+  b?.accent?.().then(setSystemAccent, () => {})
+  b?.onAccent?.(setSystemAccent)
+}
 if (typeof matchMedia === 'function') matchMedia(DARK).addEventListener('change', () => last && typeof last[0] !== 'string' && last[0].themeAuto && applyTheme(...last))
 
 export function applyTheme(p: string | Paint = '', solid = false) {
@@ -1321,7 +1334,8 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   else delete root.dataset.uiSize
   // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
   // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); pills and circles stay
-  if (o.accent && /^#[\da-f]{6}$/i.test(o.accent)) st.setProperty('--accent', o.accent), st.setProperty('--accent-fg', onAccent(o.accent))
+  const pick = o.accent === 'system' ? sysAccent : o.accent
+  if (pick && /^#[\da-f]{6}$/i.test(pick)) st.setProperty('--accent', pick), st.setProperty('--accent-fg', onAccent(pick))
   if (o.radius) st.setProperty('--radius', o.radius), st.setProperty('--rs', o.radius)
   // the accent as text (links, a picked item): a light theme's bright accent made darker where it wouldn't read; fills keep it
   const accent = st.getPropertyValue('--accent') || t.c?.accent || rootVar('--accent')
