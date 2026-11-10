@@ -2798,7 +2798,7 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-box textarea:focus { outline: none; border-color: var(--accent); }
 .reader-switch { flex: none; display: inline-flex; align-items: stretch; margin: 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); overflow: hidden; } /* U2: in the tab bar or a split pane's header, never over the terminal */
 .pane-head .reader-switch { margin: 0 2px; }
-.pane-head .reader-switch button { padding: 0 7px; font-size: 10px; }
+.pane-head .reader-switch button { padding: 0 7px; font-size: var(--fs-1); }
 .reader-switch button { border: none; background: none; padding: 1px 9px; font: 11px var(--ui-font); color: var(--muted); cursor: pointer; }
 .reader-switch button.on { background: var(--hover); color: var(--fg); }
 .term-reply { position: fixed; z-index: 9; /* over the terminal (xterm's layers go to 8), under dialogs and pages */ display: inline-flex; align-items: center; height: 24px; padding: 0 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
