@@ -1,6 +1,6 @@
 // The daemon connection: one authenticated WebSocket, requests by id, events to listeners.
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
-// http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
+// http://127.0.0.1:5199/#port=…&token=… (dev), or the link's key alone in the hash (#t=…, S11) on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
@@ -72,14 +72,15 @@ const keep = (t: string) => {
     sessionStorage.setItem('laki.token', t)
   } catch {}
 }
+// S11: the link's key comes in the hash (#t=…): a browser never sends it, so no proxy or log has it
 function pageToken() {
-  const q = new URLSearchParams(location.search)
-  const t = q.get('token')
+  const h = new URLSearchParams(location.hash.slice(1))
+  const t = h.get('t')
   if (t) {
     keep(t)
-    q.delete('token')
-    const rest = q.toString()
-    history.replaceState(history.state, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`)
+    h.delete('t')
+    const rest = h.toString()
+    history.replaceState(history.state, '', `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`)
   }
   if (!kept)
     try {
@@ -91,7 +92,7 @@ function pageToken() {
 async function wsURL() {
   const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? pageToken() }))(new URLSearchParams(location.hash.slice(1)))
   const at = port ? `ws://127.0.0.1:${port}` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` // no port: the page's own daemon
-  return { url: `${at}/ws?token=${encodeURIComponent(token)}`, token, remote: !port }
+  return { url: port ? `${at}/ws?token=${encodeURIComponent(token)}` : `${at}/ws`, token, remote: !port } // S11: remote's in its first message
 }
 
 // the daemon's address for a frame (a JS widget's page): its port here, or none: the page's own daemon (remote access)
@@ -141,6 +142,8 @@ class Api {
   async connect() {
     try {
       let to = await wsURL()
+      // S11: no key: Cloudflare's email sign-in sends the browser back without the hash. The link works until it's used
+      if (to.remote && !to.token) return this.emit({ ev: 'problem', text: "Signed in. Now open the link from Laki on your Mac again: the sign-in doesn't keep its key." })
       if (to.remote && !this.pinned) {
         const p = await pinNeed(to.token)
         if (p?.need) return this.emit({ ev: 'pin', left: p.left }) // the splash asks; pin() connects
@@ -150,6 +153,7 @@ class Api {
       const ws = new WebSocket(to.url)
       this.ws = ws
       ws.onopen = () => {
+        if (to.remote) ws.send(JSON.stringify({ auth: to.token })) // S11: first, before any call
         this.connected = true
         this.fails = 0
         this.emit({ ev: 'open' })

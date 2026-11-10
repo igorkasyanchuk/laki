@@ -14,7 +14,7 @@ import { agentChat, aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, ai
 import { planChat } from '../shared/plans.ts'
 import { readCapped, rotateLog } from '../shared/conn.ts'
 import { HostPty, ptyOn, ptyQuit } from './ptyHost.ts'
-import { aiTotals, API, HIDDEN, masked, maskSettings, recorded, type Settings, type Tab, unmasked } from '../shared/types.ts'
+import { aiTotals, API, HIDDEN, MASK, masked, maskSettings, recorded, type Settings, type Tab, unmasked } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -589,10 +589,23 @@ const REMOTE_NO = new Set(['stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookE
 const REMOTE_KEYS = /^(remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
+// S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
+// never ends, a project's scripts, a scheduled task. A shell tab stays (the phone's own terminal: it's the user, signed in)
+const SCRIPT_KEYS = ['setup', 'teardown', 'run', 'test', 'lint', 'format', 'deploy', 'ticket', 'check', 'actions', 'env']
+// a projectSet's config replaces the whole: a key left out clears it, an env value sent back masked (S3) is the one kept
+const norm = (k: string, v: unknown, cur: any): unknown => {
+  const x = typeof v === 'string' ? v.trim() || undefined : k === 'env' && v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([n, y]) => [n, y === MASK ? cur?.env?.[n] : y])) : (v ?? undefined)
+  return x && typeof x === 'object' && !Object.keys(x).length ? undefined : x // none and empty alike
+}
+const scriptsChange = (p: any) => !!p?.config && typeof p.config === 'object' && (cur => SCRIPT_KEYS.some(k => JSON.stringify(norm(k, p.config[k], cur)) !== JSON.stringify(norm(k, cur?.[k], cur))))((core.state.projects.find(x => x.id === p.id) as any)?.config)
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
-  (method === 'settingsSet' && changes(p, REMOTE_KEYS))
+  (method === 'settingsSet' && changes(p, REMOTE_KEYS)) ||
+  method === 'tunnelStart' ||
+  method === 'scheduleSet' ||
+  (method === 'shareStart' && Number(p?.hours ?? 0) === 0) ||
+  (method === 'projectSet' && scriptsChange(p))
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
@@ -1052,13 +1065,30 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 34 << 20 }) // an 
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
-  if (url.pathname !== '/ws' || !hostOk(req.headers.host) || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'), req.headers.origin)) {
+  // S11: remote access's page sends its token in its first message, never in the URL (a proxy's or Cloudflare's log
+  // would keep it); the app and the CLI may keep ?token=
+  const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
+  if (url.pathname !== '/ws' || !hostOk(req.headers.host) || !originOk(req.headers.origin) || (!far && !tokenOk(url.searchParams.get('token'), req.headers.origin))) {
     refusedWs(`${req.socket.remoteAddress ?? '?'} ${req.headers.origin ?? '(no origin)'}`)
     socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n')
     return
   }
   wss.handleUpgrade(req, socket, head, ws => {
-    const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
+    if (!far) return opened(ws)
+    // its first message within 5 s: { auth: <its token> }; anything else closes it, nothing sent before
+    const late = setTimeout(() => ws.close(4401, 'no auth'), 5000)
+    ws.once('message', raw => {
+      clearTimeout(late)
+      let said: unknown
+      try {
+        said = JSON.parse(String(raw))?.auth
+      } catch {}
+      if (typeof said === 'string' && tokenOk(said, req.headers.origin)) return opened(ws)
+      refusedWs(`${req.socket.remoteAddress ?? '?'} ${req.headers.origin} (a bad auth message)`)
+      ws.close(4401, 'bad token')
+    })
+  })
+  function opened(ws: import('ws').WebSocket) {
     const app = isApp(url.searchParams.get('token'), req.headers.origin) // S1: the app's window: yours, never looked up
     // S7: its process is in an agent's tab, couldn't be found, or it's remote access's page (a phone is on camera too): in
     // Recording mode its state has no private workspace. Until its process is known, in that mode: as an agent's
@@ -1133,7 +1163,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
       core.clients.delete(c)
       for (const s of core.sessions.values()) s.detach(c)
     })
-  })
+  }
 })
 
 const listening = new Promise<void>(r => server.once('listening', () => r()))

@@ -78,6 +78,18 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   assert.equal(await fetch(`http://127.0.0.1:${st.port}/`).then(r => r.status), 404)
   assert.ok([413, 'reset'].includes(await post('/hook/any', Buffer.alloc((1 << 20) + 10), { 'x-laki-key': k.secret })), 'over 1 MB')
   assert.equal((await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'webhook').length, 3)
+  // S11: a delivery sent again (captured on its way) runs nothing; Linear's past its 10 minutes neither
+  const once = { 'x-hub-signature-256': sig(g.secret, body), 'x-github-event': 'issues', 'x-github-delivery': 'd-1' }
+  assert.equal(await post('/hook/gh', body, once), 202)
+  assert.equal(await post('/hook/gh', body, once), 409)
+  assert.equal(await post('/hook/gh', body, { ...once, 'x-github-delivery': 'd-2' }), 202)
+  const l = await rig.rpc('hookAdd', { name: 'lin', kind: 'linear' })
+  const lin = (at: number) => (b => [b, { 'linear-signature': createHmac('sha256', l.secret).update(b).digest('hex') }] as const)(JSON.stringify({ type: 'Issue', webhookTimestamp: at }))
+  const [fresh1, h1] = lin(Date.now())
+  assert.equal(await post('/hook/lin', fresh1, h1), 202)
+  assert.equal(await post('/hook/lin', fresh1, h1), 409)
+  assert.equal(await post('/hook/lin', ...lin(Date.now() - 11 * 60e3)), 409)
+  assert.equal((await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'webhook').length, 6)
   // Expose: a quick tunnel to its port only; one that never came up isn't shown as exposed
   await assert.rejects(rig.rpc('hookExpose', { on: true }))
   assert.equal((await rig.rpc('hookList')).via, undefined)

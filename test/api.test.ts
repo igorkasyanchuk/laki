@@ -621,14 +621,14 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const on = await rig.rpc('remoteStart', { hours: 2 })
   const url = `https://fake-${port}.trycloudflare.com`
   assert.deepEqual([on.mail, on.url], ['me@x.dev', url])
-  assert.match(on.link, new RegExp(`^${url}/\\?token=[0-9a-f]{64}$`))
+  assert.match(on.link, new RegExp(`^${url}/#t=[0-9a-f]{64}$`)) // S11: in the hash
   assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
   assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
   assert.deepEqual((await rig.rpc('stateOwn')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
   // the link's key, once, from its page's origin: the page's own token for it, then the link is dead (L3)
-  const key = on.link.split('?token=')[1]
+  const key = on.link.split('#t=')[1]
   const ping = (token: string, origin?: string) =>
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   const pinAt = (body: object, origin = url) => fetch(`${at}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
@@ -646,7 +646,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal(await ping(tok), 401) // no Origin: not its page
   assert.equal(await ping(rig.info().token, url), 401) // ours with its Origin: it'd skip the caller check as the phone's page (M5)
   await assert.rejects(connect(rig, undefined, tok))
-  const c = await connect(rig, url, tok)
+  const c = await connect(rig, url, tok, true) // S11: its token in its first message
   assert.equal(await c.call('ping'), 'pong')
   // a phone has what it needs, not what outlives its session or opens Laki wider (M4)
   const far = (method: string, params = {}) =>
@@ -654,6 +654,22 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['hookAdd', { name: 'far' }], ['hookRm', { name: 'far' }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }], ['settingsSet', { editorCmd: 'sh -c evil' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
+  // S11: nor what goes on the internet, runs later or in every new workspace; a shell tab still opens (the phone's own)
+  const pr = await rig.rpc('projectAdd', { path: rig.repo })
+  const pws = await rig.rpc('wsNew', { project: pr.id, kind: 'local', name: 'far' })
+  const ptab = (await rig.rpc('tabNew', { ws: pws.id, kind: 'shell' })).id
+  for (const [m, p] of [['tunnelStart', { ws: pws.id, port: 3000 }], ['scheduleSet', { name: 'x', prompt: 'y' }], ['shareStart', { tab: ptab }], ['shareStart', { tab: ptab, hours: 0 }], ['projectSet', { id: pr.id, config: { setup: 'touch pwned' } }]] as const)
+    assert.match((await far(m, p)).error ?? '', /not over remote access/, `${m} ${JSON.stringify(p)}`)
+  assert.equal((await far('projectSet', { id: pr.id, notes: 'from the phone', config: {} })).error, undefined, 'its notes, and a config with no script changed')
+  assert.equal((await far('tabNew', { ws: pws.id, kind: 'shell' })).error, undefined, 'a shell tab: yes')
+  // S11: the socket: its token in its first message within 5 s, else closed; ?token= in the URL counts for nothing
+  const shut = (sock: WebSocket) => new Promise<number>(r => sock.once('close', code => r(code)))
+  const bad = await connect(rig, url, 'f'.repeat(64), true)
+  assert.equal(await shut(bad.ws), 4401)
+  const quiet = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${tok}`, { origin: url })
+  const t5 = Date.now()
+  assert.equal(await shut(quiet), 4401)
+  assert.ok(Date.now() - t5 >= 4000, 'after its 5 s')
   assert.equal((await far('settingsSet', { remoteMail: 'me@x.dev', notify: false })).result.notify, false) // Settings sends them all back: unchanged is fine
   assert.equal(await rig.rpc('ping'), 'pong') // still up
   c.close()
@@ -692,7 +708,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual([pub.mail, pub.open], ['', true])
   assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port}\n`))
   assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
-  assert.equal(await ping((await pinAt({ token: pub.link.split('?token=')[1] })).token, url), 200)
+  assert.equal(await ping((await pinAt({ token: pub.link.split('#t=')[1] })).token, url), 200)
   assert.equal(await ping('nope', url), 401)
   await rig.rpc('remoteStop')
   await until(() => stops() >= 4, 'cloudflared stopped', 30000)
@@ -709,7 +725,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual([pinned.mail, pinned.open, pinned.tries], ['', undefined, 3])
   assert.match(pinned.pin, /^\d{6}$/)
   assert.equal(log().split(`cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
-  const link = pinned.link.split('?token=')[1]
+  const link = pinned.link.split('#t=')[1]
   assert.equal(await ping(link, url), 401) // the link's key alone isn't in
   assert.deepEqual(await pinAt({ token: link }), { need: true, left: 3 })
   assert.deepEqual(await pinAt({ token: 'nope', pin: pinned.pin }), { need: false })
@@ -733,7 +749,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal(await ping(got.token, url), 403)
   // the last wrong PIN stops it
   const again2 = await rig.rpc('remoteStart', { hours: 1, pin: true })
-  const link2 = again2.link.split('?token=')[1]
+  const link2 = again2.link.split('#t=')[1]
   const wrong2 = again2.pin === '000000' ? '111111' : '000000'
   const app = await connect(rig)
   assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 2 more tries, then remote access stops' })

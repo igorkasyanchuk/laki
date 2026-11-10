@@ -186,9 +186,10 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
 }
 
 // A WebSocket client like the renderer's: requests by id, events collected.
-export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string) {
+// auth: as remote access's page (S11): the token in its first message, none in the URL
+export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string, auth = false) {
   const { port, token: tk } = rig.info()
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
+  const ws = new WebSocket(auth ? `ws://127.0.0.1:${port}/ws` : `ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
   let seq = 0
   const waiting = new Map<number, (m: any) => void>()
   const events: any[] = []
@@ -202,6 +203,7 @@ export async function connect(rig: { info(): { port: number; token: string }; ap
     ws.once('open', res)
     ws.once('error', rej)
   })
+  if (auth) ws.send(JSON.stringify({ auth: token }))
   return {
     ws,
     events,

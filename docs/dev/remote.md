@@ -133,18 +133,25 @@ ponytail: funnel takes port 443's root, as remote access over tailscale does.
 (`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*
 typed, in a red box; `view.remote.open`, a red status bar badge: the token is then the only lock), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`; open: 24 at most, never 0). Each start makes a
-link key (`token`) and the page's token (`access`, `remoteToken`); `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
-hash), which the renderer (`api.ts`: no port) reads on the page's own origin, takes out of the address bar
+link key (`token`) and the page's token (`access`, `remoteToken`); `remoteView` (`view.remote`) gives the link, `<url>/#t=<token>` (S11: in the hash, which a browser never sends, so
+no proxy or Cloudflare log has it; Cloudflare's email sign-in sends the browser back without it, and the page then says
+to open the link again, which still works: only `/pin` uses it), which the renderer (`api.ts`: no port) reads on the page's own origin, takes out of the address bar
 (`pageToken`: `replaceState`; Cloudflare's sign-in page, an earlier history entry, still holds the link) and swaps once
 (`pinNeed`: `POST /pin` `{ token }`, `remotePin` gives `{ need: false, token: access }` and sets `used`, the view's and
 Settings' *Opened*) for the token it connects with, kept in the tab's `sessionStorage` `laki.token` for reconnects: the
 link is dead after (L3). While it runs, `main.ts`
 takes the tunnel's URL as an Origin, and that token only with it (a client with no Origin needs the daemon's own);
+S11: its WebSocket carries no token in the URL: the upgrade goes through, and its first message must be
+`{ auth: <token> }` within 5 s, else the socket closes (4401) with nothing sent (the app and the CLI keep `?token=`);
 `remoteStop` drops both, so an old link is dead. A client from that Origin (`Conn.remote`, the `/rpc` call's) is
 refused `REMOTE_NO` (`remoteStart`, `cliInstall`, `cliRemove`, `shutdown`, `aiKey`, `skillSet`, `accountAdd`,
 `accountLogin`), `widgetSet` with `on: true`, `net: true` or a `source`, and `settingsSet` changing a `REMOTE_KEYS`
 setting (`remote*`, `webhook`, `widgetDirs`, `widgetDev`, `presets`, `env`, `tunnel`; sent back unchanged is fine: Settings saves
-them all) (M4). `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
+them all) (M4); S11: also `tunnelStart`, `scheduleSet`, `shareStart` with `hours` 0 (its default) and `projectSet` changing a
+script (`SCRIPT_KEYS`: setup, teardown, run, test, lint, format, deploy, ticket, check, actions, env; a config replaces the
+whole, so one left out counts as changed). A shell tab still opens from the phone: it's the user, signed in.
+Webhooks (inbound.ts, S11): a signed delivery sent again runs nothing (409): GitHub's `X-GitHub-Delivery` and Linear's
+signature remembered 10 minutes (`replayed`), Linear's `webhookTimestamp` within them. `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
 `--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings): the link's token (`POST /pin`, `remotePin`, main.ts:
 from the tunnel's origin) then says `need`, and `{ token, pin }` gives `access` (and `used`: a right PIN, once); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
 last stops it and broadcasts `remote` (App: a toast and a notification). The page (`api.ts`) asks `/pin` before its

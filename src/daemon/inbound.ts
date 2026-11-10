@@ -92,6 +92,25 @@ export function signed(kind: InHook['kind'], secret: string, raw: Buffer, h: Inc
   return eq(String(h['x-laki-key'] ?? ''), secret)
 }
 
+// S11: a signed request sent again (one captured on its way) runs nothing: GitHub's X-GitHub-Delivery and Linear's
+// signature are remembered REPLAY_MS, and Linear's webhookTimestamp must be within it. ponytail: in memory (a restart
+// forgets), and an X-Laki-Key hook has no id to tell one request from its copy
+const REPLAY_MS = 600_000
+const deliveries = new Map<string, number>()
+export function replayed(name: string, kind: InHook['kind'], h: IncomingMessage['headers'], body: unknown, now = Date.now()) {
+  for (const [k, at] of deliveries) if (now - at > REPLAY_MS) deliveries.delete(k)
+  let id = ''
+  if (kind === 'github') id = String(h['x-github-delivery'] ?? '')
+  if (kind === 'linear') {
+    const at = Number((body as { webhookTimestamp?: unknown } | null)?.webhookTimestamp)
+    if (!Number.isFinite(at) || Math.abs(now - at) > REPLAY_MS) return 'too old: webhookTimestamp past 10 minutes'
+    id = String(h['linear-signature'] ?? '')
+  }
+  if (!id) return
+  const key = `${name}\0${id}`
+  if (deliveries.has(key)) return 'replayed: that delivery came already'
+  deliveries.set(key, now)
+}
 function answer(res: ServerResponse, code: number, body: object) {
   res.writeHead(code, { 'content-type': 'application/json' })
   res.end(JSON.stringify(body))
@@ -116,17 +135,19 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
       if (now - (told.get(name) ?? 0) > 60000) told.set(name, now), log(`webhook ${name}: refused a request that failed its ${hook.kind === 'key' ? 'X-Laki-Key' : `${hook.kind} signature`} check`)
       return answer(res, 401, { error: 'signature' })
     }
-    // RATE a minute, of the signed ones only: an outsider's unsigned requests can't use up a hook's minute
-    const s = seen.get(name)
-    const slot = s && now - s.at < 60000 ? s : { at: now, n: 0 }
-    seen.set(name, slot)
-    if (++slot.n > RATE) return void (res.setHeader('retry-after', String(Math.ceil((slot.at + 60000 - now) / 1000))), answer(res, 429, { error: 'too many: 60 a minute' }))
     let body: unknown = raw.toString('utf8')
     try {
       body = JSON.parse(String(body))
     } catch {
       body = String(body).slice(0, BODY_CUT)
     }
+    const again = replayed(name, hook.kind, req.headers, body, now)
+    if (again) return answer(res, 409, { error: again })
+    // RATE a minute, of the signed ones only: an outsider's unsigned requests can't use up a hook's minute
+    const s = seen.get(name)
+    const slot = s && now - s.at < 60000 ? s : { at: now, n: 0 }
+    seen.set(name, slot)
+    if (++slot.n > RATE) return void (res.setHeader('retry-after', String(Math.ceil((slot.at + 60000 - now) / 1000))), answer(res, 429, { error: 'too many: 60 a minute' }))
     const event = String(req.headers['x-github-event'] ?? (body && typeof body === 'object' ? ((body as any).type ?? (body as any).action ?? '') : ''))
     const p = hook.project ? state.projects.find(x => x.id === hook.project) : undefined
     widgetEvent('webhook', { name, event, body, ...(p && { project: { id: p.id, name: p.name } }) }, undefined, undefined, { from: { agent: 'webhook' } })

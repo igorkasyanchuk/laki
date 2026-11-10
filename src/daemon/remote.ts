@@ -580,7 +580,7 @@ export const setDaemonPort = (p: number) => (daemonPort = p)
 export const remoteToken = () => (remote?.used ? remote.access : undefined)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
