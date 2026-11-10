@@ -37,18 +37,22 @@ const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv
 const mcpCmd = (a: SkillAgent) =>
   AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
 
+// A2: the agents Laki tells at their start (core's agentCmd: --append-system-prompt, developer_instructions), so their
+// skill needn't load for Progress on tabs; the others' description still names $LAKI_PROGRESS
+const START_TOLD: SkillAgent[] = ['claude', 'codex']
+
 // the files, as they'd be written now: the launcher holds this install's paths
-function files(at: string, k: SkillName): Record<string, string> {
+function files(at: string, k: SkillName, a: SkillAgent): Record<string, string> {
   const cli = join(at, 'laki')
   const laki = `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`
-  if (k === 'laki-widget') return { laki, 'SKILL.md': widgetSkill(cli) }
+  if (k === 'laki-widget') return { laki, ...widgetSkill(cli, at) }
   if (k === 'laki-orchestrate') return { laki, 'SKILL.md': orchestrateSkill(cli) }
   if (k === 'laki-specs') return { laki, 'SKILL.md': specsSkill(cli) }
   return {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki${START_TOLD.includes(a) ? '' : ', and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work'}. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
 ---
 
 # Laki
@@ -69,7 +73,39 @@ For example \`"${cli}" ls --json\`. Below, \`laki\` stands for it.
 Inside a Laki tab, \`$LAKI_APP\` is \`true\`, \`$LAKI_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
 \`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset.
 
-## Report progress
+## Start work
+
+1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path; \`tabs\`: how its tabs are split, \`a | b\` side by
+   side, \`a / b\` stacked) and tabs with their status.
+2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode|<profile>] [--name short-name] [--base <branch>]\`:
+   a new worktree on a new branch, set up by the project's setup script, with the agent started on the
+   prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
+   \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode; \`--no-setup\` skips the setup script;
+   \`--template\`, \`--action\` and \`--group\` use the user's prompt templates, agent actions and sidebar groups.
+   ${groupRule("each project's \`groups\` in \`laki ls --json\`; \`--group <name>\`")}
+   Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.
+3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
+   permission, idle).
+4. Follow up: \`laki send <ws> "<text>"\`, or \`--when-idle\` to queue it for when the agent's turn ends.
+5. Talk to other agents by name: \`laki name <name>\` names you (others reach you as \`@<name>\`), \`laki agents\`
+   lists the named ones, \`laki ask @<name> "<question>"\` asks one and prints its reply, \`laki send @<name> "<text>"\`
+   tells it something. Asked a question that way, your reply is the answer: say it plainly in your last message.
+Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
+workspace each, so they run in parallel.
+
+## More, when you need it
+
+These files are beside this one (\`${at}\`); read one when the task calls for it:
+
+- \`commands.md\`: every command and its options. For one command, \`laki help <command>\` (or \`laki <command> --help\`)
+  prints its options, what it prints and examples: prefer it.
+- \`more.md\`: your PR, files and links for the user (\`laki show\`), UI in your answer (\`laki-ui\`), secrets, alerts
+  and notices, extensions' tools, specs, project memory, a new session (\`/laki:new\`), SSH projects, issues and PRs.
+- \`workflows.md\`: workflows, graphs of blocks Laki runs for a task.
+- \`schedule.md\`: scheduled tasks (prompts at set times) and reminders for the user.
+- \`browser.md\`: checking a workspace's UI in the app's own browser (\`laki browser\`).
+
+## Report progress (only when $LAKI_PROGRESS is 1)
 
 When \`$LAKI_PROGRESS\` is \`1\` (the user turned on Settings › General › Progress on tabs), say how far along your
 task is while you work on it: \`laki progress <0-100> "<what you're on>"\` (or the MCP tool \`laki_progress\`) about
@@ -77,6 +113,37 @@ every 20-30 seconds of work. It's your estimate of the whole task, not of the st
 they take, never go back down, and send \`100\` when it's done. Laki shows it on your tab (or your workspace's row in
 the sidebar, as the user picked) until your turn ends.
 Unset: don't.
+
+## Rules
+
+- Ask the user before \`rm\`, \`archive\`, \`ship\` or \`stop\`: they end agents, delete worktrees or push. An
+  extension's gate may hold \`ship\` or \`archive\`: it prints why and exits 1; fix what it says or tell the user
+  (\`--force\` is theirs, refused in your tab). \`archive\` stops on uncommitted work (commit first), and \`rm\` of a workspace with uncommitted or unpushed work asks the user. \`ship\` with nothing to commit and no commit the base lacks says
+  *nothing to ship*: there's no PR to open.
+- Schedule a task only when the user asks for one: it starts agents later, unattended. One you add is saved off: say
+  they turn it on in Scheduled tasks (\`on\` and \`run\` are theirs), and when it would first run.
+- From your tab, \`laki new\` and \`laki tab\` start an agent or a shell, never a command (\`--cmd\`, a command
+  preset): the user starts commands. \`send\` or \`screen\` on a tab of another workspace asks the user in the app first.
+- \`<ws>\` is a workspace id; \`<ws>/<tab>\` picks a tab (by default the agent's).
+- Don't type into a busy agent unless asked: use \`send --when-idle\`.
+- The CLI talks to the Laki daemon over localhost. In a sandbox that blocks that, ask to run it outside.
+- \`unknown method\`: the running daemon is older than the CLI. Ask the user to restart it (the app's status
+  bar offers it; agents resume).
+`,
+    'commands.md': `# Laki: commands
+
+Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
+
+Unsure of one? \`laki help <command>\` (or \`laki <command> --help\`) prints its options, what it prints and examples.
+
+\`\`\`
+${USAGE}
+\`\`\`
+
+`,
+    'more.md': `# Laki: more
+
+Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
 
 ## Your pull request
 
@@ -106,49 +173,25 @@ your words say the same, for a terminal.
   { "type": "button", "label": "Fix the tests first", "do": "send", "prompt": "Fix the failing tests first" } ] }
 \`\`\`
 
-## Commands
+## Secrets, alerts and notices
 
-Unsure of one? \`laki help <command>\` (or \`laki <command> --help\`) prints its options, what it prints and examples.
+- Need a secret (an API key, a token, a password)? Never ask for it in the chat: \`path=$(laki secret "<what it is>")\`
+  has the user type it on a masked card in Laki and prints only a file's path; use it where it's needed without
+  printing it: \`KEY=$(cat "$path") <command>\`.
+- The user asks for an important alert ("show me an important alert", "ask me this with a Laki alert")? Put it on
+  their screen: \`laki alert "<question>" --choice "<answer 1>" --choice "<answer 2>"\` shows a card at the bottom
+  right, over every app, and waits for their pick (up to 30 minutes), printing it; go on by it. It waits longer than a
+  shell tool's default allows: give the call your tool's longest timeout (Claude Code's Bash: 600000 ms), or use
+  MCP's \`laki_alert\`. Without
+  \`--choice\` it only tells them something (\`--title\` names it); its text is Markdown, links open in the browser.
+  Only when they ask, or their instructions (CLAUDE.md, AGENTS.md) say when: a question in the chat is the default,
+  and routine news (a PR reviewed, tests passing, a task done) never gets one: Laki shows those itself.
+  Something they should see in Laki but not over every app (another session is ready, a heads-up for a session not
+  yours): \`laki notice "<text>" --to <workspace>[/<tab>]|@name\` puts a card at the bottom right of Laki's window,
+  whatever page is open; its Open goes to that session. \`--choice\` waits for a pick, as with laki alert.
+  \`laki show\` is a card under your own tab, its buttons opening a file, folder or page.
 
-\`\`\`
-${USAGE}
-\`\`\`
-
-## Start work
-
-1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path; \`tabs\`: how its tabs are split, \`a | b\` side by
-   side, \`a / b\` stacked) and tabs with their status.
-2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode|<profile>] [--name short-name] [--base <branch>]\`:
-   a new worktree on a new branch, set up by the project's setup script, with the agent started on the
-   prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
-   \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode; \`--no-setup\` skips the setup script;
-   \`--template\`, \`--action\` and \`--group\` use the user's prompt templates, agent actions and sidebar groups.
-   ${groupRule("each project's \`groups\` in \`laki ls --json\`; \`--group <name>\`")}
-   Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.
-3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
-   permission, idle).
-4. Follow up: \`laki send <ws> "<text>"\`, or \`--when-idle\` to queue it for when the agent's turn ends.
-5. Talk to other agents by name: \`laki name <name>\` names you (others reach you as \`@<name>\`), \`laki agents\`
-   lists the named ones, \`laki ask @<name> "<question>"\` asks one and prints its reply, \`laki send @<name> "<text>"\`
-   tells it something. Asked a question that way, your reply is the answer: say it plainly in your last message.
-6. Need a secret (an API key, a token, a password)? Never ask for it in the chat: \`path=$(laki secret "<what it is>")\`
-   has the user type it on a masked card in Laki and prints only a file's path; use it where it's needed without
-   printing it: \`KEY=$(cat "$path") <command>\`.
-7. The user asks for an important alert ("show me an important alert", "ask me this with a Laki alert")? Put it on
-   their screen: \`laki alert "<question>" --choice "<answer 1>" --choice "<answer 2>"\` shows a card at the bottom
-   right, over every app, and waits for their pick (up to 30 minutes), printing it; go on by it. It waits longer than a
-   shell tool's default allows: give the call your tool's longest timeout (Claude Code's Bash: 600000 ms), or use
-   MCP's \`laki_alert\`. Without
-   \`--choice\` it only tells them something (\`--title\` names it); its text is Markdown, links open in the browser.
-   Only when they ask, or their instructions (CLAUDE.md, AGENTS.md) say when: a question in the chat is the default,
-   and routine news (a PR reviewed, tests passing, a task done) never gets one: Laki shows those itself.
-   Something they should see in Laki but not over every app (another session is ready, a heads-up for a session not
-   yours): \`laki notice "<text>" --to <workspace>[/<tab>]|@name\` puts a card at the bottom right of Laki's window,
-   whatever page is open; its Open goes to that session. \`--choice\` waits for a pick, as with laki alert.
-   \`laki show\` is a card under your own tab, its buttons opening a file, folder or page.
-
-Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
-workspace each, so they run in parallel.
+## Extensions, specs and memory
 
 An extension (also called a widget: a small live page in Laki's sidebar) is made with the laki-widget skill (Settings ›
 Agent skill installs it); \`laki widget\` lists and checks them, and \`laki widget set <id>\` changes where one shows
@@ -170,27 +213,7 @@ general and lasting about the project (an approach that works or doesn't, a gotc
 it), \`laki memory add . "<a line or two>"\` keeps it for later sessions (not task notes, progress or secrets); a
 learned one that's wrong: \`laki memory rm . <id>\`. MCP: \`laki_memory\`, \`laki_remember\`.
 
-Workflows (on unless the user turned them off: Settings › General › Pages) are graphs of blocks Laki runs for a task,
-each run in a workspace of its own: agent blocks (a prompt, or one of the user's agent actions with \`use: <its slug>\`, which \`laki_workflows\` lists), run
-(a shell command), ask (the user picks), choice (if/else by what a block said), case (if/elsif/else: branches tested in order, else last), action (open a PR, approve, merge, dev server,
-archive: asks the user first), wait (its PR's checks), save (text, a file of the workspace, or a link into the
-workspace's Artifacts), llm (one prompt to a model on OpenRouter), webhook (a request to another system; secrets as
-{{env.NAME}}), decide (an OpenRouter decision model answers yes/no, choice or score questions about a JSON state:
-\`steps.<block>.<question>\` and its \`.p\`; unsure, the run asks the user; \`route: <question>\` gives a line per answer),
-popup (a window over Laki with HTML or Markdown: a result to read) and end (\`notify: yes\`, \`phone: yes\`); llm's
-\`json: yes\` is JSON mode (an agent's too: its answer the JSON it ends with); case branches can test numbers (\`>= 0.8\`) or JS; \`out: a, b\` on an agent, llm, run or webhook block names outputs the next blocks use as
-{{steps.<block>.a}}. Each is one Markdown file: yours in Laki, or a project's in \`.laki/workflows/<id>.md\`.
-Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
-writes one, the whole file (its description has the format and every block); to change one, take its file from
-\`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
-user reads and saves it in Laki; a project's that came with the repo (or changed since) starts for you only once the user
-allows it there. A run block's \`{{…}}\` go in as environment variables: write them bare or in double quotes, never in
-single quotes. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`, then its profile's) set how freely it acts;
-\`when done: keep\` keeps a run's worktree (unset: archived once it's done and clean). The CLI: \`laki flow ls\`,
-\`laki flow run <workflow> <project> <task>\` (\`--ws .\`: in this workspace, no new worktree), \`laki flow again <run>
-[--from <block>]\`, and \`laki flow check [file.md… | folder]\` after you write one (no daemon; exit 1 on a problem).
-
-### A new session (/laki:new)
+## A new session (/laki:new)
 
 When the user writes \`/laki:new <task>\` (or \`laki:new\`), or asks for a new session for a task "with codex" or
 "with claude": \`laki new . --preset <the agent named; none: claude> --prompt "<the task>"\`. The \`.\` is this
@@ -217,17 +240,44 @@ from the disk here. Its agents run there and have no \`laki\`.
 - Two agents on the same task, to keep the better result: \`laki new <project> --fan claude,codex --prompt "…"\`
   (the user compares them in the app).
 
-## Check the UI
+## Recipes
 
-\`laki browser open /\` loads the workspace's dev server (\`$PORT\`; start it with \`laki run <ws>\`) in a hidden
-browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css>"\`, \`fill "<css>" "<text>"\`,
-\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. \`open\`, \`click\` and
-\`fill\` print what they caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost),
-\`console error:\` lines, and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that
-before taking a screenshot. Add \`--expect-url /login\` (a path or a localhost URL) to a click or fill meant for one
-page: on any other it's refused and nothing is done.
+\`jq\` ships with macOS.
 
-## Schedule work
+    # the tabs waiting for an answer (a permission prompt)
+    laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\\(.workspace)/\\(.name)"'
+    # wait for a workspace's agents to finish their turn (a shell is running too while a command runs: a dev server)
+    while laki ls --json | jq -e '.tabs[] | select(.workspace == "<ws>" and .kind == "agent" and .status == "running")' >/dev/null; do sleep 10; done
+
+`,
+    'workflows.md': `# Laki: workflows
+
+Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
+
+Workflows (on unless the user turned them off: Settings › General › Pages) are graphs of blocks Laki runs for a task,
+each run in a workspace of its own: agent blocks (a prompt, or one of the user's agent actions with \`use: <its slug>\`, which \`laki_workflows\` lists), run
+(a shell command), ask (the user picks), choice (if/else by what a block said), case (if/elsif/else: branches tested in order, else last), action (open a PR, approve, merge, dev server,
+archive: asks the user first), wait (its PR's checks), save (text, a file of the workspace, or a link into the
+workspace's Artifacts), llm (one prompt to a model on OpenRouter), webhook (a request to another system; secrets as
+{{env.NAME}}), decide (an OpenRouter decision model answers yes/no, choice or score questions about a JSON state:
+\`steps.<block>.<question>\` and its \`.p\`; unsure, the run asks the user; \`route: <question>\` gives a line per answer),
+popup (a window over Laki with HTML or Markdown: a result to read) and end (\`notify: yes\`, \`phone: yes\`); llm's
+\`json: yes\` is JSON mode (an agent's too: its answer the JSON it ends with); case branches can test numbers (\`>= 0.8\`) or JS; \`out: a, b\` on an agent, llm, run or webhook block names outputs the next blocks use as
+{{steps.<block>.a}}. Each is one Markdown file: yours in Laki, or a project's in \`.laki/workflows/<id>.md\`.
+Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
+writes one, the whole file (its description has the format and every block); to change one, take its file from
+\`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
+user reads and saves it in Laki; a project's that came with the repo (or changed since) starts for you only once the user
+allows it there. A run block's \`{{…}}\` go in as environment variables: write them bare or in double quotes, never in
+single quotes. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`, then its profile's) set how freely it acts;
+\`when done: keep\` keeps a run's worktree (unset: archived once it's done and clean). The CLI: \`laki flow ls\`,
+\`laki flow run <workflow> <project> <task>\` (\`--ws .\`: in this workspace, no new worktree), \`laki flow again <run>
+[--from <block>]\`, and \`laki flow check [file.md… | folder]\` after you write one (no daemon; exit 1 on a problem).
+
+`,
+    'schedule.md': `# Laki: scheduling
+
+Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
 
 The daemon runs a scheduled task's prompt at the times a line of English says, while the Mac is awake (a run
 more than 30 minutes late is skipped and logged as missed).
@@ -255,42 +305,52 @@ more than 30 minutes late is skipped and logged as missed).
   workspace); it notifies them then. Words that repeat (every weekday at 9:30, mondays at 10am) ring each time. \`--important\`
   (when they say it matters): it rings as a card on their screen until they close it. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
 
-## Recipes
+`,
+    'browser.md': `# Laki: checking the UI
 
-\`jq\` ships with macOS.
+Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
 
-    # the tabs waiting for an answer (a permission prompt)
-    laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\\(.workspace)/\\(.name)"'
-    # wait for a workspace's agents to finish their turn (a shell is running too while a command runs: a dev server)
-    while laki ls --json | jq -e '.tabs[] | select(.workspace == "<ws>" and .kind == "agent" and .status == "running")' >/dev/null; do sleep 10; done
+\`laki browser open /\` loads the workspace's dev server (\`$PORT\`; start it with \`laki run <ws>\`) in a hidden
+browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css>"\`, \`fill "<css>" "<text>"\`,
+\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. \`open\`, \`click\` and
+\`fill\` print what they caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost),
+\`console error:\` lines, and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that
+before taking a screenshot. Add \`--expect-url /login\` (a path or a localhost URL) to a click or fill meant for one
+page: on any other it's refused and nothing is done.
 
-## Rules
-
-- Ask the user before \`rm\`, \`archive\`, \`ship\` or \`stop\`: they end agents, delete worktrees or push. An
-  extension's gate may hold \`ship\` or \`archive\`: it prints why and exits 1; fix what it says or tell the user
-  (\`--force\` is theirs, refused in your tab). \`archive\` stops on uncommitted work (commit first), and \`rm\` of a workspace with uncommitted or unpushed work asks the user. \`ship\` with nothing to commit and no commit the base lacks says
-  *nothing to ship*: there's no PR to open.
-- Schedule a task only when the user asks for one: it starts agents later, unattended. One you add is saved off: say
-  they turn it on in Scheduled tasks (\`on\` and \`run\` are theirs), and when it would first run.
-- From your tab, \`laki new\` and \`laki tab\` start an agent or a shell, never a command (\`--cmd\`, a command
-  preset): the user starts commands. \`send\` or \`screen\` on a tab of another workspace asks the user in the app first.
-- \`<ws>\` is a workspace id; \`<ws>/<tab>\` picks a tab (by default the agent's).
-- Don't type into a busy agent unless asked: use \`send --when-idle\`.
-- The CLI talks to the Laki daemon over localhost. In a sandbox that blocks that, ask to run it outside.
-- \`unknown method\`: the running daemon is older than the CLI. Ask the user to restart it (the app's status
-  bar offers it; agents resume).
 `,
   }
 }
 
 // laki-widget: the widget creator, a skill of its own; in Laki's claude tabs also /laki:extension, the plugin's command
 // (core's claudePlugin), the same guide with the CLI as its own command line
-const widgetSkill = (cli: string) => `---
+// A1: SKILL.md keeps what every use needs (asking first, widget.json's example, the fixtures and the check, the
+// commands); every widget.json key, the UI kit's elements and widget.html go in files beside it, read when needed
+const parts = (md: string) => new Map(md.split(/\n(?=## )/).map(x => [x.match(/^## (.+)/)?.[1] ?? '', `${x.trimEnd()}\n`]))
+function widgetSkill(cli: string, at: string): Record<string, string> {
+  const g = parts(widgetFormat())
+  const json = g.get('widget.json')!
+  const end = json.indexOf('```\n\n- ') + 4 // its example, then the keys
+  const ref = (title: string, body: string) => `# Laki extensions: ${title}\n\n${body.replace(/^## .*\n\n/, '')}`
+  const format = `${g.get('Before you write it')}
+${json.slice(0, end)}
+Every key of widget.json (source, sample, size, place, config, fetch, actions, view…): \`widget-json.md\` beside this
+file (\`${at}\`; \`laki widget check\` and its JSON Schema say what's wrong). The UI kit's elements, their props and
+samples: \`ui-kit.md\` (or \`laki widget kit [element]\`). A custom look in HTML: \`widget-html.md\`.
+
+${g.get('Fixtures and the check')}`
+  return {
+    'SKILL.md': `---
 name: laki-widget
 description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar, top bar or status bar (a clock, a count of PRs, a chart, a table) with a full view a click away, or buttons on its rail and sidebar foot (an icon, a label, a badge count, a click that runs an action), each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel, button or plugin for Laki's sidebar or rail).
 ---
 
-${widgetGuide(`Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`.`)}`
+${widgetGuide(`Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`.`, format)}`,
+    'widget-json.md': ref('every widget.json key', `## widget.json\n\n${json.slice(end).trimStart()}`),
+    'ui-kit.md': ref('the UI kit', g.get('The UI kit: "ui" (prefer it)')!),
+    'widget-html.md': ref('widget.html, a custom look', g.get('widget.html (a custom look)')!),
+  }
+}
 // N10: only you start it (disable-model-invocation), and it runs unasked only what reads: new, dev, set, on, write and
 // the rest ask you in Claude's own prompt
 const READ_ONLY = ['ls', 'kit', 'check', 'what', 'logs', 'render', 'events', 'tools']
@@ -305,7 +365,7 @@ Make or change a Laki extension for this request: $ARGUMENTS
 
 ${widgetGuide(`Run the laki CLI as \`${LAKI_CLI}\`.`)}`,
 }))
-const widgetGuide = (run: string) => `# Making a Laki extension (a widget)
+const widgetGuide = (run: string, format = widgetFormat()) => `# Making a Laki extension (a widget)
 
 Extension and widget are two names for one thing: the app says extension (Settings › Extensions), its files, ids and
 \`laki widget\` say widget. A user who asks for either means this. A widget is a folder; its name is the widget's id. Make new ones in Laki's own folder:
@@ -315,7 +375,7 @@ Extension and widget are two names for one thing: the app says extension (Settin
 (the user can add more folders in Settings › Extensions). To begin, \`${run} widget new <name> --kind <k>\` makes a working
 starter in it (kinds: ${STARTER_KINDS.join(', ')}): read its files first.
 
-${widgetFormat()}
+${format}
 ## Check your work
 
 ${run} Below, \`laki\` stands for it.
@@ -489,7 +549,7 @@ checked. Leave the workspaces as they are (the user reviews, ships or archives t
 
 function info(a: SkillAgent, k: SkillName): SkillInfo {
   const at = skillDir(a, k)
-  const want = Object.entries(files(at, k))
+  const want = Object.entries(files(at, k, a))
   const have = want.filter(([f]) => existsSync(join(at, f)))
   const state = !have.length ? 'missing' : have.length === want.length && want.every(([f, t]) => readFileSync(join(at, f), 'utf8') === t) ? 'installed' : 'outdated'
   const launcher = existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : ''
@@ -516,7 +576,7 @@ export function skillSet(o: { agent: SkillAgent; on: boolean; skill?: SkillName 
   const k = o.skill ?? 'laki'
   if (!SKILLS.includes(k)) throw new Error(`no skill ${k}`)
   const at = skillDir(o.agent, k)
-  const fs = files(at, k)
+  const fs = files(at, k, o.agent)
   if (o.on) {
     mkdirSync(at, { recursive: true })
     for (const [f, t] of Object.entries(fs)) writeFileSync(join(at, f), t)

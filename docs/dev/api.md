@@ -285,9 +285,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
 - an agent's estimate: `progress` (`tab`, `pct` 0-100, `note`; `laki progress`, MCP's `laki_progress`): it returns what
   it stored (clamped, rounded), and the tab's view has it until the turn ends (`view` drops it on idle or exit, however
   the turn ended); `settings.progress` puts `LAKI_PROGRESS=1` in agents' env (`lakiEnv`) and
-  the laki skill tells them to report every 20-30 s; claude and codex on this Mac are told at every start (`agentCmd`'s
-  `PROGRESS_NOTE`: `--append-system-prompt`, `-c developer_instructions`; the skill loads only for Laki's own tasks), and
-  claude's settings allow its `progress` command;
+  claude and codex on this Mac are told at every start (`agentCmd`'s `PROGRESS_NOTE`: `--append-system-prompt`, `-c
+  developer_instructions`), and claude's settings allow its `progress` command; A2: their skill's description no longer
+  names `$LAKI_PROGRESS` (skill.ts `START_TOLD`: it would load the whole skill into every session), gemini's, grok's and
+  opencode's still does (nothing tells them at their start), and the skill's own section stays for any that loads it;
 - Laki AI (below): `aiAsk` (from an agent: main.ts `byAgent` marks the text as the agent's and takes it out of the queue, `asAgent` runs each tool call through `agentNo` with the agent's `from`, in a chat of that tab's own (ai.ts `agentChat`, `ai-agent-<tab>.json`: never your chat's history; `aiState`, `aiNew`, `aiStop` from an agent are that chat's; your chats' `aiChats`, `aiOpen`, `aiChatRm`, `aiUnqueue`, `aiContinue`, `studioChatRm` and `voiceText` refused); claude -p's and codex exec's `laki mcp` gets that tab's `LAKI_TAB_TOKEN` (`asTab`), so its calls are the agent's too; `text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
   conversation, `busy`, `ended`, `key`: one is saved, the last 100 calls,
   `totals`), `aiNew`, `aiStop` (none: any chat's ask), `aiKey` (`key`; empty removes it); each takes `chat` (a spec's or

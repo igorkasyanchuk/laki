@@ -165,6 +165,35 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   assert.deepEqual([of('claude', 'laki-widget').state, of('claude', 'laki-widget').foreign], ['outdated', undefined])
 })
 
+// A1: a skill loads whole each time it triggers: SKILL.md keeps what every use needs, small, and names the reference
+// files written beside it; 'installed' still means every file matches. A2: the laki skill's description doesn't
+// trigger on $LAKI_PROGRESS (a claude tab with Progress on gets the instruction at its start instead)
+test('A1, A2: each SKILL.md under 8 KB, its reference files beside it and named in it; no $LAKI_PROGRESS trigger', async t => {
+  const rig = await fresh(t)
+  const refs: Record<string, string[]> = { laki: ['commands.md', 'more.md', 'workflows.md', 'schedule.md', 'browser.md'], 'laki-widget': ['widget-json.md', 'ui-kit.md', 'widget-html.md'] }
+  for (const [skill, files] of Object.entries(refs)) {
+    const rows = await rig.rpc('skillSet', { agent: 'claude', on: true, skill })
+    assert.equal(rows.find((x: { skill: string; agent: string }) => x.skill === skill && x.agent === 'claude').state, 'installed')
+    const at = join(rig.home, '.claude/skills', skill)
+    const md = readFileSync(join(at, 'SKILL.md'), 'utf8')
+    assert.ok(Buffer.byteLength(md) < 8192, `${skill}'s SKILL.md is ${Buffer.byteLength(md)} bytes`)
+    for (const f of files) {
+      assert.ok(md.includes(`\`${f}\``), `${skill}'s SKILL.md names ${f}`)
+      assert.ok(readFileSync(join(at, f), 'utf8').length > 200, `${skill}/${f}`)
+    }
+    writeFileSync(join(at, files.at(-1)!), 'edited') // a reference file changed: not installed any more
+    assert.equal((await rig.rpc('skills')).find((x: { skill: string; agent: string }) => x.skill === skill && x.agent === 'claude').state, 'outdated')
+  }
+  const laki = readFileSync(join(rig.home, '.claude/skills/laki/SKILL.md'), 'utf8')
+  assert.doesNotMatch(laki.split('\n---\n')[0], /LAKI_PROGRESS/)
+  await rig.rpc('skillSet', { agent: 'gemini', on: true }) // told nothing at its start: its skill still loads for it
+  assert.match(readFileSync(join(rig.home, '.gemini/skills/laki/SKILL.md'), 'utf8').split('\n---\n')[0], /whenever \$LAKI_PROGRESS is 1/)
+  assert.match(laki, /## Start work[\s\S]*## Rules/)
+  assert.match(readFileSync(join(rig.home, '.claude/skills/laki/commands.md'), 'utf8'), /laki new <project/)
+  assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/ui-kit.md'), 'utf8'), /`chart` \(/)
+  assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/widget-json.md'), 'utf8'), /`sample` \(\*\*required\*\*/)
+})
+
 test('ports of the workspace process tree, their names, stopping one; PR from gh, dev server', async t => {
   // listens on a free port (3100+ may be taken on this machine) and says which, and what $PORT was; shrugs off SIGTERM
   const rig = await fresh(t, {

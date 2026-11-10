@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Laki's agent skills cost far fewer tokens: the laki skill's main file is about 6 KB (was 33) and laki-widget's 7 KB (was 63), the rest in files beside them that agents read only when needed. Claude and Codex no longer load the whole laki skill just to report progress on tabs. Update them in Settings › Agent skill (Laki does it on its own for ones it installed).
 - Auto-answer rules: *Always allow in this project* on a permission ask turns its command or path into a project rule, and from then on the same ask from any agent there is answered Allow for you. Commands match by their first words (or a `*`), files by a glob inside the worktree; risky or chained commands, paths outside the worktree, questions, plans and secrets are always asked. Manage them in Settings › the project; agents can't add any.
 - Design mode in the Preview: *Pick* (⌥⌘P with the Preview focused) an element of your dev server's page, and a small composer opens by it with its selector, text, a screenshot and the file it likely comes from; say what to change and send it to the workspace's agent. Only on this Mac's pages.
 - On a Mac, Settings › Appearance › Accent color › *System* follows macOS's accent color as you change it. Behind another app, Laki's accent fills, selected row and focus rings turn grey as macOS's own apps do; status colors stay.

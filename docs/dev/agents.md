@@ -231,7 +231,14 @@ Claude gets `--settings <data>/claude-settings.json` (`claudeFile`: `-fast` for 
 tool gate is on as the tab starts, `existsSync(toolFlag())`; `hookFiles` writes every mix) and, on this Mac (not a host: no laki CLI there), `--plugin-dir
 <data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
 `/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
-`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents.
+`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's more.md says the same for the other agents.
+
+The skills (skill.ts `files`, A1): a skill loads whole each time it triggers, so each SKILL.md holds what every use
+needs (under 8 KB: `test/daemon.test.ts`) and names files beside it, written with it, for the rest: the laki skill's
+`commands.md` (USAGE; `laki help <command>` first), `more.md` (PRs, `laki show`, `laki-ui`, secrets, alerts, extensions'
+tools, specs, memory, `/laki:new`, SSH, issues and PRs), `workflows.md`, `schedule.md` and `browser.md`; laki-widget's
+`widget-json.md` (every key), `ui-kit.md` (the elements) and `widget-html.md`, cut from `widgetFormat` by its `##` heads
+(`/laki:extension` and Settings' prompt keep the whole guide). `installed` means every file matches, as before.
 Other modules add commands through `pluginFiles` (core can't import them): skill.ts' `commands/extension.md`,
 `/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command, only you start
 it (`disable-model-invocation`), and only `READ_ONLY`'s `laki widget` subcommands allowed unasked (N10: new, dev, set,
