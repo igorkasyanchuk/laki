@@ -84,7 +84,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
   - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` as it opens, the file's diff from `diff` (uncommitted) on a
     click (`diffByFile`), `gated` around `ship`; after an Open PR, the sheet's Merge when green and Send CI failures as
-    `wsSet` (no second ask: the box was it). ⌘↵ is Open PR.
+    `wsSet` (no second ask: the box was it). ⌘↵ is Open PR. In a short window each column scrolls (`.ship-cols`' one
+    `minmax(0, 1fr)` row); on a phone the files sit over the words, scrolling as one.
   - ⌘K commands' keys: `shared/keys.ts` `COMMANDS`, `settings.cmdKeys`; `keydown.ts` builds `paletteItems` only when a press matches and runs the item with that `id` (one that doesn't apply now lets the key go on).
   - Keys are handled in a capture-phase `keydown`; xterm never sees ⌘ keys. Settings › Keys' (`shared/keys.ts` `KEYS`:
     17 actions, an id, words and a default each; `settings.keys` over them, `keyMap`: '' none, one `keyOk` refuses (no

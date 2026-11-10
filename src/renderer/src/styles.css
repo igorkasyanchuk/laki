@@ -561,7 +561,8 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .help-card b { font-size: var(--fs-3); }
 .help-k { margin-right: 4px; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: var(--fs-1); letter-spacing: 0.04em; }
 .page-body > * { max-width: 760px; margin: 0 auto; }
-.settings-nav { width: 180px; flex: none; padding: var(--sp-5) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); border-right: 1px solid var(--line); background: var(--side); }
+.settings-nav { width: 180px; flex: none; padding: var(--sp-5) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--side); }
+.settings-nav > * { flex-shrink: 0; } /* a long list (All, many projects) scrolls; its rows (overflow: hidden, for the ellipsis) were squeezed under their text */
 .settings-nav button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: none; text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--muted); }
 .settings-nav button:hover { background: var(--hover); color: var(--fg); }
 .settings-nav button.on { background: var(--sel); color: var(--fg); }
@@ -1788,7 +1789,6 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .help ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: var(--sp-4); }
 .help p { margin: 8px 0; }
 .help-row { display: grid; grid-template-columns: 150px 1fr; gap: var(--sp-6); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); align-items: baseline; }
-.help-nav { overflow-y: auto; }
 .help-nav .sub { padding: var(--sp-2) var(--sp-4) var(--sp-2) 26px; font-size: var(--fs-2); }
 .help-nav .sub.on { background: none; color: var(--accent-ink); }
 .help-nav .help-guide { margin-top: auto; }
@@ -1842,7 +1842,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .narrow .board-col { max-width: none; flex: none; }
 .narrow .grid2 { grid-template-columns: 1fr; }
 .narrow .help-row { grid-template-columns: 1fr; gap: var(--sp-1); }
-.narrow .overlay { padding-top: var(--sp-4); }
+.narrow .overlay { padding-top: var(--sp-4); z-index: calc(var(--z-toast) + 1); } /* z: over the full-screen panels (Info, side panel, Preview: z-toast), as Ship from ⌘K with Files open */
 .narrow .tunnel-pop { width: calc(100vw - 16px); }
 /* 16px: iOS zooms into a smaller field it focuses */
 .narrow input, .narrow select, .narrow textarea, .narrow .xterm-helper-textarea { font-size: var(--fs-4) !important; }
@@ -3493,13 +3493,16 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 /* U5: the Ship sheet: the files on the left, the words and switches on the right */
 .ship { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 0; }
 .ship-banner { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-m); background: var(--bg2, rgba(127, 127, 127, 0.08)); }
-.ship-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--sp-5); min-height: 0; overflow: hidden; }
+.ship-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; grid-template-rows: minmax(0, 1fr); gap: var(--sp-5); min-height: 0; } /* a short window: the row fits the sheet and each column scrolls (not clipped: a field's focus ring shows) */
+.narrow .ship-cols { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; overflow-y: auto; } /* a phone: the files over the words, the two scrolling as one */
+.narrow .ship-form { margin: 0; } /* inside its column: no scroll of its overhang, sideways or down */
 .ship-files { overflow: auto; max-height: 52vh; display: flex; flex-direction: column; gap: var(--sp-1); }
 .ship-head { display: flex; gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); }
 .ship-file { display: flex; gap: var(--sp-3); align-items: center; }
 .ship-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ship-diff { max-height: 260px; overflow: auto; margin: 2px 0 6px 22px; }
-.ship-form { display: flex; flex-direction: column; gap: var(--sp-2); }
+.ship-form { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0; overflow-y: auto; padding: var(--sp-2); margin: calc(-1 * var(--sp-2)); } /* its Base, Reviewers and switches were cut off under the buttons; the padding: a field's focus ring, not clipped */
+.ship-form > * { flex-shrink: 0; }
 .ship-form textarea { resize: vertical; font: inherit; }
 .ship-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .ship-pair label { display: flex; flex-direction: column; gap: var(--sp-1); }

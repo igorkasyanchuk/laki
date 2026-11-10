@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings' list scrolls when it's taller than the window, instead of squeezing its rows together; the Ship sheet's form scrolls too, so Base, Reviewers and its switches stay reachable in a short window.
 - On macOS the sidebar is translucent: the rail and sidebar sit on macOS's sidebar material, and the terminals and pages are a rounded card on top, with the status bar under it. Words on the sidebar stay readable over any wallpaper. Turn it off in Settings › Appearance › Extras › *Translucent sidebar* (Classic design; off with Reduce transparency).
 - Rounder, calmer selection: sidebar rows, ⌘K's items and menu items sit inset with rounded corners and a soft accent fill (no side bar), dialogs and menus have matching corners, and Classic's tabs are rounded segments, the open one filled instead of a top line.
 - A tidier window: spacing, corners, shadows and text sizes on one scale, the heads and the tab bar 40px tall, rows and bars 28, the status bar in the interface font (the branch and the port stay monospace), and a toast gets a red edge only for an error.
