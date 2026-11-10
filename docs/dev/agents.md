@@ -83,7 +83,8 @@ what the view shows on the tab's runtime:
   stay). `turnList { ws | tab }`; `turnDiff { n }` (none in memory: the newest kept); `turnRewind { ws, n }`: refused
   while a tab of the workspace runs, `treeOf` now, kept as a turn (`rewind: n`, name You), then `git restore
   --source=<before>` and the files added since removed, every tab's card cleared: rewinding that turn undoes it;
-  `turnFork { ws, n }`: `wsNew` with the `after` commit as base, then the source's base. Rewind and fork are the user's
+  `turnFork { ws, n }`: `wsNew` with the `after` commit as base, the branch put back to its parent (`reset`: the
+  files stay, uncommitted; no commit of Laki's in the branch), then the source's base. Rewind and fork are the user's
   (`AGENT_NO`). `TurnStrip.tsx` (App's pane `foot`, agent tabs, with `turnChanges` on): a dot per kept turn of the tab
   (the newest 30), `turnWords` as its tip and its menu's head, the three actions (`turnApi`: `turnNext.n` and the
   `laki-turn` event open Changes on it); Changes' *This turn* has a `<select>` of the workspace's turns (`PanelApi.turns`,

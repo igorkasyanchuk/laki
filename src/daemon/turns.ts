@@ -382,7 +382,9 @@ export async function turnRewind(o: { ws?: string; tab?: string; n?: number }) {
   return { files: files.length, n: kept?.n }
 }
 
-// a new workspace on turn n's files: its commit (the tree then, on the HEAD of then) is the branch's start, the
+// a new workspace on turn n's files: its branch starts on the HEAD of then, the turn's files over it uncommitted as
+// they were (the worktree is made on the snapshot commit, then the branch is put back one: that commit is Laki's own,
+// its name and unsigned, and would be the first of the workspace's PR; a repo with no commit then: it stays), the
 // source's base the one it compares with
 export async function turnFork(o: { ws?: string; tab?: string; n?: number }) {
   const src = wsOf(o)
@@ -390,6 +392,7 @@ export async function turnFork(o: { ws?: string; tab?: string; n?: number }) {
   const at = (await g(src, ['rev-parse', '-q', '--verify', `${refOf(src.id, t.n, 'after')}^{commit}`])).trim()
   const tab = state.tabs.find(x => x.id === t.tab)
   const made = await wsNew({ project: src.project, base: at, name: `${src.id}-turn-${t.n}`, preset: tab?.profile ?? tab?.preset ?? undefined })
+  await g(made, ['reset', '-q', `${at}^`]).catch(() => {})
   if (src.base) (made.base = src.base), save()
   changed()
   return made

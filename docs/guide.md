@@ -1655,8 +1655,8 @@ newest in the accent color. Hover one for its prompt, files, time, length and co
 - *Rewind files to before it…* (asked first): every file goes back to what it was before that turn, later turns' changes
   and your own edits since included. What was there is kept as a turn of its own (a hollow dot, *You*): *Undo this
   rewind…* on it puts everything back. Not while an agent of the workspace is working.
-- *New workspace from here*: a new workspace whose branch starts on that turn's files (one commit of Laki's over the
-  commit the worktree was on), compared with the same base.
+- *New workspace from here*: a new workspace with that turn's files, uncommitted as they were, on a branch from the
+  commit the worktree was on; compared with the same base.
 
 It covers files only: not installs, migrations or pushes, nothing git ignores, and no workspaces over SSH; the agent's
 chat isn't rewound. Settings › Git & worktrees › *Turns kept*: how many per workspace (50; 0: none), 14 days at most.

@@ -23,6 +23,8 @@ let quiet = Date.now() // when the last daemon left or the last terminal ended
 let alone = Date.now() // when the last daemon left
 const path = ptySock()
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'ptyhost', ...a)
+// ponytail: no bound on what waits for a daemon that stopped reading (a hung one): dropping it would end its terminals
+// once it's back (ptyHost.ts' lost); a cap with a re-attach from the ring if a hung daemon is ever seen to cost memory
 const send = (s: Socket, m: unknown) => void (s.destroyed || s.write(frame(m)))
 const live = () => [...ptys.values()].filter(p => p.exit === undefined)
 const size = (v: unknown, max: number, d: number) => Math.max(1, Math.min(max, Number(v) | 0 || d))

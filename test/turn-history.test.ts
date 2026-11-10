@@ -70,11 +70,12 @@ test('kept turns: three survive a restart, each diff its own; rewind, and a rewi
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'busy' } })
   await assert.rejects(rig.rpc('turnRewind', { ws: ws.id, n: 1 }), /is working/)
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
-  // a workspace from turn 2: its files, on a commit of its own over the HEAD of then; compared with the source's base
+  // a workspace from turn 2: its files, uncommitted over the HEAD of then (no commit of Laki's in its branch); compared with the source's base
   const made = await rig.rpc('turnFork', { ws: ws.id, n: 2 })
   assert.deepEqual([readFileSync(join(made.path, 'a.txt'), 'utf8'), readFileSync(join(made.path, 'b.txt'), 'utf8')], ['one\ntwo\n', 'b\n'])
   assert.equal(made.base, ws.base)
-  assert.match(execFileSync('git', ['-C', made.path, 'log', '-1', '--format=%s'], { encoding: 'utf8' }), /Laki: .*turn 2: change a, add b/)
+  assert.doesNotMatch(execFileSync('git', ['-C', made.path, 'log', '--format=%an %s'], { encoding: 'utf8' }), /Laki/)
+  assert.match(execFileSync('git', ['-C', made.path, 'status', '--porcelain'], { encoding: 'utf8' }), /a\.txt[^]*b\.txt/)
   // settings.turnsKept: the newest only, the others' refs let go
   await rig.rpc('settingsSet', { turnsKept: 2 })
   await turn('one more', () => writeFileSync(file('c.txt'), 'c\n'))

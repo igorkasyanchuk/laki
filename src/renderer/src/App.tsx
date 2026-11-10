@@ -2731,7 +2731,7 @@ export function App() {
     show: t => ((turnNext.on = true), (turnNext.n = t.n), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), window.dispatchEvent(new CustomEvent('laki-turn', { detail: t.n })), showPanel('changes')),
     rewind: t =>
       ask(t.rewind ? `Undo the rewind to before turn ${t.rewind}?` : `Rewind files to before turn ${t.n}?`, { text: `${t.rewind ? 'The files go back to what they were before you rewound.' : `Every file goes back to what it was before "${t.prompt ?? `turn ${t.n}`}": this turn's changes, later turns' and your own edits since.`} What's there now is kept as a turn of its own, so this can be undone. Files only: not installs, migrations, pushes or what git ignores. Nothing is committed.`, ok: t.rewind ? 'Undo the rewind' : 'Rewind', danger: true }).then(
-        ok => (ok ? call<{ files: number }>('turnRewind', { ws, n: t.n }).then(r => done(r.files ? `${r.files} file${r.files === 1 ? '' : 's'} back as before turn ${t.rewind ?? t.n}` : 'The files are that way already')) : undefined),
+        ok => (ok ? call<{ files: number }>('turnRewind', { ws, n: t.n }).then(r => done(r.files ? `${r.files} file${r.files === 1 ? '' : 's'} back as ${t.rewind ? 'before the rewind' : `before turn ${t.n}`}` : 'The files are that way already')) : undefined),
       ),
     fork: t => void call<WorkspaceView>('turnFork', { ws, n: t.n }).then(w => showNew(w.id), () => {}),
   })

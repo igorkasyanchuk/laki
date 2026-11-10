@@ -131,6 +131,28 @@ test('the pty host: with no terminal and no daemon it ends by itself; one of ano
   assert.deepEqual(await pty.ptyList(), [])
   const hello = { pid: pty.ptyPid() }
   t.after(() => void (running(hello.pid) && process.kill(hello.pid, 'SIGKILL')))
+  // a terminal taken back while it prints (ptyAdopt's attach, then flow): the host's buffer, then what came after, in
+  // order, none of it twice
+  const noisy = new pty.HostPty('n1', { file: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 20000 ]; do echo "n$i"; i=$((i+1)); done; sleep 30'], cwd: home, env: {}, cols: 80, rows: 24 })
+  let first = ''
+  noisy.onData(d => (first += d))
+  await until(() => first.includes('n50\r'), 'it prints')
+  const back = new pty.HostPty('n1')
+  let after = ''
+  let gone: number | undefined
+  back.onData(d => (after += d))
+  back.onExit(e => (gone = e.exitCode))
+  const was = await back.attach()
+  back.flow()
+  await until(() => (was + after).includes('n19999\r'), 'all of it')
+  assert.deepEqual((was + after).match(/n\d+/g), Array.from({ length: 20000 }, (_, i) => `n${i}`))
+  // the connection lost with the host still there: its terminal was told gone here, so it's ended there too
+  const np = back.pid
+  assert.ok(running(np))
+  pty.ptyClose(true)
+  await until(() => gone === 1 && !running(np) && pty.ptyOn(), 'ended in the host once this daemon is back', 15000)
+  assert.equal(pty.ptyPid(), hello.pid)
+  assert.deepEqual(await pty.ptyList(), [])
   // a HostPty as Session uses it: output, exit, and a host that goes takes its terminals with a line saying so
   const p = new pty.HostPty('t1', { file: '/bin/sh', args: ['-c', 'echo up; sleep 30'], cwd: home, env: {}, cols: 80, rows: 24 })
   let out = ''

@@ -1732,6 +1732,7 @@ export async function ptyAdopt() {
       try {
         const hp = new HostPty(p.id)
         spawnTab(tab, { adopt: { pty: hp, cols: p.cols, rows: p.rows, hook: k.hook, token: k.token } }).replay(await hp.attach())
+        hp.flow() // what it printed meanwhile: after its buffer
         tab.again = undefined // keepShells' (a stop that kept it): it still runs, nothing to bring back at a later start
         log(`${tab.id}: its terminal outlived the daemon (pid ${p.pid})`)
       } catch (e) {
@@ -3346,7 +3347,8 @@ export function hookOk(tab: string, key: unknown) {
   return own.length > 0 && own.length === said.length && timingSafeEqual(own, said)
 }
 // S12: the tab a token is the live start's of: none once that start ended (its process gone, the tab restarted or
-// closed, the daemon started again). In memory only: never in state.json, the view or a log
+// closed, the daemon started again without the pty host). Never in state.json, the view or a log; a pty host's
+// terminal's is in pty.json (0600, R6: the next daemon's to know it by)
 export function tabOfToken(token: unknown) {
   if (typeof token !== 'string' || token.length !== 64) return
   const said = Buffer.from(token)

@@ -35,7 +35,7 @@ export const ptyOn = () => !!sock
 export const ptyList = async () => (await ask<{ ptys: PtyInfo[] }>({ op: 'list' })).ptys
 export const ptyForget = (id: string) => (open.delete(id), post({ op: 'forget', id }))
 export const ptyQuit = () => ((wanted = false), post({ op: 'quit' }))
-export const ptyClose = () => ((wanted = false), void sock?.destroy()) // tests': the connection dropped, the host left as it is
+export const ptyClose = (again = false) => ((wanted = again), void sock?.destroy()) // tests': the connection dropped, the host left as it is; again: as one lost (it's dialed again)
 export const ptyPid = () => hostPid
 
 // a terminal in the host, as node-pty's IPty to Session: its pid is -1 until the host says (never 0: a kill of -0 is
@@ -67,14 +67,25 @@ export class HostPty {
     post({ op: 'kill', id: this.id, signal })
   }
   group = (signal: string) => this.kill(signal) // the host signals the whole job
-  // everything the host kept of its output; what it prints from here on comes through onData, in order after it
+  private held?: any[] // attach: what the host says of it meanwhile, until flow
+  private end = 0 // attach: where its buffer ends: a data frame from before that is in it
+  // everything the host kept of its output. What it says meanwhile is held (frames read with the reply are handled
+  // before the caller has drawn the buffer) until flow(): then onData, in order after it
   async attach() {
-    const m = await ask<{ gone?: boolean; pid: number; d: string }>({ op: 'attach', id: this.id, from: 0 })
+    this.held = []
+    const m = await ask<{ gone?: boolean; pid: number; d: string; at: number }>({ op: 'attach', id: this.id, from: 0 })
     if (m.gone) throw new Error('that terminal is gone')
     this.pid = m.pid
+    this.end = m.at + m.d.length
     return m.d
   }
+  flow() {
+    const h = this.held ?? []
+    this.held = undefined
+    for (const m of h) if (m.ev !== 'data' || m.at >= this.end) this.got(m)
+  }
   got(m: any) {
+    if (this.held) return void this.held.push(m)
     if (m.ev === 'spawned') this.pid = m.pid
     else if (m.ev === 'data') for (const f of this.data) f(m.d)
     else if (m.ev === 'exit') {
@@ -91,7 +102,11 @@ function wire(s: Socket) {
   const feed = reader(m => {
     const w = m.re ? waits.get(m.re) : undefined
     if (w) return waits.delete(m.re), w(m)
-    open.get(m.id)?.got(m)
+    try {
+      open.get(m.id)?.got(m)
+    } catch (e) {
+      log(`${m.id}: ${(e as Error).message}`) // a terminal's own handler's: not a bad frame, the others go on
+    }
   })
   s.on('data', d => {
     try {
@@ -108,8 +123,13 @@ function wire(s: Socket) {
     if (open.size) log(`gone, ${open.size} terminals with it`)
     for (const p of [...open.values()]) p.got({ ev: 'exit', code: 1, error: 'the pty host is gone' })
     for (const [re, w] of waits) (waits.delete(re), w({ gone: true, ptys: [] }))
-    if (wanted) (wanted = false), setTimeout(() => void ptyUp().catch(e => log((e as Error).message)), 1000).unref() // new terminals go to a new one; once: a host that turns this daemon away isn't asked every second
+    if (wanted) (wanted = false), setTimeout(() => void ptyUp().then(lost).catch(e => log((e as Error).message)), 1000).unref() // new terminals go to a new one; once: a host that turns this daemon away isn't asked every second
   })
+}
+// back after a connection lost with the host still there: what it still runs was told gone here (the tabs say so, an
+// Enter starts them again), so it's ended there too: nothing runs unseen
+const lost = async () => {
+  for (const p of await ptyList()) if (!open.has(p.id)) post({ op: 'forget', id: p.id })
 }
 const dial = () =>
   new Promise<Socket>((res, rej) => {
