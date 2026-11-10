@@ -25,7 +25,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ship', group: 'Getting started', title: 'Ship it', how: "The toolbar's Ship: commit, push and open a PR in one go", icon: 'ship', go: 'ship', rpc: 'ship' },
   { id: 'tab', group: 'Getting started', title: 'Open another tab', how: "The tab bar's + (⌘⇧N): another agent or a shell beside the first", icon: 'terminal', go: 'newtab', rpc: 'tabNew' },
   { id: 'settings', group: 'Getting started', title: 'Look around Settings', how: 'Themes, fonts, notifications, your agents (⌘,)', icon: 'gear', go: 'settings', page: 'settings' },
-  { id: 'theme', group: 'Getting started', title: 'Pick a theme', how: 'Settings › Appearance: a theme painted as you hover it', icon: 'palette', go: 'section:appearance', up: v => v.settings.theme ?? '' },
+  { id: 'theme', group: 'Getting started', title: 'Pick a theme', how: 'Settings › Theme & type: a theme painted as you hover it', icon: 'palette', go: 'section:appearance', up: v => v.settings.theme ?? '' },
   { id: 'help', group: 'Getting started', title: 'Read the keys', how: 'Help (⌘/): every key and where things are', icon: 'help', go: 'help', page: 'help' },
   { id: 'palette', group: 'Getting started', title: 'Open the command palette', how: '⌘K: every workspace, page and action by name', icon: 'command', go: 'palette', page: 'palette' },
 
@@ -77,7 +77,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'todos', group: 'Power user', title: 'Keep a to-do list', how: 'To-dos: one checklist of your own, headings and to-dos under others', icon: 'listChecks', go: 'todos', rpc: 'todoListSave' },
   { id: 'calendar', group: 'Power user', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },
 
-  { id: 'meme', group: 'Just for fun', title: 'Laugh a little', how: "The sidebar foot's smiley (Settings › Appearance › Fun): a meme while agents work", icon: 'smile', go: 'fun', rpc: 'meme' },
+  { id: 'meme', group: 'Just for fun', title: 'Laugh a little', how: "The sidebar foot's smiley (Settings › Layout › Fun): a meme while agents work", icon: 'smile', go: 'fun', rpc: 'meme' },
   { id: 'video', group: 'Just for fun', title: 'Play a video', how: "The sidebar foot's play button: a YouTube video beside your work", icon: 'youtube', go: 'video' },
 ]
 

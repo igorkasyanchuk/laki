@@ -536,6 +536,12 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
   agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (SettingsProject.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
+- **Settings' Basic view** (U10): `view` (`laki.settingsView`; unset: Basic with no projects, else All; a `section`/`spot`
+  or Find a setting: All). Basic's nav is settingsMap.ts `BASIC` (four heads, each `[section, card title]`s, `*` all of
+  one); `on(id)` renders those sections, SettingsKit's `Shown` context makes `Group` return null for a card not named,
+  and `.settings-main[data-basic]` hides the sections' own h2 and notes (anything not a `.set-group`). `isBasic` marks
+  Find's hits and `laki_settings_find`'s `basic: true`. Appearance is `appearance` (Theme & type: old links land
+  there), `layout` and `extras`.
 - **`Settings.tsx`**: the settings page (⌘,; its sections' parts in `SettingsKit.tsx` (`Says`, `Group`, `Scope`), `SettingsAgents.tsx` (AI, Voice, the skill and accounts), `SettingsProject.tsx` (a project's section and the fields the global ones share), `SettingsConnect.tsx` (phone pushes, remote access, simulators), `SettingsResources.tsx` and `SettingsExtensions.tsx`, which it re-exports), autosaved, zoomed by the terminal font size times `settings.pageZoom`
   (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
   preview cancels that); the nav's sections under a head each (`SECTIONS` `group`: Laki, Agents, Connect); each section's settings in

@@ -62,8 +62,11 @@ export function HelpQ({ title }: { title: string }) {
   )
 }
 
+// U10: Settings' Basic view: which of a section's cards it shows, by title (none: All, every one)
+export const Shown = createContext<((title: string) => boolean) | null>(null)
 // a block of settings that belong together, set apart from the next: a title, what it's for, then them
-export const Group = ({ title, hint, act, children }: { title: string; hint?: ReactNode; act?: ReactNode; children: ReactNode }) => (
+export const Group = ({ title, hint, act, children }: { title: string; hint?: ReactNode; act?: ReactNode; children: ReactNode }) =>
+  (shown => shown && !shown(title))(useContext(Shown)) ? null : (
   <section className="set-group">
     <div className={`set-head ${act ? 'with-act' : ''}`}>
       <h3>{title}</h3>

@@ -369,11 +369,11 @@ function ThemeRow({ theme, onTheme, auto, onAuto }: { theme: string; onTheme: (i
         <Icon name="palette" />
         <div className="ob-what">
           <b>Make it feel like home</b>
-          <span className="muted small">A click paints Laki at once; Settings › Appearance has them all, with fonts and glass</span>
+          <span className="muted small">A click paints Laki at once; Settings › Theme & type has them all, with fonts and glass</span>
         </div>
         <span className="seg">
           {onAuto && (
-            <button className={auto ? 'on' : ''} aria-pressed={!!auto} data-tip="Light while macOS is light, dark while it's dark (Settings › Appearance picks the two themes)" onClick={() => onAuto(!auto)}>
+            <button className={auto ? 'on' : ''} aria-pressed={!!auto} data-tip="Light while macOS is light, dark while it's dark (Settings › Theme & type picks the two themes)" onClick={() => onAuto(!auto)}>
               Match the system
             </button>
           )}
@@ -640,7 +640,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
   }, [open])
   useEffect(() => void ((off || (start === 'limit' && !limits)) && start !== undefined && onStart(undefined)), [off, limits]) // a codespace, another agent: now
   const at = typeof start === 'number' ? new Date(start) : null
-  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: claude and codex only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Appearance turned it off)" : undefined
+  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: claude and codex only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Theme & type turned it off)" : undefined
   const pick = (d: string, t: string) => {
     const ms = new Date(`${d}T${t || '09:00'}`).getTime()
     if (Number.isFinite(ms)) onStart(Math.max(ms, Date.now() + 60_000))

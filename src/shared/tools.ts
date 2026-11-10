@@ -5,7 +5,7 @@ import { rpc as conn } from './conn.ts'
 import { oldName } from './caps.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
-import { FIND, HELP, SECTIONS } from './settingsMap.ts'
+import { FIND, HELP, isBasic, SECTIONS } from './settingsMap.ts'
 import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
@@ -747,7 +747,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
       const v: View = await rpc('state')
       const named = words.filter(w => !/^(on|off|is|it|to|in|of|at|do|my|me|be|the|and|how|set|now|where|what|turn|change)$/.test(w)) // a key's words, not the question's
       const values = Object.fromEntries(Object.entries(v.settings ?? {}).filter(([k, val]) => said(k, val) && named.some(w => k.toLowerCase().includes(w))))
-      return { settings: hits.map(h => ({ where: `Settings › ${label(h.sec)} › ${h.title}`, link: `laki://settings/${h.sec}?spot=${encodeURIComponent(h.title)}`, ...(HELP[h.title] && { help: HELP[h.title] }) })), values, note: hits.length ? undefined : 'nothing by those words: try others, or Settings › Find a setting' }
+      return { settings: hits.map(h => ({ where: `Settings › ${label(h.sec)} › ${h.title}`, link: `laki://settings/${h.sec}?spot=${encodeURIComponent(h.title)}`, ...(isBasic([h.sec, h.title]) && { basic: true }), ...(HELP[h.title] && { help: HELP[h.title] }) })), values, note: hits.length ? undefined : 'nothing by those words: try others, or Settings › Find a setting' }
     },
   },
 ]

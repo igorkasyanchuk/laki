@@ -52,7 +52,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans (and Gemini CLI's
   quota); click it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
 - **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
-  Settings › Appearance › *Context meter*), and a bar in the status bar, fill as
+  Settings › Layout › *Context meter*), and a bar in the status bar, fill as
   its chat's context does (amber past 70%, red past 90%), so you `/compact` or start fresh in time; its tooltip has
   the tokens the chat used and ≈ what they'd cost at API prices.
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
@@ -66,9 +66,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   phone pushes meanwhile, except an important workspace's ask. The status bar's moon ends it early; as it ends, one card
   (*While you were away*) lists what waits for you, what finished and which PRs moved; a row opens its tab, and the
   card stays until you close it.
-- **Follow the system**: Settings › Appearance › Theme › *Follow the system* paints a light theme while macOS is light
+- **Follow the system**: Settings › Theme & type › Theme › *Follow the system* paints a light theme while macOS is light
   and a dark one while it's dark (pick each); it turns with the system, terminals too.
-- **Simple row**: Settings › Appearance › Sidebar rows › *Simple row* (off by default) makes a workspace's row its name
+- **Simple row**: Settings › Layout › Sidebar rows › *Simple row* (off by default) makes a workspace's row its name
   and one next-step chip, or the turn's time while its agent works; the other marks show on hover and in its card.
 - **Behind the base**: *↓n* beside the branch in the status bar counts the commits its base has that it hasn't (as
   your clone has the base: no fetch). A click: *Update* merges the base in when that's clean, or hands the conflicts
@@ -121,7 +121,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   to do, then send.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the start of the status bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
-  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance › *Buttons and bars* hides it, the video's and the timers' buttons, and the status bar itself (its buttons then at the sidebar's foot).
+  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Layout › *Buttons and bars* hides it, the video's and the timers' buttons, and the status bar itself (its buttons then at the sidebar's foot).
 - **Timers**: the timer at the start of the status bar starts a countdown, 1 minute to an hour (or any length), as
   many as you like; each shows as a bar at the bottom of the sidebar (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
@@ -256,10 +256,10 @@ npm link
 
 **Sidebar:** projects (a branch icon for a repo, a folder for a plain folder) and their workspaces, one line each
 (status, name; GitHub's mark when it has a PR: green open, gray draft, purple merged, red closed; a red ⊗ beside it:
-an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
+an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Layout). The
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
-  else's PR. Settings › Appearance › *Sidebar rows* (or a right click › *Show ›*) turns each off; it also puts them by the status circle or after the name instead.
+  else's PR. Settings › Layout › *Sidebar rows* (or a right click › *Show ›*) turns each off; it also puts them by the status circle or after the name instead.
 - *Empty projects* (the same places, on by default): off leaves out a project with no workspace to show (none, all
   archived, or all in Pinned); the selected workspace's project and a filter's hits still show.
 
@@ -297,9 +297,9 @@ selected workspace's PR is in the status bar.
 - ⌘-click picks a workspace, ⇧-click every one between it and the last picked: a bar over the list then archives them
   (the ones with uncommitted changes asked once; Undo brings them all back), mutes them, moves them to a group or
   deletes them (asked first), and dragging one of them moves them all. Esc or a plain click lets them go.
-- A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
+- A line divides the projects; each one's workspaces hang under it, indented (Settings › Layout › *The sidebar* adds
   a guide line beside them; none by default).
-- *Diff size* (Settings › Appearance › *Sidebar rows*, or a right click › *Show ›*; off by default) puts each workspace's diff size on its row
+- *Diff size* (Settings › Layout › *Sidebar rows*, or a right click › *Show ›*; off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
@@ -418,7 +418,7 @@ selected workspace's PR is in the status bar.
   notifications*, *Remind me…*, *Mark as unread*, *Pin to top* (it moves under *Pinned*, above the projects, until
   *Unpin*), *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and
   browsers too), *Logs* (development mode) and *Show ›* (what the rows show after their names: the next step, the PR, its
-  author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan, the diff size; also Settings › Appearance ›
+  author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan, the diff size; also Settings › Layout ›
   *Sidebar rows*). Then *Open in ›*, *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your
   agent and shell actions), *PR #n ›* (the status bar PR's right-click menu: *Refresh from GitHub*, asks GitHub now, not at the next check; open it, its checks, copy its link or number, merge, approve, close, detach; no PR: *Look for a PR* and *Attach a PR…*), *Attach a PR…* (a
   git workspace on a branch with no PR found: one opened another way, by its URL or number; also the status bar's
@@ -803,7 +803,7 @@ Gemini tabs use first, the rest under *More*). Each shows when it resets. They c
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
 once a tab of that agent has run, with *As of* when they're older than 20 minutes. Laki asks no server for them unless
 you turn on *Ask Anthropic for Claude's plan limits* (or OpenAI's for Codex, Google's for Gemini CLI: the only way to
-get Gemini's) in Settings › Appearance: undocumented endpoints that may break. Then the daemon
+get Gemini's) in Settings › Layout: undocumented endpoints that may break. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in
@@ -824,10 +824,10 @@ context is full, in the accent color, amber past 70%, red past 90%; the status b
 tab's. Their tooltips say it in tokens: *142K of 200K tokens · 71%*. Claude's window is 200K, or 1M for a `[1m]` model
 (or once it holds more than 200K); Codex says its own. The tab's tooltip also has what its chat used since it began:
 *≈ $0.42 · 1.2M tokens* (input, output and cache writes and reads, at API prices; a model Laki has no price for shows
-tokens only). Settings › Appearance › *Context meter* picks how a tab shows it (a line under the tab, a ring on it, or
+tokens only). Settings › Layout › *Context meter* picks how a tab shows it (a line under the tab, a ring on it, or
 the status bar only) or turns it off; *Tokens and cost* hides the rest.
 
-**Claude's status line** (Settings › Appearance › *Read Claude's status line*, on): Claude Code hands its status line
+**Claude's status line** (Settings › Layout › *Read Claude's status line*, on): Claude Code hands its status line
 its own numbers at each redraw. Laki's tabs on this Mac run Laki's status line command, which keeps them, then runs
 yours (your project's `.claude/settings.local.json` or `.claude/settings.json`, from the project's own folder, never a
 workspace's worktree, else the account's or your
@@ -1110,7 +1110,7 @@ for you or finished while you looked away (muted ones aside); so does Laki's mar
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
 small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
 and *Screenshot to Laki AI* (on by default) has its item there with its keys.
-Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Appearance), a
+Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Layout), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes
 when this turn ends*): ✎ edits one in place (⌘⏎ saves, Esc cancels), ✕ removes it (with Undo), its handle drags it
@@ -1140,7 +1140,7 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
 *Specs*, *Flows*, *My Desk*, *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
-*AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail;
+*AI* (when it's on) over *Settings* at its bottom (Settings › Layout › Rail › *Labels* off: icons only and a narrower rail;
 *Terminals* or *Browsers* off: no button, and that project is in Projects' list). With labels on and more pages turned
 on than fit, the least used (To-dos, Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail: with
 the pages that are on by default, Flows and Specs. Settings ›
@@ -1155,7 +1155,7 @@ one needs you; a click opens it, a right click its menu (a pinned one isn't lit 
 Specs and brainstorms pin there too (the pin in an open one's header, or a right click on it in the list), counted in
 the same 5. A phone always has one sidebar.
 
-**The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
+**The sidebar's style** (Settings › Layout › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
 progress, the PR's title, the diff; a hover shows its ⋯ in a place kept for it, so nothing moves), *Words* (one PR
 pill, `#42 ✓`, for the marks, and a second line that says the one thing that matters most: *Asks: <its question>*,
@@ -1636,7 +1636,7 @@ the rest; the bar under the terminal has it as a *+N −M* chip, the sidebar's N
 of your other workspaces or projects, and the message goes with a line for each saying what it is: its folder,
 branch and agents, and how to reach it with `laki send` and `laki diff`; nothing starts by itself). The
 terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
-open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off. The chip on
+open in Reader. A tab's right click has it too. Settings › Layout › *Reader view* turns the switch off. The chip on
 a Claude Code tab's box (and *Permission mode* in its right click) shows its real mode and changes it without a restart,
 mid-turn too: *Ask*, *Accept edits*, *Plan*, or *Bypass* where its sandbox, a managed policy and how it started allow. What you type
 in its box and don't send stays, tab by tab: through a switch of tabs, closing it and ⇧⌘T, a restart or an archive (the
@@ -1648,7 +1648,7 @@ A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh
 into the workspace's terminal (its first shell tab, a new one when there's none) and that tab shows; nothing runs until
 you press ⏎ there. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
 
-Settings › Appearance › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds
+Settings › Layout › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds
 into *n steps hidden · Show*; one with a failed call stays, *1 failed* in red) or *Final answer only* (your messages and
 each turn's last answer). The steps at work now always show. *Scroll to latest when sending* (on): off, sending leaves
 you where you were reading. *Times in the Reader* (on): under your messages, when you sent each (today's as 14:02, an
@@ -1738,7 +1738,7 @@ shows that app under the call, told what it was called with and its result. Laki
 as your Claude config says (your servers and this folder's in `~/.claude.json`, the account's; never a repo's
 `.mcp.json`, which Claude asks you about first), and keeps the connection 10 minutes. The app runs in a sandbox with only
 the domains it declares; when it wants to open a link, run one of its server's tools or send the agent a message, a
-card asks you first. Servers that need a sign-in aren't reached. Settings › Appearance › *MCP Apps in the Reader* turns it off.
+card asks you first. Servers that need a sign-in aren't reached. Settings › Layout › *MCP Apps in the Reader* turns it off.
 
 **UI in answers**: an agent can put a small fenced `laki-ui` block in its answer (the laki skill says how): UI kit JSON
 (`laki widget kit` lists the elements) that Reader draws with Laki's own controls, a table, stats, a checklist,
@@ -1750,8 +1750,8 @@ Elsewhere (the terminal, a shared page) it's the JSON as code.
 The first item of a workspace's ⋯ menus (the toolbar's, its row's, its right click) is the one thing it needs from you now: *Answer claude* or *Approve the plan*
 while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *Address the review*,
 *Merge #42* once checks pass, *Review changes* when the agent is done, *Ship* when there's something to ship, *Archive*
-once its PR is merged or closed (Archive asks first). While an agent works it shows the step under way (from its plan); *CI runs* and *In review* open the PR. ⌘G does what it says. Settings › Appearance › *Sidebar rows* › *Next step* (or a right click › *Show ›*) puts it on each sidebar row as a small chip
-(none while it works, nor for conflicts or failing CI: the row's own marks show those). Settings › Appearance › *One next
+once its PR is merged or closed (Archive asks first). While an agent works it shows the step under way (from its plan); *CI runs* and *In review* open the PR. ⌘G does what it says. Settings › Layout › *Sidebar rows* › *Next step* (or a right click › *Show ›*) puts it on each sidebar row as a small chip
+(none while it works, nor for conflicts or failing CI: the row's own marks show those). Settings › Layout › *One next
 step* turns it off.
 
 ### Done check
@@ -1794,7 +1794,7 @@ tab: the step under way in bold, the done ones ticked, *Plan 2/5* and the curren
 Its sidebar row says *2/5*; hover it for the list. A list from before your last message is dimmed until the agent writes
 a new one, and one with every step done goes as the turn ends. When Claude Code asks you to approve a plan (plan mode),
 the plan shows as a card with its menu's choices as buttons; edit the plan there and *Send changes* answers *keep
-planning* and sends your version back. Settings › Appearance › *The agent's plan, live* turns it off.
+planning* and sends your version back. Settings › Layout › *The agent's plan, live* turns it off.
 
 ### Bird view
 
@@ -1874,7 +1874,7 @@ hide button), or ⌘[ and ⌘], go back and forward through the pages (My Desk, 
 Specs…) and workspaces you were on, the last 25, as in a browser: open an extension's settings from My Desk, and ‹
 brings My Desk back. A spec or brainstorm you opened, a workflow or a run is a step of its own; Settings and an
 extension's page come back at the section and tab you left. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
-removed since is skipped. Settings › Appearance › Rail › *Back and forward* turns it off.
+removed since is skipped. Settings › Layout › Rail › *Back and forward* turns it off.
 
 The window's title says where you are too: the page (*Settings — Laki*), else the workspace and tab (*fix-login ·
 claude — Laki*), so a screen share's picker, the Window menu and a browser's tab (remote access) name it.
@@ -1993,7 +1993,16 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment. A setting that assumes agent know-how (Done check, Collision radar, fast and permission modes,
 Merge when green, Send into the running turn…) has a ? after its name: a card of what it does, when to turn it on
-and what it costs.
+and what it costs; a hint stays one line, the rest is in its ? card.
+
+*Basic | All*, above the sections: Basic shows the settings most people change, in four parts (*Agents*: the default
+agent and sign-ins; *Notifications*; *Look*: theme, interface font, terminal text; *Git & PRs*: worktrees, the Done
+check, PR checks), All every section. A new install starts on Basic, one with projects on All; Find a setting and a
+link to a section open All. Appearance is three sections: *Theme & type*, *Layout* (the rail, sidebar, rows, bars,
+window designs) and *Extras* (floating bubbles, Dock icon, glass, Custom CSS). *Reset the interface* is General ›
+*Reset* (type reset to go on). A new install starts with the base fetched from origin before each worktree (*Sync the
+base branch*: Origin's), the row's next-step chip on, memory compaction off until you turn it on (its line names who
+receives the text), and no macOS notification as a turn finishes (asks still notify; finishes are in Needs you).
 - *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, on by default (Laki AI answers it): ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K; what you mark important comes as a card at the bottom right, over every app and Space, until you answer it anywhere, open it or close its ×: a workspace's asks and finishes (⋯ › Workspace › *Important: cards on screen*), a timer (*Important* in New timer or its menu), a reminder (Calendar's *Important*, `laki remind … --important`)) with a switch for each
   kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what

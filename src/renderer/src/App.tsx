@@ -3254,7 +3254,7 @@ export function App() {
     openMenu(e, [
       ...(key ? [{ head: 'Color' }, { colors: TAB_COLORS, value: railColors[key], pick: (c: string) => railColor(key, c) }, null] : []),
       ...(item ? [{ label: `Move ${item.label} into ⋯ More`, icon: 'more' as const, run: () => void call('settingsSet', { railHide: [...railHide, item.key] }).catch(() => {}) }] : []),
-      { label: 'Customize the rail…', icon: 'gear', sub: 'which buttons show, their order', run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
+      { label: 'Customize the rail…', icon: 'gear', sub: 'which buttons show, their order', run: () => setDialog({ section: 'layout', spot: 'Rail' }) },
     ])
   }
   // the rail stays while Projects' sidebar is open: a kind whose list is hidden (Terminals, Browsers) keeps it
@@ -3269,7 +3269,7 @@ export function App() {
           openMenu(e, [
             ...railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) })),
             ...(railHide.length ? [{ label: 'Show them all on the rail', icon: 'eye' as const, foot: true, run: () => void call('settingsSet', { railHide: [] }).catch(() => {}) }] : []),
-            { label: 'Customize the rail…', icon: 'gear', foot: true, run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
+            { label: 'Customize the rail…', icon: 'gear', foot: true, run: () => setDialog({ section: 'layout', spot: 'Rail' }) },
           ]),
         )}
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}

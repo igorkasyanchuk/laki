@@ -3481,3 +3481,9 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .needs-bulk button { font-size: var(--fs-1); height: 20px; padding: 0 6px; white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 500; }
 .needs-list > .project-head .project-name { flex: 0 1 auto; min-width: 0; }
 .needs-bulk .needs-allow-all { color: var(--accent-ink); border-color: var(--accent); }
+
+/* U10: Settings' Basic | All, and Basic's view: only its cards (Shown), none of the sections' own heads and notes */
+.settings-view { display: flex; margin: 4px 0 8px; }
+.settings-view button { flex: 1; }
+.settings-main[data-basic] > :not(.set-group, .basic-head) { display: none; }
+.settings-main button.danger { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }

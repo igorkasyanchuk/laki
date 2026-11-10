@@ -2,7 +2,7 @@
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
 import { FitAddon } from '@xterm/addon-fit'
-import { FIND, findKey, freshOf, SECTIONS } from '../../shared/settingsMap'
+import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, type Paint, paintKey, paintOf, preview, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
@@ -22,7 +22,7 @@ import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
-import { Fresh, Group, HelpQ, Says, Scope } from './SettingsKit'
+import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
@@ -735,6 +735,8 @@ function CliField({ api, onSkill }: { api: CliApi; onSkill?: () => void }) {
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
+// who reads what Laki AI sends (memory compaction's line): its backend's company, OpenRouter's model
+const aiWho = (ai?: AppSettings['ai']) => (b => (b === 'claude' ? 'Anthropic (claude -p, your Claude Code sign-in)' : b === 'codex' ? 'OpenAI (codex exec, your Codex sign-in)' : `OpenRouter${ai?.models?.openrouter ? ` (${ai.models.openrouter})` : ''}`))(ai?.backend ?? 'openrouter')
 export function SettingsPage(p: {
   own?: number // its own ⌘± size (App's), over Pages size
   settings: AppSettings
@@ -781,7 +783,15 @@ export function SettingsPage(p: {
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
   const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
-  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
+  // U10: Basic (four heads of the cards most people change) or All (every section); a new install starts on Basic,
+  // one with projects on All; a link to a section, or Find a setting, goes to All
+  const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))
+  useEffect(() => keep('laki.settingsView', view), [view])
+  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || BASIC.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
+  const basic = view === 'basic' ? (BASIC.find(b => b.id === sec) ?? BASIC[0]) : undefined
+  // a section's cards on: its own, or a Basic head's (only the cards it names: Shown)
+  const on = (id: string) => (basic ? basic.cards.some(c => c[0] === id) : sec === id)
+  const shown = basic ? (title: string) => basic.cards.some(([, c]) => c === '*' || c === title) : null
   useEffect(() => {
     keep('laki.settingsSec', sec)
     p.onSection?.(sec)
@@ -908,10 +918,11 @@ export function SettingsPage(p: {
   }, [onClose])
 
   const presets = s.presets ?? p.presets
-  // Development › Reset the interface: Laki as it starts. The daemon's settings (uiReset), then this viewer's laki.*
+  // General › Reset › Reset the interface: Laki as it starts. The daemon's settings (uiReset), then this viewer's laki.*
   // (App.tsx' localStorage), then a reload
   const resetUi = async () => {
-    if (!(await ask('Reset the interface?', { text: 'Every setting goes back to its default: the theme, the rail and sidebar, the terminal, notifications, the experimental features. Every extension turns off, Get started shows again, and widths, open panels and text sizes go back to how Laki starts. Projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, timers and drafts stay.', ok: 'Reset', danger: true }))) return
+    // a typed reset: one click is too easy for what it undoes
+    if ((await askText('Reset the interface?', { text: 'Every setting goes back to its default: the theme, the rail and sidebar, the terminal, notifications, the experimental features. Every extension turns off, Get started shows again, and widths, open panels and text sizes go back to how Laki starts. Projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, timers and drafts stay. Type reset to go on.', placeholder: 'reset', ok: 'Reset' }))?.trim().toLowerCase() !== 'reset') return
     try {
       await p.uiReset?.()
     } catch (e) {
@@ -926,21 +937,21 @@ export function SettingsPage(p: {
   const [usage, setUsage] = useState<AgentUsage[]>([])
   const loadAccts = () => void p.accounts?.load().then(setAccts, () => {})
   useEffect(() => {
-    if (sec !== 'presets' || !p.accounts) return
+    if (!on('presets') || !p.accounts) return
     loadAccts()
     p.accounts.usage().then(setUsage, () => {})
     const t = setInterval(() => !document.hidden && loadAccts(), 10000) // each read asks the Keychain: not too often
     return () => clearInterval(t)
-  }, [sec, !!p.accounts])
+  }, [sec, view, !!p.accounts])
   // each agent's hooks as Laki last heard them, while Agents & profiles is open
   const [hooks, setHooks] = useState<Record<string, HookSeen>>({})
   useEffect(() => {
-    if (sec !== 'presets' || !p.hooks) return
+    if (!on('presets') || !p.hooks) return
     const load = () => void p.hooks!().then(setHooks, () => {})
     load()
     const t = setInterval(() => !document.hidden && load(), 10000)
     return () => clearInterval(t)
-  }, [sec, !!p.hooks])
+  }, [sec, view, !!p.hooks])
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
   // codex: its notify, only as a turn ends; the others: the last hook, or none yet (and how many tabs aren't heard)
   const native = (h: HookSeen) => h.native && <span data-tip={`Laki compares what this agent reports through its terminal (OSC 7501) with its hooks, and only counts it: what a tab shows still comes from hooks.${h.native.last ? ` Last difference, ${ago(h.native.last.at)}: it said ${h.native.last.native}, hooks said ${h.native.last.hook}.` : ''}`}> · native status: {h.native.agree} agree, {h.native.differ} differ</span>
@@ -1030,11 +1041,11 @@ export function SettingsPage(p: {
     : [
         ...FIND.flatMap(([sec, title, more]) => {
           const where = sections.find(x => x.id === sec)?.label
-          return where && hits(`${title} ${more ?? ''} ${where}`) ? [{ sec, title, where }] : []
+          return where && hits(`${title} ${more ?? ''} ${where}`) ? [{ sec, title, where: isBasic([sec, title]) ? `${where} · Basic` : where }] : []
         }),
         ...(p.projects ?? []).filter(x => hits(`${x.name} project`)).map(x => ({ sec: `project:${x.id}`, title: x.name, where: 'Project' })),
       ].slice(0, 12)
-  const go = (r: { sec: string; title: string }) => (setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() }))
+  const go = (r: { sec: string; title: string }) => (setView('all'), setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() })) // in All: Basic hides most
   const nextKey = keyShow(keyMap(s.keys).next) // Needs you's words: ⌘J, or what Settings › Keys made it ('': none)
   // the global hotkeys (main's globalShortcut): General's, and the Keys page's too, with the keys in use now
   const globalKeys = bridge?.hotkey && (
@@ -1095,7 +1106,21 @@ export function SettingsPage(p: {
               {!found.length && <div className="muted small pad">Nothing called that.</div>}
             </>
           )}
-          {!findQ.trim() && sections.map((x, i) => (
+          {!findQ.trim() && (
+            <div className="seg settings-view" role="radiogroup" aria-label="Settings shown">
+              {(['basic', 'all'] as const).map(v => (
+                <button key={v} type="button" role="radio" aria-checked={view === v} className={view === v ? 'on' : ''} onClick={() => (setView(v), openSec(v === 'basic' ? BASIC[0].id : 'general'))} data-tip={v === 'basic' ? 'The settings most people change, in four parts' : 'Every setting, by section'}>
+                  {v === 'basic' ? 'Basic' : 'All'}
+                </button>
+              ))}
+            </div>
+          )}
+          {!findQ.trim() && basic && BASIC.map(x => (
+            <button key={x.id} className={basic.id === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
+              <Icon name={x.icon} /> {x.label}
+            </button>
+          ))}
+          {!findQ.trim() && !basic && sections.map((x, i) => (
             <Fragment key={x.id}>
               {x.group !== sections[i - 1]?.group && <div className="settings-nav-head">{x.group}</div>}
               <button className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
@@ -1104,20 +1129,22 @@ export function SettingsPage(p: {
               </button>
             </Fragment>
           ))}
-          {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Project settings</div>}
-          {!findQ.trim() && p.projects?.map(x => (
+          {!findQ.trim() && !basic && !!p.projects?.length && <div className="settings-nav-head">Project settings</div>}
+          {!findQ.trim() && !basic && p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => openSec(`project:${x.id}`)} data-tip={x.path}>
               <ProjectMark p={x} or={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} size={14} /> <span>{x.name}</span>
             </button>
           ))}
-          {!findQ.trim() && !!p.archived?.length && (
+          {!findQ.trim() && !basic && !!p.archived?.length && (
             <button className={sec === 'archived' ? 'on' : ''} onClick={() => openSec('archived')} data-tip="Projects you archived: out of the sidebar and pickers">
               <Icon name="archive" size={14} /> <span>Archived projects</span>
             </button>
           )}
         </nav>
         <Fresh.Provider value={freshHere}>
-        <div className="settings-main form">
+        <Shown.Provider value={shown}>
+        <div className="settings-main form" data-basic={basic ? '' : undefined}>
+          {basic && <h2 className="basic-head">{basic.label}</h2>}
           {p.managed && (
             <div className="setting-box managed-box" role="note">
               <Says
@@ -1157,7 +1184,7 @@ export function SettingsPage(p: {
               onSave={o => p.onSaveProject?.(project.id, o)}
             />
           )}
-          {sec === 'git' && (
+          {on('git') && (
             <>
               <h2>Git &amp; worktrees</h2>
               <Group title="New worktrees" hint="Each new workspace is a git worktree on a branch of its own, off the base branch the new-workspace page picks (the repo's main one unless you pick another)">
@@ -1204,16 +1231,16 @@ export function SettingsPage(p: {
               <Group title="In the background">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.bgRefresh !== false} onChange={v => set({ bgRefresh: v })}>
-                  <Says title="Refresh PR status in the background" hint="Checks each workspace's PR, CI and reviews every few minutes (Settings › Pull requests) and as an agent's turn ends. Off: only a PR's right click › Refresh, if gh asks for an SSH passphrase or GitHub limits you. The PR switches need it" />
+                  <Says title="Refresh PR status in the background" hint="Checks each workspace's PR, CI and reviews every few minutes" />
                 </Switch>
                 <Switch className="switch-row" on={s.doneCheck !== false} onChange={v => set({ doneCheck: v })}>
                   <Says title="Done check" hint="As an agent's turn ends having changed files, its project's check runs before you're told it's done: the scripts and second opinion a project ticks in its settings › Done check. Off: none runs anywhere" />
                 </Switch>
                 <Switch className="switch-row" on={s.radar === true} onChange={v => set({ radar: v })}>
-                  <Says title="Collision radar" hint="Off: a worktree's ⋯ › Workspace › Check overlaps looks once, when you ask. On: every 15 seconds it compares what each worktree changes with the project's other worktrees and with what landed on its base since it branched, and where two change the same lines both rows get a mark. Lockfiles don't count" />
+                  <Says title="Collision radar" hint="Marks rows whose worktrees change the same lines; off: Check overlaps looks once" />
                 </Switch>
                 <Switch className="switch-row" on={!!s.ptyHost} onChange={v => set({ ptyHost: v })}>
-                  <Says title="Terminals outlive the daemon (experimental)" hint="New tabs' terminals run in a small process of their own, so a daemon that crashes or restarts finds agents and shells still running, their screens as they were. Tabs open now move there as they restart. Quit Laki Completely and laki stop still end them (laki stop --keep doesn't)" />
+                  <Says title="Terminals outlive the daemon (experimental)" hint="New tabs' terminals keep running when the daemon crashes or restarts" />
                 </Switch>
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />
@@ -1226,14 +1253,14 @@ export function SettingsPage(p: {
                       </option>
                     ))}
                   </select>
-                  <Says title="When everything is done" hint="Once every agent working or asking you, workflow run and scheduled task due within the hour is done, a minute's countdown you can cancel, then the Mac sleeps, locks or shuts down. Once: it goes back to Do nothing after" />
+                  <Says title="When everything is done" hint="Once all work is done, the Mac sleeps, locks or shuts down after a minute" />
                 </label>
                 <Switch className="switch-row" on={s.turnChanges !== false} onChange={v => set({ turnChanges: v })}>
-                  <Says title="Each turn's changes" hint="As a Claude Code or Codex turn ends having changed files, a card under its last answer in the Reader: what it changed, Review (Changes › This turn) and Undo. Laki notes the worktree as each turn starts and ends, with an index of its own: yours is never touched" />
+                  <Says title="Each turn's changes" hint="A card under each turn that changed files: what changed, Review, Undo" />
                 </Switch>
                 {s.turnChanges !== false && (
                   <label className="switch-row">
-                    <Says title="Turns kept" hint="Every turn that changed files is kept per workspace, for 14 days at most: the dots under an agent's tab (its changes, Rewind files to before it, New workspace from here) and Changes › This turn's picker. 0: only the last one, until the daemon restarts" />
+                    <Says title="Turns kept" hint="Every turn that changed files, for Rewind and New workspace from here (0: the last)" />
                     <span className="grow" />
                     <input type="number" min={0} max={500} style={{ width: 80 }} aria-label="Turns kept" value={s.turnsKept ?? 50} onChange={e => e.target.value !== '' && set({ turnsKept: Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))) })} />
                   </label>
@@ -1280,7 +1307,7 @@ export function SettingsPage(p: {
               </Group>
             </>
           )}
-          {sec === 'general' && (
+          {on('general') && (
             <>
               <h2>General</h2>
               <Group title="New workspaces">
@@ -1413,7 +1440,7 @@ export function SettingsPage(p: {
               <Group title="Development">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
-                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns and commands) and extension (fetches, actions): ⋯ › Logs, and Logs on an extension in Settings › Extensions" />
+                  <Says title="Development mode" hint="Keeps each workspace's and extension's log: ⋯ › Logs" />
                 </Switch>
                 {s.devMode && (
                   <div className="row">
@@ -1438,12 +1465,6 @@ export function SettingsPage(p: {
                     </button>
                   </div>
                 )}
-                <div className="button-row">
-                  <Says title="Reset the interface" hint="Laki as it starts: every setting at its default (the theme, the rail, the experimental features), every extension off, Get started again, the window's layout. Projects, workspaces, sessions, profiles, accounts, keys and connections stay" />
-                  <button type="button" onClick={resetUi}>
-                    <Icon name="restore" /> Reset
-                  </button>
-                </div>
               </div>
               </Group>
               {p.cli && (
@@ -1457,13 +1478,13 @@ export function SettingsPage(p: {
                   <Says title="Labs: everything beyond the core" hint="All of these at once, and the rail's Terminal and Browser and the sidebar foot's Video, Meme and Timer (Appearance). Off, Laki is Projects, Board, Schedule, AI and Settings. Each keeps its own switch" />
                 </Switch>
                 <Switch className="switch-row" on={s.desk !== false} onChange={v => set({ desk: v })}>
-                  <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on My Desk and in the sidebar at once. Shows the rail's My Desk and ⌘K" />
+                  <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize" />
                 </Switch>
                 <Switch className="switch-row" on={s.birdView !== false} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
                 </Switch>
                 <Switch className="switch-row" on={specsOn(s)} onChange={v => set({ specs: v })}>
-                  <Says title="Specs & Brainstorms" hint="Write a project's requirements like a Notion page (checklists, images, diagrams) and brainstorm ideas with Laki AI (options, a mind map, diagrams, clickable prototypes). Each is a folder outside the repo with a README.md any agent can read. Shows the rail's Specs and a project's Specs tab" />
+                  <Says title="Specs & Brainstorms" hint="Requirements and ideas as pages beside the repo, any agent can read them" />
                 </Switch>
                 <Switch className="switch-row" on={flowsOn(s)} onChange={v => set({ workflows: v })}>
                   <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
@@ -1482,7 +1503,7 @@ export function SettingsPage(p: {
               <Group title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, for a project on GitHub">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.cloud !== false} onChange={v => set({ cloud: v })}>
-                  <Says title="Cloud workspaces (GitHub Codespaces)" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it by the hour (≈ $0.09 a core) and its disk by the month; it stops itself after its idle timeout (30 minutes unless you changed it on GitHub), and GitHub deletes a stopped one after its retention period (30 days), its unpushed work with it" />
+                  <Says title="Cloud workspaces (GitHub Codespaces)" hint="A workspace in a GitHub Codespace of its own, made through your gh" />
                 </Switch>
               </div>
               </Group>
@@ -1501,21 +1522,100 @@ export function SettingsPage(p: {
                   {moved && <span className="muted small">{moved}</span>}
                 </div>
               </Group>
+              <Group title="Reset">
+                <div className="setting-box">
+                  <div className="button-row">
+                  <Says title="Reset the interface" hint="Laki as it starts; your projects, workspaces and accounts stay" />
+                  <button type="button" className="danger" onClick={resetUi}>
+                    <Icon name="restore" /> Reset
+                  </button>
+                </div>
+                </div>
+              </Group>
             </>
           )}
-          {sec === 'appearance' && (
+          {on('appearance') && (
             <>
-              <h2>Appearance</h2>
-              <Group title="Design" hint="How the window's parts sit together: the sidebar, the tabs, the terminals and the side panel. Over the theme; not on a phone or in full screen, where it's Classic">
-                <div className="designs" role="radiogroup" aria-label="Design">
-                  {(on => DESIGNS.map(([k, name, what, traits]) => (
-                    <button key={k} type="button" role="radio" aria-checked={on === k} className={`design-card ${on === k ? 'on' : ''}`} onClick={() => set({ design: k })}>
-                      <DesignMini traits={traits} />
-                      <b>{name}</b>
-                      <span className="muted small">{what}</span>
-                    </button>
-                  )))(designTraits(s.design) ? s.design : 'classic') /* one it no longer has: Classic, as the window */}
-                </div>
+              <h2>Theme & type</h2>
+              <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.themeAuto} onChange={v => paint({ themeAuto: v })}>
+                  <Says title="Follow the system" hint="A light theme while macOS is light, a dark one while it's dark: it turns with the system, terminals and all. Off, the theme picked below stays" />
+                </Switch>
+                {s.themeAuto &&
+                  ([['themeLight', 'Light', true], ['themeDark', 'Dark', false]] as const).map(([k, label, light]) => (
+                    <label key={k} className="switch-row">
+                      <select value={themeFor({ ...s, themeAuto: true }, !light)} onChange={e => paint({ [k]: e.target.value })}>
+                        {THEMES.filter(t => !!t.light === light).map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Says title={`${label} theme`} hint={light ? 'While the system is light' : 'While the system is dark'} />
+                    </label>
+                  ))}
+              </div>
+              <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name, game or film (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
+              {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
+              {(
+                [
+                  ['Favorites', shownThemes.filter(t => favs.includes(t.id))],
+                  [favs.length ? 'All themes' : '', shownThemes], // a starred one stays here too
+                ] as [string, typeof THEMES][]
+              ).map(([head, list]) =>
+                list.length ? (
+                  <Fragment key={head}>
+                    {head && <h4 className="themes-head">{head}</h4>}
+                    <div className="themes" onMouseLeave={() => applyTheme(s)}>
+                      {list.map(t => {
+                        const [bg, panel, fg, accent, ...ansi] = preview(t)
+                        const on = (s.theme || 'default') === t.id
+                        const fav = favs.includes(t.id)
+                        return (
+                          <div key={t.id} className="theme-wrap">
+                            <button
+                              className={`theme ${on ? 'on' : ''}`}
+                              aria-pressed={on}
+                              style={{ background: bg, color: fg }}
+                              onClick={() => paint({ theme: t.id })}
+                              onMouseEnter={() => applyTheme({ ...s, theme: t.id }) /* a look before choosing */}
+                            >
+                              <span className="theme-bar" style={{ background: panel }}>
+                                <span style={{ background: accent }} />
+                                {on && (
+                                  <b className="theme-check" style={{ background: fg, color: bg }}>
+                                    <Icon name="check" size={10} />
+                                  </b>
+                                )}
+                              </span>
+                              <span className="theme-dots">
+                                {ansi.map((c, i) => (
+                                  <span key={i} style={{ background: c }} />
+                                ))}
+                              </span>
+                              <span className="theme-name">
+                                {t.name}
+                                {t.look && ' ✦'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`theme-fav ${fav ? 'on' : ''}`}
+                              style={{ color: fg }}
+                              aria-pressed={fav}
+                              data-tip={fav ? 'Out of Favorites' : 'Add to Favorites'}
+                              onClick={() => paint({ favThemes: fav ? favs.filter(x => x !== t.id) : [...favs, t.id] })}
+                            >
+                              {fav ? '★' : '☆'}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Fragment>
+                ) : null,
+              )}
               </Group>
               <Group title="Interface" hint="Tabs, menus, dropdowns, the status bar and tooltips: one font and one size. The preview changes as you do">
               <InterfacePreview />
@@ -1636,6 +1736,22 @@ export function SettingsPage(p: {
                   </>
                 ))(lookOf(s))}
               </Group>
+            </>
+          )}
+          {sec === 'layout' && (
+            <>
+              <h2>Layout</h2>
+              <Group title="Design" hint="How the window's parts sit together: the sidebar, the tabs, the terminals and the side panel. Over the theme; not on a phone or in full screen, where it's Classic">
+                <div className="designs" role="radiogroup" aria-label="Design">
+                  {(on => DESIGNS.map(([k, name, what, traits]) => (
+                    <button key={k} type="button" role="radio" aria-checked={on === k} className={`design-card ${on === k ? 'on' : ''}`} onClick={() => set({ design: k })}>
+                      <DesignMini traits={traits} />
+                      <b>{name}</b>
+                      <span className="muted small">{what}</span>
+                    </button>
+                  )))(designTraits(s.design) ? s.design : 'classic') /* one it no longer has: Classic, as the window */}
+                </div>
+              </Group>
               <Group title="Rail" hint="A column of buttons on the left: Projects, then the pages below in your order, each with what needs you there; the list beside it shows the one you pick">
                 <div className="setting-row rail-buttons">
                   <Says title="Its buttons" hint="Tick the ones to show and drag them into an order; the others go into ⋯ More. A right click on the rail does it too" />
@@ -1744,11 +1860,11 @@ export function SettingsPage(p: {
                   <Says title="One next step" hint="What the workspace needs from you now (answer, fix CI, merge, ship, archive…) first in its ⋯ menus, and ⌘G does it; Sidebar rows › Next step puts it on each row too" />
                 </Switch>
                 <Switch className="switch-row" on={s.reader !== false} onChange={v => set({ reader: v })}>
-                  <Says title="Reader view" hint="A Terminal | Reader switch on each Claude Code and Codex tab: Reader shows its chat as a conversation, your messages, its answers as text, its steps folded, a box to write in. Each tab remembers which; a phone opens them in Reader" />
+                  <Says title="Reader view" hint="A Terminal | Reader switch on Claude Code and Codex tabs: the chat as a conversation" />
                 </Switch>
                 {s.reader !== false && (
                   <Switch className="switch-row" on={s.mcpApps !== false} onChange={v => set({ mcpApps: v })}>
-                    <Says title="MCP Apps in the Reader" hint="A Claude Code tool call whose MCP server has an app for it shows that app under the call. Laki asks the server for its page, as your Claude config says (yours and this folder's servers; never a repo's .mcp.json); the app's links, tool calls and messages ask you first" />
+                    <Says title="MCP Apps in the Reader" hint="A tool call whose MCP server has an app shows that app under the call" />
                   </Switch>
                 )}
                 {s.reader !== false && (
@@ -1758,7 +1874,7 @@ export function SettingsPage(p: {
                       <option value="ok">Hide successful</option>
                       <option value="final">Final answer only</option>
                     </select>
-                    <Says title="Tool calls in the Reader" hint="Hide successful: a run of steps that all worked folds to one line (a failed one still shows). Final answer only: your messages and its last answer of each turn. The steps at work now always show; a click on n steps hidden shows them" />
+                    <Says title="Tool calls in the Reader" hint="Fold the steps that worked, or show only the final answers" />
                   </label>
                 )}
                 {s.reader !== false && (
@@ -1772,7 +1888,7 @@ export function SettingsPage(p: {
                   </Switch>
                 )}
                 <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>
-                  <Says title="The agent's plan, live" hint="An agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row. A plan it asks you to approve shows as a card you can edit: your changes go back to it. Claude Code and Codex" />
+                  <Says title="The agent's plan, live" hint="The agent's own to-do list under its tab, ticked off as it works" />
                 </Switch>
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
@@ -1800,6 +1916,11 @@ export function SettingsPage(p: {
                 </Switch>
               </div>
               </Group>
+            </>
+          )}
+          {sec === 'extras' && (
+            <>
+              <h2>Extras</h2>
               <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>
@@ -1881,7 +2002,7 @@ export function SettingsPage(p: {
                       <Says title="Card on hover" hint="Its name, project and what it asked or last said, beside the drop" />
                     </Switch>
                     <Switch className="switch-row" on={s.floaterNew !== false} onChange={v => set({ floaterNew: v })}>
-                      <Says title="+ button" hint="A + under the circles; a click shows New task (the new-workspace page in a window of its own, over the app you're in), Say it, Screenshot area and Whole screen, as the menu bar's. With it the drop stays when no agent is at work" />
+                      <Says title="+ button" hint="A + under the bubbles: New task, Say it, a screenshot" />
                     </Switch>
                     {s.floaterNew !== false && (
                       <>
@@ -2030,93 +2151,13 @@ export function SettingsPage(p: {
                 )}
               </div>
               </Group>
-              <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
-              <div className="setting-box">
-                <Switch className="switch-row" on={!!s.themeAuto} onChange={v => paint({ themeAuto: v })}>
-                  <Says title="Follow the system" hint="A light theme while macOS is light, a dark one while it's dark: it turns with the system, terminals and all. Off, the theme picked below stays" />
-                </Switch>
-                {s.themeAuto &&
-                  ([['themeLight', 'Light', true], ['themeDark', 'Dark', false]] as const).map(([k, label, light]) => (
-                    <label key={k} className="switch-row">
-                      <select value={themeFor({ ...s, themeAuto: true }, !light)} onChange={e => paint({ [k]: e.target.value })}>
-                        {THEMES.filter(t => !!t.light === light).map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
-                      <Says title={`${label} theme`} hint={light ? 'While the system is light' : 'While the system is dark'} />
-                    </label>
-                  ))}
-              </div>
-              <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name, game or film (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
-              {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
-              {(
-                [
-                  ['Favorites', shownThemes.filter(t => favs.includes(t.id))],
-                  [favs.length ? 'All themes' : '', shownThemes], // a starred one stays here too
-                ] as [string, typeof THEMES][]
-              ).map(([head, list]) =>
-                list.length ? (
-                  <Fragment key={head}>
-                    {head && <h4 className="themes-head">{head}</h4>}
-                    <div className="themes" onMouseLeave={() => applyTheme(s)}>
-                      {list.map(t => {
-                        const [bg, panel, fg, accent, ...ansi] = preview(t)
-                        const on = (s.theme || 'default') === t.id
-                        const fav = favs.includes(t.id)
-                        return (
-                          <div key={t.id} className="theme-wrap">
-                            <button
-                              className={`theme ${on ? 'on' : ''}`}
-                              aria-pressed={on}
-                              style={{ background: bg, color: fg }}
-                              onClick={() => paint({ theme: t.id })}
-                              onMouseEnter={() => applyTheme({ ...s, theme: t.id }) /* a look before choosing */}
-                            >
-                              <span className="theme-bar" style={{ background: panel }}>
-                                <span style={{ background: accent }} />
-                                {on && (
-                                  <b className="theme-check" style={{ background: fg, color: bg }}>
-                                    <Icon name="check" size={10} />
-                                  </b>
-                                )}
-                              </span>
-                              <span className="theme-dots">
-                                {ansi.map((c, i) => (
-                                  <span key={i} style={{ background: c }} />
-                                ))}
-                              </span>
-                              <span className="theme-name">
-                                {t.name}
-                                {t.look && ' ✦'}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`theme-fav ${fav ? 'on' : ''}`}
-                              style={{ color: fg }}
-                              aria-pressed={fav}
-                              data-tip={fav ? 'Out of Favorites' : 'Add to Favorites'}
-                              onClick={() => paint({ favThemes: fav ? favs.filter(x => x !== t.id) : [...favs, t.id] })}
-                            >
-                              {fav ? '★' : '☆'}
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </Fragment>
-                ) : null,
-              )}
-              </Group>
               <Group title="Custom CSS" hint="Anything the pickers above don't reach: your own rules over the app's, in every window, as you type. Pictures and fonts from the web stay blocked">
                 <textarea className="mono custom-css" rows={6} spellCheck={false} value={s.customCss ?? ''} placeholder={'.sidebar .ws { font-size: 15px; }\n.project-name { color: var(--accent); }'} onChange={e => set({ customCss: e.target.value })} />
                 <CssGuide open={!s.customCss?.trim()} onAdd={css => set({ customCss: `${(s.customCss ?? '').trimEnd()}${s.customCss?.trim() ? '\n' : ''}${css}\n` })} />
               </Group>
             </>
           )}
-          {sec === 'terminal' && (
+          {on('terminal') && (
             <>
               <h2>Terminal</h2>
               <p className="muted">How every tab's terminal looks and behaves: agents', shells' and dev servers'. The preview changes as you do.</p>
@@ -2283,7 +2324,7 @@ export function SettingsPage(p: {
               set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
           )}
-          {sec === 'needs' && (
+          {on('needs') && (
             <>
             <h2>Needs you</h2>
             <p className="muted small">Agents waiting for your answer, then the ones done while you looked away: the Dock's count and the menu bar's list are the same ones.</p>
@@ -2313,7 +2354,7 @@ export function SettingsPage(p: {
                   phone pushes
                 </button>
                 ,{' '}
-                <button type="button" className="link" onClick={() => go({ sec: 'appearance', title: 'Floating bubbles' })}>
+                <button type="button" className="link" onClick={() => go({ sec: 'extras', title: 'Floating bubbles' })}>
                   floating bubbles
                 </button>{' '}
                 and{' '}
@@ -2379,7 +2420,7 @@ export function SettingsPage(p: {
               <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
                 <div className="setting-box">
                   <Switch className="switch-row" on={s.memoryCompact?.on !== false} onChange={on => set({ memoryCompact: { ...s.memoryCompact, on } })}>
-                    <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to Laki AI's model every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
+                    <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to ${aiWho(s.ai)} every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
                   </Switch>
                   <label className="row">
                     <Says title="Every" hint="days since the last one (0: only when full)" />
@@ -2402,7 +2443,7 @@ export function SettingsPage(p: {
           {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
-          {sec === 'pr' && (
+          {on('pr') && (
             <>
               <h2>Pull requests</h2>
               <p className="muted small">
@@ -2413,7 +2454,7 @@ export function SettingsPage(p: {
               <p className="muted small">Merge, merge when green, approve and close are each project's to allow: its section here, under Pull requests (merge when green is off until you turn it on).</p>
               <Group title="Review tab">
                 <Switch className="switch-row" on={s.fullReview !== false} onChange={v => set({ fullReview: v })}>
-                  <Says title="Review tab" hint="A Review tab first in the tab bar (⌘1) while a workspace has changes: every file's diff with Viewed boxes, pinned files first, more lines around a change a click away, the PR's description, comments you gather on lines, then sent to its agent or posted on the PR as one review" />
+                  <Says title="Review tab" hint="A full-page Review tab (⌘1) while a workspace has changes" />
                 </Switch>
               </Group>
               <Group title="Checks">
@@ -2475,7 +2516,7 @@ export function SettingsPage(p: {
               <ActionsField value={s.actions} taken={p.projects?.flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])} onChange={actions => set({ actions })} />
             </>
           )}
-          {sec === 'presets' && (
+          {on('presets') && (
             <>
               <h2>Agents & profiles</h2>
               <p className="muted small">
@@ -2574,7 +2615,7 @@ export function SettingsPage(p: {
                         )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
                           <Switch className="switch-row" on={pr.steer !== false} onChange={on => setPreset(i, { steer: on ? undefined : false })}>
-                            <Says title="Send into the running turn" hint="What you send while it works (Send later, the Reader's box, a reply, a review comment) goes in at once and it reads it mid-turn, instead of waiting in the queue. Not while it asks you something or has a queue; Laki's own messages (PR fixes, workflows) still wait for its turn to end" />
+                            <Says title="Send into the running turn" hint="What you send while it works goes in at once, not into the queue" />
                           </Switch>
                         )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
@@ -2612,6 +2653,7 @@ export function SettingsPage(p: {
             </>
           )}
         </div>
+        </Shown.Provider>
         </Fresh.Provider>
       </div>
       {toTop}

@@ -75,6 +75,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['review', click('.review-tab'), '.full-review'],
     ['new-workspace', link('laki://new'), '.nw-composer'],
     ['settings', link('laki://settings'), '.settings-page'],
+    // U10: Basic shows four heads, each only its cards (Look: Theme first); All again; Layout by its link
+    ['settings-basic', async () => { await clickText('.settings-view button', 'Basic'); await waitFor(() => hasText('.settings-nav button', 'Git & PRs'), 'the Basic heads'); await clickText('.settings-nav button', 'Look') }, async () => (await has('.settings-main[data-basic]')) && (await js<string>("document.querySelector('.settings-main .set-group h3')?.textContent ?? ''")) === 'Theme' && !(await hasText('.settings-main h3', 'Rail'))],
+    ['settings-layout', async () => (await clickText('.settings-view button', 'All'), await link('laki://settings/layout?spot=Rail')()), async () => !(await has('.settings-main[data-basic]')) && (await hasText('.settings-main h2', 'Layout')) && (await hasText('.settings-main h3', 'Rail'))],
     ['board', link('laki://board'), '.board'],
     ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
     ['ai', link('laki://ai'), '.ai-page'],

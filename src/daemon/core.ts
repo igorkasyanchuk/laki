@@ -118,6 +118,10 @@ const readState = (p: string): State => {
   return s
 }
 
+// U10: a new install's defaults (an install from before keeps what it had): the base fetched from origin before a
+// worktree, the row's next-step chip, memory compaction off until you turn it on (it sends text to Laki AI's model),
+// and no macOS notification as a turn finishes (asks still notify; finishes are in Needs you)
+const NEW_DEFAULTS = { syncBase: 'origin', rowMarks: { step: true }, memoryCompact: { on: false }, notifyOn: { done: false } } as const
 export function load() {
   mkdirSync(runDir, { recursive: true, mode: 0o700 })
   const had = existsSync(statePath) || existsSync(statePath + '.bak')
@@ -180,7 +184,7 @@ export function load() {
   // unset hears it once (Settings › Resources' note), a new one never
   if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
-    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki' }) } // B2: and Laki's own theme pair, light or dark as the system is
+    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
 }
 
