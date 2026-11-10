@@ -17,7 +17,7 @@ import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
-import { USAGE_AGENTS } from './Usage'
+import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
@@ -194,7 +194,8 @@ export type AppSettings = Paint & {
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
-  usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
+  usage?: Record<string, boolean> // R4: its usage endpoint asked too (true only); else Claude's and Codex's own numbers
+  usageNote?: boolean // R4: Resources' one-time note
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
@@ -1859,8 +1860,8 @@ export function SettingsPage(p: {
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
-                  <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`${name} plan limits`} hint={a === 'gemini' ? "The status bar's ring: each model's quota, read with Gemini CLI's own Google sign-in every 5 minutes (nothing written to it)" : `The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
+                  <Switch key={a} className="switch-row" on={s.usage?.[a] === true} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
+                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={`Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. ${a === 'gemini' ? 'Off: no Gemini limits' : `Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`}`} />
                   </Switch>
                 ))}
                 <label className="switch-row">
@@ -2436,6 +2437,16 @@ export function SettingsPage(p: {
             </Group>
           )}
           {sec === 'keys' && globalKeys}
+          {sec === 'resources' && s.usageNote && (
+            <div className="setting-box note-box" role="status">
+              <p>
+                Plan limits now come from the agents' own numbers: Claude Code's status line and what Codex reports as it works. Laki no longer asks Anthropic's or OpenAI's servers with your sign-in unless you turn that on (Settings › Appearance › <i>ask … for plan limits</i>).
+              </p>
+              <button type="button" onClick={() => set({ usageNote: false })}>
+                OK
+              </button>
+            </div>
+          )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} browserBudget={s.browserBudget ?? 0} onBrowserBudget={p.resources.procs && (browserBudget => set({ browserBudget }))} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (

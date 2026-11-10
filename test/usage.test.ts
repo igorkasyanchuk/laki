@@ -77,6 +77,7 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
   const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  await rig.rpc('settingsSet', { usage: { claude: true, codex: true } }) // R4: the endpoints, asked for
 
   // no sign-ins: nothing asked
   let u = await rig.rpc('usage')
@@ -112,18 +113,19 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   await Promise.all([rig.rpc('usage'), rig.rpc('usage')])
   assert.equal(hits.length, 2)
 
-  // an agent turned off isn't listed
-  await rig.rpc('settingsSet', { usage: { claude: false } })
-  assert.deepEqual((await rig.rpc('usage')).map((x: any) => x.agent), ['codex'])
+  // R4: one turned off isn't asked: its own numbers instead (none here)
+  await rig.rpc('settingsSet', { usage: { claude: false, codex: true } })
+  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source, x.error]), [['claude', 'own', "No numbers yet: they come with Claude Code's status line, as a tab works (Settings › Appearance › Read Claude's status line)"], ['codex', 'endpoint', undefined]])
+  assert.equal(hits.length, 2)
   await rig.stop()
   await rig.start()
 
   // an expired token isn't sent (nor refreshed); a 401 says to sign in again
   writeFileSync(join(rig.home, 'keychain'), cred('old', Date.now() - 1000))
   writeFileSync(join(rig.home, '.claude', '.credentials.json'), cred('older', Date.now() - 2000))
-  await rig.rpc('settingsSet', { usage: { codex: false } })
+  await rig.rpc('settingsSet', { usage: { claude: true } })
   u = await rig.rpc('usage')
-  assert.deepEqual([u.length, u[0].error, u[0].plan], [1, 'Sign-in expired: Claude Code renews it on its next run', 'max'])
+  assert.deepEqual([u.length, u[0].error, u[0].plan, u[1].source], [2, 'Sign-in expired: Claude Code renews it on its next run', 'max', 'own'])
   assert.equal(hits.length, 2)
   await rig.stop()
   await rig.start()
@@ -132,6 +134,32 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   u = await rig.rpc('usage')
   assert.equal(u[0].error, 'Sign-in expired: Claude Code renews it on its next run')
   assert.equal(hits.at(-1)?.auth, 'Bearer revoked')
+})
+
+test('usage: R4: by default no server is asked, signed in or not; an install from before hears it once', async t => {
+  let hits = 0
+  const srv = createServer((_q, r) => (hits++, r.writeHead(500).end()))
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  mkdirSync(join(rig.home, '.claude'))
+  writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 3_600_000 } }))
+  mkdirSync(join(rig.home, '.codex'))
+  writeFileSync(join(rig.home, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'codex-token', account_id: 'acc-1' } }))
+  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source]), [['claude', 'own'], ['codex', 'own']])
+  assert.equal(hits, 0)
+  assert.equal((await rig.rpc('state')).settings.usageNote, false, 'a new install: no note')
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  delete st.settings.usageNote
+  writeFileSync(file, JSON.stringify(st))
+  await rig.start()
+  assert.equal((await rig.rpc('state')).settings.usageNote, true, 'from before: the note')
+  await rig.rpc('settingsSet', { usageNote: false })
+  await rig.stop()
+  await rig.start()
+  assert.equal((await rig.rpc('state')).settings.usageNote, false, 'once')
 })
 
 test('usage: Claude asked every 7.5 minutes; told to wait, its Retry-After or longer each time, the last numbers kept', async t => {
@@ -147,7 +175,7 @@ test('usage: Claude asked every 7.5 minutes; told to wait, its Retry-After or lo
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
   const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
-  await rig.rpc('settingsSet', { usage: { codex: false } })
+  await rig.rpc('settingsSet', { usage: { claude: true } }) // R4: Claude's endpoint asked for; Codex's own numbers (none yet)
   mkdirSync(join(rig.home, '.claude'))
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 86_400_000 } }))
   const min = 60_000
@@ -197,8 +225,9 @@ test('usage: Gemini CLI per model, its expired token refreshed once in memory, n
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
   const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
-  await rig.rpc('settingsSet', { usage: { claude: false, codex: false } })
-  assert.deepEqual(await rig.rpc('usage'), [], 'no Gemini sign-in: not listed')
+  await rig.rpc('settingsSet', { usage: { gemini: true } }) // R4: asked for; Claude's and Codex's own numbers (none here) left out below
+  const gem = async (p?: object) => (await rig.rpc('usage', p)).filter((x: any) => x.agent === 'gemini')
+  assert.deepEqual(await gem(), [], 'no Gemini sign-in: not listed')
   const g = join(rig.home, '.gemini')
   mkdirSync(g)
   // Gemini CLI's own client, read from its install: the gemini on PATH ($HOME/bin, first), its core's oauth2.js
@@ -213,7 +242,7 @@ test('usage: Gemini CLI per model, its expired token refreshed once in memory, n
   symlinkSync(join(pkg, 'dist/index.js'), join(rig.home, 'bin/gemini'))
   const creds = JSON.stringify({ access_token: 'old-token', refresh_token: 'refresh-1', expiry_date: Date.now() - 1000 })
   writeFileSync(join(g, 'oauth_creds.json'), creds)
-  const u = await rig.rpc('usage')
+  const u = await gem()
   assert.deepEqual(u.map((x: any) => [x.agent, x.error, x.windows.map((w: any) => [w.label, w.used, w.resets])]), [['gemini', undefined, [['gemini-2.5-pro', 25, Date.parse('2026-11-07T00:00:00Z')], ['gemini-2.5-flash', 90, undefined]]]])
   assert.deepEqual(hits.map(h => h.url), ['/token', '/v1internal:loadCodeAssist', '/v1internal:retrieveUserQuota'])
   const form = new URLSearchParams(hits[0].body)
@@ -223,11 +252,11 @@ test('usage: Gemini CLI per model, its expired token refreshed once in memory, n
   assert.equal(readFileSync(join(g, 'oauth_creds.json'), 'utf8'), creds, 'its sign-in untouched')
   assert.deepEqual(readdirSync(g), ['oauth_creds.json'], 'nothing written under ~/.gemini')
   // kept 5 minutes; then the token in memory is used, not refreshed again
-  await rig.rpc('usage', { now: Date.now() + 6 * 60_000 })
+  await gem({ now: Date.now() + 6 * 60_000 })
   assert.deepEqual(hits.map(h => h.url).filter(x => x === '/token').length, 1, 'refreshed once')
   // told to wait: Retry-After, the last numbers kept
   quota = 429
-  const w = await rig.rpc('usage', { now: Date.now() + 12 * 60_000 })
+  const w = await gem({ now: Date.now() + 12 * 60_000 })
   assert.match(w[0].error, /asked Laki to check less often/)
   assert.equal(w[0].windows.length, 2)
   assert.ok(w[0].next >= Date.now() + 10 * 60_000, 'waits its back-off at least')
@@ -236,14 +265,14 @@ test('usage: Gemini CLI per model, its expired token refreshed once in memory, n
   rmSync(join(rig.home, 'bin/gemini'))
   await rig.start()
   const m = hits.length
-  assert.match((await rig.rpc('usage'))[0].error, /^Unknown: the sign-in expired/)
+  assert.match((await gem())[0].error, /^Unknown: the sign-in expired/)
   assert.equal(hits.length, m)
   // an API-key user: unknown, nothing asked
   await rig.stop()
   writeFileSync(join(g, 'settings.json'), JSON.stringify({ security: { auth: { selectedType: 'gemini-api-key' } } }))
   await rig.start()
   const n = hits.length
-  const k = await rig.rpc('usage')
+  const k = await gem()
   assert.match(k[0].error, /^Unknown: signed in with an API key/)
   assert.equal(hits.length, n)
 })
@@ -262,6 +291,7 @@ test('laki limits: each agent read or its own error, --agent, --json; the policy
   t.after(() => rmSync(dirname(policy), { recursive: true, force: true }))
   writeFileSync(policy, '{}')
   const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_POLICY: policy } })
+  await rig.rpc('settingsSet', { usage: { claude: true, codex: true } }) // R4: the endpoints, asked for
   mkdirSync(join(rig.home, '.claude'))
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'fake-token', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max' } }))
   mkdirSync(join(rig.home, '.codex'))

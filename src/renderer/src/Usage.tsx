@@ -10,6 +10,8 @@ export type { AgentUsage, UsageWindow } // a window's note: what the % is of, fo
 
 // the agents whose plans have limits to read
 export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' }
+export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com', gemini: 'Google' } // R4: who its usage endpoint asks
+const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
 // Gemini's windows are its models' quotas: the models its tabs use first (the ring's is the first), the rest under More
 const byUse = (r: AgentUsage, models: string[]) => (r.agent !== 'gemini' ? r : { ...r, windows: [...r.windows].sort((a, b) => Number(!models.some(m => a.label.startsWith(m))) - Number(!models.some(m => b.label.startsWith(m)))) })
 const NAMES = USAGE_AGENTS
@@ -165,6 +167,7 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
               </details>
             )}
             {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
+            {!r.error && r.windows.length > 0 && now - r.at > STALE && <p className="muted small">As of {hm(r.at)}: {r.source === 'own' ? 'the agent says them as it works' : 'not read again since'}.</p>}
           </section>
         ))}
         {today && (
@@ -191,7 +194,7 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
           </section>
         )}
         <p className="muted small">
-          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in: Claude's every 7.5 minutes, Codex's every 5. Settings › Agents & profiles has the accounts; Appearance picks the agents.
+          {rows.some(r => r.source === 'endpoint') ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Appearance says so.` : "The agents' own numbers: Claude Code's status line, Codex's reports."} Settings › Agents & profiles has the accounts.
         </p>
       </div>
     </div>

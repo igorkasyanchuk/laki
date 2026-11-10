@@ -320,14 +320,22 @@ General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no
 
 ### Usage
 
-Plan limits (`usage.ts`, the renderer's `Usage.tsx`): `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
+Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when
+`settings.usage[agent] === true` (Settings › Appearance › *Ask … for plan limits*, off by default). Otherwise each
+account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line
+`rate_limits`, Codex's transcripts' `token_count` `rate_limits` (share.ts' `meterOf` keeps the newest as `Meter.limits`,
+`codexRateWindows`), of any age: `at` says when, Usage.tsx shows *As of HH:MM* past 20 minutes), `source: 'own'`;
+none yet: a row with `SAYS`' error; Gemini has none, so it isn't listed. Asked, `source: 'endpoint'`. An install from
+before (state.json there, an agent's `usage` unset) gets `settings.usageNote` true once: Settings › Resources' note,
+OK sets it false. A delayed start's *after the plan limit* (schedule.ts `pendingTick`) reads the same: an own window
+whose reset has passed starts it. With the endpoint on, `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
 (`Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`; no redirect followed, both; the token is the freshest of `security
 find-generic-password [-a $USER] -s "Claude Code-credentials" -w` and `~/.claude/.credentials.json`) and Codex's `GET
 chatgpt.com/backend-api/wham/usage` (`$CODEX_HOME/auth.json` `tokens`, `chatgpt-account-id`). Tokens are read-only:
 never refreshed (that can sign the agent out), an expired one isn't sent. Each agent's answer is kept 5 minutes
 (`USAGE_TTL`; Claude's 7.5, `TTL`: Anthropic turns away faster pollers; a turned-away token too), one that asked no server or failed on the way 1
 (`AGAIN`); a 429 (`busy`) its `Retry-After` (`waitOf`), else `BACK_OFF` (10, 20, 40, then 60 minutes, `slows` in a row), the last
-answer with numbers (`last`) given meanwhile with the error and `next` (Usage.tsx' `waitText`: from when, checked again when); the RPC's `now` (tests'); `settings.usage[agent] === false` skips it. The renderer asks every minute (and notifies near a limit: Notifications). Tests set `LAKI_USAGE_API`
+answer with numbers (`last`) given meanwhile with the error and `next` (Usage.tsx' `waitText`: from when, checked again when); the RPC's `now` (tests'). The renderer asks every minute (and notifies near a limit: Notifications). Tests set `LAKI_USAGE_API`
 (a fake server for both; only `http://127.0.0.1` or `localhost` count: a session's env can reach a daemon the CLI starts) and get a fake `security`
 (`test/fakes`) reading `$HOME/keychain`: never the real Keychain. Claude's account whose tab wrote `rate_limits` in its
 status line within `STATUS_FRESH` (meters.ts' `statusLimits`, below; main.ts passes it as `usage`'s `own`) isn't asked:

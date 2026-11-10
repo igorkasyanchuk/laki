@@ -82,6 +82,15 @@ test("meter: codex's context is its last token_count against its window; tokens 
   assert.ok(Math.abs(m.cost - cost) < 1e-9, `${m.cost} ≠ ${cost}`)
 })
 
+test("meter: R4: codex's plan limits from its token_count's rate_limits, the newest kept", () => {
+  const m = meterNew(now)
+  const rl = (used: number, h: number) => line({ type: 'event_msg', timestamp: at(h), payload: { type: 'token_count', info: null, rate_limits: { primary: { used_percent: used, window_minutes: 300, resets_in_seconds: 600 }, secondary: { used_percent: 4, window_minutes: 10080, resets_at: 1794326400 } } } })
+  meterOf('codex', rl(30, 1) + rl(12, 2), m, now)
+  assert.deepEqual(m.limits, { at: now - 3600e3, windows: [{ label: '5-hour', used: 30, resets: now - 3600e3 + 600e3 }, { label: 'Weekly', used: 4, resets: 1794326400e3 }] })
+  meterOf('codex', line({ type: 'event_msg', timestamp: at(0), payload: { type: 'token_count', info: null, rate_limits: {} } }), m, now)
+  assert.equal(m.limits?.windows[0].used, 30, 'none said: the last kept')
+})
+
 test("meter: a tab's view has its context and usage, read on as the transcript grows; today's kept for a restart", async t => {
   const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

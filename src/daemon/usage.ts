@@ -125,6 +125,17 @@ const span = (secs: unknown) => {
   return h === 168 ? 'Weekly' : h >= 24 && h % 24 === 0 ? `${h / 24}-day` : `${h}-hour`
 }
 
+// R4: Codex's own numbers, documented in its transcript: a token_count event's rate_limits (meters.ts' meterOf), at: its time
+export function codexRateWindows(rl: any, at: number): UsageWindow[] {
+  const out: UsageWindow[] = []
+  for (const w of [rl?.primary, rl?.secondary]) {
+    if (typeof w?.used_percent !== 'number') continue
+    const resets = typeof w.resets_at === 'number' ? w.resets_at * 1000 : typeof w.resets_in_seconds === 'number' ? at + w.resets_in_seconds * 1000 : undefined
+    out.push({ label: span(typeof w.window_minutes === 'number' ? w.window_minutes * 60 : undefined), used: pct(w.used_percent), resets })
+  }
+  return out
+}
+
 export function codexWindows(u: any, now = Date.now()): UsageWindow[] {
   const out: UsageWindow[] = []
   const add = (w: any, name?: string) => {
@@ -250,18 +261,23 @@ type Entry = { at: number; ttl: number; p?: Promise<AgentUsage>; slows?: number 
 const cache = new Map<string, Entry>()
 const last = new Map<string, AgentUsage>()
 
-// on: Settings' usage (an agent set to false isn't asked); who: each agent's accounts, its own first; own: an account's
-// windows the agent said itself (meters.ts' statusLimits, claude's status line), fresh: the endpoint isn't asked
-export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now(), own?: (w: Who, now: number) => { windows: UsageWindow[]; at: number } | undefined): Promise<AgentUsage[]> {
+// on: Settings' usage. R4: an agent's usage endpoint (undocumented, with its own sign-in) is asked only when set to
+// true; else its numbers are what it says itself (own: meters.ts' statusLimits, claude's status line and codex's
+// transcripts, of any age: at says when), and an agent with neither (gemini) isn't listed. who: each agent's accounts,
+// its own first; asked, own's fresh numbers win over the endpoint's
+const SAYS: Record<string, string> = { claude: "No numbers yet: they come with Claude Code's status line, as a tab works (Settings › Appearance › Read Claude's status line)", codex: 'No numbers yet: they come with what Codex reports as a tab works' }
+export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now(), own?: (w: Who, now: number, any?: boolean) => { windows: UsageWindow[]; at: number } | undefined): Promise<AgentUsage[]> {
   return Promise.all(
-    who.filter(w => on[w.agent] !== false && LOADERS[w.agent]).map(w => {
+    who.filter(w => LOADERS[w.agent] && (on[w.agent] === true || SAYS[w.agent])).map(w => {
       const key = `${w.agent}:${w.dir ?? ''}`
       const mine = (r: Omit<AgentUsage, 'account' | 'name' | 'default'>): AgentUsage => ({ ...r, account: w.account, name: w.name, default: w.default })
-      const said = own?.(w, now)
+      const asks = on[w.agent] === true
+      const said = own?.(w, now, !asks)
+      if (!said && !asks) return Promise.resolve(mine({ agent: w.agent, windows: [], at: now, error: SAYS[w.agent], source: 'own' }))
       if (said) {
-        // ponytail: the endpoint's other windows (per model, extra usage) as it last read them; its plan likewise
-        const had = last.get(key)
-        return Promise.resolve(mine({ agent: w.agent, plan: had?.plan, windows: [...said.windows, ...(had?.windows ?? []).filter(x => !said.windows.some(y => y.label === x.label))], at: said.at }))
+        // ponytail: the endpoint's other windows (per model, extra usage) as it last read them, while it's asked; its plan likewise
+        const had = asks ? last.get(key) : undefined
+        return Promise.resolve(mine({ agent: w.agent, plan: had?.plan, windows: [...said.windows, ...(had?.windows ?? []).filter(x => !said.windows.some(y => y.label === x.label))], at: said.at, source: 'own' }))
       }
       const c = cache.get(key)
       if (c?.p && now - c.at < c.ttl) return c.p.then(mine) // a rename, another default: now's
@@ -275,7 +291,7 @@ export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = D
             const had = last.get(key)
             return { ...(had ?? { agent: w.agent, ...r, at: Date.now() }), error: r.error, next: entry.at + entry.ttl }
           }
-          const got = { agent: w.agent, ...r, at: Date.now() }
+          const got = { agent: w.agent, ...r, at: Date.now(), source: 'endpoint' as const }
           if (got.windows.length) last.set(key, got)
           return got
         },

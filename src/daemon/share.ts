@@ -5,7 +5,8 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
-import { costOf, type Retry } from '../shared/types.ts'
+import { costOf, type Retry, type UsageWindow } from '../shared/types.ts'
+import { codexRateWindows } from './usage.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true; at?: number; end?: number; cost?: number } // F6: at, end: its first and last line's time (the transcript's); cost: on a `you`, what the turn it started cost so far (claude's usage at API prices; none: a model with no price, codex) // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
 
@@ -190,7 +191,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 // and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
 export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
@@ -253,6 +254,11 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
         const next = planFrom(m.plan, { tool: 'update_plan', input, post: false })
         if (next) m.plan = next.items.length ? next : undefined
         continue
+      }
+      if (j.type === 'event_msg' && p?.type === 'token_count' && p.rate_limits) {
+        const t = Date.parse(j.timestamp) || now
+        const windows = codexRateWindows(p.rate_limits, t)
+        if (windows.length && t >= (m.limits?.at ?? 0)) m.limits = { windows, at: t }
       }
       const i = j.type === 'event_msg' && p?.type === 'token_count' && p.info
       if (!i) continue

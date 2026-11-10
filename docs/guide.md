@@ -783,7 +783,11 @@ days in `usage-days.json`; your plan bills its own way.
 its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
 the week per model and extra usage; Codex's 5-hour and weekly windows; Gemini CLI's quota per model (the models your
-Gemini tabs use first, the rest under *More*). Each shows when it resets. The daemon
+Gemini tabs use first, the rest under *More*). Each shows when it resets. They come from what the agents report
+themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
+once a tab of that agent has run, with *As of* when they're older than 20 minutes. Laki asks no server for them unless
+you turn on *Ask Anthropic for Claude's plan limits* (or OpenAI's for Codex, Google's for Gemini CLI: the only way to
+get Gemini's) in Settings › Appearance: undocumented endpoints that may break. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in
@@ -791,10 +795,10 @@ the last 10 minutes, Claude's 5-hour and weekly numbers are the ones it gave the
 (below). When a server asks Laki to check less often, the popup keeps the
 last numbers, says when they're from and when it checks again (the server's wait, else 10, 20, 40, then every 60
 minutes). It never refreshes a token: an expired one says so
-until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). As a
+until the agent's next run renews it. As a
 limit reaches 90% (Settings › General › *Plan limit at*: 75, 90 or 95), Laki tells you once per reset: a message, and
 a notification when you're in another app (*Plan limit nearly used* turns it off). Only while Laki is open.
-until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). Under the
+until the agent's next run renews it. Under the
 agents, *Today*: the tokens your Claude Code and Codex chats used today and ≈ what they'd cost at the API's list
 prices (*≈ API price*: your plan bills its own way), with the workspaces that used most. A restart keeps it.
 
@@ -2005,8 +2009,8 @@ and what it costs.
   the night, not for good), *Each turn's changes* (on: the Reader's card of what each turn changed, [Reader
   view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays), *Archive workspace when its PR merges* (off) and *Archive workspaces untouched for* (off).
-- *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
-  default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
+- *Appearance*: what the window shows (*Ask Anthropic for Claude's plan limits*, OpenAI's for Codex's, Google's for
+  Gemini CLI's: off by default, the agents' own numbers then; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),
   *Sidebar rows* (what a row shows after its name, each on or off, as a right click › *Show ›* does: *Next step* (off
   by default), *Pull request* (GitHub's mark), *Author's picture* with *Your picture on your PRs*, ✓, ✓✓ and 👀,

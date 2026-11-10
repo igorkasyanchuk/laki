@@ -176,6 +176,9 @@ export function load() {
   // pages and buttons are saved off, each still its own switch (Settings › General › Pages; its Labs switch: all at
   // once). One from before keeps what it had: labs true, once. A test's daemon (dir.ts' inRig) leaves it all alone, the
   // tests being of those pages, unless LAKI_TEST_LEAN=1
+  // R4: plan limits no longer ask the agents' usage endpoints unless set to true: an install from before that left one
+  // unset hears it once (Settings › Resources' note), a new one never
+  if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
     state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki' }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs

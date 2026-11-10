@@ -2116,7 +2116,7 @@ export function App() {
     if (to) setWsId(to.id)
   }
   useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, settings.videoButton, settings.timerButton, settings.statusBar, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
-  const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
+  const tracked = Object.keys(USAGE_AGENTS).filter(a => a !== 'gemini' || settings.usage?.[a] === true) // the status bar's plan limits (R4: Gemini's only from its endpoint)
   const geminiModels = [...new Set((view?.tabs ?? []).filter(t => t.preset === 'gemini').flatMap(t => (m => (m ? [m] : []))(t.model ?? view?.presets.find(p => p.name === t.profile)?.model)))] // their quotas first
   // a plan limit past settings.usageAt as Usage.tsx reads them: a toast, and a notification unless you're looking (or
   // notify is off); once per window per reset (laki.limitsTold), told or not as it crosses (seen: each window's last %)

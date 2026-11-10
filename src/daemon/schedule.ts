@@ -10,6 +10,7 @@ import { accountFor, usageWho } from './accounts.ts'
 import { addTab, broadcast, byTab, changed, clients, findProject, findWs, presetNamed, projectArchived, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { usage } from './usage.ts'
+import { statusLimits } from './meters.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
@@ -387,7 +388,7 @@ export async function pendingTick(now = Date.now()) {
       if (p.limit && !(p.at !== undefined && p.at <= now)) {
         const agent = presetNamed(p.preset)?.agent ?? p.preset
         const account = accountFor({ preset: agent } as Tab, presetNamed(p.preset)?.account) ?? HOME_ACCOUNT // its tab's, now (one removed since: the agent's own)
-        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === account)).catch(() => [])
+        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === account), now, statusLimits).catch(() => []) // R4: the agent's own numbers too
         const at = u && !u.error ? resetOf(u.windows, state.settings?.usageAt ?? USAGE_AT) : undefined
         if (at !== undefined && at !== p.at && w.pending === p) (p.at = at), save(), changed()
       }

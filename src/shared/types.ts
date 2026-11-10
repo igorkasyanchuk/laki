@@ -564,7 +564,8 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
-  usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
+  usage?: Record<string, boolean> // R4: claude, codex, gemini: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
+  usageNote?: boolean // R4: the one-time note in Settings › Resources that plan limits moved to the agents' own numbers
   labs?: boolean // Settings › General › Pages' Labs switch: LABS' pages and buttons all at once (core.ts load: a new install starts with false and each of them off)
   specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
   workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)
@@ -899,7 +900,7 @@ export type StudioChat = { id: string; title: string; at: number; busy: boolean 
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
 // an agent's limits; error: why there are none (signed out…); at: when they were read
 // account: whose (an Account's id or HOME_ACCOUNT), name to tell them apart, default: the one new sessions use
-export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean } // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
+export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean; source?: 'own' | 'endpoint' } // source (R4): the agent's own numbers (its status line, its transcript) or its usage endpoint's // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':

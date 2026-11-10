@@ -20,7 +20,7 @@ test('statusline: a claude tab keeps its JSON, your own runs with it; the meter 
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
   const rig = await fresh(t, { env: { LAKI_METER_MS: '200', LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
-  await rig.rpc('settingsSet', { usage: { codex: false } })
+  await rig.rpc('settingsSet', { usage: { claude: true } }) // R4: the endpoint asked for, when its own are old
   mkdirSync(join(rig.home, '.claude'))
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 86_400_000 } }))
   // yours: what it reads kept, a line printed
@@ -59,6 +59,11 @@ test('statusline: a claude tab keeps its JSON, your own runs with it; the meter 
   assert.deepEqual([hits, u.windows.map((w: any) => [w.label, w.used])], [1, [['5-hour', 41], ['Weekly · Opus', 9]]])
   u = (await rig.rpc('usage'))[0]
   assert.deepEqual([hits, u.windows.map((w: any) => [w.label, w.used])], [1, [['5-hour', 37], ['Weekly', 16], ['Weekly · Opus', 9]]])
+
+  // R4: the endpoint off (the default): its own numbers however old, their time; the server not asked
+  await rig.rpc('settingsSet', { usage: { claude: false } })
+  u = (await rig.rpc('usage', { now: Date.now() + 60 * 60_000 }))[0]
+  assert.deepEqual([hits, u.source, u.windows.map((w: any) => w.label), u.at < Date.now()], [1, 'own', ['5-hour', 'Weekly'], true])
 
   // a closed tab's goes
   await rig.rpc('tabClose', { id: tab.id })

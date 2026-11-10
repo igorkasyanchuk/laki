@@ -273,16 +273,22 @@ export function statusOf(t: Tab): Line | undefined {
   lines.set(t.id, line)
   return line
 }
-// usage.ts' own: an account's limits from its tabs' newest fresh status line; none: ask the endpoint
-export function statusLimits(w: { agent: string; account: string }, now = Date.now()) {
-  if (w.agent !== 'claude') return
-  let best: Line | undefined
+// usage.ts' own: an account's limits from its tabs' newest status line (claude's) or transcript's rate_limits (codex's,
+// R4); fresh ones only, unless any (the endpoint isn't asked: the newest of any age, its at says how old)
+export function statusLimits(w: { agent: string; account: string }, now = Date.now(), any = false) {
+  let best: { windows: UsageWindow[]; at: number } | undefined
+  const ok = (at: number) => (any || now - at < STATUS_FRESH) && at > (best?.at ?? 0)
   for (const t of state.tabs)
-    if (t.preset === 'claude' && (t.account ?? HOME_ACCOUNT) === w.account) {
-      const s = statusOf(t)
-      if (s?.limits.length && now - s.mtime < STATUS_FRESH && s.mtime > (best?.mtime ?? 0)) best = s
+    if (t.preset === w.agent && (t.account ?? HOME_ACCOUNT) === w.account) {
+      if (w.agent === 'claude') {
+        const s = statusOf(t)
+        if (s?.limits.length && ok(s.mtime)) best = { windows: s.limits, at: s.mtime }
+      } else if (w.agent === 'codex') {
+        const l = meters.get(t.id)?.m.limits
+        if (l && ok(l.at)) best = l
+      }
     }
-  return best && { windows: best.limits, at: best.mtime }
+  return best
 }
 // your own status line, as claude reads it (the project's local settings, its committed ones, the account's, yours): the
 // first command, resolved at the tab's start (a change waits for its restart). Never Laki's own: it would run itself.

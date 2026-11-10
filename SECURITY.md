@@ -98,8 +98,9 @@ Out of scope:
 
 Laki sends no analytics and no crash reports. With nothing set up, it calls:
 
-- Anthropic (`api.anthropic.com`) and OpenAI (`chatgpt.com`): your Claude and Codex plan limits, with the agents' own
-  sign-in (Settings › Appearance turns each off);
+- Nothing for plan limits: they come from what Claude Code (its status line) and Codex (its session files) report
+  themselves. Anthropic (`api.anthropic.com`), OpenAI (`chatgpt.com`) and Google are asked, with the agent's own sign-in,
+  only once you turn that agent's *Ask … for plan limits* on (Settings › Appearance): undocumented endpoints;
 - GitHub, through your `gh`: PRs, checks, reviews;
 - GitHub's avatars (`avatars.githubusercontent.com`): PR authors' pictures (Settings › Appearance › GitHub pictures);
 - GitHub's API (`api.github.com`), every 4 hours: whether a newer release is out (Settings › General › Updates turns

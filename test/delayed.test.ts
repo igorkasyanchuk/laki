@@ -51,7 +51,10 @@ test("a delayed start: the workspace now, its agent at its time (a tick), after 
   // the CLI's: --at in words, --after-limit, a time it can't read
   const cli = JSON.parse((await rig.cli('new', p.id, '--preset', 'claude', '--name', 'cli-later', '--at', 'tomorrow at 9am', '--prompt', 'x', '--json')).out)
   assert.equal(new Date(cli.pending.at).getHours(), 9)
-  assert.equal(JSON.parse((await rig.cli('new', p.id, '--name', 'cli-limit', '--after-limit', '--prompt', 'x', '--json')).out).pending.limit, true)
+  // --after-limit: its own numbers (R4: the fake claude's status line, its resets long past) say it has reset: started
+  const lim = JSON.parse((await rig.cli('new', p.id, '--name', 'cli-limit', '--after-limit', '--prompt', 'x', '--json')).out)
+  await until(async () => (await rig.rpc('pendingTick'), (x => x.tabs.length === 1 || x.w.pending?.failed)(await view(lim.id))), 'started: its limit has reset') // once the other tabs' status lines are in
+  assert.equal((await view(lim.id)).w.pending, undefined)
   assert.match((await rig.cli('new', p.id, '--at', 'whenever', '--prompt', 'x')).err, /At what time\?/)
 
   // archived: its folder went, so no Start now until it's restored
@@ -82,6 +85,7 @@ test('a delayed start after the plan limit resets: the soonest reset at or past 
   const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
   mkdirSync(join(rig.home, '.claude'), { recursive: true })
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max' } }))
+  await rig.rpc('settingsSet', { usage: { claude: true } }) // R4: the endpoint, asked for
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'when there is room', startAt: 'limit' })
   const view = async () => ((s: any) => ({ w: s.workspaces.find((w: any) => w.id === ws.id), tabs: s.tabs.filter((t: any) => t.workspace === ws.id) }))(await rig.rpc('state'))
