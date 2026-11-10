@@ -1022,6 +1022,18 @@ export function App() {
     return () => window.removeEventListener('contextmenu', f)
   }, [])
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
+  // Done means checked, offered once per project (laki.checkOffered) as a turn ends in one with a test or lint script
+  // and no check of its own yet. Above the early return (no view yet): the
+  // socket's handler is the first render's, where a const further down is never set
+  const offerCheck = (wsId?: string) => {
+    const v = viewRef.current
+    const w = v?.workspaces.find(x => x.id === wsId)
+    const p = v?.projects.find(x => x.id === w?.project)
+    const steps = (['lint', 'test'] as const).filter(k => w?.scripts?.includes(k))
+    if (!w || !p || !steps.length || p.config?.check || v?.settings.doneCheck === false || load<string[]>('laki.checkOffered', []).includes(p.id)) return
+    store('laki.checkOffered', [...load<string[]>('laki.checkOffered', []), p.id])
+    toast(`Check ${p.name}'s work before you're told it's done? Its ${steps.join(' and ')} run as you, on what the agent changed, as each turn ends; failures go back to the agent`, () => void call('projectSet', { id: p.id, config: { ...p.config, check: { steps } } }).then(() => done(`${p.name}: checked before you're told (Settings › ${p.name})`), () => {}), 'Turn on')
+  }
 
   // a tab's queue (QueueStrip): the whole list again, with what it was (a delivery meanwhile refuses it)
   const queueSave = (t: TabView, queue: string[], was: string[]) => call('queueSet', { tab: t.id, queue, was }).then(() => true, () => false)
@@ -2950,17 +2962,6 @@ export function App() {
         </>
       )
     )
-  }
-  // Done means checked, offered once per project (laki.checkOffered) as a turn ends in one with a test or lint script
-  // and no check of its own yet
-  const offerCheck = (wsId?: string) => {
-    const v = viewRef.current
-    const w = v?.workspaces.find(x => x.id === wsId)
-    const p = v?.projects.find(x => x.id === w?.project)
-    const steps = (['lint', 'test'] as const).filter(k => w?.scripts?.includes(k))
-    if (!w || !p || !steps.length || p.config?.check || v?.settings.doneCheck === false || load<string[]>('laki.checkOffered', []).includes(p.id)) return
-    store('laki.checkOffered', [...load<string[]>('laki.checkOffered', []), p.id])
-    toast(`Check ${p.name}'s work before you're told it's done? Its ${steps.join(' and ')} run as you, on what the agent changed, as each turn ends; failures go back to the agent`, () => void call('projectSet', { id: p.id, config: { ...p.config, check: { steps } } }).then(() => done(`${p.name}: checked before you're told (Settings › ${p.name})`), () => {}), 'Turn on')
   }
   // Collision radar: where a workspace's changes meet another live worktree's, or what landed on its base since it
   // branched (the daemon's scanOverlaps); one you hid stays hidden while it reads the same
