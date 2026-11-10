@@ -565,6 +565,8 @@ export function agentCommands(o: { agent: string; project?: string }): { name: s
       return false
     }
   }
+  // only the project's folders (the repo's, anyone's): a link in your own ~/.claude or ~/.codex is yours (dotfiles)
+  const repos = (at: string) => !!proj && at.startsWith(`${proj}${sep}`)
   const commands = (at: string, prefix = '', ns = '', root?: string) => {
     let es: Dirent[] = []
     try {
@@ -574,19 +576,19 @@ export function agentCommands(o: { agent: string; project?: string }): { name: s
     }
     for (const e of es.slice(0, 300))
       if (e.isDirectory() && !ns) commands(join(at, e.name), prefix, `${e.name}:`, root ?? at)
-      else if ((e.isFile() || (e.isSymbolicLink() && within(root ?? at, join(at, e.name)))) && e.name.endsWith('.md')) add(`${prefix}${ns}${e.name.slice(0, -3)}`, join(at, e.name))
+      else if ((e.isFile() || (e.isSymbolicLink() && (!repos(at) || within(root ?? at, join(at, e.name))))) && e.name.endsWith('.md')) add(`${prefix}${ns}${e.name.slice(0, -3)}`, join(at, e.name))
   }
   const skillsIn = (at: string, sign: string) => {
     try {
-      for (const e of readdirSync(at, { withFileTypes: true }).slice(0, 300)) if ((e.isDirectory() || e.isSymbolicLink()) && existsSync(join(at, e.name, 'SKILL.md'))) add(`${sign}${e.name}`, join(at, e.name, 'SKILL.md'), true)
+      for (const e of readdirSync(at, { withFileTypes: true }).slice(0, 300)) if ((e.isDirectory() || e.isSymbolicLink()) && existsSync(join(at, e.name, 'SKILL.md')) && (!repos(at) || within(at, join(at, e.name, 'SKILL.md')))) add(`${sign}${e.name}`, join(at, e.name, 'SKILL.md'), true) // a repo's: its SKILL.md inside the folder, by its real path (a linked folder or file out of it isn't read)
     } catch {}
   }
   if (o.agent === 'claude') {
     const home = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
-    if (proj) commands(join(proj, '.claude', 'commands'))
+    if (proj && within(proj, join(proj, '.claude', 'commands'))) commands(join(proj, '.claude', 'commands')) // the folder itself (or .claude) linked out of the repo: not read
     commands(join(home, 'commands'))
     commands(join(dir, 'claude-plugin', 'commands'), 'laki:')
-    if (proj) skillsIn(join(proj, '.claude', 'skills'), '')
+    if (proj && within(proj, join(proj, '.claude', 'skills'))) skillsIn(join(proj, '.claude', 'skills'), '')
     skillsIn(join(home, 'skills'), '')
   } else if (o.agent === 'codex') {
     const home = process.env.CODEX_HOME || join(homedir(), '.codex')

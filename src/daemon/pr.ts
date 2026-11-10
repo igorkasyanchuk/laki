@@ -649,10 +649,16 @@ function tellAgent(ws: Workspace, text: string) {
 // F8: Update (the status bar's ↓n): the base merged into the workspace's branch when that is clean (merge-tree said so:
 // git merge, no editor), else over to its agent, as the fix-conflicts switch says it; rebase: onto the base, put back
 // as it was when it stops. Never a fetch, never a push
-export async function wsUpdate(o: { ws: string; how?: unknown }) {
+export async function wsUpdate(o: { ws: string; how?: unknown; from?: { tab?: string } }) {
   const ws = findWs(o.ws)
   if (ws.kind !== 'worktree' || !ws.base) throw new Error(`${ws.id} has no base branch to update from`)
+  // git under an agent's turn: HEAD and files would move while it writes (its own call, from its turn, is its own doing)
+  const busy = () => {
+    const t = tabsOf(ws.id).find(t => t.kind === 'agent' && t.id !== o.from?.tab && rtOf(t.id).status === 'running')
+    if (t) throw new Error(`${t.name} is at work in ${ws.name ?? ws.id}: update once its turn ends (or stop it first)`)
+  }
   if (o.how === 'rebase') {
+    busy()
     await git(ws, 'rebase', ws.base).catch(async e => {
       await git(ws, 'rebase', '--abort').catch(() => {})
       throw new Error(`rebase onto ${ws.base} stopped (put back as it was): ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n')[0]}`)
@@ -662,6 +668,7 @@ export async function wsUpdate(o: { ws: string; how?: unknown }) {
     return { rebased: true }
   }
   if ((await mergeClean(ws)) === false) return { ...tellAgent(ws, `This branch is behind ${ws.base}, and merging it in conflicts. Merge it in (git merge ${ws.base}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, commit the merge, then say what you changed.`), told: true }
+  busy()
   await git(ws, 'merge', '--no-edit', ws.base).catch(async e => {
     await git(ws, 'merge', '--abort').catch(() => {}) // merge-tree had no answer and it conflicts: put back as it was
     throw new Error(`merging ${ws.base} in: ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n')[0]}`)

@@ -1557,9 +1557,16 @@ const uncovered = (t: Tab) => t.preset === 'claude' && ungated.has(t.id) && tool
 export function gateRestart(p: { tab?: string } = {}) {
   const all = state.tabs.filter(t => uncovered(t) && (!p.tab || t.id === findTab(p.tab).id))
   const idle = all.filter(t => rtOf(t.id).status === 'idle' && !asking(t.id))
-  for (const t of idle) spawnTab(t, { resume: true })
-  if (idle.length) changed()
-  return { restarted: idle.length, left: all.length - idle.length }
+  let restarted = 0
+  for (const t of idle)
+    try {
+      spawnTab(t, { resume: true })
+      restarted++
+    } catch (e) {
+      log(`gate restart ${t.id}: ${(e as Error).message}`) // its folder gone, a policy's no: the others still start
+    }
+  if (restarted) changed()
+  return { restarted, left: all.length - restarted }
 }
 export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
@@ -2878,16 +2885,16 @@ const SUB_STATUS = [
 ].join('\n')
 // a worktree's file or folder that the checkout has too, the same (a folder: all that's in it; a file of another time: by
 // its bytes, up to 16 MB)
-async function same(a: string, b: string): Promise<boolean> {
+async function same(a: string, b: string, room = { left: 64 << 20 }): Promise<boolean> { // ponytail: 64 MB read per ask at most (wsPeek's hover, each Archive if clean); past it they count as not the same: you're asked
   try {
     const [x, y] = [await lstat(a), await lstat(b)]
     if (x.isSymbolicLink()) return y.isSymbolicLink() && (await readlink(a)) === (await readlink(b))
     if (x.isDirectory()) {
       if (!y.isDirectory()) return false
-      for (const n of await readdir(a)) if (!(await same(join(a, n), join(b, n)))) return false
+      for (const n of await readdir(a)) if (!(await same(join(a, n), join(b, n), room))) return false
       return true
     }
-    return x.isFile() && y.isFile() && x.size === y.size && (x.mtimeMs === y.mtimeMs || (x.size <= 16 << 20 && (await readFile(a)).equals(await readFile(b))))
+    return x.isFile() && y.isFile() && x.size === y.size && (x.mtimeMs === y.mtimeMs || (x.size <= 16 << 20 && (room.left -= 2 * x.size) >= 0 && (await readFile(a)).equals(await readFile(b))))
   } catch {
     return false
   }
@@ -2897,7 +2904,8 @@ export async function unsaved(ws: Workspace) {
   const mine = lines.filter(l => l.startsWith('!! ')).map(l => l.slice(3).replace(/\/$/, ''))
   const root = ws.host ? '' : findProject(ws.project).path
   const ignored: string[] = []
-  for (const rel of mine) if (!rel.split('/').some(s => REBUILT.has(s)) && !(root && (await same(join(ws.path, rel), join(root, rel))))) ignored.push(rel)
+  const room = { left: 64 << 20 }
+  for (const rel of mine) if (!rel.split('/').some(s => REBUILT.has(s)) && !(root && (await same(join(ws.path, rel), join(root, rel), room)))) ignored.push(rel)
   const subs: string[] = []
   for (const l of (await git(ws, 'ls-files', '-s', '-z')).split('\0').filter(l => l.startsWith('160000 '))) {
     const path = l.slice(l.indexOf('\t') + 1)
@@ -3571,7 +3579,7 @@ export function dndDigest(d: NonNullable<State['dnd']>) {
   const name = (id: string) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : ''))(state.tabs.find(t => t.id === id))
   const done = d.log.filter(x => x.kind === 'done' && name(x.tab)).map(x => `Finished: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
   const said = new Map(d.log.filter(x => x.kind === 'wait').map(x => [x.tab, x.text])) // its last ask's words; one that waited before it began has none
-  const waits = state.tabs.filter(t => rt.get(t.id)?.status === 'waiting').map(t => `Waits: ${name(t.id)}${said.get(t.id) ? `: ${said.get(t.id)}` : ''}`)
+  const waits = state.tabs.filter(t => tracked(t) && rt.get(t.id)?.status === 'waiting').map(t => `Waits: ${name(t.id)}${said.get(t.id) ? `: ${said.get(t.id)}` : ''}`)
   const moved = state.workspaces.flatMap(w => {
     const pr = prs.get(w.id)
     const now = pr && `${pr.state}:${pr.checks ?? ''}`

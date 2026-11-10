@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { completions } from '../src/renderer/src/text.ts'
@@ -39,9 +39,17 @@ test("the / menu: an agent's own commands and skills, its project's first; Laki'
   put(join(rig.repo, '.claude/commands/ship-it.md'), '---\ndescription: The repo’s own ship\n---\n')
   put(join(rig.home, '.codex/prompts/review.md'), 'Review the diff\n')
   put(join(rig.home, '.codex/skills/sql/SKILL.md'), '---\ndescription: >-\n  Write\n  SQL\n---\n') // a block scalar: its lines as one
+  // links: yours (dotfiles) are read; a repo's that lead out of it aren't (a command, a skill's SKILL.md)
+  put(join(rig.home, 'dotfiles/dot.md'), '# From dotfiles\n')
+  symlinkSync(join(rig.home, 'dotfiles/dot.md'), join(rig.home, '.claude/commands/dot.md'))
+  put(join(rig.home, 'secret.txt'), 'token=fake-secret\n')
+  symlinkSync(join(rig.home, 'secret.txt'), join(rig.repo, '.claude/commands/leak.md'))
+  mkdirSync(join(rig.repo, '.claude/skills/leak'), { recursive: true })
+  symlinkSync(join(rig.home, 'secret.txt'), join(rig.repo, '.claude/skills/leak/SKILL.md'))
   const claude = await rig.rpc('agentCommands', { agent: 'claude', project: p.id })
   assert.deepEqual(claude.filter((c: { name: string }) => c.name.startsWith('laki:')).map((c: { name: string }) => c.name), ['laki:extension', 'laki:new', 'laki:orchestrate']) // the plugin the daemon writes
   assert.deepEqual(claude.filter((c: { name: string }) => !c.name.startsWith('laki:')), [
+    { name: 'dot', sub: 'From dotfiles' },
     { name: 'front:test', sub: 'Run the frontend tests' },
     { name: 'pdf', sub: 'Read and fill PDFs', skill: true },
     { name: 'ship-it', sub: 'The repo’s own ship' }, // the project's wins over yours of the same name
@@ -53,8 +61,8 @@ test("the / menu: an agent's own commands and skills, its project's first; Laki'
   assert.deepEqual(await rig.rpc('agentCommands', { agent: 'gemini' }), [])
   // the box: your templates first, then these; a pick types /name (a codex skill: $name)
   const rows = completions({ ch: '/', q: '', from: 0 }, { templates: [{ name: 'spec', text: 'Write a spec' }], commands: [...claude.filter((c: { name: string }) => !c.name.startsWith('laki:')), { name: '$sql', sub: 'Write SQL', skill: true }] })
-  assert.deepEqual(rows.map(r => [r.label, r.value]), [['/spec', 'Write a spec'], ['/front:test', '/front:test'], ['/pdf', '/pdf'], ['/ship-it', '/ship-it'], ['$sql', '$sql']])
-  assert.equal(rows[2].sub, 'skill · Read and fill PDFs')
+  assert.deepEqual(rows.map(r => [r.label, r.value]), [['/spec', 'Write a spec'], ['/dot', '/dot'], ['/front:test', '/front:test'], ['/pdf', '/pdf'], ['/ship-it', '/ship-it'], ['$sql', '$sql']])
+  assert.equal(rows[3].sub, 'skill · Read and fill PDFs')
 })
 
 test('laki plan: list, read, new and write specs and brainstorms from a tab', async t => {

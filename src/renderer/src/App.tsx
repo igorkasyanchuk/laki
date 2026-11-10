@@ -1461,8 +1461,8 @@ export function App() {
     if (!at.length) return toast('No agent is at work')
     const names = at.map(t => `${v!.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}`)
     if (!(await ask(`Stop ${at.length === 1 ? 'the agent' : `all ${at.length} agents`} at work?`, { text: `${names.slice(0, 8).join(', ')}${names.length > 8 ? ` and ${names.length - 8} more` : ''}. Each gets its interrupt key (Esc): nothing is closed, its chat stays. What's queued for one waits for its Resume queue.`, ok: 'Stop all', danger: true }))) return
-    const r = await call<{ stopped: string[] }>('stopAll', {})
-    toast(`Stopped ${r.stopped.length} of ${at.length}`)
+    const r = await call<{ stopped: string[] }>('stopAll', {}).catch(() => undefined) // call's toast said why
+    if (r) toast(`Stopped ${r.stopped.length} of ${at.length}`)
   }
   // F8: the status bar's ↓n: the base merged in (clean), or its agent asked to (conflicts); a rebase asks first when the
   // branch is pushed (a force push would follow, yours to do)

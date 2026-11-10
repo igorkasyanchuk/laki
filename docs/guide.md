@@ -62,7 +62,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   `owner/repo`, clones it into `~/code` (or the folder you name) and adds it as a project.
 - **Stop all agents**: ⌘K › *Stop all agents* (File menu too; give it a key in Settings › Keys) names the turns under
   way, asks once and interrupts each (Esc; nothing is closed). A queue it held shows *Resume queue*.
-- **Do not disturb**: ⌘K › *Do not disturb: 30 minutes / 1 hour / until tomorrow 9:00*. No notifications, sounds or
+- **Do not disturb**: ⌘K › *Do not disturb: 30 minutes / 1 hour / until tomorrow 9:00* (after midnight: until 9:00 that morning). No notifications, sounds or
   phone pushes meanwhile, except an important workspace's ask. The status bar's moon ends it early; as it ends, one card
   lists what finished, what waits for you and which PRs moved.
 - **Follow the system**: Settings › Appearance › Theme › *Follow the system* paints a light theme while macOS is light

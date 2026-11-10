@@ -798,4 +798,8 @@ test("F8: behind its base: the count, a clean update merges, a conflicting one g
   assert.equal(g(ws.path, 'rev-parse', 'HEAD'), head) // nothing merged by Laki
   const other = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'other' })
   await assert.rejects(rig.rpc('wsUpdate', { ws: ws.id, from: { ws: other.id, tab: (await rig.tab(other.id)).id } }), /its own workspace only/)
+  // not under a turn: git would move HEAD and files while the agent writes
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'slow work' })
+  await until(async () => (await rig.tab(ws.id, 'claude: slow work')).status === 'running', 'a turn under way')
+  await assert.rejects(rig.rpc('wsUpdate', { ws: ws.id, how: 'rebase' }), /is at work in .*: update once its turn ends/)
 })
