@@ -74,6 +74,40 @@ export async function askAgent(rpc: Rpc, target: string, question: string, me = 
   throw new Error(`no answer from ${target} in ${Math.round(waitMs / 60000)} minutes (it may still be working: laki screen ${target})`)
 }
 
+// A5: laki wait and MCP's laki_wait: until none of the named workspaces' agent tabs (or the tabs named, <ws>/<tab>)
+// is running, a look every few seconds; then each one's line: idle with its last answer's first line, or waiting with
+// what it asks. waiting: one waits for the user; timedOut: some still run when ms ran out. The first look comes after a
+// moment: a prompt sent just before may not have started its turn yet (one queued counts as running)
+export type Waited = { ws: string; tab: string; name: string; status: string; text: string }
+export async function waitTabs(rpc: Rpc, targets: string[], ms: number, every = 3000): Promise<{ tabs: Waited[]; waiting: boolean; timedOut: boolean }> {
+  if (!targets.length) throw new Error('which workspaces? laki wait <ws>[/<tab>]…')
+  const end = Date.now() + ms
+  for (let first = true; ; first = false) {
+    await new Promise(r => setTimeout(r, first ? Math.min(1500, ms) : Math.min(every, Math.max(0, end - Date.now()))))
+    const v: View = await rpc('state')
+    const tabs = targets.flatMap(x => {
+      const [w, t] = x.split('/')
+      const ws = v.workspaces.find(y => y.id === w || y.name === w)
+      if (!ws) throw new Error(`no workspace ${w}`)
+      const of = v.tabs.filter(y => y.workspace === ws.id && (t ? y.id === t || y.name === t : y.kind === 'agent'))
+      if (t && !of.length) throw new Error(`no tab ${t} in ${ws.id}`)
+      return of.map(y => ({ ws: ws.id, t: y }))
+    })
+    const running = tabs.some(({ t }) => t.status === 'running' || !!t.queue?.length)
+    if (running && Date.now() < end) continue
+    const line = (s?: string) => (s ?? '').trim().split('\n')[0].slice(0, 200)
+    const rows = tabs.map(({ ws, t }) => ({ ws, tab: t.id, name: t.name, status: t.status === 'running' || t.queue?.length ? 'running' : t.status, text: t.status === 'waiting' ? line((t.ask?.tool ? `${t.ask.tool}: ${t.ask.what ?? ''}` : '') || t.ask?.question || 'it asks you something') : line(t.last) }))
+    return { tabs: rows, waiting: rows.some(r => r.status === 'waiting'), timedOut: running }
+  }
+}
+// "20m", "90s", "1h", a bare number: minutes
+export function parseWait(s: unknown, def = 20 * 60000) {
+  if (s === undefined || s === true || s === '') return def
+  const m = /^(\d+(?:\.\d+)?)\s*(s|m|h)?$/i.exec(String(s).trim())
+  if (!m) throw new Error(`--timeout ${s}: a length like 90s, 20m or 1h`)
+  return Math.round(Number(m[1]) * { s: 1000, m: 60000, h: 3600000 }[(m[2] ?? 'm').toLowerCase() as 's' | 'm' | 'h'])
+}
+
 // which sidebar group a new workspace goes in, by what the groups' names mean (Laki AI's SYSTEM, the tool's group, the
 // laki skill's laki new): where: how the caller reads the groups
 export const groupRule = (where: string) =>
@@ -281,6 +315,15 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "The last lines of a tab's terminal: what the agent or command shows now. Another workspace's tab: the user is asked first.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), lines: { type: 'number', description: 'how many lines (default 40)' } }, ['target']),
     run: a => rpc('screen', { target: a.target, lines: Number(a.lines) || 40 }, 150000),
+  },
+  {
+    name: 'laki_wait',
+    description: "Wait until none of these workspaces' agents is working (their turn ended, or one waits for the user), then each one's line: idle with its last answer's first line, or waiting with what it asks. At most 4.5 minutes a call (a tool call's limit): still running then says so; call it again.",
+    inputSchema: obj({ targets: { type: 'array', items: { type: 'string' }, description: 'workspace ids (their agents), or <ws>/<tab>' }, minutes: { type: 'number', description: 'at most this long (default and most: 4.5)' } }, ['targets']),
+    run: async a => {
+      const r = await waitTabs(rpc, (Array.isArray(a.targets) ? a.targets : [a.targets]).map(String), Math.min(Number(a.minutes) || 4.5, 4.5) * 60000)
+      return { ...r, said: r.timedOut ? 'still running: call laki_wait again' : r.waiting ? 'one waits for the user' : 'all idle' }
+    },
   },
   {
     name: 'laki_diff',

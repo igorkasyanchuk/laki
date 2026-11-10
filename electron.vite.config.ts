@@ -7,6 +7,8 @@ import { defineConfig } from 'electron-vite'
 // the build's time, in the daemon and the renderer alike: a daemon from an older build (it outlives the app) gets the
 // app's Restart Laki's daemon bar, the API number unchanged or not
 const BUILT = JSON.stringify(new Date().toISOString())
+// A9: package.json's version, for laki --version and the daemon's ping (shared/version.ts)
+const VERSION = JSON.stringify(JSON.parse(readFileSync('package.json', 'utf8')).version)
 
 // THIRD_PARTY_NOTICES.txt in out/renderer (About's *Open-source licenses*): every npm package in a bundle (electron-vite
 // builds main, preload, then the renderer in one process, so the renderer's sees them all), the ones shipped in
@@ -65,7 +67,7 @@ const notices = (last: boolean) => ({
 export default defineConfig({
   main: {
     // the Electron main process, the daemon (run as node), the CLI and agents' hook (hook.js), side by side in out/main
-    define: { __BUILT__: BUILT },
+    define: { __BUILT__: BUILT, __VERSION__: VERSION },
     plugins: [notices(false)],
     build: {
       rolldownOptions: {

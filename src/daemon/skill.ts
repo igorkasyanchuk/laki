@@ -246,8 +246,9 @@ from the disk here. Its agents run there and have no \`laki\`.
 
     # the tabs waiting for an answer (a permission prompt)
     laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\\(.workspace)/\\(.name)"'
-    # wait for a workspace's agents to finish their turn (a shell is running too while a command runs: a dev server)
-    while laki ls --json | jq -e '.tabs[] | select(.workspace == "<ws>" and .kind == "agent" and .status == "running")' >/dev/null; do sleep 10; done
+    # wait for workspaces' agents to finish their turn: a line each (idle: its answer's start; waiting: what it asks);
+    # exit 0 all idle, 2 one waits for an answer, 3 --timeout ran out (MCP: laki_wait, 4.5 minutes a call)
+    laki wait <ws> [<ws2>…] --timeout 20m
 
 `,
     'workflows.md': `# Laki: workflows
@@ -485,6 +486,7 @@ own the plan, the order and what counts as done. ${run} Below, \`laki\` stands f
     laki tab <ws> --preset codex --name review --prompt '…'  # a second agent in a workspace that exists (a review of what the first did)
     laki tab <ws> --cmd 'npm run dev'                     # a command in a terminal tab of it (the user allows yours in the app, each time)
     laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
+    laki wait <ws>… [--timeout 10m]                       # until none of them works: a line each, idle (its answer's start) or waiting (what it asks); exit 0, 2 (one waits), 3 (timed out)
     laki send <ws>[/<tab>] --when-idle '…'                # a follow-up, queued until its turn ends (without --when-idle: now)
     laki diff <ws> [--uncommitted]                        # what it changed
     laki limits [--agent claude] [--json]                 # how much of each plan is used and when it resets: before long work, pick the agent or account with room left
@@ -527,8 +529,9 @@ others' work, and that its last answer must end with one of these:
 
 ## Run and watch
 
-Start every task that's ready before watching any. Then, every minute or two, \`laki ls --json\` and, for each tab that's
-idle or waiting, \`laki screen <ws> --lines 200\` (its \`last\` has the answer's start): look for the envelope and check
+Start every task that's ready before watching any. Then \`laki wait <ws>… --timeout 2m\` on the running ones (exit 3:
+still at work, wait again; 2: one asks something) and, for each tab that's idle or waiting, \`laki screen <ws> --lines
+200\` (its \`last\` has the answer's start): look for the envelope and check
 that what's above it backs it (tests run, files there; \`laki diff <ws>\`). Short passes, not one long blocking loop, so
 you can tell the user how it goes in between. A missing or malformed envelope: read the whole screen and ask the worker
 (\`laki send <ws> --when-idle\`).

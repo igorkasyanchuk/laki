@@ -414,7 +414,13 @@ window: it can run the agent browser). Tabs on screen in a focused window get no
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's
 protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
-one or two `rpc` calls (`shared/tools.ts` `tools(rpc)`: Laki AI passes the daemon's own); none deletes, archives or ships. Its `state` (also `laki ls --json`, which the skill has agents
+one or two `rpc` calls (`shared/tools.ts` `tools(rpc)`: Laki AI passes the daemon's own); none deletes, archives or ships.
+`laki_wait` (A5) is `laki wait`'s `waitTabs` (`state` every 3 s until no named agent tab runs or has a queue), capped at
+4.5 minutes a call, under a client's MCP_TOOL_TIMEOUT (5): `timedOut` and *still running* past it. The CLI's own (A4):
+usage.ts `FLAGS`, each command's options read off its USAGE lines (`EXTRA` in main.ts for a few it doesn't list), and
+`TEXT_AFTER`, where a free-text command's words start; `laki version` (A9: shared/version.ts' `VERSION`, the build's
+`__VERSION__` or package.json beside the source; `ping { caps: true }`'s `version` for the daemon's) and `laki doctor`
+(`doctor`'s fields as ✓ ● ✗ lines with a fix each). Its `state` (also `laki ls --json`, which the skill has agents
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
 tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, for every local client, its Origin or not (`/rpc`'s
 `req.socket`, a WebSocket's `local`; not remote access's page, whose Origin takes only its own token: `tokenOk`) and the

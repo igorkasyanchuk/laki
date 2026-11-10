@@ -5,10 +5,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
-import { AGENTS, type AgentUsage, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
-import { helpFor, USAGE } from '../shared/usage.ts'
+import { AGENTS, API, type AgentUsage, type Doctor, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { FLAGS, helpFor, nearFlag, USAGE } from '../shared/usage.ts'
+import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
-import { askAgent, newWsKit, state } from '../shared/tools.ts'
+import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
@@ -24,8 +25,25 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
-const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
+const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout'])
 const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
+// A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
+// daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
+// options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
+const ALIAS: Record<string, string> = { ext: 'widget', exts: 'widget', widgets: 'widget', flows: 'flow', workflow: 'flow', presets: 'preset', plans: 'plan' }
+const TEXT_AFTER: Record<string, number> = { send: 1, ask: 1, alert: 0, notice: 0, remind: 1, ai: 0, show: 0, secret: 0, progress: 1, 'memory add': 1, 'widget log': 1 }
+const EXTRA: Record<string, string[]> = { progress: ['--tab'], name: ['--tab'], diff: ['--message'], ship: ['--message'] } // not in USAGE: a tab's own by its id (tests, scripts), -m's long name
+function optNo(a: string) {
+  const cmd = ALIAS[args[0]] ?? args[0]
+  const sub = (cmd === 'memory' && args[1] === 'add') || (cmd === 'widget' && args[1] === 'log') ? args[1] : ''
+  const free = TEXT_AFTER[sub ? `${cmd} ${sub}` : cmd]
+  if (free !== undefined && args.length - 1 - (sub ? 1 : 0) > free) return false // in its text: a word like any
+  const name = a.split('=')[0]
+  if (!FLAGS[cmd] || FLAGS[cmd].has(name) || EXTRA[cmd]?.includes(name)) return false // a command Laki doesn't know (main says so), or its own
+  const near = nearFlag(cmd, name)
+  console.error(`laki: unknown option ${name}${near ? ` (did you mean ${near}?)` : ''}${free !== undefined ? `. A text that starts with -- goes after --: laki ${cmd} … -- ${name}` : `: laki help ${cmd}`}`)
+  process.exit(1)
+}
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -33,6 +51,8 @@ for (let i = 0; i < argv.length; i++) {
   const k = a.replace(/^-+/, '')
   if (['widget', 'widgets'].includes(args[0]) && args[1] === 'log' && args.length > 3) textOnly = true // laki widget log's message: options only before it, then its words are its own
   if (!textOnly && a === '--') textOnly = true
+  else if (!textOnly && !args.length && a === '--version') args.push('version') // A9: laki --version
+  else if (!textOnly && args.length && args[0] !== 'hook' && /^--[a-z]/i.test(a) && optNo(a)) continue // never: optNo exits
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
@@ -233,6 +253,12 @@ async function main() {
     }
     case 'mcp':
       return mcp() // starts the daemon at its first tool call: stdout is the protocol's
+    case 'version': {
+      // A9: this CLI's (no daemon started); a running daemon's too, and a note when it isn't this one
+      const d = (await alive()) ? await rpc<{ version?: string; api?: number }>('ping', { caps: true }).catch(() => undefined) : undefined
+      const v = { cli: VERSION, api: API, ...(d && { daemon: d.version ?? 'older than 0.48', daemonApi: d.api }) }
+      return out(v, [`laki ${VERSION} (API ${API})`, d ? `daemon ${d.version ?? 'older than 0.48'} (API ${d.api ?? '?'})${d.version !== VERSION || d.api !== API ? ': not this CLI\'s; restart it from the app\'s status bar (tabs resume)' : ''}` : 'no daemon running'].join('\n'))
+    }
   }
   if (['flow', 'flows', 'workflow'].includes(cmd) && rest[0] === 'check') return flowCheck(rest.slice(1))
   await ensureDaemon()
@@ -516,6 +542,32 @@ async function main() {
       const named = v.tabs.filter(t => t.alias)
       const wsName = (id: string) => v.workspaces.find(w => w.id === id)?.name ?? id
       return out(named.map(t => ({ name: `@${t.alias}`, tab: t.id, workspace: t.workspace, agent: t.preset, status: t.status })), named.map(t => `@${t.alias}  ${t.preset ?? t.kind}  ${t.status}  ${wsName(t.workspace)}/${t.name}  (${t.workspace}/${t.id})`).join('\n') || 'no agent has a name yet (laki name <name> in its tab)')
+    }
+    case 'wait': {
+      // A5: laki wait <ws>[/<tab>]… [--timeout 20m]: until none of their agents works; exit 0 idle, 2 one waits, 3 timed out
+      const r = await waitTabs(rpc, rest, parseWait(flags.timeout))
+      out(r, r.tabs.map(t => `${t.ws}/${t.name}  ${t.status}${t.text ? `: ${t.text}` : ''}`).join('\n') || 'no agent tab there')
+      process.exitCode = r.timedOut ? 3 : r.waiting ? 2 : 0
+      return
+    }
+    case 'doctor': {
+      // A9: the daemon's doctor as lines: ✓ fine, ● optional or worth a look, ✗ broken (exit 1), a fix for each not fine
+      const d: Doctor = await rpc('doctor', {}, 30000)
+      if (json) return out(d)
+      const rows: [string, string, string?][] = [
+        d.git ? ['✓', 'git'] : ['✗', 'git not found', 'xcode-select --install (or your package manager)'],
+        d.gh === 'in' ? ['✓', 'gh signed in'] : d.gh === 'out' ? ['●', 'gh not signed in: no PRs, checks or issues', 'gh auth login'] : ['●', 'gh not found: no PRs, checks or issues', 'brew install gh'],
+        ...(d.gh === 'in' && d.ghCodespace === false ? [['●', 'gh has no codespace scope: no cloud workspaces', 'gh auth refresh -s codespace'] as [string, string, string]] : []),
+        d.cloudflared ? ['✓', 'cloudflared'] : ['●', 'cloudflared not found: no remote access or Expose to the world over Cloudflare', 'brew install cloudflared'],
+        ...(process.platform === 'darwin' ? [d.idb ? (['✓', 'idb'] as [string, string]) : (['●', "idb not found: laki screen can't tap the simulator", 'brew install idb-companion && pipx install fb-idb'] as [string, string, string])] : []),
+        ...d.agents.map((a): [string, string, string?] => (!a.found ? ['●', `${a.id} not found`, `install ${a.id}, then laki doctor again`] : a.signedIn === false ? ['●', `${a.id} found, not signed in`, `run ${a.id} in a terminal and sign in`] : ['✓', `${a.id}${a.signedIn ? ' signed in' : ''}`])),
+        ...(d.agents.some(a => a.found) ? [] : [['✗', 'no agent found', 'install claude or codex'] as [string, string, string]]),
+        ...(d.hooks ? [d.hooks.ok ? (['✓', "Laki's hooks reach the daemon"] as [string, string]) : (['✗', `Laki's hooks don't reach the daemon: ${d.hooks.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
+        ...(d.hookFiles ? [d.hookFiles.ok ? (['✓', "agents' hook files"] as [string, string]) : (['✗', `agents' hook files: ${d.hookFiles.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
+      ]
+      console.log(rows.map(([m, what, fix]) => `${m} ${what}${fix ? `\n    fix: ${fix}` : ''}`).join('\n'))
+      if (rows.some(r => r[0] === '✗')) process.exitCode = 1
+      return
     }
     case 'ask': {
       // laki ask <@name|ws[/tab]> <question> [--wait min]: typed in as its turn ends, then its reply printed

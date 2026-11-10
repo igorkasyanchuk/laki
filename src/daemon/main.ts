@@ -16,6 +16,7 @@ import { readCapped, rotateLog } from '../shared/conn.ts'
 import { HostPty, ptyOn, ptyQuit } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, MASK, masked, maskSettings, recorded, type Settings, type Tab, unmasked } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
+import { VERSION } from '../shared/version.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { dir, inRig } from './dir.ts'
@@ -240,7 +241,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 
 type Handler = (p: any, c?: core.Conn) => unknown
 const api: Record<string, Handler> = {
-  ping: p => (p.caps ? { pong: true, api: API, caps: CAPS } : 'pong'), // plain: 'pong', as every CLI's alive() wants
+  ping: p => (p.caps ? { pong: true, api: API, caps: CAPS, version: VERSION } : 'pong'), // plain: 'pong', as every CLI's alive() wants; version: A9's laki --version
   state: (p, c) => (v => (c && own.get(c)?.() ? v : masked(v)))(core.agentCaller(p?.from) ? recorded(core.view()) : core.view()), // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then); S3: its secrets only to your own window (own)
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
   projectClone: p => core.projectClone(p.url, p.into), // U7: yours only (FROM, AGENT_NO)

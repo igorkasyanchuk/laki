@@ -2,6 +2,8 @@
 export const USAGE = `laki: coding agents in parallel git worktrees
 
   laki help [command]                         this, or one command's details and examples (laki <command> --help too)
+  laki version | --version                    this CLI's version; with a daemon running, its version and API too
+  laki doctor [--json]                        what Laki needs, checked: git, gh, the agents, hooks; a fix for each (exit 1: one failed)
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
   laki limits [--agent claude] [--json]       how much of each agent's plan is used, and when it resets
@@ -50,6 +52,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
   laki agents                                 the named agents, wherever they run
   laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
+  laki wait <ws>[/<tab>]… [--timeout 20m] [--json]   until none of their agents works, then a line each: idle (its
+                                              last answer) or waiting (what it asks); exit 0 all idle, 2 one waits, 3 timed out
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki update --when-idle [--off]             update Laki once no agent works or asks: the app, then its daemon
   laki secret <what it is>                    in an agent's tab: the user types a token on a masked card; prints only
@@ -112,8 +116,40 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               headless: the daemon and remote access, until stopped (docs/headless.md);
                                               its link opens once, its PIN prints on a terminal only (else laki remote)
   laki remote [stop]                          remote access's link and PIN now | stop it
-  --json prints machine-readable output`
+  --json prints machine-readable output; an option the command doesn't have is refused (did you mean…?);
+  after -- every word is text: laki send ws -- --not-an-option`
 
+
+// A4: each command's options, read off its lines of USAGE (a line that names more, \`rm <ws> … | archive <ws>\`, gives
+// each its own), --json and --help everywhere: the CLI refuses any other --word before a command's text
+export const FLAGS: Record<string, Set<string>> = (() => {
+  const m: Record<string, Set<string>> = {}
+  let cur: string[] = []
+  for (const line of USAGE.split('\n')) {
+    const c = /^  laki ([a-z]+)/.exec(line)
+    if (c) cur = [c[1], ...[...line.matchAll(/\| ([a-z]+) [<[]/g)].map(x => x[1])]
+    else if (!/^\s{6,}/.test(line)) cur = []
+    for (const k of cur) {
+      m[k] ??= new Set(['--json', '--help'])
+      for (const [f] of line.matchAll(/--[a-z][\w-]*/g)) m[k].add(f)
+    }
+  }
+  return m
+})()
+// the closest of a command's options to a mistyped one (edit distance 3 at most), for the error's hint
+export function nearFlag(cmd: string, typed: string) {
+  const d = (a: string, b: string) => {
+    let row = Array.from({ length: b.length + 1 }, (_, j) => j)
+    for (let i = 1; i <= a.length; i++) {
+      const next = [i]
+      for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      row = next
+    }
+    return row[b.length]
+  }
+  const best = [...(FLAGS[cmd] ?? [])].map(f => [f, d(typed, f)] as const).sort((x, y) => x[1] - y[1])[0]
+  return best && best[1] <= 3 ? best[0] : undefined
+}
 
 // each command's details and examples, after its lines of USAGE: laki help <command>, laki <command> --help. Written
 // for agents (the skill points here): what it prints, what to pass, what to run next
@@ -143,7 +179,8 @@ script (laki run <ws> setup runs it later). --at starts its agent later, --after
   laki new shop --group Reviews --template review --prompt "#118"   under Reviews, through your review template
   laki new shop --action "PR+audit" --prompt "the login page"        your agent action's prompt, then these words`,
   send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or
-number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). While the agent asks
+number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). Options go before the
+text; a text that starts with -- goes after --: laki send a1b2 -- --flag is the text. While the agent asks
 something (status waiting: a permission prompt), the text would answer it: leave those to the user, or --when-idle.
 From an agent's tab, a tab in another workspace: the user is asked in the app first.
 
@@ -163,6 +200,24 @@ in another workspace: the user is asked in the app first. For a message that nee
 
   laki ask @backend "Which endpoint returns the user's teams?"
   laki ask a1b2 --wait 30 "Review my last commit on main and say what you'd change"`,
+  wait: `Waits until none of the named workspaces' agent tabs is working (<ws>/<tab>: that tab), a look every 3 seconds,
+then prints a line each: idle with the first line of its last answer, or waiting with what it asks. Exit 0: all idle;
+2: one waits for the user (answer it, or tell the user); 3: --timeout (default 20m: 90s, 20m, 1h) ran out, some still
+run (wait again). Instead of a loop over laki ls --json. MCP's laki_wait does the same, 4.5 minutes a call.
+
+  laki send a1b2 "Now add tests for it" && laki wait a1b2
+  laki wait a1b2 c3d4 --timeout 1h           both workspaces' agents
+  laki wait a1b2/codex --json                 that tab only; JSON: { tabs, waiting, timedOut }`,
+  version: `Prints this CLI's version (no daemon started). With a daemon running, its version and API number too, and a
+note when it isn't this CLI's (the app's status bar restarts it: tabs resume).
+
+  laki --version`,
+  doctor: `Checks what Laki needs and says what to do about each: git, gh (signed in; its codespace scope for cloud
+workspaces), cloudflared (remote access, Expose to the world), idb (the simulator's hands), each agent (found, signed
+in) and Laki's hooks (they reach the daemon). ✓ fine, ● optional or worth a look, ✗ broken: exit 1.
+
+  laki doctor
+  laki doctor --json                          the daemon's doctor as it is`,
   screen: `Prints the bottom of a tab's screen (30 lines unless --lines): what the agent shows now, its question too.
 laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and apps' windows instead (shot prints a
 PNG's path: read it). From an agent's tab, a tab in another workspace: the user is asked in the app first.
