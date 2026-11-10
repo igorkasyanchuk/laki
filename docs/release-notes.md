@@ -21,7 +21,7 @@ version it builds, with the date. -->
 - The status bar: branch, PR and checks first, one *Auto n/3* chip instead of three switches, ports and plan limits at the right end.
 - The Board's columns follow the next step, as the sidebar does: Working, Answer, Review, Fix, Merge, Done; an empty column folds to a strip.
 - The Review tab keeps its diff at least 480px wide: in a narrow window the comments fold to a strip, then the side panel steps aside until you leave the tab.
-- *Clone a repository…* on the Welcome screen and in ⌘K: a URL or `owner/repo`, cloned with your git or gh and added as a project.
+- *Clone a repository…* on the Welcome screen and in ⌘K: a URL or `owner/repo`, cloned with your git or gh and added as a project; the dialog shows git's progress as it goes.
 - *Stop all agents* (⌘K, the File menu, a key of yours in Settings › Keys): every turn under way is interrupted after one question; queued prompts wait for *Resume queue*.
 - *Do not disturb* (⌘K): 30 minutes, an hour or until tomorrow 9:00 without notifications, sounds or phone pushes, except an important workspace's ask; a moon in the status bar ends it, and one card says what finished, what waits and which PRs moved.
 - One type scale: five text sizes (11, 12, 13, 15, 20) instead of fourteen; body text is 13px.

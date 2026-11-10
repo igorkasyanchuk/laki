@@ -1232,7 +1232,23 @@ export function storageOf(ws: Workspace) {
 // git@host:path, owner/repo (GitHub's: gh's clone, so its sign-in is used; without gh, https) or a repo's folder here.
 // Never a transport that runs a program (ext::, file://, a leading -): argv, no shell, -- before the url. into: the
 // folder it goes under (unset: ~/code when it's there, else beside the last project, else home)
-// ponytail: no progress lines, the dialog spins until git ends (15 minutes at most); an event per line if it matters
+// Its progress (git's stderr, a \r between lines) goes to the windows as cloneProgress { line }, the last line, four a
+// second at most; 15 minutes at most
+function cloneRun(cmd: string, args: string[], say: (line: string) => void) {
+  return new Promise<void>((ok, no) => {
+    const c = spawn(cmd, args, { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'ignore', 'pipe'] })
+    let err = ''
+    let at = 0
+    const timer = setTimeout(() => c.kill(), 15 * 60_000)
+    c.stderr!.on('data', d => {
+      err = (err + d).slice(-4000)
+      const line = err.split(/[\r\n]/).findLast(l => l.trim())?.trim()
+      if (line && Date.now() - at > 250) (at = Date.now()), say(line.slice(0, 160))
+    })
+    c.on('error', e => (clearTimeout(timer), no(e)))
+    c.on('close', code => (clearTimeout(timer), code === 0 ? ok() : no(Object.assign(new Error(`${cmd} ended with ${code ?? 'a signal'}`), { stderr: err.replace(/\r/g, '\n') }))))
+  })
+}
 const CLONE_URL = /^(https:\/\/|ssh:\/\/|git@[\w.-]+:)[\w@:/.~%+-]+$/
 const GH_REPO = /^\w[\w.-]*\/[\w.-]+$/
 export async function projectClone(url: unknown, into?: unknown): Promise<Project> {
@@ -1247,10 +1263,10 @@ export async function projectClone(url: unknown, into?: unknown): Promise<Projec
   const dest = join(parent, name)
   if (existsSync(dest)) throw new Error(`${dest} is already there: open it as a project, or clone into another folder`)
   mkdirSync(parent, { recursive: true })
-  const opts = { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 15 * 60_000, maxBuffer: 1 << 22 }
-  const clone = (x: string) => run('git', ['-c', 'protocol.ext.allow=never', 'clone', '--', x, dest], opts)
+  const say = (line: string) => broadcast({ ev: 'cloneProgress', line })
+  const clone = (x: string) => cloneRun('git', ['-c', 'protocol.ext.allow=never', 'clone', '--progress', '--', x, dest], say)
   try {
-    if (gh) await run('gh', ['repo', 'clone', u, dest], opts).catch(() => (rmSync(dest, { recursive: true, force: true }), clone(`https://github.com/${u}.git`)))
+    if (gh) await cloneRun('gh', ['repo', 'clone', u, dest, '--', '--progress'], say).catch(() => (rmSync(dest, { recursive: true, force: true }), clone(`https://github.com/${u}.git`)))
     else await clone(u)
   } catch (e) {
     rmSync(dest, { recursive: true, force: true }) // half a clone: none

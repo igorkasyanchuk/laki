@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { recorded, type View } from '../src/shared/types.ts'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, seen, until } from './helpers.ts'
 
 test("S2: an agent's rm asks the user; files and tabs are its own workspace's; no share, no file opened by its app; a sandboxed one: none of it", async t => {
   const rig = await fresh(t)
@@ -100,7 +100,9 @@ test('U7: Clone a repository: a local repo or a URL into a folder, added as a pr
   const rig = await fresh(t)
   const bare = join(rig.home, 'shop.git')
   execFileSync('git', ['clone', '-q', '--bare', rig.repo, bare])
+  const app = await connect(rig)
   const p = await rig.rpc('projectClone', { url: bare, into: join(rig.home, 'code') })
+  await seen(app, e => e.ev === 'cloneProgress' && /Cloning into|done/.test(e.line), "git's progress, to the window")
   assert.equal(p.path.endsWith('/code/shop'), true)
   assert.equal(p.git, true)
   assert.ok(existsSync(join(p.path, '.git')))

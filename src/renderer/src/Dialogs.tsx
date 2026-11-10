@@ -33,7 +33,7 @@ import { SchedulesPage } from './Schedules'
 import { spanText, type Collision } from '../../shared/overlap'
 import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
-import { lazy, type ReactNode, Suspense, useState } from 'react'
+import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
 
@@ -602,6 +602,8 @@ export function Pages({ app }: { app: AppCtx }) {
 export function Dialogs({ app }: { app: AppCtx }) {
   const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws } = app
   const [cloning, setCloning] = useState(false)
+  const [cloneLine, setCloneLine] = useState('') // git's own progress, as it clones (the daemon's cloneProgress)
+  useEffect(() => (cloning ? api.on(m => m.ev === 'cloneProgress' && setCloneLine(String(m.line))) : setCloneLine('')), [cloning])
   // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
   // template: the default prompt template of a new workspace under it ('' none)
   // a group's name and defaults (Edit group: template, agent, where, permission mode, model, effort, base; '' none)
@@ -890,7 +892,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
         <Prompt
           title="Clone a repository"
           placeholder="https://github.com/owner/repo, git@host:owner/repo.git, or owner/repo"
-          hint="Cloned with your own git (gh for owner/repo, with its sign-in), then added as a project."
+          hint={(cloning && cloneLine) || 'Cloned with your own git (gh for owner/repo, with its sign-in), then added as a project.'}
           picks={[{ label: 'Into', none: '~/code, else beside your last project', options: [], free: true }]}
           busy={cloning ? 'Cloning…' : undefined}
           onClose={() => setDialog(null)}
