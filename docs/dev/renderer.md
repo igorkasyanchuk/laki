@@ -63,6 +63,12 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 
 `src/renderer/src`:
 
+- **Cost of a redraw** (E7, 2026-11, 60 workspaces, 140 tabs): a state event from the daemon to React's commit, built
+  app: 3–5 ms (dev React: 25–35 ms; App and the sidebar's rows, every one, each time; a hover card two of those;
+  typing in the Reader box only the box). Under a frame, so no memo work: memo on `Icon` and `Glyph` measured no gain
+  and went. To measure again: a world (`npm run demo` with more workspaces), and `window.__REACT_DEVTOOLS_GLOBAL_HOOK__`
+  defined before React loads (its `onCommitFiberRoot(id, root)`: `root.current.actualDuration` in dev; the fibers with
+  flag 1 rendered).
 - **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
   built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).

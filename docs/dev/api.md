@@ -377,6 +377,9 @@ WebSocket events:
   (500 ms at most: a masked one then, the whole one after). The `state` method always masked; `stateOwn`: whole, refused to agents and the remote page (`laki remote`'s link).
   `settingsSet` puts a `MASK` back as the value it hides (`unmasked`), so a masked page's save changes nothing;
   what `settingsSet` and `presetSave` answer with is masked too unless the caller is you (`call()`'s end);
+  E6 measured it (2026-11, 60 workspaces, 140 tabs, 5 agents' hooks every 2 s): 40 KB an event, about one a second
+  (the 30 ms debounce and `sent` fold the hooks), ~42 KB/s; JSON.stringify 0.12 ms, JSON.parse 0.3 ms. Under the bar
+  for per-slice patches (a few ms, a few hundred KB/s): whole states stay. Measure again before adding them;
 - `data` and `responder`: per tab;
 - `turn`: waiting, done or limit, for notifications;
 - `browse`: an agent browser op, for the app (above);
