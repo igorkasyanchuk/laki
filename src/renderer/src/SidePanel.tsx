@@ -1362,7 +1362,7 @@ function CsvTable({ path, text, edit, onText }: { path: string; text: string; ed
                 )}
               </td>
               {[...Array(cols)].map((_, c) => (
-                <td key={c} className={`${edit ? 'csv-edit' : ''} ${c >= row.length ? 'csv-none' : ''}`} {...act(() => pick(i + 1, c))}>
+                <td key={c} className={`${edit ? 'csv-edit' : ''} ${c >= row.length ? 'csv-none' : ''}`} {...act(() => pick(i + 1, c))} role={undefined /* still a cell to a screen reader */}>
                   {cell(i + 1, c)}
                 </td>
               ))}

@@ -4681,6 +4681,7 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   for (const r of reviewers) if (!NAME_OK.test(r)) throw new Error(`reviewer ${r}? a GitHub login or org/team`)
   const files = o.files?.map(String) // []: none committed (the commits already there pushed)
   if (files && !files.length && mode === 'commit') throw new Error('no files picked to commit')
+  const prTitle = o.title?.trim() || (o.body?.trim() ? message.trim() : '') // a body without a title: the commit's message as it (--fill has no room for a body)
   const prBase = o.base?.trim().replace(/^origin\//, '')
   if (prBase !== undefined && (!prBase || prBase.startsWith('-') || !/^[\w./-]+$/.test(prBase))) throw new Error(`base ${prBase || '(none)'}? a branch name`)
   // nothing to commit and no commit the base hasn't: gh would open no PR (no commits between them), so said here, before
@@ -4732,11 +4733,11 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
           // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send a
           // git status of gh's or glab's in. Theirs reads Laki's instead (turnsTidy clears it), its stat data kept
           'export GIT_INDEX_FILE="$LAKI_INDEX"',
-          lab ? gitlab.shipMr({ title: !!o.title?.trim(), draft: o.draft, reviewers: !!reviewers.length }) : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create ${o.title?.trim() ? '--title "$LAKI_TITLE" --body "$LAKI_BODY"' : '--fill'}${o.draft ? ' --draft' : ''}${reviewers.length ? ' --reviewer "$LAKI_REVIEWERS"' : ''}${R} --head "$LAKI_HEAD"${B}`,
+          lab ? gitlab.shipMr({ title: !!prTitle, draft: o.draft, reviewers: !!reviewers.length }) : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create ${prTitle ? '--title "$LAKI_TITLE" --body "$LAKI_BODY"' : '--fill'}${o.draft ? ' --draft' : ''}${reviewers.length ? ' --reviewer "$LAKI_REVIEWERS"' : ''}${R} --head "$LAKI_HEAD"${B}`,
         ]),
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const words: Record<string, string> = o.title?.trim() ? { LAKI_TITLE: o.title.trim(), LAKI_BODY: o.body ?? '' } : {}
+  const words: Record<string, string> = prTitle ? { LAKI_TITLE: prTitle, LAKI_BODY: o.body ?? '' } : {}
   const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, LAKI_TREE: tree, LAKI_INDEX: index, ...words, ...(reviewers.length && { LAKI_REVIEWERS: reviewers.join(',') }), ...(lab ? { LAKI_BASE: base } : { LAKI_HEAD: head, ...(B && { LAKI_BASE: base }) }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()

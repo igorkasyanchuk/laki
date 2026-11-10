@@ -787,7 +787,7 @@ export function SettingsPage(p: {
   // one with projects on All; a link to a section, or Find a setting, goes to All
   const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))
   useEffect(() => keep('laki.settingsView', view), [view])
-  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || BASIC.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
+  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || (view === 'basic' && BASIC.some(y => y.id === x)) || p.projects?.some(y => `project:${y.id}` === x) ? x : view === 'basic' ? BASIC[0].id : 'general'))(p.section ?? load('laki.settingsSec', 'general'))) // a Basic head only in Basic (a link's spot opens All)
   const basic = view === 'basic' ? (BASIC.find(b => b.id === sec) ?? BASIC[0]) : undefined
   // a section's cards on: its own, or a Basic head's (only the cards it names: Shown)
   const on = (id: string) => (basic ? basic.cards.some(c => c[0] === id) : sec === id)
