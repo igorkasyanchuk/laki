@@ -4,7 +4,7 @@
 // box, chips for the subagents and background tasks a claude chat still runs; under an MCP call, its app (McpApp); in
 // an answer, a laki-ui block drawn with the UI kit (UiBlock). The terminal stays attached under it: Terminal brings
 // it back as it was
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { ask, Icon, type MenuItem, ON, useMenu } from './ui'
@@ -58,6 +58,19 @@ export function flushDraft(id: string) {
   return due.go()
 }
 export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: ReaderApi; active: boolean; look?: ReaderLook }) {
+  // U2: the AI button (App's .ai-fab-wrap, by the main area's bottom right) goes up over this box, not onto its Send
+  const fabOver = useCallback((b: HTMLFormElement | null) => {
+    const m = b?.closest<HTMLElement>('.main')
+    if (!b || !m) return
+    const set = () => m.style.setProperty('--fab-over', `${Math.round(m.getBoundingClientRect().bottom - b.getBoundingClientRect().top + 10)}px`)
+    const ro = new ResizeObserver(set)
+    ro.observe(b)
+    ro.observe(m)
+    return () => {
+      ro.disconnect()
+      m.style.removeProperty('--fab-over')
+    }
+  }, [])
   const [said, setSaid] = useState<Said[]>()
   const [bg, setBg] = useState<BgTask[]>([])
   const [apps, setApps] = useState<App[]>([])
@@ -291,7 +304,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           </div>
         </div>
       ) : (
-        <form className="rd-box" onSubmit={e => (e.preventDefault(), send())}>
+        <form className="rd-box" ref={fabOver} onSubmit={e => (e.preventDefault(), send())}>
           {tab.mode && (
             <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip={tab.modeUnknown ? `Claude's footer isn't on screen (a menu, a transcript view or a narrow pane hides it). Last seen: ${modeLabel(tab.mode)}` : 'Its permission mode: change it without restarting'} onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
               {tab.modeUnknown ? 'Mode unknown' : modeLabel(tab.mode)} ▾

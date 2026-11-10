@@ -1,7 +1,7 @@
 // What App's parts read of App: menus.ts, keydown.ts, Palette.tsx, TabBar.tsx, Sidebar.tsx and Dialogs.tsx. App builds
 // it each render, after `if (!view)` (so `view` is there), from its own state and helpers: all state and every hook
 // stay in App, and a part destructures what it uses. A new field: its type here, then its name in App's `appBase`.
-import type { Dispatch, RefObject, SetStateAction } from 'react'
+import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react'
 import type { ExtTab } from './Extension'
 import type { DeskAsk } from './Desk'
 import type { ProjectTab } from './Project'
@@ -276,6 +276,8 @@ export type AppBase = {
   railOf: (k?: RailKind) => RailKind
   rawKind: (w: WorkspaceView) => RailKind
   readerOn: boolean
+  readSwitch: (id?: string) => ReactNode // U2: Terminal | Reader for a tab (App)
+  onePane: boolean // the selected tab's pane is alone (no split): the tab bar has its switch
   refreshPR: () => Promise<void>
   reply: { tab: string; text: string; x: number; y: number } | null
   replyTo: (id: string) => TabView[]

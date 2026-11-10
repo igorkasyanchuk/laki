@@ -143,7 +143,7 @@ export function TabStrip({ app }: { app: AppCtx }) {
 
 // the bar over the terminals: the tabs (unless they're in a strip), who made the workspace, the widgets, the buttons
 export function TabBar({ app }: { app: AppCtx }) {
-  const { canLater, devRunning, devTab, editorName, editScripts, info, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setReveal, setSideOpen, setWsId, showInfo, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
+  const { onePane, readSwitch, canLater, devRunning, devTab, editorName, editScripts, info, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setReveal, setSideOpen, setWsId, showInfo, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
   return (
     <div className="tabbar drag" data-tabbar>
       {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
@@ -154,6 +154,7 @@ export function TabBar({ app }: { app: AppCtx }) {
         </button>
       ))(creatorOf(ws, view.tabs)))(live.find(x => x.id === ws.from))}
       <span className="spacer" />
+      {onePane && readSwitch(tab?.id) /* U2: a split pane has it in its header */}
       {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
       {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
       {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}

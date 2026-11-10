@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Get started is the loop now: add a project, start a task, answer the agent, review its changes, ship or archive (the rest under Explore more). It no longer opens by itself: its bar at the sidebar's foot does.
+- Nothing sits on your work: the Terminal | Reader switch moved to the tab bar (or a split pane's header), the AI button rises over the Reader's box, Scheduled's examples are examples (a click fills in New task), and the Review tab's keys are behind a Keys button.
 - The window starts with about 0.9 MB less code: Settings, Help, the AI page, the board, Scheduled, a project's and an extension's page load as you open them (or point at their rail button).
 - Archiving a workspace with uncommitted changes names the files that would go, and a turn's dot under its tab shows as soon as the turn ends.
 - Plan limits now come from what Claude Code and Codex report themselves; Laki no longer asks Anthropic's or OpenAI's servers with your sign-in unless you turn on *Ask … for plan limits* in Settings › Appearance (Gemini's need it).

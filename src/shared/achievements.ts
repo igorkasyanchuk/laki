@@ -16,16 +16,19 @@ export type Achievement = { id: string; group: AchGroup; title: string; how: str
 const count = (v: View, f: (p: View['projects'][number]) => number) => v.projects.reduce((n, p) => n + f(p), 0)
 const splits = (l: unknown): number => (l && typeof l === 'object' && 'dir' in l ? 1 + splits((l as any).a) + splits((l as any).b) : 0)
 
+// U3: Getting started's first five are Get started's loop (panels.tsx STEPS), the same ids: App ticks one in both
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'project', group: 'Getting started', title: 'Add a project', how: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", icon: 'folderPlus', go: 'project', rpc: 'projectAdd' },
   { id: 'workspace', group: 'Getting started', title: 'Start a workspace', how: 'An agent and a prompt in a worktree of its own (⌘N)', icon: 'plus', go: 'new', rpc: 'wsNew' },
+  { id: 'answer', group: 'Getting started', title: 'Answer an agent with a click', how: 'When an agent asks, its choices show as buttons over the terminal', icon: 'message', rpc: 'answer' },
+  { id: 'changes', group: 'Getting started', title: 'Look at the changes', how: "The right panel's Changes: a workspace's diff, file by file", icon: 'diff', go: 'panel:changes' },
+  { id: 'ship', group: 'Getting started', title: 'Ship it', how: "The toolbar's Ship: commit, push and open a PR in one go", icon: 'ship', go: 'ship', rpc: 'ship' },
   { id: 'tab', group: 'Getting started', title: 'Open another tab', how: "The tab bar's + (⌘⇧N): another agent or a shell beside the first", icon: 'terminal', go: 'newtab', rpc: 'tabNew' },
   { id: 'settings', group: 'Getting started', title: 'Look around Settings', how: 'Themes, fonts, notifications, your agents (⌘,)', icon: 'gear', go: 'settings', page: 'settings' },
   { id: 'theme', group: 'Getting started', title: 'Pick a theme', how: 'Settings › Appearance: a theme painted as you hover it', icon: 'palette', go: 'section:appearance', up: v => v.settings.theme ?? '' },
   { id: 'help', group: 'Getting started', title: 'Read the keys', how: 'Help (⌘/): every key and where things are', icon: 'help', go: 'help', page: 'help' },
   { id: 'palette', group: 'Getting started', title: 'Open the command palette', how: '⌘K: every workspace, page and action by name', icon: 'command', go: 'palette', page: 'palette' },
 
-  { id: 'answer', group: 'Agents', title: 'Answer an agent with a click', how: 'When an agent asks, its choices show as buttons over the terminal', icon: 'message', rpc: 'answer' },
   { id: 'jump', group: 'Agents', title: 'Jump to who needs you', how: '⌘J: the next tab waiting for you, wherever it is', icon: 'arrowRight' },
   { id: 'later', group: 'Agents', title: 'Send a message later', how: '⌘L: to an agent in 20 minutes or at 6pm', icon: 'clock' },
   { id: 'race', group: 'Agents', title: 'Race two agents', how: "The new-workspace page's More › Race: one prompt, a worktree each, then compare", icon: 'race', go: 'new', rpc: 'wsFan' },
@@ -36,11 +39,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'projectAction', group: 'Agents', title: "Give a project its own action", how: "A project's settings › Actions: one only its Run menu has", icon: 'run', go: 'section:actions', up: v => count(v, p => p.config?.actions?.length ?? 0) },
   { id: 'memory', group: 'Agents', title: 'Give agents a rule', how: 'Global memory: what claude and codex should always know', icon: 'bulb', go: 'section:memory', up: v => (v.settings.memory?.length ?? 0) + count(v, p => p.memory?.filter(m => !m.auto).length ?? 0) },
 
-  { id: 'changes', group: 'Git & PRs', title: 'Look at the changes', how: "The right panel's Changes: a workspace's diff, file by file", icon: 'diff', go: 'panel:changes' },
   { id: 'revert', group: 'Git & PRs', title: 'Revert a hunk', how: "In Changes, a hunk's Revert: take back one part, keep the rest", icon: 'undo', go: 'panel:changes', rpc: 'hunkUndo|fileUndo' },
   { id: 'comment', group: 'Git & PRs', title: 'Comment on a line', how: 'In Changes, click a line: a note to the agent or the PR', icon: 'messageDots', go: 'panel:changes' },
   { id: 'viewed', group: 'Git & PRs', title: 'Review a file', how: "In Changes on a PR, a file's Viewed box: ticked on GitHub too, and folded here", icon: 'checkCircle', go: 'panel:changes', rpc: 'prViewed', ok: p => p.viewed === true },
-  { id: 'ship', group: 'Git & PRs', title: 'Ship it', how: "The toolbar's Ship: commit, push and open a PR in one go", icon: 'ship', go: 'ship', rpc: 'ship' },
   { id: 'autofix', group: 'Git & PRs', title: 'Let the agent fix CI', how: "A PR's switches: failing checks, review comments and conflicts go to the agent", icon: 'ciFail', go: 'panel:info', rpc: 'wsSet', ok: p => [p.autoFix, p.autoReview, p.autoMerge].includes(true) },
   { id: 'merge', group: 'Git & PRs', title: 'Approve or merge in Laki', how: "Info's PR: Approve, or Merge with squash, merge or rebase", icon: 'gitMerge', go: 'panel:info', rpc: 'prAct', ok: p => p.act !== 'close' },
   { id: 'archive', group: 'Git & PRs', title: 'Archive a finished one', how: "A workspace's ⋯ › Archive: the worktree goes, the branch stays, Undo brings it back", icon: 'archive', rpc: 'wsArchive' },

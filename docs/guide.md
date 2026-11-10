@@ -222,13 +222,15 @@ npm link
    screen, on that screen if it's still there). It starts its background daemon if one isn't running. With no project yet it says what it found:
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
-2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
-   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser, Cloud workspaces,
-   Agents & profiles, remote access, Scheduled tasks, Workflows), each with a button that does it, and a theme to pick
-   from a dropdown (painted as you pick). Workflows' button opens Settings › General › Pages while they're off.
-   A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
-   stays as a bar at the sidebar's bottom (a click opens it again, ✕ hides it; *Get started* in ⌘K or the Help menu's *Get Started Again…* brings it back);
-   *Don't show again* hides both.
+2. *Get started* is a bar at the sidebar's bottom from the first launch (it pulses as a step is done); a click opens
+   it, it never opens by itself. Five steps, the loop of a task: add a project, start a task, answer the agent (the
+   first answer ticks it), review its changes (Changes or the Review tab on a workspace with a diff), ship a PR or
+   archive; each with a button that goes there (Needs you's next, Changes, Ship). *Explore more*, folded under them,
+   has the rest and doesn't count: an extension, actions, a prompt template, a terminal or a browser, Cloud
+   workspaces, Agents & profiles, remote access, Scheduled tasks, Workflows (while they're on). A theme to pick is at
+   its foot. A step ticks itself as you do it, or click its circle to tick it yourself; the five are the first of
+   Achievements › Getting started too. ✕ on the bar hides it (*Get started* in ⌘K or the Help menu's *Get Started
+   Again…* brings it back); *Don't show again* too.
 3. Add a project: **⌘O**, + at the top of the sidebar › *Project folder…*, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
 4. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
@@ -1612,7 +1614,7 @@ laki flow pause <run> | flow resume <run>      # pause after the block it's on |
 
 ### Reader view
 
-Each Claude Code and Codex tab has a *Terminal | Reader* switch at its top right. Reader shows its chat as a
+Each Claude Code and Codex tab has a *Terminal | Reader* switch: in the tab bar, or in a split pane's header (never over the terminal). Reader shows its chat as a
 conversation, read from the agent's own transcript: your messages on the right (a long one folds to 10 lines: *Show more*), its answers as formatted text, each run
 of tool calls folded into one line (click for the list), and what it's doing now. When it asks something, its choices
 are buttons (asked to edit or write a file, the change shows above them, red and green: the first 8 lines, *Expand* for

@@ -649,7 +649,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         />
       ))}
       <WidgetGrid widgets={ownWidgets} api={widgetApi} desk={settings.desk !== false} />
-      {(steps => !onboard.off && steps.some(x => !onboardDone.has(x.id)) && dialog !== 'onboard' && <OnboardBar done={steps.filter(x => onboardDone.has(x.id)).length} of={steps.length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />)(stepsOf(settings))}
+      {(steps => !onboard.off && steps.some(x => !onboardDone.has(x.id)) && dialog !== 'onboard' && <OnboardBar key={steps.filter(x => onboardDone.has(x.id)).length /* a step done: a new bar, its pulse again */} done={steps.filter(x => onboardDone.has(x.id)).length} of={steps.length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />)(stepsOf(settings))}
       {!wideBar && (
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           {footButtons(labels)}

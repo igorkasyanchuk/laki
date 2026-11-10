@@ -2725,6 +2725,15 @@ export function App() {
   const readerOn = settings.reader !== false
   const inReader = (id: string) => readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader'
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
+  // U2: Terminal | Reader, in the pane's header (split panes) or the tab bar (one pane): never over the terminal's lines
+  const readSwitch = (id?: string) =>
+    id && readerOn && readable(byId(id)) ? (
+      <div className="reader-switch nodrag" role="group" aria-label="Show it as">
+        <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
+        <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>
+      </div>
+    ) : null
+  const onePane = !group || tabsOf(group).length < 2
   const readerApi: ReaderApi = {
     dismiss: tab => call('failDismiss', { tab }),
     draft: (tab, text) => api.call('tabDraft', { tab, text }),
@@ -2836,7 +2845,10 @@ export function App() {
     ...(view?.workspaces.some(w => w.codespace !== undefined) ? ['experimental'] : []), // a codespace made; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
+    ...(((panelShown && panelTab === 'changes') || reviewOn) && ws?.stat && (ws.stat.files > 0 || ws.stat.dirty > 0) ? ['changes'] : []), // U3: a diff looked at
   ])
+  // U3: the loop's steps a call does: an answer, a ship or an archive (achievements off or on)
+  useEffect(() => api.onCall(method => (id => id && setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] })))(method === 'answer' ? 'answer' : method === 'ship' || method === 'wsArchive' ? 'ship' : '')), [])
   const onboardKey = [...onboardDone].sort().join()
   useEffect(() => {
     if (view && onboardDone.size > onboard.done.length) setOnboard(o => ({ ...o, done: [...onboardDone] })) // kept: a project removed later doesn't undo it
@@ -2849,7 +2861,6 @@ export function App() {
     const ids = [...onboardDone].filter(id => !a.got?.[id] && !a.hidden?.includes(id) && ACHIEVEMENTS.some(x => x.id === id && x.group === 'Getting started')) // the same step in both: a project, a workspace, Settings
     if (ids.length) achSet({ got: { ...a.got, ...Object.fromEntries(ids.map(id => [id, Date.now()])) } }).catch(() => {})
   }, [onboardKey, !!view])
-  const hasProject = onboardDone.has('project')
   // ⌘F: a diff's find bar (Diff.tsx DiffFind) when the pointer was last in one (Changes, the full review), or the full
   // review covers the terminals; else the terminal's
   const lastDown = useRef<Element | null>(null)
@@ -2864,11 +2875,7 @@ export function App() {
     host?.dispatchEvent(new Event('laki-find'))
     return !!host
   }
-  useEffect(() => {
-    if (!view || onboard.seen || dialog || !hasProject) return // a link's page first: it comes as that closes; Welcome (its git, gh and agent checks) before any project
-    setOnboard(o => ({ ...o, seen: true }))
-    setDialog('onboard') // once, after the first project: everyone, this update's users too
-  }, [!!view, !dialog, hasProject])
+  // U3: Get started never opens by itself: its bar at the sidebar's foot (from the first launch) does, ⌘K, laki://onboard
   // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on). Once the first view
   // is in (the socket is open: Workflows are on before the settings come), and quietly: a list in the background
   const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
@@ -3465,7 +3472,7 @@ export function App() {
     openInItems, openMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
     pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarKey, radarOf, rail,
-    railBar, railKind, railOf, rawKind, readerOn, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
+    railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
     reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
     schedulesFor, selectGroup, selectTab, sendLater, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal,
     setFind, setFinds, setFolded, setGallery, setGroups, setMaking, setNewFor, setNewImages, setNewInit, setOnboard,
@@ -3528,6 +3535,7 @@ export function App() {
           <div className="term-wrap" data-review={reviewOn && ws ? '' : undefined}>
             {group ? (
               <Panes
+                head={readSwitch}
                 layout={group}
                 active={tab?.id ?? null}
                 drag={drag}
@@ -3567,15 +3575,7 @@ export function App() {
                     image={peekImage(id)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                   />
-                  {readerOn && readable(byId(id)) && (
-                    <>
-                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
-                      <div className="reader-switch" role="group" aria-label="Show it as">
-                        <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
-                        <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>
-                      </div>
-                    </>
-                  )}
+                  {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
                   </>
                 )}
                 foot={id =>

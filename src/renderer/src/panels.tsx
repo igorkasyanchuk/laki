@@ -283,13 +283,19 @@ export function TimerBar({ end, left, label, tip, onMenu, onPause, onStop }: { e
   )
 }
 
-// Get started: the steps a new Laki takes, shown once as it opens (App's laki.onboard). Each is done by itself as it
-// happens (App's onboardDone: a project added, Settings' sections seen…) or ticked by hand; Go does it. Skip for now
-// closes it and leaves what's left at the sidebar's foot (OnboardBar); Don't show again hides both
-export const STEPS: { id: string; title: string; hint: string; go: string }[] = [
+// Get started (U3): the core loop, five steps that count (n of 5), each done by itself as it happens (App's
+// onboardDone: a project there, a workspace, an answer, the changes looked at, a ship or an archive) or ticked by hand;
+// Go takes you there. Explore more, folded under them: the rest, not counted, a page that's off left out. It never
+// opens by itself: the bar at the sidebar's foot (OnboardBar) opens it, ⌘K's Get started and laki://onboard too
+export type Step = { id: string; title: string; hint: string; go: string }
+export const STEPS: Step[] = [
   { id: 'project', title: 'Add a project', hint: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", go: 'Add one' },
-  { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
-  { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
+  { id: 'workspace', title: 'Start a task', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
+  { id: 'answer', title: 'Answer the agent', hint: 'When it asks, its choices are buttons; Needs you lists who waits (⌘J goes there)', go: 'Needs you' },
+  { id: 'changes', title: 'Review its changes', hint: 'Changes, or the Review tab: its diff file by file, a comment on a line goes back to it', go: 'Changes' },
+  { id: 'ship', title: 'Ship a PR or archive', hint: 'Ship: commit, push and open a PR in one go; or archive a workspace that is done', go: 'Ship' },
+]
+export const MORE_STEPS: (Step & { when?: (s: { workflows?: boolean; remote?: boolean }) => boolean })[] = [
   { id: 'widgets', title: 'Make an extension', hint: 'Small live pages in the sidebar or on the Desk: from a starter, or Laki AI makes one for you', go: 'Extensions' },
   { id: 'actions', title: 'Set up actions', hint: 'The Run menu: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
@@ -298,38 +304,41 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'presets', title: 'Set up agents & profiles', hint: 'Each profile its agent, model, effort and account: a second Claude plan, a cheaper model', go: 'Agents & profiles' },
   { id: 'remote', title: 'Try remote access', hint: 'Laki on your phone: signed in by email (Cloudflare), with a PIN, or over Tailscale', go: 'Remote access' },
   { id: 'schedules', title: 'Schedule a prompt', hint: 'An agent on a prompt every weekday at 9am, or once tomorrow', go: 'Scheduled tasks' },
-  { id: 'workflows', title: 'Try a workflow', hint: 'Blocks Laki runs for a task: agents, commands, your answers, a PR', go: 'Workflows' },
+  { id: 'workflows', title: 'Try a workflow', hint: 'Blocks Laki runs for a task: agents, commands, your answers, a PR', go: 'Workflows', when: s => s.workflows !== false },
 ]
-
-const ALL_STEPS = STEPS
 // U1: never a step for a page that's off (a new install's Labs: Workflows)
-export const stepsOf = (s?: { workflows?: boolean }) => STEPS.filter(x => x.id !== 'workflows' || s?.workflows !== false)
+export const stepsOf = (_s?: { workflows?: boolean }) => STEPS
+export const moreOf = (s?: { workflows?: boolean }) => MORE_STEPS.filter(x => !x.when || x.when(s ?? {}))
 
-export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, auto, onAuto, steps: STEPS = ALL_STEPS }: { auto?: boolean; onAuto?: (on: boolean) => void; steps?: typeof ALL_STEPS; done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
+export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, auto, onAuto, more = MORE_STEPS }: { auto?: boolean; onAuto?: (on: boolean) => void; more?: Step[]; done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
   const n = STEPS.filter(x => done.has(x.id)).length
   const next = STEPS.find(x => !done.has(x.id))?.id // the one step in the accent: the rest wait their turn
+  const [explore, setExplore] = useState(false)
+  const step = (x: Step, main: boolean) => (
+    <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
+      <button className="ob-tick" aria-pressed={done.has(x.id)} disabled={done.has(x.id)} data-tip={done.has(x.id) ? 'Done' : 'Mark it done'} aria-label={`${x.title}: ${done.has(x.id) ? 'done' : 'mark it done'}`} onClick={() => onTick(x.id)}>
+        {done.has(x.id) && <Icon name="check" size={12} />}
+      </button>
+      <div className="ob-what">
+        <b>{x.title}</b>
+        <span className="muted small">{x.hint}</span>
+      </div>
+      <button className={main && x.id === next ? 'primary' : ''} onClick={() => onGo(x.id)}>
+        {x.go}
+      </button>
+    </div>
+  )
   return (
     <Modal title="Get started with Laki" onClose={onSkip} wide>
       <div className="onboard">
         <div className="ob-bar" style={{ '--p': `${(n / STEPS.length) * 100}%` } as CSSProperties} />
-        <p className="muted small">{n === STEPS.length ? 'All done. Enjoy Laki!' : `${n} of ${STEPS.length} done. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
+        <p className="muted small">{n === STEPS.length ? 'The loop is yours: a task, its answers, its changes, shipped. Explore more below.' : `${n} of ${STEPS.length}: the loop, a task from start to shipped. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
+        <div className="ob-steps">{STEPS.map(x => step(x, true))}</div>
+        <button type="button" className="ob-more-head" aria-expanded={explore} onClick={() => setExplore(o => !o)}>
+          <Icon name={explore ? 'chevron' : 'chevronRight'} size={12} /> Explore more <span className="muted small">{more.filter(x => done.has(x.id)).length} of {more.length}, not counted</span>
+        </button>
+        {explore && <div className="ob-steps ob-more">{more.map(x => step(x, false))}</div>}
         <ThemeRow theme={theme} onTheme={onTheme} auto={auto} onAuto={onAuto} />
-        <div className="ob-steps">
-        {STEPS.map(x => (
-          <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
-            <button className="ob-tick" aria-pressed={done.has(x.id)} disabled={done.has(x.id)} data-tip={done.has(x.id) ? 'Done' : 'Mark it done'} onClick={() => onTick(x.id)}>
-              {done.has(x.id) && <Icon name="check" size={12} />}
-            </button>
-            <div className="ob-what">
-              <b>{x.title}</b>
-              <span className="muted small">{x.hint}</span>
-            </div>
-            <button className={x.id === next ? 'primary' : ''} onClick={() => onGo(x.id)}>
-              {x.go}
-            </button>
-          </div>
-        ))}
-        </div>
         <div className="row">
           <button onClick={onOff}>Don't show again</button>
           <span className="grow" />
@@ -406,9 +415,10 @@ function ThemeRow({ theme, onTheme, auto, onAuto }: { theme: string; onTheme: (i
 }
 
 // what's left of Get started, at the sidebar's foot: a click opens it again, × hides it for good
+// U3: it pulses once as it shows and as a step is done (App keys it by the count: a new one each time)
 export function OnboardBar({ done, of = STEPS.length, onOpen, onOff }: { done: number; of?: number; onOpen: () => void; onOff: () => void }) {
   return (
-    <div className="timer-bar onboard-bar" onClick={onOpen} data-tip="Get started: the steps left">
+    <div className="timer-bar onboard-bar pulse" onClick={onOpen} data-tip="Get started: the loop, five steps">
       <Icon name="check" size={13} />
       <span className="timer-what">Get started</span>
       <span className="muted small">

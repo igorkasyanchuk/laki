@@ -12,7 +12,7 @@ import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
 import { DigestCard, NoticeCard, ShownDialog, ShownPops } from './Shown'
 import { SharePop } from './Tunnel'
-import { ReplyPop, About, Onboarding, stepsOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
+import { ReplyPop, About, Onboarding, moreOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
 import { WidgetDialog, WidgetModal } from './Widgets'
 import { Picker } from './Picker'
@@ -85,7 +85,7 @@ const StarterPicker = (p: Parameters<typeof StarterLazy>[0]) => (
 
 // the pages in the main area, over the panes
 export function Pages({ app }: { app: AppCtx }) {
-  const { achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere } = app
+  const { nextNeed, achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere } = app
   // a page's own move that isn't a place of its own (a Settings section, an extension page's tab): the place it's at
   // says it, so Back or Forward to it opens there, not where it was opened
   // (after App's own effect: a page's first report comes from its effects, which run before App's records its place)
@@ -124,6 +124,9 @@ export function Pages({ app }: { app: AppCtx }) {
     if (id === 'project') openProject()
     else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
     else if (id === 'settings') setDialog('settings')
+    else if (id === 'answer') nextNeed() // U3: the next tab that waits for you, else says none does
+    else if (id === 'changes') (ws ? showPanel('changes') : toast('Pick a workspace first: its changes show in Changes'))
+    else if (id === 'ship') (ws?.kind === 'worktree' ? setDialog('ship') : toast('Ship needs a worktree: start a task first'))
     else if (id === 'shell') quickNew('shells')
     else if (id === 'experimental') setDialog({ section: 'general', spot: 'Cloud workspaces' })
     else if (id === 'workflows' && !flowsOn) setDialog({ section: 'general', spot: 'Pages' }) // Workflows off: where it's turned on again
@@ -350,7 +353,7 @@ export function Pages({ app }: { app: AppCtx }) {
       )}
       {dialog === 'onboard' && (
         <Onboarding
-          steps={stepsOf(settings)}
+          more={moreOf(settings)}
           done={onboardDone}
           onGo={onboardGo}
           onTick={id => setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))}

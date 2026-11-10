@@ -73,6 +73,8 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
+// U2: the review's keys, as its Keys popover lists them (the handler: onKey)
+const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent']]
 export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
@@ -458,9 +460,10 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             </>
           ) : err ? '' : 'Loading…'}
         </span>
-        <span className="fr-keys muted small" data-tip="j k: the next or last file · v: Viewed · b: blame · p: pin to the top · c: comment on the line under the mouse · ⌘⏎: send to the agent">
-          j k · v · b · p · c · ⌘⏎
-        </span>
+        {/* U2: the keys in a popover, each with what it does: no bare legend */}
+        <button type="button" className="ghost fr-keys-btn" aria-haspopup="menu" onClick={e => openMenu(e, [{ head: 'Keys in the review' }, ...REVIEW_KEYS.map(([k, what]) => ({ label: what, hint: k, run: () => {} }))])}>
+          Keys
+        </button>
         {anyOpen ? (
           <IconButton icon="collapse" title="Collapse all" onClick={() => setShown(listed.map(f => f.path), false)} />
         ) : (

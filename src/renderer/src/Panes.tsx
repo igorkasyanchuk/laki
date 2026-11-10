@@ -101,6 +101,7 @@ export function Panes(p: {
   onMenu: (e: MouseEvent, tab: string) => void // right click on a pane header
   ghost: ReactNode // what follows the pointer while dragging
   render: (tab: string) => ReactNode
+  head?: (tab: string) => ReactNode // a split pane's header's own controls (Terminal | Reader), before its ×
   foot?: (tab: string) => ReactNode // under the pane's terminal, which gets shorter (a tab's queue)
   onFocus: (tab: string) => void
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (Settings › Terminal)
@@ -130,6 +131,8 @@ export function Panes(p: {
           {panes.length > 1 && (
             <div className="pane-head" style={colorVar(p.color(tab))} onPointerDown={e => p.startDrag(e, tab)} onContextMenu={e => p.onMenu(e, tab)}>
               {p.label(tab)}
+              <span className="spacer" />
+              {p.head?.(tab)}
               <button className="x" aria-label="Close the tab" data-tip="Close" onPointerDown={e => e.stopPropagation()} onClick={() => p.onClose(tab)}>
                 ×
               </button>

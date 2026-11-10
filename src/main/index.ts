@@ -54,6 +54,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const ctx = (sel: string) => js(`(e => e && e.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: e.getBoundingClientRect().x + 12, clientY: e.getBoundingClientRect().y + 6 })))(document.querySelector(${q(sel)}))`)
   const typeIn = (sel: string, text: string) => js(`(e => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ${q(text)}); e.dispatchEvent(new Event('input', { bubbles: true })) })(document.querySelector(${q(sel)}))`)
   const nap = (ms: number) => new Promise(r => setTimeout(r, ms))
+  // U2: two elements both drawn and apart (their boxes don't meet)
+  const apart = (a: string, b: string) => js<boolean>(`(() => { const [x, y] = [${q(a)}, ${q(b)}].map(s => document.querySelector(s)?.getBoundingClientRect()); return !!x && !!y && x.width > 0 && y.width > 0 && (x.right <= y.left || y.right <= x.left || x.bottom <= y.top || y.bottom <= x.top) })()`)
   const waitFor = async (f: () => Promise<unknown>, what: string, ms = 8000) => {
     for (const at = Date.now(); !(await f()); await nap(100)) if (Date.now() - at > ms) throw new Error(`no ${what} after ${ms / 1000} s`)
   }
@@ -67,7 +69,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const checkout = () => join(ws.co.path, 'src/checkout.js')
   const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
     ['projects', null, '.sidebar .ws'],
+    ['switch-apart', null, () => apart('.reader-switch', '.pane.active .xterm-screen')], // U2: Terminal | Reader off the terminal's lines
     ['reader', click('.reader-switch button:last-child'), '.reader'],
+    ['fab-apart', null, () => apart('.ai-fab', '.rd-box button.primary')], // U2: the AI button off the Reader's Send
     ['review', click('.review-tab'), '.full-review'],
     ['new-workspace', link('laki://new'), '.nw-composer'],
     ['settings', link('laki://settings'), '.settings-page'],
@@ -76,9 +80,10 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     ['palette', key('k', true), '.palette-input'],
+    // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
+    ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
     ['flow-archive-asks', async () => {
-      await key('Escape')()
       ws.dark = await named('dark-mode')
       writeFileSync(join(ws.dark.path, 'notes.txt'), 'mine\n')
       await pick(row(ws.dark.id), 'Archive workspace')
@@ -156,7 +161,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
     out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }) })
     writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
-    if (name === 'palette') await key('Escape')()
+    if (name === 'palette' || name === 'get-started') await key('Escape')()
   }
   writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2))
   app.exit(out.every(s => s.ok) ? 0 : 1)

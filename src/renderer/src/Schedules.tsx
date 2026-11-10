@@ -1,12 +1,12 @@
 // Scheduled tasks (the clock at the bottom of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { Ghosts, ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Omit<Schedule, 'archived'>> & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false)
@@ -31,6 +31,12 @@ export const soon = (t: number, now = Date.now()) => {
   const d = Math.round(m / 60 / 24)
   return m < 1 ? 'now' : m < 60 ? `in ${m} min` : h < 24 ? `in ${h} h` : d === 1 ? 'in a day' : `in ${d} days`
 }
+// U2: what an empty Scheduled page offers to start from (a click fills in New task): name, when, agent, prompt
+const SAMPLES: [string, string, string, string][] = [
+  ["Review yesterday's PRs", 'weekdays at 9:00', 'claude', "Look at the pull requests opened or updated yesterday and sum up what needs my attention, worst first."],
+  ['Update dependencies', 'every monday at 8:00', 'codex', 'Update the dependencies to their latest minor versions, run the tests, and open a PR with what changed.'],
+  ['Check the nightly build', 'every day at 7:30', 'claude', "Check last night's CI run on the main branch; if it failed, find why and propose a fix."],
+]
 type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
@@ -520,17 +526,31 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             />
           ) : (
             <>
-            <Ghosts>
-              {([["Review yesterday's PRs", 'weekdays at 9:00', 'claude'], ['Update dependencies', 'every monday at 8:00', 'codex'], ['Check the nightly build', 'every day at 7:30', 'claude']] as const).flatMap(([name, when, preset], i) =>
-                (rule => ('error' in rule ? [] : [<Fragment key={name}>{row({ id: `sample-${i}`, name, project: only || view.projects[0]?.id || '', preset, ws: 'new', prompt: '', when, rule, on: true, next: Date.now() + (i + 2) * 3_600_000 })}</Fragment>]))(parseWhen(when)),
-              )}
-            </Ghosts>
             <div className="sched-empty">
               <Icon name="clock" size={18} />
               <span>
                 <b>No scheduled tasks{only ? ' in this project' : ''}</b>
-                <span className="muted small">An agent on a prompt at a time, once or on repeat. New task makes one.</span>
+                <span className="muted small">An agent on a prompt at a time, once or on repeat. New task makes one, or start from an example.</span>
               </span>
+            </div>
+            {/* U2: examples, not ghost tasks: no switches, a click fills in New task */}
+            <div className="sched-head sched-examples-head">
+              <h3>Examples</h3>
+            </div>
+            <div className="sched-examples">
+              {SAMPLES.map(([name, when, preset, prompt]) => (
+                <button key={name} type="button" className="sched-example" disabled={!view.projects.length} data-tip={view.projects.length ? 'Fill in New task with it' : 'Open a project first (⌘O)'} onClick={() => void open({ ...blank(), name, when, prompt, ...(agents.includes(preset) && { preset }) })}>
+                  <span className="sched-icon" data-kind="fork">
+                    <Icon name="fork" />
+                  </span>
+                  <span className="sched-example-text">
+                    <span className="sched-name">{name}</span>
+                    <span className="sched-meta">
+                      <b>{when}</b> · {preset}
+                    </span>
+                  </span>
+                </button>
+              ))}
             </div>
             </>
           )}

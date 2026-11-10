@@ -261,6 +261,12 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .ob-themes > .theme.on { outline: 2px solid var(--fg); outline-offset: 2px; }
 .ob-themes:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent); border-radius: var(--radius); }
 .onboard-bar { cursor: pointer; }
+.onboard-bar.pulse { animation: ob-pulse 1.2s ease-out 1; } /* U3: once as it shows and as a step is done (Sidebar keys it by the count) */
+@keyframes ob-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { .onboard-bar.pulse { animation: none; } }
+.ob-more-head { display: flex; align-items: center; gap: 6px; margin: 4px 0; padding: 4px 2px; border: none; background: none; color: var(--fg); font-weight: 600; cursor: pointer; text-align: left; }
+.ob-more { max-height: 240px; }
+.onboard > .ob-steps:not(.ob-more) { flex: none; overflow: visible; } /* U3: the loop's five never scroll; Explore more does */
 .onboard-bar:hover { color: var(--fg); }
 /* a running timer: a bar like the minimized video's */
 .timer-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; border-top: 1px solid var(--line); color: var(--muted); }
@@ -1466,7 +1472,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .fr-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
 .fr-head .seg button { padding-inline: 10px; }
 .fr-head > .muted.grow { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* U6: its count never wraps */
-.fr-keys { font-family: var(--mono); font-size: var(--fs-1); white-space: nowrap; }
+.fr-keys-btn { flex: none; padding: 1px 8px; font-size: var(--fs-1); }
 .fr-cols { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; } /* FullReview sets the widths */
 .fr-edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 4; } /* inside the diff's padding: never over the files' scrollbar or Viewed boxes */
 .fr-edge.r { transform: translateX(100%); } /* inside the comments' padding: never over the diff's scrollbar */
@@ -2154,6 +2160,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .status .sb-ai.on { background: var(--accent); color: var(--accent-fg); }
 .status .sb-ai.landed { animation: sb-ai-in 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes sb-ai-in { from { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.main:has(.rd-box) > .ai-fab-wrap { bottom: max(34px, var(--fab-over, 34px)); } /* U2: over the Reader's box (its ref sets --fab-over), not on its Send */
 .main:has(.sim-type) > .ai-fab-wrap { bottom: 76px; } /* over the Simulator's typing row, not on its Return; first: the strip and a page win */
 .main:has(.sim-type) > .ai-float { bottom: 126px; height: min(620px, calc(100% - 152px)); } /* above the button, as at 34px */
 .main:has(> .artifacts) > .ai-fab-wrap { bottom: 184px; } /* over the Artifacts strip, not on it */
@@ -2235,6 +2242,11 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-row:is(:hover, :focus-within) .sched-acts, .sched-acts:has(.btn-spin) { opacity: 1; }
 .sched-acts > .btn-spin { margin: 0 7px; }
 @media (hover: none) { .sched-acts { opacity: 1; } } /* a touch screen has no hover to show them */
+.sched-examples { display: flex; flex-direction: column; gap: 6px; } /* U2: an empty Scheduled page's examples: a click fills in New task */
+.sched-example { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px dashed var(--line); border-radius: var(--radius); background: none; color: var(--fg); text-align: left; cursor: pointer; }
+.sched-example:hover:not(:disabled) { border-style: solid; background: var(--hover); }
+.sched-example-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sched-examples-head { margin-top: 14px; }
 .ghosts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; opacity: 0.45; pointer-events: none; user-select: none; }
 .ghost { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .ghost b { font-weight: 600; white-space: nowrap; }
@@ -2784,8 +2796,9 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-out-text { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font-family: var(--mono); font-size: var(--fs-2); }
 .rd-box textarea { flex: 1; resize: none; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--fg); font: inherit; }
 .rd-box textarea:focus { outline: none; border-color: var(--accent); }
-.reader-switch { position: absolute; top: 6px; right: 14px; z-index: 10; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); opacity: 0.55; overflow: hidden; transition: opacity 0.15s; }
-.reader-switch:hover, .pane-body:hover .reader-switch { opacity: 1; }
+.reader-switch { flex: none; display: inline-flex; align-items: stretch; margin: 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); overflow: hidden; } /* U2: in the tab bar or a split pane's header, never over the terminal */
+.pane-head .reader-switch { margin: 0 2px; }
+.pane-head .reader-switch button { padding: 0 7px; font-size: 10px; }
 .reader-switch button { border: none; background: none; padding: 1px 9px; font: 11px var(--ui-font); color: var(--muted); cursor: pointer; }
 .reader-switch button.on { background: var(--hover); color: var(--fg); }
 .term-reply { position: fixed; z-index: 9; /* over the terminal (xterm's layers go to 8), under dialogs and pages */ display: inline-flex; align-items: center; height: 24px; padding: 0 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
