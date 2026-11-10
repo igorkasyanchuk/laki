@@ -209,6 +209,7 @@ when it has them) and its own fields, 64 KB at most:
 | `workspace.new` | a workspace is made | `prompt` (2,000 characters), `agent` |
 | `workspace.archived`, `workspace.restored`, `workspace.removed` | as named | |
 | `schedule.ran` | a scheduled task ran or failed | `task: { id, name }`, `ok`, `what` |
+| `schedule.done` | a scheduled run's agent (or workflow, or extension) ended, waits, or failed | `task: { id, name }`, `state` (done, waiting, failed, stopped), `said`, `pr: { number, url }`, `diff: { add, del, files }`, `cost` |
 | `app.open` | Laki's window comes back | |
 | `ship.done` | a workspace's Ship ends | `ok`, `exit` (its code), `pr: { url, number }` when there is one by then |
 | `flow.ended` | a workflow's run ends | `run`, `workflow: { id, name }`, `status`, `why` |

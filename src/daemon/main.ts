@@ -787,6 +787,7 @@ function agentNo(method: string, p: any) {
   if (method === 'send') text(p.text, 'text')
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
+  else if (method === 'scheduleSet' && p?.onlyIf?.kind === 'cmd') notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
@@ -1234,6 +1235,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('remoteTick', 15000, () => remoteMod.remoteTick())
   ticks.register('shareTick', 15000, () => remoteMod.shareTick())
   ticks.register('tunnelTick', 15000, () => remoteMod.tunnelTick())
+  scheduleMod.runOutcomes() // T1: a scheduled run's end, from its tab's turns
   ticks.register('scheduleTick', 30000, () => scheduleMod.scheduleTick())
   ticks.register('pendingTick', 30000, () => scheduleMod.pendingTick())
   ticks.register('reminderTick', 30000, () => scheduleMod.reminderTick())

@@ -119,6 +119,7 @@
               "workspace.restored",
               "workspace.removed",
               "schedule.ran",
+              "schedule.done",
               "app.open",
               "ship.done",
               "flow.ended",

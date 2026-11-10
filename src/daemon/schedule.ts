@@ -3,14 +3,16 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
-import { nextRun, parseAt, parseWhen, stamp, whenOf, wsTitle } from '../shared/when.ts'
+import { flowsOn, HOME_ACCOUNT, isAgent, type OnlyIf, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type RunState, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
+import { nextRun, parseAt, parseWhen, partsOf, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, broadcast, byTab, changed, clients, findProject, findWs, presetNamed, projectArchived, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
-import { dir } from './dir.ts'
+import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, git, log, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabsOf, tail, tracked, turnEnds, turnWaits, wsLog, wsNew } from './core.ts'
+import { dir, inRig } from './dir.ts'
 import { usage } from './usage.ts'
-import { statusLimits } from './meters.ts'
+import { meterView, statusLimits } from './meters.ts'
+import { wsStat } from './files.ts'
+import { flowPhone } from './phone.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
@@ -148,8 +150,7 @@ export function reminderTick(now = Date.now()) {
 
 const RUNS_KEPT = 200
 export const RUNS_SHOWN = 50
-// a run this late (the Mac asleep, Laki not running) is skipped, and the log says so
-// ponytail: missed runs never catch up; run them on wake if that's what people want
+// a run this late (the Mac asleep, Laki not running) is missed: logged, or run once it's noticed (T2: missed catchup)
 export const MISSED_AFTER = 30 * 60e3
 
 const findSchedule = (id: string) => {
@@ -158,8 +159,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -261,6 +262,17 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   }
   s.prompt = s.prompt?.trim() ?? ''
   if (!s.prompt && !ext) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
+  // T1: Tell me (unset: when it needs you or fails)
+  if (s.notify != null && !['never', 'needs', 'always'].includes(s.notify)) throw new Error('tell you? never, needs (when it needs you or fails) or always')
+  if (!s.notify || s.notify === 'needs') delete s.notify
+  // T2: a run the Mac slept through (unset: catchup for at most 2 times a day), until when (minutes after midnight)
+  if (s.missed != null && s.missed !== 'skip' && s.missed !== 'catchup') throw new Error('if the Mac sleeps through it? skip or catchup')
+  if (!s.missed) delete s.missed
+  if (s.catchUntil != null && (!Number.isInteger(s.catchUntil) || s.catchUntil < 0 || s.catchUntil >= 1440)) throw new Error('catch up until? minutes after midnight (0-1439)')
+  if (s.catchUntil == null) delete s.catchUntil
+  delete s.catchup // edited: one waiting goes
+  s.onlyIf = onlyIfOf(s.onlyIf, s) // T3
+  if (!s.onlyIf) delete s.onlyIf, delete s.lastHead
   s.name = s.name?.trim() || undefined
   if (!old || o.when !== undefined) {
     const r = parseWhen(s.when ?? '')
@@ -282,6 +294,67 @@ export function scheduleRm(id: string) {
   changed()
 }
 
+// T3: a run condition, checked as given (a client's JSON): not for a workflow or an extension (they decide for themselves)
+function onlyIfOf(v: unknown, s: Schedule): OnlyIf | undefined {
+  if (v == null || v === '') return undefined
+  const o = v as Partial<Record<string, unknown>>
+  if (s.workflow || s.widget) throw new Error("only if…: a run condition is for an agent's task (a workflow or an extension decides for itself)")
+  if (o.kind === 'commits') return { kind: 'commits' }
+  if (o.kind === 'prs') {
+    if (o.what !== 'failing' && o.what !== 'review' && o.what !== 'any') throw new Error('only if which PRs? failing, review or any')
+    return { kind: 'prs', what: o.what }
+  }
+  if (o.kind === 'issues') {
+    const label = typeof o.label === 'string' ? o.label.trim().slice(0, 100) : ''
+    return { kind: 'issues', ...(label && { label }) }
+  }
+  if (o.kind === 'cmd') {
+    const cmd = typeof o.cmd === 'string' ? o.cmd.trim() : ''
+    if (!cmd) throw new Error('only if what? a command (exit 0: it runs)')
+    return { kind: 'cmd', cmd: cmd.slice(0, 2000) }
+  }
+  throw new Error('only if? commits, prs, issues or cmd')
+}
+// T3: whether to run now: skip says why not; check, {{check}} in the prompt (the command's first line, the PRs or
+// issues found, the base's head); head: the base's, kept once an agent starts (commits). A gh or git failure fails the run
+async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string; head?: string; fail?: string }> {
+  const p = findProject(s.project)
+  const o = s.onlyIf!
+  const since = state.runs?.find(r => r.schedule === s.id && r.ok && !r.skipped && r.tab)?.at ?? 0 // its last run that started an agent
+  if (o.kind === 'commits') {
+    const base = s.base || (await branches(p.id)).main || 'HEAD'
+    await git(p, 'fetch', '--quiet', 'origin', base).catch(() => {}) // none (no origin, offline): the local branch as it is
+    const head = await git(p, 'rev-parse', '--verify', '--quiet', `origin/${base}^{commit}`).catch(() => git(p, 'rev-parse', '--verify', `${base}^{commit}`))
+    if (s.lastHead && head === s.lastHead) return { skip: `no new commits on ${base}`, check: '' }
+    return { head, check: head.slice(0, 12) }
+  }
+  if (o.kind === 'prs') {
+    type P = { number: number; isDraft?: boolean; reviewDecision?: string; statusCheckRollup?: { conclusion?: string; state?: string }[] }
+    const prs = JSON.parse((await run('gh', ['pr', 'list', '--state', 'open', '--limit', '100', '--json', 'number,isDraft,reviewDecision,statusCheckRollup'], { cwd: p.path, timeout: 60000 })).stdout || '[]') as P[]
+    const failing = (x: P) => (x.statusCheckRollup ?? []).some(c => /^(FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE)$/.test(c.conclusion || c.state || ''))
+    const hit = prs.filter(x => (o.what === 'any' ? true : o.what === 'failing' ? failing(x) : !x.isDraft && x.reviewDecision === 'REVIEW_REQUIRED'))
+    if (!hit.length) return { skip: o.what === 'failing' ? 'no PR with failing checks' : o.what === 'review' ? 'no PR waiting for review' : 'no open PR', check: '' }
+    return { check: hit.map(x => `#${x.number}`).join(' ') }
+  }
+  if (o.kind === 'issues') {
+    const issues = JSON.parse((await run('gh', ['issue', 'list', '--state', 'open', '--limit', '50', '--json', 'number,createdAt', ...(o.label ? ['--label', o.label] : [])], { cwd: p.path, timeout: 60000 })).stdout || '[]') as { number: number; createdAt?: string }[]
+    const fresh = issues.filter(x => Date.parse(x.createdAt ?? '') > since)
+    if (!fresh.length) return { skip: `no new issues${o.label ? ` labeled ${o.label}` : ''}`, check: '' }
+    return { check: fresh.map(x => `#${x.number}`).join(' ') }
+  }
+  // a command of yours (never an agent's or remote access's: main.ts), in the project's folder, 60 s; a repo whose
+  // .laki.json waits for your trust doesn't run it
+  if (p.host) return { fail: `${p.name} is on another machine: a check command runs only for a project on this Mac`, check: '' }
+  if (cfgWait(p)) return { fail: `not checked: ${p.name}'s .laki.json changed and waits for your trust (Settings › the project)`, check: '' }
+  const r = await run('/bin/sh', ['-c', o.cmd], { cwd: p.path, timeout: 60000, maxBuffer: 1 << 20 }).then(
+    x => ({ code: 0, out: x.stdout }),
+    (e: { code?: number | string; stdout?: string; killed?: boolean }) => ({ code: e.killed ? 'timeout' : (e.code ?? 1), out: e.stdout ?? '' }),
+  )
+  const line = String(r.out).trim().split('\n')[0].slice(0, 200)
+  if (r.code !== 0) return { skip: `its check said no (${r.code === 'timeout' ? 'over 60 s' : `exit ${r.code}`})${line ? `: ${line}` : ''}`, check: '' }
+  return { check: line }
+}
+
 const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${widgetName(s.widget)}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
 
 const logRun = (r: ScheduleRun) => {
@@ -296,18 +369,40 @@ const logRun = (r: ScheduleRun) => {
 const sameOf = (s: Schedule) => (s.sameWs ? state.workspaces.find(w => w.id === s.sameWs && !w.archived) : undefined)
 const sameMaking = new Set<string>()
 
-// one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent
-export async function runSchedule(s: Schedule, now = Date.now()): Promise<ScheduleRun> {
+// one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent. asked: Run now (its
+// condition isn't checked: you asked); late: a catch-up's words (T2), before what it did
+export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: boolean; late?: string } = {}): Promise<ScheduleRun> {
   s = state.schedules?.find(x => x.id === s.id) ?? s // scheduleSet replaces a task: the current one
   const r: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '' }
-  const prompt = stamp(s.prompt, now)
+  let check = ''
+  let head: string | undefined
   s.last = now
   try {
     if (projectArchived(s.project)) throw new Error(`${s.project} is archived: bring it back to run its tasks`)
+    if (s.onlyIf && !s.widget && !s.workflow && !o.asked) {
+      const c = await onlyIfCheck(s)
+      if (c.fail) throw new Error(c.fail)
+      if (c.skip) {
+        Object.assign(r, { skipped: true, what: `skipped: ${c.skip}` })
+        log(`scheduled task ${s.id}: ${r.what}`)
+        return logRun(r)
+      }
+      ;({ check, head } = c)
+    }
+    if (o.late) r.what = `${o.late}: `
+  } catch (e) {
+    Object.assign(r, { ok: false, what: (e as Error).message })
+    widgetEvent('schedule.ran', { task: { id: s.id, name: s.name ?? runName(s, now) }, ok: r.ok, what: r.what }, r.ws)
+    return logRun(r)
+  }
+  const prompt = stamp(s.prompt.replaceAll('{{check}}', check), now)
+  const late = r.what
+  try {
     if (s.widget) {
       // an extension: fetched, or one of its actions run (on ones only)
       const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new', 'same'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)
       if (!u.ok) throw new Error(u.error ?? `${u.name} failed`)
+      Object.assign(r, { state: 'done', endedAt: Date.now() }) // T1: its end is now
       r.what = s.action ? `ran ${u.name}'s ${s.action}${u.out?.trim() ? `: ${u.out.trim().split('\n').pop()!.slice(0, 120)}` : ''}` : `fetched ${u.name}`
     } else if (s.workflow) {
       // a workflow's run, unless the last one this task started is still going
@@ -315,7 +410,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       if (going) throw new Error(`skipped: its last run (${going.id}) is still going`)
       if (!flowHooks.start || !flowsOn(state.settings)) throw new Error('Workflows are off: Settings › General › Pages')
       const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
-      r.ws = run.ws
+      Object.assign(r, { ws: run.ws, flow: run.id, state: 'running' }) // T1: its end, scheduleFlowEnded
       r.what = `${run.status === 'queued' ? 'queued' : 'started'} a run of ${s.workflow} (${run.id})` // past its at once: it waits its turn
     } else if (s.ws === 'new' || s.ws === 'local-new' || (s.ws === 'same' && !sameOf(s))) {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar (same: its first
@@ -357,10 +452,14 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
         r.what = `started ${s.fresh ? 'fresh ' : ''}in a new tab, ${t.name}`
       }
     }
+    if (r.tab) r.state = 'running' // T1: filled in as its turns end (runEnded)
+    if (head && r.tab) s.lastHead = head // T3 commits: the next run waits for newer ones
   } catch (e) {
     r.ok = false
     r.what = (e as Error).message
+    if (s.widget) Object.assign(r, { state: 'failed', endedAt: Date.now() })
   }
+  if (late) r.what = late + r.what
   widgetEvent('schedule.ran', { task: { id: s.id, name: s.name ?? runName(s, now) }, ok: r.ok, what: r.what }, r.ws)
   return logRun(r)
 }
@@ -368,7 +467,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
 export function scheduleRun(id: string) {
   const s = findSchedule(id)
   if (s.archived) throw new Error('this task is archived: restore it to run it (Archived, at the bottom of Scheduled tasks)') // archived ones never run
-  return runSchedule(s)
+  return runSchedule(s, Date.now(), { asked: true })
 }
 
 // ---------- a workspace's agent started later (wsNew startAt)
@@ -422,7 +521,8 @@ export function startPending(w: Workspace, now = Date.now(), asked = false) {
   }
 }
 
-// every 30 s (tests pass `now`): what's due runs, what's long overdue is logged as missed; then the next time
+// every 30 s (tests pass `now`): what's due runs, what's long overdue is missed (logged, or a catch-up waits: T2); then
+// the next time; then one catch-up waiting, if any (several that woke together go a tick, 30 s, apart)
 export async function scheduleTick(now = Date.now()) {
   // every due one moves on first: a tick while a run is still starting (a worktree takes a while) doesn't start it again
   const due = (state.schedules ?? []).filter(s => s.on && !s.archived && s.next !== undefined && s.next <= now).map(s => ({ s, at: s.next! }))
@@ -430,13 +530,100 @@ export async function scheduleTick(now = Date.now()) {
     s.next = s.rule.once ? undefined : nextRun(s.rule, now)
     if (s.rule.once) s.on = false
   }
-  if (!due.length) return
-  save()
-  changed()
+  if (due.length) save(), changed()
   for (const { s, at } of due) {
     if (!state.schedules?.some(x => x.id === s.id)) continue // deleted while an earlier one started
-    if (now - at > MISSED_AFTER) logRun({ id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, at), at, ok: false, what: "missed: the Mac was asleep or Laki wasn't running" })
+    if (now - at > MISSED_AFTER) missed(s, at, now)
     else if (s.widget) void runSchedule(s, now) // a fetch may take minutes (an AI source's): the rest don't wait for it
     else await runSchedule(s, now)
   }
+  await catchTick(now)
+}
+
+// T2: a task that catches up: a rule of at most 2 times a day (every N minutes or hours: no), unless it says
+const catches = (s: Schedule) => (s.missed ?? (Math.max(...partsOf(s.rule).map(p => p.times.length)) <= 2 ? 'catchup' : 'skip')) === 'catchup'
+const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+const missedRun = (s: Schedule, at: number, why: string) => logRun({ id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, at), at, ok: false, what: `missed: ${why}` })
+// a due time the Mac slept through: its latest one (the ones before it only logged) waits to run, before catchUntil (that
+// day's, after the due time) or the task's next time; past that, or a task that skips: missed
+function missed(s: Schedule, at: number, now: number) {
+  if (!catches(s)) return void missedRun(s, at, "the Mac was asleep or Laki wasn't running")
+  let latest = at
+  for (let t = nextRun(s.rule, at), n = 0; t !== undefined && t <= now && n < 1000; t = nextRun(s.rule, t), n++) latest = t
+  const day = new Date(latest)
+  if (s.catchUntil !== undefined) day.setHours(0, s.catchUntil, 0, 0)
+  if (s.catchUntil !== undefined && day.getTime() <= latest) day.setDate(day.getDate() + 1)
+  const until = s.catchUntil !== undefined ? day.getTime() : (s.next ?? latest + 12 * 3600e3)
+  if (now >= until) return void missedRun(s, latest, `the Mac woke after ${hhmm(until)}`)
+  s.catchup = { due: latest, until }
+  save()
+  changed()
+}
+// one a tick: the oldest catch-up waiting runs (one past its time: missed); not on a battery under 20% (unless the
+// task says? ponytail: no per-task switch yet; pmset's, the Mac's only)
+async function catchTick(now: number) {
+  const waiting = (state.schedules ?? []).filter(s => s.catchup && s.on !== false && !s.archived).sort((a, b) => a.catchup!.due - b.catchup!.due)
+  for (const s of waiting.filter(x => now >= x.catchup!.until)) missedRun(s, s.catchup!.due, `the Mac woke after ${hhmm(s.catchup!.until)}`), delete s.catchup
+  const s = waiting.find(x => x.catchup)
+  if (!s) return
+  if (await lowBattery()) return // the next tick looks again, until its time is up
+  const at = s.catchup!.due
+  delete s.catchup
+  save()
+  await runSchedule(s, now, { late: `after wake (due ${hhmm(at)})` })
+}
+const lowBattery = async () => {
+  if (process.platform !== 'darwin' || inRig()) return false // tests: never
+  const out = await run('pmset', ['-g', 'batt'], { timeout: 5000 }).then(r => r.stdout, () => '')
+  const m = /(\d+)%;\s*discharging/.exec(out)
+  return !!m && Number(m[1]) < 20
+}
+
+// ---------- T1: how a run ended: its tab's turns (core's turnEnds, turnWaits), the first day after it started; each
+// end again (it resumed, it ended again). A workflow's: its run's end (scheduleFlowEnded); an extension's: at once
+const OUTCOME_MS = 24 * 3600e3
+const runOfTab = (tab: string, now = Date.now()) => state.runs?.find(r => r.tab === tab && r.state !== undefined && now - r.at < OUTCOME_MS)
+async function runEnded(tab: Tab, st: RunState, text?: string) {
+  if (!runOfTab(tab.id)) return
+  const endedAt = Date.now()
+  const d = await wsStat({ ws: tab.workspace }).catch(() => null) // first: the entry changes at once, whole
+  const r = runOfTab(tab.id)
+  if (!r) return
+  const was = r.state
+  const said = text?.trim().split('\n')[0].slice(0, 200)
+  const pr = prOf(tab.workspace)
+  const u = state.settings?.costs !== false ? meterView(tab).usage : undefined
+  Object.assign(r, { state: st, endedAt, ...(said && { said }), ...(pr?.number && { pr: { number: pr.number, url: pr.url } }), ...(u && { tokens: u.tokens, ...(u.cost !== undefined && { cost: u.cost }) }), ...(d && { diff: { add: d.add, del: d.del, files: d.files } }) })
+  save()
+  changed()
+  ranTold(r, was)
+}
+// main.ts, as the daemon starts (not as this module loads: core's sets may not be there yet, load-order.test)
+export function runOutcomes() {
+  turnEnds.add((tab, o) => void setTimeout(() => void runEnded(tab, o.failed || o.limit ? 'failed' : 'done', o.last).catch(e => log(`run ${tab.id}: ${e.message}`)), 1500).unref?.()) // its usage meter is read a second after the end
+  turnWaits.add((tab, o) => void runEnded(tab, 'waiting', o.question).catch(e => log(`run ${tab.id}: ${e.message}`)))
+}
+// a workflow's run ended (workflow.ts' end): its task's log entry says how
+export function scheduleFlowEnded(id: string, status: string, why: string) {
+  const r = state.runs?.find(x => x.flow === id && x.state === 'running')
+  if (!r) return
+  const was = r.state
+  Object.assign(r, { state: status === 'done' ? 'done' : status === 'stopped' ? 'stopped' : 'failed', endedAt: Date.now(), said: why.trim().split('\n')[0].slice(0, 200) })
+  save()
+  changed()
+  ranTold(r, was)
+}
+// told as it changes (Tell me: needs, unset: when it waits or failed; always: done too; never): a `scheduled` event (the
+// app's notification and toast) and a phone push (a wait's push is its tab's own: not twice); extensions' schedule.done
+function ranTold(r: ScheduleRun, was?: RunState) {
+  const s = state.schedules?.find(x => x.id === r.schedule)
+  const name = s?.name ? stamp(s.name, r.at) : r.name
+  widgetEvent('schedule.done', { task: { id: r.schedule, name }, state: r.state, said: r.said, ...(r.pr && { pr: r.pr }), ...(r.diff && { diff: r.diff }), ...(r.cost !== undefined && { cost: r.cost }) }, r.ws)
+  if (r.state === was) return
+  const tell = s?.notify ?? 'needs'
+  const needs = r.state === 'waiting' || r.state === 'failed'
+  if (tell === 'never' || (tell === 'needs' && !needs)) return
+  const how = r.state === 'waiting' ? 'needs you' : r.state === 'failed' ? 'failed' : r.state === 'stopped' ? 'stopped' : 'is done'
+  broadcast({ ev: 'scheduled', run: r.id, ws: r.ws, tab: r.tab, state: r.state, name, text: `${name} ${how}${r.said ? `: ${r.said}` : ''}` })
+  if (r.state !== 'waiting') flowPhone(name, r.ws && (state.workspaces.find(w => w.id === r.ws)?.name || r.ws), how, r.said ?? '', 'Scheduled')
 }

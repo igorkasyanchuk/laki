@@ -15,7 +15,7 @@ import { stamp } from '../shared/when.ts'
 import { queueOrder, ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
-import { flowFiles, flowHooks } from './schedule.ts'
+import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
 import { ciLogs, prAct, scanPRs } from './pr.ts'
 import { isLive, killGroup } from './resources.ts'
 import { linkAdd } from './artifacts.ts'
@@ -1367,6 +1367,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, { ...(r.by && { from: { agent: r.by } }), hops: (r.hops ?? 0) + 1 }) // an agent's run: its end is the agent's event; one hop more than the event that started it
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
+  scheduleFlowEnded(r.id, status, why) // T1: a scheduled task's run of it says how it ended
   next() // its slot
   void tidy(r)
 }
@@ -1677,6 +1678,7 @@ const SAMPLE_EVENTS: Record<string, Record<string, unknown>> = {
   'pr.closed': { pr: SAMPLE_PR },
   'workspace.new': { prompt: 'Fix the login redirect', agent: 'claude' },
   'schedule.ran': { task: { id: 'sample', name: 'Nightly dependency bumps' }, ok: true },
+  'schedule.done': { task: { id: 'sample', name: 'Nightly dependency bumps' }, state: 'done', said: 'Bumped 4 packages; tests pass.', pr: { number: 63, url: 'https://github.com/acme/shop/pull/63' } },
   'ship.done': { ok: true, exit: 0, pr: { url: SAMPLE_PR.url, number: SAMPLE_PR.number } },
   'flow.ended': { run: 'sample', workflow: { id: 'fix-ci', name: 'Fix CI' }, status: 'done', why: '' },
   'limit.hit': { agent: 'claude', until: 0 },

@@ -2,14 +2,15 @@
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Schedule, ScheduleRun, View } from '../../shared/types'
+import type { OnlyIf, Schedule, ScheduleRun, TaskNotify, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
-import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
+import { describe, nextRun, parseWhen, partsOf, type Rule, stamp, wsTitle } from '../../shared/when'
+import { runIcon, runLine } from './runs'
 import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
 
 export type SchedulesApi = {
-  set(s: Partial<Omit<Schedule, 'archived'>> & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false)
+  set(s: { [K in keyof Omit<Schedule, 'archived'>]?: Schedule[K] | null } & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false); null: unset (missed, catchUntil, onlyIf)
   rm(id: string): Promise<unknown> // Delete permanently: an archived one's
   toast?: (text: string, undo?: () => void) => void // Archive's, with Undo
   run(id: string): Promise<ScheduleRun>
@@ -21,6 +22,13 @@ export type SchedulesApi = {
 
 const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'weekdays at 9am; fri at 4pm', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
 const RUNS = 8 // the log's rows until Show all
+// T2: a rule of at most 2 times a day catches up by default (the daemon's catches)
+const catchesOf = (rule: Rule, missed?: 'skip' | 'catchup') => (missed ?? (Math.max(...partsOf(rule).map(p => p.times.length)) <= 2 ? 'catchup' : 'skip')) === 'catchup'
+const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const ONLY: [string, string][] = [['commits', 'new commits on its base'], ['prs:failing', 'a PR with failing checks'], ['prs:review', 'a PR waiting for review'], ['prs:any', 'any open PR'], ['issues', 'new issues'], ['cmd', 'a command says so']]
+const onlyKey = (o?: OnlyIf) => (!o ? '' : o.kind === 'prs' ? `prs:${o.what}` : o.kind)
+const onlyWords = (o?: OnlyIf) => (!o ? 'always runs' : `only if ${o.kind === 'issues' && o.label ? `new issues labeled ${o.label}` : o.kind === 'cmd' ? `\`${o.cmd.slice(0, 40)}\` says so` : (ONLY.find(x => x[0] === onlyKey(o))?.[1] ?? o.kind)}`)
+const NOTIFY: [TaskNotify, string, string][] = [['needs', 'Tell me when it needs me or fails', 'The default'], ['always', 'Tell me always', 'When it waits, fails or is done'], ['never', 'Never tell me', 'Its log says how it went']]
 // where a run goes: its words, its icon
 export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['same', 'a new workspace, then the same one each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
 export const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -37,7 +45,7 @@ const SAMPLES: [string, string, string, string][] = [
   ['Update dependencies', 'every monday at 8:00', 'codex', 'Update the dependencies to their latest minor versions, run the tests, and open a PR with what changed.'],
   ['Check the nightly build', 'every day at 7:30', 'claude', "Check last night's CI run on the main branch; if it failed, find why and propose a fix."],
 ]
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean; notify?: TaskNotify; missed?: 'skip' | 'catchup'; catchUntil?: number; onlyIf?: OnlyIf } // notify (T1), missed and catchUntil (T2), onlyIf (T3): the task's // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -207,6 +215,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   }, [])
   const [saving, setSaving] = useState(false)
   const [allRuns, setAllRuns] = useState(false)
+  const [hideSkips, setHideSkips] = useState(() => load<boolean>('laki.hideSkips', false)) // T3: skipped runs out of the log
   const [menu, openMenu] = useMenu()
   const set = (k: Partial<Form>) => setForm(f => f && { ...f, ...k })
   const project = view.projects.find(p => p.id === form?.project)
@@ -230,7 +239,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     if (!form || !ready) return
     setSaving(true)
     setErr('')
-    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script
+    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh, notify: form.notify ?? 'needs', missed: form.missed ?? null, catchUntil: form.catchUntil ?? null, onlyIf: !form.workflow && !form.widget ? (form.onlyIf ?? null) : null }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script; null: unset
     setSaving(false)
   }
   const run = async (s: Schedule) => {
@@ -243,7 +252,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     // the project's local workspace is its folder; one that's gone: what Where's menu offers, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
     const ws = ['new', 'same', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }) })
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf })
   }
   const titleOf = (s: Schedule) => s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: 'It and its settings go for good; its runs stay in the log.', ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id).catch(fail))
@@ -316,9 +325,33 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       ],
       'right',
     )
+  // T2: what a run the Mac slept through does; T3: when it runs at all
+  const missedMenu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { label: 'Run it when the Mac wakes', sub: 'Once, the latest time it missed', icon: 'clock', hint: rule && !('error' in rule) && catchesOf(rule, form?.missed) ? ON : undefined, run: () => set({ missed: 'catchup' }) },
+      { label: 'Until a time…', sub: form?.catchUntil !== undefined ? `Until ${hm(form.catchUntil)}` : 'Until its next time', icon: 'clock', run: () => void askText('Catch up until what time?', { value: form?.catchUntil !== undefined ? hm(form.catchUntil) : '10:00', placeholder: 'empty: until its next time', ok: 'Set' }).then(t => { if (t === null) return; const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim()); set({ missed: 'catchup', catchUntil: m ? Math.min(1439, Number(m[1]) * 60 + Number(m[2])) : undefined }) }) },
+      { label: 'Skip it', sub: 'The log says it was missed', icon: 'minus', hint: rule && !('error' in rule) && !catchesOf(rule, form?.missed) ? ON : undefined, run: () => set({ missed: 'skip' }) },
+    ])
+  const onlyMenu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { label: 'Always runs', sub: 'At every time it says', icon: 'clock', hint: !form?.onlyIf ? ON : undefined, run: () => set({ onlyIf: undefined }) },
+      ...ONLY.map(([k, words]) => ({
+        label: `Only if ${words}`,
+        sub: k === 'commits' ? 'Since its last run that started an agent' : k === 'issues' ? 'Since its last run; a label…' : k === 'cmd' ? 'Yours, in the project folder: exit 0 runs it' : 'The project’s open PRs',
+        icon: k === 'cmd' ? 'terminal' : k.startsWith('prs') ? 'pr' : k === 'issues' ? 'alertCircle' : 'fork',
+        hint: onlyKey(form?.onlyIf) === k ? ON : undefined,
+        run: () =>
+          k === 'cmd'
+            ? void askText('Only if this command says so', { value: form?.onlyIf?.kind === 'cmd' ? form.onlyIf.cmd : '', placeholder: 'test -n "$(git log -1 --since=1.day)"', text: 'Run in the project folder, 60 s at most: exit 0 runs the task, its first line is {{check}}.', ok: 'Set' }).then(c => c?.trim() && set({ onlyIf: { kind: 'cmd', cmd: c.trim() } }))
+            : k === 'issues'
+              ? void askText('Only if there are new issues', { value: form?.onlyIf?.kind === 'issues' ? (form.onlyIf.label ?? '') : '', placeholder: 'a label (optional)', ok: 'Set' }).then(l => l !== null && set({ onlyIf: { kind: 'issues', ...(l.trim() && { label: l.trim() }) } }))
+              : set({ onlyIf: k === 'commits' ? { kind: 'commits' } : { kind: 'prs', what: k.slice(4) as 'failing' | 'review' | 'any' } }),
+      }) as MenuItem),
+    ])
   const failed = runs.filter(r => !r.ok).length
   const next = schedules.reduce((m, x) => (x.on && x.next && (!m || x.next < m) ? x.next : m), 0) // the soonest; 0: none on
-  const shown = allRuns ? runs : runs.slice(0, RUNS)
+  const logged = hideSkips ? runs.filter(r => !r.skipped) : runs
+  const shown = allRuns ? logged : logged.slice(0, RUNS)
   const valid = !!rule && !('error' in rule)
 
   // a task's row: the list's, and the empty list's samples (B6)
@@ -433,6 +466,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               <input className="nw-chip-input" value={form.when} aria-label="When" placeholder={`When: ${EXAMPLES[0]}`} spellCheck={false} onChange={e => set({ when: e.target.value })} />
             </label>
             {rule && 'error' in rule && <div className="field-err">{rule.error}</div>}
+            {valid && (
+              <button type="button" className="link small sched-missed" aria-haspopup="menu" onClick={missedMenu}>
+                If the Mac sleeps through it: {catchesOf(rule, form.missed) ? `runs when it wakes, until ${form.catchUntil !== undefined ? hm(form.catchUntil) : 'its next time'}` : 'skipped (the log says so)'}
+              </button>
+            )}
             {valid ? (
               <div className="schedule-preview">
                 <Icon name="check" /> {describe(rule)} · next {nextOf(rule).map(at).join(', ')}
@@ -473,6 +511,18 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   {!!listed?.branches.length && <IconButton icon="chevron" title="Pick the base branch" className="nw-chip-more" onClick={baseMenu} />}
                 </span>
               )}
+              {!form.workflow && !form.widget && (
+                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Run only when there's something to do: a skip is logged, no agent starts. What it found is {{check}} in the prompt" onClick={onlyMenu}>
+                  <Icon name="filter" />
+                  <span className="nw-chip-text">{onlyWords(form.onlyIf)}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+              )}
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="When a run tells you (a notification, and a phone push if Settings has one)" onClick={e => openMenu(e, NOTIFY.map(([v, label, sub]) => ({ label, sub, icon: v === 'never' ? 'bellOff' : 'bell', hint: (form.notify ?? 'needs') === v ? ON : undefined, run: () => set({ notify: v }) }) as MenuItem))}>
+                <Icon name={form.notify === 'never' ? 'bellOff' : 'bell'} />
+                <span className="nw-chip-text">{form.notify === 'never' ? 'never tells you' : form.notify === 'always' ? 'tells you always' : 'tells you when it needs you'}</span>
+                <Icon name="chevron" size={11} />
+              </button>
               <label className="nw-chip" data-tip={`Optional; a new workspace or session is named after it. {{DD-MM-YY}}, {{YYYY-MM-DD}}, {{HH:mm}} or {{ddd D MMM}} in the name or the prompt become the run's date and time`}>
                 <Icon name="pencil" />
                 <input className="nw-chip-input" value={form.name} aria-label="Name" placeholder={makes ? 'name: from the prompt, dated' : form.widget && !form.prompt.trim() ? `name: ${extName(form.widget, form.action)}` : 'name: from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
@@ -601,6 +651,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 {failed > 0 && <span className="sched-failed"> · {failed} failed</span>}
               </span>
             )}
+            {runs.some(r => r.skipped) && (
+              <button type="button" className="link small" onClick={() => setHideSkips(h => (keep('laki.hideSkips', !h), !h))}>
+                {hideSkips ? 'Show skipped' : 'Hide skipped'}
+              </button>
+            )}
           </div>
           {!runs.length ? (
             <p className="muted small">{only && view.runs?.length ? 'None for this project.' : 'None yet.'}</p>
@@ -611,14 +666,16 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 return (
                   <div
                     key={r.id}
-                    className={`sched-run ${r.ok ? '' : 'failed'} ${live ? 'live' : ''}`}
+                    className={`sched-run ${r.ok ? '' : 'failed'} ${r.skipped ? 'skipped' : ''} ${r.state ? `is-${r.state}` : ''} ${live ? 'live' : ''}`}
                     {...(live && { role: 'button', tabIndex: 0, 'data-tip': 'Go to it', onClick: () => api.open(r.ws!, r.tab), onKeyDown: (e: React.KeyboardEvent) => e.key === 'Enter' && api.open(r.ws!, r.tab) })}
                   >
                     <span className="sched-run-dot">
-                      <Icon name={r.ok ? 'check' : 'x'} size={11} />
+                      <Icon name={runIcon(r)} size={11} />
                     </span>
                     <b>{r.name}</b>
-                    <span className="muted">{r.what}</span>
+                    <span className="muted" data-tip={r.state && r.state !== 'running' ? r.what : undefined}>
+                      {runLine(r)}
+                    </span>
                     <span className="sched-run-at" data-tip={at(r.at)}>
                       {ago(r.at)}
                     </span>

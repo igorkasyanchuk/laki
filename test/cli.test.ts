@@ -275,7 +275,7 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   r = await rig.cli('schedule', 'run', s.id)
   assert.match(r.out, /^✓ started in a new workspace, /)
   r = await rig.cli('schedule', 'log')
-  assert.match(r.out, /✓ {2}check the build {2}started in a new workspace/)
+  assert.match(r.out, /[◐✓] {2}check the build {2}started in a new workspace/) // T1: ◐ while its agent works, ✓ once done
   assert.equal((await rig.cli('schedule', 'off', s.id)).out.trim(), `${s.id} off`)
   assert.equal(JSON.parse((await rig.cli('schedule', '--json')).out).find((x: any) => x.id === s.id).on, false)
   assert.equal((await rig.cli('schedule', 'rm', s.id)).out.trim(), `removed ${s.id}`)

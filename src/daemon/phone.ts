@@ -128,10 +128,10 @@ export async function phoneTick() {
 
 // a workflow's notify with phone: yes (workflow.ts): a push like an agent's done one, when Settings has phone pushes
 // what: how it says it (shows you, is done, failed)
-export function flowPhone(name: string, ws: string | undefined, what: string, text: string) {
+export function flowPhone(name: string, ws: string | undefined, what: string, text: string, kind = 'Workflow') {
   const w = state.settings?.webhook
   if (!w?.url?.trim()) return
-  pushTo(w, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `Workflow ${name}`, title: `Workflow ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }).catch(e => log(`push ${name}: ${e.message}`))
+  pushTo(w, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `${kind} ${name}`, title: `${kind} ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }).catch(e => log(`push ${name}: ${e.message}`))
 }
 // a workflow's Ask you, confirm, stuck or unsure decision (workflow.ts' ask, unsure): a waiting push like a tab's, its
 // choices as text, and buttons with Answer from the phone (a tap is flowHooks.answer; ponytail: ntfy shows the first 3);

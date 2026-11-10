@@ -6,7 +6,8 @@ import { type FormEvent, useMemo, useState } from 'react'
 import type { Reminder, Schedule, ScheduleRun } from '../../shared/types'
 import { describe, parseWhen, partsOf, type Rule, stamp, whenOf } from '../../shared/when'
 import { Modal } from './panels'
-import { Icon, IconButton, load, keep, Page, act } from './ui'
+import { Icon, IconButton, type IconName, load, keep, Page, act } from './ui'
+import { runIcon, runLine } from './runs'
 
 export type CalendarApi = {
   add(r: { at: number; every?: string; text: string; ws?: string; important?: boolean }): Promise<unknown>
@@ -15,7 +16,7 @@ export type CalendarApi = {
   openWs(ws: string): void
   openSchedules(): void
 }
-type Item = { key: string; at: number; kind: 'task' | 'run' | 'reminder'; text: string; tip?: string; ok?: boolean; r?: Reminder; ws?: string }
+type Item = { key: string; at: number; kind: 'task' | 'run' | 'reminder'; text: string; tip?: string; ok?: boolean; icon?: IconName; r?: Reminder; ws?: string } // icon: a run's end (T1)
 
 const DAY = 86400000
 const MANY = 4 // a task with more times a day than this is one line for the day (every 30 minutes…)
@@ -81,7 +82,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
   const items = useMemo(() => {
     const all: Item[] = [
       ...schedules.flatMap(s => occurrences(s, Math.max(first, Date.now()), end)), // what's coming; what was is the runs
-      ...runs.filter(r => r.at >= first && r.at < end).map(r => ({ key: `r:${r.id}`, at: r.at, kind: 'run' as const, text: r.name, tip: r.what, ok: r.ok, ws: r.ws })),
+      ...runs.filter(r => r.at >= first && r.at < end).map(r => ({ key: `r:${r.id}`, at: r.at, kind: 'run' as const, text: r.name, tip: runLine(r), ok: r.ok && r.state !== 'failed', icon: runIcon(r), ws: r.ws })),
       ...reminders.flatMap(r => remindersAt(r, first, end).map(x => ({ r, ...x }))).map(({ r, at, n }) => ({ key: `m:${r.id}:${at}`, at, kind: 'reminder' as const, text: n > 1 ? `${r.text} ×${n}` : r.text, tip: [r.every && `repeats: ${r.every} (a tick stops it)`, r.by && `from ${r.by}`, r.ws && workspaces.find(w => w.id === r.ws)?.name].filter(Boolean).join(' · ') || undefined, r, ws: r.ws })),
     ]
     const by = new Map<number, Item[]>()
@@ -109,7 +110,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
           {i.r!.done && <Icon name="check" size={9} />}
         </button>
       ) : (
-        <Icon name={i.kind === 'task' ? 'clock' : i.ok ? 'check' : 'x'} size={11} />
+        <Icon name={i.kind === 'task' ? 'clock' : (i.icon ?? (i.ok ? 'check' : 'x'))} size={11} />
       )}
       <span className="cal-time">{hm(i.at)}</span>
       {i.r?.every && <Icon name="repeat" size={10} />}

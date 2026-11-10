@@ -72,9 +72,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
-                                              prompt is the run's date
+                                              prompt is the run's date; --only-if: run only when there's something
+                                              to do (a skip is logged); {{check}}: what it found
   laki schedule on|off|run|archive|restore|rm <id>  turn one on or off, run it now, archive or restore it, delete it
   laki flow [ls]                             workflows and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…] [--budget "30 min, $2"]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs; --budget: its working time and AI cost, past either it asks)
@@ -315,8 +316,13 @@ or one under it); on any other page it's refused and nothing is done, so a page 
   laki ship a1b2 -m "Add CSV export"
   laki ship a1b2 -m "Add CSV export" --title "CSV export" --body "Adds Export ▾ › CSV" --draft
   laki ship a1b2 -m "Fix the parser" --files src/parse.ts,test/parse.test.ts`,
-  schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
-late is skipped). --where: new (a worktree each run), same (a worktree its first run makes, every run after
+  schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake. A run the Mac slept
+through runs once it wakes (--missed catchup, the default for at most 2 times a day; until --catch-until, else its next
+time) or is skipped (--missed skip, every N minutes or hours). --only-if: commits (new ones on its base since its last
+run), prs:failing|review|any (the project's open PRs), issues[:label] (new ones), cmd:"…" (yours, in the project's
+folder: exit 0 runs it; never from an agent); what it found is {{check}} in the prompt. --notify: never, needs (when
+it waits for you or fails: the default) or always (done too). laki schedule log shows how each run ended (◐ running,
+✓ done, ◆ waiting, ✗ failed, – skipped); --json has its state, the agent's last line, PR, cost and diff. --where: new (a worktree each run), same (a worktree its first run makes, every run after
 there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a run into a workspace it shares
 (same, folder, an id) starts a new agent tab there instead of telling the agent it has.
 --base: the branch a new worktree starts off (new, and same's; gone when it runs: that run fails and says so).
@@ -326,6 +332,7 @@ there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a ru
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
   laki schedule add shop --when "fridays at 5pm" --base release/2.0 "Backport this week's fixes"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
+  laki schedule add shop --when "weekdays at 7am" --only-if prs:failing "Fix the failing PRs: {{check}}"
   laki schedule log`,
   alert: `An important card on the user's screen (bottom right, over every app and Space, until they close it), only
 when they ask for one ("show me an important alert", "ask me with a Laki alert") or their instructions (CLAUDE.md,

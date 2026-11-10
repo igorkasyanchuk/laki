@@ -820,8 +820,20 @@ run fails, saying so.
   archive|restore|rm <id>`). *Runs* shows the
   last 8 (*Show all* for the rest of the last 50; click one to go to its workspace); the filter at the top (*All
   projects*) narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
-- The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
-  minutes late (the Mac asleep, Laki not running) is skipped and logged as missed.
+- The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run the Mac slept through
+  (more than 30 minutes late) runs once it wakes, the latest time it missed only, for a task that runs at most twice a
+  day; the form says so under the time (*If the Mac sleeps through it: runs when it wakes, until …*: click it to skip
+  instead, or pick until when). A task that runs every N minutes or hours skips it, and the log says it was missed.
+  Several that wake together start 30 s apart; not on a battery under 20%.
+- Each run in *Runs* says how it ended once its agent's turn does: ✓ done (the agent's last line, its PR, its diff
+  and cost), ◆ waiting for you, ✗ failed; a click goes to its workspace. *Tell me* on the form: when it needs you or
+  fails (the default), always, or never: a notification (and a phone push, if set). The Calendar shows the same.
+  `laki schedule log` has it too (`--json`: every field).
+- *Only if* on the form (an agent's task): run only when there's something to do: new commits on its base since its
+  last run, a PR with failing checks, one waiting for review or any open PR, new issues (with a label), or a command
+  of yours (in the project folder, 60 s: exit 0 runs it). A skipped run is logged (muted; *Hide skipped* folds them)
+  and starts no workspace. `{{check}}` in the prompt is what it found: the PRs' numbers, the issues', the command's
+  first line. An agent can set the first ones on its own tasks, never a command.
 - Groups: a task's right click › *Move to group* › *New group…* names one; drag a task onto a group's head to move it
   there, a click on the head folds it, its ⋯ turns all of them on or off, renames or ungroups it. ⌘-click picks tasks
   (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.

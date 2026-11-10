@@ -169,13 +169,13 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
 
   // into that workspace: its running claude gets the prompt (Run now); off, it doesn't run
   await rig.rpc('scheduleSet', { id: s.id, on: false })
-  const into = await task({ ws: first.ws, prompt: 'follow up {{YYYY}}', when: 'weekdays at 9' })
+  const into = await task({ ws: first.ws, prompt: 'follow up {{YYYY}}', when: 'weekdays at 9', missed: 'skip' }) // T2's catch-up: schedule-runs.test
   const sent = await rig.rpc('scheduleRun', { id: into.id })
   assert.equal(sent.tab, first.tab)
   assert.match(sent.what, /^(sent to|queued for) its tab, claude/)
   await until(async () => (await rig.tab(first.ws)).last === `answer: follow up ${new Date().getFullYear()}`, 'the prompt, dated, reached the same agent')
 
-  // long overdue (the Mac asleep): logged as missed, not run, and on to the next time
+  // long overdue (the Mac asleep), a task that skips: logged as missed, not run, and on to the next time
   await rig.rpc('scheduleTick', { now: into.next + 31 * 60e3 })
   v = await rig.rpc('state')
   assert.deepEqual([v.runs[0].schedule, v.runs[0].ok, v.runs[0].at], [into.id, false, into.next])

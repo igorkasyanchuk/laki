@@ -224,9 +224,37 @@ same workspace (`same`: the first run's is `new`'s, kept as the task's `sameWs`;
 makes another; another `ws` or project drops it) or a workspace (its id); in those last three, the prompt goes to the
 workspace's running agent of that preset (`send` whenIdle), else a new tab with it; `fresh` (Start fresh: only where a
 workspace is shared) always a new tab, the earlier ones left open. Every run, or a missed one (more
-than `MISSED_AFTER`, 30 minutes, late: skipped), goes to `state.runs` (the last 200; the view has 50). A tick moves
+than `MISSED_AFTER`, 30 minutes, late), goes to `state.runs` (the last 200; the view has 50). A tick moves
 every due task on before it runs any, so a slow worktree isn't started twice. Removing a project removes its tasks; a
 gone or archived workspace is a failed run.
+
+How a run ended (T1): a run that started an agent is `state: 'running'`; `runOutcomes` (main.ts, as the daemon starts:
+not as the module loads, load-order.test) adds to core's `turnEnds` (1.5 s later: its usage meter is read by then) and
+`turnWaits`; `runEnded` finds the run of that tab (`runOfTab`: its first day, `OUTCOME_MS`) and sets `state` (done,
+waiting, failed: an API error or a limit), `endedAt`, `said` (the answer's or question's first line, 200), `pr`
+(`prOf`), `tokens` and `cost` (`meterView`, with costs on), `diff` (`wsStat`), all at once. Each end again (resumed)
+updates it. A workflow's run (`flow`: its id) ends by workflow.ts' `finish` calling `scheduleFlowEnded`; an extension's
+is `done` or `failed` at once. `ranTold`: extensions' `schedule.done` (`task`, `state`, `said`, `pr`, `diff`, `cost`) on
+each, and as the state changes, by the task's `notify` (unset `needs`: waiting or failed; `always`: done too; `never`)
+a `scheduled` event (App: a notification and a toast, Open goes to its tab) and `flowPhone(…, 'Scheduled')` (not for
+a wait: its tab pushes that itself). ponytail: a waiting run's notification may come twice (its tab's and the task's).
+
+A run the Mac slept through (T2): `missed` (a due time over `MISSED_AFTER` late): a task that `catches` (`missed`, unset:
+`catchup` for a rule of at most 2 times a day, else `skip`) gets `catchup: { due, until }`: the latest occurrence before
+now, until `catchUntil` (minutes after midnight, that day's after the due time) or its next time; past it, or a `skip`
+task: a `missed:` run is logged. `catchTick` (each tick, after the due ones) runs the oldest one waiting
+(`runSchedule`'s `late`: *after wake (due 02:00): …*), one a tick, so several 30 s apart; one past its `until` is
+logged missed. `lowBattery` (pmset: discharging under 20%) holds it a tick; never in tests. ponytail: no per-task
+override of the battery rule yet.
+
+A run condition (T3, `onlyIf`, an agent's task only: a workflow or an extension decides for itself; Run now skips it):
+`onlyIfCheck` before anything starts: `commits` (the base, else `branches().main`, fetched; its head against
+`lastHead`, kept when a run starts an agent), `prs` (`gh pr list` once: `failing` checks, `review` REVIEW_REQUIRED and not
+a draft, `any`), `issues` (`gh issue list`, a `label`: created since the task's last run that started an agent), `cmd`
+(`/bin/sh -c` in the project's folder, 60 s: exit 0 runs; not a project on another machine, nor one whose
+`.laki.json` waits for trust (`cfgWait`): a failed run). A no is a run with `skipped`, `ok`, `what: skipped: …`, no
+workspace; the run's `{{check}}` in its prompt is the command's first line, the PRs' or issues' numbers, the head.
+main.ts refuses `onlyIf.cmd` from an agent (`agentNo`), and remote access can't `scheduleSet` at all.
 
 ### Notifications
 

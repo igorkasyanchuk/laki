@@ -2320,6 +2320,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-run.failed .sched-run-dot { color: var(--error); background: color-mix(in srgb, var(--error) 16%, transparent); }
 .sched-run b { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .sched-run > .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sched-run.skipped { opacity: 0.6; } /* T3: its condition said no */
+.sched-run.is-waiting .sched-run-dot { color: var(--warn); }
+.sched-missed { align-self: flex-start; }
 .sched-run-at { flex: none; margin-left: auto; color: var(--muted); font-size: var(--fs-3); font-variant-numeric: tabular-nums; }
 .sched-run.live { cursor: pointer; }
 .sched-run.live:hover { background: var(--hover); }

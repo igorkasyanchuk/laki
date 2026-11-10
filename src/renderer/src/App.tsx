@@ -1245,6 +1245,12 @@ export function App() {
         if (m.status !== 'over' && (s?.notifyOn?.done === false || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
         notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined)
+      } else if (m.ev === 'scheduled') {
+        // T1: a scheduled run waits for you, failed, or (Tell me: always) is done: a notification and a toast to it
+        const s = viewRef.current?.settings
+        const go = () => (m.tab && viewRef.current?.tabs.some(t => t.id === m.tab) ? (setDialog(null), selectTab(m.tab)) : m.ws && viewRef.current?.workspaces.some(w => w.id === m.ws && !w.archived) ? (setDialog(null), setWsId(m.ws)) : setDialog('schedules'))
+        if (s?.notify !== false) notify('Scheduled task', noteCut(String(m.text)), m.tab ?? '', go, s?.notifySound)
+        toast(String(m.text).slice(0, 160), go, 'Open')
       } else if (m.ev === 'flow') {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings

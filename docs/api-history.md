@@ -170,3 +170,4 @@ needs no bump: `settingsSet` keeps any field.
 162: `sourceGuess` (the files a Preview pick likely comes from: `git grep` of its id, a class, its text).
 163: a project's `allow` (auto-answer rules: `projectSet`, yours only) and a tab's `allowed` (asks a rule answered); the view's `managed.allowRules`.
 164: remote access's `host` (My domain, D1), `down` and `was` (started again, D2), `locked`, `wrong` (D5) and `pairUntil`; `remotePair` (Add a device) and `remoteDeviceRm` (Revoke, Forget devices), the view's `remoteDevices` (D3).
+165: a scheduled task's `notify`, `missed`, `catchUntil`, `onlyIf` (and `lastHead`, `catchup`: the daemon's); a run's `state`, `endedAt`, `said`, `pr`, `cost`, `tokens`, `diff`, `skipped`, `flow`; the `scheduled` event; extensions' `schedule.done` (T1, T2, T3).
