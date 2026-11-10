@@ -337,8 +337,12 @@ test('U8: Do not disturb: no push for a finish or an ask; ended, one notice says
   assert.equal(r.ended, true)
   assert.ok(r.lines.some((l: string) => l.startsWith('Waits: quiet · claude')), r.lines.join(' | '))
   assert.ok(r.lines.some((l: string) => l.startsWith('Finished: quiet · claude')), r.lines.join(' | '))
-  const ev = await until(() => app.events.find(e => e.ev === 'notice' && /^Do not disturb is over/.test(e.title)), 'the digest')
-  assert.match(ev.text, /Waits: quiet · claude[\s\S]*Finished: quiet · claude/)
+  // the digest: kept in the view until its card is closed
+  const d = (await rig.rpc('state')).digest
+  assert.deepEqual(d.rows.map((x: any) => [x.kind, x.name, x.ws, x.tab]), [['wait', 'quiet · claude', ws.id, tab.id], ['done', 'quiet · claude', ws.id, tab.id]])
+  assert.ok(d.since <= d.until)
   assert.equal((await rig.rpc('state')).dnd, undefined)
+  assert.deepEqual(await rig.rpc('dndSet', { seen: true }), { seen: true })
+  assert.equal((await rig.rpc('state')).digest, undefined)
   assert.deepEqual(await rig.rpc('dndSet', { off: true }), { ended: false })
 })

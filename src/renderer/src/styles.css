@@ -2708,6 +2708,12 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .shown-pop-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .shown-pop-head > .icon-svg { flex: none; color: var(--accent-ink); }
 .shown-pop-body { max-height: 160px; overflow: auto; font-size: var(--fs-3); }
+.digest .shown-pop-body { max-height: min(50vh, 420px); display: flex; flex-direction: column; gap: 8px; }
+.digest-group { display: flex; flex-direction: column; gap: 2px; }
+.digest-title { font-size: var(--fs-1); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.digest-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 4px 6px; border: 0; border-radius: var(--radius); background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.digest-row:hover { background: var(--raised); }
+.digest-row span { color: var(--muted); font-size: var(--fs-2); overflow-wrap: anywhere; }
 .shown-pop-foot { display: flex; align-items: center; gap: 12px; }
 .notice-foot { flex-wrap: wrap; gap: 8px; }
 .notice-foot > button:not(.link) { height: 26px; padding: 0 10px; }

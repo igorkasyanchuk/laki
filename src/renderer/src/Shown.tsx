@@ -3,6 +3,7 @@
 // browser (main's window-open handler); anything else is Markdown.
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from './api'
+import type { Digest, DigestRow } from '../../shared/types'
 import { Folded, Markdown } from './MarkdownView'
 import { Icon, IconButton } from './ui'
 
@@ -130,6 +131,43 @@ export function FloatNotices() {
     </div>
   )
 }
+// U8: what happened during Do not disturb, once it's over: who waits, what ended, which PRs moved; a row opens its tab
+// (a PR's: its workspace); kept until closed
+export function DigestCard({ d, onOpen, onClose }: { d: Digest; onOpen: (r: DigestRow) => void; onClose: () => void }) {
+  const at = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className="shown-pop digest" role="region" aria-label="What happened during Do not disturb">
+      <div className="shown-pop-head">
+        <Icon name="moon" />
+        <b className="shown-title">
+          While you were away ({at(d.since)} to {at(d.until)})
+        </b>
+        <span className="spacer" />
+        <IconButton icon="x" title="Close" onClick={onClose} />
+      </div>
+      <div className="shown-pop-body">
+        {!d.rows.length && <span className="muted">Nothing finished, asked or moved.</span>}
+        {([['wait', 'Waiting for you'], ['done', 'Finished'], ['pr', 'Pull requests']] as const).map(([k, title]) =>
+          (rows =>
+            rows.length > 0 && (
+              <div key={k} className="digest-group">
+                <div className="digest-title">
+                  {title} · {rows.length}
+                </div>
+                {rows.map((r, i) => (
+                  <button key={i} type="button" className="digest-row" onClick={() => onOpen(r)}>
+                    <b>{r.name}</b>
+                    {r.text && <span>{r.text}</span>}
+                  </button>
+                ))}
+              </div>
+            ))(d.rows.filter(r => r.kind === k)),
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function NoticeCard({ n, onAnswer, onOpen }: { n: Notice; onAnswer: (choice?: string) => void; onOpen?: () => void }) {
   return (
     <div className="shown-pop">

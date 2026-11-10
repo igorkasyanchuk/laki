@@ -9,7 +9,7 @@ import { type AccountView, type Account, type WorkspaceView, aiOn, type ProjectC
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
-import { NoticeCard, ShownDialog, ShownPops } from './Shown'
+import { DigestCard, NoticeCard, ShownDialog, ShownPops } from './Shown'
 import { SharePop } from './Tunnel'
 import { ReplyPop, About, Onboarding, stepsOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
@@ -209,14 +209,16 @@ export function Pages({ app }: { app: AppCtx }) {
       <ShownPops
         pops={pops}
         notices={
-          notices.length > 0 &&
-          notices.map(n => {
+          (view.digest || notices.length > 0) && [
+            view.digest && <DigestCard key="digest" d={view.digest} onOpen={r => (setDialog(null), r.tab && view.tabs.some(t => t.id === r.tab) ? selectTab(r.tab) : setWsId(r.ws))} onClose={() => void call('dndSet', { seen: true }).catch(() => {})} />,
+            ...notices.map(n => {
             // Open: off any page, to its session (a workspace: as you left it); one without choices goes as you do
             const tab = [n.to ? n.to.tab : n.tab].find(id => id && view.tabs.some(t => t.id === id))
             const w = (!tab && n.to && view.workspaces.find(x => x.id === n.to!.ws && !x.archived)) || undefined
             const open = tab || w ? () => (setDialog(null), tab ? selectTab(tab) : setWsId(w!.id), !n.choices.length && answerNotice(n)) : undefined
             return <NoticeCard key={n.id} n={n} onAnswer={c => answerNotice(n, c)} onOpen={open} />
-          })
+          }),
+          ]
         }
         onShow={p => (setShown(q => [...q, p]), setPops(q => q.filter(x => x !== p)))} onOpenRun={p => (setDialog({ workflows: '', run: p.run }), setPops(q => q.filter(x => x !== p)))} onClose={k => setPops(q => q.filter(x => x.key !== k))} />
       {(t =>

@@ -890,6 +890,13 @@ export function App() {
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
   setQuiet(!!view?.dnd) // U8: Do not disturb: api.ts notify sends nothing but an important ask's card
+  // as it ends: one notification of what its digest card holds (not for a card a restart found waiting)
+  useEffect(() => {
+    const d = view?.digest
+    if (!d?.rows.length || Date.now() - d.until > 60_000) return
+    const n = (k: string, one: string) => (c => (c ? [`${c} ${one}`] : []))(d.rows.filter(r => r.kind === k).length)
+    notify('Do not disturb is over', [...n('wait', 'waiting for you'), ...n('done', 'finished'), ...n('pr', 'PR moved')].join(', '), '', () => {}, view?.settings.notifySound)
+  }, [view?.digest?.until])
   // Settings' Dock icon (unset: the app's own, nothing to send)
   const dockIcon = view?.settings.dockIcon
   useEffect(() => {

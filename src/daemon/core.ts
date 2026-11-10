@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
-import { LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -687,6 +687,7 @@ export function view(): View {
     api: API,
     ...(diskFull && { diskFull }),
     ...(dndOn() && { dnd: { until: state.dnd!.until } }), // U8
+    ...(state.digest && { digest: state.digest }),
     caps: CAPS,
     built: BUILT,
     today: todayView(),
@@ -3664,7 +3665,8 @@ function dndNote(tab: Tab, kind: 'done' | 'wait', text: string) {
   state.dnd!.log = [...state.dnd!.log.filter(x => x.tab !== tab.id || x.kind !== kind), { kind, tab: tab.id, text: line }].slice(-DND_LOG) // a tab's last of each
 }
 turnEnds.add((tab, o) => void (o.limit || dndNote(tab, 'done', o.failed ? `stopped: ${o.last ?? ''}` : (o.last ?? ''))))
-export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown }) {
+export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown; seen?: unknown }) {
+  if (o.seen) return delete state.digest, save(), changed(), { seen: true }
   if (o.off) return dndEnd()
   const until = typeof o.until === 'number' ? o.until : Date.now() + Math.max(1, Math.min(24 * 60, Number(o.minutes) || 30)) * 60_000
   if (!(until > Date.now()) || until > Date.now() + 7 * 864e5) throw new Error('until when? 30 minutes, an hour, or a time in the next week')
@@ -3673,35 +3675,32 @@ export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown })
   changed()
   return { until }
 }
-// what happened meanwhile, in lines: the turns that ended (their first line), the tabs that wait still, the PRs that moved
-export function dndDigest(d: NonNullable<State['dnd']>) {
-  const name = (id: string) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : ''))(state.tabs.find(t => t.id === id))
-  const done = d.log.filter(x => x.kind === 'done' && name(x.tab)).map(x => `Finished: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
+// what happened meanwhile: the tabs that wait still (their ask's first line), the turns that ended (their answer's), the
+// PRs that moved
+export function dndDigest(d: NonNullable<State['dnd']>): DigestRow[] {
+  const wsName = (id: string) => state.workspaces.find(w => w.id === id)?.name ?? id
+  const at = (id: string) => (t => t && { ws: t.workspace, tab: t.id, name: `${wsName(t.workspace)} · ${t.name}` })(state.tabs.find(t => t.id === id))
   const said = new Map(d.log.filter(x => x.kind === 'wait').map(x => [x.tab, x.text])) // its last ask's words; one that waited before it began has none
-  const waits = state.tabs.filter(t => tracked(t) && rt.get(t.id)?.status === 'waiting').map(t => `Waits: ${name(t.id)}${said.get(t.id) ? `: ${said.get(t.id)}` : ''}`)
+  const waits = state.tabs.filter(t => tracked(t) && rt.get(t.id)?.status === 'waiting').map(t => ({ kind: 'wait' as const, ...at(t.id)!, text: said.get(t.id) ?? '' }))
+  const done = d.log.filter(x => x.kind === 'done').flatMap(x => (a => (a ? [{ kind: 'done' as const, ...a, text: x.text }] : []))(at(x.tab)))
   const moved = state.workspaces.flatMap(w => {
     const pr = prs.get(w.id)
     const now = pr && `${pr.state}:${pr.checks ?? ''}`
     if (!pr || w.archived || now === d.prs[w.id]) return []
-    return [`PR #${pr.number} (${w.name ?? w.id}): ${pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.checks === 'pass' ? 'checks pass' : pr.checks === 'fail' ? 'checks fail' : d.prs[w.id] ? 'checks running' : 'opened'}`]
+    return [{ kind: 'pr' as const, ws: w.id, name: `#${pr.number} · ${w.name ?? w.id}`, text: pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.checks === 'pass' ? 'checks pass' : pr.checks === 'fail' ? 'checks fail' : d.prs[w.id] ? 'checks running' : 'opened' }]
   })
   return [...waits, ...done, ...moved]
 }
+// it ends: the digest is kept (state.digest, the view's) until you close its card in Laki's window (dndSet { seen })
 export function dndEnd() {
   const d = state.dnd
   if (!d) return { ended: false }
   delete state.dnd
+  const rows = dndDigest(d)
+  state.digest = { since: d.since, until: Date.now(), rows }
   save()
   changed()
-  const lines = dndDigest(d)
-  const at = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  const more = lines.length > 8 ? `\n…and ${lines.length - 8} more` : ''
-  try {
-    void alertShow({ title: `Do not disturb is over (${at(d.since)} to ${at(Date.now())})`, text: lines.length ? lines.slice(0, 8).join('\n').slice(0, 560) + more : 'Nothing finished, asked or moved meanwhile.' }, 'notice')
-  } catch (e) {
-    log(`dnd digest: ${(e as Error).message}`)
-  }
-  return { ended: true, lines }
+  return { ended: true, lines: rows.map(r => `${r.kind === 'wait' ? 'Waits' : r.kind === 'done' ? 'Finished' : 'PR'}: ${r.name}${r.text ? `: ${r.text}` : ''}`) }
 }
 export const dndTick = () => void (state.dnd && !dndOn() && dndEnd())
 
