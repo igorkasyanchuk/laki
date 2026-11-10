@@ -9,7 +9,7 @@ import { describe } from '../../shared/when'
 import { Markdown } from './MarkdownView'
 import { NotesView } from './panels'
 import { at, soon, WHERE } from './Schedules'
-import { ProjectSection } from './Settings'
+import { ProjectSection } from './SettingsProject'
 import { ask, Icon, IconButton, keep, load, Page, Switch } from './ui'
 
 export const PROJECT_TABS = [

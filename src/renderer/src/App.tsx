@@ -1,5 +1,5 @@
 import { unloadStep } from '../../shared/browserBudget'
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
@@ -7,26 +7,27 @@ import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { FullReview, type ReviewApi, type Talk } from './FullReview'
+import type { ReviewApi, Talk } from './FullReview'
 import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { notInstalled, tabAgent } from '../../shared/install'
 import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, type SkillInfo, termLook, type WidgetsApi } from './Settings'
-import { AiPage } from './Ai'
+import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
+import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
+import { extMenuItems } from './extMenu'
 import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
 import { type DeskAsk, onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
-import { type ProjectTab } from './Project'
+import type { ProjectTab } from './Project' // a type alone: verbatimModuleSyntax keeps a { type } import's module in the bundle (E8)
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { hasCap } from '../../shared/caps'
 import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch } from '../../shared/widgetSchema'
-import { type ExtTab } from './Extension'
+import type { ExtTab } from './Extension'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
@@ -54,7 +55,7 @@ import { menusOf } from './menus'
 import { onKey } from './keydown'
 import { layoutOf, TabBar, TabStrip } from './TabBar'
 import { sideOf, Sidebar } from './Sidebar'
-import { Dialogs, Pages } from './Dialogs'
+import { Dialogs, Pages, PRELOAD } from './Dialogs'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -74,6 +75,9 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
 type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
+// E8: loaded as they first show (the Review tab, the floating AI chat): not in the window's first load
+const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.FullReview })))
+const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
 const STEP_ICON: Record<StepId, IconName> = { continue: 'run', answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
@@ -3053,7 +3057,7 @@ export function App() {
   const tinted = (key: string) => (railColors[key] ? { className: 'rail-icon tinted', style: colorVar(railColors[key]) } : { className: 'rail-icon' })
   // a rail button: its icon, words (Labels), and a count or a dot on the icon
   const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode, menu?: (e: React.MouseEvent) => void) => (
-    <button key={key} type="button" data-rail={key} data-key={isKeyId(key) ? key : undefined} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run}>
+    <button key={key} type="button" data-rail={key} data-key={isKeyId(key) ? key : undefined} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run} onPointerEnter={() => key in PRELOAD && void PRELOAD[key as keyof typeof PRELOAD]().catch(() => {}) /* E8: its page's code, before the click */}>
       <span {...tinted(key)}>
         <Icon name={icon} size={18} />
         {mark}
@@ -3627,7 +3631,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} onGuest={g => (g ? guests.current.set(id, g) : guests.current.delete(id))} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
-            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} />}
+            {reviewOn && ws && <Suspense fallback={null}><FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} /></Suspense>}
           </div>
           {tabsAt === 'right' && <TabStrip app={app} />}
           {previewed && ws && (
@@ -3761,7 +3765,9 @@ export function App() {
           <>
             {aiFloat && (
               <AiFloat>
+                <Suspense fallback={null}>
                 <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />
+                </Suspense>
               </AiFloat>
             )}
             {!aiDock ? (

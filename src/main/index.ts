@@ -135,6 +135,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     }, async () => /gh pr merge/.test(fakeLog())],
   ]
   const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
+  // E8: the page's start to its first sidebar row painted (main.tsx' mark): what a lazy page saves shows here
+  const first = await js<number>("performance.getEntriesByName('laki-sidebar')[0]?.startTime ?? -1").catch(() => -1)
+  out.push({ name: 'first-row', ok: first >= 0, ms: Math.round(first), ...(first < 0 && { why: 'no laki-sidebar mark' }) })
   for (const [i, [name, go, sel]] of steps.entries()) {
     const at = Date.now()
     const seen = errors.length

@@ -10,7 +10,7 @@ import { modeItems, readable } from './Reader'
 import { wsLink } from './links'
 import { api, bridge } from './api'
 import type { Collision } from '../../shared/overlap'
-import { ROW_MARKS, rowMarkUsed, rowMarkSet } from './Settings'
+import { ROW_MARKS, rowMarkUsed, rowMarkSet } from './settingsBase'
 export function menusOf(app: AppBase) {
   const { accountsOf, apps, archive, attachable, byId, call, closeTabs, copy, copyTab, done, extItems, fail, floated, floatTab, flowMenu, fold, folded, forkWs, groupMoves, groups, inReader, isTerm, kh, laterCancel, laterChange, laterNow, mark, markUnread, newIn, newWord, openIn, openInItems, prMenu, projOf, rail, rawKind, readerOn, refreshPR, restore, rmItem, runMenu, selectTab, setDialog, setGroups, setOverlapsAt, setRead, setSharing, settings, setWsId, showInfo, showPanel, sortItems, split, stepItem, tabByWs, termIn, termsOk, termWhere, toast, view } = app
   // a workspace's first agent tab; ● again on a tab, as if its turn ended unseen (until it's looked at again)

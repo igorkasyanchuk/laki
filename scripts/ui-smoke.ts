@@ -3,7 +3,7 @@
 // each page opened, a selector of its own waited for, no Boundary, no console error, a screenshot). The screenshots end
 // in dist/ui-smoke; the demo daemon is stopped and the temp folder removed, pass or fail.
 import { execFileSync, spawn } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +15,23 @@ const shots = join(root, 'dist/ui-smoke')
 const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home, LAKI_HOME: join(home, 'data') }).filter(([k]) => !k.startsWith('CLAUDE') && !k.startsWith('ELECTRON_')))
 const node = (...a: string[]) => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', ...a], { cwd: root, env, encoding: 'utf8' })
 let code = 1
+// E8: the JS the app window loads before it draws: the entry's static imports, and App's chunk (main.tsx' import) with its own
+function firstLoad() {
+  const dir = join(root, 'out/renderer')
+  const entry = /src="\.\/(assets\/[^"]+\.js)"/.exec(readFileSync(join(dir, 'index.html'), 'utf8'))?.[1]
+  if (!entry) return 'first load: no entry script in out/renderer/index.html'
+  const seen = new Set<string>()
+  const walk = (f: string) => {
+    if (seen.has(f)) return
+    seen.add(f)
+    for (const m of readFileSync(join(dir, f), 'utf8').matchAll(/(?:^|[;\n])\s*import\s*(?:[^'"()]*?from\s*)?["']\.\/([^"']+\.js)["']/g)) walk(`assets/${m[1]}`)
+  }
+  walk(entry)
+  const app = /import\(["']\.\/(App-[^"']+\.js)["']\)/.exec(readFileSync(join(dir, entry), 'utf8'))?.[1]
+  if (app) walk(`assets/${app}`)
+  const kb = [...seen].reduce((n, f) => n + statSync(join(dir, f)).size, 0) / 1024
+  return `first load: ${kb.toFixed(0)} KB of JS in ${seen.size} files (entry ${(statSync(join(dir, entry)).size / 1024).toFixed(0)} KB)`
+}
 try {
   const demo = JSON.parse(node('scripts/demo.ts', home).trim().split('\n').pop()!) as { token?: string }
   // a new install starts without Labs: Workflows on for its step
@@ -33,6 +50,7 @@ try {
     for (const s of JSON.parse(readFileSync(result, 'utf8')) as { name: string; ok: boolean; ms: number; why?: string }[]) console.log(`${s.ok ? 'ok  ' : 'FAIL'} ${s.name.padEnd(18)} ${String(s.ms).padStart(5)} ms${s.why ? `  ${s.why}` : ''}`)
     rmSync(shots, { recursive: true, force: true })
     cpSync(join(home, 'shots'), shots, { recursive: true })
+    console.log(firstLoad())
     console.log(`screenshots: ${shots}`)
   } else console.log('the window never finished: no result.json (120 s at most)')
 } finally {

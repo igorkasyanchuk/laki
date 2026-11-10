@@ -63,6 +63,16 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 
 `src/renderer/src`:
 
+- **What loads when** (E8): `main.tsx` imports `App` (the app window) or `NewWindow.tsx` (a floated one) as the fonts
+  load, so each loads only what it draws. Dialogs.tsx' `PRELOAD` and `lazyPage`: Settings (its sections with it), an
+  extension's page, the UI kit, Help, a project's page, the AI page, the board and Scheduled load as they open, in
+  their frame meanwhile (`Waiting`), or as the pointer comes over their rail button (App's `railButton`); App's
+  FullReview and the floating AI chat as they first show. What the rest reads of Settings is `settingsBase.ts` (fonts,
+  the terminal's look, designs, the rail, row marks, `isSection`) and `extMenu.ts` (an extension's menu); a type from a
+  page is `import type` (`verbatimModuleSyntax` keeps `import { type X }`'s module in the bundle). Measured with
+  `npm run test:ui` (its first load and `first-row`): the window's first load 3,900 KB of JS in 7 files before, 3,021
+  KB in 12 after; the first sidebar row painted at 177–219 ms before, 179–210 ms after (the parse saved is within the
+  noise). The board's own chunk is 11 KB, but its import of the AI page's `Thumbs` kept that one in the first load.
 - **Cost of a redraw** (E7, 2026-11, 60 workspaces, 140 tabs): a state event from the daemon to React's commit, built
   app: 3–5 ms (dev React: 25–35 ms; App and the sidebar's rows, every one, each time; a hover card two of those;
   typing in the Reader box only the box). Under a frame, so no memo work: memo on `Icon` and `Glyph` measured no gain

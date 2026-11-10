@@ -229,6 +229,7 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
+| `src/renderer/src/settingsBase.ts` | what the rest of the app reads of Settings (E8: the Settings page loads as it opens): `FONT_SIZE`, `fontStack`, `termLook`, `PAGE_ZOOMS`, `DESIGNS`, the rail's `RAIL_ITEMS`, the rows' `ROW_MARKS`, `isSection`; Settings.tsx re-exports it. `extMenu.ts`: an extension's menu (`extMenuItems`) |
 | `src/renderer/src/appCtx.ts` | what App's parts read of App: `AppBase` (a field per App local they use; App builds `appBase` each render after `if (!view)`), the `Dialog` type, small helpers they share. No state, no hooks: those stay in App |
 | `src/renderer/src/menus.ts` | `menusOf`: the ⋯ and right-click menus of a workspace (`wsMenu`), a tab (`tabMenu`), a file (`fileMenu`) and a project (`projectActions`), and the sidebar's *Show ›* (`showItems`) |
 | `src/renderer/src/keydown.ts` | `onKey`: App's keys in the capture phase (Settings › Keys' `bound`, an extension action's key, the fixed `act` map: ⌘1…⌘9, ⌘↑ ⌘↓, ⌘O, ⌘E, ⌘D, zoom); App's listener calls it once there's a view |
@@ -281,6 +282,8 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 - **The daemon only listens on 127.0.0.1**, behind the token and the Origin check. Keep both on any new
   endpoint. A refused WebSocket is logged once per address and Origin, then counted once a minute (`refusedWs`, L15). Remote access reaches it through cloudflared on this Mac, for one email (or, asked for with a typed
   confirm, anyone with the link), with a token and an origin of its own that end with it; only the page's static files skip the checks.
+- **A type from another module is `import type`**, not `import { type X }`: with `verbatimModuleSyntax` the latter keeps
+  the module in the bundle, and a lazy page (Dialogs.tsx' `PRELOAD`) lands back in the window's first load.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **No `*` or `:not()` under a `:has()`** (`.main:has(…) > *`): beside any `:has()` Blink can't follow by class
   (`:only-child`, `:nth-child`, `:disabled`: BlockNote's and Mantine's have them), every DOM change then restyles the

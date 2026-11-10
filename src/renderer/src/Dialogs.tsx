@@ -3,7 +3,8 @@
 // over everything (Ship, Check overlaps, the timers', renames, a project's notes…). App renders them with what
 // appCtx.ts says they read.
 import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, specsOf, wsName } from './appCtx'
-import { type AccountsApi, SettingsPage, type SkillInfo, FONT_SIZE } from './Settings'
+import type { AccountsApi, SkillInfo } from './Settings'
+import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
 import { type AccountView, type Account, type WorkspaceView, aiOn, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type GateHeld, type Project, prIn, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
@@ -14,26 +15,19 @@ import { SharePop } from './Tunnel'
 import { ReplyPop, About, Onboarding, stepsOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
 import { WidgetDialog, WidgetModal } from './Widgets'
-import { ExtensionPage } from './Extension'
-import { UiKitPage, StarterPicker } from './UiKit'
-import { HelpPage } from './Help'
 import { Picker } from './Picker'
 import { DeskPage } from './Desk'
 import { CalendarPage } from './Calendar'
-import { ProjectPage } from './Project'
-import { AiPage } from './Ai'
 import { completeOf, withImages } from './PromptInput'
 import { specPrompt, planTemplates } from '../../shared/plans'
 import { BirdPage } from './Bird'
 import { AchievementsPage } from './Achievements'
-import { BoardPage } from './Board'
 import { nameOf, youtubeEmbed, mergeActions, parseDuration, templatesFor } from './text'
 import { ComparePage } from './Compare'
-import { SchedulesPage } from './Schedules'
 import { spanText, type Collision } from '../../shared/overlap'
 import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
-import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
+import { type ComponentType, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
 
@@ -52,6 +46,41 @@ const Lazy = ({ title, onClose, children }: { title: string; onClose: () => void
   <Boundary title={title} onClose={onClose}>
     <Suspense fallback={<Waiting title={title} onClose={onClose} />}>{children}</Suspense>
   </Boundary>
+)
+// E8: the bigger pages too, out of the window's first load: each loads as it opens, or as the pointer comes over its
+// rail button (App's preload), in its frame meanwhile
+export const PRELOAD = {
+  settings: () => import('./Settings'),
+  extension: () => import('./Extension'),
+  uikit: () => import('./UiKit'),
+  help: () => import('./Help'),
+  project: () => import('./Project'),
+  ai: () => import('./Ai'),
+  board: () => import('./Board'),
+  schedules: () => import('./Schedules'),
+}
+// ponytail: its props as any inside (lazy's own types don't carry a generic page's); the page's are checked where it's used
+function lazyPage<P extends object>(load: () => Promise<ComponentType<P>>, title: string) {
+  const L = lazy(() => load().then(c => ({ default: c as ComponentType<any> })))
+  return (p: P) => (
+    <Lazy title={title} onClose={(p as { onClose?: () => void }).onClose ?? (() => {})}>
+      <L {...p} />
+    </Lazy>
+  )
+}
+const SettingsPage = lazyPage(() => PRELOAD.settings().then(m => m.SettingsPage), 'Settings')
+const ExtensionPage = lazyPage(() => PRELOAD.extension().then(m => m.ExtensionPage), 'Extension')
+const UiKitPage = lazyPage(() => PRELOAD.uikit().then(m => m.UiKitPage), 'UI kit')
+const HelpPage = lazyPage(() => PRELOAD.help().then(m => m.HelpPage), 'Help')
+const ProjectPage = lazyPage(() => PRELOAD.project().then(m => m.ProjectPage), 'Project')
+const AiPage = lazyPage(() => PRELOAD.ai().then(m => m.AiPage), 'Laki AI')
+const BoardPage = lazyPage(() => PRELOAD.board().then(m => m.BoardPage), 'Board')
+const SchedulesPage = lazyPage(() => PRELOAD.schedules().then(m => m.SchedulesPage), 'Scheduled')
+const StarterLazy = lazy(() => PRELOAD.uikit().then(m => ({ default: m.StarterPicker })))
+const StarterPicker = (p: Parameters<typeof StarterLazy>[0]) => (
+  <Suspense fallback={null}>
+    <StarterLazy {...p} />
+  </Suspense>
 )
 
 // the pages in the main area, over the panes

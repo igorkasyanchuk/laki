@@ -7,6 +7,8 @@ import { UI_TYPES, type UiProblem } from '../../shared/widgetUi'
 import { type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Icon, IconButton, type MenuItem, ON, Switch, useMenu } from './ui'
 import { Group, Says } from './SettingsKit'
+import { BARS, extMenuItems, fits, PLACES, SIZES } from './extMenu'
+export { extMenuItems }
 import { ago } from '../../shared/widget'
 import { StarterPicker } from './UiKit'
 import { describeHours, parseHours } from '../../shared/when'
@@ -49,19 +51,6 @@ export type WidgetsApi = {
 }
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
 
-const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3, 4].map(a => [a, d] as [number, number])) // ½ down: a thin line
-// Auto: in the top or status bar, as wide as it needs (a JS page: as its page measures itself)
-const fits = (w: WidgetView) => placesOf(w).some(p => p === 'top' || p === 'status')
-const PLACES: [WidgetPlace, string, string][] = [
-  ['side', 'Sidebar', 'In the sidebar, above its buttons'],
-  ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],
-  ['status', 'Status bar', "At the status bar's right end: a line high"],
-  ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
-  ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
-  ['desk', 'My Desk', 'A tile on the My Desk page, sized there'],
-  ['panel', 'Right panel', 'A tab of the right panel (⌥⌘B), beside Info and Files'],
-  ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
-]
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
   ['m', 'Medium'],
@@ -234,7 +223,6 @@ const WcRow = ({ title, hint, children }: { title: ReactNode; hint?: ReactNode; 
     <div className="wc-ctl">{children}</div>
   </div>
 )
-const BARS: WidgetPlace[] = ['side', 'top', 'status']
 
 // Where it shows, drawn: a small Laki window with each place it's in lit, the pill under the mouse brighter
 function PlaceMap({ on, hot }: { on: WidgetPlace[]; hot?: WidgetPlace }) {
@@ -299,21 +287,6 @@ export const KitHero = ({ kit }: { kit: (icons?: boolean) => void }) => (
   </div>
 )
 
-export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
-  const places = placesOf(w)
-  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
-  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(places.includes(v) ? places.filter(x => x !== v) : [...places, v])
-  const size = w.size.join('x')
-  return [
-    { label: w.on ? 'Turn off' : 'Turn on', icon: 'power', sub: w.on ? 'nothing of it runs until you turn it on' : undefined, run: () => void api.set(w.id, { on: !w.on }) },
-    { label: 'Show in', icon: 'layout', items: offered.map(([v, n, tip]) => ({ label: n, sub: tip, ...(places.includes(v) && { hint: ON }), run: () => flip(v) })) },
-    ...(places.some(p => BARS.includes(p)) && (!w.button || fits(w)) ? [{ label: 'Size', icon: 'grid', items: [...(fits(w) ? [{ label: 'Auto: in a bar, as wide as it needs', ...(w.fit && { hint: ON }), run: () => void api.set(w.id, { fit: true }) }] : []), ...SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(!(w.fit && fits(w)) && size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d], fit: false }) }))] } as MenuItem] : []),
-    null,
-    ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),
-    // a repo's goes with its repo, a dev link's is your folder: neither to the trash from here
-    ...(api.rm && !w.project && !w.dev ? [{ label: 'Delete…', icon: 'trash', danger: true, sub: 'to the trash: Undo brings it back', run: () => void api.rm!(w.id) } as MenuItem] : []),
-  ]
-}
 
 export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const [hot, setHot] = useState<WidgetPlace>() // the place pill under the mouse: lit brighter in the map
