@@ -19,11 +19,13 @@ export function rollup(tabs: TabView[]) {
 
 // ◆ needs you, spinner running (setup: a setup script), ● finished while you looked away, ◷ usage limit,
 // ✖ exited, ○ idle, ✓ ended fine.
+// R13: said, not only drawn: a screen reader hears the status (the glyph and its color say it to the eye)
+const SAID: Record<string, string> = { waiting: 'needs you', running: 'working', setup: 'setting up', done: 'finished', idle: 'idle', exited: 'ended with an error', ok: 'ended', finished: 'ended', limit: 'at its usage limit' }
 export function Glyph({ s }: { s: string }) {
-  if (s === 'running' || s === 'setup') return <span className={`glyph spin g-${s}`} title={s} />
+  if (s === 'running' || s === 'setup') return <span className={`glyph spin g-${s}`} role="img" aria-label={SAID[s]} title={s} />
   const ch = { waiting: '◆', done: '●', idle: '○', exited: '✖', ok: '✓', finished: '✓', limit: '◷' }[s] ?? '·'
   return (
-    <span className={`glyph g-${s || 'none'}`} title={s || 'shell'}>
+    <span className={`glyph g-${s || 'none'}`} role="img" aria-label={SAID[s] ?? 'a terminal'} title={s || 'shell'}>
       {ch}
     </span>
   )

@@ -31,6 +31,7 @@ version it builds, with the date. -->
 - *Simple row* (Settings › Appearance › Sidebar rows, off by default): a workspace's row is its name and one next-step chip; the other marks show on hover.
 - Laki's own theme pair, *Laki* and *Laki Light* (the mark's orange as the accent), first in Get started's themes; the default theme is unchanged.
 - Empty pages show what they will hold: faint sample rows on Schedule, Workflows, Notes and My Desk; the Reader's empty chat offers three prompts that fill the box.
+- Accessibility: every button has a name for a screen reader, a status mark says its state in words, the side panel's tabs move with ← →, and a column's resize edge takes the arrow keys (Enter resets).
 - Files copied into a new worktree (`.worktreeinclude`, *Copy ignored files*) are cloned where the disk can (APFS): no extra space until one is changed.
 - Settings › Git › *Clone dependency folders*: node_modules, .venv and the like go into a new worktree as one clone (`.laki.json`'s `clone` names a repo's own); *Keep a spare worktree* has the next workspace's worktree ready before you ask.
 - A branch behind its base shows *↓n* beside it in the status bar: *Update* merges the base in when that's clean, or asks the agent to when it conflicts; *Rebase* too. Nothing is fetched or pushed for you.

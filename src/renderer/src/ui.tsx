@@ -304,6 +304,19 @@ export function Edge({ x, to, done, reset }: { x: { left: number } | { right: nu
       className={`fr-edge ${'right' in x ? 'r' : ''}`}
       style={x}
       data-tip="Drag to resize · double-click to reset"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize: the left and right arrows, Enter to reset"
+      tabIndex={0}
+      onKeyDown={e => {
+        // R13: by keyboard too: 16px a press (⇧: 64), Enter back to its width
+        if (e.key === 'Enter') return reset()
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+        e.preventDefault()
+        const r = e.currentTarget.getBoundingClientRect()
+        to(r.left + ('right' in x ? r.width : 0) + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 64 : 16), e.currentTarget.parentElement!.getBoundingClientRect())
+        done()
+      }}
       onPointerDown={e => (e.currentTarget.setPointerCapture(e.pointerId), e.preventDefault())}
       onPointerMove={e => held(e) && to(e.clientX, e.currentTarget.parentElement!.getBoundingClientRect())}
       onLostPointerCapture={done}
@@ -710,6 +723,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
                     key={c}
                     className={`swatch ${c === (it.value ?? 'none') ? 'on' : ''}`}
                     style={colorVar(c)}
+                    aria-label={c === 'none' ? 'No color' : c}
                     data-tip={`${c === 'none' ? 'No color' : c}${n <= 9 ? ` · ${n}` : ''}`}
                     onClick={() => {
                       onClose()

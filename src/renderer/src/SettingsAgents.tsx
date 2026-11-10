@@ -335,7 +335,7 @@ export function AccountsBlock({ agent, api, views, usage, use, onUse, reload, fa
     <div className="accounts" role="radiogroup" aria-label={`${AGENT_NAMES[agent]} accounts`}>
       {mine.map(v => (
         <div key={v.id} className={`account-row${v.id === use ? ' on' : ''}`}>
-          <button type="button" role="radio" aria-checked={v.id === use} className="account-pick" data-tip={v.id === use ? 'New sessions start on it' : 'Make it the default for new sessions (running tabs keep theirs)'} onClick={() => onUse(v.id)} />
+          <button type="button" role="radio" aria-checked={v.id === use} aria-label="The default account for new sessions" className="account-pick" data-tip={v.id === use ? 'New sessions start on it' : 'Make it the default for new sessions (running tabs keep theirs)'} onClick={() => onUse(v.id)} />
           <div className="account-who">
             {v.id === HOME_ACCOUNT ? (
               <b>Default sign-in</b>

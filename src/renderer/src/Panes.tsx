@@ -130,7 +130,7 @@ export function Panes(p: {
           {panes.length > 1 && (
             <div className="pane-head" style={colorVar(p.color(tab))} onPointerDown={e => p.startDrag(e, tab)} onContextMenu={e => p.onMenu(e, tab)}>
               {p.label(tab)}
-              <button className="x" data-tip="Close" onPointerDown={e => e.stopPropagation()} onClick={() => p.onClose(tab)}>
+              <button className="x" aria-label="Close the tab" data-tip="Close" onPointerDown={e => e.stopPropagation()} onClick={() => p.onClose(tab)}>
                 ×
               </button>
             </div>

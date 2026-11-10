@@ -254,8 +254,8 @@ export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: numbe
           </select>
           <span className="grow" />
           <span className="seg">
-            <button className={by === 'cost' ? 'on' : ''} onClick={() => setBy('cost')}>$</button>
-            <button className={by === 'tokens' ? 'on' : ''} onClick={() => setBy('tokens')}>Tokens</button>
+            <button className={by === 'cost' ? 'on' : ''} aria-label="By cost" aria-pressed={by === 'cost'} onClick={() => setBy('cost')}>$</button>
+            <button className={by === 'tokens' ? 'on' : ''} aria-pressed={by === 'tokens'} onClick={() => setBy('tokens')}>Tokens</button>
           </span>
         </div>
         {err && <p className="warn">{err}</p>}

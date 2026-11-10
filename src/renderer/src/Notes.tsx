@@ -107,7 +107,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
           {colors.length > 0 && (
             <div className="notes-colors" role="group" aria-label="Only this color">
               {colors.map(c => (
-                <button key={c} type="button" className={`notes-dot ${only === c ? 'on' : ''}`} style={colorVar(c)} aria-pressed={only === c} data-tip={only === c ? 'Show every color' : `Only ${c}`} onClick={() => setOnly(o => (o === c ? null : c))} />
+                <button key={c} type="button" className={`notes-dot ${only === c ? 'on' : ''}`} style={colorVar(c)} aria-pressed={only === c} aria-label={`Only ${c} notes`} data-tip={only === c ? 'Show every color' : `Only ${c}`} onClick={() => setOnly(o => (o === c ? null : c))} />
               ))}
             </div>
           )}

@@ -573,14 +573,29 @@ export function SidePanel(p: {
   return (
     <div className="side-panel" style={{ width: p.width }}>
       <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />
-      <div className="sp-tabs">
+      <div
+        className="sp-tabs"
+        role="tablist"
+        aria-label="The side panel"
+        onKeyDown={e => {
+          // R13: ← → between its tabs, as a tablist does
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+          const all = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')]
+          const i = all.indexOf(document.activeElement as HTMLElement)
+          if (i < 0) return
+          e.preventDefault()
+          const to = all[(i + (e.key === 'ArrowLeft' ? all.length - 1 : 1)) % all.length]
+          to.focus()
+          to.click()
+        }}
+      >
         {tabs.map(t => (
-          <button key={t.id} className={t.id === tab ? 'on' : ''} data-tip={t.label} onClick={() => p.onTab(t.id)}>
+          <button key={t.id} role="tab" aria-selected={t.id === tab} aria-label={t.label} tabIndex={t.id === tab ? 0 : -1} className={t.id === tab ? 'on' : ''} data-tip={t.label} onClick={() => p.onTab(t.id)}>
             <Icon name={t.icon} /> <span className="sp-tab-label">{t.label}</span>
           </button>
         ))}
         {p.ext?.map(x => (
-          <button key={x.id} className={x.id === tab ? 'on' : ''} data-tip={x.label} onClick={() => p.onTab(x.id)}>
+          <button key={x.id} role="tab" aria-selected={x.id === tab} aria-label={x.label} tabIndex={x.id === tab ? 0 : -1} className={x.id === tab ? 'on' : ''} data-tip={x.label} onClick={() => p.onTab(x.id)}>
             {x.icon} <span className="sp-tab-label">{x.label}</span>
           </button>
         ))}
