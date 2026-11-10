@@ -83,7 +83,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow check [file.md… | folder]        check workflow files, no daemon (none given: ./.laki/workflows); exit 1 on a problem
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
-  laki widget what <id>                       what turning it on runs, and its files' hash
+  laki widget what <id> [--full <file>]       what turning it on runs, and its files' hash; --full: a file it cut, whole
   laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
   laki widget logs <id> [-n 100] [-f] [--level error] [--ws <ws>] [--json]  its log (when it keeps one): -f follows it
   laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off; options before the text only

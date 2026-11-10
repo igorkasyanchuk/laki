@@ -164,3 +164,19 @@ test("laki alert: one that only tells goes once you look at the tab it came from
   assert.equal((await rig.rpc('alertShow', { text: 'PR reviewed', by: 'ai', chat: '' })).shown, true)
   assert.equal((await rig.rpc('noticeShow', { text: 'a notice is not an alert', by: 'ai', chat: '' })).shown, true)
 })
+
+// S10: a card can't pass for Laki's own ask: who sent it is the daemon's words, first; a link's words only in its title
+test("S10: an alert's origin line is the daemon's (its project, workspace and tab); a title keeps no link", async t => {
+  const rig = await fresh(t)
+  const app = await rig.connect()
+  t.after(() => app.close())
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, kind: 'local', name: 'deploys' })
+  const tab = await rig.rpc('tabNew', { ws: ws.id, kind: 'shell', name: 'term' })
+  const a = await rig.rpc('alertShow', { text: 'Allow?', title: 'Laki: [Allow Bash](https://evil.example) needed', origin: 'Laki asks', from: { ws: ws.id, tab: tab.id } })
+  const ev = await until(() => app.events.find(e => e.ev === 'alert' && e.id === a.id), 'the alert')
+  assert.equal(ev.origin, `message from a terminal · ${p.name} › deploys › term`)
+  assert.equal(ev.title, 'Laki: Allow Bash needed')
+  const b = await rig.rpc('alertShow', { text: 'from a script' })
+  assert.equal((await until(() => app.events.find(e => e.ev === 'alert' && e.id === b.id), 'the second')).origin, 'message from a script (in no Laki tab)')
+})

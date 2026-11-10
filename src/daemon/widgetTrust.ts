@@ -20,6 +20,7 @@ export function widgetWhat(id: string) {
   if (typeof disk === 'string') throw new Error(`${w.m.name || w.id}: ${disk}`)
   if (JSON.stringify(disk) !== JSON.stringify(w.m)) scanWidgets(), (w = find(id))
   const hash = filesHash(w, true) // first: a change while it's read gives a hash a Yes can't match
+  const shown = guarded(w) ? repoShown(w) : undefined
   const src = sourceOf(w)
   const fetch = w.m.script ? `node ${w.m.script}` : w.m.fetch
   const [runs, code]: [string, string?] =
@@ -32,8 +33,8 @@ export function widgetWhat(id: string) {
   const fence = '`'.repeat(Math.max(3, ...[...(code ?? '').matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run in it
   const events = Object.keys(w.m.on ?? {}).map(e => `\`${e.replace(/`/g, '')}\``) // its actions run on these, unclicked
   const holds = [...new Set(gatesOf(w).flatMap(([, a]) => gateOf(a)))] // its gates: it can hold these
-  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}${holds.some(g => g !== 'tool') ? `\n\nIt can hold a workspace's ${holds.filter(g => g !== 'tool').join(', ')}: its gate runs before each.` : ''}${holds.includes('tool') ? "\n\nIt sees each tool call Claude makes in a workspace, before it runs (the command, the file and what it writes): it can refuse it, or change it, which Claude then asks you about." : ''}${guarded(w) ? repoShown(w) : ''}`
-  return { name: w.m.name || w.id, on: onOf(w), text, hash }
+  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}${holds.some(g => g !== 'tool') ? `\n\nIt can hold a workspace's ${holds.filter(g => g !== 'tool').join(', ')}: its gate runs before each.` : ''}${holds.includes('tool') ? "\n\nIt sees each tool call Claude makes in a workspace, before it runs (the command, the file and what it writes): it can refuse it, or change it, which Claude then asks you about." : ''}${shown?.text ?? ''}`
+  return { name: w.m.name || w.id, on: onOf(w), text, hash, ...(shown?.cut.length && { cut: shown.cut }) }
 }
 
 // a repo's (not yours, not Laki's): its actions' commands, every file trusting it covers by name, and the text of the
@@ -46,6 +47,7 @@ function repoShown(w: Entry) {
   const cmds = [w.m.fetch, w.m.script, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join('\n')
   const runs = (n: string) => n === w.m.script || cmds.includes(n) || (!/(^|\/)node_modules\//.test(n) && (cmds.includes(basename(n)) || SCRIPT.test(n))) || ((statSync(join(w.dir, n), { throwIfNoEntry: false })?.mode ?? 0) & 0o111) !== 0
   let left = 12_000
+  const cut: string[] = []
   const files = (w.file ? [] : all.names.sort())
     .filter(n => n !== 'widget.json' && runs(n))
     .flatMap(n => {
@@ -56,16 +58,34 @@ function repoShown(w: Entry) {
         return []
       }
       if (t.includes('\0')) return [`${n}: not text`]
-      const cut = t.length > Math.min(3000, left) ? `${t.slice(0, Math.max(0, Math.min(3000, left)))}\n…` : t
-      left -= cut.length
-      return [`${n}:\n\n${block(cut.trimEnd())}`]
+      const room = Math.max(0, Math.min(3000, left))
+      if (t.length <= room) return (left -= t.length), [`${n}:\n\n${block(t.trimEnd())}`]
+      // S10: cut: said loudly, and Turn on waits until it's been opened whole (widgetFull)
+      cut.push(n)
+      left -= room
+      const of = `showing ${room.toLocaleString('en-US')} of ${t.length.toLocaleString('en-US')} characters`
+      return [`${n}: **CUT, ${of}**: open it in full before you turn it on.${room ? `\n\n${block(`${t.slice(0, room).trimEnd()}\n…`)}` : ''}`]
     })
   const bad = 'bad' in all && all.bad ? `\n\nIt can't be trusted: ${all.bad}.` : ''
   const ig = w.project && !w.file ? ignoredOf(w, all.names) : []
   const state = stateOf(w.m)
   const said = `${ig.length ? `\n\nOf those, the repo ignores (an agent in it could write them):\n\n${block(ig.join('\n'))}` : ''}${state.length ? `\n\nLeft out as what it writes (its state): ${state.join(', ')}` : ''}`
-  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nWhat it runs:\n\n${files.join('\n\n')}` : ''}\n\nEvery file it's trusted as (a change to any turns it off):\n\n${block(all.names.sort().join('\n'))}${said}${bad}`
+  const unseen = all.names.filter(n => n !== 'widget.json' && !runs(n)).sort() // S10: hashed, its text not shown
+  const text = `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nWhat it runs:\n\n${files.join('\n\n')}` : ''}${unseen.length ? `\n\nNot shown here (it doesn't run them, but they count: a change to any turns it off):\n\n${block(unseen.join('\n'))}` : ''}\n\nEvery file it's trusted as (a change to any turns it off):\n\n${block(all.names.sort().join('\n'))}${said}${bad}`
+  return { text, cut }
 }
+// S10: a file the turn-on sheet cut, whole; opened for the files as they are now (hash), so Turn on may go ahead
+const opened = new Set<string>()
+export function widgetFull(o: { id: string; file: string }) {
+  const w = find(o.id)
+  const shown = guarded(w) ? repoShown(w) : undefined
+  if (!shown?.cut.includes(String(o.file))) throw new Error(`${o.file}: not one the sheet cut (laki widget what ${w.id})`)
+  const text = readFileSync(join(w.dir, String(o.file)), 'utf8')
+  opened.add(`${w.id}\0${filesHash(w, true)}\0${o.file}`)
+  return { file: o.file, text }
+}
+// the cut files not opened whole for the files as they are now: Turn on refuses while there are any (widgetSet)
+export const notOpened = (w: Entry) => (h => (guarded(w) ? repoShown(w).cut.filter(n => !opened.has(`${w.id}\0${h}\0${n}`)) : []))(filesHash(w, true))
 // what a Yes holds for (filesHash): the extension's own files (widgetFiles' list, all of them, sorted) and what it runs
 // that lives outside them (the store's source; its manifest as read: actions, on, stream…; net), so an edit asks again, one made
 // while Laki was closed too (sh do.sh with do.sh changed). Laki AI's turn-on question, widgetSet's seen, a tool's ask and

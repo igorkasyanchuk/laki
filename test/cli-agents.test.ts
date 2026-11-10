@@ -1,7 +1,7 @@
 // The laki CLI from an agent's tab: Laki's plugin, what agents are told, project memory, what an agent may start.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { connect, fresh, until } from './helpers.ts'
@@ -393,6 +393,20 @@ test('laki secret: a masked card on the tab; the value only in a 0600 file in it
   assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 3600e3 }), 0)
   assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 1) // a day on: gone
   assert.ok(!existsSync(path))
+  // S10: a .laki-secrets the agent made a link (to a folder of yours): not written, never tidied through
+  const box = dirname(dirname(path))
+  const yours = join(rig.home, 'yours')
+  mkdirSync(yours)
+  writeFileSync(join(yours, 'old.txt'), 'keep me')
+  rmSync(join(box, '.laki-secrets'), { recursive: true, force: true })
+  symlinkSync(yours, join(box, '.laki-secrets'))
+  const third = rig.rpc('secretAsk', { label: 'Token', from: { tab: tab.id } })
+  third.catch(() => {})
+  const s3 = await until(async () => (await rig.tab(ws.id)).secret, 'the card a third time')
+  await assert.rejects(rig.rpc('secretGive', { id: s3.id, value: 'v' }), /isn't a folder of its own \(a link\?\): not written/)
+  await rig.rpc('secretGive', { id: s3.id, refuse: true })
+  assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 0)
+  assert.deepEqual(readdirSync(yours), ['old.txt'])
 })
 
 test('a name you gave a workspace stays: an agent renames it only when you asked (--asked); a page title never', async t => {

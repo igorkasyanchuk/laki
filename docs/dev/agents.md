@@ -108,14 +108,17 @@ what the view shows on the tab's runtime:
 `secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`) on the tab (waiting while
 its command runs: Needs you, a notification, a phone push), panels.tsx `SecretStrip` at the pane's foot, a password
 field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<storage>/.laki-secrets/<slug>-<hex>`, 0600
-(hidden: no artifact) and the agent gets its path; `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
+(hidden: no artifact) and the agent gets its path (S10: only into a real folder of the storage folder, `ownDir`: a
+`.laki-secrets` link is refused and never tidied through; the file opened `O_EXCL | O_NOFOLLOW`); `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
 memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
 
 `daemon/alerts.ts`: `laki alert <text> [--title t] [--choice A]…` (MCP's `laki_alert`; `ALERT_WAIT`, 30 minutes, the
 CLI's rpc waits as long): `alertShow` (refused with no app connected, from a workspace Recording mode hides: phone.ts
 `hidden`, or past `RATE`, 5 a minute from each tab or from outside one; its words without `HIDDEN`'s characters) broadcasts `alert` (`id`, `title`: yours or the
-caller's workspace · tab, `text`, `choices` up to 6, `tab`); App makes it a card on screen (`notify`'s `card.alert`,
-a button per choice). Without choices it returns `{ shown }`; with them it waits for `alertAnswer` (`id`, a `choice` of
+caller's workspace · tab, a Markdown link's words only, `text`, `choices` up to 6, `tab`, and S10's `origin`: the
+daemon's *message from agent · project › workspace › tab* (a terminal's, a script's in no tab, Laki AI's), never the
+caller's); App makes it a card on screen (`notify`'s `card.alert`, a button per choice): main's `alert` tone, not an
+ask's (ask.ts: its origin the first line, no *Waiting for you*, no choice styled as the main one). Without choices it returns `{ shown }`; with them it waits for `alertAnswer` (`id`, a `choice` of
 its own, or none: the card's ×, Close all; refused from an agent), else `timedOut`, then broadcasts `alertDone` (the card
 goes: main's `card-gone`). The CLI prints the pick, exit 1 when closed or timed out. Tested in `test/alerts.test.ts`.
 `laki notice <text> [--title t] [--choice A]… [--to <ref>]` (MCP's `laki_notice`) is `alertShow(p, 'notice')`

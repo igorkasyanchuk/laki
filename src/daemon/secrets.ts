@@ -6,8 +6,8 @@
 // command fails and it can ask again), and an agent stopped while it waits leaves the card up to SECRET_WAIT; this Mac's workspaces only (no storage folder on a host)
 
 import { randomBytes, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readdirSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { SECRET_WAIT } from '../shared/types.ts'
 import { broadcast, changed, log, rtOf, slug, state, storageOf, tracked } from './core.ts'
 import { phone } from './phone.ts'
@@ -58,20 +58,39 @@ export function secretGive(o: { id?: string; value?: unknown; refuse?: boolean }
   if (!value) throw new Error('empty: type it, or Refuse')
   if (value.length > SECRET_MAX) throw new Error(`longer than ${SECRET_MAX >> 10} KB`)
   const dir = join(a.folder, DIR)
-  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+  } catch {}
+  // S10: the agent writes its storage folder: a .laki-secrets of its own (a link to a folder it would rather read, or
+  // where a file of yours would go) isn't written. ponytail: a swap between this check and the write; O_NOFOLLOW guards the file
+  if (!ownDir(a.folder, dir)) throw new Error(`${DIR} in the storage folder isn't a folder of its own (a link?): not written`)
   const path = join(dir, `${slug(a.label) || 'secret'}-${randomBytes(3).toString('hex')}`)
-  writeFileSync(path, value, { mode: 0o600, flag: 'wx' })
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+  try {
+    writeSync(fd, value)
+  } finally {
+    closeSync(fd)
+  }
   log(`secret: ${a.label} for ${a.tab} in ${path}`) // the path, never the value
   a.done({ path })
   return { ok: true }
 }
 
+// a real folder (not a link) inside the storage folder, by its real path
+function ownDir(folder: string, dir: string) {
+  try {
+    const st = lstatSync(dir)
+    return st.isDirectory() && !st.isSymbolicLink() && realpathSync(dir).startsWith(`${realpathSync(folder)}${sep}`)
+  } catch {
+    return false
+  }
+}
 // hourly: each storage folder's secrets past SECRET_HOURS (tests pass now)
 export function secretsTidy(now = Date.now()) {
   let n = 0
   for (const w of state.workspaces) {
     const dir = w.storage && join(w.storage, DIR)
-    if (!dir || !existsSync(dir)) continue
+    if (!dir || !existsSync(dir) || !ownDir(w.storage!, dir)) continue // S10: a link: never the files it points at
     for (const f of readdirSync(dir))
       try {
         if (now - statSync(join(dir, f)).mtimeMs > SECRET_HOURS * 3600e3) rmSync(join(dir, f), { force: true }), n++

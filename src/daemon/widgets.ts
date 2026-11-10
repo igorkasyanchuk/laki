@@ -28,7 +28,7 @@ import { gatesOf, stopStream, streaming, streams, streamSync, toolGateFlag } fro
 export { toolGateOn } from './widgetEvents.ts'
 import { fixtureNames, fixturesOf } from './widgetDev.ts'
 import { aiKey, allowedOf, allowOf, approve, cmdsOf, grantsOf, steering, TOOL_NAME, toolsOf, ungrant, widgetToolCall } from './widgetTools.ts'
-import { dirHash, eachHash, filesHash, repoBad, repoFiles } from './widgetTrust.ts'
+import { dirHash, eachHash, filesHash, notOpened, repoBad, repoFiles } from './widgetTrust.ts'
 import { historyOf, snapshot, statOf } from './widgetFiles.ts'
 export * from './widgetLogs.ts'
 export * from './widgetEvents.ts'
@@ -898,6 +898,8 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
   // a repo's (an agent-linked one's): on only after a look (laki widget what's hash), and trusted as its files are now
   if (o.on === true && guarded(w) && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} ${whence(w)}: look at what it runs first (laki widget what ${w.id})`)
+  const unopened = o.on === true && guarded(w) && !w.s.on ? notOpened(w) : []
+  if (unopened.length) throw new Error(`the sheet cut ${unopened.join(', ')}: open ${unopened.length === 1 ? 'it' : 'them'} in full first (laki widget what ${w.id} --full ${unopened[0]})`) // S10
   const badPlace = o.place === undefined ? undefined : (Array.isArray(o.place) ? o.place : [o.place]).find(x => !isPlace(x)) // a typo would put back widget.json's
   if (badPlace !== undefined) throw new Error(`no place ${badPlace}: ${WIDGET_PLACES.join(', ')}`)
   if (o.place !== undefined && placeList(o.place).includes('row') && !scoped(w)) throw new Error(`${w.m.name || w.id} is one for the app: a row's mark is per workspace`)

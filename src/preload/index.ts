@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
-  notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[], card?: { diff?: string; ask?: boolean; alert?: string; tone?: string }) => ipcRenderer.send('notify', title, body, tab, sound, actions, card),
+  notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[], card?: { diff?: string; ask?: boolean; alert?: string; tone?: string; origin?: string }) => ipcRenderer.send('notify', title, body, tab, sound, actions, card),
   cardGone: (key: string) => ipcRenderer.send('card-gone', key), // a laki alert over: its card goes
   asking: (tabs: string[]) => ipcRenderer.send('asking', tabs), // the tabs that wait: cards on screen for the others' asks go
   sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound

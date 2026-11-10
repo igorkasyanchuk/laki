@@ -43,6 +43,16 @@ const about = (ref: string): { ws: string; tab?: Tab } => {
 const wsName = (id: string) => state.workspaces.find(w => w.id === id)?.name ?? id
 const named = (tab: { workspace: string; name: string }) => `${wsName(tab.workspace)} · ${tab.name}`
 const hides = (ws?: string) => hidden(state.workspaces.find(w => w.id === ws))
+const MD_LINK = /!?\[([^\]]*)\]\([^)]*\)/g
+// S10: who sent it, by the daemon, never the caller's words: the card's fixed first line, so an alert can't pass for
+// Laki's own ask (a permission prompt's card)
+function originOf(tab: Tab | undefined, by: unknown) {
+  if (by === 'ai') return 'message from Laki AI'
+  if (!tab) return "message from a script (in no Laki tab)"
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  const proj = state.projects.find(p => p.id === ws?.project)
+  return `message from ${tab.kind === 'agent' ? 'agent' : 'a terminal'} · ${[proj?.name ?? proj?.id, ws?.name ?? ws?.id, tab.name].filter(Boolean).join(' › ')}`
+}
 
 export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert') {
   // Laki AI's (aiRpc's by and chat): only when you asked for one, or allowed it
@@ -62,8 +72,8 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
   if (recent.length >= RATE) throw new Error(`${RATE} alerts or notices a minute at most: wait a minute, or say it in one`)
   sent.set(tab?.id ?? '', [...recent, now])
   const id = randomUUID().slice(0, 8)
-  const title = clean(o.title, 80) || (tab ? named(tab) : 'Laki')
-  const ev = { ev: kind, id, title, text, choices, ...(tab && { tab: tab.id }), ...(to && { to: { ws: to.ws, ...(to.tab && { tab: to.tab.id }), name: to.tab ? named(to.tab) : wsName(to.ws) } }) }
+  const title = clean(String(o.title ?? '').replace(MD_LINK, '$1'), 80) || (tab ? named(tab) : 'Laki') // S10: a link's words only: no link to click in a title
+  const ev = { ev: kind, id, title, text, choices, origin: originOf(tab, o.by), ...(tab && { tab: tab.id }), ...(to && { to: { ws: to.ws, ...(to.tab && { tab: to.tab.id }), name: to.tab ? named(to.tab) : wsName(to.ws) } }) }
   if (kind === 'notice') {
     // past NOTICES, the oldest that only tell go: one that waits stays (its caller would hear a close you never
     // made); its wait ends by ALERT_WAIT anyway

@@ -527,7 +527,7 @@ const notes = new Set<Notification>()
 // card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
 // its edge's color
-type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown }
+type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown; origin?: unknown }
 ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[], card?: CardOpts) => {
   if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
@@ -539,8 +539,10 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
     const ask = card.ask === true && !!t
     const alert = typeof card.alert === 'string' && /^[\w-]{1,40}$/.test(card.alert) ? card.alert : ''
     const actions = alert ? buttons.filter(a => a.alert?.id === alert) : buttons.filter(a => !a.tool && !a.alert)
-    const tone = ask || (alert && actions.length) ? 'ask' : ['ok', 'bad'].includes(card.tone as string) ? (card.tone as Card['tone']) : 'info'
-    return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), actions })
+    // S10: a laki alert has a tone of its own, never an ask's (a permission prompt's), and its origin line from the daemon
+    const tone = alert ? 'alert' : ask ? 'ask' : ['ok', 'bad'].includes(card.tone as string) ? (card.tone as Card['tone']) : 'info'
+    const origin = alert && typeof card.origin === 'string' ? card.origin.slice(0, 200) : undefined
+    return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), ...(origin && { origin }), actions })
   }
   const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })
   const done = () => notes.delete(n)
@@ -563,7 +565,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 // no focus taken, a click lands at once), stacked, the newest on top. key: one per tab (its ask, its finish: the newer
 // replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
 // waiting), any card until it's opened or closed (×, Close all)
-type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info'; at: number; title: string; body: string; diff?: string; actions: NoteAction[]; error?: string }
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string }
 const CARD_W = 380
 let cards: Card[] = []
 let cardN = 0

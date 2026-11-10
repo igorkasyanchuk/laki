@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Safer: a `laki alert` card always says who sent it (agent, project, workspace, tab) on its first line and no longer looks like a permission ask; a repo extension's turn-on sheet says when it cut a file and has you open it whole first; `laki secret` won't write through a link.
 - Safer: a sandboxed Claude can't read Laki's data folder (its keys, state and accounts), only pasted images and files, storage folders and worktrees.
 - Safer: a repo's extension is checked by its files' contents before every run, so an edit that keeps its size and date still turns it off.
 - Safer: an agent can't open a page it wrote in a browser, and its *Expose to the world* asks you first; a project's *Expose* list (who gets in) now holds for every tunnel to it, yours too.

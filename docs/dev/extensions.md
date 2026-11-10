@@ -477,7 +477,10 @@ its commands name, an executable: a data file a command cats isn't); git failing
 left out, a link to a folder followed (and listed, as git does) while its realpath stays inside (a loop back to a folder
 it's in skipped); `repoBad`: a file or link out of it (realpath)
 or past `REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown`
-lists every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules;
+lists every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules
+(S10: a file cut at 3,000 characters, or past 12,000 in all, says *CUT, showing n of m characters*; `widgetWhat`'s
+`cut` names them and `widgetSet` `on` refuses until each was opened whole, `widgetFull`, for the files as they are;
+the ones it hashes but doesn't show are named under *Not shown here*);
 the ones git ignores, `ignoredOf`, and its state),
 and a scan that finds an on one with another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`,
 `ungrant`, a warn line and a `widget-say` `notify` naming the files whose `eachHash` differs, five at most). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`

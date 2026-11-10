@@ -1274,8 +1274,8 @@ export function App() {
         // laki alert: what an agent or a script asked to show you as a card on screen, with its choices (each answers
         // it: alertAnswer); notifications off or not, as you asked for it
         const picks: string[] = m.choices ?? []
-        if (bridge) notify(String(m.title), String(m.text), m.tab ?? '', () => {}, viewRef.current?.settings.notifySound, picks.map(c => ({ text: c, alert: { id: m.id, choice: c } })), { alert: m.id })
-        else void choose(String(m.title), String(m.text), picks.length ? picks.map((c, i) => ({ label: c, primary: i === 0 })) : [{ label: 'OK', primary: true }], undefined, `alert:${m.id}`).then(i => void api.call('alertAnswer', { id: m.id, ...(picks[i] !== undefined && { choice: picks[i] }) }).catch(() => {})) // a browser (remote access): the app's own dialog
+        if (bridge) notify(String(m.title), String(m.text), m.tab ?? '', () => {}, viewRef.current?.settings.notifySound, picks.map(c => ({ text: c, alert: { id: m.id, choice: c } })), { alert: m.id, origin: m.origin })
+        else void choose(String(m.title), `${m.origin ? `${m.origin}\n\n` : ''}${m.text}`, picks.length ? picks.map((c, i) => ({ label: c, primary: i === 0 })) : [{ label: 'OK', primary: true }], undefined, `alert:${m.id}`).then(i => void api.call('alertAnswer', { id: m.id, ...(picks[i] !== undefined && { choice: picks[i] }) }).catch(() => {})) // a browser (remote access): the app's own dialog
       } else if (m.ev === 'alertDone') bridge ? bridge.cardGone?.(`alert:${m.id}`) : unchoose(`alert:${m.id}`)
       else if (m.ev === 'reminder') {
         // the calendar's reminder, due (the daemon rings each once): a notification and a toast, Open its workspace. One
@@ -2394,13 +2394,26 @@ export function App() {
     if (await call('projectTrust', { id: p.id, hash: c.hash }).then(() => true, () => false)) done(`Trusted ${p.name}'s .laki.json`)
   }
   const repoSheet = async (w: WidgetView) => {
-    const what = await call<{ name: string; text: string; hash: string }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e)), null))
+    const what = await call<{ name: string; text: string; hash: string; cut?: string[] }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e)), null))
     if (!what) return
     const proj = view?.projects.find(p => p.id === w.project)?.name ?? w.project
     const needs = w.options.filter(x => x.required || x.type === 'secret').map(x => `${x.label || x.key}${x.type === 'secret' ? ' (a secret, kept on this Mac)' : ''}${x.required ? ', needed' : ''}`)
     const from = w.project ? `It comes with ${proj}'s repo (.laki/extensions)` : "An agent linked its folder (laki widget dev): its code is the agent's"
     const text = [`${from}${w.changed ? ', and its files changed there since you turned it on' : ''}.`, what.text.replace(/^`{3,}$/gm, '').replace(/\n{3,}/g, '\n\n'), needs.length ? `Its settings: ${needs.join('; ')}.` : '', w.project ? 'It shows and runs only in its workspaces.' : 'It turns off again as its files change.'].filter(Boolean).join('\n\n')
-    return (await choose(`Turn on ${what.name}?`, text, [{ label: 'Cancel' }, { label: w.project ? `Turn on in ${proj}` : 'Turn on', primary: true }])) === 1 ? what.hash : undefined
+    // S10: a file the sheet cut is opened whole before Turn on shows (the daemon refuses it until then too)
+    const opened = new Set<string>()
+    for (;;) {
+      const left = (what.cut ?? []).filter(f => !opened.has(f))
+      const say = left.length ? `${text}\n\nThe sheet cut ${left.join(', ')}: open ${left.length === 1 ? 'it' : 'each'} in full before you turn it on.` : text
+      const i = await choose(`Turn on ${what.name}?`, say, [{ label: 'Cancel' }, ...left.map(f => ({ label: `Open ${f} in full` })), ...(left.length ? [] : [{ label: w.project ? `Turn on in ${proj}` : 'Turn on', primary: true }])])
+      if (!(i >= 1)) return // Cancel, Esc (-1)
+      if (i > left.length) return what.hash
+      const f = left[i - 1]
+      const full = await call<{ text: string }>('widgetFull', { id: w.id, file: f }).catch(e => (toast(String(e?.message ?? e)), null))
+      if (!full) return
+      opened.add(f)
+      await choose(`${f}, in full`, full.text, [{ label: 'Back', primary: true }])
+    }
   }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {

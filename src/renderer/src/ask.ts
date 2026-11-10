@@ -5,7 +5,7 @@
 // A laki alert's words as Markdown (links open in the browser: main's window-open handler), a line break kept as one
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 type Action = { text: string }
-type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info'; at: number; title: string; body: string; diff?: string; actions: Action[]; error?: string }
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string }
 type Bridge = {
   ask: {
     onCards(cb: (cards: Card[], colors: Record<string, string>) => void): void
@@ -37,7 +37,9 @@ function cardEl(c: Card) {
   const head = el('div', '', 'head')
   head.append(el('span', '', 'dot'), el('span', c.title, 'title'))
   head.title = c.title
-  box.append(x, head)
+  box.append(x)
+  if (c.tone === 'alert') box.append(el('div', c.origin ?? 'message from an agent or a script', 'origin')) // S10: the daemon's words, first: it's a message, not Laki asking
+  box.append(head)
   // a laki alert's words as Markdown (markdownHtml escapes every word); any other card's as written: an ask's command
   // next to its Allow must read as it runs (no * or backslash taken as formatting)
   if (c.body) box.append(c.key.startsWith('alert:') ? Object.assign(el('div', '', 'what md'), { innerHTML: imgsAsLinks(markdownHtml(lineBreaks(c.body))) }) : el('pre', c.body, 'what'))
@@ -45,7 +47,7 @@ function cardEl(c: Card) {
   if (c.actions.length) {
     const opts = el('div', '', 'opts')
     c.actions.forEach((a, i) => {
-      const b = el('button', a.text, `opt${i ? '' : ' first'}`) as HTMLButtonElement
+      const b = el('button', a.text, `opt${i || c.tone === 'alert' ? '' : ' first'}`) as HTMLButtonElement // an alert's choices are all alike
       b.title = a.text
       b.onclick = () => {
         for (const o of opts.querySelectorAll('button')) o.disabled = true

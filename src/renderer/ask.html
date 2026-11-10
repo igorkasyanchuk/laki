@@ -9,6 +9,7 @@
       html, body { margin: 0; background: transparent; color: var(--fg); font: 12.5px/1.4 var(--font); }
       body { box-sizing: border-box; max-height: 100vh; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
       .card { position: relative; display: flex; flex-direction: column; gap: 7px; padding: 11px 12px 12px; background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: 10px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35), 0 0 0 0.5px rgb(0 0 0 / 0.4); }
+      .card.alert { border-left-color: var(--muted); } .card.alert .dot { background: var(--muted); animation: none; } .origin { color: var(--muted); font-size: 11px; margin: 0 22px 4px 0; overflow-wrap: anywhere; } /* S10: a message's own look, never an ask's */
       .card.ok { border-left-color: var(--done); } .card.bad { border-left-color: var(--error); } .card.info { border-left-color: var(--accent); }
       .card.ok .dot { background: var(--done); animation: none; } .card.bad .dot { background: var(--error); animation: none; } .card.info .dot { background: var(--accent); animation: none; }
       .all { display: flex; justify-content: flex-end; padding: 0 4px; }

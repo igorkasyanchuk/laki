@@ -715,6 +715,7 @@ async function main() {
       }
       // what turning it on runs, and its files' hash: laki widget on <id> --seen <hash> holds only for those files
       if (sub === 'what') {
+        if (typeof flags.full === 'string') return (r => out(r, r.text))(await rpc<{ text: string }>('widgetFull', { id, file: flags.full })) // S10: a file the sheet cut, whole
         const r: { name: string; on: boolean; text: string; hash: string } = await rpc('widgetWhat', { id })
         return out(r, `${r.name} (${r.on ? 'on' : 'off'})\n\n${r.text}\n\nlaki widget on ${id} --seen ${r.hash}`)
       }

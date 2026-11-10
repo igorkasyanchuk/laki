@@ -378,3 +378,22 @@ test("S8: a repo extension's same-size edit with its mtime restored is off at on
   assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo: off until you look/)
   assert.ok(!existsSync(pwned), "the new code didn't run")
 })
+
+// S10: a file the turn-on sheet cuts is said loudly, and Turn on waits until it's been opened whole; the files it hashes
+// but doesn't show are named
+test("S10: the trust sheet says what it cut and names what it doesn't show; on only once each cut file is opened in full", async t => {
+  const rig = await fresh(t)
+  const long = `${'echo padding\n'.repeat(4000)}echo '{"n": 1}'\n`
+  ext(rig.repo, 'big', { name: 'Big', fetch: 'sh fetch.sh' }, { 'fetch.sh': long, 'data.txt': 'just data\n' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const id = `${p.id}.big`
+  const what = await rig.rpc('widgetWhat', { id })
+  assert.match(what.text, new RegExp(`fetch\\.sh: \\*\\*CUT, showing 3,000 of ${long.length.toLocaleString('en-US')} characters\\*\\*`))
+  assert.deepEqual(what.cut, ['fetch.sh'])
+  assert.match(what.text, /Not shown here[^]*data\.txt/)
+  await assert.rejects(rig.rpc('widgetSet', { id, on: true, seen: what.hash }), /the sheet cut fetch\.sh: open it in full first/)
+  await assert.rejects(rig.rpc('widgetFull', { id, file: 'data.txt' }), /not one the sheet cut/)
+  assert.equal((await rig.rpc('widgetFull', { id, file: 'fetch.sh' })).text, long)
+  await rig.rpc('widgetSet', { id, on: true, seen: what.hash })
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
+})
