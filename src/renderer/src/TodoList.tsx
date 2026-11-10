@@ -5,7 +5,7 @@
 // only as it opens (App's lazy import), BlockNote with it. App.tsx passes a TodoListApi.
 import { useEffect, useRef, useState } from 'react'
 import { SpecEditor } from './SpecEditor'
-import { Icon, Page } from './ui'
+import { Ghosts, Icon, Page } from './ui'
 
 export type TodoListApi = { call<T = any>(method: string, params?: object): Promise<T> }
 type List = { blocks: unknown[]; md: string; at: number }
@@ -37,6 +37,14 @@ export default function TodoListPage({ api, onClose }: { api: TodoListApi; onClo
         {err && <p className="warn small">{err}</p>}
         {list && !md.replace(/^\s*- \[[ x]\]\s*$/gm, '').trim() /* nothing written yet (an empty to-do aside) */ && (
           <div className="note-empty todo-empty">
+            <Ghosts className="todo-ghosts">
+              {([['Reply to the review on the cart PR', true], ['Try the new onboarding on a clean install', false], ['Write the release notes', false]] as const).map(([text, done]) => (
+                <label key={text} className="ghost">
+                  <input type="checkbox" checked={done} readOnly tabIndex={-1} />
+                  <span className={done ? 'done' : ''}>{text}</span>
+                </label>
+              ))}
+            </Ghosts>
             <Icon name="listChecks" size={28} />
             <b>Your to-dos</b>
             <p className="muted small">One checklist of your own, for any project. Enter makes the next to-do, Tab puts one under the one above, # a heading; a tick keeps it until you delete it.</p>

@@ -67,6 +67,17 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
       { label: 'Delete…', icon: 'trash', danger: true, run: () => remove(n) },
     ])
   )
+  // a note's row: the list's, and the empty list's samples (B6)
+  const row = (n: Item) => (
+              <button key={n.id} type="button" className={`note-row ${n.id === open ? 'on' : ''}`} style={colorVar(n.color)} onClick={() => onOpen(n.id)} onContextMenu={e => rowMenu(e, n)}>
+                <span className="note-row-head">
+                  <b>{named(n)}</b>
+                  {n.pinned && <Icon name="pin" size={11} />}
+                </span>
+                {n.preview && <span className="note-prev">{n.preview}</span>}
+                <span className="note-when">{ago(n.at) || day(n.at)}</span>
+              </button>
+  )
   return (
     <Page
       title="Notes"
@@ -102,18 +113,9 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
           )}
           <div className="notes-list">
             {err && <p className="warn small">{err}</p>}
-            {list && !shown.length && !q && !only && <Ghosts rows={[['Release checklist', 'tests, notes, tag'], ['Ideas', 'what to build next'], ['Standup', 'yesterday, today, blocked']]} />}
+            {list && !shown.length && !q && !only && <Ghosts>{([['Release checklist', 'Tests, notes, tag', 'green', true], ['Ideas', 'What to build next', 'yellow', false], ['Standup', 'Yesterday, today, blocked', undefined, false]] as const).map(([title, preview, color, pinned], i) => row({ id: `sample-${i}`, title, preview, color, pinned, created: Date.now(), at: Date.now() - i * 3_600_000 }))}</Ghosts>}
             {list && !shown.length && <p className="muted small notes-none">{q || only ? 'No note matches.' : 'No notes yet: New note writes one.'}</p>}
-            {shown.map(n => (
-              <button key={n.id} type="button" className={`note-row ${n.id === open ? 'on' : ''}`} style={colorVar(n.color)} onClick={() => onOpen(n.id)} onContextMenu={e => rowMenu(e, n)}>
-                <span className="note-row-head">
-                  <b>{named(n)}</b>
-                  {n.pinned && <Icon name="pin" size={11} />}
-                </span>
-                {n.preview && <span className="note-prev">{n.preview}</span>}
-                <span className="note-when">{ago(n.at) || day(n.at)}</span>
-              </button>
-            ))}
+            {shown.map(row)}
           </div>
         </aside>
         {side && <Edge x={{ left: sideW }} to={(x, box) => setSideW(Math.round(Math.max(200, Math.min(x - box.left, 560, box.width - 360))))} done={() => keep(SIDE_W, sideW)} reset={() => (setSideW(SIDE_INIT), keep(SIDE_W, SIDE_INIT))} />}

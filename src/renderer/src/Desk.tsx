@@ -320,7 +320,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       )}
       {!here.length ? (
         <div className="desk-empty">
-          <Ghosts rows={[['My PRs', '3 open · 1 needs a review'], ['Today', '4 turns · 2 workspaces waiting'], ['Links', 'the staging site, the board, the docs']]} />
+          <Ghosts className="tiles" rows={[['My PRs', '3 open · 1 needs a review'], ['Today', '4 turns · 2 workspaces waiting'], ['Links', 'the staging site, the board, the docs']]} />
           <b>My Desk is empty</b>
           <p className="muted small">
             Put extensions here (your PRs, links, ones you build with Laki AI) as tiles of any size: an overview of what's

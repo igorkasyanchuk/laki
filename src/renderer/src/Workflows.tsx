@@ -200,6 +200,40 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
     </nav>
   )
 
+  // a workflow's row: the list's, and the empty list's samples (B6)
+  const wfRow = (w: WorkflowItem) => {
+                  const n = going.filter(r => runOf(r, w)).length
+                  return (
+                    <div className="sched-row">
+                      <span className="sched-icon">
+                        <Icon name="flow" />
+                      </span>
+                      <button type="button" className="sched-main" data-tip="Open" onClick={() => setAt({ kind: 'wf', sel: w })}>
+                        <span className="sched-name">{w.name}</span>
+                        <span className="sched-meta">
+                          {w.problems.length ? <b className="wf-bad">{w.problems[0]}</b> : <span>{w.desc || `${w.blocks.length} blocks`}</span>}
+                          {n > 0 && <span className="sched-next">{n} running</span>}
+                          {queued.some(r => runOf(r, w)) && <span className="sched-next">{queued.filter(r => runOf(r, w)).length} queued</span>}
+                        </span>
+                        <span className="sched-tags">
+                          <span className="tag">{w.source === 'project' ? pname(w.project) : 'yours'}</span>
+                          <span className="tag">{WHERE_TAGS[w.where]}</span>
+                          <span className="tag">{w.blocks.length} blocks</span>
+                          {w.stats?.paused && <span className="tag bad" data-tip={`${w.stats.paused.why}: events and its schedules don't start it until you turn it on again (its ⋯)`}>Paused</span>}
+                          {w.stats && <StatChips s={w.stats} />}
+                          {w.byAgent && <span className="tag warn">by an agent</span>}
+                          {w.untrusted && !w.byAgent && <span className="tag warn">{w.changed ? 'changed' : 'not allowed'}</span>}
+                          {w.untrusted && !!w.skipped && <span className="tag warn" data-tip="Events or scheduled runs that didn’t start it since Laki started">{w.skipped === 1 ? '1 event skipped' : `${w.skipped} events skipped`}</span>}
+                          {drafts.has(keyOf(w)) && <span className="tag warn">unsaved changes</span>}
+                        </span>
+                      </button>
+                      <span className="sched-acts">
+                        <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w))} />
+                        <IconButton icon="more" title="More: copy, delete" onClick={e => wfMenu(e, w)} />
+                      </span>
+                    </div>
+                  )
+  }
   return (
     <Page title="Workflows" head={crumbs} wide={at.kind !== 'index'} esc={false} onClose={onClose}>
       {at.kind === 'index' ? (
@@ -305,43 +339,15 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                 what="workflows"
                 onMove={(keys, group) => void regroup(keys, group)}
                 onTurn={(keys, on) => void Promise.all(mine.filter(w => keys.includes(keyOf(w))).map(w => api.call('flowPause', { id: w.id, source: w.source, project: w.project, on }))).then(refresh, e => api.toast((e as Error).message))}
-                row={w => {
-                  const n = going.filter(r => runOf(r, w)).length
-                  return (
-                    <div className="sched-row">
-                      <span className="sched-icon">
-                        <Icon name="flow" />
-                      </span>
-                      <button type="button" className="sched-main" data-tip="Open" onClick={() => setAt({ kind: 'wf', sel: w })}>
-                        <span className="sched-name">{w.name}</span>
-                        <span className="sched-meta">
-                          {w.problems.length ? <b className="wf-bad">{w.problems[0]}</b> : <span>{w.desc || `${w.blocks.length} blocks`}</span>}
-                          {n > 0 && <span className="sched-next">{n} running</span>}
-                          {queued.some(r => runOf(r, w)) && <span className="sched-next">{queued.filter(r => runOf(r, w)).length} queued</span>}
-                        </span>
-                        <span className="sched-tags">
-                          <span className="tag">{w.source === 'project' ? pname(w.project) : 'yours'}</span>
-                          <span className="tag">{WHERE_TAGS[w.where]}</span>
-                          <span className="tag">{w.blocks.length} blocks</span>
-                          {w.stats?.paused && <span className="tag bad" data-tip={`${w.stats.paused.why}: events and its schedules don't start it until you turn it on again (its ⋯)`}>Paused</span>}
-                          {w.stats && <StatChips s={w.stats} />}
-                          {w.byAgent && <span className="tag warn">by an agent</span>}
-                          {w.untrusted && !w.byAgent && <span className="tag warn">{w.changed ? 'changed' : 'not allowed'}</span>}
-                          {w.untrusted && !!w.skipped && <span className="tag warn" data-tip="Events or scheduled runs that didn’t start it since Laki started">{w.skipped === 1 ? '1 event skipped' : `${w.skipped} events skipped`}</span>}
-                          {drafts.has(keyOf(w)) && <span className="tag warn">unsaved changes</span>}
-                        </span>
-                      </button>
-                      <span className="sched-acts">
-                        <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w))} />
-                        <IconButton icon="more" title="More: copy, delete" onClick={e => wfMenu(e, w)} />
-                      </span>
-                    </div>
-                  )
-                }}
+                row={wfRow}
               />
             ) : (
               <>
-              <Ghosts rows={[['Ship a feature', 'plan → ask me → build → test → open a PR'], ['Fix a bug', 'reproduce → fix → run the tests → review'], ['Weekly cleanup', 'find dead code → remove it → one PR']]} />
+              <Ghosts>
+                {([['Ship a feature', 'Plan, ask me, build, test, open a PR', 6], ['Fix a bug', 'Reproduce, fix, run the tests, review', 5], ['Weekly cleanup', 'Find dead code, remove it, one PR', 4]] as const).map(([name, desc, n]) => (
+                  <Fragment key={name}>{wfRow({ id: `sample-${n}`, name, desc, where: 'worktree', blocks: Array(n).fill({}), source: 'yours', problems: [], text: '' } as unknown as WorkflowItem)}</Fragment>
+                ))}
+              </Ghosts>
               <div className="sched-empty">
                 <Icon name="flow" size={18} />
                 <span>

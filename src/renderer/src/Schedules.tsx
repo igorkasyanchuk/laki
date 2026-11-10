@@ -1,7 +1,7 @@
 // Scheduled tasks (the clock at the bottom of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
@@ -315,6 +315,49 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const shown = allRuns ? runs : runs.slice(0, RUNS)
   const valid = !!rule && !('error' in rule)
 
+  // a task's row: the list's, and the empty list's samples (B6)
+  const row = (s: Schedule) => (
+                <div className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
+                  {((k: IconName) => (
+                    <span className="sched-icon" data-kind={k}>
+                      <Icon name={k} />
+                    </span>
+                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' || s.ws === 'same' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
+                  <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
+                    <span className="sched-name">{s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt)}</span>
+                    <span className="sched-meta">
+                      <b>{describe(s.rule)}</b>
+                      {s.on && s.next ? (
+                        <span className="sched-next" data-tip={at(s.next)}>
+                          next {soon(s.next)}
+                        </span>
+                      ) : (
+                        <span>{s.rule.once && s.last ? 'ran' : 'off'}</span>
+                      )}
+                    </span>
+                    <span className="sched-tags">
+                      <span className="tag">{nameOf(s.project)}</span>
+                      {s.workflow ? (
+                        <span className="tag">workflow: {flowName(s.workflow)}</span>
+                      ) : s.widget ? (
+                        <span className="tag">{s.name ? `extension: ${extName(s.widget, s.action)}` : 'extension'}</span>
+                      ) : (
+                        <>
+                          <span className="tag">{s.preset}</span>
+                          <span className="tag">{s.ws === 'same' && s.sameWs ? `the same one each run: ${view.workspaces.find(w => w.id === s.sameWs)?.name || s.sameWs}` : where(s.ws)}{s.fresh ? ', fresh each run' : ''}</span>
+                          {s.base && <span className="tag">off {s.base}</span>}
+                          {s.noSetup && <span className="tag">no setup</span>}
+                        </>
+                      )}
+                    </span>
+                  </button>
+                  <span className="sched-acts">
+                    {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
+                    <IconButton icon="archive" title="Archive: off the list, never runs; Archived below brings it back" onClick={() => void archive(s, true)} />
+                  </span>
+                  <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
+                </div>
+  )
   return (
     <Page title="Scheduled tasks" esc={false} onClose={onClose}>
       <div className="schedules">
@@ -473,52 +516,15 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               what="tasks"
               onMove={(ids, group) => void Promise.all(ids.map(id => api.set({ id, group }))).catch(fail)}
               onTurn={(ids, on) => void Promise.all(ids.map(id => api.set({ id, on }))).catch(fail)}
-              row={s => (
-                <div className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
-                  {((k: IconName) => (
-                    <span className="sched-icon" data-kind={k}>
-                      <Icon name={k} />
-                    </span>
-                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' || s.ws === 'same' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
-                  <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
-                    <span className="sched-name">{s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt)}</span>
-                    <span className="sched-meta">
-                      <b>{describe(s.rule)}</b>
-                      {s.on && s.next ? (
-                        <span className="sched-next" data-tip={at(s.next)}>
-                          next {soon(s.next)}
-                        </span>
-                      ) : (
-                        <span>{s.rule.once && s.last ? 'ran' : 'off'}</span>
-                      )}
-                    </span>
-                    <span className="sched-tags">
-                      <span className="tag">{nameOf(s.project)}</span>
-                      {s.workflow ? (
-                        <span className="tag">workflow: {flowName(s.workflow)}</span>
-                      ) : s.widget ? (
-                        <span className="tag">{s.name ? `extension: ${extName(s.widget, s.action)}` : 'extension'}</span>
-                      ) : (
-                        <>
-                          <span className="tag">{s.preset}</span>
-                          <span className="tag">{s.ws === 'same' && s.sameWs ? `the same one each run: ${view.workspaces.find(w => w.id === s.sameWs)?.name || s.sameWs}` : where(s.ws)}{s.fresh ? ', fresh each run' : ''}</span>
-                          {s.base && <span className="tag">off {s.base}</span>}
-                          {s.noSetup && <span className="tag">no setup</span>}
-                        </>
-                      )}
-                    </span>
-                  </button>
-                  <span className="sched-acts">
-                    {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
-                    <IconButton icon="archive" title="Archive: off the list, never runs; Archived below brings it back" onClick={() => void archive(s, true)} />
-                  </span>
-                  <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
-                </div>
-              )}
+              row={row}
             />
           ) : (
             <>
-            <Ghosts rows={[['Review yesterday\'s PRs', 'weekdays at 9:00 · claude'], ['Update dependencies', 'Mondays at 8:00 · codex'], ['Check the nightly build', 'once, tomorrow at 7:30']]} />
+            <Ghosts>
+              {([["Review yesterday's PRs", 'weekdays at 9:00', 'claude'], ['Update dependencies', 'every monday at 8:00', 'codex'], ['Check the nightly build', 'every day at 7:30', 'claude']] as const).flatMap(([name, when, preset], i) =>
+                (rule => ('error' in rule ? [] : [<Fragment key={name}>{row({ id: `sample-${i}`, name, project: only || view.projects[0]?.id || '', preset, ws: 'new', prompt: '', when, rule, on: true, next: Date.now() + (i + 2) * 3_600_000 })}</Fragment>]))(parseWhen(when)),
+              )}
+            </Ghosts>
             <div className="sched-empty">
               <Icon name="clock" size={18} />
               <span>

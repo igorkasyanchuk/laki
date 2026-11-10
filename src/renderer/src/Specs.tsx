@@ -19,7 +19,7 @@ import { ReadDiagram, SpecEditor, useEscape } from './SpecEditor'
 import { type Img, PromptInput, useDraft } from './PromptInput'
 import { normalizeDiagram } from './specmd'
 import { shortPath } from './text'
-import { ask, Icon, IconButton, keep, load as stored, type MenuItem, Page, useMenu } from './ui'
+import { Ghosts, ask, Icon, IconButton, keep, load as stored, type MenuItem, Page, useMenu } from './ui'
 
 export type SpecsApi = {
   call: <T = any>(method: string, params?: object) => Promise<T>
@@ -198,6 +198,8 @@ export function SpecsPage({ projects, at, api, onNav, onClose }: { projects: Pro
             (words.length || project || matching.length ? (
               <div className="plans-empty muted small">{`No ${only ? KIND_WORDS[only][0].toLowerCase() : 'specs or brainstorms'} here.`}</div>
             ) : (
+              <>
+              {!only && <Ghosts><div className="plans-rows">{([['Checkout: guest orders', 'spec', 2], ['How should search work?', 'brainstorm', 0], ['Dark mode', 'spec', 1]] as const).map(([title, kind, files], i) => row({ project: project || projects[0]?.id || '', kind, slug: `sample-${i}`, title, at: Date.now() - (i + 1) * 3_600_000, path: '', files }))}</div></Ghosts>}
               <div className="note-empty plans-none">
                 <Icon name={only ? kindIcon(only) : 'spec'} size={28} />
                 <b>{only ? `Your ${KIND_WORDS[only][0].toLowerCase()}` : 'Your specs and brainstorms'}</b>
@@ -210,6 +212,7 @@ export function SpecsPage({ projects, at, api, onNav, onClose }: { projects: Pro
                   ))}
                 </div>
               </div>
+              </>
             ))
           )}
         </div>

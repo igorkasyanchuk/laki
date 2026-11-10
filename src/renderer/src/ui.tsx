@@ -75,16 +75,18 @@ export function Countdown({ to }: { to: number }) {
 
 // the turn timer (settings.timers): since the earliest turn going among these tabs
 // B6: an empty page shows what it will hold: a few sample rows, faint, not for the screen reader or the pointer
-// ponytail: plain rows (a title and a line), not each page's own row component with sample props
-export function Ghosts({ rows }: { rows: [string, string][] }) {
+// children: the page's own rows, drawn from sample items (inert: no click, no Tab stop); rows: a title and a line each,
+// where a page has no row to borrow (My Desk's tiles are extensions)
+export function Ghosts({ rows, children, className = '' }: { rows?: [string, string][]; children?: ReactNode; className?: string }) {
   return (
-    <div className="ghosts" aria-hidden>
-      {rows.map(([a, b]) => (
-        <div key={a} className="ghost">
-          <b>{a}</b>
-          <span>{b}</span>
-        </div>
-      ))}
+    <div className={`ghosts ${className}`} aria-hidden inert>
+      {children ??
+        rows?.map(([a, b]) => (
+          <div key={a} className="ghost">
+            <b>{a}</b>
+            <span>{b}</span>
+          </div>
+        ))}
     </div>
   )
 }
