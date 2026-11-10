@@ -34,6 +34,8 @@
 .wf-page button.small { padding: 2px 8px; font-size: var(--fs-2); display: inline-flex; align-items: center; gap: 4px; }
 .wf-problems { color: var(--waiting); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 .wf-problems::before { content: '⚠ '; }
+.wf-hint { color: var(--muted); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; } /* W1: outside text to an agent that doesn't ask */
+.wf-hint::before { content: 'ⓘ '; }
 .wf-split { flex: 1; min-height: 0; display: flex; }
 .wf-scroll { position: relative; flex: 1; min-width: 0; overflow: auto; background-image: radial-gradient(color-mix(in srgb, var(--fg) 9%, transparent) 1.2px, transparent 1.3px); background-size: 18px 18px; }
 .wf-canvas { position: relative; min-width: 100%; min-height: 100%; }

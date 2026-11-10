@@ -47,6 +47,14 @@ Out of scope:
 - an agent doing what its own permission mode allows;
 - a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
 
+### Workflows: text from outside in an agent's prompt
+
+A workflow's agent block or AI call that uses text from outside Laki (an issue's title or body from GitHub, a webhook's
+JSON, an extension's or an agent's event, the agent's own words in Laki's events, a command's output, a CI log) gets
+it fenced under a line saying whose it is and that it's data, never instructions; a single plain word (a number, a
+branch, a URL) stays inline. A command gets the same values through its environment, never as code. The editor says
+when such text goes to an agent that acts without asking.
+
 ### Scheduled tasks on events
 
 A task on a GitHub event (CI failing, a PR, an issue, a push) gets the event's title in its prompt only fenced, under a

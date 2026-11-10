@@ -4,6 +4,7 @@
 // (.laki/workflows/<id>.md in its repo). This file is the format both sides share: parse, toFile, check.
 
 import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDGET_EVENTS } from './types.ts'
+import { fenced, plain, untrusted } from './fence.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -815,6 +816,40 @@ export function jsonFill(t: string, vars: Record<string, string | undefined>) {
 
 // {{name}} from a run's variables; an unknown one stays as it is
 export const fill = (text: string, vars: Record<string, string | undefined>) => String(text ?? '').replace(/\{\{\s*([\w.?-]+)\s*\}\}/g, (m, k: string) => vars[k] ?? m)
+
+// W1: a variable from outside Laki, and whose: an event's fields when GitHub (issue.labeled), a webhook's sender or an
+// extension or agent (custom.*) sent it, the agent's own words in Laki's own events (a turn's last answer, its
+// question, its error; a run's why), a run block's output, a webhook block's answer, a CI log. Laki's own fields (a
+// workspace's name, a tab's kind) aren't
+const AGENT_WORDS = ['event.last', 'event.question', 'event.error', 'event.why']
+export const outsideOn = (on?: string) => on === 'issue.labeled' || on === 'webhook' || !!on?.startsWith('custom.')
+export function outsideVar(k: string, on: string | undefined, blocks: Pick<Block, 'id' | 'kind'>[]): string | undefined {
+  if (k.startsWith('event.')) return on === 'issue.labeled' ? 'from GitHub, where anyone can write it' : on === 'webhook' ? "from a webhook's sender" : outsideOn(on) ? 'from an extension or an agent' : AGENT_WORDS.includes(k) ? "an agent's own words" : undefined
+  const m = /^steps\.(.+)\.(output|log)$/.exec(k)
+  if (!m) return
+  if (m[2] === 'log') return "a CI log, the PR's own code's output"
+  const b = blocks.find(x => x.id === m[1])
+  return b?.kind === 'run' ? "a command's output" : b?.kind === 'webhook' ? "a webhook's answer" : undefined
+}
+// an agent's or a model's prompt (not a run's command: its values go through env; nor a case's test): an outside
+// variable's value fenced under a line that says whose it is and that it's data, the fence longer than any backticks in
+// it (so nothing inside closes it), cut at max; one plain word (a number, a branch, a URL) inline
+export const fillData = (text: string, vars: Record<string, string | undefined>, whose: (k: string) => string | undefined, max: number) =>
+  String(text ?? '').replace(/\{\{\s*([\w.?-]+)\s*\}\}/g, (m, k: string) => {
+    const v = vars[k]
+    if (v === undefined) return m
+    const w = whose(k)
+    return !w || plain(v) ? v : `\n${untrusted(`{{${k}}}, ${w}`)}\n${fenced(v.slice(0, max))}\n`
+  })
+// the editor's hints (not problems: it runs as it is): an agent that acts without asking on outside text
+export function hints(wf: Workflow): string[] {
+  const out: string[] = []
+  for (const b of wf.blocks.filter(x => x.kind === 'agent' && ['auto', 'acceptEdits', 'bypassPermissions'].includes(permOf(wf, x) ?? ''))) {
+    const used = [...new Set([...(b.text ?? '').matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(k => outsideVar(k, wf.on, wf.blocks)))]
+    if (used.length) out.push(`${blockName(b)}: {{${used[0]}}}${used.length > 1 ? ` and ${used.length - 1} more` : ''}: this text comes from outside: the agent is told it is data`)
+  }
+  return out
+}
 
 // a run block's command, its {{vars}} as env references a shell never reads as code: unquoted "$LAKI_V_n", inside
 // double quotes $LAKI_V_n"" (the "" ends the name, in POSIX shells and fish alike), the values in env. Inside single

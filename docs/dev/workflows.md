@@ -208,6 +208,17 @@ and `webhook` (`hookServe`: its own server, below in remote.md). Both are emitte
 payload's `project` instead (`pj`; `here` refused), and so do a repo extension's (widgetEvents.ts) and the project's
 own workflows. Tested in `test/inbound.test.ts`.
 
+Outside text in prompts (W1): `outsideVar(k, on, blocks)` (shared/workflow.ts) says whose a variable is when it isn't
+Laki's: `event.*` of `issue.labeled` (GitHub), `webhook` and `custom.*` (an extension's or an agent's emit), the
+agent's own words in Laki's events (`event.last`, `.question`, `.error`, `.why`), a run block's `steps.<id>.output`, a
+webhook block's, and any `steps.<id>.log` (a CI log). An agent block's prompt (its action's text too) and an AI call's
+prompt and system go through `dataFill` → `fillData`: such a value is a fenced block (shared/fence.ts `fenced`: longer
+than any backticks in it) under `untrusted`'s line naming the variable and whose it is, cut at `ANSWER_MAX`; one plain
+word (`plain`: a number, a branch, a URL) inline. Not a run's command (`shellFill`'s env), a case's test or a file's
+text. `hints(wf)`: the editor's (`.wf-hint`, not a problem: it runs), an agent block with perm auto, acceptEdits or
+bypassPermissions using one. The run's event is its trigger's (`event <name>`, `try <name>`). Kept: an outside event is
+`from: { agent }`, so bypassPermissions and run blocks refuse to start on it (`fromEvent`). `test/workflow-events.test.ts`.
+
 Events (`eventHooks.flows`, after the setting): `heard` keeps each project's newest payload of each event (`HEARD_MAX` 200, the oldest go), `lastEvents`
 each workflow's last `FLOW_HEARD` (5) outcomes (`FlowHeard`: at, event, ws, run or why; the item's `events`, its settings'
 *Last 5 events*), in memory (`note`, and `refused`'s skip, bump `flowFiles.heard`: the view's `flowHeard`, the page's). `fromEvent(wf, name, payload, ws, o)`, one path for a real

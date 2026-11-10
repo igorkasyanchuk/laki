@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { queueOrder, ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
@@ -360,6 +360,9 @@ function varsOf(r: FlowRun): Record<string, string> {
   return { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
 }
 
+// W1: what an agent's or a model's prompt fills: outside variables fenced as data (fillData). The run's event: its trigger's
+const dataFill = (r: FlowRun, text: string, vars: Record<string, string>) => fillData(text, vars, k => outsideVar(k, /^(?:event|try) (.+)$/.exec(r.trigger)?.[1], r.flow.blocks), ANSWER_MAX)
+
 // an event's fields as {{event.<path>}}: each leaf by its path, an object or list also whole (JSON), 2000 keys at most
 function eventVars(ev: unknown) {
   const out: Record<string, string> = {}
@@ -592,7 +595,7 @@ async function work(r: FlowRun, b: Block) {
     case 'run':
       return command(r, b)
     case 'llm':
-      return sent(r, b, llmSend(b, vars, `${r.flow.name} · ${blockName(b)}`))
+      return sent(r, b, llmSend(b, vars, `${r.flow.name} · ${blockName(b)}`, (t, v) => dataFill(r, t, v)))
     case 'decide':
       return sent(r, b, decideSend(b, vars, before(r, vars), `${r.flow.name} · ${blockName(b)}`))
     case 'webhook': {
@@ -757,7 +760,7 @@ function agent(r: FlowRun, b: Block) {
   const action = findAction(g, own, b.use)
   if (b.use && !action) throw new Error(`no agent action “${b.use}” here (Settings › Actions, or the project's)${(x => (x.length ? `: ${x.join(', ')}` : ''))(mergeActions(g, own).map(a => a.slug ?? a.name))}`)
   const vars = varsOf(r)
-  const prompt = [...[action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => fill(t!, vars)), b.out?.length ? outAsk(b.out) : b.json && jsonAsk].filter(Boolean).join('\n\n')
+  const prompt = [...[action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => dataFill(r, t!, vars)), b.out?.length ? outAsk(b.out) : b.json && jsonAsk].filter(Boolean).join('\n\n')
   const preset = b.agent || 'claude'
   const ag = agentOf(preset)
   if (ag === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
@@ -978,11 +981,11 @@ async function sent(r: FlowRun, b: Block, send: Send) {
 }
 
 // an AI call: the prompt (and out:'s ask) to OpenRouter, its answer as {{steps.<id>.answer}}
-function llmSend(b: Block, vars: Record<string, string>, ask: string): Send {
-  const prompt = [fill(b.text ?? '', vars), b.out?.length && outAsk(b.out)].filter(Boolean).join('\n\n')
+function llmSend(b: Block, vars: Record<string, string>, ask: string, f: (text: string, vars: Record<string, string>) => string = fill): Send { // f: a run's dataFill (W1); Test's: as typed
+  const prompt = [f(b.text ?? '', vars), b.out?.length && outAsk(b.out)].filter(Boolean).join('\n\n')
   return async (signal, say) => {
     say(`${blockName(b)}: asks ${b.model || 'Settings › AI’s model'}`, prompt)
-    const a = await aiComplete({ model: b.model, prompt, system: b.system && fill(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask })
+    const a = await aiComplete({ model: b.model, prompt, system: b.system && f(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask })
     say(`${a.model} answered${a.cost ? ` ($${a.cost.toFixed(4)})` : ''}`, a.text)
     return { exit: 'ok', why: `${a.model}: “${clip(a.text, 80)}”`, vars: { [`steps.${b.id}.answer`]: a.text.slice(-ANSWER_MAX) }, text: a.text, cost: a.cost }
   }

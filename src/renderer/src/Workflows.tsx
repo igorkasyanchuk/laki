@@ -9,7 +9,7 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { queueOrder, ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, hints, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -745,6 +745,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
   const parsed = useMemo(() => parse(text, item.id), [text])
   const wf = parsed.workflow
   const problems = [...parsed.problems, ...check(wf)]
+  const tips = problems.length ? [] : hints(wf) // W1: runs as it is, said
   const dirty = text !== item.text
   const [doomed, setDoomed] = useState<string | null>(null) // the block its trash is under the pointer: red on the canvas
   useEffect(() => setDoomed(null), [pick]) // another block's panel: not that one
@@ -940,6 +941,11 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         {problems.length > 0 && (
           <span className="wf-problems" data-tip={problems.join('\n')}>
             {problems.length === 1 ? problems[0] : `${problems[0]} · ${problems.length - 1} more`}
+          </span>
+        )}
+        {tips.length > 0 && (
+          <span className="wf-hint" data-tip={tips.join('\n')}>
+            {tips.length === 1 ? tips[0] : `${tips[0]} · ${tips.length - 1} more`}
           </span>
         )}
       </div>
