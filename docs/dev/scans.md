@@ -256,6 +256,36 @@ a draft, `any`), `issues` (`gh issue list`, a `label`: created since the task's 
 workspace; the run's `{{check}}` in its prompt is the command's first line, the PRs' or issues' numbers, the head.
 main.ts refuses `onlyIf.cmd` from an agent (`agentNo`), and remote access can't `scheduleSet` at all.
 
+On an event (T4, `trigger`: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`; `branch`, `label`, `by`
+others|me, `gap` minutes, unset 30, `perDay`, unset 10; an agent's task only): no times (`when` '', an empty `rule`,
+no `next`). `eventTick` (3 minutes, slow while idle; `LAKI_EVENT_TICK_MS`; skipped while `quotaLow`, the PR scans'
+rule) reads each GitHub project on this Mac once per kind a tick, its tasks sharing the answer (`ask`'s memo): `gh run
+list --branch` (completed failures by run id; a `pull_request` run on the branch is a fork's), `gh pr list` (opened: a
+number past `marks.pr`; reviewed: a PR's newest `latestReviews` past `marks.reviews`; `branch`: the PR's base), `gh
+issue list` (past `marks.issue`, `--label`), `git ls-remote origin` (`push`: the head past `marks.head`); `by` asks `gh
+api user` once. A task's first read only sets `marks` and `seen`. `onEvent`: once per id (`seen`, the last 50), a
+fork's is a `held` run (no workspace, a `scheduled` event; `scheduleRelease`, the page's *Run it*, starts it: yours
+only), then the gap since `last` and the runs today (logged skips), then `runSchedule`'s `event`: its words before
+what it did (`r.event`), `fillEvent` (shared/fence.ts: `{{event.url}}`, `.number`, `.branch` inline when plain, the
+title fenced under `untrusted`'s line, never inline; none named: *What started it: …* appended) and a PR's event's
+workspace linked to it (wsNew `linked`, guessed). ponytail: an incoming webhook doesn't feed them yet; an SSH host's
+project isn't read.
+
+A run's workspaces (T5, `ws: new` only): after a run starts, `keepTidy` archives the task's run workspaces past `keep`
+(unset 5, 0 all), oldest first, only when nothing is lost: wsArchive's `ifClean` (R1), no open PR, not pinned, no
+agent running or waiting; the rest are counted in `kept` (the row's *2 older runs kept: they have work*). `emptyGone`
+(unset: on): a run whose agent ended `done` with no diff against its base, nothing uncommitted and no PR (its stat read
+fresh: `wsStat`'s `fresh`) is archived then, and its log entry says so. Archive only: the branch and Restore stay.
+
+A failed run (T6, `settle`, not Run now's): a transient one (`TRANSIENT`: the network, a fetch, a lock, busy) gets
+`again: { at: +5 min }` and `retry` on its entry, run by `scheduleTick` (*tried again: …*) once: a second failure
+counts. At its agent's plan limit (`limitOf`: claude's, codex's usage at or past `usageAt`, `resetOf`'s reset) a run
+waits for the reset (`again`, why `limit`: *its plan limit reset: …*) if that's before its `deadline` (its next time,
+that day's `catchUntil`), else *skipped: plan limit*. `fails` counts failed runs in a row (a failed start, an agent that
+ended on an error, a workflow run that failed; a wait, a skip and Run now don't; `done` resets it); at 3 the task is off
+with `pausedWhy` and `pausedField` (`fieldOf`: base, ws, preset, widget, workflow), a `scheduled` event and a phone push
+once. The page shows it on top with *Fix*: its form, at that field. An edit that leaves it on clears them.
+
 ### Notifications
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind

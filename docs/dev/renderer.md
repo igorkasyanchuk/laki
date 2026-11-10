@@ -720,7 +720,11 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   names), the tasks (`.sched-list`, a row each: its where's icon, name, the rule and a `.sched-next` pill, tags for project,
   agent and where; ▷ and delete on hover; its switch last), the runs' log (`RUNS`, a round mark, `ago`, then
   *Show all*; a click goes to the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
-  `laki.runsSeen` (localStorage: the newest run the page showed).
+  `laki.runsSeen` (localStorage: the newest run the page showed). T4: *Or on an event* swaps the When field for
+  `.sched-event`'s chips (`EVENT_WORDS`' menu, a branch or a label, by whom; `triggerWords`), such tasks under *On
+  events*, a held run's *Run it* (`release`). T5: the *keeps its last* chip (`KEEPS`, emptyGone in its menu), a row's
+  kept tag. T6: `.sched-paused` on top for a task off after failing, *Fix* (`fix`: its form, `spot` focusing the
+  `data-field` of `pausedField`).
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset, then
   *Today* (the view's `today`: Meters, above).

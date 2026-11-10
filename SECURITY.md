@@ -47,6 +47,13 @@ Out of scope:
 - an agent doing what its own permission mode allows;
 - a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
 
+### Scheduled tasks on events
+
+A task on a GitHub event (CI failing, a PR, an issue, a push) gets the event's title in its prompt only fenced, under a
+line saying it's the outsider's text and data, never inline; its URL, number and branch only when they're plain
+(letters, digits, `/:.#-` and the like). A fork's PR, or a CI run of one, starts nothing: its run is held until you
+click *Run it* (an agent can't). At least 30 minutes between a task's runs and 10 a day, by default.
+
 ### Remote access: devices and PINs
 
 At a stable address (Tailscale, or My domain on your named tunnel) a page that opens remote access's link (and its PIN)

@@ -72,11 +72,12 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" | --on ci.failed|pr.opened|pr.review|issue.opened|push [--branch b] [--label l] [--by others|me|any] [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] [--keep-runs 5] [--keep-empty] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date; --only-if: run only when there's something
                                               to do (a skip is logged); {{check}}: what it found
   laki schedule on|off|run|archive|restore|rm <id>  turn one on or off, run it now, archive or restore it, delete it
+  laki schedule release <run>                 start a run held for your click (a fork's PR, on an event)
   laki flow [ls]                             workflows and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…] [--budget "30 min, $2"]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs; --budget: its working time and AI cost, past either it asks)
   laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]  as if on an event (its on: unless named; the last one heard, else a sample in --ws; --dry: its variables and only when: tests first)
@@ -328,11 +329,19 @@ there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a ru
 --base: the branch a new worktree starts off (new, and same's; gone when it runs: that run fails and says so).
 --no-setup: each new worktree without the project's setup script (new, and same's).
 {{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
+--on: instead of --when, a run on each GitHub event, read every few minutes: ci.failed (a CI run failing on --branch, its
+main unset), pr.opened, pr.review (--branch: PRs into it), issue.opened (--label), push (to --branch); --by others|me.
+{{event.title}}, {{event.url}}, {{event.number}}, {{event.branch}} in the prompt are its (the title fenced, as data); at
+least 30 minutes apart, 10 a day; a fork's PR is held until laki schedule release <run> (or Run it in the app).
+--keep-runs: a new workspace each run keeps its last N (5 unset, 0 all), older ones archived when they have nothing to
+lose; --keep-empty: keep a run that changed nothing (else archived as it ends). A failure that may pass (the network, a
+lock) is tried again 5 minutes on; an agent at its plan limit starts as it resets; 3 failures in a row turn it off.
 
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
   laki schedule add shop --when "fridays at 5pm" --base release/2.0 "Backport this week's fixes"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
   laki schedule add shop --when "weekdays at 7am" --only-if prs:failing "Fix the failing PRs: {{check}}"
+  laki schedule add shop --on ci.failed --branch main "CI failed on main: {{event.url}}. Find why and open a PR with the fix"
   laki schedule log`,
   alert: `An important card on the user's screen (bottom right, over every app and Space, until they close it), only
 when they ask for one ("show me an important alert", "ask me with a Laki alert") or their instructions (CLAUDE.md,

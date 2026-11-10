@@ -401,3 +401,35 @@ test('scheduled tasks: Archive takes one off the list and its runs, Restore brin
   await rig.rpc('scheduleRm', { id: s.id })
   assert.deepEqual((await rig.rpc('state')).schedules, [])
 })
+
+test('T5: keep 2 of 6 runs: the older ones archived (oldest first), a dirty and a pinned one kept and counted; an empty run archived as it ends', async t => {
+  const rig = await fresh(t)
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // the fake's PR for every branch: none (an open one is kept)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'x', when: 'every day at 2am', keep: -1 }), /keep how many/)
+  const s = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'hello', when: 'every day at 2am', keep: 2, emptyGone: false })
+  const ws = async () => (await rig.rpc('state')).workspaces.filter((w: any) => w.schedule === s.id)
+  const run = async () => {
+    const r = await rig.rpc('scheduleRun', { id: s.id })
+    await until(async () => (await rig.tab(r.ws))?.last === 'answer: hello', 'its agent done')
+    return r.ws as string
+  }
+  const ids = [await run(), await run(), await run()]
+  ids.push(await run()) // the 4th: the 2 oldest go
+  await until(async () => (await ws()).filter((w: any) => w.archived).length === 2, 'two archived')
+  assert.deepEqual((await ws()).filter((w: any) => w.archived).map((w: any) => w.id).sort(), ids.slice(0, 2).sort())
+  // the 3rd dirty, the 4th pinned: kept as the 6th starts, counted
+  const path3 = (await ws()).find((w: any) => w.id === ids[2]).path
+  writeFileSync(join(path3, 'work.txt'), 'mine')
+  await rig.rpc('wsSet', { id: ids[3], pinned: true })
+  ids.push(await run(), await run())
+  await until(async () => (await rig.rpc('state')).schedules.find((x: any) => x.id === s.id).kept === 2, '2 kept')
+  assert.deepEqual((await ws()).filter((w: any) => !w.archived).map((w: any) => w.id).sort(), ids.slice(2).sort())
+  // keep 0: all; emptyGone (unset: on): a run that changed nothing archived as it ends, said in its log entry
+  const e = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'nothing to do', when: 'every day at 3am', keep: 0 })
+  assert.equal(e.keep, 0)
+  const r = await rig.rpc('scheduleRun', { id: e.id })
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws).archived, 'the empty run archived')
+  await until(async () => /archived: it changed nothing$/.test((await rig.rpc('state')).runs.find((x: any) => x.id === r.id).what), 'said so')
+})

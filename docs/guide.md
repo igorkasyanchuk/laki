@@ -834,6 +834,18 @@ run fails, saying so.
   of yours (in the project folder, 60 s: exit 0 runs it). A skipped run is logged (muted; *Hide skipped* folds them)
   and starts no workspace. `{{check}}` in the prompt is what it found: the PRs' numbers, the issues', the command's
   first line. An agent can set the first ones on its own tasks, never a command.
+- *Or on an event* under the time: a run on each GitHub event instead of times (the *On events* section): CI failing
+  on a branch (its main unset), a PR opened or reviewed (into a branch; by others, by you), an issue opened (with a
+  label), a push. Laki reads them every few minutes; at least 30 minutes apart, 10 runs a day. `{{event.title}}`,
+  `{{event.url}}`, `{{event.number}}` and `{{event.branch}}` in the prompt are its (the title goes to the agent as the
+  outsider's text, never as an instruction), and a PR's run is linked to that PR. A fork's PR is held: *Run it* on its
+  log entry starts it (`laki schedule add <project> --on ci.failed …`, `laki schedule release <run>`).
+- A new workspace each run keeps its last 5 (the *keeps its last* chip: 1 to 10, or all): older ones are archived as a
+  new run starts, only when nothing would be lost (no uncommitted work, no open PR, not pinned, no agent at work; the
+  row counts the ones kept). A run that changed nothing is archived as its agent ends. Restore brings either back.
+- A failure that may pass (the network, a lock) is tried again 5 minutes later, once; an agent at its plan limit starts
+  as the limit resets (before the task's next time, else it's skipped). After 3 failures in a row the task turns off,
+  tells you once, and shows on top of the page with why and *Fix*, which opens its form at what broke.
 - Groups: a task's right click › *Move to group* › *New group…* names one; drag a task onto a group's head to move it
   there, a click on the head folds it, its ⋯ turns all of them on or off, renames or ungroups it. ⌘-click picks tasks
   (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.

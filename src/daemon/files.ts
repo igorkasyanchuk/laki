@@ -453,10 +453,10 @@ export async function mergeClean(w: Workspace): Promise<boolean | undefined> {
   return clean
 }
 // the hover card's: one workspace's now (the scan keeps only the shown ones'); none off a git repo or for a codespace asleep
-export async function wsStat(o: { ws: string }): Promise<Stat | null> {
+export async function wsStat(o: { ws: string; fresh?: boolean }): Promise<Stat | null> {
   const w = findWs(o.ws)
   if (w.archived || away(w) || state.projects.find(p => p.id === w.project)?.git === false || (!w.host && !existsSync(w.path))) return null
-  return stats.get(w.id) ?? statOf(w)
+  return (!o.fresh && stats.get(w.id)) || statOf(w) // fresh: read now, not the last scan's (a scheduled run's end)
 }
 // a window's workspace for the Review tab: its view's ws, else (none, or null: a page over it, an SSH host's) its tab's
 export const viewWs = (v: Conn['view']) => v && (v.ws ?? state.tabs.find(t => t.id === v.tab)?.workspace)

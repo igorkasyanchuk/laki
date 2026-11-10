@@ -264,7 +264,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   `archived`: true archives it (`archived` its time, no `next`, never due), false restores it (its `next` again if on),
   no checks, as off and a group;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
-  `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
+  `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock), `eventTick` (T4, `now`), `scheduleRelease` (`run`:
+  a held one, yours only); the CLI's `laki schedule`;
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app
   bundle's processes by `--type`, none on plain node, which the renderer names by main's `procs` IPC (each pid's
   holder: the window, a JS widget's or the video's frame (`framesInSubtree`: JS widgets share one process, one site),

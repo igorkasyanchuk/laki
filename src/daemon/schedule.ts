@@ -3,11 +3,13 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { flowsOn, HOME_ACCOUNT, isAgent, type OnlyIf, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type RunState, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
+import { flowsOn, HOME_ACCOUNT, isAgent, type OnlyIf, type Project, type TaskEvent, type TaskEventIn, type TaskMarks, type TaskTrigger, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type RunState, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, partsOf, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, git, log, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabsOf, tail, tracked, turnEnds, turnWaits, wsLog, wsNew } from './core.ts'
+import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, firstLine, ghCount, git, log, onGitHub, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabStatus, tabsOf, tail, tracked, turnEnds, turnWaits, wsArchive, wsLog, wsNew } from './core.ts'
+import { fillEvent, plain } from '../shared/fence.ts'
+import { quotaLow } from './pr.ts'
 import { dir, inRig } from './dir.ts'
 import { usage } from './usage.ts'
 import { meterView, statusLimits } from './meters.ts'
@@ -159,8 +161,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf' | 'trigger' | 'keep' | 'emptyGone'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf', 'trigger', 'keep', 'emptyGone'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -273,8 +275,22 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   delete s.catchup // edited: one waiting goes
   s.onlyIf = onlyIfOf(s.onlyIf, s) // T3
   if (!s.onlyIf) delete s.onlyIf, delete s.lastHead
+  // T5: its run workspaces kept (a new workspace each run only: unset 5, 0 all), one that did nothing archived as it ends
+  if (s.keep != null && (!Number.isInteger(s.keep) || s.keep < 0 || s.keep > 100)) throw new Error('keep how many of its workspaces? 0 (all) to 100')
+  if (s.emptyGone != null && typeof s.emptyGone !== 'boolean') throw new Error('emptyGone? true or false')
+  if (s.keep == null || s.ws !== 'new' || s.workflow || s.widget) delete s.keep, delete s.kept
+  if (s.emptyGone !== false || s.ws !== 'new' || s.workflow || s.widget) delete s.emptyGone
+  // T6: edited (on again, a field fixed): its failures start over
+  if (s.on) delete s.fails, delete s.pausedWhy, delete s.pausedField
+  delete s.again
   s.name = s.name?.trim() || undefined
-  if (!old || o.when !== undefined) {
+  // T4: on an event instead of a clock (no times, no next); what it heard starts over when the event changes
+  const trig = triggerOf(s.trigger, s)
+  const what = (t?: TaskTrigger) => JSON.stringify([t?.event, t?.branch, t?.label])
+  if (!trig || what(trig) !== what(old?.trigger)) delete s.marks, delete s.seen
+  if (trig) Object.assign(s, { trigger: trig, when: '', rule: { days: [], times: [] } })
+  else delete s.trigger
+  if (!trig && (!old || o.when !== undefined || old.trigger)) {
     const r = parseWhen(s.when ?? '')
     if ('error' in r) throw new Error(r.error)
     s.rule = r
@@ -355,6 +371,148 @@ async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string;
   return { check: line }
 }
 
+// ---------- T4: a task on an event instead of a clock: CI failing on a branch, a PR opened or reviewed, an issue opened,
+// a push. Heard by eventTick (every 3 minutes, slow while idle; never while GitHub's quota is low, as the PR scans): one
+// gh call per project and kind a tick, shared by its tasks. A task's first read only notes what's there (marks, seen).
+// ponytail: GitHub projects on this Mac only (no SSH host's); an incoming webhook (inHooks) doesn't feed them yet
+export const EVENTS: TaskEvent[] = ['ci.failed', 'pr.opened', 'pr.review', 'issue.opened', 'push']
+const EVENT_GAP = 30 // minutes between a task's runs (unset)
+const EVENT_DAY = 10 // runs a day at most (unset)
+const SEEN_KEPT = 50
+function triggerOf(v: unknown, s: Schedule): TaskTrigger | undefined {
+  if (v == null || v === '') return undefined
+  const o = v as Partial<Record<string, unknown>>
+  if (s.workflow || s.widget) throw new Error("on an event: that's for an agent's task (a workflow has its own on:)")
+  const event = o.event as TaskEvent
+  if (!EVENTS.includes(event)) throw new Error(`on which event? ${EVENTS.join(', ')}`)
+  const text = (k: string) => (typeof o[k] === 'string' ? (o[k] as string).trim().slice(0, 100) : '')
+  const branch = text('branch')
+  const label = text('label')
+  if (branch.startsWith('-')) throw new Error(`branch ${branch}? a branch, not an option`)
+  if (o.by != null && o.by !== 'others' && o.by !== 'me' && o.by !== 'any') throw new Error('by whom? others, me or any')
+  const num = (k: string, hi: number, what: string) => {
+    if (o[k] == null) return undefined
+    if (!Number.isInteger(o[k]) || (o[k] as number) < (k === 'gap' ? 0 : 1) || (o[k] as number) > hi) throw new Error(what)
+    return o[k] as number
+  }
+  const gap = num('gap', 1440, 'minutes between its runs? 0 to 1440')
+  const perDay = num('perDay', 100, 'runs a day at most? 1 to 100')
+  return { event, ...(branch && { branch }), ...(label && event === 'issue.opened' && { label }), ...(o.by && o.by !== 'any' && { by: o.by as 'others' | 'me' }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
+}
+
+type Ask = <T>(key: string, f: () => Promise<T>) => Promise<T>
+// what's new for one task since its last read: its marks and seen moved on (on the task as it is now: scheduleSet may
+// have replaced it meanwhile); the first read only sets them
+async function eventsOf(s: Schedule, p: Project, ask: Ask): Promise<TaskEventIn[]> {
+  const t = s.trigger!
+  const m = s.marks
+  const branch = t.branch || (await ask('main', async () => (await branches(p.id)).main)) || 'main'
+  const gh = <T>(args: string[]) => ask(args.join(' '), () => (ghCount(args), run('gh', args, { cwd: p.path, timeout: 30000, maxBuffer: 8 << 20 }).then(r => JSON.parse(String(r.stdout) || '[]') as T)))
+  const me = t.by ? await ask('me', () => run('gh', ['api', 'user', '--jq', '.login'], { timeout: 10000 }).then(r => String(r.stdout).trim().toLowerCase())) : ''
+  const whose = (login?: string) => !t.by || (t.by === 'me') === (!!login && login.toLowerCase() === me)
+  const marks: TaskMarks = {}
+  const seen = new Set(s.seen)
+  let out: TaskEventIn[] = []
+  if (t.event === 'ci.failed') {
+    // a run on the branch that ended failing, by its id (an older one may end after a newer); a pull_request run there is
+    // a fork's (a branch of the repo's own has its own name): held
+    type R = { databaseId: number; status?: string; conclusion?: string; event?: string; displayTitle?: string; url?: string }
+    const runs = await gh<R[]>(['run', 'list', '--branch', branch, '--limit', '20', '--json', 'databaseId,status,conclusion,event,displayTitle,url'])
+    const failed = runs.filter(r => r.status === 'completed' && /^(failure|timed_out|startup_failure)$/.test(r.conclusion ?? ''))
+    out = failed.map(r => ({ id: `ci:${r.databaseId}`, kind: t.event, words: `CI failed on ${branch}`, title: r.displayTitle, url: r.url, branch, ...(/^pull_request/.test(r.event ?? '') && { fork: true }) }))
+  } else if (t.event === 'pr.opened' || t.event === 'pr.review') {
+    type R = { number: number; title?: string; url?: string; author?: { login?: string }; headRefName?: string; baseRefName?: string; isCrossRepository?: boolean; latestReviews?: { author?: { login?: string }; state?: string; submittedAt?: string }[] }
+    const prs = (await gh<R[]>(['pr', 'list', '--state', 'open', '--limit', '30', '--json', 'number,title,url,author,headRefName,baseRefName,isCrossRepository,latestReviews'])).filter(x => !t.branch || x.baseRefName === t.branch)
+    const ev = (x: R, id: string, words: string): TaskEventIn => ({ id, kind: t.event, words, title: x.title, url: x.url, number: x.number, branch: x.headRefName, ...(x.isCrossRepository && { fork: true }) })
+    if (t.event === 'pr.opened') {
+      marks.pr = Math.max(m?.pr ?? 0, ...prs.map(x => x.number))
+      out = prs.filter(x => x.number > (m?.pr ?? Infinity) && whose(x.author?.login)).map(x => ev(x, `pr:${x.number}`, `PR #${x.number} opened`))
+    } else {
+      marks.reviews = {}
+      for (const x of prs) {
+        const r = [...(x.latestReviews ?? [])].filter(y => y.submittedAt).sort((a, b) => a.submittedAt!.localeCompare(b.submittedAt!)).pop()
+        if (!r) continue
+        marks.reviews[x.number] = r.submittedAt!
+        if (m && m.reviews?.[x.number] !== r.submittedAt && whose(r.author?.login)) out.push(ev(x, `review:${x.number}:${r.submittedAt}`, `PR #${x.number} reviewed (${(r.state ?? '').toLowerCase().replace(/_/g, ' ') || 'a review'})`))
+      }
+    }
+  } else if (t.event === 'issue.opened') {
+    type R = { number: number; title?: string; url?: string; author?: { login?: string } }
+    const issues = await gh<R[]>(['issue', 'list', '--state', 'open', '--limit', '30', '--json', 'number,title,url,author', ...(t.label ? ['--label', t.label] : [])])
+    marks.issue = Math.max(m?.issue ?? 0, ...issues.map(x => x.number))
+    out = issues.filter(x => x.number > (m?.issue ?? Infinity) && whose(x.author?.login)).map(x => ({ id: `issue:${x.number}`, kind: t.event, words: `issue #${x.number} opened`, title: x.title, url: x.url, number: x.number }))
+  } else {
+    // a push: the branch's head on origin moved (who pushed isn't known here: by doesn't apply)
+    const head = await ask(`head ${branch}`, () => git(p, 'ls-remote', 'origin', `refs/heads/${branch}`).then(o => o.split(/\s/)[0] || ''))
+    marks.head = head
+    if (head && head !== m?.head) out = [{ id: `push:${head}`, kind: t.event, words: `a push to ${branch} (${head.slice(0, 7)})`, branch }]
+  }
+  const cur = state.schedules?.find(x => x.id === s.id)
+  if (!cur) return []
+  const fresh = m ? out.filter(e => !seen.has(e.id)) : [] // the first read: what's there is old news
+  cur.marks = marks
+  cur.seen = [...(m ? (s.seen ?? []) : out.map(e => e.id)), ...fresh.map(e => e.id)].slice(-SEEN_KEPT)
+  return fresh
+}
+
+// one event: once per id (seen), a fork's held for your click, then its guards (the gap since its last run, runs a day)
+async function onEvent(s: Schedule, ev: TaskEventIn, now: number) {
+  const t = s.trigger!
+  const base: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '', event: ev.words }
+  if (ev.fork) {
+    // a fork's PR (or a CI run of one): its text and code are a stranger's, so no agent starts on it until you say
+    const r = logRun({ ...base, what: `held: ${ev.words}, from a fork: it runs only when you start it`, held: ev })
+    log(`scheduled task ${s.id}: ${r.what}`)
+    broadcast({ ev: 'scheduled', run: r.id, state: 'waiting', name: r.name, text: `${r.name}: ${ev.words} is from a fork, held until you start it (Scheduled tasks)` })
+    return
+  }
+  const gap = t.gap ?? EVENT_GAP
+  if (s.last !== undefined && now - s.last < gap * 60e3) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, ${Math.round((now - s.last) / 60e3)} min after its last run (at least ${gap} apart)` })
+  const day = new Date(now).setHours(0, 0, 0, 0)
+  const today = (state.runs ?? []).filter(r => r.schedule === s.id && r.event && !r.skipped && !r.held && r.at >= day).length
+  if (today >= (t.perDay ?? EVENT_DAY)) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, it ran ${today} times today (its most)` })
+  await runSchedule(s, now, { event: ev })
+}
+
+let eventBusy = false
+export async function eventTick(now = Date.now()) {
+  const on = (state.schedules ?? []).filter(s => s.trigger && s.on && !s.archived && !projectArchived(s.project))
+  if (!on.length || eventBusy || (await quotaLow(now))) return
+  eventBusy = true
+  const memo = new Map<string, Promise<unknown>>()
+  try {
+    for (const s of on) {
+      const p = state.projects.find(x => x.id === s.project)
+      if (!p || p.host || p.kind || p.git === false || !onGitHub(p.path)) continue
+      const ask: Ask = (k, f) => (memo.get(`${p.id} ${k}`) ?? memo.set(`${p.id} ${k}`, f()).get(`${p.id} ${k}`)) as ReturnType<typeof f>
+      const heard = await eventsOf(s, p, ask).catch(e => void log(`scheduled task ${s.id}: its events not read: ${firstLine(e)}`))
+      if (!heard) continue
+      save()
+      for (const ev of heard) {
+        const cur = state.schedules?.find(x => x.id === s.id)
+        if (!cur?.on || cur.archived) break // turned off by a run before it (T6)
+        await onEvent(cur, ev, now)
+      }
+    }
+  } finally {
+    eventBusy = false
+  }
+}
+
+// a held run (a fork's): started now, as you asked (Run it, on its log entry)
+export async function scheduleRelease(o: { run: string }) {
+  const r = state.runs?.find(x => x.id === o.run && x.held)
+  if (!r) throw new Error(`no held run ${o.run}`)
+  const s = findSchedule(r.schedule)
+  if (s.archived) throw new Error('this task is archived: restore it first')
+  const ev = r.held!
+  delete r.held
+  r.what = `${ev.words}, from a fork: you started it`
+  save()
+  changed()
+  return runSchedule(s, Date.now(), { event: { ...ev, fork: false }, asked: true })
+}
+
 const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${widgetName(s.widget)}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
 
 const logRun = (r: ScheduleRun) => {
@@ -369,11 +527,107 @@ const logRun = (r: ScheduleRun) => {
 const sameOf = (s: Schedule) => (s.sameWs ? state.workspaces.find(w => w.id === s.sameWs && !w.archived) : undefined)
 const sameMaking = new Set<string>()
 
+// ---------- T6: a run that failed. Transient (the network, a fetch, a lock, busy): tried again once, 5 minutes on; the
+// rest not. Failed runs in a row (an agent that ended on an error too; one waiting for you doesn't count, nor a skip or a
+// Run now) turn the task off at FAILS_OFF, told once (a notification, a phone push); the page shows it on top, with Fix
+const RETRY_MS = 5 * 60e3
+const FAILS_OFF = 3
+const TRANSIENT = /network|unable to access|could not read from remote|could not resolve host|timed? ?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|\.lock'?: File exists|is locked|\bbusy\b|try again/i
+// the form's field to fix (Fix on the page)
+const fieldOf = (why: string) => (/\bbase\b/i.test(why) ? 'base' : /extension/i.test(why) ? 'widget' : /workflow/i.test(why) ? 'workflow' : /preset|pick an agent/i.test(why) ? 'preset' : /workspace|is archived|isn't in/i.test(why) ? 'ws' : undefined)
+const live = (s: Schedule) => state.schedules?.find(x => x.id === s.id)
+function failedRun(s: Schedule, why: string) {
+  const cur = live(s)
+  if (!cur?.on) return
+  cur.fails = (cur.fails ?? 0) + 1
+  if (cur.fails < FAILS_OFF) return void save()
+  const field = fieldOf(why)
+  Object.assign(cur, { on: false, next: undefined, pausedWhy: why.slice(0, 300), ...(field && { pausedField: field }) })
+  delete cur.again, delete cur.catchup
+  save()
+  changed()
+  const name = cur.name ?? runName(cur, Date.now())
+  log(`scheduled task ${cur.id}: off, it failed ${FAILS_OFF} times in a row: ${why}`)
+  broadcast({ ev: 'scheduled', state: 'failed', name, text: `${name} is off: it failed ${FAILS_OFF} times in a row (${why})` })
+  flowPhone(name, undefined, `is off: it failed ${FAILS_OFF} times in a row`, why, 'Scheduled')
+}
+const goodRun = (s: Schedule) => (cur => cur?.fails && (delete cur.fails, save()))(live(s))
+// a start's end (not Run now's: you saw it): good, a retry waiting, or one more failure
+function settle(s: Schedule, r: ScheduleRun, o: { asked?: boolean; again?: boolean; event?: TaskEventIn }, now: number) {
+  if (o.asked) return
+  if (r.ok) return void (r.state === 'done' && goodRun(s))
+  if (r.what.startsWith('skipped:')) return
+  const cur = live(s)
+  if (cur?.on && !o.again && TRANSIENT.test(r.what)) {
+    cur.again = { at: now + RETRY_MS, why: 'retry', ...(o.event && { event: o.event }) }
+    r.retry = cur.again.at
+    r.what += ` (it tries again at ${hhmm(r.retry)})`
+    return
+  }
+  failedRun(s, r.what)
+}
+
+// the plan limit of a task's agent (claude's, codex's: usage.ts), reached now: its reset
+const usageOf = async (preset: string, now: number) => {
+  const agent = presetNamed(preset)?.agent ?? preset
+  const account = accountFor({ preset: agent } as Tab, presetNamed(preset)?.account) ?? HOME_ACCOUNT // its tab's, now (one removed since: the agent's own)
+  const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === account), now, statusLimits).catch(() => []) // R4: the agent's own numbers too
+  return u && !u.error ? u : undefined
+}
+async function limitOf(s: Schedule, now: number) {
+  const agent = presetNamed(s.preset)?.agent ?? s.preset
+  if (agent !== 'claude' && agent !== 'codex') return
+  const u = await usageOf(s.preset, now)
+  const at = state.settings?.usageAt ?? USAGE_AT
+  if (!u?.windows.some(w => !w.note && w.resets && w.used >= at)) return
+  const reset = resetOf(u.windows, at)
+  return reset !== undefined && reset > now ? { reset, agent } : undefined
+}
+// how late a deferred start may be: before its next time, and that day's catchUntil when it has one
+const deadline = (s: Schedule, now: number) => Math.min(s.next ?? now + 12 * 3600e3, s.catchUntil === undefined ? Infinity : (d => (d.setHours(0, s.catchUntil!, 0, 0) <= now ? d.setDate(d.getDate() + 1) : d.getTime()))(new Date(now)))
+
+// ---------- T5: a task's run workspaces (a new one each run): past keep, its older ones archived as each new one starts,
+// oldest first, only those with nothing to lose: clean (wsArchive's ifClean: nothing uncommitted, no submodule or ignored
+// work), no open PR, not pinned, no agent working or asking; the rest kept and counted (the row says so). Archive, never
+// delete: the branch stays, Restore brings it back, its log entry still links to it
+const KEEP = 5
+const working = (w: Workspace) => tabsOf(w.id).some(t => t.kind === 'agent' && ['running', 'waiting'].includes(tabStatus(t.id)))
+const keeps = (w: Workspace) => !!w.pinned || prOf(w.id)?.state === 'OPEN' || working(w)
+const archiveRun = (w: Workspace, why: string) =>
+  wsArchive(w.id, { ifClean: true }).then(
+    held => (held ? false : (wsLog(w, `archived: ${why}`), true)),
+    e => (log(`scheduled run ${w.id} not archived: ${firstLine(e)}`), false),
+  )
+async function keepTidy(s: Schedule) {
+  const keep = s.keep ?? KEEP
+  if (s.ws !== 'new' || s.workflow || s.widget || !keep) return
+  const mine = state.workspaces.filter(w => w.schedule === s.id && !w.archived && w.kind === 'worktree').sort((a, b) => b.created - a.created)
+  let kept = 0
+  for (const w of mine.slice(keep).reverse()) if (keeps(w) || !(await archiveRun(w, `its scheduled task keeps its last ${keep} runs`))) kept++
+  const cur = live(s)
+  if (!cur || (cur.kept ?? 0) === kept) return
+  if (kept) cur.kept = kept
+  else delete cur.kept
+  save()
+  changed()
+}
+// a run whose agent ended with nothing to show (no diff against its base, nothing uncommitted, no PR): archived (emptyGone)
+async function emptyGone(r: ScheduleRun, d: { files: number; dirty?: number } | null) {
+  const s = state.schedules?.find(x => x.id === r.schedule)
+  const w = state.workspaces.find(x => x.id === r.ws)
+  if (!s || s.ws !== 'new' || s.emptyGone === false || s.workflow || s.widget || !w || w.archived || w.schedule !== s.id || w.kind !== 'worktree') return
+  if (!d || d.files || d.dirty || w.pinned || prOf(w.id) || working(w)) return
+  if (!(await archiveRun(w, 'its scheduled run changed nothing'))) return
+  r.what += ' · archived: it changed nothing'
+  save()
+  changed()
+}
+
 // one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent. asked: Run now (its
 // condition isn't checked: you asked); late: a catch-up's words (T2), before what it did
-export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: boolean; late?: string } = {}): Promise<ScheduleRun> {
+export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: boolean; late?: string; event?: TaskEventIn; again?: boolean } = {}): Promise<ScheduleRun> {
   s = state.schedules?.find(x => x.id === s.id) ?? s // scheduleSet replaces a task: the current one
-  const r: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '' }
+  const r: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '', ...(o.event && { event: o.event.words }), ...(o.asked && { asked: true }) }
   let check = ''
   let head: string | undefined
   s.last = now
@@ -389,13 +643,24 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       }
       ;({ check, head } = c)
     }
-    if (o.late) r.what = `${o.late}: `
+    // T6: its agent at its plan limit: started as it resets, if that's before its next time; else skipped
+    const limit = !s.widget && !s.workflow && !o.asked ? await limitOf(s, now) : undefined
+    if (limit) {
+      const cur = live(s)
+      if (limit.reset > deadline(s, now) || !cur) return logRun(Object.assign(r, { skipped: true, what: 'skipped: plan limit (it resets after its next time)' }))
+      cur.again = { at: limit.reset, why: 'limit', ...(o.event && { event: o.event }) }
+      return logRun(Object.assign(r, { retry: limit.reset, what: `deferred: ${limit.agent}'s plan limit, it starts at ${hhmm(limit.reset)} as it resets` }))
+    }
+    const pre = [o.late, o.event?.words].filter(Boolean).join(', ') // a catch-up's, a retry's; T4: the event that started it
+    if (pre) r.what = `${pre}: `
   } catch (e) {
     Object.assign(r, { ok: false, what: (e as Error).message })
+    settle(s, r, o, now)
     widgetEvent('schedule.ran', { task: { id: s.id, name: s.name ?? runName(s, now) }, ok: r.ok, what: r.what }, r.ws)
     return logRun(r)
   }
-  const prompt = stamp(s.prompt.replaceAll('{{check}}', check), now)
+  const stamped = stamp(s.prompt.replaceAll('{{check}}', check), now)
+  const prompt = o.event ? fillEvent(stamped, o.event) : stamped.replace(/\{\{event\.\w+\}\}/g, '') // Run now on an event's task: none
   const late = r.what
   try {
     if (s.widget) {
@@ -419,7 +684,8 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       // its base branch gone: wsNew refuses it, so the run fails and says so (never off another branch)
       if (s.ws === 'same' && sameMaking.has(s.id)) throw new Error('skipped: its first run is still making its workspace')
       if (s.ws === 'same') sameMaking.add(s.id)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) }).finally(() => sameMaking.delete(s.id))
+      const pr = o.event?.kind.startsWith('pr.') && plain(o.event.url) // T4: a PR's event: the PR is its workspace's link
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }), ...(pr && { linked: pr, guessed: true }) }).finally(() => sameMaking.delete(s.id))
       // on the task as it is now: one edited while its workspace was made is another object (scheduleSet replaces it), and
       // one moved elsewhere meanwhile takes none
       const cur = state.schedules?.find(x => x.id === s.id)
@@ -459,9 +725,12 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
     r.what = (e as Error).message
     if (s.widget) Object.assign(r, { state: 'failed', endedAt: Date.now() })
   }
+  settle(s, r, o, now)
   if (late) r.what = late + r.what
   widgetEvent('schedule.ran', { task: { id: s.id, name: s.name ?? runName(s, now) }, ok: r.ok, what: r.what }, r.ws)
-  return logRun(r)
+  logRun(r)
+  if (r.ok && r.ws && s.ws !== 'local-new' && !s.workflow && !s.widget) void keepTidy(s).catch(e => log(`scheduled task ${s.id}: ${firstLine(e)}`)) // T5
+  return r
 }
 
 export function scheduleRun(id: string) {
@@ -485,10 +754,8 @@ export async function pendingTick(now = Date.now()) {
     for (const w of state.workspaces.filter(x => x.pending && !x.archived && !x.pending.failed && !projectArchived(x.project))) { // an archived project's: once it's back (late)
       const p = w.pending!
       if (p.limit && !(p.at !== undefined && p.at <= now)) {
-        const agent = presetNamed(p.preset)?.agent ?? p.preset
-        const account = accountFor({ preset: agent } as Tab, presetNamed(p.preset)?.account) ?? HOME_ACCOUNT // its tab's, now (one removed since: the agent's own)
-        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === account), now, statusLimits).catch(() => []) // R4: the agent's own numbers too
-        const at = u && !u.error ? resetOf(u.windows, state.settings?.usageAt ?? USAGE_AT) : undefined
+        const u = await usageOf(p.preset, now)
+        const at = u ? resetOf(u.windows, state.settings?.usageAt ?? USAGE_AT) : undefined
         if (at !== undefined && at !== p.at && w.pending === p) (p.at = at), save(), changed()
       }
       if (p.at !== undefined && p.at <= now && w.pending === p) startPending(w, now)
@@ -536,6 +803,13 @@ export async function scheduleTick(now = Date.now()) {
     if (now - at > MISSED_AFTER) missed(s, at, now)
     else if (s.widget) void runSchedule(s, now) // a fetch may take minutes (an AI source's): the rest don't wait for it
     else await runSchedule(s, now)
+  }
+  // T6: a retry (5 minutes after a transient failure) or a start at a plan limit's reset, when due
+  for (const s of (state.schedules ?? []).filter(x => x.again && x.again.at <= now && x.on && !x.archived)) {
+    const a = s.again!
+    delete s.again
+    save()
+    await runSchedule(s, now, { again: true, late: a.why === 'limit' ? 'its plan limit reset' : 'tried again', ...(a.event && { event: a.event }) })
   }
   await catchTick(now)
 }
@@ -586,7 +860,7 @@ const runOfTab = (tab: string, now = Date.now()) => state.runs?.find(r => r.tab 
 async function runEnded(tab: Tab, st: RunState, text?: string) {
   if (!runOfTab(tab.id)) return
   const endedAt = Date.now()
-  const d = await wsStat({ ws: tab.workspace }).catch(() => null) // first: the entry changes at once, whole
+  const d = await wsStat({ ws: tab.workspace, fresh: true }).catch(() => null) // first: the entry changes at once, whole
   const r = runOfTab(tab.id)
   if (!r) return
   const was = r.state
@@ -597,6 +871,12 @@ async function runEnded(tab: Tab, st: RunState, text?: string) {
   save()
   changed()
   ranTold(r, was)
+  const s = state.schedules?.find(x => x.id === r.schedule)
+  if (s && st !== was && !r.asked) {
+    if (st === 'failed') failedRun(s, `its agent ended on an error${said ? `: ${said}` : ''}`) // T6: counts; a wait doesn't
+    if (st === 'done') goodRun(s)
+  }
+  if (st === 'done' && was !== 'done') await emptyGone(r, d) // T5
 }
 // main.ts, as the daemon starts (not as this module loads: core's sets may not be there yet, load-order.test)
 export function runOutcomes() {
@@ -612,6 +892,8 @@ export function scheduleFlowEnded(id: string, status: string, why: string) {
   save()
   changed()
   ranTold(r, was)
+  const s = state.schedules?.find(x => x.id === r.schedule)
+  if (s && !r.asked) r.state === 'done' ? goodRun(s) : r.state === 'failed' && failedRun(s, `its workflow run failed${r.said ? `: ${r.said}` : ''}`) // T6
 }
 // told as it changes (Tell me: needs, unset: when it waits or failed; always: done too; never): a `scheduled` event (the
 // app's notification and toast) and a phone push (a wait's push is its tab's own: not twice); extensions' schedule.done

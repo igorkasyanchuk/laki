@@ -1964,6 +1964,10 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .sched-arch-head, .sched-arch-head:hover { background: none; border: 0; padding: 0; color: inherit; cursor: pointer; align-items: center; }
 .sched-arch-head h3 { margin: 0; }
 .sched-failed { color: var(--error); }
+.sched-paused { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-5); border: 1px solid color-mix(in srgb, var(--error) 40%, var(--line)); border-radius: var(--radius); background: color-mix(in srgb, var(--error) 8%, transparent); color: var(--fg); } /* T6: a task off after failing, with Fix */
+.sched-paused > span { flex: 1; min-width: 0; }
+.sched-paused > svg { color: var(--error); flex: none; }
+.sched-event { margin-top: 0; }
 .sched-form { display: flex; flex-direction: column; gap: var(--sp-4); }
 .sched-form .nw-composer textarea { min-height: 76px; }
 .sched-ext-says { padding: var(--sp-5) var(--sp-5) var(--sp-2); } /* an extension fetch: nothing to type */

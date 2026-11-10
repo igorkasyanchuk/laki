@@ -22,6 +22,7 @@
 //   ticketTick     30 s   slow   linked tickets' scripts, each when due
 //   watchLimits    30 s   keep   plan limits' resets
 //   scheduleTick   30 s   keep   scheduled tasks due
+//   eventTick      3 min  slow   scheduled tasks on events: GitHub's CI runs, PRs, issues, a branch's head (schedule.ts)
 //   pendingTick    30 s   keep   workspaces' later starts due
 //   reminderTick   30 s   keep   reminders due
 //   diskTick       30 s   keep   the state saved again after a full disk (core.ts save), only while it's full

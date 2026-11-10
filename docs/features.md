@@ -108,7 +108,7 @@ time and AI money per run (`budget: 60 min, $5`).
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the side panel's Info.
-- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore),
+- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore; or on a GitHub event: CI failing, a PR, an issue, a push; old run workspaces tidied, a failing task retried, then turned off with *Fix*),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.

@@ -25,8 +25,8 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
-const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until'])
-const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
+const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -646,7 +646,7 @@ async function main() {
     case 'schedule': {
       const [sub = 'ls', id, ...words] = rest
       const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-      const line = (s: Schedule) => `${s.id}  ${s.archived ? 'archived' : s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.fresh ? ' fresh' : ''}${s.base ? ` off ${s.base}` : ''}${s.noSetup ? ', no setup' : ''}`}  ${s.name || s.prompt}`
+      const line = (s: Schedule) => `${s.id}  ${s.archived ? 'archived' : s.on ? 'on ' : 'off'}  ${s.trigger ? `on ${s.trigger.event}${s.trigger.branch ? ` ${s.trigger.branch}` : ''}${s.trigger.label ? ` labeled ${s.trigger.label}` : ''}` : describe(s.rule)}${s.pausedWhy && !s.on ? ` (failed ${s.fails ?? 3} in a row: ${s.pausedWhy})` : ''}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.fresh ? ' fresh' : ''}${s.base ? ` off ${s.base}` : ''}${s.noSetup ? ', no setup' : ''}`}  ${s.name || s.prompt}`
       if (sub === 'ls' || sub === 'log') {
         const v: View = await rpc('state')
         if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
@@ -655,7 +655,11 @@ async function main() {
         return out(v.runs ?? [], (v.runs ?? []).map((r: ScheduleRun) => `${at(r.at)}  ${glyph(r)}  ${r.name}  ${r.what}${r.state && r.state !== 'running' ? `  → ${r.state}${r.said ? `: ${r.said}` : ''}${r.pr ? ` (PR #${r.pr.number})` : ''}` : ''}`).join('\n') || 'no runs yet')
       }
       if (sub === 'add') {
-        if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
+        if (!flags.when && !flags.on) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>, or on an event: --on ci.failed')
+        const str = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined)
+        const trigger = str('on') && { event: str('on'), ...(str('branch') && { branch: str('branch') }), ...(str('label') && { label: str('label') }), ...(str('by') && { by: str('by') }) } // T4
+        const keepRuns = str('keep-runs')
+        if (keepRuns !== undefined && !/^\d+$/.test(keepRuns)) throw new Error('--keep-runs? a number (0: all)')
         const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
         const only = typeof flags['only-if'] === 'string' ? flags['only-if'] : ''
         const [kind, ...more] = only.split(':')
@@ -663,7 +667,7 @@ async function main() {
         const onlyIf = !only ? undefined : kind === 'cmd' ? { kind, cmd: arg } : kind === 'prs' ? { kind, what: arg || 'any' } : kind === 'issues' ? { kind, ...(arg && { label: arg }) } : { kind }
         const until = typeof flags['catch-until'] === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(flags['catch-until'].trim()) : null
         if (flags['catch-until'] && !until) throw new Error('--catch-until? a time of day: 10:00')
-        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, fresh: !!flags.fresh || undefined, name: flags.name, prompt: flags.prompt || words.join(' '), ...(onlyIf && { onlyIf }), ...(flags.notify && { notify: flags.notify }), ...(flags.missed && { missed: flags.missed }), ...(until && { catchUntil: Number(until[1]) * 60 + Number(until[2]) }) })
+        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, fresh: !!flags.fresh || undefined, name: flags.name, prompt: flags.prompt || words.join(' '), ...(onlyIf && { onlyIf }), ...(flags.notify && { notify: flags.notify }), ...(flags.missed && { missed: flags.missed }), ...(until && { catchUntil: Number(until[1]) * 60 + Number(until[2]) }), ...(trigger && { trigger }), ...(keepRuns !== undefined && { keep: Number(keepRuns) }), ...(flags['keep-empty'] && { emptyGone: false }) })
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)
@@ -673,7 +677,11 @@ async function main() {
         return out(r, `${r.ok ? '✓' : '✗'} ${r.what}`)
       }
       if (sub === 'rm') return out((await rpc('scheduleRm', { id })) ?? { ok: true }, `removed ${id}`)
-      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|archive|restore|rm <id>`)
+      if (sub === 'release') {
+        const r = await rpc('scheduleRelease', { run: id }, 120000) // T4: a fork's held run (laki schedule log has its id with --json)
+        return out(r, `${r.ok ? '✓' : '✗'} ${r.what}`)
+      }
+      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" | --on <event> <prompt> | on|off|run|archive|restore|rm <id> | release <run>`)
     }
     case 'flow':
     case 'flows':
