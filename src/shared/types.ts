@@ -591,6 +591,8 @@ export type Settings = {
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // tailscale: a PIN as well
   remoteFunnel?: boolean // tailscale: tailscale funnel, the internet (a PIN always)
+  remoteWrong?: 'wait' | 'stop' // D5: after the wrong PINs, no PIN taken for a while (wait, unset too) or remote access stops
+  remoteDeviceDays?: number // D3: how long a paired device stays in (1-90 days; unset: 30)
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
@@ -889,12 +891,16 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 // host: My domain's (D1: a hostname of your named tunnel, a PIN always); down: why it's starting again (D2: no url
 // meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
 // state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
 // its last address; what remoteBack starts again. Never a token or the PIN
 export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
+// locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
+// a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number }
+export type SavedDevice = RemoteDevice & { hash: string }
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)
@@ -921,7 +927,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { digest?: Digest; projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; updatesOn?: boolean; dnd?: { since: number; until: number; prs: Record<string, string>; log: { kind: 'done' | 'wait'; tab: string; text: string }[] } /* U8: Do not disturb (core.ts dndSet) */; tunnels?: SavedTunnel[]; remote?: SavedRemote; modelNeeds?: Record<string, string> } // modelNeeds: a model the installed claude is too old for, the version it needs (accounts.ts); cfgTrust: projects from before .laki.json's trust were trusted as they were, once; updatesOn: an updateCheck saved off turned back on, once (load, 0.33); flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
+export type State = { digest?: Digest; projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; updatesOn?: boolean; dnd?: { since: number; until: number; prs: Record<string, string>; log: { kind: 'done' | 'wait'; tab: string; text: string }[] } /* U8: Do not disturb (core.ts dndSet) */; tunnels?: SavedTunnel[]; remote?: SavedRemote; remoteDevices?: SavedDevice[]; modelNeeds?: Record<string, string> } // modelNeeds: a model the installed claude is too old for, the version it needs (accounts.ts); cfgTrust: projects from before .laki.json's trust were trusted as they were, once; updatesOn: an updateCheck saved off turned back on, once (load, 0.33); flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -1086,7 +1092,7 @@ export type ArchivedProject = { id: string; name: string; path: string; host?: s
 // that ended (their answer's), PRs that moved
 export type DigestRow = { kind: 'wait' | 'done' | 'pr'; ws: string; tab?: string; name: string; text: string }
 export type Digest = { since: number; until: number; rows: DigestRow[] }
-export type View = { digest?: Digest; dnd?: { until: number } /* U8: Do not disturb is on, until then: no notifications but an important workspace's ask */; modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; diskFull?: { free: number } /* R4: the state couldn't be saved, the disk is full (bytes free): kept in memory, tried again */; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[]; allowRules?: false } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+export type View = { digest?: Digest; dnd?: { until: number } /* U8: Do not disturb is on, until then: no notifications but an important workspace's ask */; modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; diskFull?: { free: number } /* R4: the state couldn't be saved, the disk is full (bytes free): kept in memory, tried again */; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[]; allowRules?: false } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; remoteDevices?: RemoteDevice[] /* D3: remote access's paired devices, kept while it's off too */; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // S7: the view an agent, MCP or Laki AI gets while Recording mode is on: no private workspace (its own or its project's
 // private), its tabs, layout and today's use, nor a private project; the app's window gets them all and veils the rows
 export function recorded(v: View): View {
@@ -1145,7 +1151,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 163
+export const API = 164
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

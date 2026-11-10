@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
-import { type Agent, AGENT_NAMES, type Remote, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
+import { type Agent, AGENT_NAMES, type Remote, type RemoteDevice, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
 import { broadcast, changed, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
 import { dir } from './dir.ts'
 import { policyRemote } from './policy.ts'
@@ -590,7 +590,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
 // left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
 // again (remoteAgain), its address before, why it's down
-type RemoteRun = { mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout> }
+type RemoteRun = { mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
@@ -599,7 +599,7 @@ const hashOf = (t: string) => createHash('sha256').update(t).digest('hex')
 export const accessOk = (t: unknown) => !!remote?.used && !!remote.access && typeof t === 'string' && !!t && same(hashOf(t), remote.access)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 const newPin = () => String(randomInt(0, 1e6)).padStart(6, '0')
 const hex = () => randomBytes(32).toString('hex')
@@ -770,32 +770,156 @@ export function same(a: string, b: string | undefined) {
   const [x, y] = [Buffer.from(a), Buffer.from(b)]
   return x.length === y.length && timingSafeEqual(x, y)
 }
-// the page's first ask (main.ts' POST /pin, from the page's origin): the link's key, once, for the token the page
-// connects with (need: false and token; with a PIN: need, then the PIN gives it), after which the link is dead (need:
-// false, no token: a token that isn't the link's, the page's own already, or a link opened before). A wrong PIN counts
-// down; the last stops remote access, and the app says so
-export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolean; left?: number; token?: string } | { token: string } {
+// ---------- trusted devices (D3): at a stable address (Tailscale, My domain) the page that opens a link (after its PIN)
+// is paired: a device token of its own (32 random bytes) in an HttpOnly, Secure, SameSite=Strict cookie the daemon sets
+// on that origin (no script reads it), kept by the daemon as its hash only (state.remoteDevices: id, name from the user
+// agent, added, last seen, until: settings.remoteDeviceDays, 30 by default, 1 to 90). Its WebSocket and /rpc calls get
+// in by it (main.ts, with the Origin check as ever), several at once; a closed tab or a restart doesn't matter. Add a
+// device (remotePair) makes a new link, 10 minutes and one use. Revoke drops its connections at once (main.ts' onGone);
+// remoteStop keeps them (nothing connects meanwhile), Forget devices (revoke all) clears them. A quick tunnel's page keeps
+// one tab's token instead (its address is new each start)
+const DEVICE_COOKIE = '__Host-laki-device'
+const PAIR_MS = 10 * 60e3
+const stable = (r: RemoteRun) => !!(r.host || r.via)
+const deviceDays = () => (n => (Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30))(Number(state.settings?.remoteDeviceDays))
+export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, ...d }) => d) : undefined)
+let gone: (ids: string[]) => void = () => {}
+export const onGone = (f: (ids: string[]) => void) => void (gone = f) // main.ts: a revoked or expired device's sockets closed
+const cookieOf = (header: string | undefined) => {
+  for (const part of (header ?? '').split(';')) {
+    const at = part.indexOf('=')
+    if (at > 0 && part.slice(0, at).trim() === DEVICE_COOKIE) return part.slice(at + 1).trim()
+  }
+}
+// its user agent in two words: what it is, its browser (shown, never trusted)
+const deviceName = (ua = '') => {
+  const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh|Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux|CrOS/.test(ua) ? 'Linux' : 'A device'
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\/|FxiOS/.test(ua) ? 'Firefox' : /Chrome\/|CriOS/.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : ''
+  return browser ? `${os} · ${browser}` : os
+}
+// a remote connection's device by its cookie: while remote access runs at a stable address, not expired; its id (every
+// remote connection knows it: the activity log's). Its last seen kept a minute apart at most
+export function deviceOf(cookie: string | undefined, now = Date.now()): string | undefined {
   const r = remote
-  if (!r || r.used || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
-  const use = () => {
+  const t = cookieOf(cookie)
+  if (!r?.url || !stable(r) || !t || !/^[0-9a-f]{64}$/.test(t)) return undefined
+  const h = hashOf(t)
+  const d = state.remoteDevices?.find(x => same(h, x.hash))
+  if (!d || d.until <= now) return undefined
+  if (now - d.seenAt > 60000) (d.seenAt = now), save(), changed()
+  return d.id
+}
+function pair(r: RemoteRun, o: Asker) {
+  const t = hex()
+  const now = Date.now()
+  const d = { id: randomUUID().slice(0, 8), name: deviceName(o.ua), hash: hashOf(t), addedAt: now, seenAt: now, until: now + deviceDays() * 86400e3 }
+  state.remoteDevices = [...(state.remoteDevices ?? []), d]
+  Object.assign(r, { used: true, keyUntil: undefined })
+  keepRemote() // saves
+  log(`remote access: a new device, ${d.name} (${d.id})${o.ip ? ` from ${o.ip}` : ''}, until ${new Date(d.until).toISOString()}`)
+  broadcast({ ev: 'remote', text: `A new device joined remote access: ${d.name}${o.ip ? ` (${o.ip})` : ''}. Settings › Remote access › Devices lists it: Revoke it there if it isn't yours.` })
+  changed()
+  return { need: false, device: true, cookie: `${DEVICE_COOKIE}=${t}; Path=/; Max-Age=${Math.floor((d.until - now) / 1000)}; HttpOnly; Secure; SameSite=Strict` }
+}
+// Add a device: a new link (and PIN), good for 10 minutes and one use; only at a stable address
+export function remotePair(): Remote | undefined {
+  const r = remote
+  if (!r?.url) throw new Error("remote access isn't running")
+  if (!stable(r)) throw new Error("devices need a stable address (Tailscale or My domain): a quick tunnel's link opens once, in one tab")
+  Object.assign(r, { token: hex(), used: false, keyUntil: Date.now() + PAIR_MS, ...(r.pin && { pin: newPin(), left: triesOf(), lockUntil: undefined }) })
+  changed()
+  return remoteView()
+}
+// Revoke (one, by id) or Revoke all / Forget devices (all): its sockets closed at once (gone)
+export function remoteDeviceRm(p: { id?: unknown; all?: unknown }) {
+  const all = state.remoteDevices ?? []
+  const out = p.all === true ? all : all.filter(d => d.id === p.id)
+  if (!out.length && p.all !== true) throw new Error(`no device ${String(p.id)}`)
+  const left = all.filter(d => !out.includes(d))
+  if (left.length) state.remoteDevices = left
+  else delete state.remoteDevices
+  save()
+  if (out.length) log(`remote access: ${out.map(d => `${d.name} (${d.id})`).join(', ')} revoked`), gone(out.map(d => d.id))
+  changed()
+  return { revoked: out.length }
+}
+// past their time: off the list, their sockets closed (remoteTick)
+function devicesTidy(now: number) {
+  const out = (state.remoteDevices ?? []).filter(d => d.until <= now)
+  if (!out.length) return
+  const left = (state.remoteDevices ?? []).filter(d => d.until > now)
+  if (left.length) state.remoteDevices = left
+  else delete state.remoteDevices
+  save()
+  log(`remote access: ${out.map(d => `${d.name} (${d.id})`).join(', ')} expired`)
+  gone(out.map(d => d.id))
+  changed()
+}
+
+// D5: once the tries are used, no PIN is taken for a while (Wait, settings.remoteWrong's default) instead of stopping
+// (Stop: as before, so a link's holder could end it with two requests). 1 minute, then 5, then 30 each time, counted
+// per start. Each wrong one is logged and told on the Mac with the time and the address the tunnel reports
+// (CF-Connecting-IP, Tailscale's login: shown, never trusted). DAY_CAP: 20 wrong in a day stop it anyway, for every PIN
+// mode: at 2 tries per lock and locks of 1, 5, 30, 30… minutes that's at most about 2 × 49 ≈ 98 guesses a day without
+// it; with it, 20 a start out of 10^6 PINs (1 in 50,000), and only the Mac starts it again. Devices paired already
+// aren't affected
+const LOCKS = [1, 5, 30].map(m => m * 60e3)
+const DAY_CAP = 20
+const mins = (ms: number) => (m => `${m} minute${m === 1 ? '' : 's'}`)(Math.max(1, Math.ceil(ms / 60e3)))
+const waits = () => state.settings?.remoteWrong !== 'stop'
+type Asker = { cookie?: string; ua?: string; ip?: string } // the /pin request's: its cookie, user agent, the tunnel's address for it
+export type PinAnswer = { need: boolean; left?: number; wait?: number; token?: string; device?: boolean; cookie?: string }
+// the page's first ask (main.ts' POST /pin, from the page's origin): a paired device's cookie, else the link's key,
+// once, for the page's way in (a quick tunnel's: need false and token, the token it connects with; a stable address's:
+// device and its cookie, which main.ts sets; with a PIN: need, then the PIN gives it), after which the link is dead
+// (need: false, nothing: a key that isn't the link's, a link opened before or past its 10 minutes). A wrong PIN counts
+// down, then waits (D5) or stops it (remoteWrong: 'stop')
+export function remotePin(p: { token?: unknown; pin?: unknown }, o: Asker = {}): PinAnswer {
+  const r = remote
+  if (!r) return { need: false }
+  if (deviceOf(o.cookie)) return { need: false, device: true } // paired: no link, no PIN, no lock
+  const now = Date.now()
+  if (r.used || (r.keyUntil && now >= r.keyUntil) || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
+  const use = (): PinAnswer => {
+    if (stable(r)) return pair(r, o)
     const t = hex()
     Object.assign(r, { used: true, access: hashOf(t) })
     keepRemote()
     changed()
-    return t
+    return { need: false, token: t }
   }
-  if (!r.pin) return { need: false, token: use() }
+  if (!r.pin) return use()
+  if (r.lockUntil && now < r.lockUntil) {
+    if (p.pin === undefined) return { need: true, left: 0, wait: r.lockUntil }
+    throw new Error(`Too many wrong PINs: try again in ${mins(r.lockUntil - now)}`)
+  }
+  if (r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }) // the wait is over
   if (p.pin === undefined) return { need: true, left: r.left }
-  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return { token: use() }
+  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return use()
   r.left = (r.left ?? 1) - 1
-  if (r.left > 0) {
-    changed()
-    throw new Error(`Wrong PIN: ${r.left} more ${r.left === 1 ? 'try' : 'tries'}, then remote access stops`)
+  r.wrong = [...(r.wrong ?? []).filter(t => now - t < 86400e3), now]
+  const from = o.ip ? ` from ${o.ip}` : ''
+  const at = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  log(`remote access: a wrong PIN${from} (${r.wrong.length} today)`)
+  const end = (why: string, page: string) => {
+    log(`remote access ended: ${why}`)
+    remoteStop()
+    broadcast({ ev: 'remote', text: `Remote access stopped: ${why} on its page${from} at ${at}. Start it again for a new link and PIN.` })
+    throw new Error(page)
   }
-  log('remote access ended: a wrong PIN')
-  remoteStop()
-  broadcast({ ev: 'remote', text: 'Remote access stopped: a wrong PIN was typed on its page. Start it again for a new link and PIN.' })
-  throw new Error('Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.')
+  if (r.wrong.length >= DAY_CAP) end(`${DAY_CAP} wrong PINs today`, 'Too many wrong PINs today: remote access stopped. Start it again on your Mac.')
+  if (r.left > 0) {
+    broadcast({ ev: 'remote', text: `A wrong PIN was typed on remote access's page${from} at ${at}: ${r.left} more ${r.left === 1 ? 'try' : 'tries'} before ${waits() ? 'it waits' : 'it stops'}.` })
+    changed()
+    throw new Error(`Wrong PIN: ${r.left} more ${r.left === 1 ? 'try' : 'tries'}, then ${waits() ? `no PIN is taken for ${mins(LOCKS[Math.min(r.locks ?? 0, LOCKS.length - 1)])}` : 'remote access stops'}`)
+  }
+  if (!waits()) end('a wrong PIN', 'Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.')
+  const lock = LOCKS[Math.min(r.locks ?? 0, LOCKS.length - 1)]
+  Object.assign(r, { locks: (r.locks ?? 0) + 1, lockUntil: now + lock })
+  log(`remote access: no PIN taken for ${mins(lock)} (${triesOf()} wrong${from})`)
+  broadcast({ ev: 'remote', text: `Remote access takes no PIN for ${mins(lock)}: ${triesOf()} wrong ${triesOf() === 1 ? 'PIN' : 'PINs'} on its page${from} at ${at}. Paired devices stay in.` })
+  changed()
+  throw new Error(`Wrong PIN: no PIN is taken for ${mins(lock)}, then try again`)
 }
 
 // remote access past its time ends (main.ts asks every 15 s; tests move the clock). The timer's own ask (no now) also
@@ -809,6 +933,8 @@ export function remoteTick(now?: number) {
   if (now === undefined) lastTick = at
   if (remote?.until && at >= remote.until) return log('remote access ended: its time is up'), remoteStop()
   const r = remote
+  if (r?.lockUntil && at >= r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }), changed() // D5: the wait is over
+  devicesTidy(at)
   if (woke && r?.url && !r.via) void awake(r)
   // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note
   if (r?.via === 'tailscale' && !r.funnel)

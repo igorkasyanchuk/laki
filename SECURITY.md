@@ -47,6 +47,24 @@ Out of scope:
 - an agent doing what its own permission mode allows;
 - a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
 
+### Remote access: devices and PINs
+
+At a stable address (Tailscale, or My domain on your named tunnel) a page that opens remote access's link (and its PIN)
+is paired: the daemon sets a device token of its own (32 random bytes) in an `HttpOnly`, `Secure`, `SameSite=Strict`
+cookie on that origin, keeps only its SHA-256 hash (with a name from the user agent, when it was added and last seen,
+until when: 30 days unless you pick 1 to 90), and lets in a socket or a call that brings it from that origin only (the
+Origin check as ever). A link opens once; *Add a device* makes another, good for 10 minutes. Revoke drops a device's
+connections at once; a stop keeps the devices (nothing connects while it's off), *Forget devices* clears them. A new
+device is told on the Mac. A quick tunnel's page keeps one tab's token instead (its address changes each start). The
+page's token and the device tokens are never in the view, a log or `state.json` in clear.
+
+Wrong PINs no longer stop remote access by default (*After wrong PINs* › *Wait*; *Stop* is as before, so anyone with
+the link could end it for you): after the tries (2 unless you pick 1 to 10), no PIN is taken for 1 minute, then 5,
+then 30 each time, counted per start. Each wrong PIN and each wait is logged and told on the Mac with the address the
+tunnel reports (`CF-Connecting-IP`, Tailscale's login: shown, never trusted). 20 wrong PINs in a day stop it anyway: at 2
+tries per wait and waits of 1, 5, 30, 30… minutes that's under 100 guesses a day without the cap, and with it at most 20
+a start out of 10^6 PINs (1 in 50,000), and only the Mac starts it again (a new PIN). Paired devices aren't affected.
+
 ### Auto-answer rules
 
 A project's auto-answer rules (Settings › the project, or *Always allow in this project* on an ask's card) answer a
@@ -102,7 +120,10 @@ project's test script is, which the agent can edit.
   address, until its time runs out or you stop it. A permanent tunnel (your own domain) has no lock of Laki's: protect
   it with Cloudflare Access, as Settings › Tunnels says.
 - Remote access with no email or PIN (*anyone with the link*) is only as safe as the link: 24 hours at most, and the
-  link works once.
+  link works once. Remote access comes back after Laki restarts or its tunnel drops, until its time runs out or you
+  stop it; a quick tunnel's at a new address, with a new link.
+- My domain (remote access on your named tunnel) has only Laki's PIN unless you add a Cloudflare Access policy for its
+  hostname in Cloudflare's dashboard: cloudflared can't set one.
 - An extension's https picture comes through the daemon from a public site, judged by its name: a name that resolves
   to this Mac or your network still goes (`ponytail:` in `src/daemon/main.ts`).
 

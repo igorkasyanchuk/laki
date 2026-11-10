@@ -721,7 +721,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
 
   // Laki's PIN (no email, the saved one kept; pin wins over an email): the link's key alone only asks for it, the PIN
   // gives the page its token; a wrong one counts down (settings' remoteTries), the last stops remote access
-  await rig.rpc('settingsSet', { remoteTries: 3 })
+  await rig.rpc('settingsSet', { remoteTries: 3, remoteWrong: 'stop' }) // D5's Stop: as before (Wait is remote-access.test's)
   const pinned = await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev', pin: true })
   assert.deepEqual([pinned.mail, pinned.open, pinned.tries], ['', undefined, 3])
   assert.match(pinned.pin, /^\d{6}$/)
@@ -756,7 +756,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 2 more tries, then remote access stops' })
   assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 1 more try, then remote access stops' })
   assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.' })
-  assert.match((await until(async () => app.events.find(m => m.ev === 'remote'), 'the app told')).text, /Remote access stopped: a wrong PIN/)
+  assert.match((await until(async () => app.events.find(m => m.ev === 'remote' && /stopped/.test(m.text)), 'the app told')).text, /Remote access stopped: a wrong PIN/)
   app.close()
   assert.equal((await rig.rpc('state')).remote, undefined)
   await until(() => stops() >= 7, 'cloudflared stopped', 30000)

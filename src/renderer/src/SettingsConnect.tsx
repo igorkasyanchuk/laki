@@ -396,15 +396,18 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number }
+// devices, pair, revoke (D3): the paired ones, Add a device, Revoke (one; none: all)
+export type RemoteApi = { state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string }
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number } // wrong: after the wrong PINs (D5); days: a paired device's (D3)
+const DAYS = [1, 7, 14, 30, 60, 90] // how long a paired device stays in (the daemon takes 1-90)
 const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)']] // a quick tunnel's
 // D1: where it's published; a quick tunnel's address is new each start, the other two stay (a bookmark keeps working)
 type Address = 'tailscale' | 'domain' | 'quick'
@@ -462,9 +465,15 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
               {r.pin && <IconButton icon="clipboard" label="Copy all" title="Copy the link and the PIN, to send in one message" onClick={() => api.copy(remoteText(r))} />}
               {!r.via && !r.used && <IconButton icon="link" title="Open (here: the link opens once)" onClick={() => api.open(r.link!)} />}
             </div>
-            <p className={r.used ? 'warn-soft small' : 'muted small'}>
-              {r.used ? 'Opened: the link works once, in one tab, and that tab stays in. For another device, stop remote access and start it again.' : 'The link opens once, in one tab: the page keeps its own key after that.'}
-            </p>
+            {r.host || r.via ? (
+              <p className="muted small">
+                {r.used ? 'Opened: that device is paired (Devices, below). For another one, Add a device.' : r.pairUntil ? `This link pairs one device, until ${ends(r.pairUntil)}: it gets in by itself after that, for ${opts.days} days.` : `The link pairs one device: it gets in by itself after that, for ${opts.days} days (a closed tab or a restart doesn't matter).`}
+              </p>
+            ) : (
+              <p className={r.used ? 'warn-soft small' : 'muted small'}>
+                {r.used ? 'Opened: the link works once, in one tab, and that tab stays in. For another device, stop remote access and start it again.' : 'The link opens once, in one tab: the page keeps its own key after that.'}
+              </p>
+            )}
             {r.down ? (
               <p className="warn-soft small">Reconnecting ({r.down}): it starts again by itself{r.host || r.via ? ', at the same address' : ', at a new address'}.</p>
             ) : r.was ? (
@@ -491,8 +500,10 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
                   <IconButton icon="copy" title="Copy the PIN" onClick={() => api.copy(r.pin!)} />
                 </div>
                 <span className="muted small">
-                  The page asks for it. {r.tries === 1 ? 'One more wrong PIN stops' : `${r.tries} wrong PINs stop`} remote access. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+                  The page asks for it. {r.tries === 1 ? 'One more wrong PIN' : `${r.tries} wrong PINs`} {opts.wrong === 'stop' ? 'stop remote access' : 'and it takes none for a while (1, 5, then 30 minutes; 20 in a day stop it)'}. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
                 </span>
+                {r.locked && <span className="warn-soft small">Wrong PINs: no PIN is taken until {new Date(r.locked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Paired devices stay in.</span>}
+                {!r.locked && !!r.wrong && <span className="warn-soft small">{r.wrong} wrong {r.wrong === 1 ? 'PIN' : 'PINs'} today (20 stop it).</span>}
               </div>
             ) : r.via === 'tailscale' ? (
               <p className="muted small">
@@ -512,6 +523,11 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
               </p>
             )}
             <div className="row">
+              {(r.host || r.via) && (
+                <button onClick={() => (setErr(''), api.pair().catch(fail))} title="A new link (and PIN) that pairs one more device, good for 10 minutes">
+                  Add a device
+                </button>
+              )}
               <button className="danger" onClick={stop}>
                 Stop remote access
               </button>
@@ -593,11 +609,12 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             </>
           )}
           {pin ? (
+            <>
             <div className="field">
               <span>
-                Wrong PINs before it stops <span className="muted">· a new PIN each start, shown here</span>
+                Wrong PINs in a row <span className="muted">· a new PIN each start, shown here</span>
               </span>
-              <div className="seg" role="radiogroup" aria-label="Wrong PINs before it stops">
+              <div className="seg" role="radiogroup" aria-label="Wrong PINs in a row">
                 {TRIES.map(n => (
                   <button key={n} type="button" role="radio" aria-checked={n === tries} className={n === tries ? 'on' : ''} onClick={() => set({ tries: n })}>
                     {n}
@@ -605,6 +622,20 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
                 ))}
               </div>
             </div>
+            <div className="field">
+              <span>After wrong PINs</span>
+              <div className="seg" role="radiogroup" aria-label="After wrong PINs">
+                {([['wait', 'Wait'], ['stop', 'Stop remote access']] as const).map(([v, label]) => (
+                  <button key={v} type="button" role="radio" aria-checked={opts.wrong === v} className={opts.wrong === v ? 'on' : ''} onClick={() => set({ wrong: v })}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="muted small">
+                {opts.wrong === 'stop' ? 'Remote access stops: anyone with the link can end it for you with wrong PINs.' : 'No PIN is taken for 1 minute, then 5, then 30; 20 wrong in a day stop it. Paired devices stay in.'}
+              </span>
+            </div>
+            </>
           ) : ts ? null : (
           <>
           <label>
@@ -649,6 +680,42 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         </form>
       )}
       {err && <p className="field-err">{err}</p>}
+      {(!!api.devices?.length || (r ? !!(r.host || r.via) : ts || dom)) && (
+        <div className="remote-devices">
+          <h3>Devices</h3>
+          <p className="muted small">
+            At a stable address (Tailscale or My domain), a device that opened a link is paired: it gets in by itself, as long as remote access runs, until its
+            time is up. Laki tells you here when a new one joins. A quick tunnel's link opens one tab instead.
+          </p>
+          {api.devices?.map(d => (
+            <div className="row" key={d.id}>
+              <span>
+                <b>{d.name}</b> <span className="muted small">· last seen {ends(d.seenAt)} · until {ends(d.until)}</span>
+              </span>
+              <button onClick={() => api.revoke(d.id).catch(fail)} title="It's out at once, its connections closed">
+                Revoke
+              </button>
+            </div>
+          ))}
+          <label>
+            <span>A device stays in for</span>
+            <select value={opts.days} onChange={e => set({ days: Number(e.target.value) })}>
+              {DAYS.map(n => (
+                <option key={n} value={n}>
+                  {n === 1 ? '1 day' : `${n} days`}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!!api.devices?.length && (
+            <div className="row">
+              <button className="danger" onClick={() => api.revoke().catch(fail)}>
+                {r ? 'Revoke all' : 'Forget devices'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {(r ? !r.via : !ts) && (
       <div className="remote-tip">
         <p className="muted small">

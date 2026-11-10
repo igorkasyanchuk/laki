@@ -169,3 +169,4 @@ needs no bump: `settingsSet` keeps any field.
 161: `shipDraft` (the Ship sheet's start: the uncommitted files, the commits ahead, a title and body from the workspace's name, first prompt and last answer), `ship`'s `files`, `title`, `body`, `draft`, `base`, `reviewers` and `mode` (cap `ship.sheet`).
 162: `sourceGuess` (the files a Preview pick likely comes from: `git grep` of its id, a class, its text).
 163: a project's `allow` (auto-answer rules: `projectSet`, yours only) and a tab's `allowed` (asks a rule answered); the view's `managed.allowRules`.
+164: remote access's `host` (My domain, D1), `down` and `was` (started again, D2), `locked`, `wrong` (D5) and `pairUntil`; `remotePair` (Add a device) and `remoteDeviceRm` (Revoke, Forget devices), the view's `remoteDevices` (D3).

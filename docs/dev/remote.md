@@ -186,6 +186,26 @@ The timer's `remoteTick` (no `now`) notes a gap over a minute (the Mac slept): `
 (a 5xx or no answer: started again: a quick one's `remoteAgain`, My domain's `connDown`); not Tailscale's, which this
 Mac can't reach.
 
+Trusted devices (D3, at a stable address: `stable`, Tailscale or My domain): `remotePin`'s `use` there is `pair`: a
+device token (`hex`, 32 bytes) in the `Set-Cookie` main.ts' `/pin` sends (`__Host-laki-device`, `Path=/`, `Max-Age` its
+days, `HttpOnly; Secure; SameSite=Strict`), `state.remoteDevices` (`SavedDevice`: `id`, `name` from the user agent:
+`deviceName`, `hash`, `addedAt`, `seenAt`, `until`: `settings.remoteDeviceDays`, 1-90, 30), the view's `remoteDevices`
+without the hash, a `remote` event (*A new device joined*). `deviceOf(cookie)` (main.ts' `/rpc` when the bearer isn't the
+page's token, and the far WebSocket's first message: any `auth` then, the page sends `device`) finds it while remote
+access runs at a stable address and it hasn't expired, `seenAt` a minute apart; the Conn keeps its `device` (the
+activity log's). `/pin` with a valid cookie says `{ device: true }` before any key or lock, so a new tab gets in
+(`api.ts`: `pinNeed` first, even with no key; `DEVICE` kept as the tab's token). `remotePair` (Add a device): a new link
+key, `keyUntil` 10 minutes, a new PIN; refused for a quick tunnel. `remoteDeviceRm` (`id` or `all`) and `devicesTidy`
+(`remoteTick`: past `until`) call main.ts' `onGone`, which closes those devices' sockets (`devSocks`, 4401). Both RPCs
+are FROM, AGENT_NO and REMOTE_NO. A quick tunnel keeps one tab's token (`access`, its hash).
+
+PIN waits (D5, `settings.remoteWrong`: `wait`, unset too, or `stop`): the tries used (`left` 0), `lockUntil` is `LOCKS`
+(1, 5, 30 minutes) by `locks` this start, and `left` comes back when it passes (`remoteTick` or the next ask); during
+it `/pin` says `{ need, left: 0, wait }` and any PIN is refused. `wrong`: today's wrong PINs' times, `DAY_CAP` (20)
+stops it (final). Each wrong PIN and each wait: a log line and a `remote` event with the time and main.ts' `ip`
+(`CF-Connecting-IP` or `X-Forwarded-For`, Tailscale's `Tailscale-User-Login`; shown, never decided on). The view's
+`locked`, `wrong`. `stop`: the last wrong PIN stops it as before.
+
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's

@@ -66,6 +66,7 @@ export type Msg = { ev: string; [k: string]: any }
 // remote access's token, taken out of the address bar (and this page's history entry: Cloudflare's sign-in page, an
 // entry before it, keeps the link) once read; the tab keeps it for its reconnects and reloads
 let kept = ''
+const DEVICE = 'device' // D3: the page of a paired device: its cookie gets it in (sent as its auth: any word does)
 const keep = (t: string) => {
   kept = t
   try {
@@ -122,7 +123,8 @@ async function whyNot(token: string): Promise<string | undefined> {
 
 // remote access's first ask (core.remotePin): the link's key, good once, for this tab's own token, or a PIN first.
 // null: no answer (asked again next time)
-async function pinNeed(token: string): Promise<{ need: boolean; left?: number; token?: string } | null> {
+// device: a paired device (D3, a stable address): its cookie (HttpOnly, the daemon's) is its way in, no token here
+async function pinNeed(token: string): Promise<{ need: boolean; left?: number; token?: string; device?: boolean } | null> {
   const r = await fetch('/pin', { method: 'POST', body: JSON.stringify({ token }) }).catch(() => null)
   return r?.ok ? r.json().catch(() => null) : null
 }
@@ -142,12 +144,13 @@ class Api {
   async connect() {
     try {
       let to = await wsURL()
-      // S11: no key: Cloudflare's email sign-in sends the browser back without the hash. The link works until it's used
-      if (to.remote && !to.token) return this.emit({ ev: 'problem', text: "Signed in. Now open the link from Laki on your Mac again: the sign-in doesn't keep its key." })
       if (to.remote && !this.pinned) {
         const p = await pinNeed(to.token)
         if (p?.need) return this.emit({ ev: 'pin', left: p.left }) // the splash asks; pin() connects
         if (p?.token) keep(p.token), (to = await wsURL()) // the link's key, swapped for this tab's: the link is dead now
+        else if (p?.device) keep(DEVICE), (to = await wsURL()) // D3: paired (now, or before: a new tab, a restart)
+        // S11: no key: Cloudflare's email sign-in sends the browser back without the hash. The link works until it's used
+        else if (!to.token) return this.emit({ ev: 'problem', text: "Signed in. Now open the link from Laki on your Mac again: the sign-in doesn't keep its key." })
         this.pinned = !!p
       }
       const ws = new WebSocket(to.url)
@@ -192,8 +195,8 @@ class Api {
   // the PIN shown in Laki on the Mac, for remote access's page: its token in place of the link's key, then connect
   async pin(code: string) {
     const r = await fetch('/pin', { method: 'POST', body: JSON.stringify({ token: pageToken(), pin: code }) }).then(r => r.json(), () => null).catch(() => null)
-    if (!r?.token) throw new Error(r?.error ?? 'Laki on your Mac is out of reach. Try again.')
-    keep(r.token)
+    if (!r?.token && !r?.device) throw new Error(r?.error ?? 'Laki on your Mac is out of reach. Try again.')
+    keep(r.token ?? DEVICE) // D3: a paired device's way in is its cookie
     this.pinned = true
     void this.connect()
   }

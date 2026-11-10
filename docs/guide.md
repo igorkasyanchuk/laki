@@ -667,8 +667,16 @@ email address only, unless you leave the email out on purpose (below).
 - With a PIN instead (*Sign in with* › *PIN (Laki)*; the email stays the default): no Cloudflare sign-in and no
   email. Each start makes a new 6-digit PIN, shown big beside the QR code; the page asks for it before it opens
   Laki (the link's key alone gets nothing else). A wrong PIN counts down: after 2 (or what you pick: 1, 2, 3, 5 or 10)
-  remote access stops, the link and the PIN die with it, and Laki says so here and in a notification. Copy the link
-  and the PIN apart (to send them two ways), or *Copy all* for both in one message.
+  no PIN is taken for 1 minute, then 5, then 30 each time (*After wrong PINs* › *Wait*), and 20 wrong in a day stop
+  it; with *Stop remote access* instead, the tries' end stops it, the link and the PIN die with it. Each wrong PIN is
+  told here and in a notification, with its time and the address the tunnel reports. Copy the link and the PIN apart
+  (to send them two ways), or *Copy all* for both in one message.
+- Devices: at a stable address (Tailscale or My domain), the phone or computer that opens the link (and types the
+  PIN) is paired: it gets back in by itself, a closed tab, a reload or a restart of Laki notwithstanding, for 30 days
+  (*A device stays in for*: 1 to 90). Settings › *Remote access* › *Devices* lists each with when it was last seen and
+  until when; *Add a device* makes a new link (and PIN) for another, good for 10 minutes and once; *Revoke* drops one
+  at once, *Revoke all* (or *Forget devices* while it's off) every one. Laki says when a new device joins. With a
+  quick tunnel, the link opens one tab as before.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.

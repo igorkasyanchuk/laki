@@ -33,7 +33,7 @@ import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widge
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
-import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
+import { daemonPort, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { archiveBack, archiveDrop, archiveKeep, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
@@ -106,7 +106,7 @@ export const turnStarts = new Set<(tab: Tab) => void>()
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
 // and each turn that stops to ask (a moment after its hook: the menu it draws, askOf's options; none read: none)
 export const turnWaits = new Set<(tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => void>()
-export type Conn = Client & { remote?: boolean; view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
+export type Conn = Client & { remote?: boolean; device?: string /* D3: remote access's paired device, by its id */; view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -697,6 +697,7 @@ export function view(): View {
     presets: presets(),
     settings: state.settings ?? {},
     remote: remoteView(),
+    remoteDevices: remoteDevices(),
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
     todos: state.todos,
