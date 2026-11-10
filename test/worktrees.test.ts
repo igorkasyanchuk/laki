@@ -838,3 +838,76 @@ test('F7: dependency folders are cloned whole into a new worktree; a spare workt
   await until(() => !existsSync(spare), 'the spare removed with the setting')
 })
 
+
+test('R1, R2: laki rm typed in your shell tab says what goes too; a clean archive drops an older kept ref; Restore onto a branch that moved keeps its commits', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'work' })
+  await until(() => rig.tab(ws.id))
+  const sh = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...a], { cwd, encoding: 'utf8' })
+  const ref = `refs/laki/archived/${ws.id}`
+  // you, in a Laki shell tab ($LAKI_TAB, no agent in it: the daemon asks nothing): the same refusal
+  writeFileSync(join(ws.path, 'new.txt'), 'mine\n')
+  rig.env.LAKI_TAB = (await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })).id
+  const rm = await rig.cli('rm', 'work')
+  delete rig.env.LAKI_TAB
+  assert.equal(rm.code, 1)
+  assert.match(rm.out + rm.err, /Not deleted: 1 uncommitted path/)
+  // committed, then archived with nothing uncommitted: a ref an earlier archive left doesn't wait for the next Restore
+  sh(ws.path, 'add', '-A')
+  sh(ws.path, 'commit', '-qm', 'mine')
+  sh(rig.repo, 'update-ref', ref, 'HEAD')
+  assert.equal((await rig.cli('archive', 'work')).code, 0)
+  assert.throws(() => sh(rig.repo, 'rev-parse', '--verify', '-q', ref))
+  // archived with a change, its branch got a commit meanwhile: Restore puts the change on top, the commit's file stays
+  await rig.rpc('wsRestore', { id: ws.id })
+  writeFileSync(join(ws.path, 'README.md'), 'changed\n')
+  assert.equal((await rig.cli('archive', 'work', '--force')).code, 0)
+  const was = sh(rig.repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
+  sh(rig.repo, 'checkout', '-q', ws.branch)
+  writeFileSync(join(rig.repo, 'later.txt'), 'later\n')
+  sh(rig.repo, 'add', '-A')
+  sh(rig.repo, 'commit', '-qm', 'later')
+  sh(rig.repo, 'checkout', '-q', was)
+  await rig.rpc('wsRestore', { id: ws.id })
+  assert.equal(readFileSync(join(ws.path, 'later.txt'), 'utf8'), 'later\n')
+  assert.equal(readFileSync(join(ws.path, 'README.md'), 'utf8'), 'changed\n')
+  assert.equal(sh(ws.path, 'status', '--porcelain'), ' M README.md\n')
+  assert.throws(() => sh(rig.repo, 'rev-parse', '--verify', '-q', ref), 'taken back: its ref is gone')
+})
+
+test('R1, R2: archive stops on uncommitted work outside the app (the CLI, an agent); forced, Restore brings the files back; rm says what goes', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'work' })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  const sh = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' })
+  assert.equal(sh(ws.path, 'status', '--porcelain'), '') // the agent's start leaves nothing in it
+  writeFileSync(join(ws.path, 'README.md'), 'changed\n')
+  writeFileSync(join(ws.path, 'new.txt'), 'mine\n')
+  const archived = async () => !!(await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.archived
+  // the CLI: said, not done
+  const no = await rig.cli('archive', 'work')
+  assert.equal(no.code, 1)
+  assert.match(no.out + no.err, /Not archived: 2 uncommitted paths/)
+  // an agent: never with uncommitted work, whatever it passes
+  assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id, force: true, from: { ws: ws.id, tab } }), { dirty: 2 })
+  assert.equal(await archived(), false)
+  // yours, forced: archived, the files kept in the repo
+  assert.equal((await rig.cli('archive', 'work', '--force')).code, 0)
+  assert.equal(await archived(), true)
+  assert.ok(!existsSync(ws.path))
+  const ref = `refs/laki/archived/${ws.id}`
+  assert.match(sh(rig.repo, 'rev-parse', ref), /^[0-9a-f]{40}/)
+  await rig.rpc('wsRestore', { id: ws.id })
+  assert.equal(readFileSync(join(ws.path, 'README.md'), 'utf8'), 'changed\n')
+  assert.equal(readFileSync(join(ws.path, 'new.txt'), 'utf8'), 'mine\n')
+  assert.equal(sh(ws.path, 'status', '--porcelain'), ' M README.md\n?? new.txt\n')
+  assert.throws(() => sh(rig.repo, 'rev-parse', '--verify', '-q', ref), 'the kept files are back: their ref is gone')
+  // rm: the CLI says what would go with it
+  const rm = await rig.cli('rm', 'work')
+  assert.equal(rm.code, 1)
+  assert.match(rm.out + rm.err, /Not deleted: 2 uncommitted paths/)
+  assert.equal((await rig.cli('rm', 'work', '--force')).code, 0)
+  assert.ok(!(await rig.rpc('state')).workspaces.some((w: any) => w.id === ws.id))
+})

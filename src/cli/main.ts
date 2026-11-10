@@ -224,7 +224,7 @@ async function main() {
     case 'remote': {
       // laki remote [stop]: remote access's link (and PIN) now, as Settings shows it; a headless server's way to it
       if (rest[0] === 'stop') return rpc('remoteStop').then(() => out({ ok: true }, 'stopped'))
-      const r: Remote | undefined = (await rpc<View>('state')).remote
+      const r: Remote | undefined = (await rpc<View>('stateOwn', { from: caller() })).remote // S3: the view's has no link or PIN
       return out(r ?? null, remoteText(r))
     }
     case 'mcp':
@@ -339,8 +339,22 @@ async function main() {
     case 'fork': {
       const m = { rm: 'wsRm', archive: 'wsArchive', restore: 'wsRestore', fork: 'wsFork' }[cmd]
       // archive: the extensions' gates run first (by you, or the agent whose tab this is); --force past them, yours only
-      const r = await rpc(m, { id: rest[0], ...(cmd === 'archive' && { force: !!flags.force, from: caller() }) }, 120000)
+      // R1: rm and archive take the worktree: with work only there (uncommitted paths; rm: commits on no remote too) they
+      // say so and stop; --force does it (yours only: an agent's archive is refused, its rm asks you)
+      if (cmd === 'rm' && !flags.force) {
+        const n = await rpc('wsPeek', { id: rest[0] }) // it couldn't look: said, nothing deleted
+        const lost = [n?.dirty && `${n.dirty} uncommitted path${n.dirty === 1 ? '' : 's'}`, n?.unpushed && `${n.unpushed} commit${n.unpushed === 1 ? '' : 's'} on no remote`].filter(Boolean)
+        if (lost.length) {
+          out(n, `Not deleted: ${lost.join(', ')} would go with it.\nlaki rm ${rest[0]} --force deletes it anyway`)
+          process.exit(1)
+        }
+      }
+      const r = await rpc(m, { id: rest[0], ...(cmd === 'archive' && { ifClean: !flags.force, force: !!flags.force, from: caller() }), ...(cmd === 'rm' && { from: caller() }) }, 120000)
       if (r?.held) held('archive', r)
+      if (cmd === 'archive' && r?.dirty) {
+        out(r, `Not archived: ${r.dirty} uncommitted path${r.dirty === 1 ? '' : 's'}${r.ignored?.length ? ` (ignored files of its own: ${r.ignored.slice(0, 5).join(', ')})` : ''}${r.subs?.length ? ` (submodules: ${r.subs.join(', ')})` : ''}.\nCommit them first, or laki archive ${rest[0]} --force (you, not an agent): Restore brings uncommitted files back, not ignored ones`)
+        process.exit(1)
+      }
       return out(r ?? { ok: true }, r?.id ? `${r.id}  ${r.path}` : 'ok')
     }
     case 'memory': {

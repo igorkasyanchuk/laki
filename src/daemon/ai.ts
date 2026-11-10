@@ -13,7 +13,7 @@ import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
 import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceFillers, voiceFix, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, modelCheck, presets, state } from './core.ts'
+import { broadcast, cliArgv, modelCheck, presets, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
 import { execGroup, own } from './resources.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -23,6 +23,10 @@ import { widgetFormat } from '../shared/widgetGuide.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
+// S2: an agent's asks (laki ai from its tab) have a chat of their own, per tab: its words never sit in the history of
+// an ask of yours, which acts as you. ponytail: its file stays after the tab closes (a few KB; it ends as a spec's does)
+export const agentChat = (tab: string) => `agent:${tab}`
+const AGENT_CHAT = /^agent:[\w.-]{1,80}$/
 const pastDir = join(dir, 'ai-chats') // the AI page's earlier chats: <at>-<hex>.json each, as ai-chat.json
 const PAST_MAX = 100 // ponytail: the newest kept; older ones go as a new one is kept
 const PAST_ID = /^\d+-[0-9a-f]{6}$/
@@ -56,7 +60,7 @@ const skilled = () => state.settings?.ai?.skill !== false
 // a spec's or brainstorm's chat: which one, so every ask in it is about it
 const system = (t: Thread) => {
   const own = String(state.settings?.ai?.context ?? '').trim().slice(0, CONTEXT_MAX)
-  const plan = t.id && !t.id.startsWith('widget:') ? planOfChat(t.id) : undefined
+  const plan = t.id && !t.id.startsWith('widget:') && !AGENT_CHAT.test(t.id) ? planOfChat(t.id) : undefined
   return [SYSTEM, skilled() && SKILL, plan && aboutPlan(plan), t.about, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
 }
 // its README.md as it is at each ask (the user edits it as they talk), so a question that doesn't name it is still
@@ -214,7 +218,7 @@ function asking(chat?: string) {
   return thread(id)
 }
 function thread(id = ''): Thread {
-  const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : planOfChat(id).file // a spec's gone, or off: that says so, each time
+  const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : AGENT_CHAT.test(id) ? join(dir, `ai-agent-${id.slice(6)}.json`) : planOfChat(id).file // a spec's gone, or off: that says so, each time
   const known = threads.get(id)
   if (known) return known
   const j: any = readJson(file) ?? {}
@@ -672,7 +676,15 @@ function dataUrl(path: string) {
 // `laki mcp` as an MCP server for a CLI agent: this daemon's (LAKI_HOME), through node or Electron as node
 // perm: claude's, whose --permission-prompt-tool is laki mcp's laki_permission (codex has none); mcpWith: any env of laki mcp's
 const mcpWith = (env: Record<string, string>) => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, ...env, ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
-const mcpServer = (chat: string, perm = false) => mcpWith({ LAKI_AI: '1', LAKI_AI_CHAT: chat, ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }) })
+// S2: an agent's chat: its claude -p or codex exec calls Laki with that tab's token, so each tool call is that agent's
+// (S12, main.ts: its asks, its refusals), not yours; its tab gone, no token: refused
+const asTab = (chat: string): Record<string, string> => {
+  if (!AGENT_CHAT.test(chat)) return {}
+  const token = sessions.get(chat.slice(6))?.tabToken
+  if (!token) throw new Error("the agent's tab is gone")
+  return { LAKI_TAB_TOKEN: token }
+}
+const mcpServer = (chat: string, perm = false) => mcpWith({ ...asTab(chat), LAKI_AI: '1', LAKI_AI_CHAT: chat, ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }) })
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here

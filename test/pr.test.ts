@@ -548,15 +548,16 @@ test('merge: gh pr merge by the way picked (kept as the project\'s next), -R off
   mkdirSync(gh)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
-  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', headRefOid: 'aaa', mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }
+  const head = 'a'.repeat(40)
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', headRefOid: head, mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, isDraft: true }))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
   const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
   await rig.rpc('prAct', { ws: ws.id, act: 'merge', method: 'rebase', deleteBranch: false })
-  assert.match(log(), /gh pr merge --rebase -R github.com\/o\/r -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  assert.ok(log().includes(`gh pr merge --rebase --match-head-commit ${head} -R github.com/o/r -- https://github.com/o/r/pull/9\n`), 'only the commit the scan saw')
   assert.equal((await rig.rpc('state')).projects[0].config.mergeMethod, 'rebase')
   await rig.rpc('prAct', { ws: ws.id, act: 'merge' }) // no way: squash, the branch deleted
-  assert.match(log(), /gh pr merge --squash --delete-branch -R github.com\/o\/r -- /)
+  assert.ok(log().includes(`gh pr merge --squash --delete-branch --match-head-commit ${head} -R github.com/o/r -- `))
   // the project's switches: off, refused; a page saving its config keeps the last way
   await rig.rpc('projectSet', { id: p.id, config: { pr: { merge: false, close: false, approve: true, land: false } } })
   const cfg = (await rig.rpc('state')).projects[0].config
@@ -574,7 +575,7 @@ test('merge: gh pr merge by the way picked (kept as the project\'s next), -R off
   await rig.rpc('prRefresh')
   await until(async () => merges() === 3, 'merged when green')
   // the last merge (a scan a second after it may log after it)
-  assert.equal(log().split('\n').filter(l => l.startsWith('gh pr merge')).at(-1), 'gh pr merge --squash --delete-branch -R github.com/o/r -- https://github.com/o/r/pull/9')
+  assert.equal(log().split('\n').filter(l => l.startsWith('gh pr merge')).at(-1), `gh pr merge --squash --delete-branch --match-head-commit ${head} -R github.com/o/r -- https://github.com/o/r/pull/9`)
   await rig.rpc('prRefresh')
   assert.equal(merges(), 3, 'once per head')
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, headRefOid: 'bbb', reviewDecision: 'REVIEW_REQUIRED' }))

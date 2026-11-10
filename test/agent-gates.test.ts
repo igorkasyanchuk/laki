@@ -121,3 +121,38 @@ test('U7: Clone a repository: a local repo or a URL into a folder, added as a pr
   const tab = await rig.tab(ws.id)
   await assert.rejects(rig.rpc('projectClone', { url: bare, into: join(rig.home, 'two'), from: { ws: ws.id, tab: tab.id } }), /clone a repository/)
 })
+
+test("S3: the view's secrets are your window's alone: the CLI's and an agent's state, and remote access's link, are masked; masks sent back change nothing", async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { env: { API_KEY: 'fake-secret' }, webhook: { url: 'https://api.telegram.example/botfake-secret/sendMessage', format: 'json' }, presets: [{ name: 'mine', agent: 'claude', env: { TOKEN: 'fake-secret' } }] })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  await rig.rpc('projectSet', { id: p.id, config: { env: { PROJ: 'fake-secret' } } }) // a project's env too
+  // /rpc's state (the CLI, MCP, an agent's laki ls --json): names and hosts, no values
+  for (const from of [undefined, { ws: ws.id, tab }]) {
+    const v = await rig.rpc('state', { from })
+    assert.ok(!JSON.stringify(v).includes('fake-secret'), 'no secret in the view')
+    assert.deepEqual([v.settings.env, v.settings.webhook.url, v.settings.presets[0].env], [{ API_KEY: '•••' }, 'https://api.telegram.example/•••', { TOKEN: '•••' }])
+  }
+  // your own window's: as they are
+  const app = await connect(rig)
+  const mine = (await until(() => app.events.findLast(m => m.ev === 'state'), 'its first state')).view as View
+  assert.equal(mine.settings.env?.API_KEY, 'fake-secret')
+  assert.match(mine.settings.webhook?.url ?? '', /botfake-secret/)
+  // a masked view's Settings saving every key: the real ones stay
+  const seen = (await rig.rpc('state')).settings
+  await rig.rpc('settingsSet', { env: seen.env, webhook: seen.webhook, presets: seen.presets, agent: 'codex' })
+  const kept = (await until(() => app.events.findLast(m => m.ev === 'state' && (m.view as View).settings.agent === 'codex'), 'saved')).view as View
+  assert.deepEqual([kept.settings.env, kept.settings.presets?.[0].env], [{ API_KEY: 'fake-secret' }, { TOKEN: 'fake-secret' }])
+  const proj = (await rig.rpc('state')).projects[0]
+  assert.deepEqual(proj.config.env, { PROJ: '•••' })
+  await rig.rpc('projectSet', { id: p.id, config: proj.config })
+  assert.deepEqual((await rig.rpc('stateOwn')).projects[0].config.env, { PROJ: 'fake-secret' })
+  // what settingsSet answers with: whole to you, masked to an agent
+  assert.deepEqual((await rig.rpc('settingsSet', { from: { ws: ws.id, tab } })).env, { API_KEY: '•••' })
+  assert.deepEqual((await rig.rpc('settingsSet', {})).env, { API_KEY: 'fake-secret' })
+  // the whole view: stateOwn, never an agent's
+  await assert.rejects(rig.rpc('stateOwn', { from: { ws: ws.id, tab } }), /an agent can't read the view's secrets/)
+  assert.equal((await rig.rpc('stateOwn')).remote, undefined)
+})

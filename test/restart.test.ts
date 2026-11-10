@@ -309,7 +309,7 @@ test("R12: an agent that isn't installed ends its tab with 127 (the strip's sign
   assert.equal(notInstalled({ kind: 'agent', status: 'exited', code: 1 }), false)
   assert.equal(notInstalled({ kind: 'shell', status: 'exited', code: 127 }), false)
   assert.deepEqual([tabAgent({ preset: 'codex' }), tabAgent({ preset: 'fast' }, [{ name: 'fast', agent: 'claude' }]), tabAgent({ preset: 'nope' })], ['codex', 'claude', undefined])
-  for (const a of Object.values(INSTALL)) assert.ok(!a.cmd || /^(curl -fsSL https:\/\/\S+ \| bash|npm install -g @[\w-]+\/[\w-]+)$/.test(a.cmd), a.cmd)
+  for (const a of Object.values(INSTALL)) assert.ok(!a.cmd || /^(curl -fsSL https:\/\/\S+ \| bash|npm install -g @[\w-]+\/[\w-]+)$/.test(a.cmd), String(a.cmd))
 
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

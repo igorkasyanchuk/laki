@@ -60,7 +60,8 @@ Out of scope:
   mode and what it hides, *Guess my next prompt*, keep awake, how long storage files, archived workspaces and pasted
   images are kept, memory's compaction, updates, the background picture, or reset the interface, nor a project's
   scripts, env, trust or memory list), and ask Laki AI,
-  which acts as you, but not in an extension's page chat. It can't import worktrees either (a delete removes their
+  which then acts with that agent's rights, in a chat of that tab's own (never yours: it can't read, open or delete your chats), but not in an extension's page chat.
+  The view an agent or the remote page reads has no remote access link or PIN, phone webhook or env values. It can't import worktrees either (a delete removes their
   folder); an imported one's folder is removed only by `git worktree remove`, which checks it's that repo's.
 - A tab's state (its hooks: a turn's start and end, a tool call) is taken with that tab's own key (`LAKI_HOOK`, new each
   start), or from a process of that tab or of none. The key is in the agent's environment, which another process of

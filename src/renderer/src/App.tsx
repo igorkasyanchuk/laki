@@ -1572,7 +1572,7 @@ export function App() {
     if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
     if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${keptArts ? ' (kept)' : ': deleted'}` })
     facts.push({ label: 'Created', icon: 'clock', value: ago(w.created) })
-    const verdict = rmVerdict({ archive, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, subs: pk.subs?.length, ignored: pk.ignored?.length, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
+    const verdict = rmVerdict({ archive, kept: archive && !w.host && w.codespace === undefined, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, subs: pk.subs?.length, ignored: pk.ignored?.length, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
     return { facts, verdict }
   }
   const rmWs = async (w: WorkspaceView) => {

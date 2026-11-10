@@ -1176,10 +1176,12 @@ async function act(r: FlowRun, b: Block) {
       r.wait = { kind: 'run' }
       return touch()
     }
-    const h = a === 'approve' || a === 'merge' ? await prAct({ ws: ws.id, act: a, by: 'workflow' }) : a === 'archive' ? await wsArchive(ws.id, { by: 'workflow', agent: r.by, ...cause(r) }) : a === 'dev' ? runDev(ws.id, undefined, r.by) : undefined
+    const h = a === 'approve' || a === 'merge' ? await prAct({ ws: ws.id, act: a, by: 'workflow' }) : a === 'archive' ? await wsArchive(ws.id, { ifClean: true, by: 'workflow', agent: r.by, ...cause(r) }) : a === 'dev' ? runDev(ws.id, undefined, r.by) : undefined
     if (!['approve', 'merge', 'archive', 'dev'].includes(a)) throw new Error(`no action ${a}`)
     const no = (h as { held?: GateHeld[] } | undefined)?.held
     if (no) return held(no)
+    const left = a === 'archive' ? (h as { dirty?: number } | undefined)?.dirty : undefined
+    if (left) throw new Error(`not archived: ${left} uncommitted path${left === 1 ? '' : 's'} in ${ws.name ?? ws.id} (commit or ship first)`) // R1
     leave(r, b, 'ok', a === 'dev' ? 'the dev server runs' : `${a}d`)
   } catch (e) {
     leave(r, b, 'error', (e as Error).message)

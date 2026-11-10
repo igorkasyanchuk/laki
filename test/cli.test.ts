@@ -116,7 +116,7 @@ test('cli: help, usage errors, open', async t => {
   assert.match(h.out, /^  laki widget new <name>/)
   assert.doesNotMatch(h.out, /laki widget dev/)
   h = await rig.cli('help', 'archive') // an alternative on another command's line
-  assert.match(h.out, /^  laki rm <ws> \| archive <ws>/)
+  assert.match(h.out, /^  laki rm <ws> \[--force\] \| archive <ws>/)
   h = await rig.cli('help', 'stop')
   assert.equal(h.out.trim().split('\n').length, 1, 'not the lines whose words say "stop it"')
   h = await rig.cli('send', 'nope', '--', '--help') // after --: text to send, not a help request
@@ -220,7 +220,10 @@ test('cli: every command, as text', async t => {
   r = await rig.cli('project', 'rm', 'repo')
   assert.equal(r.code, 1)
   assert.match(r.err, /repo has workspaces: delete them first \(one\)/)
-  await rig.cli('rm', 'one')
+  r = await rig.cli('rm', 'one') // R1: its commits are on no remote
+  assert.equal(r.code, 1)
+  assert.match(r.out, /^Not deleted: .*on no remote would go with it\.\nlaki rm one --force deletes it anyway/)
+  await rig.cli('rm', 'one', '--force')
   assert.equal((await rig.cli('project', 'rm', 'repo')).out, 'removed repo\n')
 })
 
@@ -279,8 +282,9 @@ test('cli: preset ls, add, set, off, rm; bad fields refused', async t => {
   let r = await rig.cli('preset', 'add', 'claude-ask', '--perm', 'auto', '--model', 'opus', '--env', 'A=1', '--env', 'B=x=y')
   assert.equal(r.code, 0, r.err)
   assert.equal(r.out.trim(), 'added claude-ask')
-  const v = await rig.rpc('state')
+  const v = await rig.rpc('stateOwn') // S3: state's has the env's names only
   assert.deepEqual(v.presets.find((p: any) => p.name === 'claude-ask'), { name: 'claude-ask', agent: 'claude', perm: 'auto', model: 'opus', env: { A: '1', B: 'x=y' } })
+  assert.deepEqual((await rig.rpc('state')).presets.find((p: any) => p.name === 'claude-ask').env, { A: '•••', B: '•••' })
   r = await rig.cli('preset', 'set', 'claude-ask', '--model', '', '--effort', 'high', '--name', 'ask')
   assert.equal(r.code, 0, r.err)
   r = await rig.cli('preset', 'off', 'ask')

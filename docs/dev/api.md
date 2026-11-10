@@ -111,6 +111,12 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   a git that fails, a local, archived or gone one: none of it; `subs`, `ignored`: `unsaved`'s, below, only when there are
   some): what App's `rmFacts` puts in the delete question (ui.tsx `ask` `facts`, `.ask-facts`; each line's `tone` and
   `chip`, and text.ts `rmVerdict` over them; `peekFacts`: the *Submodules* and *Ignored files* lines), waited for 1.5 s at most;
+- `wsArchive` keeps a local worktree's uncommitted work first (files.ts `archiveKeep`: its tree as a commit at
+  `refs/laki/archived/<ws>`, none when it equals HEAD's, an older one dropped then; `wsRestore`'s `archiveBack` restores it
+  into the new worktree (the branch moved meanwhile: `cherry-pick -n`, its changes on top of the newer commits, a
+  conflict's markers left and the ref kept) and drops the ref, `dropWs`' `archiveDrop` drops it with an archived one). `ifClean` is forced for an agent's call
+  (main.ts), the CLI's without `--force` and a workflow's Archive (which fails the block). The CLI's `rm` without
+  `--force` asks `wsPeek` first, from a Laki tab too, and stops on uncommitted paths or commits on no remote.
 - `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns
   `{ dirty }`, the count of all it'd lose, with `subs` and `ignored` when there are some. core.ts `unsaved`: status'
   lines (`--untracked-files=normal`, whatever your config says), and what `noNested`'s status doesn't count:
@@ -272,7 +278,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   the laki skill tells them to report every 20-30 s; claude and codex on this Mac are told at every start (`agentCmd`'s
   `PROGRESS_NOTE`: `--append-system-prompt`, `-c developer_instructions`; the skill loads only for Laki's own tasks), and
   claude's settings allow its `progress` command;
-- Laki AI (below): `aiAsk` (`text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
+- Laki AI (below): `aiAsk` (from an agent: main.ts `byAgent` marks the text as the agent's and takes it out of the queue, `asAgent` runs each tool call through `agentNo` with the agent's `from`, in a chat of that tab's own (ai.ts `agentChat`, `ai-agent-<tab>.json`: never your chat's history; `aiState`, `aiNew`, `aiStop` from an agent are that chat's; your chats' `aiChats`, `aiOpen`, `aiChatRm`, `aiUnqueue`, `aiContinue`, `studioChatRm` and `voiceText` refused); claude -p's and codex exec's `laki mcp` gets that tab's `LAKI_TAB_TOKEN` (`asTab`), so its calls are the agent's too; `text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
   conversation, `busy`, `ended`, `key`: one is saved, the last 100 calls,
   `totals`), `aiNew`, `aiStop` (none: any chat's ask), `aiKey` (`key`; empty removes it); each takes `chat` (a spec's or
   brainstorm's, `planChat`; none: the AI page's), and `aiContinue` (an ended chat taken up again), `aiTick` (`now`: tests
@@ -365,7 +371,12 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   (`imageSave`) and its path returned. The CLI's `laki browser`, MCP's `laki_browser`.
 
 WebSocket events:
-- `state`: the whole view, debounced 30 ms;
+- `state`: the whole view, debounced 30 ms; whole only for your window (a local connection of no tab: `own`), else
+  `types.ts` `masked` (no `remote.link`, the PIN, `settings.webhook.url` past its origin, `replyTopic`, env values of
+  settings, presets and projects as `MASK`, which `projectSet` keeps as they are); none is sent before the caller is known
+  (500 ms at most: a masked one then, the whole one after). The `state` method always masked; `stateOwn`: whole, refused to agents and the remote page (`laki remote`'s link).
+  `settingsSet` puts a `MASK` back as the value it hides (`unmasked`), so a masked page's save changes nothing;
+  what `settingsSet` and `presetSave` answer with is masked too unless the caller is you (`call()`'s end);
 - `data` and `responder`: per tab;
 - `turn`: waiting, done or limit, for notifications;
 - `browse`: an agent browser op, for the app (above);

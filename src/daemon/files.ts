@@ -1,6 +1,7 @@
 // a worktree's files: the diff against its base and its size, Changes' revert and redo, and the side panel's tree,
 // reads and writes. core.ts imports it, and its users import it directly.
 
+import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
@@ -8,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
-import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, noNested, q, run, save, state, within } from './core.ts'
+import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, noNested, q, run, save, state, within, wsLog } from './core.ts'
 import { dir } from './dir.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
@@ -755,3 +756,40 @@ export async function fileWrite(o: { ws: string; path: string; text: string; was
   else writeFileSync(abs, o.text)
   return { size: Buffer.byteLength(o.text) }
 }
+
+// R2: an archived workspace's files as they were (uncommitted and new ones; not ignored ones, nor a submodule's own
+// changes: the app's question names those) under refs/laki/archived/<ws> in its repo. Restore puts them back, deleting
+// the workspace drops them. ponytail: local worktrees only; a host's is archived as before
+const archivedRef = (ws: string) => `refs/laki/archived/${ws}`
+export async function archiveKeep(ws: Workspace) {
+  if (ws.host || ws.codespace !== undefined || !/^[\w.-]+$/.test(ws.id) || !existsSync(ws.path)) return false
+  try {
+    const tree = await treeOf(ws, true)
+    const head = (await g(ws, ['rev-parse', '-q', '--verify', 'HEAD']).catch(() => '')).trim()
+    if (head && tree === (await g(ws, ['rev-parse', `${head}^{tree}`])).trim()) {
+      await g(ws, ['update-ref', '-d', archivedRef(ws.id)]).catch(() => {}) // an earlier archive's, never taken back: not over this one at Restore
+      return false // nothing of its own
+    }
+    const env = { ...process.env, GIT_AUTHOR_NAME: 'Laki', GIT_AUTHOR_EMAIL: 'laki@localhost', GIT_COMMITTER_NAME: 'Laki', GIT_COMMITTER_EMAIL: 'laki@localhost' }
+    const c = (await g(ws, ['commit-tree', '--no-gpg-sign', tree, ...(head ? ['-p', head] : []), '-m', `Laki: ${ws.id} as archived`], env)).trim()
+    await g(ws, ['update-ref', archivedRef(ws.id), c])
+    return true
+  } catch (e) {
+    wsLog(ws, `archive: its uncommitted files weren't kept: ${(e as Error).message}`)
+    return false
+  }
+}
+export async function archiveBack(ws: Workspace) {
+  if (ws.host || ws.codespace !== undefined) return
+  const ref = archivedRef(ws.id)
+  if (!(await g(ws, ['rev-parse', '-q', '--verify', ref]).catch(() => '')).trim()) return
+  const at = (r: string) => g(ws, ['rev-parse', '-q', '--verify', r]).then(s => s.trim(), () => '')
+  const [was, head] = [await at(`${ref}^`), await at('HEAD')]
+  // the branch moved while it was archived: its changes on top of what's there now (conflicts as markers, the ref kept),
+  // not the older tree over the newer commits
+  if (was && head && was !== head) await g(ws, ['cherry-pick', '-n', ref]).finally(() => g(ws, ['reset', '-q']).catch(() => {}))
+  else await g(ws, ['restore', `--source=${ref}`, '--worktree', '--', '.'])
+  await g(ws, ['update-ref', '-d', ref]).catch(() => {})
+  wsLog(ws, 'restored with its uncommitted files as they were')
+}
+export const archiveDrop = (repo: string, ws: string) => void (/^[\w.-]+$/.test(ws) && existsSync(repo) && execFile('git', ['-C', repo, 'update-ref', '-d', archivedRef(ws)], () => {}))

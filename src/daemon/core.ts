@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson, writeAtomic } from '../shared/conn.ts'
-import { type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -35,7 +35,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
+import { archiveBack, archiveDrop, archiveKeep, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -1111,7 +1111,8 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   }
   if (Array.isArray(o.rows) && p.seps) p.rows = o.rows.filter(x => typeof x === 'string').slice(0, 2000)
   if (o.config) {
-    const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => ENV_KEY.test(k)))
+    // a masked view's value (an agent's, remote access's page): the one it has, as it is
+    const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => ENV_KEY.test(k)).map(([k, v]) => [k, v === MASK && p.config?.env?.[k] !== undefined ? p.config.env[k] : v]))
     p.config = {
       setup: o.config.setup?.trim() || undefined,
       teardown: o.config.teardown?.trim() || undefined,
@@ -2981,6 +2982,7 @@ async function teardown(ws: Workspace) {
 export const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
   widgetEvent('workspace.removed', {}, ws.id) // its payload now, while it's there
+  if (ws.archived) archiveDrop(state.projects.find(p => p.id === ws.project)?.path ?? '', ws.id) // R2: what archiving kept of it
   prSeen.delete(ws.id)
   saidTried.delete(ws.id)
   widgetsGone(ws.id) // its extensions' instances
@@ -3108,7 +3110,8 @@ function rmStorage(ws: Workspace) {
 }
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.
-// ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are:
+// ifClean: only with nothing uncommitted (archiving removes the worktree; R2 keeps its uncommitted files for Restore,
+// not ignored ones or a submodule's), else how many paths are:
 // status' lines, and unsaved's submodules and ignored files (named, when there are some)
 export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; subs?: string[]; ignored?: string[]; held?: GateHeld[] } | undefined> {
   const ws = findWs(ref)
@@ -3125,6 +3128,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   // stopped, its files kept for Restore. ponytail: GitHub deletes a stopped one after its retention period (30 days by
   // default), its uncommitted and unpushed work with it: the app's archive ask says so (text.ts rmVerdict's cs), it isn't held
   if (ws.codespace) await cs.stop(ws.codespace).then(() => (ws.csState = 'Shutdown'))
+  await archiveKeep(ws) // R2: its uncommitted files, for Restore
   await teardown(ws)
   ws.archived = true
   ws.archivedAt = Date.now()
@@ -3149,6 +3153,7 @@ export async function wsRestore(ref: string) {
     })
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
+  await archiveBack(ws).catch(e => wsLog(ws, `restore: its uncommitted files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${ws.id}`))
   ws.archived = false
   ws.archivedAt = undefined
   ws.touchedAt = Date.now() // archive when idle: a full period from here, so an Undo stays undone

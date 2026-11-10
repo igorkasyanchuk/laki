@@ -1027,13 +1027,19 @@ export async function prLabel(o: { ws: string; label: string; on: boolean }) {
 // --delete-branch also checks out the default branch here and deletes the local one. GitHub deletes the head branch
 // (not a fork's). Then a scan, a moment later: this may run inside one (autoPR)
 // GitLab's: glab mr merge (its source branch removed unless kept; glab sets it to merge when the pipeline passes)
+// Only the commit the last scan saw (--match-head-commit, glab's --sha): a push since then isn't merged unchecked;
+// refused, the scan below shows the new head and its checks
 async function merge(ws: Workspace, pr: PR, how: MergeMethod, deleteBranch: boolean) {
-  if (isLab(pr)) await glabAct(ws, pr, 'merge', how, deleteBranch)
-  else
-    await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), '-R', repoOf(pr), '--', pr.url], { timeout: 60000 }).catch(e => {
-      throw new Error(ghSays(e, `PR #${pr.number}`))
-    })
-  setTimeout(() => void scanPRs(), 1000)
+  try {
+    if (isLab(pr)) await glabAct(ws, pr, 'merge', how, deleteBranch)
+    else
+      await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), ...(/^[0-9a-f]{7,64}$/.test(pr.head ?? '') ? ['--match-head-commit', pr.head!] : []), '-R', repoOf(pr), '--', pr.url], { timeout: 60000 }).catch(e => {
+        // GitHub's words for a head that isn't the one asked for; another refusal (a branch behind its base) as gh says it
+        throw new Error(/head branch was modified|expected head (sha|oid)|head (sha|oid|commit) (did|does)(n.t| not) match/i.test(String(e?.stderr ?? e?.message)) ? `PR #${pr.number} got new commits: its checks run again` : ghSays(e, `PR #${pr.number}`))
+      })
+  } finally {
+    setTimeout(() => void scanPRs(), 1000) // once it's done (a slow merge isn't scanned midway), a refused one too
+  }
 }
 
 // prDiff: the PR's whole diff as GitHub has it (gh pr diff), in diff's shape: Changes' PR view, for a workspace that

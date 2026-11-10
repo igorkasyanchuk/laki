@@ -536,7 +536,7 @@ test('Reset the interface: every setting at its default but what you set up, the
   await rig.rpc('settingsSet', { theme: 'dawn', railLabels: false, workflows: false, specs: true, birdView: true, aiGlow: true, ownAvatar: false, editor: 'zed', env: { A: '1' }, webhook: { url: 'https://ntfy.sh/x' }, branchPrefix: 'me/', voice: { on: false, model: 'm' }, achievements: { got: { board: 1 }, hidden: ['race'] } })
   const s = await rig.rpc('uiReset')
   assert.deepEqual(s, { editor: 'zed', env: { A: '1' }, webhook: { url: 'https://ntfy.sh/x' }, voice: { on: false, model: 'm' }, achievements: { got: { board: 1 }, hidden: ['race'] }, workflows: false, specs: true }, 'voice kept as you set it, like Laki AI; achievements too; Workflows and Specs as you set them (unset is on)')
-  assert.deepEqual((await rig.rpc('state')).settings, s, 'kept, and the view says so')
+  assert.deepEqual((await rig.rpc('stateOwn')).settings, s, 'kept, and the view says so')
   const w = await find(rig, 'mine')
   assert.deepEqual([w.on, w.place], [false, 'top'], 'off, its other choices kept')
 })

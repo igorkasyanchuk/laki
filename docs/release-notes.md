@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Archive keeps uncommitted work: what a worktree hadn't committed is saved with the archive and comes back with *Restore* (local projects; gone once the archive is deleted).
+- Safer: `laki archive`, a workflow's Archive and an agent's archive stop on uncommitted work (`laki archive --force` goes on); `laki rm` refuses when uncommitted or unpushed work would go with it (`--force`).
+- Safer: a merge from Laki (the button, Merge when green) only merges the commit whose checks it saw; a push in between refuses it, and the checks run again.
+- Safer: Laki AI asked by an agent acts with that agent's rights, not yours, in a chat of its own (yours stay yours); remote access's link and PIN, the phone webhook and env values no longer go to agents' or shared pages' copies of the view (`laki remote` still prints the link for you).
 - Safer: an agent can no longer switch its own permission mode, or type a `!` command from its sandbox, by sending keys as bytes.
 - Safer: an agent's `laki rm` (a workspace, a project, a scheduled task) asks you first; it changes files and closes tabs only in its own workspace, can't share a tab's page, and can't merge a PR or flip a PR switch as you.
 - Safer: agents can't change your voice dictionary, Laki AI's instructions or your keys; a ⌘K command's key never takes over ⌘C, ⌘V or ⌘Q.

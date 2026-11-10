@@ -26,7 +26,8 @@ export function frame(m: unknown) {
 // a socket's bytes as frames; throws on one too long or not JSON (the caller drops the connection)
 export function reader(on: (m: any) => void) {
   let buf: Buffer = Buffer.alloc(0)
-  return (d: Buffer) => {
+  return (chunk: Buffer | string) => {
+    const d = typeof chunk === 'string' ? Buffer.from(chunk) : chunk // a socket with an encoding set gives strings
     buf = buf.length ? Buffer.concat([buf, d]) : d
     while (buf.length >= 4) {
       const n = buf.readUInt32BE(0)

@@ -296,8 +296,9 @@ selected workspace's PR is in the status bar.
   its changes (how many files, new and deleted ones, lines added and removed, what's not committed), ports and marks
   (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
   *Open*, *PR #n on GitHub* (or the PR's title), ⋯ its menu.
-- Archiving asks first, saying what goes (the worktree, uncommitted changes with it) and what stays (the branch, its
-  artifacts); *Undo* is in the message that follows. Several at once (picked rows, the Board's *Archive all*) ask once.
+- Archiving asks first, saying what goes (the worktree) and what stays (the branch, its artifacts, and uncommitted
+  changes: saved with the archive, back with *Restore*, gone once the archive is deleted; a project over SSH or in
+  the cloud loses them); *Undo* is in the message that follows. Several at once (picked rows, the Board's *Archive all*) ask once.
 - Click a project's arrow to fold its workspaces away (its busiest status and their count stay), again to unfold;
   *Collapse all projects* and *Expand all projects* are in ⌘K. (Terminals and Browsers fold on a click anywhere.)
 - Click a project's name for its page (also ⋯ › *Open project page*), in tabs: *Notes* (yours, in Markdown; *Edit*,
@@ -2448,6 +2449,7 @@ laki browser fix-the-login open /login                  # the agent browser (the
 laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | text | screenshot
 laki browser fix-the-login click "#save" --expect-url /settings   # refused, nothing done, on any other page
 laki archive fix-the-login | restore … | fork … | rm …
+laki archive fix-the-login --force   # with uncommitted work too (kept, back with restore); rm --force: unpushed work goes
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace
 laki rename . "login redirect" --asked                  # an agent, over a name you gave it: only when you asked
 laki pr . 42                                            # attach a PR (URL or number) to the workspace

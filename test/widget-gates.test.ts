@@ -158,6 +158,11 @@ test('gates: a no that exits 1 is a no: it holds a ship, a merge and an archive,
   assert.deepEqual(await rig.rpc('prAct', { ws: ws.id, act: 'merge' }), { held: [{ ...no[0], gate: 'merge' }] })
   assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr merge'), 'not merged')
   assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id }), { held: [{ ...no[0], gate: 'archive' }] })
+  const dirty = await rig.cli('archive', ws.id) // R1: feature.txt isn't committed: that's said first
+  assert.equal(dirty.code, 1)
+  assert.match(dirty.out, /^Not archived: 1 uncommitted path/)
+  execFileSync('git', ['-C', ws.path, 'add', '-A'])
+  execFileSync('git', ['-C', ws.path, '-c', 'user.name=t', '-c', 'user.email=t@x.dev', 'commit', '-qm', 'feature'])
   const c = await rig.cli('archive', ws.id)
   assert.equal(c.code, 1)
   assert.match(c.out, /^Not archived:\n {2}No1: x\n {4}fix: do y\nlaki archive --force does it anyway/)

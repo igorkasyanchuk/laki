@@ -86,7 +86,7 @@ export const noMR = (said: string) => /no (open )?merge requests? (available|fou
 // the MR actions: approve, close, merge (squash or rebase as picked; the source branch removed unless kept), draft or ready
 export function glabAct(ws: Workspace, pr: PR, act: 'approve' | 'close' | 'merge', how?: string, removeBranch = true) {
   const iid = String(pr.number)
-  const args = act === 'approve' ? ['mr', 'approve', iid] : act === 'close' ? ['mr', 'close', iid] : ['mr', 'merge', iid, '--yes', ...(how === 'squash' ? ['--squash'] : how === 'rebase' ? ['--rebase'] : []), ...(removeBranch ? ['--remove-source-branch'] : [])]
+  const args = act === 'approve' ? ['mr', 'approve', iid] : act === 'close' ? ['mr', 'close', iid] : ['mr', 'merge', iid, '--yes', ...(how === 'squash' ? ['--squash'] : how === 'rebase' ? ['--rebase'] : []), ...(removeBranch ? ['--remove-source-branch'] : []), ...(/^[0-9a-f]{7,64}$/.test(pr.head ?? '') ? ['--sha', pr.head!] : [])] // --sha: only the commit the scan saw
   return glab(ws, args, 60000).catch(e => Promise.reject(new Error(glabSays(e, `MR !${iid}`))))
 }
 export const glabDraft = (ws: Workspace, pr: PR, draft: boolean) => glab(ws, ['mr', 'update', String(pr.number), draft ? '--draft' : '--ready']).catch(e => Promise.reject(new Error(glabSays(e, `MR !${pr.number}`))))

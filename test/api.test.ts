@@ -624,7 +624,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.match(on.link, new RegExp(`^${url}/\\?token=[0-9a-f]{64}$`))
   assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
   assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
-  assert.deepEqual((await rig.rpc('state')).remote, on)
+  assert.deepEqual((await rig.rpc('stateOwn')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
   // the link's key, once, from its page's origin: the page's own token for it, then the link is dead (L3)
@@ -679,7 +679,8 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const ever = await rig.rpc('remoteStart', { hours: 0 })
   assert.equal(ever.until, undefined)
   await rig.rpc('remoteTick', { now: Date.now() + 3650 * 86400e3 })
-  assert.equal((await rig.rpc('state')).remote?.link, ever.link)
+  assert.equal((await rig.rpc('stateOwn')).remote.link, ever.link)
+  assert.equal((await rig.rpc('state')).remote.link, undefined) // S3: not in the view the CLI and agents read
   await rig.rpc('remoteStop')
   await until(() => stops() >= 3, 'cloudflared stopped', 30000)
 
@@ -883,6 +884,9 @@ test('the view goes out only when it changed: tool calls that keep a tab running
   t.after(() => app.close())
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PreToolUse' } })
   await until(() => app.events.some((m: any) => m.ev === 'state' && m.view.tabs.find((x: any) => x.id === tab.id)?.status === 'running' && m.view.workspaces[0].pr), 'running, its PR scanned')
+  // a window's first view comes once the daemon knows whose it is (S3), and the change after it goes out to all,
+  // the same or not (core's hello): have that one out before counting
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUse' } })
   await new Promise(r => setTimeout(r, 300)) // anything else under way goes out
   app.events.splice(0)
   for (const h of ['PostToolUse', 'PreToolUse', 'PostToolUse']) await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: h } })

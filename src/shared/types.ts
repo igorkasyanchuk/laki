@@ -1086,6 +1086,35 @@ export function recorded(v: View): View {
   if (!gone.size && !off.size) return v
   return { ...v, projects: v.projects.filter(p => !off.has(p.id)), workspaces: v.workspaces.filter(w => !gone.has(w.id)), tabs: v.tabs.filter(t => !gone.has(t.workspace)), layouts: v.layouts && Object.fromEntries(Object.entries(v.layouts).filter(([k]) => !gone.has(k))), today: v.today && { ...v.today, ws: v.today.ws.filter(x => !gone.has(x.ws)) }, digest: v.digest && { ...v.digest, rows: v.digest.rows.filter(r => !gone.has(r.ws)) } }
 }
+// S3: the view for anyone but your own window: the CLI and MCP (an agent's too: telling them apart costs a process
+// lookup per call), Laki AI, an agent's connection, remote access's page. No secrets in it: remote access's link (its
+// token; laki remote asks stateOwn) and PIN, the phone webhook's URL and reply topic (a bot's token, an ntfy topic),
+// env values (yours, a profile's). Names and hosts stay, so what's set still shows; sent back as they are, a
+// settingsSet leaves the real ones (unmasked)
+export const MASK = '•••'
+const maskUrl = (u: string) => {
+  try {
+    return `${new URL(u).origin}/${MASK}`
+  } catch {
+    return MASK
+  }
+}
+const maskEnv = <T extends { env?: Record<string, string> }>(x: T): T => (x.env && Object.keys(x.env).length ? { ...x, env: Object.fromEntries(Object.keys(x.env).map(k => [k, MASK])) } : x)
+export function maskSettings(s: Settings): Settings {
+  const w = s.webhook
+  return { ...maskEnv(s), ...(w && (w.url || w.replyTopic) && { webhook: { ...w, ...(w.url && { url: maskUrl(w.url) }), ...(w.replyTopic && { replyTopic: MASK }) } }), ...(s.presets && { presets: s.presets.map(maskEnv) }) }
+}
+export function masked(v: View): View {
+  const { link: _, ...remote } = v.remote ?? ({} as Remote)
+  // a project's env too (its settings'): projectSet keeps a value sent back as the mask
+  return { ...v, projects: v.projects?.map(p => (p.config?.env ? { ...p, config: maskEnv(p.config) } : p)), settings: maskSettings(v.settings ?? {}), presets: v.presets?.map(maskEnv), ...(v.remote && { remote: { ...remote, ...(remote.pin && { pin: MASK }) } }) }
+}
+// a settingsSet from a masked view (Settings saves every key): the masked ones are the ones it has, left as they are
+export function unmasked<T extends Record<string, any>>(p: T, now: Settings): T {
+  const m = maskSettings(now) as Record<string, unknown>
+  const real = now as Record<string, unknown>
+  return Object.fromEntries(Object.entries(p ?? {}).filter(([k, v]) => !(k in m && m[k] !== real[k] && JSON.stringify(v) === JSON.stringify(m[k])))) as T
+}
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
@@ -1106,7 +1135,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 158
+export const API = 159
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

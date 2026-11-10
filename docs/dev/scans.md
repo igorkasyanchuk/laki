@@ -173,6 +173,8 @@
   project's `mergeMethod` or squash, the branch deleted) once per head (`fix.land`; `wsSet` turning it on again clears it
   at the next scan: `retry`);
   a failure is `overToYou`. The app asks once as it's turned on. A project's `land` turned off clears its workspaces' `autoLand` (`projectSet`).
+- `merge` (the button's, `autoMerge`'s): `gh pr merge --match-head-commit <the scan's head>` (glab: `--sha`), so a push
+  after the scan refuses it (*PR #n got new commits: its checks run again*); a scan follows either way.
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
   commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`: each tail `fenced`, said to be the
 PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's `cross` (`isCrossRepository`): App's
