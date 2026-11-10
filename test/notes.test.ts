@@ -7,6 +7,7 @@ import { test } from 'node:test'
 import { CAPS, hasCap, oldName, sendAs } from '../src/shared/caps.ts'
 import { rpc } from '../src/shared/conn.ts'
 import { API } from '../src/shared/types.ts'
+import { VERSION } from '../src/shared/version.ts'
 import { fresh } from './helpers.ts'
 
 test('notes: on unless turned off; made, saved, searched, colored, pinned, a file kept, deleted with its files', async t => {
@@ -86,7 +87,7 @@ test('note.* (H6.3): the namespaced names reach the same handlers and checks; ca
   await assert.rejects(rig.rpc('note.nope'), /^Error: unknown method note\.nope$/)
   await assert.rejects(rig.rpc('constructor'), /^Error: unknown method constructor$/) // not the table's prototype
   assert.equal(await rig.rpc('ping'), 'pong') // what every CLI's alive() checks
-  assert.deepEqual(await rig.rpc('ping', { caps: true }), { pong: true, api: API, caps: CAPS })
+  assert.deepEqual(await rig.rpc('ping', { caps: true }), { pong: true, api: API, caps: CAPS, version: VERSION }) // version: A9's laki --version
   assert.deepEqual((await rig.rpc('state')).caps, CAPS)
   assert.ok(CAPS.includes('ns:note') && CAPS.includes('ws.peek'))
 })
