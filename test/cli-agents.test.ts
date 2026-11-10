@@ -262,7 +262,7 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
   await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
   // its Bash tool, with Laki's variables taken out
   await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run env -u LAKI_TAB -u LAKI_WORKSPACE ${laki} widget on ${id} --seen ${hash} > ${out} 2>&1; ${laki} schedule run nope >> ${out} 2>&1; echo done >> ${out}` })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'the agent ran it', 60000)
   const said = readFileSync(out, 'utf8')
   assert.match(said, /only you can turn an extension on/) // an agent's, by its process
   assert.match(said, /an agent can't run a scheduled task now/)
@@ -271,8 +271,9 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
   const r = await rig.cli('widget', 'on', id, '--seen', hash)
   assert.equal(r.out, `${id} on\n`, r.err)
   // an agent's schedule is saved off
+  rmSync(out, { force: true }) // the last command's done isn't this one's
   await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} schedule add ${p.id} --when "every day at 9am" check the build > ${out} 2>&1; echo done >> ${out}` })
-  await until(() => readFileSync(out, 'utf8').includes('done'), 'scheduled')
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'scheduled')
   await until(async () => (await rig.rpc('state')).schedules?.length === 1, 'the task saved')
   assert.equal((await rig.rpc('state')).schedules[0].on, false)
   // another workspace's tab: the user is asked first in the app (toolAsk with cross); a no is a refusal, Allow once reads it
@@ -286,7 +287,7 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
     ask.seen = true
     assert.equal(ask.to, 'other')
     await rig.rpc('widgetToolAnswer', { req: ask.req, allow })
-    await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'it went on', 30000)
+    await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'it went on', 30000)
     assert.match(readFileSync(out, 'utf8'), said)
   }
   // one this workspace started (a worker: laki new from its tab): no question, as for its own (laki-orchestrate)
@@ -295,7 +296,7 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
   rmSync(out, { force: true })
   const asks = app.events.filter(m => m.ev === 'toolAsk').length
   await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} screen ${kid.id}/${kidShell} > ${out} 2>&1; echo done >> ${out}` })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'read unasked', 30000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'read unasked', 30000)
   assert.doesNotMatch(readFileSync(out, 'utf8'), /another workspace/)
   assert.equal(app.events.filter(m => m.ev === 'toolAsk').length, asks)
   // a new agent tab with a prompt in another workspace asks as a send does
@@ -304,7 +305,7 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
   const tabAsk = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'send' && !m.seen), 'a tab asked for', 30000)
   assert.deepEqual([tabAsk.to, tabAsk.target, tabAsk.text], ['other', 'a new agent tab', 'hello'])
   await rig.rpc('widgetToolAnswer', { req: tabAsk.req, allow: 'deny' })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'refused', 30000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'refused', 30000)
   assert.match(readFileSync(out, 'utf8'), /another workspace: the user said no/)
   assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === other.id && x.kind === 'agent'))
   app.close()

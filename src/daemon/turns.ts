@@ -304,8 +304,9 @@ async function pin(ws: Workspace, ref: string, tree: string, head: string, msg: 
   await g(ws, ['update-ref', ref, c])
 }
 const unpin = (ws: Workspace, n: number) => Promise.all((['before', 'after'] as const).map(s => g(ws, ['update-ref', '-d', refOf(ws.id, n, s)]).catch(() => {})))
-async function turnKeep(ws: Workspace, o: Omit<TurnKept, 'n' | 'ended' | 'add' | 'del' | 'count'>) {
-  const max = keepN()
+// must: a rewind's (what was there is kept whatever the setting, or it couldn't be undone)
+async function turnKeep(ws: Workspace, o: Omit<TurnKept, 'n' | 'ended' | 'add' | 'del' | 'count'>, must = false) {
+  const max = Math.max(keepN(), must ? 1 : 0)
   if (!max) return
   return inLine(ws.id, async () => {
     const k = readKept(ws)
@@ -361,7 +362,7 @@ export async function turnRewind(o: { ws?: string; tab?: string; n?: number }) {
   const files = await filesOf(ws, now, t.before) // what the rewind does: A a file that comes back, D one that goes
   if (!files.length) return { files: 0 }
   if (tabsOf(ws.id).some(x => rtOf(x.id).status === 'running')) throw new Error('a turn started meanwhile: nothing rewound')
-  const kept = await turnKeep(ws, { tab: t.tab, name: 'You', prompt: `Rewound to before turn ${t.n}`, rewind: t.n, before: now, after: t.before, files })
+  const kept = await turnKeep(ws, { tab: t.tab, name: 'You', prompt: `Rewound to before turn ${t.n}`, rewind: t.n, before: now, after: t.before, files }, true)
   const back = files.filter(f => f.status !== 'D').map(f => f.path)
   if (back.length) await g(ws, ['restore', `--source=${t.before}`, '--worktree', '--', ...back])
   for (const f of files)

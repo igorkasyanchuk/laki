@@ -446,7 +446,9 @@ tmux) used to count as you. A token per tab makes an agent's caller a fact the d
   daemon.json's token: as before, by its process.
 - **What the daemon does.** `/rpc` takes the main token or a live tab token (never from remote access's page; the
   WebSocket takes the main one only). With an **agent** tab's token the caller is that tab for every `FROM` and `CALLER`
-  method and for `hook`, with no lookup (no lsof or ps per connection). A **shell** tab's token only lets the call in:
+  method and for `hook` when its process is in no tab or can't be found (`callerOf`); a process found in another tab is
+  that tab's, so a token read out of another tab's environment gains nothing. The daemon and the app delete an
+  inherited `LAKI_TAB_TOKEN` as they start. A **shell** tab's token only lets the call in:
   who typed there is still looked up (`peerOf`, `treeAgent`), since an agent's `ps` can read a shell's environment. The
   main token from a process found in a tab stays an agent's, so reading daemon.json gains nothing while it's in the tree.
 - **The sandbox.** A sandboxed claude's generated settings deny reads of `<data>/daemon.json`: its Bash commands

@@ -835,6 +835,8 @@ export function retryText(r: NonNullable<TabView['retry']>, now = Date.now()) {
 // right before your next message, a new session, or the end). The last line while it runs, and a run you stopped, show
 // either way
 export type ReaderLine = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true; at?: number; end?: number; cost?: number }
+// a turn's cost, about: $0.21, a small one $0.0040; none: nothing
+const usd = (n?: number) => (n ? (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`) : '')
 // F6: a message's time: today's as 14:02, an older one's with its day (9 Nov 14:02; another year's with the year)
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 export function saidTime(at: number, now = Date.now()) {
@@ -855,13 +857,13 @@ export function readerTimes(said: ReaderLine[], running: boolean, now = Date.now
     const end = x.end ?? x.at
     if ((next ? next.who !== 'you' && next.who !== 'new' : running) || !end) return
     const took = you?.at && end > you.at ? tookText(end - you.at) : ''
-    out[i] = [saidTime(end, now), took, you?.cost ? (you.cost < 0.01 ? `$${you.cost.toFixed(4)}` : `$${you.cost.toFixed(2)}`) : ''].filter(Boolean).join(' · ')
+    out[i] = [saidTime(end, now), took, usd(you?.cost)].filter(Boolean).join(' · ')
   })
   return out
 }
 // F1: a kept turn in a line (TurnStrip's tip and menu head): `#3 · change a, add b · 2 files +2 −0 · 14:02 · 1m 4s · $0.21`
 export const turnWords = (t: { n: number; prompt?: string; count: number; add: number; del: number; started?: number; ended: number; cost?: number }, now = Date.now()) =>
-  [`#${t.n}`, t.prompt, `${t.count} file${t.count === 1 ? '' : 's'} +${t.add} −${t.del}`, saidTime(t.ended, now), t.started ? tookText(t.ended - t.started) : '', t.cost ? (t.cost < 0.01 ? `$${t.cost.toFixed(4)}` : `$${t.cost.toFixed(2)}`) : '']
+  [`#${t.n}`, t.prompt, `${t.count} file${t.count === 1 ? '' : 's'} +${t.add} −${t.del}`, saidTime(t.ended, now), t.started ? tookText(t.ended - t.started) : '', usd(t.cost)]
     .filter(Boolean)
     .join(' · ')
 // F6: a fenced block the Reader offers Run on: a shell's, with something in it and no hidden character (bidi marks,

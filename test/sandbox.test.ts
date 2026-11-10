@@ -42,7 +42,7 @@ console.log(process.argv[3] + ' ' + process.argv[5] + ': ' + (await r.text()).re
   ]
   const line = calls.map(([m, params, tag]) => `${process.execPath} ${script} ${join(rig.data, 'daemon.json')} ${m} '${JSON.stringify(params)}' ${tag} >> ${out} 2>&1`).join('; ')
   await rig.rpc('send', { target: `${ws.id}/${tab.id}`, text: `run ${line}; echo done >> ${out}` })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'it ran', 60000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'it ran', 60000)
   const said = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').filter(l => l !== 'done').map(l => [l.split(' ')[1].replace(/:$/, ''), l]))
   assert.match(said.rm, /an agent can't remove one of the user's accounts/)
   assert.match(said.move, /an agent can't move a tab to another of the user's accounts/)

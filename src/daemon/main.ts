@@ -50,6 +50,7 @@ import { device, sim } from './device.ts'
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
 delete process.env.LAKI_WORKSPACE
 delete process.env.LAKI_TAB
+delete process.env.LAKI_TAB_TOKEN // S12: nor that tab's: what the daemon starts (Laki AI's laki mcp, the pty host) would call as its agent
 mkdirSync(dir, { recursive: true, mode: 0o700 })
 chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 
@@ -599,11 +600,18 @@ const peerOf = (sock: Socket) => {
   }
   return t
 }
+// S12: who a connection is: the tab its process is found in; with an agent tab's token (known), that tab when its
+// process is in no tab or can't be found (a detached child's, a launchd job's: the point of the token), but a process
+// found in another tab is that one's (a token read out of another tab's environment names its reader, not its owner)
+const callerOf = async (sock: Socket, known?: Tab) => {
+  const peer = await peerOf(sock).catch(() => null)
+  return known ? (peer && peer.id !== known.id ? peer : known) : peer
+}
 async function whoCalls(sock: Socket, method: string, p: any, known?: Tab) {
   // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
   const from = FROM.has(method) || (method === 'state' && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
   if (!from && !CALLER.has(method)) return p
-  const tab = known ?? (await peerOf(sock).catch(() => null)) // S12: its tab's token says who, no lookup
+  const tab = await callerOf(sock, known)
   if (tab === null || sock.readableEnded || sock.destroyed) {
     log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
     throw new Error(core.WHO)
@@ -865,7 +873,7 @@ async function hookWho(sock: Socket, p: any, known?: Tab) {
     if (core.hookOk(String(p.tab ?? ''), p.key)) return
     throw new Error("not this tab's start: a tab's state comes from its own agent")
   }
-  const tab = known ?? (await peerOf(sock).catch(() => null))
+  const tab = await callerOf(sock, known)
   if (tab === null || sock.readableEnded || sock.destroyed) throw new Error(core.WHO)
   if (tab && tab.id !== p.tab) {
     log(`hook refused: ${tab.id} reported ${String(p.tab).slice(0, 40)}'s state`)

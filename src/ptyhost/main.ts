@@ -2,7 +2,7 @@
 // daemon that crashes, stops or is updated finds them still running: it lists them, attaches and replays the buffer.
 // No state.json, no git, no hooks: it reads no file and takes only proto.ts' ops, on a socket of the user's alone
 // (0600, no TCP). The daemon starts it when settings.ptyHost is on (daemon/ptyHost.ts); it ends with `quit`, or with
-// no live terminal and no daemon for 10 minutes, or (tests) once LAKI_TEST_PARENT is gone.
+// no live terminal and no daemon for 10 minutes, or no daemon at all for 3 days, or (tests) once LAKI_TEST_PARENT is gone.
 // ponytail: a resize isn't kept in the buffer: a replay is drawn at the size the pty has now, and one cut at 2 MB may
 // start inside an escape sequence
 import pty from '@lydell/node-pty'
@@ -12,6 +12,7 @@ import { frame, PTY_PROTO, ptySock, reader } from './proto.ts'
 
 const RING = 2 << 20 // characters of output kept per terminal
 const IDLE = Number(process.env.LAKI_PTY_IDLE_MS) || 600_000
+const ORPHAN = Number(process.env.LAKI_PTY_ORPHAN_MS) || 72 * 3600_000 // no daemon that long: its terminals are ended (Laki not opened again, or removed)
 const VERSION = Number(process.env.LAKI_PTY_VERSION) || PTY_PROTO // tests': a host of another version
 const SIGNALS = new Set(['SIGHUP', 'SIGKILL', 'SIGINT', 'SIGTERM'])
 
@@ -19,6 +20,7 @@ type P = { id: string; pty: ReturnType<typeof pty.spawn>; cols: number; rows: nu
 const ptys = new Map<string, P>()
 const socks = new Set<Socket>()
 let quiet = Date.now() // when the last daemon left or the last terminal ended
+let alone = Date.now() // when the last daemon left
 const path = ptySock()
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'ptyhost', ...a)
 const send = (s: Socket, m: unknown) => void (s.destroyed || s.write(frame(m)))
@@ -132,7 +134,7 @@ const server = createServer(s => {
   s.on('error', () => {})
   s.on('close', () => {
     socks.delete(s)
-    quiet = Date.now()
+    quiet = alone = Date.now()
     for (const p of ptys.values()) p.subs.delete(s)
   })
 })
@@ -156,6 +158,7 @@ setInterval(() => {
     }
   }
   if (!socks.size && !live().length && Date.now() - quiet > IDLE) quit('no terminal and no daemon')
+  else if (!socks.size && Date.now() - alone > ORPHAN) quit('no daemon for too long')
 }, Math.min(IDLE, 2000))
 process.on('SIGTERM', () => quit('SIGTERM'))
 process.on('uncaughtException', e => log('uncaught', e))

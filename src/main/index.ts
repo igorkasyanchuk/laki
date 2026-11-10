@@ -17,6 +17,7 @@ import { updater } from './update.ts'
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
 // environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
 if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
+delete process.env.LAKI_TAB_TOKEN // S12: opened from a Laki tab (open passes the environment on): the app's own calls are yours, not that tab's agent's
 const dev = !!process.env.ELECTRON_RENDERER_URL
 // the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
 const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''

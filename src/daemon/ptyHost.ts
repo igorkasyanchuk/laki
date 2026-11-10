@@ -108,7 +108,7 @@ function wire(s: Socket) {
     if (open.size) log(`gone, ${open.size} terminals with it`)
     for (const p of [...open.values()]) p.got({ ev: 'exit', code: 1, error: 'the pty host is gone' })
     for (const [re, w] of waits) (waits.delete(re), w({ gone: true, ptys: [] }))
-    if (wanted) setTimeout(() => void ptyUp().catch(e => log((e as Error).message)), 1000).unref() // new terminals go to a new one
+    if (wanted) (wanted = false), setTimeout(() => void ptyUp().catch(e => log((e as Error).message)), 1000).unref() // new terminals go to a new one; once: a host that turns this daemon away isn't asked every second
   })
 }
 const dial = () =>

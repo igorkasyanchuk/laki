@@ -99,6 +99,14 @@ test('the pty host: with no terminal and no daemon it ends by itself; one of ano
   const c = await client(home)
   c.s.destroy()
   await until(() => !running(idle.pid!), 'the idle host gone')
+  // one whose daemon never comes back ends too, whatever it still runs
+  const lone = host(home, { LAKI_PTY_ORPHAN_MS: '400' })
+  const lc = await client(home)
+  lc.post({ op: 'spawn', id: 'left', file: '/bin/sleep', args: ['30'], cwd: home, env: {} })
+  const left = (await until(() => lc.got.find(x => x.ev === 'spawned'), 'its terminal')).pid
+  assert.ok(running(lone.pid!) && running(left))
+  lc.s.destroy()
+  await until(() => !running(lone.pid!) && !running(left), 'the orphaned host and its terminal gone')
   const old = host(home, { LAKI_PTY_VERSION: '7' })
   t.after(() => void old.kill('SIGKILL'))
   const raw = await client(home)

@@ -2,6 +2,7 @@
 // daemon restart; a permanent one on your named tunnel (settings.tunnel): its DNS record, one cloudflared for all of
 // them, its address kept (remote.ts)
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -123,7 +124,11 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   await rig.rpc('tunnelStart', { ws: ws.id, port: 5000, host: 'web' })
   assert.match((await tunnels())[0].down, /goes to your tunnel laki, not laki2/)
   assert.doesNotMatch(ingress(), /api/)
+  const running = () => spawnSync('pgrep', ['-f', join(rig.data, 'cloudflared/ingress.yml')]).status === 0
+  assert.ok(running(), 'the connector runs while a tunnel is up')
   await rig.rpc('tunnelStop', { ws: ws.id, port: 5000 })
   await rig.rpc('tunnelStop', { ws: ws.id, port: 4000 })
-  await until(() => log().split(/ run laki2?\n/).length === log().split('cloudflared named stopped').length, 'none left: the connector stops').catch(e => assert.fail(`${e.message}\n${log()}`))
+  // none left: the connector stops. By its process, not by a stop line per start in the fake's log: one that ended
+  // with the daemon's restart above may be gone before its trap wrote (R9: seen under load)
+  await until(() => !running(), 'none left: the connector stops').catch(e => assert.fail(`${e.message}\n${log()}`))
 })

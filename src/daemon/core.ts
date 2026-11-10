@@ -1731,6 +1731,7 @@ export async function ptyAdopt() {
       try {
         const hp = new HostPty(p.id)
         spawnTab(tab, { adopt: { pty: hp, cols: p.cols, rows: p.rows, hook: k.hook, token: k.token } }).replay(await hp.attach())
+        tab.again = undefined // keepShells' (a stop that kept it): it still runs, nothing to bring back at a later start
         log(`${tab.id}: its terminal outlived the daemon (pid ${p.pid})`)
       } catch (e) {
         log(`${tab.id}: its terminal not taken back: ${(e as Error).message}`)
@@ -1740,6 +1741,7 @@ export async function ptyAdopt() {
     }
     for (const id of Object.keys(ptyKept)) if (!sessions.has(id)) delete ptyKept[id]
     ptySave()
+    save()
   } catch (e) {
     log(`pty host: ${(e as Error).message}`) // none: terminals are this daemon's own, as before
   }
@@ -2504,7 +2506,7 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
   const how = state.settings?.syncBase
   if (!how || proj.git === false) return base
   const name = base.replace(/^origin\//, '')
-  if (!name || name === 'HEAD' || name.startsWith('-')) return base // -…: git would read it as an option
+  if (!name || name === 'HEAD' || name.startsWith('-') || /^[0-9a-f]{40}$/.test(name)) return base // -…: git would read it as an option; a commit by its full name (turnFork's): nothing of origin's to fetch
   const ok = (args: string[]) => exec(proj, 'git', args, { timeout: 60000 }).then(() => true, e => (step(`git ${args.join(' ')}: ${firstLine(e)}`), false)) // a minute at most: a slow remote never holds the workspace up long
   if (how === 'ff' && name === base && (await ok(['fetch', '--quiet', 'origin', `${name}:${name}`]))) return step(`${name} fast-forwarded to origin's`), base
   if (!(await ok(['fetch', '--quiet', 'origin', name]))) return base

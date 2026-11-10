@@ -255,7 +255,8 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
     window.addEventListener('laki-turn', f)
     return () => window.removeEventListener('laki-turn', f)
   }, [])
-  useEffect(() => setTurnN(undefined), [ws])
+  const wsWas = useRef(ws)
+  useEffect(() => void (wsWas.current !== ws && ((wsWas.current = ws), setTurnN(undefined))), [ws]) // another workspace's: not on mount, which may come with the strip's pick
   useEffect(() => {
     let on = true
     if (inTurn) void wsApi.turns?.().then(l => on && setTurns(l), () => {})

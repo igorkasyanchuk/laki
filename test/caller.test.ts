@@ -27,7 +27,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   const agent = async (...cmds: string[]) => {
     rmSync(out, { force: true })
     await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${cmds.join('; ')}; echo done >> ${out}` })
-    await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+    await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'the agent ran it', 60000)
     return readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
   }
   writeFileSync(join(ws.path, 'feature.txt'), 'done\n') // something to ship: its force is what's refused
@@ -148,7 +148,7 @@ test("N14, N15: an agent's from: '' starts nothing that never asks; a project's 
       curl('projectTrust', { id: p.id }),
     ].join('; ')}; echo done >> ${out}`,
   })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'the agent ran it', 60000)
   const [yolo, cmd, fan, setup, memory, trust, notes, mine, learned, look] = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
   assert.match(yolo.error, /an agent can't start an agent that never asks/)
   assert.match(cmd.error, /an agent can't start a command of its own/)
@@ -187,7 +187,7 @@ test("#1: a command an agent sends into a terminal is the agent's, another works
   const agent = async (cmd: string) => {
     rmSync(out, { force: true })
     await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${cmd} > ${out} 2>&1; echo done >> ${out}` })
-    await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+    await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'the agent ran it', 60000)
     return readFileSync(out, 'utf8')
   }
   await agent(`${laki} tab ${ws.id} --preset shell`)
@@ -337,7 +337,7 @@ test("an agent can't set When everything is done or its like, import worktrees, 
       curl('wsSet', { id: ws.id, important: true }),
     ].join('; ')}; echo done >> ${out}`,
   })
-  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  await until(() => existsSync(out) && /done\s*$/.test(readFileSync(out, 'utf8')), 'the agent ran it', 60000)
   const said = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
   for (const i of [0, 1, 2, 3, 4, 5, 6]) assert.equal(said[i].error, "an agent can't change that setting: it's the user's (ask them)")
   assert.match(said[7].error, /an agent can't import worktrees as workspaces/)
@@ -397,6 +397,17 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
   assert.equal((await post(mine, 'ping', {})).result, 'pong')
   // the daemon's own, from no tab: you
   assert.equal((await post(token, 'settingsSet', { nextPrompt: true })).error, undefined)
+  // another tab's token in this tab's process (read out of its environment): still this tab, which can't report the other's state
+  const other = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
+  await until(async () => (await rig.screen(`${ws.id}/${other}`)).includes('> '), "the other's prompt")
+  const said2 = join(rig.home, 'tab-token-2')
+  await rig.rpc('send', { target: `${ws.id}/${other}`, text: `run printenv LAKI_TAB_TOKEN > ${said2}` })
+  const theirs = (await until(() => existsSync(said2) && readFileSync(said2, 'utf8').trim(), "the other's token")) as string
+  assert.equal((await post(theirs, 'hook', { tab: other, state: 'running' })).error, undefined) // from no tab: the other's own
+  const stolen = join(rig.home, 'stolen-out')
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run curl -s -H 'Authorization: Bearer ${theirs}' --data '${JSON.stringify({ method: 'hook', params: { tab: other, state: 'waiting' } })}' http://127.0.0.1:${port}/rpc > ${stolen}` })
+  await until(() => existsSync(stolen) && readFileSync(stolen, 'utf8').length > 0, 'its call answered', 60000)
+  assert.match(readFileSync(stolen, 'utf8'), /comes from its own agent/)
   // a wrong one, and remote access's page with a tab's
   assert.equal((await post('f'.repeat(64), 'ping', {})).code, 401)
   // a sandboxed claude's settings: daemon.json out of its Bash commands' reach and its Read tool's

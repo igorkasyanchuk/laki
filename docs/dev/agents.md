@@ -389,7 +389,8 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   ptys and the last 2 MB each printed. No state.json, no git, no hooks; it reads no file. The daemon starts it detached
   when missing (`daemon/ptyHost.ts` `ptyUp`: as the setting is turned on, and as a daemon starts with it on); its log is
   `<data>/ptyhost.log`. It ends with `quit` (a stop), with no live terminal and no daemon for 10 minutes
-  (`LAKI_PTY_IDLE_MS`), or in tests once `LAKI_TEST_PARENT` is gone.
+  (`LAKI_PTY_IDLE_MS`), with no daemon at all for 3 days whatever still runs (`LAKI_PTY_ORPHAN_MS`), or in tests once
+  `LAKI_TEST_PARENT` is gone.
 - **Protocol** (`src/ptyhost/proto.ts`): a unix socket `<data>/pty.sock` (0600; in the temp folder by the data folder's
   hash when that path is too long for a socket), frames of a 4-byte length and JSON. Ops: `hello`, `list`, `spawn`,
   `attach { id, from }`, `write`, `resize`, `kill { id, signal }`, `forget`, `quit`; events: `spawned`, `data` (`at`: its
