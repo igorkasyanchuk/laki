@@ -1075,7 +1075,7 @@ const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
 // off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
 export function trusted(w: Entry) {
   const rf = guarded(w) && !w.file ? repoFiles(w) : undefined // one listing for both
-  if (!guarded(w) || (w.s.trusted === dirHash(w, false, rf?.names) && !rf?.bad)) return
+  if (!guarded(w) || (w.s.trusted === dirHash(w, true, rf?.names) && !rf?.bad)) return // S8: read whole before each run, never by its stat
   if (w.s.on) untrust(w, rf?.names)
   throw new Error(`${w.m.name || w.id} changed ${where(w)}: off until you look`)
 }

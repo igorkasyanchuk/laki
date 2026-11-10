@@ -466,7 +466,9 @@ under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` lea
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` of the project's `.laki`, recursive, a change under `extensions/`; while `.laki` is missing, the project's folder, flat: a branch without it and back reads them again (macOS says nothing to a watch of `.laki/extensions` itself as git removes it); 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
-`trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles` (#4): every file under the folder (`git
+`trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles` (#4; S8: `dirHash` reads again only when
+a file's name, mtime, size, ctime or inode changed, and widgets.ts' `trusted`, the check before every `exec`, always
+reads them whole: a same-size edit with its mtime put back is caught there): every file under the folder (`git
 ls-files --stage` and `--others --directory`, ignored ones too; a gitlink (160000), an untracked folder and a nested
 repo walked, `.git` left out) but its state: widget.json's `state` (`stateOf`, `stateHas`: a glob without a / by name,
 with one by path, a trailing / a folder; `manifestCheck` checks it) and `STATE` (`.DS_Store`, `__pycache__/`, `*.pyc`;

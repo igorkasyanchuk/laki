@@ -3,7 +3,7 @@
 // to delete or rewrite; a host's project isn't read
 import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -353,4 +353,28 @@ test("#34.4: a branch without .laki/extensions and back: its extensions go, then
   await until(async () => !(await has()), "gone on the bare branch")
   git('checkout', '-q', 'main')
   await until(has, "back on main")
+})
+
+// S8: the check before each run reads the files whole: an edit of the same size with its mtime put back is caught
+test("S8: a repo extension's same-size edit with its mtime restored is off at once; the new code doesn't run", async t => {
+  const rig = await fresh(t)
+  const pwned = join(rig.home, 'pwned-s8')
+  const bad = `touch "${pwned}"; echo '{}'\n`
+  const good = `echo '{"n": 1}'`.padEnd(bad.length - 1, ' ') + '\n'
+  assert.equal(good.length, bad.length)
+  const d = ext(rig.repo, 'same', { name: 'Same', fetch: 'sh fetch.sh' }, { 'fetch.sh': good })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const id = `${p.id}.same`
+  await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
+  await until(async () => (x => x?.at && !x.running)((await rig.rpc('state')).widgets.find((w: any) => w.id === id)), 'on: fetched')
+  const f = join(d, 'fetch.sh')
+  const was = statSync(f)
+  const ref = join(rig.home, 's8-times')
+  execFileSync('touch', ['-r', f, ref]) // its times to the nanosecond
+  writeFileSync(f, bad)
+  execFileSync('touch', ['-r', ref, f]) // put back
+  assert.equal(statSync(f).mtimeMs, was.mtimeMs, 'its mtime put back')
+  assert.equal(statSync(f).size, was.size)
+  assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo: off until you look/)
+  assert.ok(!existsSync(pwned), "the new code didn't run")
 })

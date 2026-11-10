@@ -245,7 +245,9 @@ function repoNames(w: Entry, fresh: boolean) {
 }
 export function dirHash(w: Entry, fresh = false, known?: string[]) {
   const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
-  const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
+  // S8: ctime and inode too: an edit of the same size with its mtime put back (utimes) still changes its ctime, and a
+  // file swapped in by a rename its inode
+  const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size, st?.ctimeMs, st?.ino])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {
     const h = createHash('sha256')
