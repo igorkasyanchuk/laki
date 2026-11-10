@@ -466,7 +466,7 @@ const daemon = () =>
 const winFile = () => join(app.getPath('userData'), 'window.json')
 type WinAt = { x: number; y: number; width: number; height: number; max?: boolean; full?: boolean; float?: boolean }
 let float = false // the Frosted design (glass IPC), kept beside the bounds: the first frame needs it, before the renderer has the settings
-const lights = () => (float ? { x: 22, y: 20 } : { x: 14, y: 12 }) // inside the sidebar's panel, else centered in the 38px sidebar header
+const lights = () => (float ? { x: 22, y: 20 } : { x: 14, y: 13 }) // inside the sidebar's panel, else centered in the 40px sidebar header
 function winAt(): WinAt | null {
   try {
     const w: WinAt = JSON.parse(readFileSync(winFile(), 'utf8'))

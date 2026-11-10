@@ -189,8 +189,8 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .sidebar[hidden] { display: none !important; } /* hidden, not unmounted: its video plays on */
 :is(.notes-side, .ai-chats)[hidden] { display: none; } /* a page's own list, its head's button (ui.tsx usePageSide) */
-/* 38px: the traffic lights (trafficLightPosition y 12) sit in its middle; 76px clears them (the app only: .electron) */
-.side-head { height: 38px; flex: none; display: flex; align-items: center; gap: 1px; padding: 0 6px; }
+/* V2: 40px, on the 4px grid: the traffic lights (trafficLightPosition y 13) sit in its middle; 76px clears them (the app only: .electron) */
+.side-head { height: 40px; flex: none; display: flex; align-items: center; gap: 1px; padding: 0 6px; }
 .electron .side-head { padding-left: 76px; }
 /* the rail layout (App's railBar, Settings › Appearance › Layout): a column of kinds left of the list, Slack's; the traffic
    lights sit over it, so the list's head starts at its edge */
@@ -246,7 +246,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 :not(.xterm-viewport)::-webkit-scrollbar-track, :not(.xterm-viewport)::-webkit-scrollbar-corner { background: transparent; }
 :not(.xterm-viewport)::-webkit-scrollbar-thumb { min-width: 28px; min-height: 28px; border: 1px solid transparent; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 16%, transparent) padding-box; }
 :not(.xterm-viewport)::-webkit-scrollbar-thumb:hover, :not(.xterm-viewport)::-webkit-scrollbar-thumb:active { background-color: color-mix(in srgb, var(--fg) 34%, transparent); }
-.side-foot { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; height: 34px; padding: 0 6px; border-top: 1px solid var(--line); overflow: hidden; }
+.side-foot { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; height: 28px; padding: 0 6px; border-top: 1px solid var(--line); overflow: hidden; }
 /* the foot in one row: App's fit drops the last data-bare buttons' words (Settings' first) until it fits */
 .side-foot > button[data-bare].labeled { width: 24px; padding: 0; }
 .side-foot > button[data-bare] .ib-label { display: none; }
@@ -534,7 +534,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 /* Settings: a page over the main column */
 .settings-page { position: absolute; inset: 0; z-index: var(--z-page); display: flex; flex-direction: column; background: var(--bg); }
 .main:has(> .settings-page) > .body { visibility: hidden; } /* nothing under a page shows through it (glass, a see-through theme) */
-.settings-head { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); background: var(--side); -webkit-app-region: drag; }
+.settings-head { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); background: var(--side); -webkit-app-region: drag; }
 .settings-head button { -webkit-app-region: no-drag; }
 .electron.side-closed .settings-head { padding-left: 76px; }
 .electron.list-off .settings-head { padding-left: max(16px, calc(76px - var(--rail-w, 68px))); } /* the rail's page: past the traffic lights */
@@ -621,7 +621,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .vars .var { font-size: var(--fs-2); padding: 1px 7px; border-radius: var(--r-pill); color: var(--accent-ink); background: var(--bg); }
 .vars .var:hover { border-color: var(--accent); }
 .sample { padding: 10px 12px; background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); white-space: nowrap; overflow: hidden; }
-.tabbar { height: 38px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--side); }
+.tabbar { height: 40px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--side); }
 .tab { display: flex; align-items: center; gap: 6px; height: 29px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--muted); max-width: 240px; white-space: nowrap; margin-bottom: -1px; font-size: var(--fs-3); }
 .tab > span:not(.glyph):not(.badge) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tab:hover { color: var(--fg); background: var(--hover); }
@@ -677,7 +677,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .term-wrap { flex: 1; min-width: 0; position: relative; background: var(--term-bg); }
 .term { position: absolute; inset: 6px 4px 4px 10px; }
 .empty { height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 6px; color: var(--muted); } /* safe: taller than the pane (Ready on a phone), it starts at the top and scrolls, never up under the tab bar */
-.status { height: 22px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: var(--fs-1); color: var(--muted); border-top: 1px solid var(--line); background: var(--side); font-family: var(--mono); white-space: nowrap; min-width: 0; overflow: hidden; }
+.status { height: 28px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: var(--fs-1); color: var(--muted); border-top: 1px solid var(--line); background: var(--side); font-family: var(--ui-font); white-space: nowrap; min-width: 0; overflow: hidden; }
 .status .pr { border: none; background: none; padding: 0; display: inline-flex; align-items: center; gap: 3px; }
 .ci-mark { display: inline-flex; align-items: center; gap: 3px; }
 .status .sb-branch svg { vertical-align: -1px; margin-right: 4px; }
@@ -3329,7 +3329,7 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .app[data-dz~='chrome'] .settings-page > .settings-body { overflow: hidden; } /* round corners over its nav; a .page-body scrolls, which clips them too */
 /* the sidebar: its list a card under the top row */
 .app[data-dz~='side-card'] .sidebar { position: relative; z-index: 1; isolation: isolate; padding: 0 0 var(--d-gap) var(--d-gap); } /* z-index: what it opens past its edge stays over the main area */
-.app[data-dz~='side-card'] .sidebar::before { content: ''; position: absolute; z-index: -1; inset: 38px 0 var(--d-gap) var(--d-gap); border: 1px solid var(--line); border-radius: var(--d-r); background: var(--side); box-shadow: var(--d-lift); pointer-events: none; }
+.app[data-dz~='side-card'] .sidebar::before { content: ''; position: absolute; z-index: -1; inset: 40px 0 var(--d-gap) var(--d-gap); border: 1px solid var(--line); border-radius: var(--d-r); background: var(--side); box-shadow: var(--d-lift); pointer-events: none; }
 .app[data-dz~='boxed'] .side-scroll { padding-top: var(--d-gap, 8px); } /* the design's gap all round: the card's top, its sides, between projects */
 .app[data-dz~='boxed'] .side-scroll > .project { margin: 0 var(--d-gap, 8px) var(--d-gap, 8px); padding: 2px 0 6px; border: 1px solid var(--line); border-radius: max(0, calc(var(--d-r) - var(--r-s))); background: color-mix(in srgb, var(--fg) 3%, transparent); }
 /* the terminals and the side panel: one card, cards inside it, or each a card */
@@ -3508,3 +3508,7 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .ws-sep:focus-within .ws-acts { display: inline-flex; }
 
 .form label.tunnel-host:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* V2: the status bar in the interface font; only what you'd type stays mono: the branch, the port */
+.status * { font-family: inherit; }
+.status :is(.sb-branch, .port-item, .port-item *) { font-family: var(--mono); }
