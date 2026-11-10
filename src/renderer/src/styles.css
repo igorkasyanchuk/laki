@@ -2389,6 +2389,10 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .welcome-checks { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px; text-align: left; }
 .welcome-checks .check { display: flex; align-items: center; gap: 8px; color: var(--fg); }
 .welcome-checks .check .muted { margin-left: auto; text-align: right; }
+.welcome-checks .check .muted.grow { margin-left: 0; text-align: left; } /* U4: a failing row: its words, then its one button */
+.welcome-ready { color: var(--muted); }
+.welcome-again { align-self: flex-start; margin-top: 4px; }
+.project-sample { margin-left: 4px; }
 .welcome-checks .check-why { display: inline-flex; color: var(--muted); cursor: help; }
 .welcome-checks .check-why:hover, .welcome-checks .check-why:focus-visible { color: var(--fg); }
 /* Find a setting */

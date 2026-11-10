@@ -587,6 +587,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
                 <ProjectMark p={p} or={markOf(p)} />
               </span>
               <span className="project-name">{p.name}</span>
+              {p.sample && <span className="tag project-sample" data-tip="Laki's sample repo: Remove sample in its menu">sample</span>}
               {shut && mine.length > 0 && (
                 <>
                   {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}

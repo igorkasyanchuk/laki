@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Welcome fixes what it finds: Install and Sign in buttons (a terminal with the command typed), each agent's sign-in checked, what's ready on one line; and *Try it on a sample repo* to take Laki for a spin on a tiny project with a failing test.
 - Get started is the loop now: add a project, start a task, answer the agent, review its changes, ship or archive (the rest under Explore more). It no longer opens by itself: its bar at the sidebar's foot does.
 - Nothing sits on your work: the Terminal | Reader switch moved to the tab bar (or a split pane's header), the AI button rises over the Reader's box, Scheduled's examples are examples (a click fills in New task), and the Review tab's keys are behind a Keys button.
 - The window starts with about 0.9 MB less code: Settings, Help, the AI page, the board, Scheduled, a project's and an extension's page load as you open them (or point at their rail button).

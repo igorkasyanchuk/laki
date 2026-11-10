@@ -130,7 +130,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
     your checkout has the same (`same`: a folder all through; a file by size and time, else its bytes up to 16 MB), as
     `copyIncludes`' copies are. On a host every one counts (nothing is copied there), and none inside a submodule does.
   `unsavedWhy` puts it in words for a log (Archive on merge's, when idle's, a workflow's `stays`);
-  `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH);
+  `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH, and each found one's `signedIn` (U4: its sign-in's file or Keychain item there, never read; an API key in the env; grok and opencode: unset));
+  `sampleNew` (U4: Welcome's *Try it on a sample repo*: a tiny JS project with a failing test made once in `<data>/sample`, a project with `sample`; again: that one) and `sampleRm` (it and its folder; its worktrees first); agents refused both;
 - tabs and agents: `tabNew`/`tabClose` (a tab's name: `addTab`, `freeName` numbers it; an agent tab after the
   workspace's first, with a prompt, is `<agent>: <taskTitle(prompt)>` (`shared/types.ts`: its first words, no URLs, paths,
   flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit and

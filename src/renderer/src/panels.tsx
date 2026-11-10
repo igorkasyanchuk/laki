@@ -1744,27 +1744,38 @@ export function Ready({ name, branch, project, actions, later }: { name: string;
 const CLOUDFLARED_WHY =
   "Cloudflare's free tunnel, no account needed. Laki uses it for public links: share a workspace's dev server (the globe next to a port in the status bar), and open Laki itself from your phone (Settings › Remote access)."
 
-// no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
-export function Welcome({ onOpen, onSsh, onClone, check }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor> }) {
+// no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target).
+// U4: what passes is one line; each failing row has one button that fixes it: Install or Sign in opens a terminal with
+// the command typed, not run (App's onRun: as that terminal exits, Welcome is back and checks again); Check again last.
+// sample: Try it on a sample repo (a daemon with the sample cap)
+const LOGIN: Partial<Record<Agent, string>> = { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini' } // each agent's own sign-in (Gemini CLI asks as it starts)
+export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor>; onRun?: (cmd: string) => void; onSample?: (agent?: Agent) => void }) {
   const [d, setD] = useState<Doctor | null>(null)
   const [busy, setBusy] = useState(false)
   const again = () => (setBusy(true), void check().then(setD, () => {}).finally(() => setBusy(false))) // R12: no restart of Laki to see a new install
   useEffect(again, [])
   const mac = /Mac/.test(navigator.userAgent) // Linux's (and WSL's) hints: apt
-  const row = (ok: boolean, name: string, hint: string, why?: string) => (
+  const fix = (label: 'Install' | 'Sign in', cmd?: string) => cmd && onRun && (
+    <button type="button" className="sm" data-tip={`A terminal with ${cmd} typed: press Return to run it`} onClick={() => onRun(cmd)}>
+      {label}
+    </button>
+  )
+  const row = (name: string, hint: string, button?: ReactNode, why?: string, optional = false) => (
     <div className="check" key={name}>
-      <Glyph s={ok ? 'ok' : why ? 'idle' : 'exited'} />{/* why: optional, so missing it is no failure */}
+      <Glyph s={optional ? 'idle' : 'exited'} />{/* optional: missing it is no failure */}
       <b>{name}</b>
       {why && (
         <span className="check-why" data-tip={why} aria-label={why} tabIndex={0}>
           <Icon name="help" size={13} />
         </span>
       )}
-      <span className="muted">{hint}</span>
+      <span className="muted grow">{hint}</span>
+      {button}
     </div>
   )
   const found = d?.agents.filter(a => a.found) ?? []
   const missing = d?.agents.filter(a => !a.found) ?? []
+  const ready = d ? [d.git && 'git', d.gh === 'in' && 'gh', d.ghCodespace && 'codespace scope', d.cloudflared && 'cloudflared', ...found.filter(a => a.signedIn !== false).map(a => AGENT_NAMES[a.id]), d.hooks?.ok && 'hooks', d.hookFiles?.ok && 'hook files'].filter(Boolean) : []
   return (
     <div className="welcome">
       <img src={icon} alt="" />
@@ -1781,14 +1792,28 @@ export function Welcome({ onOpen, onSsh, onClone, check }: { onOpen: () => void;
       <button className="welcome-ssh" onClick={onSsh}>
         <Icon name="server" /> Open a folder over SSH…
       </button>
+      {onSample && (
+        <button className="welcome-ssh" data-tip="A tiny JS project with a failing test, in Laki's own folder: an agent fixes it" onClick={() => onSample(found.find(a => a.signedIn !== false)?.id)}>
+          <Icon name="flask" /> Try it on a sample repo
+        </button>
+      )}
       {d && (
         <div className="welcome-checks">
-          {row(d.git, 'git', d.git ? 'found' : `needed for worktrees: ${mac ? 'xcode-select --install' : 'sudo apt install git'}`)}
-          {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : `not found, for PRs: ${mac ? 'brew' : 'sudo apt'} install gh`)}
-          {d.ghCodespace !== undefined && row(d.ghCodespace, 'codespace scope', d.ghCodespace ? 'there: cloud workspaces work' : 'optional, for cloud workspaces: gh auth refresh -s codespace')}
-          {d.cloudflared !== undefined &&
-            row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : `optional: ${mac ? 'brew ' : ''}install cloudflared`, CLOUDFLARED_WHY)}
-          {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install one below, then Check again')}
+          {ready.length > 0 && (
+            <div className="check welcome-ready">
+              <Glyph s="ok" />
+              <span>
+                <b>{ready.join(', ')}</b>: ready
+              </span>
+            </div>
+          )}
+          {!d.git && row('git', `needed for worktrees: ${mac ? 'xcode-select --install' : 'sudo apt install git'}`, fix('Install', mac ? 'xcode-select --install' : 'sudo apt install git'))}
+          {d.gh === 'out' && row('gh', 'not signed in: PRs, checks and Ship need it', fix('Sign in', 'gh auth login'))}
+          {d.gh === 'missing' && row('gh', 'not found: PRs, checks and Ship need it', fix('Install', mac ? 'brew install gh' : 'sudo apt install gh'))}
+          {d.ghCodespace === false && row('codespace scope', 'optional, for cloud workspaces', fix('Sign in', 'gh auth refresh -s codespace'), undefined, true)}
+          {d.cloudflared === false && row('cloudflared', 'optional: public links', fix('Install', mac ? 'brew install cloudflared' : undefined), CLOUDFLARED_WHY, true)}
+          {found.filter(a => a.signedIn === false).map(a => row(AGENT_NAMES[a.id], 'not signed in', fix('Sign in', LOGIN[a.id])))}
+          {!found.length && row('agents', 'none on PATH: install one below')}
           {missing.length > 0 && (
             <details className="welcome-install" open={!found.length}>
               <summary className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</summary>
@@ -1796,20 +1821,16 @@ export function Welcome({ onOpen, onSsh, onClone, check }: { onOpen: () => void;
                 <div className="check" key={a.id}>
                   <b>{AGENT_NAMES[a.id]}</b>
                   <code className="grow">{INSTALL[a.id].cmd ?? 'see its own docs'}</code>
-                  {INSTALL[a.id].cmd && (
-                    <button type="button" className="sm" onClick={() => void navigator.clipboard.writeText(INSTALL[a.id].cmd!)}>
-                      Copy
-                    </button>
-                  )}
+                  {fix('Install', INSTALL[a.id].cmd)}
                 </div>
               ))}
             </details>
           )}
-          <button type="button" className="sm" disabled={busy} onClick={again}>
+          {d.hooks && !d.hooks.ok && row('hooks', d.hooks.why!)}
+          {d.hookFiles && !d.hookFiles.ok && row('hook files', d.hookFiles.why!)}
+          <button type="button" className="sm welcome-again" disabled={busy} onClick={again}>
             {busy ? 'Checking…' : 'Check again'}
           </button>
-          {d.hooks && row(d.hooks.ok, 'hooks', d.hooks.ok ? "Laki's hook command runs: agents tell it when they ask and finish" : d.hooks.why!)}
-          {d.hookFiles && row(d.hookFiles.ok, 'hook files', d.hookFiles.ok ? 'written: the agents find the hooks' : d.hookFiles.why!)}
         </div>
       )}
     </div>

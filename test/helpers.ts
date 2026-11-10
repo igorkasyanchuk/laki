@@ -81,7 +81,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     GIT_COMMITTER_NAME: 't',
     GIT_COMMITTER_EMAIL: 't@t',
   }
-  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'LAKI_TAB_TOKEN' || k === 'CODEX_HOME' || k.startsWith('ANDROID_')) delete env[k] // ANDROID_HOME: the Simulator's adb, never this Mac's
+  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'LAKI_TAB_TOKEN' || k === 'CODEX_HOME' || k.startsWith('ANDROID_') || /^(ANTHROPIC|OPENAI|GEMINI)_API_KEY$/.test(k)) delete env[k] // U4: doctor's signed in by a key in the env // ANDROID_HOME: the Simulator's adb, never this Mac's
   Object.assign(env, o.env)
   mkdirSync(join(home, 'bin'))
   execFileSync('git', ['init', '-q', '-b', 'main', repo], { env })

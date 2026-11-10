@@ -4462,7 +4462,59 @@ export async function doctor(): Promise<Doctor> {
   const said = onPath('gh') ? (ghCount(['auth', 'status']), await run('gh', ['auth', 'status'], { timeout: 8000 }).then(r => `${r.stdout}${r.stderr}`, () => null)) : undefined
   const gh = said === undefined ? 'missing' : said === null ? 'out' : 'in'
   // its token's codespace scope (cloud workspaces'): optional, said where it's missing
-  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })), hooks: await hooksRun(), hookFiles: hookFilesOk() }
+  const agents = await Promise.all(
+    AGENTS.map(async id => {
+      const found = onPath(id)
+      const s = found ? await signedIn(id) : undefined
+      return { id, found, ...(s !== undefined && { signedIn: s }) }
+    }),
+  )
+  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk() }
+}
+// U4: whether a found agent is signed in, by where it keeps its sign-in being there (never read): claude's credentials
+// file or Keychain item (security without -w: the item's attributes, not its secret), codex's auth.json, Gemini CLI's
+// oauth_creds.json, or the API key in the environment. undefined: no cheap way to tell (grok, opencode)
+async function signedIn(id: Agent): Promise<boolean | undefined> {
+  const env = process.env
+  if (id === 'claude') return !!env.ANTHROPIC_API_KEY || existsSync(join(env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), '.credentials.json')) || (process.platform === 'darwin' && (await run('security', ['find-generic-password', '-s', 'Claude Code-credentials'], { timeout: 3000 }).then(() => true, () => false)))
+  if (id === 'codex') return !!env.OPENAI_API_KEY || existsSync(join(env.CODEX_HOME || join(homedir(), '.codex'), 'auth.json'))
+  if (id === 'gemini') return !!env.GEMINI_API_KEY || existsSync(join(env.GEMINI_CLI_HOME || homedir(), '.gemini', 'oauth_creds.json'))
+  return undefined
+}
+
+// U4: Welcome's Try it on a sample repo: a tiny JS project whose test fails, made once under <data>/sample (in code, no
+// binary), a project marked sample; again: the same one. sampleRm: it goes, and its folder (Laki's own) with it
+const SAMPLE: Record<string, string> = {
+  'README.md': '# Sample shop\n\nA tiny project to try Laki on. `npm test` fails: ask an agent to fix it.\n',
+  'package.json': `${JSON.stringify({ name: 'sample-shop', private: true, type: 'module', scripts: { test: 'node --test' } }, null, 2)}\n`,
+  'cart.js': '// the total of a cart: each item\'s price times how many\nexport function total(items) {\n  return items.reduce((sum, item) => sum + item.price, 0)\n}\n',
+  'cart.test.js': "import assert from 'node:assert/strict'\nimport { test } from 'node:test'\nimport { total } from './cart.js'\n\ntest('an empty cart costs nothing', () => assert.equal(total([]), 0))\ntest('each item counts as many times as its quantity', () => assert.equal(total([{ price: 2, qty: 3 }, { price: 5, qty: 1 }]), 11))\n",
+}
+export async function sampleNew(): Promise<Project> {
+  const had = state.projects.find(p => p.sample)
+  if (had) return unshelve(had, true)
+  const path = join(dir, 'sample')
+  if (!existsSync(join(path, '.git'))) {
+    rmSync(path, { recursive: true, force: true }) // one half made
+    mkdirSync(path, { recursive: true })
+    for (const [f, text] of Object.entries(SAMPLE)) writeFileSync(join(path, f), text)
+    const at = { path }
+    await git(at, 'init', '-q', '-b', 'main')
+    await git(at, 'add', '-A')
+    await git(at, '-c', 'user.name=Laki', '-c', 'user.email=sample@laki.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'A sample shop: its test fails')
+  }
+  const p = await projectAdd(path)
+  p.sample = true
+  save()
+  changed()
+  return p
+}
+export function sampleRm() {
+  const p = state.projects.find(x => x.sample)
+  if (!p) return false
+  projectRm(p.id) // its worktrees first: projectRm says so
+  if ([join(dir, 'sample'), join(realpathSync(dir), 'sample')].includes(p.path)) rmSync(p.path, { recursive: true, force: true }) // Laki's own folder only
+  return true
 }
 // doctor's hooks: Laki's hook command runs, as agents run it (hook ping: no RPC, exits at once)
 const hooksRun = () =>

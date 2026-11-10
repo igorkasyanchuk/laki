@@ -305,3 +305,25 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   await sleep(7000)
   assert.equal((await rig.tab(ws.id)).status, 'running')
 })
+
+test("U4: Welcome's sample repo: made once with a failing test, a project marked sample; Remove sample takes it and its folder", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('sampleNew')
+  assert.equal(p.sample, true)
+  for (const f of ['README.md', 'package.json', 'cart.js', 'cart.test.js']) assert.ok(existsSync(join(p.path, f)), f)
+  assert.equal(execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: p.path, encoding: 'utf8' }).trim(), '1')
+  const env = { ...process.env, NODE_TEST_CONTEXT: undefined } // this runner's: a nested --test would report to it, and pass
+  assert.throws(() => execFileSync(process.execPath, ['--test', 'cart.test.js'], { cwd: p.path, stdio: 'ignore', env }), 'its test fails: the task')
+  // again: the same one, not a second
+  assert.equal((await rig.rpc('sampleNew')).id, p.id)
+  assert.equal((await rig.rpc('state')).projects.filter((x: any) => x.sample).length, 1)
+  // an agent can't make or remove it
+  const ws = await rig.rpc('wsNew', { project: (await rig.rpc('projectAdd', { path: rig.repo })).id, preset: 'claude' })
+  const from = { ws: ws.id, tab: (await until(() => rig.tab(ws.id))).id }
+  await assert.rejects(rig.rpc('sampleRm', { from }), /an agent can't remove the sample project/)
+  await assert.rejects(rig.rpc('sampleNew', { from }), /an agent can't make the sample project/)
+  assert.equal(await rig.rpc('sampleRm'), true)
+  assert.equal((await rig.rpc('state')).projects.some((x: any) => x.sample), false)
+  assert.equal(existsSync(p.path), false)
+  assert.equal(await rig.rpc('sampleRm'), false)
+})

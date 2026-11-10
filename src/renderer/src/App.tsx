@@ -2891,6 +2891,37 @@ export function App() {
     const w = await call<WorkspaceView>('quickNew', { kind, ...(url && { url }), ...at }).catch(() => null) // the toast says why
     if (w && front) (showNew(w.id), setDialog(null))
   }
+  // U4: Welcome's Install or Sign in: a terminal with the command typed (not run), `; exit` after it, so it ends as the
+  // command does; as it exits, it goes and Welcome is back (its checks run again as it shows)
+  const [fixTab, setFixTab] = useState<{ tab: string; ws: string } | null>(null)
+  const welcomeRun = async (cmd: string) => {
+    const w = await call<WorkspaceView>('quickNew', { kind: 'shells' }).catch(() => null)
+    if (!w) return
+    for (let i = 0; i < 50; i++) {
+      const t = (await api.call<View>('state').catch(() => null))?.tabs.find(x => x.workspace === w.id)
+      if (t) {
+        setFixTab({ tab: t.id, ws: w.id })
+        await call('send', { target: t.id, text: `${cmd}; exit`, enter: false }).catch(() => {})
+        break
+      }
+      await new Promise(r => setTimeout(r, 100))
+    }
+    showNew(w.id)
+  }
+  useEffect(() => {
+    if (!fixTab || !view) return
+    const t = view.tabs.find(x => x.id === fixTab.tab)
+    if (t && t.status !== 'exited') return
+    setFixTab(null)
+    if (view.workspaces.some(w => w.id === fixTab.ws)) void call('wsRm', { id: fixTab.ws }).catch(() => {}) // a shell's tab goes as it exits: its terminal's workspace too
+    setWsId(null)
+    setRailKind('projects')
+  }, [view, fixTab])
+  // U4: Try it on a sample repo: the project (made once), then New workspace with a task for it and the first agent
+  const welcomeSample = async (agent?: string) => {
+    const p = await call<Project>('sampleNew').catch(() => null)
+    if (p) newWs(p.id, { prompt: 'Fix the failing test in cart.js and add one more test', ...(agent && view?.presets.some(x => x.name === agent && !x.off) && { preset: agent }) })
+  }
   const quickRef = useRef(quickNew)
   quickRef.current = quickNew
   useEffect(() => {
@@ -3614,7 +3645,7 @@ export function App() {
                 {ws ? (
                   ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} project={view.projects.find(p => p.id === ws.project)?.name} actions={newTabActions.filter(x => x.label !== 'Command…')} later={ws.pending && { title: `${ws.pending.agent} ${pendingWords(ws.pending, true).replace(/^S/, 's')}`, prompt: ws.pending.prompt, failed: ws.pending.failed, onStart: () => laterNow(ws), onChange: () => void laterChange(ws), onCancel: () => void laterCancel(ws) }} />
                 ) : (
-                  view.projects.length ? (
+                  view.projects.some(p => !p.kind) || railKind !== 'projects' ? ( /* U4: Welcome until a project of yours, a Terminals tab of its own aside */
                     <>
                       {/* none picked: a fresh start, or the last of this rail kind went (the rail stays on it) */}
                       <p>{railKind === 'shells' ? 'No terminals open.' : railKind === 'browsers' ? 'No pages open.' : live.length ? 'No workspace selected.' : 'No workspaces yet.'}</p>
@@ -3622,7 +3653,7 @@ export function App() {
                       <StarLaki />
                     </>
                   ) : (
-                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} />
+                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} onRun={welcomeRun} onSample={hasCap(view, 'sample') ? welcomeSample : undefined} />
                   )
                 )}
               </div>

@@ -138,6 +138,11 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await clickText('.palette-item', 'Merge #63')
       await answer('Squash and merge')
     }, async () => /gh pr merge/.test(fakeLog())],
+    // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
+    ['welcome', async () => {
+      for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})
+      for (const p of (await rpc<View>('state')).projects) await rpc('projectRm', { id: p.id }).catch(() => {})
+    }, async () => (await has('.welcome')) && (await hasText('.welcome-checks .check', 'not signed in')) && (await hasText('.welcome-checks button', 'Sign in')) && (await has('.welcome-ready'))],
   ]
   const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
   // E8: the page's start to its first sidebar row painted (main.tsx' mark): what a lazy page saves shows here

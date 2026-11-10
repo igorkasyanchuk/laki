@@ -221,7 +221,11 @@ npm link
 1. Open the app (maximized the first time; after that where you left it: its size, place, maximized or full
    screen, on that screen if it's still there). It starts its background daemon if one isn't running. With no project yet it says what it found:
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
-   links and remote access) and which agents are on your PATH.
+   links and remote access), which agents are on your PATH and whether each is signed in. What's ready is one line;
+   each thing missing has one button: *Install* or *Sign in* opens a terminal with the command typed (press Return to
+   run it); as it finishes, the terminal goes and Welcome checks again (*Check again* is at its end too). *Try it on a
+   sample repo* makes a tiny project with a failing test in Laki's data folder and opens New workspace with a task
+   for it; it's tagged *sample* in the sidebar, and its menu's *Remove sample* takes it and its folder away.
 2. *Get started* is a bar at the sidebar's bottom from the first launch (it pulses as a step is done); a click opens
    it, it never opens by itself. Five steps, the loop of a task: add a project, start a task, answer the agent (the
    first answer ticks it), review its changes (Changes or the Review tab on a workspace with a diff), ship a PR or

@@ -828,6 +828,14 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   assert.deepEqual([d.gh, d.ghCodespace], ['in', false]) // cloud workspaces' scope: the optional line
   writeFileSync(join(rig.home, 'gh', 'auth'), "Logged in to github.com\n  - Token scopes: 'codespace', 'gist', 'repo'\n")
   assert.equal((await rig.rpc('doctor')).ghCodespace, true)
+  // U4: an agent signed in: its sign-in's file there (never read)
+  const signed = (d: any) => ['claude', 'codex'].map(id => d.agents.find((a: any) => a.id === id)?.signedIn)
+  assert.deepEqual(signed(d), [false, false])
+  mkdirSync(join(rig.home, '.claude'), { recursive: true })
+  writeFileSync(join(rig.home, '.claude', '.credentials.json'), '{"never":"read"}')
+  mkdirSync(join(rig.home, '.codex'), { recursive: true })
+  writeFileSync(join(rig.home, '.codex', 'auth.json'), '{}')
+  assert.deepEqual(signed(await rig.rpc('doctor')), [true, true])
 })
 
 test('answer a menu, unread, a race, an issue, the agent browser', async t => {
@@ -976,7 +984,7 @@ test('a folder: Create with an agent makes another session beside its own (none:
   assert.ok(said.includes(`${p.id}: ${own.id} is the folder's own workspace: another one beside it`), said.join('\n'))
   assert.ok(said.some((l: string) => l.startsWith(`${p.id}: agent: claude`)), said.join('\n'))
   const mine = (await rig.rpc('logs', { key: `ws:${next.id}` })).map((l: { text: string }) => l.text)
-  assert.ok(mine.some((l: string) => l.startsWith('claude: ') && l.includes('-lic claude --settings ') && l.includes('--plugin-dir') && l.endsWith('/notes)')), mine.join('\n'))
+  assert.ok(mine.some((l: string) => l.startsWith('claude: ') && l.includes('-lic LAKI_ARG_0= LAKI_ARG_1= claude --settings ') /* S12: its arguments' variables emptied first */ && l.includes('--plugin-dir') && l.endsWith('/notes)')), mine.join('\n'))
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'nope' }))
   assert.ok((await rig.rpc('logs', { key: 'new' })).some((l: { text: string }) => l.text.startsWith(`${p.id}: failed: `)), 'a failure says why')
 })
