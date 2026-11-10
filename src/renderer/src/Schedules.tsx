@@ -264,11 +264,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf, trigger: s.trigger, keep: s.keep, emptyGone: s.emptyGone })
   }
   // T6: Fix on a task that's off after failing: its form, at the field that broke
-  const [spot, setSpot] = useState<string>()
-  const fix = (s: Schedule) => (edit(s), setSpot(s.pausedField === 'widget' || s.pausedField === 'workflow' ? 'preset' : (s.pausedField ?? 'prompt')))
+  const [spot, setSpot] = useState<{ id: string; field: string }>() // the task's form, once it's open (a discard ask may come first)
+  const fix = (s: Schedule) => (edit(s), setSpot({ id: s.id, field: s.pausedField === 'widget' || s.pausedField === 'workflow' ? 'preset' : (s.pausedField ?? 'prompt') }))
   useEffect(() => {
-    if (!spot || !form) return
-    const el = document.querySelector<HTMLElement>(`.sched-form [data-field="${spot}"]`)
+    if (!spot || form?.id !== spot.id) return
+    const el = document.querySelector<HTMLElement>(`.sched-form [data-field="${spot.field}"]`)
     el?.scrollIntoView({ block: 'center' })
     ;(el?.matches('input, button, textarea') ? el : el?.querySelector<HTMLElement>('input, button'))?.focus()
     setSpot(undefined)

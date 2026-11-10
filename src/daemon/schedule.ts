@@ -606,7 +606,7 @@ const archiveRun = (w: Workspace, why: string) =>
   )
 const tidying = new Map<string, Promise<void>>() // a task's tidy at a time: two runs starting together don't archive one twice
 const keepTidy = (s: Schedule) => {
-  const p = (tidying.get(s.id) ?? Promise.resolve()).then(() => tidy(s))
+  const p = (tidying.get(s.id) ?? Promise.resolve()).catch(() => {}).then(() => tidy(s)) // the one before failing doesn't skip this one
   tidying.set(s.id, p)
   return p.finally(() => tidying.get(s.id) === p && tidying.delete(s.id))
 }

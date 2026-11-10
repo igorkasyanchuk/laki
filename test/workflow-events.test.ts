@@ -401,6 +401,8 @@ end: success
   assert.deepEqual(check(wf), [])
   assert.deepEqual(hints(wf), ['fix: {{event.data.n}} and 2 more: this text comes from outside: the agent is told it is data'])
   assert.deepEqual(hints({ ...wf, on: 'workspace.new' }), ['fix: {{steps.say.output}}: this text comes from outside: the agent is told it is data'], "Laki's own event: only the command's output")
+  const own = parse(text.replace('agent: claude · perm: acceptEdits', 'agent: careful')).workflow // a profile's mode counts too
+  assert.deepEqual([hints(own).length, hints(own, [{ name: 'careful', perm: 'acceptEdits' }]).length], [0, 1])
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true })

@@ -842,9 +842,9 @@ export const fillData = (text: string, vars: Record<string, string | undefined>,
     return !w || plain(v) ? v : `\n${untrusted(`{{${k}}}, ${w}`)}\n${fenced(v.slice(0, max))}\n`
   })
 // the editor's hints (not problems: it runs as it is): an agent that acts without asking on outside text
-export function hints(wf: Workflow): string[] {
+export function hints(wf: Workflow, presets: Pick<Preset, 'name' | 'perm'>[] = []): string[] { // presets: a profile's mode when the block and the head give none
   const out: string[] = []
-  for (const b of wf.blocks.filter(x => x.kind === 'agent' && ['auto', 'acceptEdits', 'bypassPermissions'].includes(permOf(wf, x) ?? ''))) {
+  for (const b of wf.blocks.filter(x => x.kind === 'agent' && ['auto', 'acceptEdits', 'bypassPermissions'].includes(permOf(wf, x) ?? presets.find(p => p.name === (x.agent || 'claude'))?.perm ?? ''))) {
     const used = [...new Set([...(b.text ?? '').matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(k => outsideVar(k, wf.on, wf.blocks)))]
     if (used.length) out.push(`${blockName(b)}: {{${used[0]}}}${used.length > 1 ? ` and ${used.length - 1} more` : ''}: this text comes from outside: the agent is told it is data`)
   }

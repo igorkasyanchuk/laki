@@ -252,7 +252,8 @@ let foldersReady = false // the renderer listens for them
 const headless = process.argv.indexOf('--headless')
 if (headless > 0) {
   const cli = fileURLToPath(new URL('./cli.js', import.meta.url))
-  const r = spawnSync(process.execPath, [cli, 'serve', ...process.argv.slice(headless + 1)], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', LAKI_HEADLESS_PARENT: String(process.pid) } })
+  const chromium = /^--(no-sandbox|disable-gpu[\w-]*|in-process-gpu|ozone-platform(-hint)?(=.*)?|enable-features=.*|disable-features=.*|user-data-dir=.*)$/ // a window's switches (the AppImage's --no-sandbox): none here, so not laki serve's
+  const r = spawnSync(process.execPath, [cli, 'serve', ...process.argv.slice(headless + 1).filter(a => !chromium.test(a))], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', LAKI_HEADLESS_PARENT: String(process.pid) } })
   process.exit(r.status ?? 1)
 }
 

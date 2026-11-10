@@ -745,7 +745,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
   const parsed = useMemo(() => parse(text, item.id), [text])
   const wf = parsed.workflow
   const problems = [...parsed.problems, ...check(wf)]
-  const tips = problems.length ? [] : hints(wf) // W1: runs as it is, said
+  const tips = problems.length ? [] : hints(wf, presets) // W1: runs as it is, said
   const dirty = text !== item.text
   const [doomed, setDoomed] = useState<string | null>(null) // the block its trash is under the pointer: red on the canvas
   useEffect(() => setDoomed(null), [pick]) // another block's panel: not that one
