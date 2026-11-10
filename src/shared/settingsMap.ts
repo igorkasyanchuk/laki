@@ -162,6 +162,8 @@ export const FIND: [string, string, string?][] = [
   ['voice', 'Word fixes', 'vocabulary dictionary words names terms correct correction replace mishearing misheard spelling voice dictation transcript'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
+  ['git', 'Clone dependency folders into new worktrees', 'node_modules venv vendor target pods gradle apfs clonefile reflink fast copy'],
+  ['git', 'Keep a spare worktree', 'spare ready instant fast new workspace worktree prepared'],
   ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
   ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],

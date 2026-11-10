@@ -120,7 +120,7 @@ export const checkOk = (c: unknown): DoneCheck | undefined => {
 export type CheckStep = { name: CheckStepName; state: 'wait' | 'run' | 'pass' | 'fail' | 'skip'; ms?: number; out?: string }
 // a workspace's last check: the agent tab whose turn it checked, how it went, how many failures in a row went back
 export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' | 'over'; steps: CheckStep[]; review?: { agent: string; state: 'wait' | 'run' | 'pass' | 'note' | 'fail'; note?: string }; tries: number; at: number }
-export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
+export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; clone?: string[] /* F7: folders cloned whole into a new worktree */; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -623,6 +623,8 @@ export type Settings = {
   whenDone?: WhenDone // once every agent, workflow run and scheduled task that was going is done: the Mac sleeps, locks or shuts down after WHEN_DONE_WAIT (core's whenDone; then off again; unset: off)
   copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
+  cloneDeps?: boolean // F7: and the dependency folders at the repo's root (core.ts CLONE_DIRS), each cloned whole (unset: off)
+  spareWorktree?: boolean // F7: a spare worktree per project, ready for the next new workspace (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
   prBots?: string[] // review bots whose threads the review switch sends (unset: PR_BOTS)

@@ -444,6 +444,7 @@ const api: Record<string, Handler> = {
     throw new Error(`nothing to stop called ${k}`)
   },
   sleepTick: p => resourcesMod.sleepTick(p?.now), // tests move the clock
+  spareTick: p => (!process.env.LAKI_TEST_PARENT ? undefined : p?.peek ? { making: core.spareBusy() } : core.spareTick()), // tests': the tick now, or how many are being made
   archiveIdleTick: p => prMod.archiveIdleTick(process.env.LAKI_TEST_PARENT ? p?.now : undefined), // tests move the clock; nobody else: a far-off now would archive every clean worktree
   longTurnTick: p => longTurnTick(p?.now), // tests move the clock
   longStop: p => longStop(p), // { tab }: a long turn's notification's Stop
@@ -669,7 +670,7 @@ for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw
 // accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
 // yours Laki starts); S6: voice (its dictionary rewrites what you dictate and send), Laki AI's own (ai.context is its
 // instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action)
-const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks|voice|ai|readerTools|keys|cmdKeys)$/
+const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|inHooks|voice|ai|readerTools|keys|cmdKeys)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -1067,6 +1068,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('reminderTick', 30000, () => scheduleMod.reminderTick())
   ticks.register('memoryTick', 1800000, () => memoryTick())
   ticks.register('archiveIdleTick', 1800000, () => prMod.archiveIdleTick())
+  ticks.register('spareTick', 600000, () => core.spareTick()) // F7: each project's spare worktree made, kept at the checkout's commit, or removed with the setting
   ticks.register('widgetTick', 30000, () => widgetTick(), { idle: 'slow' })
   ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick(), { idle: 'pause' }) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())

@@ -1376,6 +1376,7 @@ export function projectRm(ref: string) {
   const live = state.workspaces.filter(w => w.project === p.id && (w.kind === 'worktree' || w.schedule) && !w.archived)
   if (live.length) throw new Error(`${p.name} has workspaces: delete them first (${live.map(w => w.id).join(', ')})`)
   for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w), rmStorage(w) // their storage folders too
+  void spareDrop(p) // F7: its spare worktree
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
@@ -2534,10 +2535,14 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       base = `origin/${base}`
     }
     const add = pr ? ['--detach', path] : [path, '-b', branch, ...(base.startsWith('origin/') ? ['--no-track'] : []), base] // --no-track: a push never goes to origin's base
-    step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
-    await worktreeAdd(proj, ...add).catch(e => {
-      throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
-    })
+    if (!pr && (await spareTake(proj, path, branch, base, base.startsWith('origin/')))) step(`the spare worktree, moved to ${path} and switched to ${branch} off ${base}`)
+    else {
+      step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
+      await worktreeAdd(proj, ...add).catch(e => {
+        throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
+      })
+    }
+    if (!proj.host) setTimeout(() => void spareMake(proj), inRig() ? 0 : 5000).unref() // the next one's, once this one is on its way
     if (pr) {
       // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is; by URL: a number
       // would be gh's default repo's
@@ -2720,7 +2725,85 @@ export const within = (root: string, p: string) => p === root || p.startsWith(ro
 // daemon.log, not a failed workspace. Copied one by one, awaited: node_modules' thousands don't hold the daemon up
 // ponytail: file by file (each one's link and place checked), not one cp -c -R of a whole folder: faster still, with
 // those checks done for the folder as a whole; and no spare worktree kept ready
+// F7: whole folders cloned into a new worktree: .laki.json's `clone`, and with Settings' Clone dependency folders the
+// ones a package manager fills (CLONE_DIRS), where the repo's root has them. One cp -c -R each (APFS's clonefile; Linux:
+// --reflink=auto): no bytes copied until either side writes; on a filesystem without clones cp copies, by itself. A
+// folder git has files of is in the worktree already and is left; links inside stay links (cp -R doesn't follow them)
+// ponytail: its time in the workspace's log and daemon.log, not its size (a du of node_modules takes as long as the clone)
+export const CLONE_DIRS = ['node_modules', '.venv', 'venv', 'vendor/bundle', 'target', 'Pods', '.gradle']
+async function cloneDirs(proj: Project, ws: Workspace) {
+  const own = projectConfig(ws).clone
+  const list = [...new Set([...(Array.isArray(own) ? own : []).filter((p): p is string => typeof p === 'string'), ...(state.settings?.cloneDeps ? CLONE_DIRS : [])].map(p => p.trim().replace(/\/+$/, '')).filter(Boolean))]
+  for (const rel of list) {
+    const began = Date.now()
+    try {
+      if (isAbsolute(rel) || rel.split('/').includes('..')) continue
+      const root = realpathSync(proj.path)
+      const to = realpathSync(ws.path)
+      const src = join(root, rel)
+      const dst = join(to, rel)
+      if (!lstatSync(src, { throwIfNoEntry: false })?.isDirectory() || lstatSync(dst, { throwIfNoEntry: false })) continue // no folder of its own there (a link isn't one), or the worktree has it (git's files)
+      let up = dirname(dst) // as copyIncludes: nothing through a folder linked out of the repo or the worktree
+      while (!existsSync(up)) up = dirname(up)
+      if (!within(root, realpathSync(src)) || !within(to, realpathSync(up))) continue
+      mkdirSync(dirname(dst), { recursive: true })
+      await run('cp', process.platform === 'darwin' ? ['-cR', src, dst] : ['--reflink=auto', '-R', src, dst], { timeout: 10 * 60_000 })
+      wsLog(ws, `cloned ${rel} in ${Date.now() - began} ms`)
+      log(`cloned ${rel} into ${ws.id} in ${Date.now() - began} ms`)
+    } catch (e) {
+      log(`clone into ${ws.id}: ${rel}: ${firstLine(e)}`)
+    }
+  }
+}
+
+// F7: a spare worktree per project (Settings' Keep a spare worktree, off): made in the background, detached at the
+// checkout's commit, its ignored files cloned and copied in. The next new workspace takes it (git worktree move, then
+// its branch off the base there: a checkout of what differs, not of the whole tree) and another is made. Not for a
+// host's project, one with submodules (git can't move those), nor on a battery under 20%. It is `.spare` in the
+// project's worktrees folder: a full checkout's space (its clones: none); projectRm and the setting turned off remove it
+const sparePath = (proj: Project) => join(worktreesOf(proj), '.spare')
+const sparing = new Set<string>()
+export const spareBusy = () => sparing.size
+const onPower = () => (process.platform !== 'darwin' ? Promise.resolve(true) : run('pmset', ['-g', 'batt']).then(r => !/Battery Power/.test(r.stdout) || Number(/(\d+)%/.exec(r.stdout)?.[1] ?? 100) >= 20, () => true))
+export async function spareDrop(proj: Project) {
+  if (!proj.host && existsSync(sparePath(proj))) await git(proj, 'worktree', 'remove', '--force', sparePath(proj)).catch(() => rmSync(sparePath(proj), { recursive: true, force: true }))
+}
+export async function spareMake(proj: Project) {
+  const path = sparePath(proj)
+  if (!state.settings?.spareWorktree || proj.host || proj.kind || proj.git === false || sparing.has(proj.id) || !state.projects.includes(proj) || existsSync(join(proj.path, '.gitmodules'))) return
+  sparing.add(proj.id)
+  try {
+    const head = await git(proj, 'rev-parse', 'HEAD')
+    if (existsSync(path)) return void ((await git({ path }, 'rev-parse', 'HEAD')) === head || (await git({ path }, 'checkout', '--detach', head))) // the checkout moved on: there again
+    if (!(await onPower())) return
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+    await worktreeAdd(proj, '--detach', path, head)
+    await copyIncludes(proj, { id: `${proj.id}.spare`, path, project: proj.id } as Workspace)
+    log(`spare worktree for ${proj.id}: ready`)
+  } catch (e) {
+    log(`spare worktree for ${proj.id}: ${firstLine(e)}`)
+    await spareDrop(proj)
+  } finally {
+    sparing.delete(proj.id)
+  }
+}
+async function spareTake(proj: Project, path: string, branch: string, base: string, noTrack: boolean) {
+  const spare = sparePath(proj)
+  if (!state.settings?.spareWorktree || proj.host || sparing.has(proj.id) || !existsSync(spare)) return false
+  try {
+    await git(proj, 'worktree', 'move', spare, path)
+    await git({ path }, 'switch', '-c', branch, ...(noTrack ? ['--no-track'] : []), base)
+    return true
+  } catch (e) {
+    log(`spare worktree for ${proj.id} not taken: ${firstLine(e)}`)
+    await git(proj, 'worktree', 'remove', '--force', existsSync(path) ? path : spare).catch(() => {})
+    return false
+  }
+}
+export const spareTick = () => void state.projects.map(p => (state.settings?.spareWorktree ? spareMake(p) : spareDrop(p)).catch(() => {}))
+
 async function copyIncludes(proj: Project, ws: Workspace) {
+  await cloneDirs(proj, ws)
   const list = projectConfig(ws).copy
   const pats = (Array.isArray(list) ? list : []).filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => `--exclude=${p.trim()}`)
   const file = join(proj.path, '.worktreeinclude')

@@ -25,7 +25,7 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
   a value but those (one already saved is off); an agent can't change it (main.ts' `AGENT_KEYS`, with `doneCheck`,
   `recording`, `nextPrompt`, `keepAwake`, the tidies' `storageDays`, `archivedDays`, `imageDays`, `memoryCompact`,
   `updateCheck`, `updateDelay`, and the global ones of what `projectSet`'s `config` holds: `actions`, `templates`,
-  `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
+  `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`, `cloneDeps`, `spareWorktree`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
   `uiReset`, nor `wsSet`'s `important`, nor `updateIdle` while `updateCheck` is off or `updateDelay` set; remote access can: Cancel). Tested with a `pmset`
   in the rig's `$HOME/bin` (`test/resources.test.ts`);
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -171,6 +171,12 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - `worktreeAdd` (`wsNew`'s and `wsRestore`'s `git worktree add`): `-c checkout.workers=0` (a worker per core) unless the
   project's `git config --get checkout.workers` says something (`ownWorkers`: read once per repo per daemon, by host and path, a host's
   there); tested with a logging `git` in the rig's `$HOME/bin` (`test/worktrees.test.ts`);
+- whole folders first (F7, `cloneDirs`, called by `copyIncludes`): `.laki.json`'s `clone` and, with `settings.cloneDeps`,
+  `CLONE_DIRS` at the repo's root, each one `cp -cR` (Linux `--reflink=auto -R`), skipped when the worktree has the
+  folder or a link leads out. The spare (`settings.spareWorktree`, `spareMake`/`spareTake`/`spareDrop`, `spareTick` every
+  10 minutes): `<worktrees>/<project>/.spare`, detached at the checkout's HEAD with those files in; `wsNew` takes it with
+  `git worktree move` and `git switch -c <branch> <base>` (not for a PR, a host, a repo with `.gitmodules`), then makes
+  the next; any failure falls back to `worktree add`.
 - files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is

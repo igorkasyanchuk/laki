@@ -2367,6 +2367,10 @@ you trust it. Env that changes how programs start (`PATH`, `ZDOTDIR`, `BASH_ENV`
 ```
 
 Two of them live only there:
+- `clone`: folders cloned whole into a new worktree (`["node_modules", ".venv"]`): one `cp -c -R` each, on APFS a few
+  seconds and no extra disk until a file changes (elsewhere a plain copy). Settings › Git › *Clone dependency folders*
+  does it for the usual ones at any repo's root; *Keep a spare worktree* keeps one worktree per project ready, so the
+  next new workspace starts at once.
 - `copy`: files git doesn't keep that a new worktree needs, as gitignore patterns. A `.worktreeinclude` at the repo's
   root (one pattern a line) does the same; both add up. They're copied from the repo's own
   checkout into each new or restored worktree, with their permissions, before setup and the agent start; one already

@@ -1,7 +1,7 @@
 // Worktrees and their files: ignored files copied, .laki.json's trust, setup, diff, the side panel's files, a folder without git.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
@@ -803,3 +803,38 @@ test("F8: behind its base: the count, a clean update merges, a conflicting one g
   await until(async () => (await rig.tab(ws.id, 'claude: slow work')).status === 'running', 'a turn under way')
   await assert.rejects(rig.rpc('wsUpdate', { ws: ws.id, how: 'rebase' }), /is at work in .*: update once its turn ends/)
 })
+
+test('F7: dependency folders are cloned whole into a new worktree; a spare worktree is taken by the next workspace', async t => {
+  const rig = await fresh(t)
+  const g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim()
+  writeFileSync(join(rig.repo, '.gitignore'), 'node_modules\n')
+  mkdirSync(join(rig.repo, 'node_modules/a'), { recursive: true })
+  writeFileSync(join(rig.repo, 'node_modules/a/index.js'), 'main\n')
+  symlinkSync('a/index.js', join(rig.repo, 'node_modules/link'))
+  g(rig.repo, 'add', '.gitignore')
+  g(rig.repo, 'commit', '-qm', 'ignore')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { cloneDeps: true })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  assert.equal(readFileSync(join(a.path, 'node_modules/a/index.js'), 'utf8'), 'main\n')
+  assert.ok(lstatSync(join(a.path, 'node_modules/link')).isSymbolicLink()) // a link stays a link
+  writeFileSync(join(a.path, 'node_modules/a/index.js'), 'its own\n') // a clone is its own file
+  assert.equal(readFileSync(join(rig.repo, 'node_modules/a/index.js'), 'utf8'), 'main\n')
+  // the spare: made after a new workspace, with the clones in it; the next one is it, moved and on its own branch
+  await rig.rpc('settingsSet', { spareWorktree: true })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'two' })
+  const spare = join(b.path, '..', '.spare')
+  const ready = () => until(async () => existsSync(join(spare, '.git')) && (await rig.rpc('spareTick', { peek: true })).making === 0, 'the spare')
+  await ready()
+  assert.equal(readFileSync(join(spare, 'node_modules/a/index.js'), 'utf8'), 'main\n')
+  await rig.rpc('settingsSet', { cloneDeps: false }) // so only the spare can bring node_modules
+  const c = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
+  assert.equal(g(c.path, 'symbolic-ref', '--short', 'HEAD'), c.branch)
+  assert.equal(readFileSync(join(c.path, 'node_modules/a/index.js'), 'utf8'), 'main\n')
+  assert.equal(g(c.path, 'status', '--porcelain'), '')
+  await ready() // another
+  await rig.rpc('settingsSet', { spareWorktree: false })
+  await rig.rpc('spareTick')
+  await until(() => !existsSync(spare), 'the spare removed with the setting')
+})
+

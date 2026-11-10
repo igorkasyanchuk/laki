@@ -222,6 +222,8 @@ export type AppSettings = Paint & {
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
   copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
+  cloneDeps?: boolean // F7: dependency folders cloned whole
+  spareWorktree?: boolean // F7: a spare worktree per project
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
   prBots?: string[] // review bots whose threads go to the agent (unset: PR_BOTS)
@@ -1268,6 +1270,12 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={!!s.copyUntracked} onChange={v => set({ copyUntracked: v })}>
                   <Says title="Copy untracked files to new worktrees" hint="New files you haven't committed (or ignored) yet" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.cloneDeps} onChange={v => set({ cloneDeps: v })}>
+                  <Says title="Clone dependency folders into new worktrees" hint="node_modules, .venv, vendor/bundle, target, Pods and .gradle at the repo's root, each as one clone: on APFS about a second and no extra disk until a file changes. A repo names its own in .laki.json's clone" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.spareWorktree} onChange={v => set({ spareWorktree: v })}>
+                  <Says title="Keep a spare worktree" hint="One per project, made in the background with these files in it: the next new workspace takes it and starts at once. A checkout's worth of disk each; not on a battery under 20%" />
                 </Switch>
               </div>
               </Group>

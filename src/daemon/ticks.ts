@@ -36,6 +36,7 @@
 //   aiTick         10 min keep   Laki AI's unused spec chats ended
 //   memoryTick     30 min keep   memory's compaction, when due
 //   archiveIdleTick 30 min keep  worktrees nobody touched archived (pr.ts, settings.archiveIdle)
+//   spareTick      10 min keep   each project's spare worktree made or brought to the checkout's commit (settings.spareWorktree), removed without it
 //   ghHour         1 h    keep   Laki's own gh calls in its log
 //   logTick        1 h    keep   daemon.log past 10 MB moved to daemon.log.1 (conn.ts rotateLog)
 //   tidy           1 h    keep   old pasted images, storage files, archived workspaces, trash
