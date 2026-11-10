@@ -1059,6 +1059,13 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .plan-list .p-done .queue-text { color: var(--muted); text-decoration: line-through; } .plan-list .p-done .check-mark { color: var(--done); }
 .plan-list .p-now .queue-text { color: var(--fg); font-weight: 600; } .plan-list .p-now .check-mark { color: var(--accent-ink); }
 .plan-strip.stale .plan-list, .plan-strip.stale .plan-head { opacity: 0.6; }
+/* F1: a tab's kept turns, a dot each (hollow: a rewind) */
+.turn-strip { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-top: 1px solid var(--line); overflow: hidden; }
+.turn-dot { width: 9px; height: 9px; min-width: 9px; padding: 0; border-radius: 50%; border: 1px solid var(--muted); background: var(--muted); opacity: 0.55; cursor: pointer; }
+.turn-dot:last-of-type { opacity: 1; background: var(--accent); border-color: var(--accent); }
+.turn-dot.rewind { background: none; }
+.turn-dot:hover, .turn-dot:focus-visible { opacity: 1; outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 1px; }
+.sp-turn-pick { max-width: 220px; }
 .plan-ask { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line); }
 .plan-ask textarea { margin: 0 12px; min-height: 60px; max-height: 220px; resize: vertical; padding: 6px 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 12.5px/1.45 var(--mono); }
 .plan-acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 8px; }

@@ -1648,6 +1648,21 @@ back as they were before the turn, the ones it made removed; refused once one of
 committed or staged). Laki notes the worktree as each turn starts and ends (Codex has no start: its last turn's end),
 with an index of its own; Settings › Git & worktrees › *Each turn's changes* turns it off.
 
+Every turn that changed files is kept, per workspace, across restarts: a row of dots under an agent's tab (*Turns*), the
+newest in the accent color. Hover one for its prompt, files, time, length and cost; a click offers:
+
+- *Show its changes*: the side panel's Changes on that turn (its *This turn* has a picker of every kept turn).
+- *Rewind files to before it…* (asked first): every file goes back to what it was before that turn, later turns' changes
+  and your own edits since included. What was there is kept as a turn of its own (a hollow dot, *You*): *Undo this
+  rewind…* on it puts everything back. Not while an agent of the workspace is working.
+- *New workspace from here*: a new workspace whose branch starts on that turn's files (one commit of Laki's over the
+  commit the worktree was on), compared with the same base.
+
+It covers files only: not installs, migrations or pushes, nothing git ignores, and no workspaces over SSH; the agent's
+chat isn't rewound. Settings › Git & worktrees › *Turns kept*: how many per workspace (50; 0: none), 14 days at most.
+The snapshots are refs of Laki's own in the repo (`refs/laki/turns/…`): no push takes them, and they go with the
+workspace.
+
 With Settings › AI › *Guess my next prompt* (off: it's one more request to Laki AI's model per turn), the empty box shows,
 greyed out, what you'd likely send next, guessed from your last message and the answer: Tab takes it, Esc hides it.
 

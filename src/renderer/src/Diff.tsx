@@ -35,7 +35,7 @@ export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
 // (gh pr diff; a linked PR's first, or one that came to a workspace changing nothing of its own: `empty` as it was when
 // the PR first showed, so a file saved meanwhile doesn't flip it, nor does its own PR, opened after its commits). Branch or Uncommitted is kept per view (store), the PR's for this look only
 export type Scope = 'branch' | 'uncommitted' | 'pr' | 'turn' // turn: an agent's last turn's changes (turns.ts turnDiff)
-export const turnNext = { on: false } // the Reader's card's Review: Changes opens on This turn
+export const turnNext: { on: boolean; n?: number } = { on: false } // the Reader's card's Review: Changes opens on This turn; n: a kept turn's (F1: the strip's Show its changes)
 export function useScope(store: string, pr: boolean, linked: boolean, worktree: boolean, turn = false, empty?: boolean) {
   const was = useRef<boolean | undefined>(undefined)
   if (was.current === undefined && pr && empty !== undefined) was.current = empty // its stat and its PR may come after the view opens

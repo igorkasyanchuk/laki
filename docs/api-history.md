@@ -163,4 +163,4 @@ needs no bump: `settingsSet` keeps any field.
 155: `tabDraft` (`{ tab, text? }`, a Reader box's unsent text, agents refused), a tab's `drafted` in the view.
 156: `tabMode` (`{ tab, mode }`: a running claude's permission mode by its own ⇧⇥, agents refused), a tab's `mode` and `bypassNo` in the view.
 157: a tab's `failed` in the view (a turn ended on an API error), `failDismiss`; `longStop`.
-158: `gateRestart` and a tab's `ungated`; a tab's `modeUnknown`; the view's `diskFull`, `dnd` and `digest`; `projectClone`; `stopAll`, `queueResume` and a tab's `queueHeld`; `dndSet`; `wsUpdate` and `Stat`'s `behind`, `ahead`, `clean`; an agent's removes ask (`toolAsk` `cross: 'remove'`).
+158: `gateRestart` and a tab's `ungated`; a tab's `modeUnknown`; the view's `diskFull`, `dnd` and `digest`; `projectClone`; `stopAll`, `queueResume` and a tab's `queueHeld`; `dndSet`; `wsUpdate` and `Stat`'s `behind`, `ahead`, `clean`; an agent's removes ask (`toolAsk` `cross: 'remove'`); `turnList`, `turnRewind`, `turnFork`, `turnDiff`'s `n` (kept turns); a chat line's `at`, `end`, `cost`; `shutdown`'s `keep`.

@@ -1,6 +1,6 @@
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, creatorOf, neverAsks, PERMS, veiled, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -33,6 +33,7 @@ import { Glyph, rollup } from './Glyph'
 import { needsTab, nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
+import { type TurnApi, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
 import { Term, xterms, type SelectionUse } from './Term'
@@ -1804,7 +1805,8 @@ export function App() {
     preview: (path, line) => openFile({ ws: w.id, path, line }),
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
-    turnChanges: () => api.call<Changes>('turnDiff', { ws: w.id }),
+    turnChanges: n => api.call<Changes>('turnDiff', { ws: w.id, ...(n !== undefined && { n }) }),
+    turns: () => api.call<TurnKept[]>('turnList', { ws: w.id }),
     ...(w.kind === 'worktree' && { bases: () => api.call('baseBranches', { ws: w.id }), setBase: (base: string) => api.call('wsBase', { ws: w.id, base }) }),
     commits: () => api.call<Commits>('commits', { ws: w.id }),
     commitDiff: sha => api.call<Changes>('commitDiff', { ws: w.id, sha }),
@@ -2710,6 +2712,16 @@ export function App() {
     undo: t =>
       void ask(`Undo ${t.name}'s last turn?`, { text: `${t.changes!.n} file${t.changes!.n === 1 ? '' : 's'} back as they were before it: ${t.changes!.files.slice(0, 4).map(f => f.path).join(', ')}${t.changes!.n > 4 ? '…' : ''}. Files it made are removed. Nothing is committed.`, ok: 'Undo', danger: true }).then(ok => void (ok && call<{ files: number }>('turnUndo', { tab: t.id }).then(r => done(`${r.files} file${r.files === 1 ? '' : 's'} back as before the turn`), () => {}))),
   }
+  // F1: a kept turn's menu (TurnStrip): its diff in Changes, the files back to before it, a workspace from it
+  const turnApi = (ws: string): TurnApi => ({
+    list: tab => api.call<TurnKept[]>('turnList', { tab }),
+    show: t => ((turnNext.on = true), (turnNext.n = t.n), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), window.dispatchEvent(new CustomEvent('laki-turn', { detail: t.n })), showPanel('changes')),
+    rewind: t =>
+      ask(t.rewind ? `Undo the rewind to before turn ${t.rewind}?` : `Rewind files to before turn ${t.n}?`, { text: `${t.rewind ? 'The files go back to what they were before you rewound.' : `Every file goes back to what it was before "${t.prompt ?? `turn ${t.n}`}": this turn's changes, later turns' and your own edits since.`} What's there now is kept as a turn of its own, so this can be undone. Files only: not installs, migrations, pushes or what git ignores. Nothing is committed.`, ok: t.rewind ? 'Undo the rewind' : 'Rewind', danger: true }).then(
+        ok => (ok ? call<{ files: number }>('turnRewind', { ws, n: t.n }).then(r => done(r.files ? `${r.files} file${r.files === 1 ? '' : 's'} back as before turn ${t.rewind ?? t.n}` : 'The files are that way already')) : undefined),
+      ),
+    fork: t => void call<WorkspaceView>('turnFork', { ws, n: t.n }).then(w => showNew(w.id), () => {}),
+  })
   const restore = (id: string) => call('wsRestore', { id }).then(() => showNew(id))
   const newWs = (projectId?: string, init?: Partial<NewWsParams>) => {
     setNewFor(projectId)
@@ -3546,6 +3558,7 @@ export function App() {
                         <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
                         <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
+                        {t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnApi(t.workspace)} />}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}

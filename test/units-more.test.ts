@@ -582,3 +582,11 @@ test('F6: the Reader’s times (a message’s, a finished turn’s end, length a
   assert.equal(out[0].cost, costOf('claude-sonnet-4-5', { input: 1000, output: 1000, write: 0, read: 0 }))
   assert.equal(chatOf('codex', line({ type: 'event_msg', timestamp: '2026-11-10T12:00:00.000Z', payload: { type: 'user_message', message: 'hi' } }))[0].at, Date.parse('2026-11-10T12:00:00.000Z'))
 })
+
+test('F1: a kept turn in a line: its number, prompt, files, when, how long, the cost', async () => {
+  const { turnWords } = await import('../src/renderer/src/text.ts')
+  const at = (h: number, m: number, s = 0) => new Date(2026, 10, 10, h, m, s).getTime()
+  const t = { n: 3, tab: 't', name: 'claude', before: 'a', after: 'b', files: [], prompt: 'change a, add b', started: at(14, 0, 56), ended: at(14, 2), add: 2, del: 0, count: 2, cost: 0.214 }
+  assert.equal(turnWords(t, at(15, 0)), '#3 · change a, add b · 2 files +2 −0 · 14:02 · 1m 4s · $0.21')
+  assert.equal(turnWords({ ...t, n: 4, prompt: undefined, started: undefined, cost: undefined, count: 1, add: 0, del: 5 }, at(15, 0)), '#4 · 1 file +0 −5 · 14:02')
+})

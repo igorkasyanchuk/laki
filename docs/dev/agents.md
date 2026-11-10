@@ -70,8 +70,24 @@ what the view shows on the tab's runtime:
   `changes` (`TurnChanges`: `n`, `add`, `del`, the first `TURN_FILES` files, git's A/M/D, no renames). The Reader's
   `TurnCard` (Review: Changes' *This turn*, `Scope` `turn`, the `laki-scope` event, `turnDiff`, read only; Undo:
   `turnUndo`, after `ask`: refused while it runs or once one of its files changed since, then `git restore
-  --source=<before> --worktree` and its added files removed, `inside`). ponytail: the last turn per tab, in memory;
-  this Mac's git workspaces only;
+  --source=<before> --worktree` and its added files removed, `inside`). ponytail: the card is the last turn per tab,
+  in memory; this Mac's git workspaces only;
+- every turn kept (F1, `settings.turnsKept`: 50 unset, 0 none, 500 at most; `KEEP_DAYS` 14): `turnEnded` hands each
+  turn that changed files to `turnKeep`: `<data>/turns/<ws>.json` (`{ repo, next, turns: TurnKept[] }`: n, tab, name,
+  the prompt's first line (`rt.asked`), started, ended, the trees, counts, the first `TURN_FILES` files, claude's cost
+  from `chatRead`), one change at a time per workspace (`inLine`). The trees stay alive as commits (`commit-tree` on
+  the HEAD of then, Laki as author, never signed) under `refs/laki/turns/<ws>/<n>/before` and `/after`: outside
+  refs/heads and refs/tags, and every push in the code names its refs. A turn past the count or the days loses its
+  refs; `turnsTidy` (hourly, and after `wsRm`) drops a gone workspace's list and refs (`turnsGone`; archived ones
+  stay). `turnList { ws | tab }`; `turnDiff { n }` (none in memory: the newest kept); `turnRewind { ws, n }`: refused
+  while a tab of the workspace runs, `treeOf` now, kept as a turn (`rewind: n`, name You), then `git restore
+  --source=<before>` and the files added since removed, every tab's card cleared: rewinding that turn undoes it;
+  `turnFork { ws, n }`: `wsNew` with the `after` commit as base, then the source's base. Rewind and fork are the user's
+  (`AGENT_NO`). `TurnStrip.tsx` (App's pane `foot`, agent tabs, with `turnChanges` on): a dot per kept turn of the tab
+  (the newest 30), `turnWords` as its tip and its menu's head, the three actions (`turnApi`: `turnNext.n` and the
+  `laki-turn` event open Changes on it); Changes' *This turn* has a `<select>` of the workspace's turns (`PanelApi.turns`,
+  `turnChanges(n)`). Tests: `test/turn-history.test.ts`. ponytail: files only, nothing git ignores, no hosts; a turn
+  that changed nothing isn't kept; a rewind names every path on one command line;
 - the next prompt (`settings.nextPrompt`, off unless true; Settings › AI's *Guess my next prompt*): at a claude or codex
   turn's end with an answer (yours: not a workflow's, nothing queued; Laki AI on, with a key for OpenRouter), `aiOnce`
   with your last message (`Runtime.asked`: UserPromptSubmit's, codex's `input-messages`) and the answer's end; a line

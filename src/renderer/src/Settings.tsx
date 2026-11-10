@@ -209,6 +209,7 @@ export type AppSettings = Paint & {
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   turnChanges?: boolean // each turn's changes: the Reader's card, This turn, Undo (unset: on)
+  turnsKept?: number // F1: turns kept per workspace (unset: 50; 0: none)
   nextPrompt?: boolean // as a turn ends, its next prompt guessed for the Reader's box (unset: off)
   whenDone?: WhenDone // sleep, lock or shut down once all that was going is done, then off again (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees, checked on its own (unset: off; a workspace's Check overlaps asks)
@@ -1311,6 +1312,13 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.turnChanges !== false} onChange={v => set({ turnChanges: v })}>
                   <Says title="Each turn's changes" hint="As a Claude Code or Codex turn ends having changed files, a card under its last answer in the Reader: what it changed, Review (Changes › This turn) and Undo. Laki notes the worktree as each turn starts and ends, with an index of its own: yours is never touched" />
                 </Switch>
+                {s.turnChanges !== false && (
+                  <label className="switch-row">
+                    <Says title="Turns kept" hint="Every turn that changed files is kept per workspace, for 14 days at most: the dots under an agent's tab (its changes, Rewind files to before it, New workspace from here) and Changes › This turn's picker. 0: only the last one, until the daemon restarts" />
+                    <span className="grow" />
+                    <input type="number" min={0} max={500} style={{ width: 80 }} aria-label="Turns kept" value={s.turnsKept ?? 50} onChange={e => e.target.value !== '' && set({ turnsKept: Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))) })} />
+                  </label>
+                )}
               </div>
               </Group>
               <Group title="Clean-up">

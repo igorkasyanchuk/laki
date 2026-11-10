@@ -7,7 +7,7 @@ import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
 import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
-import type { MergeMethod } from '../../shared/types'
+import type { MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu } from './ui'
@@ -32,7 +32,8 @@ export type PanelApi = {
   preview: (path: string, line?: number) => void // in the app
   changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
-  turnChanges: () => Promise<Changes> // an agent's last turn's (turns.ts turnDiff)
+  turnChanges: (n?: number) => Promise<Changes> // an agent's last turn's (turns.ts turnDiff); n: a kept turn's (F1)
+  turns?: () => Promise<TurnKept[]> // the workspace's kept turns: This turn's picker
   bases?: () => Promise<{ base: string; gone: boolean; local: string[]; remote: string[] }> // a worktree's: the branches its diff could compare with (Change base)
   setBase?: (base: string) => Promise<unknown> // its new base: the diff and later compares go against it
   commits: () => Promise<Commits> // what the branch adds over its base, each pushed or not (Commits)
@@ -246,9 +247,23 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
     return () => window.removeEventListener('laki-scope', f)
   }, [])
   const inTurn = scope === 'turn'
+  // F1: which turn This turn shows: the last one (unset), or a kept one picked here or from the strip under a tab
+  const [turnN, setTurnN] = useState<number | undefined>(() => (n => ((turnNext.n = undefined), n))(turnNext.n))
+  const [turns, setTurns] = useState<TurnKept[]>([])
+  useEffect(() => {
+    const f = (e: Event) => ((turnNext.n = undefined), setTurnN((e as CustomEvent<number>).detail))
+    window.addEventListener('laki-turn', f)
+    return () => window.removeEventListener('laki-turn', f)
+  }, [])
+  useEffect(() => setTurnN(undefined), [ws])
+  useEffect(() => {
+    let on = true
+    if (inTurn) void wsApi.turns?.().then(l => on && setTurns(l), () => {})
+    return () => void (on = false)
+  }, [ws, inTurn, turnN])
   const all = scope === 'pr' || inTurn // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
   const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
-  const [d, err, reload] = useLoad(inTurn ? api.turnChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
+  const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : ''}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, scope])
@@ -368,6 +383,16 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
     <>
       <div className="sp-tools">
         <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} turn={turn} />
+        {inTurn && turns.length > 0 && (
+          <select className="sp-turn-pick small" aria-label="Which turn" value={turnN ?? ''} onChange={e => setTurnN(e.target.value ? Number(e.target.value) : undefined)}>
+            <option value="">Last turn</option>
+            {[...turns].reverse().map(t => (
+              <option key={t.n} value={t.n}>
+                #{t.n} {t.name}: {(t.prompt ?? '').slice(0, 60)}
+              </option>
+            ))}
+          </select>
+        )}
         {(sum => (
           <span className="sp-sum muted small grow" data-tip={sum && files.length ? `${sum} · click a line to comment` : undefined}>
             {sum || (err ? '' : 'Loading…')}

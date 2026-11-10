@@ -491,6 +491,9 @@ export type ProgramState = 'idle' | 'working' | 'done' | 'blocked' | 'error' // 
 export type NativeSeen = { agree: number; differ: number; last?: { at: number; native: ProgramState; hook: string; app?: string } }
 export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
 export type TurnFile = { path: string; add: number; del: number; status: string } // status: git's A, M, D (no renames)
+// F1: a turn kept on disk (turns.ts): n: its number in its workspace; before, after: the worktree's trees; count: how
+// many files (files: the first TURN_FILES); rewind: a rewind to before that turn (You, undone by rewinding this one)
+export type TurnKept = { n: number; tab: string; name: string; prompt?: string; started?: number; ended: number; before: string; after: string; add: number; del: number; count: number; files: TurnFile[]; cost?: number; rewind?: number }
 export type TurnChanges = { at: number; add: number; del: number; n: number; files: TurnFile[] } // n: how many files; files: the first TURN_FILES
 export const WHEN_DONE = ['sleep', 'lock', 'shutdown'] as const
 export type WhenDone = (typeof WHEN_DONE)[number] | 'off'
@@ -619,6 +622,7 @@ export type Settings = {
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
   keepAwake?: boolean // the Mac doesn't sleep while an agent works or waits for you (core's keepAwake: caffeinate -i; unset: off)
+  turnsKept?: number // F1: how many turns' snapshots a workspace keeps on disk (unset: 50; 0: none; at most 500), 14 days at most
   turnChanges?: boolean // each claude or codex turn's changes, from a snapshot of the worktree as it starts and ends (turns.ts; unset: on)
   nextPrompt?: boolean // as a claude or codex turn ends, Laki AI's model guesses your next message: the Reader's box shows it greyed out, Tab takes it (turns.ts; a request per turn; unset: off)
   whenDone?: WhenDone // once every agent, workflow run and scheduled task that was going is done: the Mac sleeps, locks or shuts down after WHEN_DONE_WAIT (core's whenDone; then off again; unset: off)

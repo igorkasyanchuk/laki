@@ -4,16 +4,18 @@
 // (Tab takes it). main.ts imports it (turnStarts, turnEnds), core doesn't: core keeps what the view shows on the tab's
 // runtime (suggest, changes).
 
+import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
 import { basename, join, sep } from 'node:path'
-import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
-import { addTab, broadcast, changed, findWs, input, presets, rtOf, sessions, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
+import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type TurnKept, type Workspace } from '../shared/types.ts'
+import { addTab, broadcast, changed, findWs, input, presets, rtOf, save, sessions, state, storageOf, tabsOf, tracked, turnEnds, turnStarts, wsLog, wsNew } from './core.ts'
 import { phoneLong } from './phone.ts'
 import { widgetEvent } from './widgets.ts'
 import { dir } from './dir.ts'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { diff, g, inside, treeOf, turnDir } from './files.ts'
 import { chatRead } from './meters.ts'
 import { aiOnce, hasKey } from './ai.ts'
@@ -210,11 +212,11 @@ export async function handoverPics(tab: Tab, ws: Workspace, text: string, to: st
 // workspace (<data>/turns/<ws>.index: git add -A, write-tree; the worktree's own index never touched), as a turn starts
 // (claude's UserPromptSubmit; codex has no start: its last turn's end) and as it ends: what differs is the turn's. Undo
 // writes those files back as they were before it, only while they're still as it left them.
-// ponytail: the last turn per tab, in memory (a restart forgets it); this Mac's git workspaces (no host); a tree is a
-// loose object git may prune after two weeks
+// The card is the last turn per tab, in memory; every turn that changed something is also kept on disk (F1, below).
+// ponytail: this Mac's git workspaces (no host)
 export const TURN_FILES = 50
 type Turn = { before: string; after: string; files: TurnFile[] }
-const cuts = new Map<string, { start?: Promise<string | undefined>; last?: string; turn?: Turn }>() // by tab
+const cuts = new Map<string, { start?: Promise<string | undefined>; at?: number; last?: string; turn?: Turn }>() // by tab; at: when its turn started
 const wsFor = (tab: Tab) => {
   const ws = state.workspaces.find(w => w.id === tab.workspace)
   const ok = ws && !ws.archived && !ws.host && state.settings?.turnChanges !== false && tracked(tab) && (tab.preset === 'claude' || tab.preset === 'codex') && state.projects.find(p => p.id === ws.project)?.git !== false && existsSync(ws.path)
@@ -227,6 +229,7 @@ turnStarts.add(tab => {
   if (!ws) return
   const c = cutOf(tab.id)
   c.start = treeOf(ws).catch(e => said(ws, e))
+  c.at = Date.now()
   c.turn = rtOf(tab.id).changes = undefined // the card is the last turn's: not while the next one works or asks
 })
 turnEnds.add(tab => {
@@ -244,6 +247,8 @@ async function turnEnded(tab: Tab, ws: Workspace) {
     const r = rtOf(tab.id)
     const files = before && before !== after ? await filesOf(ws, before, after) : []
     c.turn = files.length ? { before: before!, after, files } : undefined
+    if (files.length) void turnKeep(ws, { tab: tab.id, name: tab.name, prompt: firstLine(r.asked), started: c.at, before: before!, after, files, cost: costOf(tab) }).catch(e => said(ws, e))
+    c.at = undefined
     r.changes = files.length ? { at: Date.now(), add: files.reduce((n, f) => n + f.add, 0), del: files.reduce((n, f) => n + f.del, 0), n: files.length, files: files.slice(0, TURN_FILES) } : undefined
     changed()
   } catch (e) {
@@ -264,16 +269,129 @@ async function filesOf(ws: Workspace, from: string, to: string): Promise<TurnFil
   return out
 }
 
-// This turn in Changes: the newest turn of the workspace's tabs that changed something, as diff() gives a diff
-export async function turnDiff(o: { ws?: string; tab?: string }) {
+// ---------- every turn kept (F1): each turn that changed files, per workspace, in <data>/turns/<ws>.json (its tab, the
+// prompt's first line, when, the trees before and after, the files, the cost when the transcript says), the newest
+// settings.turnsKept (50 unset; 0: none) of the last KEEP_DAYS. The trees stay alive through refs of Laki's own,
+// refs/laki/turns/<ws>/<n>/before and /after, each a commit of the tree on the HEAD of then (never under refs/heads or
+// refs/tags, so no push takes them: Ship and every push name their refs); a turn let go loses its refs, a workspace
+// removed all of them (turnsTidy, after wsRm). turnList reads them; turnDiff one's diff; turnRewind puts the worktree's
+// files back as they were before turn n, keeping what was there as a turn of its own (a rewind of that one undoes it);
+// turnFork starts a workspace on turn n's commit. Rewind and fork are yours, not an agent's (main.ts' AGENT_NO).
+// ponytail: files only (not installs, migrations or pushes), nothing git ignores, no SSH hosts; a turn that changed
+// nothing isn't kept; a rewind names every path on one git command line
+const KEEP_DAYS = 14
+const ME = { GIT_AUTHOR_NAME: 'Laki', GIT_AUTHOR_EMAIL: 'laki@localhost', GIT_COMMITTER_NAME: 'Laki', GIT_COMMITTER_EMAIL: 'laki@localhost' }
+type Kept = { repo: string; next: number; turns: TurnKept[] }
+const keptFile = (ws: string) => join(turnDir, `${ws}.json`)
+const refOf = (ws: string, n: number, side: 'before' | 'after') => `refs/laki/turns/${ws}/${n}/${side}`
+const keepN = () => (n => (Number.isFinite(n) && n >= 0 ? Math.min(500, Math.floor(n)) : 50))(Number(state.settings?.turnsKept ?? 50))
+const firstLine = (s?: string) => (s ?? '').trim().split('\n')[0].slice(0, 160) || undefined
+const readKept = (ws: Workspace): Kept => readJson<Kept>(keptFile(ws.id)) ?? { repo: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, next: 1, turns: [] }
+// the turn's cost so far, as the Reader has it (claude's usage at API prices: share.ts chatOf)
+const costOf = (tab: Tab) => {
+  try {
+    return tab.preset === 'claude' ? chatRead({ tab: tab.id }).said?.findLast(x => x.who === 'you')?.cost : undefined
+  } catch {}
+}
+const waits = new Map<string, Promise<unknown>>() // by workspace: one change of its list at a time
+const inLine = <T>(ws: string, f: () => Promise<T>): Promise<T> => {
+  const p = (waits.get(ws) ?? Promise.resolve()).then(f, f)
+  waits.set(ws, p.catch(() => {}))
+  return p
+}
+async function pin(ws: Workspace, ref: string, tree: string, head: string, msg: string) {
+  const c = (await g(ws, ['commit-tree', '--no-gpg-sign', tree, ...(head ? ['-p', head] : []), '-m', msg], { ...process.env, ...ME })).trim()
+  await g(ws, ['update-ref', ref, c])
+}
+const unpin = (ws: Workspace, n: number) => Promise.all((['before', 'after'] as const).map(s => g(ws, ['update-ref', '-d', refOf(ws.id, n, s)]).catch(() => {})))
+async function turnKeep(ws: Workspace, o: Omit<TurnKept, 'n' | 'ended' | 'add' | 'del' | 'count'>) {
+  const max = keepN()
+  if (!max) return
+  return inLine(ws.id, async () => {
+    const k = readKept(ws)
+    const n = k.next++
+    const head = await g(ws, ['rev-parse', '-q', '--verify', 'HEAD']).then(s => s.trim(), () => '')
+    await pin(ws, refOf(ws.id, n, 'before'), o.before, head, `Laki: ${ws.id} before turn ${n}`)
+    await pin(ws, refOf(ws.id, n, 'after'), o.after, head, `Laki: ${ws.id}, turn ${n}${o.prompt ? `: ${o.prompt}` : ''}`)
+    const t: TurnKept = { ...o, n, ended: Date.now(), add: o.files.reduce((s, f) => s + f.add, 0), del: o.files.reduce((s, f) => s + f.del, 0), count: o.files.length, files: o.files.slice(0, TURN_FILES) }
+    k.turns.push(JSON.parse(JSON.stringify(t)))
+    const old = Date.now() - KEEP_DAYS * 86400_000
+    const gone = k.turns.filter((x, i) => x.ended < old || i < k.turns.length - max)
+    k.turns = k.turns.filter(x => !gone.includes(x))
+    for (const x of gone) await unpin(ws, x.n)
+    mkdirSync(turnDir, { recursive: true, mode: 0o700 })
+    writeAtomic(keptFile(ws.id), JSON.stringify(k), 0o600)
+    return t
+  })
+}
+const wsOf = (o: { ws?: string; tab?: string }) => findWs(o.ws ?? state.tabs.find(t => t.id === o.tab)?.workspace ?? '')
+const keptTurn = (ws: Workspace, n: unknown) => {
+  const t = readKept(ws).turns.find(x => x.n === Number(n))
+  if (!t) throw new Error(`turn ${n} isn't kept any more`)
+  return t
+}
+// a workspace's kept turns, oldest first; tab: only that tab's
+export function turnList(o: { ws?: string; tab?: string }): TurnKept[] {
+  const ws = wsOf(o)
+  return readKept(ws).turns.filter(t => !o.tab || t.tab === o.tab)
+}
+
+// This turn in Changes: the newest turn of the workspace's tabs that changed something, as diff() gives a diff; n: a
+// kept one's; none in memory (a restart since): the newest kept
+export async function turnDiff(o: { ws?: string; tab?: string; n?: number }) {
   const tabs = state.tabs.filter(t => (o.tab ? t.id === o.tab : t.workspace === o.ws))
-  const tab = tabs.filter(t => cuts.get(t.id)?.turn).sort((a, b) => (rtOf(b.id).changes?.at ?? 0) - (rtOf(a.id).changes?.at ?? 0))[0]
-  const t = tab && cuts.get(tab.id)!.turn!
-  if (!tab || !t) throw new Error('no turn changed anything here yet')
-  const ws = findWs(tab.workspace)
+  const tab = o.n === undefined ? tabs.filter(t => cuts.get(t.id)?.turn).sort((a, b) => (rtOf(b.id).changes?.at ?? 0) - (rtOf(a.id).changes?.at ?? 0))[0] : undefined
+  const kept = tab ? undefined : o.n !== undefined ? keptTurn(wsOf(o), o.n) : (o.ws || o.tab ? turnList(o).at(-1) : undefined)
+  const t = tab ? cuts.get(tab.id)!.turn! : kept
+  if (!t) throw new Error('no turn changed anything here yet')
+  const ws = tab ? findWs(tab.workspace) : wsOf(o)
   const text = await g(ws, ['diff', '--no-color', '--no-ext-diff', '--no-renames', '--src-prefix=a/', '--dst-prefix=b/', t.before, t.after])
   const MAX = 4 << 20
-  return { base: `${tab.name}'s last turn`, from: t.before, files: t.files, diff: text.replace(/\n$/, '').slice(0, MAX), tab: tab.id }
+  return { base: tab ? `${tab.name}'s last turn` : kept!.rewind ? kept!.prompt! : `${kept!.name}'s turn ${kept!.n}`, from: t.before, files: t.files, diff: text.replace(/\n$/, '').slice(0, MAX), tab: tab?.id ?? kept!.tab, ...(kept && { n: kept.n }) }
+}
+
+// the worktree's files as they were before turn n. What's there now is kept first, as a turn of its own (its n comes
+// back): a rewind of that one puts everything back, your own edits since too
+export async function turnRewind(o: { ws?: string; tab?: string; n?: number }) {
+  const ws = wsOf(o)
+  const busy = tabsOf(ws.id).find(t => rtOf(t.id).status === 'running')
+  if (busy) throw new Error(`${busy.name} is working: wait for its turn to end, or stop it`)
+  const t = keptTurn(ws, o.n)
+  const now = await treeOf(ws)
+  const files = await filesOf(ws, now, t.before) // what the rewind does: A a file that comes back, D one that goes
+  if (!files.length) return { files: 0 }
+  if (tabsOf(ws.id).some(x => rtOf(x.id).status === 'running')) throw new Error('a turn started meanwhile: nothing rewound')
+  const kept = await turnKeep(ws, { tab: t.tab, name: 'You', prompt: `Rewound to before turn ${t.n}`, rewind: t.n, before: now, after: t.before, files })
+  const back = files.filter(f => f.status !== 'D').map(f => f.path)
+  if (back.length) await g(ws, ['restore', `--source=${t.before}`, '--worktree', '--', ...back])
+  for (const f of files)
+    if (f.status === 'D')
+      try {
+        rmSync(inside(ws, f.path), { force: true }) // inside: links followed, never a file outside the worktree
+      } catch {}
+  // the cards are of turns the files no longer show; codex's next turn starts from here
+  const last = await treeOf(ws).catch(() => undefined)
+  for (const x of tabsOf(ws.id)) {
+    const c = cuts.get(x.id)
+    if (c) (c.turn = undefined), (c.last = last)
+    rtOf(x.id).changes = undefined
+  }
+  wsLog(ws, `rewound to before turn ${t.n}: ${files.length} file${files.length === 1 ? '' : 's'}`)
+  changed()
+  return { files: files.length, n: kept?.n }
+}
+
+// a new workspace on turn n's files: its commit (the tree then, on the HEAD of then) is the branch's start, the
+// source's base the one it compares with
+export async function turnFork(o: { ws?: string; tab?: string; n?: number }) {
+  const src = wsOf(o)
+  const t = keptTurn(src, o.n)
+  const at = (await g(src, ['rev-parse', '-q', '--verify', `${refOf(src.id, t.n, 'after')}^{commit}`])).trim()
+  const tab = state.tabs.find(x => x.id === t.tab)
+  const made = await wsNew({ project: src.project, base: at, name: `${src.id}-turn-${t.n}`, preset: tab?.profile ?? tab?.preset ?? undefined })
+  if (src.base) (made.base = src.base), save()
+  changed()
+  return made
 }
 
 // Undo: the turn's files as they were before it (those it added removed), while each is still as it left them
@@ -307,9 +425,25 @@ export async function turnUndo(o: { tab?: string }) {
 // hourly (main.ts): the indexes of workspaces gone or archived, the turns of tabs closed
 export function turnsTidy() {
   const live = new Set(state.workspaces.filter(w => !w.archived).map(w => `${w.id}.index`))
-  for (const f of existsSync(turnDir) ? readdirSync(turnDir) : []) if (!live.has(f)) rmSync(join(turnDir, f), { force: true })
+  const here = new Set(state.workspaces.map(w => `${w.id}.json`)) // F1: kept turns stay while the workspace does, archived too
+  for (const f of existsSync(turnDir) ? readdirSync(turnDir) : []) {
+    if (f.endsWith('.json')) {
+      if (!here.has(f)) turnsGone(f.slice(0, -5))
+    } else if (!live.has(f)) rmSync(join(turnDir, f), { force: true })
+  }
   for (const id of cuts.keys()) if (!state.tabs.some(t => t.id === id)) cuts.delete(id)
   for (const id of sides.keys()) if (!state.tabs.some(t => t.id === id)) sides.delete(id) // closed tabs' side chats
+}
+
+// a workspace that's gone: its kept turns' refs out of its repo, then its list
+function turnsGone(ws: string) {
+  const file = keptFile(ws)
+  const repo = readJson<Kept>(file)?.repo
+  rmSync(file, { force: true })
+  if (!repo || !existsSync(repo) || !/^[\w.-]+$/.test(ws)) return
+  execFile('git', ['-C', repo, 'for-each-ref', '--format=%(refname)', `refs/laki/turns/${ws}/`], (e, out) => {
+    for (const ref of e ? [] : String(out).split('\n').filter(Boolean)) execFile('git', ['-C', repo, 'update-ref', '-d', ref], () => {})
+  })
 }
 
 // Side chat (a tab's menu, the Reader's head: SideChat.tsx): a quick question about what an agent is doing, answered

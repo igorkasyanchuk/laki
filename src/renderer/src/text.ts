@@ -859,6 +859,11 @@ export function readerTimes(said: ReaderLine[], running: boolean, now = Date.now
   })
   return out
 }
+// F1: a kept turn in a line (TurnStrip's tip and menu head): `#3 · change a, add b · 2 files +2 −0 · 14:02 · 1m 4s · $0.21`
+export const turnWords = (t: { n: number; prompt?: string; count: number; add: number; del: number; started?: number; ended: number; cost?: number }, now = Date.now()) =>
+  [`#${t.n}`, t.prompt, `${t.count} file${t.count === 1 ? '' : 's'} +${t.add} −${t.del}`, saidTime(t.ended, now), t.started ? tookText(t.ended - t.started) : '', t.cost ? (t.cost < 0.01 ? `$${t.cost.toFixed(4)}` : `$${t.cost.toFixed(2)}`) : '']
+    .filter(Boolean)
+    .join(' · ')
 // F6: a fenced block the Reader offers Run on: a shell's, with something in it and no hidden character (bidi marks,
 // zero-width ones, controls: what runs wouldn't be what's read; then Copy only)
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell'])
