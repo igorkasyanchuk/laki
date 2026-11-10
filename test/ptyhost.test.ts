@@ -184,4 +184,17 @@ test("a daemon killed mid-command starts again: the terminal still runs, its out
   // a plain stop ends the terminals and the host
   await rig.stop()
   await until(() => !running(Number(pid)) && !existsSync(join(rig.data, 'pty.sock')), 'the shell and the host gone')
+  // the setting turned off, then a crash: the host left behind is ended as the next daemon starts, nothing runs unseen
+  await rig.start()
+  const again = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === shell.id && !x.asleep), 'the shell started again')
+  const out2 = join(rig.home, 'said2')
+  await rig.rpc('input', { tab: again.id, data: `echo $$ > ${out2}\r` })
+  const pid2 = Number(await until(() => existsSync(out2) && readFileSync(out2, 'utf8').trim(), 'its pid'))
+  await rig.rpc('settingsSet', { ptyHost: false })
+  const d2 = rig.info().pid
+  process.kill(d2, 'SIGKILL')
+  await until(() => !running(d2), 'the daemon gone')
+  assert.ok(running(pid2))
+  await rig.start()
+  await until(() => !running(pid2) && !existsSync(join(rig.data, 'pty.sock')), 'the host and its shell ended')
 })

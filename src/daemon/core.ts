@@ -27,7 +27,7 @@ import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
-import { HostPty, ptyForget, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
+import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
 import { ptySock } from '../ptyhost/proto.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
@@ -1716,7 +1716,7 @@ const ptyFile = join(dir, 'pty.json')
 let ptyKept: PtyKept = {}
 const ptySave = () => writeAtomic(ptyFile, JSON.stringify(ptyKept), 0o600)
 export async function ptyAdopt() {
-  if (!state.settings?.ptyHost) return
+  if (!state.settings?.ptyHost) return void (await ptyGone().catch(() => {})) // turned off since: nothing runs unseen
   try {
     await ptyUp()
     const was = readJson<PtyKept>(ptyFile) ?? {}

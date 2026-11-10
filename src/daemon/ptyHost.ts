@@ -149,5 +149,11 @@ async function up(): Promise<void> {
   await sleep(300)
   return up()
 }
+// the setting off: a host left from when it was on is ended, its terminals with it (their tabs start again as any)
+export async function ptyGone() {
+  if (sock) return ptyQuit()
+  const s = existsSync(ptySock()) ? await dial().catch(() => undefined) : undefined
+  s?.end(frame({ op: 'quit' }))
+}
 let upping: Promise<void> | undefined
 export const ptyUp = () => (upping ??= up().finally(() => (upping = undefined)))

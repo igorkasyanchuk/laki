@@ -385,7 +385,8 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
 - **A daemon that starts** (`core.ptyAdopt`, before `restoreAll`): lists the host's terminals; each live one whose tab
   is still here gets its `Session` back (`spawnTab`'s `adopt`: nothing started), the mirror drawn from the host's buffer
   (`Session.replay`: muted, so old queries get no answer and old hooks and OSC 7501 reports aren't heard twice). The
-  rest are ended. `restoreAll` leaves adopted tabs alone; the others start again as before (resume).
+  rest are ended. `restoreAll` leaves adopted tabs alone; the others start again as before (resume). With the setting off,
+  a host left from when it was on is quit (`ptyGone`): nothing runs unseen.
 - **Keys.** `LAKI_HOOK` and `LAKI_TAB_TOKEN` are per start and live in the program's environment, which survives:
   `<data>/pty.json` (0600) keeps them by tab with the host's id, so hooks and `laki` calls stay the tab's own.
 - **Stops.** A crash, a kill, and `shutdown { keep: true }` (`laki stop --keep`, the app's restart of an older daemon
