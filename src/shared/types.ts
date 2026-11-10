@@ -591,6 +591,7 @@ export type Settings = {
   reader?: boolean // Reader view: an agent tab as its chat (chatRead), a Terminal | Reader switch on each (on unless false)
   readerTools?: 'ok' | 'final' // the Reader's tool calls: all (unset), ok: a run whose calls all worked hidden (a failed one's shows), final: only your messages and its last answer of each turn; the run at work shows either way, the hidden ones under "n steps hidden · Show"
   readerScroll?: boolean // the Reader scrolls to the latest as you send (on unless false)
+  readerTimes?: boolean // F6: the Reader's small lines of when a message was sent and a turn's end, length and cost (on unless false)
   sendKey?: 'mod' // a chat's box sends with ⌘⏎, ⏎ a new line (unset: ⏎ sends, ⇧⏎ a new line): keys.ts sendIs
   nextStep?: boolean // One next step: first in a workspace's ⋯ menus, ⌘G (on unless false); a row's chip with rowMarks.step
   livePlan?: boolean // the agent's plan, live: its to-do list on its tab and row, a plan it asks you to approve as a card (on unless false)

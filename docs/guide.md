@@ -1623,10 +1623,16 @@ tab shows *Draft*); agents can't read it. A
 ```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,
 marked *Proposal*: what it suggests, not applied.
 
+A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh`, `shell`) *▷ Run*: the command is typed
+into the workspace's terminal (its first shell tab, a new one when there's none) and that tab shows; nothing runs until
+you press ⏎ there. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
+
 Settings › Appearance › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds
 into *n steps hidden · Show*; one with a failed call stays, *1 failed* in red) or *Final answer only* (your messages and
 each turn's last answer). The steps at work now always show. *Scroll to latest when sending* (on): off, sending leaves
-you where you were reading. Settings › Keys › *Send with*: ⏎ (⇧⏎ a new line) or ⌘⏎ (⏎ a new line), in the Reader and
+you where you were reading. *Times in the Reader* (on): under your messages, when you sent each (today's as 14:02, an
+older one's with its day); under a finished answer, when it ended, how long the turn took and about what it cost
+(`14:04 · 2m 10s · $0.21`; the cost for Claude, at API prices). Settings › Keys › *Send with*: ⏎ (⇧⏎ a new line) or ⌘⏎ (⏎ a new line), in the Reader and
 every chat box (Laki AI's, an extension's, a spec's, Side chat).
 
 `/clear` (or Codex's `/new`) starts a new chat in the same tab: the Reader keeps the earlier one above a *New session*

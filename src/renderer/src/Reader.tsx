@@ -8,13 +8,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { ask, Icon, type MenuItem, ON, useMenu } from './ui'
-import { linkify, Markdown, UiBlocks } from './MarkdownView'
+import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
 import { daemonBase, openExternal } from './api'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
-import { type Mention, type ReaderLine, readerShown, retrying, retryText, withMentions } from './text'
+import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
 import { optLabel } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
@@ -26,12 +26,12 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string) => unknown } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
 // Settings › Appearance's: which tool calls show (text.ts readerShown), and whether sending scrolls to the latest (on unless false)
-export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean }
+export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean; times?: boolean } // times: F6, on unless false
 
 // a running claude's permission modes (the chip, a tab's menu): the one on ticked, Bypass red, and greyed with why when it can't be had
 export const modeItems = (tab: TabView, set: (mode: string) => unknown): MenuItem[] =>
@@ -181,6 +181,9 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   // the chat's lines: what Tool calls in the Reader hides goes in runs, each one line (n steps hidden · Show)
   const running = tab.status === 'running'
   const shown = useMemo(() => readerShown(said ?? [], look.tools, running), [said, look.tools, running])
+  // F6: when each message was sent, and each finished turn's end, length and cost
+  const times = useMemo(() => (look.times === false ? [] : readerTimes(said ?? [], running)), [said, running, look.times])
+  const runCode = useMemo(() => (api.run ? (text: string) => api.run!(tab, text) : undefined), [tab.id])
   const line = (x: Said, i: number) => [
     x.who === 'you' ? (
       <You key={i} text={x.text} stopped={x.stopped} onEdit={x.stopped && !running && i === said!.length - 1 ? () => (setText(x.text), box.current?.focus()) : undefined} />
@@ -202,6 +205,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
       </div>
     ),
     ...(x.stopped && x.who !== 'you' ? [<div key={`s${i}`} className="rd-stopped muted small">Stopped</div>] : []),
+    ...(times[i] ? [<div key={`t${i}`} className={x.who === 'you' ? 'rd-time you muted' : 'rd-time muted'}>{times[i]}</div>] : []),
     ...apps.filter(a => a.at === i).map(a => <McpApp key={a.id} app={a} tab={tab} api={api} />),
   ]
   const rows: React.ReactNode[] = []
@@ -225,6 +229,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   flush()
   return (
     <UiBlocks.Provider value={uiDraw}>
+    <RunCode.Provider value={runCode}>
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <div className="reader-col">
@@ -319,6 +324,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         </form>
       )}
     </div>
+    </RunCode.Provider>
     </UiBlocks.Provider>
   )
 }

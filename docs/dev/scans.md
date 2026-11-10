@@ -54,7 +54,10 @@
   a workspace's `check`; panels.tsx `CheckStrip` at the pane's foot; App's `offerCheck` (once per project,
   `laki.checkOffered`); SettingsProject.tsx' *Done check* group. `checkTidy`: hourly, gone workspaces' last trees and
   `<data>/check` (each check's own index before 0.42).
-- Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
+- Reader view (F6: a line's `at`/`end` are its transcript lines' times, a `you`'s `cost` its turn's claude usage at API
+  prices, counted once per message id (`chatOf`'s `spent`); text.ts `readerTimes` makes the small lines
+  (`settings.readerTimes`, on unless false), `canRun` says which fenced block gets *▷ Run* (MarkdownView's `RunCode`,
+  App's `readerApi.run`: `send` with `enter: false` into a shell tab)). Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
   `chatOf` as shares read, `v` moving with it, the newest 400; `{ none }` without a transcript): Reader.tsx over the
   pane's `Term` (still attached; its `active` off meanwhile), `readable` (claude, codex), asked every 1.5 s while shown;
   App's `readMode` (`laki.reader`: `reader` or `term` per tab, unset: `narrow`'s Reader), `.reader-switch`, the tab

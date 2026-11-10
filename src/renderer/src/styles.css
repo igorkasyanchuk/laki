@@ -2750,6 +2750,13 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-new { display: flex; align-items: center; gap: 10px; margin: 6px 0; } .rd-new::before, .rd-new::after { content: ''; flex: 1; border-top: 1px dashed var(--line); }
 .rd-you-stopped { display: flex; gap: 8px; margin-top: 4px; color: var(--muted); white-space: normal; } .rd-you-stopped .link { padding: 0; font-size: inherit; }
 .rd-stopped { margin-top: -4px; }
+/* F6: when a message was sent, a turn's end, length and cost: small, muted, selectable */
+.rd-time { margin-top: -6px; font-size: var(--fs-1); font-variant-numeric: tabular-nums; user-select: text; }
+.rd-time.you { align-self: flex-end; }
+.md-code { position: relative; }
+.md-code-acts { position: absolute; top: 4px; right: 6px; display: flex; gap: 10px; opacity: 0; transition: opacity .12s; }
+.md-code:hover .md-code-acts, .md-code-acts:focus-within { opacity: 1; }
+.md-code-acts .link { background: var(--panel); padding: 1px 6px; border-radius: var(--radius); }
 .rd-failed { align-self: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; color: var(--error); }
 .rd-failed-why { min-width: 0; overflow-wrap: anywhere; }
 .rd-retry { align-self: flex-start; padding: 4px 9px; border-radius: 999px; color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }

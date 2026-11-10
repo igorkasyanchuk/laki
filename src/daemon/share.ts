@@ -7,7 +7,7 @@ import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
 import { costOf, type Retry } from '../shared/types.ts'
 
-export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true } // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
+export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true; at?: number; end?: number; cost?: number } // F6: at, end: its first and last line's time (the transcript's); cost: on a `you`, what the turn it started cost so far (claude's usage at API prices; none: a model with no price, codex) // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
 
 // claude's: <its config>/projects/<the folder's>/<session>.jsonl; codex's: <its home>/sessions/y/m/d/rollout-…-<thread>.jsonl
 export function transcriptOf(agent: string, dir: string, id: string): string | undefined {
@@ -49,13 +49,25 @@ function toolLine(name: string, input: unknown) {
 // result that failed counts on it (fail)
 export type McpCall = { id: string; server: string; tool: string; input: unknown; at: number; result?: unknown; error?: boolean }
 export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: Map<string, McpCall>, ids?: Map<string, number>): Said[] {
+  let at: number | undefined // the line's time
   const add = (who: Said['who'], t: unknown) => {
     const text = String(t ?? '').trim()
     if (who === 'you' && STOPPED.test(text)) return void (out.length && (out[out.length - 1].stopped = true))
     if (!text || (who === 'you' && NOISE.test(text))) return
     const last = out.at(-1)
-    if (last && last.who === who && who !== 'you') last.text += (who === 'tool' ? '\n' : '\n\n') + text
-    else out.push({ who, text })
+    if (last && last.who === who && who !== 'you') (last.text += (who === 'tool' ? '\n' : '\n\n') + text), at && (last.end = at)
+    else out.push({ who, text, ...(at && { at }) })
+  }
+  // F6: a claude answer's usage, at API prices, onto the message that started its turn. An answer is a line per block,
+  // each with its usage so far: the last one counts, by its id (ids' "$" keys: what was counted for it)
+  const spent = (j: any) => {
+    const u = j.message?.usage
+    const you = ids && u && j.message.model !== '<synthetic>' ? out.findLast(x => x.who === 'you') : undefined
+    const cost = you && costOf(j.message.model, { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 })
+    if (!you || cost === undefined) return
+    const key = '$' + (j.message.id ?? '')
+    you.cost = (you.cost ?? 0) + cost - (j.message.id ? (ids!.get(key) ?? 0) : 0)
+    if (j.message.id) ids!.set(key, cost)
   }
   for (const line of jsonl.split('\n')) {
     let j: any
@@ -64,8 +76,10 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: M
     } catch {
       continue
     }
+    at = (t => (Number.isFinite(t) ? t : undefined))(Date.parse(j.timestamp))
     if (agent === 'claude') {
       if (j.isSidechain || j.isMeta) continue // a subagent's, or what Laki or a command added
+      if (j.type === 'assistant') spent(j)
       const c = j.message?.content
       const parts: any[] = typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []
       for (const x of parts) {

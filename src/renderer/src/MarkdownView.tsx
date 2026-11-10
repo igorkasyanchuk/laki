@@ -4,7 +4,7 @@
 import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
-import { proposalOf } from './text'
+import { canRun, proposalOf } from './text'
 import { useNear } from './ui'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
@@ -28,18 +28,41 @@ const UiFence = ({ text }: { text: string }) => {
   return draw ? draw(text) : <Code text={text} lang="json" />
 }
 
-const Code = ({ text, lang }: { text: string; lang?: string }) => (
-  <pre>
-    <code>
-      {highlight(`x.${lang || 'txt'}`, text).map((l, i) => (
-        <Fragment key={i}>
-          {i > 0 && '\n'}
-          {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
-        </Fragment>
-      ))}
-    </code>
-  </pre>
-)
+// F6: a chat's shell block run in a terminal of the workspace: whoever provides it (the Reader) types it there, no Enter
+export const RunCode = createContext<((text: string) => void) | undefined>(undefined)
+function Code({ text, lang }: { text: string; lang?: string }) {
+  const chat = useContext(InChat)
+  const run = useContext(RunCode)
+  const [copied, setCopied] = useState(false)
+  const pre = (
+    <pre>
+      <code>
+        {highlight(`x.${lang || 'txt'}`, text).map((l, i) => (
+          <Fragment key={i}>
+            {i > 0 && '\n'}
+            {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
+          </Fragment>
+        ))}
+      </code>
+    </pre>
+  )
+  if (!chat) return pre
+  return (
+    <div className="md-code">
+      {pre}
+      <div className="md-code-acts">
+        <button type="button" className="link small" onClick={() => void navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)), () => {})}>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        {run && canRun(lang, text) && (
+          <button type="button" className="link small" data-tip="Types it into this workspace's terminal: press ⏎ there to run it" onClick={() => run(text)}>
+            ▷ Run
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 // a ```diff block in a chat: red and green lines, each file's name, the numbers its @@ heads give (text.ts' proposalOf);
 // nothing is applied: it's what the agent proposes. Elsewhere, or not a diff, plain code
 function DiffBlock({ text, lang }: { text: string; lang: string }) {

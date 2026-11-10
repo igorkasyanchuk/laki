@@ -215,6 +215,7 @@ export type AppSettings = Paint & {
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
   mcpApps?: boolean // MCP Apps under their calls in the Reader (unset: on)
   readerTools?: 'ok' | 'final' // the Reader's tool calls: all (unset), hide successful, final answer only
+  readerTimes?: boolean // F6: times under the Reader's messages (on unless false)
   readerScroll?: boolean // the Reader scrolls to the latest as you send (unset: on)
   sendKey?: 'mod' // a chat's box sends with ⌘⏎ (unset: ⏎)
   nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
@@ -1832,6 +1833,11 @@ export function SettingsPage(p: {
                     </select>
                     <Says title="Tool calls in the Reader" hint="Hide successful: a run of steps that all worked folds to one line (a failed one still shows). Final answer only: your messages and its last answer of each turn. The steps at work now always show; a click on n steps hidden shows them" />
                   </label>
+                )}
+                {s.reader !== false && (
+                  <Switch className="switch-row" on={s.readerTimes !== false} onChange={v => set({ readerTimes: v })}>
+                    <Says title="Times in the Reader" hint="Under your messages, when you sent each; under a finished answer, when it ended, how long the turn took and about what it cost (Claude, at API prices)" />
+                  </Switch>
                 )}
                 {s.reader !== false && (
                   <Switch className="switch-row" on={s.readerScroll !== false} onChange={v => set({ readerScroll: v })}>

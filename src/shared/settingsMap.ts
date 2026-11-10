@@ -73,6 +73,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Gemini CLI plan limits', 'usage ring quota per model gemini google'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
+  ['appearance', 'Times in the Reader', 'time timestamp when sent duration how long took cost turn message reader chat'],
   ['appearance', 'Tool calls in the Reader', 'hide tool calls steps bash read search successful failed final answer only chat reader quiet'],
   ['appearance', 'Scroll to latest when sending', 'reader scroll bottom jump yank keep position reading send'],
   ['keys', 'Send with', 'enter cmd command return send message newline chat composer reader ai'],

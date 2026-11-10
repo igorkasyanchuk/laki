@@ -1,5 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
+import { tookText } from '../../shared/island.ts'
 import { HIDDEN, type View, type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 
@@ -833,7 +834,35 @@ export function retryText(r: NonNullable<TabView['retry']>, now = Date.now()) {
 // run of tool calls shows only when one of them failed; final: your messages and each turn's last answer (an answer
 // right before your next message, a new session, or the end). The last line while it runs, and a run you stopped, show
 // either way
-export type ReaderLine = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true }
+export type ReaderLine = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true; at?: number; end?: number; cost?: number }
+// F6: a message's time: today's as 14:02, an older one's with its day (9 Nov 14:02; another year's with the year)
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export function saidTime(at: number, now = Date.now()) {
+  const [d, n] = [new Date(at), new Date(now)]
+  const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (d.toDateString() === n.toDateString()) return time
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() === n.getFullYear() ? '' : ` ${d.getFullYear()}`} ${time}`
+}
+// F6: the small line under a Reader's message, by its index: under yours, when you sent it; under a finished turn's
+// last line, when it ended, how long the turn took (from your message) and what it cost when known. Not under the
+// turn at work, nor lines with no time (a transcript without timestamps)
+export function readerTimes(said: ReaderLine[], running: boolean, now = Date.now()) {
+  const out: (string | undefined)[] = said.map(x => (x.who === 'you' && x.at ? saidTime(x.at, now) : undefined))
+  let you: ReaderLine | undefined
+  said.forEach((x, i) => {
+    if (x.who === 'you' || x.who === 'new') return void (you = x.who === 'you' ? x : undefined)
+    const next = said[i + 1]
+    const end = x.end ?? x.at
+    if ((next ? next.who !== 'you' && next.who !== 'new' : running) || !end) return
+    const took = you?.at && end > you.at ? tookText(end - you.at) : ''
+    out[i] = [saidTime(end, now), took, you?.cost ? (you.cost < 0.01 ? `$${you.cost.toFixed(4)}` : `$${you.cost.toFixed(2)}`) : ''].filter(Boolean).join(' · ')
+  })
+  return out
+}
+// F6: a fenced block the Reader offers Run on: a shell's, with something in it and no hidden character (bidi marks,
+// zero-width ones, controls: what runs wouldn't be what's read; then Copy only)
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell'])
+export const canRun = (lang: string | undefined, text: string) => SHELLS.has((lang ?? '').toLowerCase()) && !!text.trim() && !HIDDEN.test(text)
 export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {
   return said.map((x, i) => {
     if (!tools || x.who === 'you' || x.who === 'new' || x.who === 'screen' || (running && i === said.length - 1)) return true

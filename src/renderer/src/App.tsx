@@ -2695,6 +2695,15 @@ export function App() {
     bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),
     appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
+    // F6: a shell block's command into the workspace's terminal (its first shell tab, else a new one), typed and not
+    // run: the tab shows, ⏎ there runs it. ponytail: a shell that just started has no bracketed paste yet, so a block
+    // of several lines lands as one
+    run: async (t, text) => {
+      const sh = viewRef.current?.tabs.find(x => x.workspace === t.workspace && x.kind === 'shell') ?? (await call<TabView>('tabNew', { ws: t.workspace, preset: 'shell' }).catch(() => null))
+      if (!sh) return
+      await call('send', { target: sh.id, text: text.replace(/\n+$/, ''), enter: false }).catch(() => {})
+      selectTab(sh)
+    },
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
     answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
@@ -3521,7 +3530,7 @@ export function App() {
                   />
                   {readerOn && readable(byId(id)) && (
                     <>
-                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll }} />}
+                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
                       <div className="reader-switch" role="group" aria-label="Show it as">
                         <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
                         <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>

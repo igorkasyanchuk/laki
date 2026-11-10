@@ -538,3 +538,47 @@ test('B3: Follow the system picks the theme by the system: your two, else the pi
   assert.equal(themeFor({ themeAuto: true, themeDark: 'paper' }, true), 'default') // a light one saved as the dark: not taken
   assert.equal(themeFor({ themeAuto: true, themeLight: 'gone' }, false), 'paper')
 })
+
+test('F6: the Reader’s times (a message’s, a finished turn’s end, length and cost), Run only on a shell block with no hidden character, a transcript’s times and a turn’s cost', async () => {
+  const { saidTime, readerTimes, canRun } = await import('../src/renderer/src/text.ts')
+  const { chatOf } = await import('../src/daemon/share.ts')
+  const at = (h: number, m: number, s = 0, d = 10) => new Date(2026, 10, d, h, m, s).getTime()
+  const now = at(15, 0)
+  assert.equal(saidTime(at(14, 2), now), '14:02')
+  assert.equal(saidTime(at(9, 5, 0, 9), now), '9 Nov 9:05')
+  assert.equal(saidTime(new Date(2025, 0, 3, 23, 59).getTime(), now), '3 Jan 2025 23:59')
+  const said = [
+    { who: 'you' as const, text: 'fix it', at: at(14, 2), cost: 0.2149 },
+    { who: 'tool' as const, text: 'Bash ls', at: at(14, 2, 5), end: at(14, 3) },
+    { who: 'agent' as const, text: 'done', at: at(14, 4), end: at(14, 4, 10) },
+    { who: 'you' as const, text: 'and this', at: at(14, 30), cost: 0.004 },
+    { who: 'agent' as const, text: 'ok', at: at(14, 30, 42) },
+    { who: 'new' as const, text: '' },
+    { who: 'agent' as const, text: 'no times' },
+    { who: 'you' as const, text: 'last', at: at(14, 50) },
+    { who: 'agent' as const, text: 'working', at: at(14, 51) },
+  ]
+  // the turn at work has no end line; one that's over does, though nothing follows it
+  assert.deepEqual(readerTimes(said, true, now), ['14:02', undefined, '14:04 · 2m 10s · $0.21', '14:30', '14:30 · 42s · $0.0040', undefined, undefined, '14:50', undefined])
+  assert.equal(readerTimes(said, false, now)[8], '14:51 · 1m 0s')
+  assert.deepEqual(readerTimes([{ who: 'you', text: 'x' }, { who: 'agent', text: 'y' }], false, now), [undefined, undefined])
+  // Run: a shell's block, as read
+  assert.equal(canRun('bash', 'npm test'), true)
+  assert.equal(canRun('SH', 'a\nb'), true)
+  for (const [lang, text] of [['ts', 'npm test'], [undefined, 'npm test'], ['sh', '  \n'], ['sh', 'echo a‮b'], ['zsh', 'rm ​-rf x'], ['shell', 'a\r\nb'], ['bash', 'x\x1b[201~y']] as const) assert.equal(canRun(lang, text), false, JSON.stringify([lang, text]))
+  // the transcript's times on the lines; an answer's usage counted once per message id, onto the message that began the turn
+  const line = (o: object) => JSON.stringify(o)
+  const usage = (out: number) => ({ input_tokens: 1000, output_tokens: out, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 })
+  const ids = new Map<string, number>()
+  const out = chatOf('claude', [
+    line({ type: 'user', timestamp: '2026-11-10T12:00:00.000Z', message: { content: 'hello' } }),
+    line({ type: 'assistant', timestamp: '2026-11-10T12:00:05.000Z', message: { id: 'm1', model: 'claude-sonnet-4-5', usage: usage(10), content: [{ type: 'text', text: 'one' }] } }),
+    line({ type: 'assistant', timestamp: '2026-11-10T12:00:09.000Z', message: { id: 'm1', model: 'claude-sonnet-4-5', usage: usage(1000), content: [{ type: 'text', text: 'two' }] } }),
+    line({ type: 'assistant', timestamp: '2026-11-10T12:00:10.000Z', message: { id: 'm2', model: 'no-such-model', usage: usage(1000), content: [{ type: 'text', text: 'three' }] } }),
+  ].join('\n'), [], undefined, ids)
+  assert.deepEqual(out.map(x => [x.who, x.at && new Date(x.at).toISOString().slice(11, 19), x.end && new Date(x.end).toISOString().slice(11, 19)]), [['you', '12:00:00', undefined], ['agent', '12:00:05', '12:00:10']])
+  const { costOf } = await import('../src/shared/types.ts')
+  assert.ok(out[0].cost! > 0)
+  assert.equal(out[0].cost, costOf('claude-sonnet-4-5', { input: 1000, output: 1000, write: 0, read: 0 }))
+  assert.equal(chatOf('codex', line({ type: 'event_msg', timestamp: '2026-11-10T12:00:00.000Z', payload: { type: 'user_message', message: 'hi' } }))[0].at, Date.parse('2026-11-10T12:00:00.000Z'))
+})
