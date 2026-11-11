@@ -2,8 +2,8 @@
 
 <h1 align="center">Laki</h1>
 
-<p align="center"><b>Laki turns a dozen coding agents into one inbox: each in its own worktree, Laki says which needs
-you, checks its work and takes it to a merged PR.</b><br>
+<p align="center"><b>Run a dozen coding agents at once without losing track: Laki shows which one needs you, checks
+what each did, and gets it merged.</b><br>
 Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linux preview) · MIT · <a href="https://laki.sh">laki.sh</a></p>
 
 ### One inbox for every agent
