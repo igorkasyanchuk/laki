@@ -20,6 +20,8 @@ export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER
 cd "$H/repo" && git init -q -b main && echo hi > README.md && echo '{"setup":"echo setup-ran"}' > .laki.json && git add -A && git commit -qm init
 laki() { ELECTRON_RUN_AS_NODE=1 "$BIN" "$RES/cli.js" "$@"; }
 ELECTRON_RUN_AS_NODE=1 "$BIN" "$RES/daemon.js" > "$H/daemon.out" 2>&1 &
+APP_PID=
+trap 'kill $APP_PID 2> /dev/null; laki stop > /dev/null 2>&1' EXIT # a failed step (set -e) leaves no window or daemon behind: a running one stops the next release at its preflight
 for i in $(seq 50); do [ -f "$LAKI_HOME/daemon.json" ] && break; sleep 0.1; done
 laki project add "$H/repo"
 laki new repo --preset claude --name packed --prompt "hello from the bundle"
@@ -36,7 +38,7 @@ for i in $(seq 100); do [ -f "$H/shot.png" ] && break; sleep 0.1; done
 laki new repo --preset claude --name other --prompt "menu" > /dev/null
 for i in $(seq 100); do [ -s "$H/notify.log" ] && break; sleep 0.1; done
 echo "--- notifications:"; cat "$H/notify.log"
-sleep 0.5; kill $APP_PID || true; laki stop
+sleep 0.5
 grep -i refused "$H/daemon.out" || echo "no refused connections"
 # About's licenses: a bundled package (react) and a shipped one (ws, npm ls's)
 NOTICES=$RES/../renderer/THIRD_PARTY_NOTICES.txt
