@@ -104,13 +104,17 @@ export function webPushEncrypt(sub: WebSub, plain: Buffer, o: { ecdh?: ECDH; sal
   rs.writeUInt32BE(4096)
   return Buffer.concat([salt, rs, Buffer.from([as.length]), as, body])
 }
-// what the service worker shows: title, body, a tag (one per tab: a newer one replaces it), and at most 2 actions (what
-// browsers show): the first and the last choice, each the tap ntfy's buttons send (nonce:n:sig)
+// what the service worker shows: title, body, a tag (one per tab: a newer one replaces it, and rings again), and at
+// most 2 actions (what browsers show): the first and the last choice, each the tap ntfy's buttons send (nonce:n:sig).
+// A push service takes 4096 bytes encrypted (3993 of JSON): the body cut by bytes, as Cyrillic or CJK takes 2-3 each
+export const PAYLOAD_MAX = 3900
 export function webPushPayload(w: Webhook, p: Push) {
   p = shown(w, p)
   const { title, body } = pushText(p)
   const taps = buttons(p)
-  return { title, body: cut(body, 1500), tag: p.tab || title, actions: (taps.length > 2 ? [taps[0], taps.at(-1)!] : taps).map(o => ({ title: cut(o.label, 40), tap: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}` })) }
+  const o = { title: cut(title, 200), body: cut(body, 1500), tag: p.tab || title, actions: (taps.length > 2 ? [taps[0], taps.at(-1)!] : taps).map(o => ({ title: cut(o.label, 40), tap: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}` })) }
+  while (Buffer.byteLength(JSON.stringify(o)) > PAYLOAD_MAX && o.body.length > 1) o.body = cut(o.body, Math.floor(o.body.length * 0.8))
+  return o
 }
 export function webPushRequest(w: Webhook, sub: WebSub, p: Push, v: Vapid, now = Date.now(), o?: { ecdh?: ECDH; salt?: Buffer }): { url: string; init: RequestInit } {
   return { url: sub.endpoint, init: { method: 'POST', headers: { authorization: vapidAuth(sub.endpoint, v, now), 'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: '86400', urgency: p.event === 'waiting' ? 'high' : 'normal' }, body: webPushEncrypt(sub, Buffer.from(JSON.stringify(webPushPayload(w, p))), o) } }

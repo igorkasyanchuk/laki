@@ -914,7 +914,10 @@ turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) =
     const w = r.wait // its turn: an agent's, one at a limit, a stalled one you're asked about (it answered after all)
     if (!live(r) || !w || !(w.kind === 'agent' || w.kind === 'agent-ask' || w.kind === 'limit' || w.kind === 'stuck') || !w.tab || w.tab !== tab.id) continue
     const b = blockOf(r, r.cur)!
-    if (w.kind === 'agent' && w.queued !== undefined && tab.queue?.includes(w.queued)) continue // a turn before ours: ours is still queued
+    if (w.kind === 'agent' && w.queued !== undefined && tab.queue?.includes(w.queued)) {
+      if (r.meter?.tab === tab.id) Object.assign(r.meter, { since: Date.now(), from: chatCost(tab, true) }) // a turn before ours: ours still queued, its cost from here (W2)
+      continue
+    }
     if (o.limit) {
       Object.assign(r, { status: 'paused' as FlowStatus, wait: { kind: 'limit', tab: tab.id, until: o.limit } })
       say(r, `${blockName(b)}: ${tab.name} hit its usage limit; paused until ${new Date(o.limit).toTimeString().slice(0, 5)}`)

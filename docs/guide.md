@@ -689,7 +689,8 @@ email address only, unless you leave the email out on purpose (below).
   shows *Offline: your Mac is not reachable* when it can't reach the Mac. It keeps only the page's static files, never
   a token or anything from your agents. Installed, *Turn on* notifications, then pick *This phone (Web Push)* in
   Settings › *Phone pushes*: each push is encrypted on your Mac for that phone and goes through its browser's own push
-  service; the first and last choice are buttons that answer the agent. A quick tunnel's page says *Add to Home
+  service; the first and last choice are buttons that answer the agent where the browser shows them (Chrome on
+  Android does; Safari on an iPhone shows none: a tap opens Laki). A quick tunnel's page says *Add to Home
   Screen works with a stable address*.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:

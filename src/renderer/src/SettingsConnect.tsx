@@ -52,7 +52,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
         <p className="muted small">
           To the phones paired with remote access (Settings › Remote access, at Tailscale's or My domain's address) that added Laki to their Home Screen and turned
           its notifications on: encrypted on this Mac for each phone, through its browser's own push service, no URL and no other service. A notification's
-          buttons answer, as ntfy's do (the first and last choice).
+          buttons answer, as ntfy's do (the first and last choice; Safari on an iPhone shows none: a tap opens Laki).
         </p>
       ) : (
         <label>

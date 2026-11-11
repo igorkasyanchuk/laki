@@ -190,7 +190,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {}
   try { d = e.data ? e.data.json() : {} } catch {}
-  e.waitUntil(self.registration.showNotification(d.title || 'Laki', { body: d.body || '', tag: d.tag, icon: '/icon-192.png', data: d, actions: (d.actions || []).map(a => ({ action: a.tap, title: a.title })) }))
+  e.waitUntil(self.registration.showNotification(d.title || 'Laki', { body: d.body || '', tag: d.tag, renotify: !!d.tag, icon: '/icon-192.png', data: d, actions: (d.actions || []).map(a => ({ action: a.tap, title: a.title })) }))
 })
 self.addEventListener('notificationclick', e => {
   e.notification.close()

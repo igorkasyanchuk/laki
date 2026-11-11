@@ -817,6 +817,7 @@ export const remoteOn = () => !!remote?.url
 export function devicePush(id: string, sub: { endpoint: string; p256dh: string; auth: string } | undefined) {
   const d = state.remoteDevices?.find(x => x.id === id)
   if (!d) throw new Error('not a paired device')
+  if (sub ? d.push?.endpoint === sub.endpoint && d.push.p256dh === sub.p256dh && d.push.auth === sub.auth : !d.push) return // as it was (the page sends it at each start)
   if (sub) d.push = { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }
   else delete d.push
   save()

@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createDecipheriv, createECDH, createPublicKey, hkdfSync, verify } from 'node:crypto'
-import { pushRequest, replies, subOk, tapOf, tapSig, vapidNew, webPushRequest } from '../src/daemon/push.ts'
+import { PAYLOAD_MAX, pushRequest, replies, subOk, tapOf, tapSig, vapidNew, webPushPayload, webPushRequest } from '../src/daemon/push.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 const p = { event: 'waiting', workspace: 'fix-login', tab: 't1', agent: 'claude', question: 'Run rm -rf build?' } as const
@@ -397,4 +397,8 @@ test('push format webpush: encrypted for the subscription, a VAPID JWT for its s
   // titles only: nothing off the screen, no buttons
   const t = webPushRequest({ format: 'webpush', detail: 'titles' }, sub, { ...p, options: opts, nonce: '0123456789abcdef', key: 'k3y' }, v, now)
   assert.notDeepEqual(t.init.body, r.init.body)
+  // a long question in Chinese (3 bytes a character): cut by bytes, to what a push service takes (4096 encrypted)
+  const long = webPushPayload({ format: 'webpush' }, { ...p, question: '允许运行这个命令吗？'.repeat(200), options: opts, nonce: '0123456789abcdef', key: 'k3y' })
+  assert.ok(Buffer.byteLength(JSON.stringify(long)) <= PAYLOAD_MAX && long.body.length > 500, `${Buffer.byteLength(JSON.stringify(long))} bytes, ${long.body.length} characters`)
+  assert.equal(long.actions.length, 2)
 })
