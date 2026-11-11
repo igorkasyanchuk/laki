@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.48.0 · Nov 11, 2026
 
 - *Restart the daemon* works when another copy of Laki started the daemon, and says why when it can't. A menu's highlight moves at once as you hover, with no fade leaving the last item lit.
 - The tab bar is quieter: *Layout* moved into its ⋯ menu, and the info and ⌘K buttons are gone (the side panel and ⌘K still have them).
