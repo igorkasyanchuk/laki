@@ -861,6 +861,10 @@ run fails, saying so.
 - A failure that may pass (the network, a lock) is tried again 5 minutes later, once; an agent at its plan limit starts
   as the limit resets (before the task's next time, else it's skipped). After 3 failures in a row the task turns off,
   tells you once, and shows on top of the page with why and *Fix*, which opens its form at what broke.
+- A run stops after 60 minutes of its agent's working time (waiting for you isn't counted), as Stop would: its chat
+  stays, the log says *time limit 60 min*, and it tells you. At most 2 runs go at once; one due past that waits its turn
+  and starts as one ends (*waited its turn*), or is skipped if it still waits at its next time. The *stops after* chip
+  sets a task's limit, and below it every task's and how many at once. Run now never waits.
 - Groups: a task's right click › *Move to group* › *New group…* names one; drag a task onto a group's head to move it
   there, a click on the head folds it, its ⋯ turns all of them on or off, renames or ungroups it. ⌘-click picks tasks
   (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.

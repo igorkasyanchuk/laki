@@ -7,7 +7,7 @@ import { flowsOn, HOME_ACCOUNT, isAgent, type OnlyIf, type Project, type TaskEve
 import { nextRun, parseAt, parseWhen, partsOf, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, firstLine, ghCount, git, log, onGitHub, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabStatus, tabsOf, tail, tracked, turnEnds, turnWaits, wsArchive, wsLog, wsNew } from './core.ts'
+import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, firstLine, ghCount, git, input, log, onGitHub, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabStatus, tabsOf, tail, tracked, turnEnds, turnWaits, wsArchive, wsLog, wsNew } from './core.ts'
 import { fillEvent, plain } from '../shared/fence.ts'
 import { quotaLow } from './pr.ts'
 import { dir, inRig } from './dir.ts'
@@ -161,8 +161,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf' | 'trigger' | 'keep' | 'emptyGone'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf', 'trigger', 'keep', 'emptyGone'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf' | 'trigger' | 'keep' | 'emptyGone' | 'maxMinutes'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf', 'trigger', 'keep', 'emptyGone', 'maxMinutes'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -188,7 +188,7 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   const given = Object.fromEntries(SCHEDULE_IN.filter(k => o[k] !== undefined).map(k => [k, o[k]]))
   if (old && Object.keys(given).every(k => k === 'group' || (k === 'on' && given.on === false))) {
     // off, a group and archive take no checks: a task whose workspace or preset is gone can still be stopped or moved
-    if (given.on === false) Object.assign(old, { on: false, next: undefined }), delete old.again // off: no retry or later start either
+    if (given.on === false) Object.assign(old, { on: false, next: undefined }), delete old.again, delete old.queued // off: no retry, later start or place in line either
     if (given.group !== undefined) groupSet(old, given.group)
     if (o.archived !== undefined) archiveSet(old, o.archived)
     save()
@@ -280,6 +280,11 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   if (s.emptyGone != null && typeof s.emptyGone !== 'boolean') throw new Error('emptyGone? true or false')
   if (s.keep == null || s.ws !== 'new' || s.workflow || s.widget) delete s.keep, delete s.kept
   if (s.emptyGone !== false || s.ws !== 'new' || s.workflow || s.widget) delete s.emptyGone
+  // T8: its runs' time limit, in minutes of its agent's working time (unset: settings.scheduleMaxMinutes; 0: none); a
+  // workflow has its own budget, an extension's run ends at once
+  if (s.maxMinutes != null && (!Number.isInteger(s.maxMinutes) || s.maxMinutes < 0 || s.maxMinutes > 1440)) throw new Error('time limit? minutes, 0 (none) to 1440')
+  if (s.maxMinutes == null || s.workflow || s.widget) delete s.maxMinutes
+  if (!s.on || o.archived) delete s.queued
   // T6: edited (on again, a field fixed): its failures start over
   if (s.on) delete s.fails, delete s.pausedWhy, delete s.pausedField
   delete s.again
@@ -814,11 +819,17 @@ export async function scheduleTick(now = Date.now()) {
     if (s.rule.once) s.on = false
   }
   if (due.length) save(), changed()
+  timeTick(now) // T8: a run past its time limit stopped, its place given to one waiting
+  await lineTick(now)
   for (const { s, at } of due) {
     if (!state.schedules?.some(x => x.id === s.id)) continue // deleted while an earlier one started
     if (now - at > MISSED_AFTER) missed(s, at, now)
     else if (s.widget) void runSchedule(s, now) // a fetch may take minutes (an AI source's): the rest don't wait for it
-    else await runSchedule(s, now)
+    else {
+      if (s.queued !== undefined) lineSkip(s) // its last one still waits at this one's time: skipped, this one waits instead
+      if (full(now)) inLine(s, at)
+      else await starting(() => runSchedule(s, now))
+    }
   }
   // T6: a retry (5 minutes after a transient failure) or a start at a plan limit's reset, when due
   for (const s of (state.schedules ?? []).filter(x => x.again && x.again.at <= now && going(x))) {
@@ -829,6 +840,90 @@ export async function scheduleTick(now = Date.now()) {
   }
   await catchTick(now)
 }
+
+// ---------- T8: a run's time limit and the runs going at once
+// its agent's working time (sample: only while its tab is running, never a wait for you; a step past STEP is the Mac
+// asleep, not counted), past its task's maxMinutes (unset: settings.scheduleMaxMinutes, 60; 0: none): the turn is
+// interrupted as Stop does (Esc: the chat stays, to resume), the run is 'stopped' and told. A workflow's: its own budget
+const MAX_MINUTES = 60
+const STEP = 2 * 60e3
+const count = (n: unknown, d: number) => (Number.isInteger(n) && (n as number) >= 0 ? (n as number) : d) // a setting as a client sent it
+const maxOf = (r: ScheduleRun) => (s => s?.maxMinutes ?? count(state.settings?.scheduleMaxMinutes, MAX_MINUTES))(state.schedules?.find(x => x.id === r.schedule))
+function sample(r: ScheduleRun, now: number) {
+  const from = r.clock ?? r.at
+  if (r.tab && tabStatus(r.tab) === 'running' && now > from && now - from <= STEP) r.spent = (r.spent ?? 0) + (now - from)
+  r.clock = Math.max(now, from)
+}
+const timed = (r: ScheduleRun, now: number) => !!r.tab && !r.flow && (r.state === 'running' || r.state === 'waiting') && now - r.at < OUTCOME_MS
+function timeTick(now: number) {
+  let stopped = false
+  for (const r of (state.runs ?? []).filter(x => timed(x, now))) {
+    sample(r, now) // saved with the next save (a restart's stale clock: one step not counted)
+    const max = maxOf(r)
+    if (!max || (r.spent ?? 0) < max * 60e3) continue
+    if (tabStatus(r.tab!) === 'running') input(r.tab!, '\x1b') // a wait isn't Esc'd: Esc would answer it
+    const was = r.state
+    Object.assign(r, { state: 'stopped', endedAt: Date.now(), said: `time limit ${max} min` })
+    log(`scheduled run ${r.id} (${r.tab}): stopped, its time limit (${max} min)`)
+    ranTold(r, was, true)
+    stopped = true
+  }
+  if (stopped) save(), changed()
+}
+// at most settings.scheduleAtOnce (unset: 2; 0: no cap) runs going at once: an agent's while its run is running (one
+// waiting for you, or whose agent was seen working and is idle now, a hand's Esc: not), a workflow's until it ends. A due
+// one past it waits its turn (queued: its due time), the oldest first, as one ends (lineTick: a run's end, each tick);
+// one still waiting at its task's next time is skipped. Run now, a retry and a catch-up don't wait; an extension's fetch
+// isn't counted (it ends at once)
+const AT_ONCE = 2
+const capOf = () => count(state.settings?.scheduleAtOnce, AT_ONCE)
+let begun = 0 // starts under way (a worktree takes a while): counted before their run's in the log
+const starting = async <T>(f: () => Promise<T>) => {
+  begun++
+  try {
+    return await f()
+  } finally {
+    begun--
+  }
+}
+const holds = (r: ScheduleRun, now: number) =>
+  r.state === 'running' && now - r.at < OUTCOME_MS && (r.flow ? !!state.flows?.some(f => f.id === r.flow && !FLOW_ENDED.includes(f.status)) : !!r.tab && state.tabs.some(t => t.id === r.tab) && !(tabStatus(r.tab) === 'idle' && r.spent))
+function full(now: number) {
+  const cap = capOf()
+  return cap > 0 && (state.runs ?? []).filter(r => holds(r, now)).length + begun >= cap
+}
+function inLine(s: Schedule, at: number) {
+  s.queued = at
+  log(`scheduled task ${s.id}: waits its turn (${capOf()} going at once)`)
+  save()
+  changed()
+}
+function lineSkip(s: Schedule) {
+  logRun({ id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, s.queued!), at: s.queued!, ok: true, skipped: true, what: `skipped: queue (${capOf()} were going until its next time)` })
+  delete s.queued
+}
+let lineBusy = false
+async function lineTick(now = Date.now()) {
+  if (lineBusy) return
+  lineBusy = true
+  try {
+    for (const s of (state.schedules ?? []).filter(x => x.queued !== undefined).sort((a, b) => a.queued! - b.queued!)) {
+      if (!going(s)) {
+        delete s.queued
+        save()
+        continue
+      }
+      if (full(now)) break
+      const at = s.queued!
+      delete s.queued
+      save()
+      await starting(() => runSchedule(s, now, { late: `waited its turn (due ${hhmm(at)})` }))
+    }
+  } finally {
+    lineBusy = false
+  }
+}
+const lineNext = () => void lineTick().catch(e => log(`scheduled tasks: ${firstLine(e)}`))
 
 // T2: a task that catches up: a rule of at most 2 times a day (every N minutes or hours: no), unless it says
 const catches = (s: Schedule) => (s.missed ?? (Math.max(...partsOf(s.rule).map(p => p.times.length)) <= 2 ? 'catchup' : 'skip')) === 'catchup'
@@ -878,7 +973,7 @@ async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) 
   const endedAt = Date.now()
   const d = await wsStat({ ws: tab.workspace, fresh: true }).catch(() => null) // first: the entry changes at once, whole
   const r = runOfTab(tab.id)
-  if (!r) return
+  if (!r || r.state === 'stopped') return // T8: stopped at its time limit, it stays so
   const was = r.state
   const said = text?.trim().split('\n')[0].slice(0, 200)
   const pr = prOf(tab.workspace)
@@ -893,6 +988,7 @@ async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) 
     if (st === 'done') goodRun(s)
   }
   if (st === 'done' && was !== 'done') await emptyGone(r, d) // T5
+  if (st !== 'waiting') lineNext() // T8: its place, to one waiting
 }
 // main.ts, as the daemon starts (not as this module loads: core's sets may not be there yet, load-order.test)
 export function runOutcomes() {
@@ -910,16 +1006,17 @@ export function scheduleFlowEnded(id: string, status: string, why: string) {
   ranTold(r, was)
   const s = state.schedules?.find(x => x.id === r.schedule)
   if (s && !r.asked) r.state === 'done' ? goodRun(s) : r.state === 'failed' && failedRun(s, `its workflow run failed${r.said ? `: ${r.said}` : ''}`) // T6
+  lineNext() // T8
 }
 // told as it changes (Tell me: needs, unset: when it waits or failed; always: done too; never): a `scheduled` event (the
 // app's notification and toast) and a phone push (a wait's push is its tab's own: not twice); extensions' schedule.done
-function ranTold(r: ScheduleRun, was?: RunState) {
+function ranTold(r: ScheduleRun, was?: RunState, limit = false) { // limit (T8): stopped at its time limit, told as a failure is
   const s = state.schedules?.find(x => x.id === r.schedule)
   const name = s?.name ? stamp(s.name, r.at) : r.name
   widgetEvent('schedule.done', { task: { id: r.schedule, name }, state: r.state, said: r.said, ...(r.pr && { pr: r.pr }), ...(r.diff && { diff: r.diff }), ...(r.cost !== undefined && { cost: r.cost }) }, r.ws)
   if (r.state === was) return
   const tell = s?.notify ?? 'needs'
-  const needs = r.state === 'waiting' || r.state === 'failed'
+  const needs = r.state === 'waiting' || r.state === 'failed' || limit
   if (tell === 'never' || (tell === 'needs' && !needs)) return
   const how = r.state === 'waiting' ? 'needs you' : r.state === 'failed' ? 'failed' : r.state === 'stopped' ? 'stopped' : 'is done'
   broadcast({ ev: 'scheduled', run: r.id, ws: r.ws, tab: r.tab, state: r.state, name, text: `${name} ${how}${r.said ? `: ${r.said}` : ''}` })

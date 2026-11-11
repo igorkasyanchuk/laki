@@ -617,7 +617,7 @@ test('the agent browser: ops and urls checked, an answer, a screenshot, failures
 test('scheduled tasks: the default agent, empty prompts and times, edits that keep the rule, a custom tab passed over, one deleted mid-tick', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await rig.rpc('settingsSet', { agent: 'codex' })
+  await rig.rpc('settingsSet', { agent: 'codex', scheduleAtOnce: 0 /* T8's cap: schedule-runs.test */ })
   const s1 = await rig.rpc('scheduleSet', { project: p.id, prompt: 'check the build', when: 'every day at 9am' })
   assert.deepEqual([s1.preset, s1.ws, s1.on], ['codex', 'new', true])
   await rig.rpc('settingsSet', { agent: '' })

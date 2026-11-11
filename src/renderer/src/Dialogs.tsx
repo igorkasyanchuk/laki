@@ -542,6 +542,7 @@ export function Pages({ app }: { app: AppCtx }) {
             toast: (text, undo) => toast(text, undo),
             run: id => api.call('scheduleRun', { id }),
             release: run => api.call('scheduleRelease', { run }),
+            settings: o => api.call('settingsSet', o),
             flows: flowsOn ? () => api.call('flowList', {}) : undefined,
             branches: project => api.call('branches', { project }),
             open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),

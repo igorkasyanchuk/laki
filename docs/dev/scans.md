@@ -287,6 +287,21 @@ ended on an error, a workflow run that failed; a wait, a plan limit's end, a ski
 with `pausedWhy` and `pausedField` (`fieldOf`: base, ws, preset, widget, workflow), a `scheduled` event and a phone push
 once. The page shows it on top with *Fix*: its form, at that field. An edit that leaves it on clears them.
 
+A run's time limit and the runs going at once (T8, `timeTick` and `lineTick`, each `scheduleTick` before the due
+ones): an agent run's `spent` is its agent's working time, sampled (`sample`, at `clock`) only while its tab is
+`running` (a wait for you isn't counted; a step over `STEP`, 2 min, is the Mac asleep, not counted either). Past its
+task's `maxMinutes` (unset: `settings.scheduleMaxMinutes`, else 60; 0 none; not a workflow's, which has its budget, nor an
+extension's) its turn gets Esc, as Stop does (the chat stays: a prompt goes on in it; a wait isn't Esc'd, Esc would
+answer it), the run is `stopped`, *time limit 45 min* its `said`, told as a failure is (`ranTold`'s `limit`: Tell me's
+needs too), and `runEnded` leaves a stopped run as it is. `settings.scheduleAtOnce` (unset 2; 0 no cap; a bad value: the
+default, `count`) caps the runs going (`holds`: running, in its first day, its tab still there and not idle after it
+was seen working, an Esc by hand; a workflow's until it ends; `begun`: starts under way); a due one over it waits
+(`queued`, its due time, the page's *waits its turn*), oldest first, started by `lineTick` (each tick, and `lineNext`
+as a run ends: `runEnded` but a wait, `scheduleFlowEnded`, a time limit) with *waited its turn (due 02:00): …*. One
+still waiting at its task's next time: a *skipped: queue* entry at its due time, and the new one waits instead. Off or
+archived: its place goes. Run now, a retry and a catch-up don't wait; an extension's fetch isn't counted. The form's
+clock chip sets the task's limit and, below it, every task's and how many at once (`SchedulesApi.settings`).
+
 ### Notifications
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind

@@ -127,6 +127,7 @@ test('when: several times in one line, a part each; a time two parts share runs 
 test('scheduled tasks: a new workspace each run, or the workspace’s agent; once, missed, the log', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { scheduleAtOnce: 0 }) // T8's cap: schedule-runs.test
   const task = (o: object) => rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'nightly deps', when: 'every day at 2am', ...o })
   await assert.rejects(task({ when: 'whenever' }), /At what time/)
   await assert.rejects(task({ preset: 'shell' }), /pick an agent/)

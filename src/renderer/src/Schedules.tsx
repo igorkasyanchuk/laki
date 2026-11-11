@@ -2,7 +2,7 @@
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { OnlyIf, Schedule, ScheduleRun, TaskEvent, TaskNotify, TaskTrigger, View } from '../../shared/types'
+import type { OnlyIf, Schedule, ScheduleRun, Settings, TaskEvent, TaskNotify, TaskTrigger, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, partsOf, type Rule, stamp, wsTitle } from '../../shared/when'
@@ -19,6 +19,7 @@ export type SchedulesApi = {
   flows?: () => Promise<WorkflowItem[]> // Workflows on: a task may run one instead of a prompt
   branches(project: string): Promise<{ branches: string[]; main: string; current: string }> // a new workspace's base: the new-workspace page's list
   release?(run: string): Promise<unknown> // T4: a fork's held run, started (Run it)
+  settings?(s: Pick<Settings, 'scheduleMaxMinutes' | 'scheduleAtOnce'>): Promise<unknown> // T8: every task's time limit, runs at once
 }
 
 const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'weekdays at 9am; fri at 4pm', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
@@ -33,6 +34,9 @@ const onlyWords = (o?: OnlyIf) => (!o ? 'always runs' : `only if ${o.kind === 'i
 const EVENT_WORDS: [TaskEvent, string, IconName][] = [['ci.failed', 'CI fails', 'x'], ['pr.opened', 'a PR is opened', 'pr'], ['pr.review', 'a PR gets a review', 'pr'], ['issue.opened', 'an issue is opened', 'alertCircle'], ['push', 'someone pushes', 'fork']]
 export const triggerWords = (t: TaskTrigger) => `when ${EVENT_WORDS.find(x => x[0] === t.event)?.[1] ?? t.event}${t.branch ? ` ${t.event.startsWith('pr.') ? 'into' : 'on'} ${t.branch}` : t.event === 'ci.failed' || t.event === 'push' ? ' on its main branch' : ''}${t.label ? `, labeled ${t.label}` : ''}${t.by === 'others' ? ', by others' : t.by === 'me' ? ', by me' : ''}`
 const KEEPS = [1, 2, 3, 5, 10, 0] // T5: a task's run workspaces kept (0: all)
+const LIMITS = [15, 30, 45, 60, 120, 240, 0] // T8: a run's time limit, minutes of its agent's working time (0: none)
+const AT_ONCE = [1, 2, 3, 5, 0] // T8: runs going at once (0: no cap)
+const mins = (m: number) => (m ? (m % 60 ? `${m} min` : `${m / 60} h`) : 'no time limit')
 const NOTIFY: [TaskNotify, string, string][] = [['needs', 'Tell me when it needs me or fails', 'The default'], ['always', 'Tell me always', 'When it waits, fails or is done'], ['never', 'Never tell me', 'Its log says how it went']]
 // where a run goes: its words, its icon
 export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['same', 'a new workspace, then the same one each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
@@ -50,7 +54,7 @@ const SAMPLES: [string, string, string, string][] = [
   ['Update dependencies', 'every monday at 8:00', 'codex', 'Update the dependencies to their latest minor versions, run the tests, and open a PR with what changed.'],
   ['Check the nightly build', 'every day at 7:30', 'claude', "Check last night's CI run on the main branch; if it failed, find why and propose a fix."],
 ]
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean; notify?: TaskNotify; missed?: 'skip' | 'catchup'; catchUntil?: number; onlyIf?: OnlyIf; trigger?: TaskTrigger; keep?: number; emptyGone?: boolean } // trigger (T4): on an event instead of times; keep, emptyGone (T5); notify (T1), missed and catchUntil (T2), onlyIf (T3): the task's // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean; notify?: TaskNotify; missed?: 'skip' | 'catchup'; catchUntil?: number; onlyIf?: OnlyIf; trigger?: TaskTrigger; keep?: number; emptyGone?: boolean; maxMinutes?: number } // maxMinutes (T8); trigger (T4): on an event instead of times; keep, emptyGone (T5); notify (T1), missed and catchUntil (T2), onlyIf (T3): the task's // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -248,7 +252,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     if (!form || !ready) return
     setSaving(true)
     setErr('')
-    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh, notify: form.notify ?? 'needs', missed: form.missed ?? null, catchUntil: form.catchUntil ?? null, onlyIf: !form.workflow && !form.widget ? (form.onlyIf ?? null) : null, trigger: evented ? form.trigger : null, when: evented ? '' : form.when, keep: newEach ? (form.keep ?? null) : null, emptyGone: newEach && form.emptyGone === false ? false : null }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script; null: unset
+    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh, notify: form.notify ?? 'needs', missed: form.missed ?? null, catchUntil: form.catchUntil ?? null, onlyIf: !form.workflow && !form.widget ? (form.onlyIf ?? null) : null, trigger: evented ? form.trigger : null, when: evented ? '' : form.when, keep: newEach ? (form.keep ?? null) : null, emptyGone: newEach && form.emptyGone === false ? false : null, maxMinutes: !form.workflow && !form.widget ? (form.maxMinutes ?? null) : null }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script; null: unset
     setSaving(false)
   }
   const run = async (s: Schedule) => {
@@ -261,7 +265,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     // the project's local workspace is its folder; one that's gone: what Where's menu offers, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
     const ws = ['new', 'same', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf, trigger: s.trigger, keep: s.keep, emptyGone: s.emptyGone })
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf, trigger: s.trigger, keep: s.keep, emptyGone: s.emptyGone, maxMinutes: s.maxMinutes })
   }
   // T6: Fix on a task that's off after failing: its form, at the field that broke
   const [spot, setSpot] = useState<{ id: string; field: string }>() // the task's form, once it's open (a discard ask may come first)
@@ -288,6 +292,24 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       ...KEEPS.map(n => ({ label: n ? `Keep the last ${n}` : 'Keep them all', sub: n === 5 ? 'The default' : undefined, icon: 'archive', hint: (form?.keep ?? 5) === n ? ON : undefined, run: () => set({ keep: n }) }) as MenuItem),
       null,
       { label: 'Archive a run that changed nothing', sub: 'As its agent ends: no diff, no PR', icon: 'archive', hint: form?.emptyGone !== false ? ON : undefined, run: () => set({ emptyGone: form?.emptyGone === false ? undefined : false }) },
+    ])
+  // T8: its runs' time limit (its agent's working time: a wait for you isn't counted), and every task's
+  const allMax = view.settings.scheduleMaxMinutes ?? 60
+  const atOnce = view.settings.scheduleAtOnce ?? 2
+  const limitMenu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { head: "Stop a run after (its agent's working time)" },
+      { label: `As every task: ${mins(allMax)}`, sub: 'Below', icon: 'clock', hint: form?.maxMinutes === undefined ? ON : undefined, run: () => set({ maxMinutes: undefined }) },
+      ...LIMITS.map(n => ({ label: n ? `After ${mins(n)}` : 'Never', icon: 'clock', hint: form?.maxMinutes === n ? ON : undefined, run: () => set({ maxMinutes: n }) }) as MenuItem),
+      ...(api.settings
+        ? [
+            null,
+            { head: 'Every task' },
+            ...LIMITS.map(n => ({ label: n ? `Stop after ${mins(n)}` : 'No time limit', sub: n === 60 ? 'The default' : undefined, icon: 'clock', hint: allMax === n ? ON : undefined, run: () => void api.settings!({ scheduleMaxMinutes: n }).catch(fail) }) as MenuItem),
+            null,
+            ...AT_ONCE.map(n => ({ label: n ? `${n} at once` : 'Any number at once', sub: n === 2 ? 'The default: the rest wait their turn' : undefined, icon: 'layers', hint: atOnce === n ? ON : undefined, run: () => void api.settings!({ scheduleAtOnce: n }).catch(fail) }) as MenuItem),
+          ]
+        : []),
     ])
   const titleOf = (s: Schedule) => s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: 'It and its settings go for good; its runs stay in the log.', ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id).catch(fail))
@@ -611,6 +633,13 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its older run workspaces archived as a new one starts (only those with nothing to lose); one that changed nothing archived as it ends" onClick={keepMenu}>
                   <Icon name="archive" />
                   <span className="nw-chip-text">{form.keep === 0 ? 'keeps every workspace' : `keeps its last ${form.keep ?? 5}`}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+              )}
+              {!form.workflow && !form.widget && (
+                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="A run stops (as Stop does: its chat stays) after this much of its agent's working time; waiting for you isn't counted. Below it, every task's and how many run at once" onClick={limitMenu}>
+                  <Icon name="clock" />
+                  <span className="nw-chip-text">{(n => (n ? `stops after ${mins(n)}` : 'no time limit'))(form.maxMinutes ?? allMax)}</span>
                   <Icon name="chevron" size={11} />
                 </button>
               )}
