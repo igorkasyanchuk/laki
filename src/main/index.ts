@@ -1583,7 +1583,7 @@ async function tellSend() {
   if (!tellPng || !w || w.isDestroyed() || !quickReady) return
   const png = tellPng
   tellPng = null
-  w.webContents.send('quick-tell', { png, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', dictation: await dictationOn() })
+  w.webContents.send('quick-tell', { png, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', dictation: !smoke && (await dictationOn()) }) // ui-smoke: no real dictation on your Mac
 }
 ipcMain.on('quick-tell-ready', e => {
   if (!quickW || e.sender !== quickW.webContents || !from(e, 'quick')) return
