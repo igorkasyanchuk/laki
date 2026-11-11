@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
-import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
+import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { talkDefault } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
@@ -211,6 +211,26 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('.ask-box'), 'its confirm')
     }, async () => (await js<number>(`[...document.querySelectorAll('.ask-box *')].filter(e => !e.children.length && e.textContent.trim() === 'Bash: npm test').length`)) === 1 && (await hasText('.ask-box', 'fix-cart-total')) && (await hasText('.ask-box', 'checkout-flow'))],
     ['allow-all-answered', () => answer('Allow all (2)'), async () => !(await rpc<View>('state')).tabs.some(t => t.status === 'waiting' && t.ask?.what === 'npm test')],
+    // Q4: a waiting agent answered from its edge bubble: the bubbles shown (Laki behind another app), its circle's click
+    // (main's pinGo, as floater-click: a synthetic pointer can't capture), the pinned card's first option
+    ['bubble-answer', async () => {
+      const v = await rpc<View>('state')
+      const id = v.workspaces.find(x => x.name === 'checkout-flow' || x.id === 'checkout-flow')!.id
+      const t = (await rpc<{ id: string }>('tabNew', { ws: id, preset: 'claude' })).id
+      await waitFor(async () => (await rpc<string>('screen', { target: t, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      await rpc('send', { target: t, text: 'perm bash :: npm run lint' })
+      await waitFor(async () => floats.items.some(x => x.tab === t && x.status === 'waiting'), 'its bubble waiting')
+      setFront(false)
+      await waitFor(async () => !!card && !card.isDestroyed(), 'the card window')
+      await nap(300)
+      pinGo({ kind: 'click', tab: t, waiting: true })
+      const c = <T>(code: string) => (card && !card.isDestroyed() ? (card.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => c<boolean>("!!document.querySelector('#card.pinned [data-n]') && document.querySelector('#card.pinned .pin-what').textContent.includes('npm run lint')"), 'the pinned card with its options')
+      writeFileSync(join(dir, 'bubble-answer-window.png'), (await card!.webContents.capturePage()).toPNG())
+      await c("document.querySelector('#card.pinned [data-n]').click()")
+      ws.answered = { id: t } as View['workspaces'][number]
+    }, async () => !(await rpc<View>('state')).tabs.some(t => t.id === ws.answered.id && t.status === 'waiting') && !pinned.tab],
+    ['bubble-front', async () => setFront(true), async () => !floater?.isVisible()],
     // U5: the Ship sheet on dark-mode (notes.txt uncommitted): its file with a box, the PR's title drafted, Open PR
     ['ship-sheet', async () => {
       await key('Escape')()
@@ -1238,7 +1258,8 @@ function barWin() {
     if (kind(url) === 'card') {
       card = w
       w.setIgnoreMouseEvents(true)
-      w.on('closed', () => card === w && (card = null))
+      w.on('closed', () => card === w && ((card = null), (pinned = { tab: '' })))
+      w.on('blur', () => pinned.tab && pinGo({ kind: 'blur' })) // Q4: a click elsewhere unpins it
       return
     }
     if (kind(url) === 'menu') {
@@ -1303,7 +1324,7 @@ function placeFloater() {
   const d = notch ? islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay()) : undefined
   // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange); the island also while
   // nothing runs, waits or is done (idle recent ones don't keep it up) and over a full-screen app
-  if ((notch ? !floats.items.some(f => f.status !== 'idle') : !floats.items.length && !floats.add) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
+  if ((notch ? !floats.items.some(f => f.status !== 'idle') : !floats.items.length && !floats.add) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), pinned.tab && pinGo({ kind: 'esc' }), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
@@ -1337,9 +1358,10 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
   if (parked && floatState() !== parked) parked = ''
-  if (floats.at !== was) (fold(), card?.hide(), card?.setIgnoreMouseEvents(floats.at !== 'notch'), floats.at === 'edge' && floater && snap()) // to the edge again: where it was
+  if (floats.at !== was) (fold(), (pinned = { tab: '' }), card?.hide(), card?.setIgnoreMouseEvents(floats.at !== 'notch'), floats.at === 'edge' && floater && snap()) // to the edge again: where it was
   placeFloater()
   islandFloats()
+  if (pinned.tab) pinGo({ kind: 'list', waiting: floats.items.filter(x => x.status === 'waiting').map(x => x.tab) }), pinned.tab && pinCard() // Q4: answered elsewhere: unpinned; else its new text
 })
 // Stop (Settings › Resources): the bubbles' windows closed, until an agent's state changes
 let parked = ''
@@ -1450,7 +1472,7 @@ ipcMain.handle('floater-answer', async (e, tab: unknown, n: unknown, label: unkn
   if (typeof tab !== 'string' || typeof n !== 'number' || typeof label !== 'string') return { error: 'no such choice' }
   if (!floats.items.some(x => x.tab === tab)) return { error: 'that tab is gone' } // only one the bubbles show
   return rpc('answer', { tab, n, label }).then(
-    () => ({}),
+    () => (pinned.tab === tab && pinGo({ kind: 'answered' }), {}),
     (err: Error) => ({ error: err.message }),
   )
 })
@@ -1539,7 +1561,49 @@ ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
   } else if (up && stackFrom) (home = stackFrom), (stackFrom = null) // not saved: a drag saves where it is
   snap(false, now)
 })
-ipcMain.on('floater-open', (e, tab: string, panel?: unknown) => ((floater && e.sender === floater.webContents) || (card && e.sender === card.webContents)) && typeof tab === 'string' && (fold(), app.focus({ steal: true }), show(tab, panel === 'changes' ? 'changes' : undefined), earn('bubble')))
+ipcMain.on('floater-open', (e, tab: string, panel?: unknown) => ((floater && e.sender === floater.webContents) || (card && e.sender === card.webContents)) && typeof tab === 'string' && (fold(), pinned.tab && pinGo({ kind: 'esc' }), openTab(tab, panel === 'changes' ? 'changes' : undefined)))
+const openTab = (tab: string, panel?: 'changes') => (app.focus({ steal: true }), show(tab, panel), earn('bubble'))
+// Q4: an edge circle's click (shared/island.ts pinStep): a waiting one's card pinned to answer from, else (or the pinned
+// one again) its tab opened, as before
+let pinned: Pin = { tab: '' }
+let pinTop = 0 // the pinned circle's place along the bar
+let pinSent = '' // what the pinned card was last sent: the same again isn't (its reply keeps what's typed)
+function pinGo(ev: PinEv) {
+  const was = pinned.tab
+  const r = pinStep(pinned, ev, Date.now())
+  pinned = r.pin
+  if (card && !card.isDestroyed()) {
+    if (was && !pinned.tab) (pinSent = ''), card.setIgnoreMouseEvents(true), card.setFocusable(false), card.hide(), (hover = null)
+    if (pinned.tab && pinned.tab !== was) (pinTop = hover?.tab === pinned.tab ? hover.top : pinTop), (hover = null), pinCard()
+  }
+  if (r.open) openTab(r.open)
+}
+function pinCard() {
+  const f = floats.items.find(x => x.tab === pinned.tab)
+  if (!card || card.isDestroyed() || !f) return
+  const msg = JSON.stringify([f, floats.colors])
+  if (msg === pinSent) return
+  pinSent = msg
+  card.setIgnoreMouseEvents(false)
+  card.setFocusable(true)
+  card.webContents.send('card', f, floats.colors, true)
+}
+ipcMain.on('floater-click', (e, tab: unknown) => {
+  if (!floater || e.sender !== floater.webContents || typeof tab !== 'string' || floats.at === 'notch') return
+  const f = floats.items.find(x => x.tab === tab)
+  if (f) pinGo({ kind: 'click', tab, waiting: f.status === 'waiting' })
+})
+ipcMain.on('floater-pin', (e, ev: unknown) => card && e.sender === card.webContents && ev === 'esc' && pinned.tab && pinGo({ kind: 'esc' }))
+// the pinned card's one-line reply to an agent that asks in words (no menu): typed in now, as an answer (agent: an agent tab only)
+ipcMain.handle('floater-reply-send', async (e, tab: unknown, text: unknown) => {
+  if (!card || e.sender !== card.webContents || typeof tab !== 'string' || tab !== pinned.tab) return { error: 'not the pinned card' }
+  if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
+  if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
+  return rpc('send', { target: tab, text: text.trim(), agent: true }).then(
+    () => (pinGo({ kind: 'answered' }), {}),
+    (err: Error) => ({ error: err.message }),
+  )
+})
 ipcMain.on('floater-seen', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && void rpc('seen', { tab }).catch(() => {}))
 // the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
 // own), Ask Laki AI (the AI page, in one too), the menu bar's screenshots; Say it from the menu: the bar opens its window
@@ -1877,13 +1941,17 @@ ipcMain.on('floater-tip', (e, name: unknown, hint: unknown, top: unknown) => {
   else card?.hide()
 })
 ipcMain.on('floater-hover', (e, tab: string, top: number) => {
-  if (!floater || e.sender !== floater.webContents || dragFrom) return
+  if (!floater || e.sender !== floater.webContents || dragFrom || pinned.tab) return // a pinned card stays (Q4)
   const f = floats.items.find(x => x.tab === tab)
   hover = f && Number.isFinite(top) && floats.cards && !front && overBar() ? { tab, top } : null
   if (hover) card?.webContents.send('card', f, floats.colors)
   else card?.hide()
 })
 ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
+  if (card && barAt && e.sender === card.webContents && pinned.tab && pinned.tab === tab && w > 0 && w < 800 && h > 0 && h < 800) {
+    card.setBounds({ ...beside(Math.round(w), Math.round(h), pinTop - 6), width: Math.round(w), height: Math.round(h) }) // Q4: pinned, wherever the pointer is
+    return void (card.isVisible() || card.show(), card.focus())
+  }
   if (!card || !barAt || e.sender !== card.webContents || hover?.tab !== tab || !(w > 0 && w < 800 && h > 0 && h < 800)) return
   if (front || !overBar()) return void ((hover = null), card.hide()) // gone meanwhile (a click that brought Laki forward)
   card.setBounds({ ...beside(Math.round(w), Math.round(h), hover.top - 6), width: Math.round(w), height: Math.round(h) })

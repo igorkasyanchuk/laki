@@ -2164,7 +2164,10 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
-  (state, checks, review, conflicts), diff size and ports; click to open it in Laki; a right click shows *Reply…*,
+  (state, checks, review, conflicts), diff size and ports; click to open it in Laki (one waiting for you: the click
+  pins its card instead, to answer there: its options as buttons, 1–9 too, or a line to answer in words, and *Open
+  tab*; a permission shows the tool and the first 3 lines of its command or file, and a longer one only *Open*, so you
+  read all of it first; a second click or a double click opens it, Esc or a click elsewhere puts the card away); a right click shows *Reply…*,
   *Open tab* and, for a done one, *Seen* (no longer lit); ⌥-click is *Reply…*: a small window aimed at that agent, its
   last answer above the box, ⏎ sends (queued while it works; a closed tab says so and keeps your text), and an agent
   that asks with a menu shows its options as buttons instead; drag it from anywhere on it (a circle too)

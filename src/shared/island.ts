@@ -74,3 +74,29 @@ export function plainLines(md: string | undefined, n = 3, max = 160) {
 // a reply from the bubbles: to an agent that asks with a menu, only its options (typed keys would pick one); else text,
 // queued while it works
 export const replyOf = (f: { status: string; ask?: { options: unknown[] } }) => (f.status === 'waiting' && f.ask?.options.length ? 'options' : 'text')
+
+// Q4: an edge bubble's card pinned to answer from (main's pinGo): a click on a waiting circle pins its card (clickable,
+// focusable: its options, a reply, Open); a click on the pinned one again (a double click is two clicks), or on one that
+// doesn't wait, opens its tab, as before; Esc, a click elsewhere (the card's blur), its answer, or its ask gone
+// (list: the waiting ones now) unpin it. A press on the bar blurs the card before its click comes: the one pinned up
+// to PIN_GRACE ms before counts as still pinned
+export const PIN_GRACE = 500
+export type Pin = { tab: string; gone?: { tab: string; at: number } }
+export type PinEv = { kind: 'click'; tab: string; waiting: boolean } | { kind: 'esc' | 'blur' | 'answered' } | { kind: 'list'; waiting: string[] }
+export function pinStep(p: Pin, ev: PinEv, now: number): { pin: Pin; open?: string } {
+  if (ev.kind === 'click') {
+    const cur = p.tab || (p.gone && now - p.gone.at < PIN_GRACE ? p.gone.tab : '')
+    return ev.tab === cur || !ev.waiting ? { pin: { tab: '' }, open: ev.tab } : { pin: { tab: ev.tab } }
+  }
+  if (ev.kind === 'list') return { pin: !p.tab || ev.waiting.includes(p.tab) ? p : { tab: '' } }
+  if (ev.kind === 'blur') return { pin: { tab: '', ...((p.tab || p.gone) && { gone: p.tab ? { tab: p.tab, at: now } : p.gone }) } }
+  return { pin: { tab: '' } }
+}
+// a permission ask's command or file on a pinned card: its first PIN_LINES lines; cut: no buttons there (you'd allow what
+// you can't read), Open shows it all
+export const PIN_LINES = 3
+export function pinWhat(what: string, n = PIN_LINES, max = 400) {
+  const lines = what.split('\n')
+  const shown = lines.slice(0, n).join('\n')
+  return { shown: shown.length > max ? `${shown.slice(0, max - 1)}…` : shown, cut: lines.length > n || shown.length > max }
+}

@@ -144,6 +144,14 @@
       #island { box-sizing: border-box; width: 400px; padding: 12px 14px; background: #000; color: #e8eaf0; border-radius: 0 0 18px 18px; display: flex; flex-direction: column; gap: 8px; user-select: text; -webkit-user-select: text; }
       body:not([data-mode='card']) #island, body[data-mode='card'] #island:empty { display: none; }
       body[data-mode='card'] #card:empty { display: none; }
+      /* Q4: a waiting circle's card pinned to answer from: clickable, its options and a reply line as the island's */
+      #card.pinned { width: 320px; display: flex; flex-direction: column; gap: 7px; user-select: text; -webkit-user-select: text; }
+      #card.pinned .pin-what { max-height: none; overflow: hidden; }
+      #card.pinned button { font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, var(--bg)); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; text-align: left; }
+      #card.pinned button:hover { border-color: var(--muted); }
+      #card.pinned .i-opt.primary { border-color: var(--accent); }
+      #card.pinned .i-send { padding: 2px 8px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; }
+      .i-reply input { flex: 1; border: none; outline: none; background: none; color: inherit; font: inherit; min-height: 20px; }
       .i-head { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
       .i-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink, var(--running)); align-self: center; }
       .i-dot.waiting { background: var(--waiting); } .i-dot.done { background: var(--done); } .i-dot.idle { opacity: 0.4; }

@@ -9,7 +9,7 @@
 // The bar opens the other three (window.open): one renderer process for all four.
 import './floater.css'
 import { alwaysOf, permVerb } from '../../shared/ask'
-import { dotsText, plainLines, replyOf, tookText } from '../../shared/island'
+import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, initials, noteWhole, wavOf } from './text'
 import { type TalkTo, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
@@ -48,7 +48,10 @@ type Bridge = {
     menuClose: () => void
     onMenu: (cb: (open: boolean) => void) => void
     onVoiceOpen: (cb: () => void) => void
-    onCard: (cb: (f: Float, colors: Colors) => void) => void
+    onCard: (cb: (f: Float, colors: Colors, pinned?: boolean) => void) => void
+    click: (tab: string) => void
+    pin: (ev: 'esc') => void
+    replySend: (tab: string, text: string) => Promise<{ error?: string }>
     cardSize: (tab: string, w: number, h: number) => void
     onVoice: (cb: (items: Float[], colors: Colors, to: string, reply?: Float) => void) => void
     voiceSend: (tab: string, text: string) => Promise<{ error?: string; queued?: boolean }>
@@ -113,9 +116,19 @@ document.body.dataset.mode = mode
 let hinted = false // the reply hint on a finished one's card: once per session
 if (mode === 'card') {
   islandPage()
-  bridge?.onCard((f, colors) => {
+  let pinned = '' // Q4: the tab whose card is pinned to answer from
+  document.addEventListener('keydown', e => {
+    if (!pinned || e.metaKey || e.ctrlKey) return
+    if (e.key === 'Escape') bridge?.pin('esc')
+    else if (/^[1-9]$/.test(e.key) && (e.target as HTMLElement).tagName !== 'INPUT') card.querySelector<HTMLButtonElement>(`[data-n="${e.key}"]`)?.click()
+  })
+  bridge?.onCard((f, colors, pin) => {
     paint(colors)
     document.getElementById('island')!.replaceChildren() // the island's card or list, from before a switch to the edge: never under it (the window is this card's size: it showed cut)
+    card.classList.toggle('pinned', !!pin)
+    const draft = pin && pinned === f.tab ? (card.querySelector('input')?.value ?? '') : ''
+    pinned = pin ? f.tab : ''
+    if (pin) return pinnedCard(f, draft)
     card.classList.toggle('tip', (f.status as string) === 'tip') // a stacked action's name
     if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
     card.style.setProperty('--c', `var(--${f.status})`)
@@ -182,7 +195,7 @@ else {
     if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'ai' || d?.act === 'area' || d?.act === 'screen' || d?.act === 'tell')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
     else if (click && d?.tab && alt) hover(''), bridge?.reply(d.tab) // ⌥-click: a reply to it, Laki stays where it is
-    else if (click && d?.tab) hover(''), bridge?.open(d.tab)
+    else if (click && d?.tab) hover(''), bridge?.click(d.tab) // Q4: main pins a waiting one's card, else opens its tab
     else if (click && d?.act === 'plus') plus(!!d.wasOpen)
     else if (click && d?.act) {
       hover('')
@@ -291,6 +304,58 @@ else {
     else if (hovered) hover('')
     bridge?.size(length(), up)
   }
+}
+
+// Q4: a waiting circle's card, pinned (main: clickable, focusable): what it asks; a permission's tool and its command or
+// file in mono, its first 3 lines (cut: no buttons, Open to read it all); its options as buttons (1-9), or a line to
+// answer in words (sent now, as an answer); Open. Esc, a click elsewhere or the answer unpins it (main)
+function pinnedCard(f: Float, draft: string) {
+  const note = el('div', '', 'i-note')
+  const fit = () => bridge?.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
+  const bad = (t: string) => ((note.textContent = t), note.classList.add('bad'), fit())
+  const a = f.ask
+  const parts: HTMLElement[] = [el('b', f.name), el('div', `${f.agent ?? 'agent'} asks · ${f.project}`, 'meta')]
+  let cut = false
+  if (a?.tool) {
+    const w = pinWhat(a.what ?? '')
+    cut = w.cut
+    parts.push(el('div', permVerb(a.tool), 'i-q'), el('pre', w.shown, 'i-what pin-what'), ...(cut ? [el('div', 'Longer than this card: Open it to read all of it before you answer', 'i-sub')] : []))
+  } else if (a?.question || f.last) parts.push(el('div', a?.question ?? f.last ?? '', 'i-q'))
+  const btn = (text: string, cls: string, on: () => void) => Object.assign(el('button', text, cls) as HTMLButtonElement, { onclick: on })
+  if (replyOf(f) === 'options') {
+    const opts = el('div', '', 'i-opts pin-opts')
+    const always = a?.rule ? alwaysOf(a) : undefined
+    if (!cut && whole(a))
+      for (const o of a!.options) {
+        const b = btn(`${o.n}  ${o === always ? `Always: ${a!.rule}` : o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
+          const r = await bridge?.answer(f.tab, o.n, o.label)
+          if (r?.error) bad(r.error)
+        })
+        b.dataset.n = String(o.n)
+        opts.append(b)
+      }
+    else if (!cut) parts.push(el('div', "Can't show it whole here: answer in its tab", 'i-sub'))
+    parts.push(opts)
+  } else {
+    // its question in words: a line, ⏎ sends it now
+    const wrap = el('div', '', 'i-reply')
+    const input = Object.assign(document.createElement('input'), { placeholder: `Answer ${f.agent ?? 'it'}…`, spellcheck: false, value: draft })
+    const go = async () => {
+      if (!input.value.trim()) return
+      const r = await bridge?.replySend(f.tab, input.value)
+      if (r?.error) bad(r.error)
+    }
+    input.onkeydown = e => {
+      if (e.key === 'Enter' && !e.isComposing) e.preventDefault(), go()
+    }
+    wrap.append(input, Object.assign(el('button', '↑', 'i-send'), { onclick: go, title: 'Send (⏎)' }))
+    parts.push(wrap)
+    setTimeout(() => input.focus(), 30)
+  }
+  const foot = el('div', '', 'i-foot')
+  foot.append(btn('Open tab', '', () => bridge?.open(f.tab)), el('span', 'Esc closes', 'i-sub'))
+  card.replaceChildren(...parts, note, foot)
+  fit()
 }
 
 // an Edit's or Write's change (Ask.diff, permDiff's lines) on its card: red and green, its first 10 lines (its cut's

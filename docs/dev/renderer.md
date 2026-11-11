@@ -429,6 +429,14 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `floater-reply` → `replyTo`: #voice with `replyFor` (`sendVoice`: no pick row, its last answer, a waiting one's
   options as buttons; text refused while it shows a menu; queued: *Queued*, then it closes); the hover card's *Right-click or ⌥-click to reply*, once
   a session. Tested in `test/island.test.ts`.
+- **A pinned card** (Q4, edge): a circle's click is `floater-click`, main's `pinGo` (shared/island.ts `pinStep`): a
+  waiting one's card is pinned (`pinned`: the card window takes clicks and the focus, `card` with `pinned` true;
+  floater.ts `pinnedCard`: its options as the island's buttons, keys 1-9, else a line for an answer in words,
+  `floater-reply-send`: `send` `agent: true` now; a permission's `pinWhat`, its first `PIN_LINES` lines, cut: no buttons,
+  only *Open tab*); a click on the pinned one again (a double click: two) or one that doesn't wait opens its tab
+  (`openTab`), as before. Esc (`floater-pin`), the card's blur (a click elsewhere; `PIN_GRACE`: the bar's press blurs it
+  before its click), the answer (`floater-answer`, `floater-reply-send`) or its ask gone (each `floats`: `list`) unpin
+  it. While pinned, hovers don't move the card. `npm run test:ui`'s `bubble-answer` answers a waiting demo tab there.
 - **The talk pill** (Q2, `settings.talkOn` with the cloud engine, `talkKey`, unset `TALK_KEY` ⌃⌥⌘M; App's `talkKey` to
   main's `talk-hotkey`, `bindKey('talk')`): main's `talk()` opens `floater.html#talk` as a focusable panel window of its
   own at the pointer (`TALK` 320 by 78), or, open already, sends `talk-key` (the second press). The page (floater.ts

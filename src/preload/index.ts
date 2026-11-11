@@ -108,7 +108,10 @@ contextBridge.exposeInMainWorld('laki', {
     menuClose: () => ipcRenderer.send('floater-menu-close'),
     onMenu: (cb: (open: boolean) => void) => ipcRenderer.on('floater-menu', (_e, open: boolean) => cb(open)),
     onVoiceOpen: (cb: () => void) => ipcRenderer.on('floater-voice', () => cb()), // the menu's Say it: the bar opens the window
-    onCard: (cb: (f: object, colors: Record<string, string>) => void) => ipcRenderer.on('card', (_e, f, colors) => cb(f, colors)),
+    onCard: (cb: (f: object, colors: Record<string, string>, pinned?: boolean) => void) => ipcRenderer.on('card', (_e, f, colors, pinned) => cb(f, colors, pinned)), // Q4: pinned, to answer from
+    click: (tab: string) => ipcRenderer.send('floater-click', tab), // Q4: an edge circle's click: main pins a waiting one's card, else opens it
+    pin: (ev: 'esc') => ipcRenderer.send('floater-pin', ev),
+    replySend: (tab: string, text: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-reply-send', tab, text), // the pinned card's one-line answer
     cardSize: (tab: string, w: number, h: number) => ipcRenderer.send('floater-card', tab, w, h),
     // the voice prompt's window: the agents it can go to, then the text out (no tab: a new session's page)
     onVoice: (cb: (items: object[], colors: Record<string, string>, to: string, reply?: object) => void) => ipcRenderer.on('voice', (_e, items, colors, to, reply) => cb(items, colors, to, reply)), // reply: the one agent it answers (a circle's Reply…)

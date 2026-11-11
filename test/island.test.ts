@@ -1,7 +1,7 @@
 // The bubbles' island (floaterAt notch) and replies from the bubbles: shared/island.ts' pure parts
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cardQueue, cardRect, DONE_FOLD, dotsText, fullScreen, hasNotch, islandDisplay, lifeStep, NOTCH, pillRect, plainLines, replyOf, tookText, WING } from '../src/shared/island.ts'
+import { cardQueue, cardRect, DONE_FOLD, dotsText, fullScreen, hasNotch, islandDisplay, lifeStep, NOTCH, type Pin, PIN_GRACE, type PinEv, pillRect, pinStep, pinWhat, plainLines, replyOf, tookText, WING } from '../src/shared/island.ts'
 
 // a MacBook's built-in screen (a 38-point menu bar around its notch), an external one (24), one with a full-screen app
 const macbook = { bounds: { x: 0, y: 0, width: 1512, height: 982 }, workArea: { x: 0, y: 38, width: 1512, height: 944 }, internal: true }
@@ -70,4 +70,49 @@ test("a reply's words: the answer's first lines as plain text, how long the turn
   assert.equal(replyOf({ status: 'waiting', ask: { options: [{}, {}] } }), 'options') // typed keys would pick one
   assert.equal(replyOf({ status: 'waiting' }), 'text')
   assert.equal(replyOf({ status: 'done' }), 'text')
+})
+
+// Q4: an edge bubble's card pinned to answer from
+test('Q4: pinStep: a waiting circle pins, the pinned one again or one at work opens, Esc, blur, the answer, its ask gone unpin', () => {
+  let p: Pin = { tab: '' }
+  const go = (ev: PinEv, now = 1000) => {
+    const r = pinStep(p, ev, now)
+    p = r.pin
+    return r.open
+  }
+  assert.equal(go({ kind: 'click', tab: 'a', waiting: false }), 'a', 'not waiting: opens, as before')
+  assert.equal(p.tab, '')
+  assert.equal(go({ kind: 'click', tab: 'w', waiting: true }), undefined)
+  assert.equal(p.tab, 'w', 'pinned')
+  assert.equal(go({ kind: 'click', tab: 'x', waiting: true }), undefined)
+  assert.equal(p.tab, 'x', 'another waiting one: pinned instead')
+  assert.equal(go({ kind: 'click', tab: 'x', waiting: true }), 'x', 'the pinned one again (a double click): opens')
+  assert.equal(p.tab, '')
+  for (const kind of ['esc', 'answered'] as const) {
+    go({ kind: 'click', tab: 'w', waiting: true })
+    go({ kind })
+    assert.equal(p.tab, '', kind)
+  }
+  // a press on the bar blurs the card first: its click on the pinned circle still opens it, just after
+  go({ kind: 'click', tab: 'w', waiting: true })
+  go({ kind: 'blur' }, 2000)
+  assert.equal(p.tab, '')
+  assert.equal(go({ kind: 'click', tab: 'w', waiting: true }, 2000 + PIN_GRACE - 1), 'w')
+  go({ kind: 'click', tab: 'w', waiting: true }, 3000)
+  go({ kind: 'blur' }, 3000)
+  assert.equal(go({ kind: 'click', tab: 'w', waiting: true }, 3000 + PIN_GRACE + 1), undefined, 'later: a new click pins it again')
+  assert.equal(p.tab, 'w')
+  go({ kind: 'list', waiting: ['w', 'y'] })
+  assert.equal(p.tab, 'w', 'still asking')
+  go({ kind: 'list', waiting: ['y'] })
+  assert.equal(p.tab, '', 'answered elsewhere')
+})
+
+test('Q4: pinWhat: a command its first 3 lines, longer is cut (no buttons then)', () => {
+  assert.deepEqual(pinWhat('npm test'), { shown: 'npm test', cut: false })
+  assert.deepEqual(pinWhat('a\nb\nc'), { shown: 'a\nb\nc', cut: false })
+  assert.deepEqual(pinWhat('a\nb\nc\nrm -rf /'), { shown: 'a\nb\nc', cut: true })
+  const long = pinWhat('x'.repeat(500))
+  assert.equal(long.cut, true)
+  assert.equal(long.shown.length, 400)
 })
