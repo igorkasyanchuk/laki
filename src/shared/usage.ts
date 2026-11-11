@@ -139,20 +139,34 @@ export const FLAGS: Record<string, Set<string>> = (() => {
   }
   return m
 })()
-// the closest of a command's options to a mistyped one (edit distance 3 at most), for the error's hint
-export function nearFlag(cmd: string, typed: string) {
-  const d = (a: string, b: string) => {
-    let row = Array.from({ length: b.length + 1 }, (_, j) => j)
-    for (let i = 1; i <= a.length; i++) {
-      const next = [i]
-      for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
-      row = next
+// edit distance, two letters swapped one edit (sned: send)
+const dist = (a: string, b: string) => {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i ? (j ? 0 : i) : j)))
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
     }
-    return row[b.length]
-  }
-  const best = [...(FLAGS[cmd] ?? [])].map(f => [f, d(typed, f)] as const).sort((x, y) => x[1] - y[1])[0]
-  return best && best[1] <= 3 ? best[0] : undefined
+  return d[a.length][b.length]
 }
+// the n closest of known to a mistyped word (edit distance up to half its length, 3 at most, or one starts the
+// other), nearest first
+export const nearest = (typed: string, known: Iterable<string>, n = 1) =>
+  [...new Set(known)]
+    .map(k => [k, k.startsWith(typed) || typed.startsWith(k) ? Math.min(1, dist(typed, k)) : dist(typed, k)] as const)
+    .filter(x => x[1] <= Math.min(3, Math.max(1, Math.floor(typed.length / 2))))
+    .sort((x, y) => x[1] - y[1])
+    .slice(0, n)
+    .map(x => x[0])
+// the closest of a command's options to a mistyped one, for the error's hint
+export const nearFlag = (cmd: string, typed: string): string | undefined => nearest(typed, FLAGS[cmd] ?? [])[0]
+// A6: a command's own subcommands, read off its lines of USAGE (laki widget on|off|run <id> | logs <id>: on, off, run, logs)
+export const subsOf = (cmd: string) =>
+  USAGE.split('\n')
+    .filter(l => l.startsWith(`  laki ${cmd} `) || l === `  laki ${cmd}`)
+    .flatMap(l => l.split(/(?<=\S) {2,}/)[0].slice(`  laki ${cmd}`.length).split(' | '))
+    .flatMap(part => (part.trim().split(' ')[0] ?? '').replace(/^\[|\]$/g, '').split('|'))
+    .filter(w => /^[a-z]+$/.test(w))
 
 // each command's details and examples, after its lines of USAGE: laki help <command>, laki <command> --help. Written
 // for agents (the skill points here): what it prints, what to pass, what to run next
@@ -402,7 +416,7 @@ agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, arch
 // laki help <command> [sub]: that command's lines of USAGE (with the lines under each) and its HELP; null: no such
 // command. A sub narrows them to its own lines (laki help widget new), else all of the command's
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-export function helpFor(cmd: string, sub?: string): string | null {
+export function helpFor(cmd: string, sub?: string, more = true): string | null {
   const w = esc(cmd)
   const re = (at: string) => new RegExp(`${at}${w}([ |]|$)`)
   const blocks: string[][] = []
@@ -415,8 +429,8 @@ export function helpFor(cmd: string, sub?: string): string | null {
   const head = (b: string[]) => b[0].split(/(?<=\S) {2,}/)[0] // the command, not what it does (| stop it)
   const own = blocks.filter(b => re('^  laki ').test(head(b)))
   const mine = own.length ? own : blocks.filter(b => re('\\| ').test(head(b)))
-  const more = Object.hasOwn(HELP, cmd) ? HELP[cmd] : '' // not an inherited key (constructor)
-  if (!mine.length && !more) return null
+  const tail = more && Object.hasOwn(HELP, cmd) ? HELP[cmd] : '' // not an inherited key (constructor); more false: its lines of USAGE only (A6)
+  if (!mine.length && !tail) return null
   const narrow = sub && mine.filter(b => new RegExp(`^  laki ${w} (\\S*\\|)?${esc(sub)}([ |]|$)`).test(head(b)))
-  return [...(narrow && narrow.length ? narrow : mine).flat(), ...(more ? ['', more] : [])].join('\n')
+  return [...(narrow && narrow.length ? narrow : mine).flat(), ...(tail ? ['', tail] : [])].join('\n')
 }

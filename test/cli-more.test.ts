@@ -287,7 +287,7 @@ test('cli: widget ls, reload, run, on/off, render, action, as the app would show
 
   r = await rig.cli('widget', 'frob')
   assert.equal(r.code, 1)
-  assert.match(r.err, /^laki: usage: laki widget \[ls\] \| reload/)
+  assert.match(r.err, /^laki: unknown widget command frob\.\n  laki widget \[ls\] \| reload/)
   r = await rig.cli('widget', 'on', 'nope')
   assert.equal(r.code, 1)
   assert.match(r.err, /no widget nope/)

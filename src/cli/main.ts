@@ -6,7 +6,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
 import { AGENTS, API, type AgentUsage, type Doctor, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
-import { FLAGS, helpFor, nearFlag, USAGE } from '../shared/usage.ts'
+import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
@@ -43,6 +43,12 @@ function optNo(a: string) {
   const near = nearFlag(cmd, name)
   console.error(`laki: unknown option ${name}${near ? ` (did you mean ${near}?)` : ''}${free !== undefined ? `. A text that starts with -- goes after --: laki ${cmd} … -- ${name}` : `: laki help ${cmd}`}`)
   process.exit(1)
+}
+// A6: a command or subcommand Laki doesn't know: two lines (the nearest, then where to look), or that command's own
+// lines of USAGE; never all of it (348 lines in an agent's context for a typo)
+function unknown(cmd: string, typed: string): never {
+  const near = nearest(typed, cmd ? subsOf(cmd) : [...Object.keys(FLAGS), ...Object.keys(ALIAS)], 2)
+  throw new Error(`unknown ${cmd ? `${cmd} command` : 'command'} ${typed}.${near.length ? ` Did you mean: ${near.join(', ')}?` : ''}\n${cmd ? helpFor(cmd, undefined, false) : 'laki help lists every command'}`)
 }
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -263,6 +269,11 @@ async function main() {
     }
   }
   if (['flow', 'flows', 'workflow'].includes(cmd) && rest[0] === 'check') return flowCheck(rest.slice(1))
+  // A6: no daemon started for a typo, a command's or one of its subcommands' (laki plan <project> is one word)
+  if (!Object.hasOwn(FLAGS, cmd) && !Object.hasOwn(ALIAS, cmd)) unknown('', cmd)
+  const base = ALIAS[cmd] ?? cmd
+  if (['widget', 'flow', 'schedule', 'project', 'preset'].includes(base) && rest[0] !== undefined && !subsOf(base).includes(rest[0])) unknown(base, rest[0])
+  if (base === 'plan' && rest.length > 1 && !['ls', ...subsOf('plan')].includes(rest[0])) unknown('plan', rest[0])
   await ensureDaemon()
   switch (cmd) {
     case 'ls': {
@@ -493,7 +504,8 @@ async function main() {
         const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
         return out(v.presets, v.presets.map(line).join('\n'))
       }
-      if (!['add', 'set', 'on', 'off', 'rm'].includes(sub) || !name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] | on|off|rm <name>')
+      if (!['add', 'set', 'on', 'off', 'rm'].includes(sub)) unknown('preset', sub)
+      if (!name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] | on|off|rm <name>')
       const set: Record<string, unknown> = {}
       for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
       if (flags.fast) set.fast = true
@@ -681,7 +693,7 @@ async function main() {
         const r = await rpc('scheduleRelease', { run: id }, 120000) // T4: a fork's held run (laki schedule log has its id with --json)
         return out(r, `${r.ok ? '✓' : '✗'} ${r.what}`)
       }
-      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" | --on <event> <prompt> | on|off|run|archive|restore|rm <id> | release <run>`)
+      unknown('schedule', sub)
     }
     case 'flow':
     case 'flows':
@@ -759,7 +771,7 @@ async function main() {
         const r: FlowRun = await rpc('flowHold', { id, on: sub === 'pause' })
         return out(r, `${id}  ${status(r)}`)
       }
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | on <workflow> [project] | check [file.md… | folder] | trash | restore <trash-id> | show|stop|pause|resume <run> | answer <run> <n> [words]')
+      unknown('flow', sub)
     }
     case 'widget':
     case 'widgets': {
@@ -927,7 +939,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | what <id> | on <id> [--seen <hash>] | off|run <id> | logs <id> [-n 100] [-f] [--level l] | log <id> [--level l] <text> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
+      unknown('widget', sub)
     }
     case 'ai': {
       const [sub] = rest
@@ -945,7 +957,7 @@ async function main() {
       return out(r, r.text)
     }
     default:
-      throw new Error(`unknown command ${cmd}\n\n${USAGE}`)
+      unknown('', cmd)
   }
 }
 

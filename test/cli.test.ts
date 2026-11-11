@@ -138,6 +138,22 @@ test('cli: help, usage errors, open', async t => {
   let r = await rig.cli('frob')
   assert.equal(r.code, 1)
   assert.match(r.err, /unknown command frob/)
+  // A6: a typo is two lines (the nearest commands, where to look), not all of USAGE
+  r = await rig.cli('sned', 'hi')
+  assert.equal(r.code, 1)
+  assert.equal(r.err, 'laki: unknown command sned. Did you mean: send, new?\nlaki help lists every command\n')
+  assert.ok(r.err.split('\n').length < 5)
+  r = await rig.cli('qwxz')
+  assert.equal(r.err, 'laki: unknown command qwxz.\nlaki help lists every command\n', 'nothing near: no guess')
+  // a subcommand's: that command's own lines of USAGE, not its examples or anyone else's
+  r = await rig.cli('preset', 'ad', 'x')
+  assert.equal(r.code, 1)
+  assert.match(r.err, /^laki: unknown preset command ad\. Did you mean: add\?\n  laki preset \[ls\]/)
+  assert.ok(r.err.split('\n').every(l => !l.trim() || /^(laki: |  laki preset |\s{6,})/.test(l)), r.err)
+  r = await rig.cli('plan', 'raed', '.', 'spec', 'x')
+  assert.match(r.err, /^laki: unknown plan command raed\. Did you mean: read\?/)
+  r = await rig.cli('ext', 'frob')
+  assert.match(r.err, /^laki: unknown widget command frob\.\n  laki widget \[ls\] \| reload/)
   r = await rig.cli('new')
   assert.match(r.err, /usage: laki new <project>/)
   // open: this checkout's build when there is one, else the app by its bundle id (the fake open only records it)
@@ -280,7 +296,7 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.equal(JSON.parse((await rig.cli('schedule', '--json')).out).find((x: any) => x.id === s.id).on, false)
   assert.equal((await rig.cli('schedule', 'rm', s.id)).out.trim(), `removed ${s.id}`)
   r = await rig.cli('schedule', 'nope')
-  assert.match(r.err, /usage: laki schedule/)
+  assert.match(r.err, /^laki: unknown schedule command nope\.\n  laki schedule \[ls\]/)
 })
 
 test('cli: preset ls, add, set, off, rm; bad fields refused', async t => {

@@ -2528,7 +2528,10 @@ Every workspace gets its own `$PORT` (3100, 3110, …).
 `laki help` (or `laki --help`) lists every command; `laki help <command>` (or `laki <command> --help`) prints one's
 options, what it prints and examples, written for agents as much as for you. An option a command doesn't have is an
 error that names the nearest one (`laki new app --promt …`: *unknown option --promt (did you mean --prompt?)*), before
-anything runs; a text that starts with `--` goes after `--` (`laki send fix-login -- --verbose is broken`).
+anything runs; a text that starts with `--` goes after `--` (`laki send fix-login -- --verbose is broken`). A command
+Laki doesn't have is two lines, the nearest ones and where to look (*unknown command sned. Did you mean: send, new?*);
+a subcommand it doesn't have (`laki widget reloda`) says the nearest and prints that command's own lines only. Neither
+starts the daemon.
 
 ```bash
 laki project add ~/code/app

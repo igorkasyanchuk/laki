@@ -16,6 +16,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - After an update, *New in <version>* shows its three biggest changes once, each with *Try* where there's something to open; *All changes* opens Settings › Release notes, now there for everyone (and in ⌘K). A new install sees none. [Try it](laki://settings/notes)
 - Orange now means *needs you*: Needs you's cards stand out over a quieter sidebar, and the accent is gone from project names, switches, tabs and settled chips. Tabs, side panel tabs and segmented buttons all mark the open one with a line under it; project names are in sentence case; status marks are drawn in your icon pack instead of text characters.
 - Laki AI costs less with Claude models on OpenRouter: its tools and instructions are cached between rounds and asks, and the AI page's Calls tab and `laki ai log` say how many tokens came from the cache.
+- A mistyped command no longer prints the CLI's whole help: `laki sned` says *Did you mean: send, new?* and where to look, and a mistyped subcommand (`laki widget reloda`) prints only that command's lines.
 - Workflows keep secrets out of what they pass on: a token from Settings', the project's or a profile's env that a command prints shows as •••• in its output, the run's log, an agent's answer and a webhook's response, so it never reaches an AI call's prompt or a webhook's body. The command itself still gets it.
 
 ## 0.48.0 · Nov 11, 2026
