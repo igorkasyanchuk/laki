@@ -34,6 +34,14 @@ contextBridge.exposeInMainWorld('laki', {
   quickKey: (label: string): Promise<boolean> => ipcRenderer.invoke('quick-hotkey', label), // Q1: the quick bar's global keys ('' none)
   quickMore: (text: string) => ipcRenderer.send('quick-more', text), // the quick bar's More: the whole new-workspace page with its text
   quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
+  tellKey: (label: string): Promise<boolean> => ipcRenderer.invoke('tell-hotkey', label), // Q7: show and tell's global keys ('' none)
+  // the quick bar's: show and tell's picture (Laki's Microphone access, macOS dictation on), or the editor's drawing on it
+  onTell: (cb: (t: object) => void) => {
+    ipcRenderer.on('quick-tell', (_e, t: object) => cb(t))
+    ipcRenderer.send('quick-tell-ready') // then main sends one taken before the page was up
+  },
+  quickAnnotate: (png: string) => ipcRenderer.send('quick-annotate', png),
+  privacyPane: (which: string) => ipcRenderer.send('privacy-pane', which),
   quickHeight: (h: number) => ipcRenderer.send('quick-height', h), // as tall as its page
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
   update: (op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<object | null> => ipcRenderer.invoke('update', op),

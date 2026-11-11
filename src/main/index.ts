@@ -114,6 +114,17 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       if (quickW && !quickW.isDestroyed()) writeFileSync(join(dir, 'quick-bar-window.png'), (await quickW.webContents.capturePage()).toPNG()) // its own window: the main one's screenshot doesn't have it
       await q("document.querySelector('.quick-bar button.primary').click()")
     }, async () => (!quickW || quickW.isDestroyed()) && (await rpc<View>('state')).workspaces.filter(x => !x.archived).length === before + 1],
+    // Q7: show and tell, its screencapture skipped (a stub picture: the app's icon): the quick bar with the picture in
+    // it and its hint, then Esc drops both
+    ['show-and-tell', async () => {
+      tellPng = readFileSync(join(RENDERER, 'icon-192.png')).toString('base64')
+      quickWin()
+      void tellSend()
+      const q = <T>(code: string) => (quickW && !quickW.isDestroyed() ? (quickW.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => q<boolean>("!!document.querySelector('.quick-bar .prompt-image img') && !!document.querySelector('.quick-tell')"), 'the picture in the quick bar')
+      if (quickW && !quickW.isDestroyed()) writeFileSync(join(dir, 'show-and-tell-window.png'), (await quickW.webContents.capturePage()).toPNG())
+      await q("document.querySelector('.quick-bar textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
+    }, async () => !quickW || quickW.isDestroyed()],
     // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
     ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
@@ -731,9 +742,9 @@ function accelOf(label: string) {
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
   return accel(m)
 }
-type Key = 'open' | 'shot' | 'quick' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1)
-const keys: Record<Key, string> = { open: '', shot: '', quick: '' } // what each holds
-const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show] } // what each asked for
+type Key = 'open' | 'shot' | 'quick' | 'tell' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1); tell: show and tell (Q7, tellShot)
+const keys: Record<Key, string> = { open: '', shot: '', quick: '', tell: '' } // what each holds
+const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show], tell: ['', show] } // what each asked for
 let shotOn = false // Screenshot to Laki AI is on (Settings › General): the menu bar has it too
 function grab(which: Key) {
   const [a, fn] = wants[which]
@@ -757,6 +768,8 @@ ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label
 ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label !== false), bindKey('shot', shotOn ? label : '', shotAsk)))
 // Q1: the quick bar's keys ('' none: off until set, Settings › Keys)
 ipcMain.handle('quick-hotkey', (e, label: unknown) => from(e) && bindKey('quick', label, () => quickWin()))
+// Q7: show and tell's keys ('' none: off until set, Settings › General)
+ipcMain.handle('tell-hotkey', (e, label: unknown) => from(e) && bindKey('tell', label, () => tellShot()))
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // updates (./update.ts): its state to the app window as it changes. Installing quits for good: quitAndInstall emits
@@ -1084,6 +1097,7 @@ function trayMenu() {
       { label: 'Recording Mode', type: 'checkbox', checked: recording, click: () => void rpc('settingsSet', { recording: !recording }).catch(() => {}) }, // private workspaces hidden
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
+      { label: 'Show and Tell…', ...(keys.tell && { accelerator: keys.tell, registerAccelerator: false }), click: () => tellShot() }, // Q7: a part of the screen, then say what to do with it
       ...(shotOn ? [{ label: 'Screenshot to Laki AI…', ...(keys.shot && { accelerator: keys.shot, registerAccelerator: false }), click: shotAsk }] : []),
       { type: 'separator' },
       { label: `Open ${app.name}`, ...(keys.open && { accelerator: keys.open, registerAccelerator: false }), click: () => show() }, // its global hotkey beside it
@@ -1121,7 +1135,7 @@ type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
-const menuH = () => MENU.height + (floats.ai ? 46 : 0) // a row more: Ask Laki AI
+const menuH = () => MENU.height + 46 + (floats.ai ? 46 : 0) // a row more: Show and tell (Q7), and Ask Laki AI
 const STYLES = ['glow', 'gradient', 'arc', 'bricks', 'comet', 'wave', 'still'] // a working agent's circle (Settings' previews: floater.css)
 let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true, ai: false, at: 'edge' }
 let floater: BrowserWindow | null = null
@@ -1514,6 +1528,7 @@ ipcMain.on('floater-act', (e, what: unknown) => {
   else if (what === 'ai' && floats.ai) aiWin()
   else if (what === 'area') screenshot(true)
   else if (what === 'screen') screenPick()
+  else if (what === 'tell') tellShot()
   else if (what === 'mic') floater?.webContents.send('floater-voice')
 })
 ipcMain.on('floater-menu-at', (e, top: unknown) => floater && e.sender === floater.webContents && typeof top === 'number' && Number.isFinite(top) && (menuTop = top))
@@ -1542,9 +1557,55 @@ function quickWin(prompt?: string) {
     if (prompt) quickW.webContents.send('new-prompt', prompt)
     return void (quickW.show(), quickW.focus())
   }
+  quickReady = false
   const w = (quickW = panelWin({ window: 'quick', ...(prompt && { prompt }) }, 640, 132, { minWidth: 440, minHeight: 112, resizable: false }, 0.16))
-  w.on('closed', () => quickW === w && (quickW = null))
+  w.webContents.on('did-navigate', () => quickW === w && (quickReady = false)) // a reload: it listens again as it's up
+  w.on('closed', () => quickW === w && ((quickW = null), (quickReady = false), (tellPng = null)))
 }
+// Q7: show and tell (its global key, the menu bar's and the bubbles' item): a part of the screen (the bubbles out of it,
+// as any shot), then the quick bar with the picture in it and the mic on (the page's: cloud voice, or macOS dictation
+// when it's on; neither: a box to type in): ⏎ sends both to its target (an agent tab, a new task, Laki AI), E draws on
+// it first (annotate, back to the bar), Esc drops both. Screen Recording refused: said, with its pane; never tried again
+let quickReady = false // its page listens for show and tell's picture (quick-tell-ready)
+let tellPng: string | null = null // the picture until it does
+function tellShot() {
+  if (screenOff()) return privacySay('screen')
+  screenshot(true, undefined, png => ((tellPng = png), quickWin(), void tellSend()), () => screenOff(true) && privacySay('screen'))
+}
+async function tellSend() {
+  const w = quickW
+  if (!tellPng || !w || w.isDestroyed() || !quickReady) return
+  const png = tellPng
+  tellPng = null
+  w.webContents.send('quick-tell', { png, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', dictation: await dictationOn() })
+}
+ipcMain.on('quick-tell-ready', e => {
+  if (!quickW || e.sender !== quickW.webContents || !from(e, 'quick')) return
+  quickReady = true
+  void tellSend()
+})
+// macOS dictation turned on (System Settings › Keyboard › Dictation): what the quick bar's mic starts, else it's a box
+const dictationOn = () => (mac ? new Promise<boolean>(r => execFile('defaults', ['read', 'com.apple.HIToolbox', 'AppleDictationAutoEnable'], { timeout: 2000 }, (err, out) => r(!err && out.trim() === '1'))) : Promise.resolve(false))
+// Screen Recording for Laki: refused (denied, restricted), or after a shot that brought no picture, not granted (asked,
+// and turned down; an Esc in screencapture leaves it granted)
+const screenOff = (after = false) => mac && (s => (after ? s !== 'granted' : s === 'denied' || s === 'restricted'))(systemPreferences.getMediaAccessStatus('screen'))
+const PANES = { screen: ['Screen Recording', 'Privacy_ScreenCapture'], microphone: ['Microphone', 'Privacy_Microphone'] } as const
+const paneOpen = (which: keyof typeof PANES) => void shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${PANES[which][1]}`)
+// which permission is missing, said once per try, a click opens its pane
+function privacySay(which: keyof typeof PANES) {
+  const name = PANES[which][0]
+  appLog(`show and tell: no ${name} for Laki`)
+  const n = new Notification({ title: `Laki needs ${name}`, body: `System Settings › Privacy & Security › ${name}: turn Laki on, then try again. Click to open it.` })
+  n.on('click', () => paneOpen(which))
+  n.show()
+}
+ipcMain.on('privacy-pane', (e, which: unknown) => from(e, 'quick', 'new', 'ai') && (which === 'microphone' || which === 'screen') && paneOpen(which))
+// its E: the picture in the editor (the bar hidden meanwhile), the drawing back to it (annotate's to)
+ipcMain.on('quick-annotate', (e, png: unknown) => {
+  if (!quickW || e.sender !== quickW.webContents || !from(e, 'quick') || typeof png !== 'string' || png.length > 40e6) return
+  quickW.hide()
+  annotate(png, 'quick')
+})
 ipcMain.on('quick-more', (e, text: unknown) => {
   if (!quickW || e.sender !== quickW.webContents || !fromApp(e)) return
   quickW.close()
@@ -1789,8 +1850,11 @@ function screenPick() {
 // the screenshot's editor (annotate.html): a small window over the others to crop it, draw on it and say what to do
 // with it; Add to prompt sends both to the new-workspace page, Esc drops them
 let annot: BrowserWindow | null = null
-function annotate(png: string) {
+let annotTo: 'app' | 'quick' = 'app' // where its picture goes: the new-workspace page, or back to the quick bar (Q7)
+const quickBack = () => quickW && !quickW.isDestroyed() && (quickW.show(), quickW.focus())
+function annotate(png: string, to: 'app' | 'quick' = 'app') {
   annot?.destroy()
+  annotTo = to
   const { width, height } = nativeImage.createFromBuffer(Buffer.from(png, 'base64')).getSize()
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) // the screen you're on, likely the one shot
   const a = d.workArea
@@ -1817,12 +1881,13 @@ function annotate(png: string) {
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', e => e.preventDefault())
   w.webContents.once('did-finish-load', () => w.webContents.send('annotate-image', png))
-  w.on('closed', () => annot === w && (annot = null))
+  w.on('closed', () => annot === w && ((annot = null), to === 'quick' && quickBack()))
   w.loadURL(pageURL('annotate.html'))
 }
 ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
   if (!annot || e.sender !== annot.webContents || typeof png !== 'string') return
   annot.destroy()
+  if (annotTo === 'quick' && quickW && !quickW.isDestroyed()) return void (quickW.webContents.send('quick-tell', { png, note: typeof note === 'string' ? note.slice(0, 4000) : '', edited: true }), quickBack())
   const s: [string, string] = [png, typeof note === 'string' ? note.slice(0, 4000) : '']
   if (shotReady && win) win.webContents.send('shot', ...s)
   else shot = s

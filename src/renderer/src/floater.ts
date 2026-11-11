@@ -26,6 +26,7 @@ const ACTS = [
   ['mic', 'Say it', 'dictate a prompt'],
   ['area', 'Screenshot area', 'drag over what to show'],
   ['screen', 'Whole screen', "the screen you're on"],
+  ['tell', 'Show and tell', 'a screenshot, then say what to do'], // Q7: main's tellShot
   ['ai', 'Ask Laki AI', 'it starts and steers agents'],
 ] as const
 type Act = (typeof ACTS)[number][0]
@@ -89,6 +90,7 @@ const ICONS: Record<Act | 'plus', string> = {
   ai: svg('<path d="M6.5 2.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3L2 7l3.3-1.2zM12 9.5l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6z"/>', 16),
   area: svg('<path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/>', 16),
   screen: svg('<rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 14h4M8 11v3"/>', 16),
+  tell: svg('<path d="M2 5V2h3M2 11v3h3M11 2h3v3"/><rect x="9.5" y="7" width="3" height="5" rx="1.5"/><path d="M8 11a3 3 0 0 0 6 0M11 14v1"/>', 16), // a corner of the area, a mic
 }
 const button = (act: Act | 'plus', name: string) => {
   const b = Object.assign(document.createElement('div'), { className: 'fl-btn', innerHTML: ICONS[act] })
@@ -166,7 +168,7 @@ else {
   const done = (click: boolean) => {
     const d = drag
     drag = null
-    if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'ai' || d?.act === 'area' || d?.act === 'screen')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
+    if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'ai' || d?.act === 'area' || d?.act === 'screen' || d?.act === 'tell')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
     else if (click && d?.tab && alt) hover(''), bridge?.reply(d.tab) // ⌥-click: a reply to it, Laki stays where it is
     else if (click && d?.tab) hover(''), bridge?.open(d.tab)

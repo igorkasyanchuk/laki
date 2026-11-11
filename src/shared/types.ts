@@ -705,6 +705,8 @@ export type Settings = {
   shotKey?: string // its keys (unset: ui.tsx SHOT_KEY; '': none, the menu bar's item only)
   quickOn?: boolean // Q1: the quick bar's global hotkey (unset: off)
   quickKey?: string // its keys (unset: ui.tsx QUICK_KEY)
+  tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
+  tellKey?: string // its keys (unset: ui.tsx TELL_KEY)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
   background?: { file?: string; dim?: number; blur?: number } // Settings › Appearance › Background image: <data>/background/<file> (core's bgSet), how much the theme covers it (%) and its blur (px)

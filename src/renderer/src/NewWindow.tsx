@@ -16,6 +16,7 @@ import { Term } from './Term'
 import { setSendKey } from '../../shared/keys'
 import { applyTheme, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
 import { ask, AskHost, askText, Icon, IconButton, load, Tips } from './ui'
+import { handOff } from './tell'
 import { cloudVoice, voiceStart } from './voice'
 import { imagesVia, insertMenus } from './Widgets'
 
@@ -189,7 +190,9 @@ export function NewWindow() {
 // the project you last made one in (the new-workspace page's last picks), an agent that waits or is idle (send), or
 // Laki AI. Tab (⇧Tab) or "@word " at the start changes the chip; ⏎ sends and closes it (the app you were in has the
 // keyboard again); Esc closes; a failed send keeps the text. The mic and a screenshot (⌘⇧M, ⌘⇧S); More: the whole
-// new-workspace page with the text, its project, agent and template pickers
+// new-workspace page with the text, its project, agent and template pickers. Q7, show and tell (main's tellShot): it
+// opens with a screenshot in it and the mic on (cloud voice, or macOS dictation when it's on; neither: the box to type
+// in); ⏎ sends both (tell.ts handOff), E (in an empty box, or ⌘E) draws on it first (the editor, back here), Esc drops both
 type Target = { kind: 'new'; project: string; label: string } | { kind: 'send'; tab: string; label: string } | { kind: 'ai'; label: string }
 // a target by what it is, not where it is in the list: one picked stays picked as the list changes
 const keyOf = (t: Target) => (t.kind === 'send' ? `send:${t.tab}` : t.kind)
@@ -216,7 +219,24 @@ export function QuickWindow() {
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [shot, setShot] = useState<{ n: number; png: string }>()
+  const [tell, setTell] = useState<{ png: string; mic: string; dictation: boolean }>() // Q7: its picture now, Laki's Microphone access, macOS dictation on
   useEffect(() => void bridge?.onNewPrompt?.(p => setText(p)), []) // another New task with words: into the box
+  useEffect(
+    () =>
+      void bridge?.onTell?.(t => {
+        setImages([]) // the picture replaces one before it (E's drawing too)
+        setShot(s => ({ n: (s?.n ?? 0) + 1, png: t.png })) // PromptInput: as if pasted, then the mic
+        if (t.note) setText(x => [x.trim(), t.note!.trim()].filter(Boolean).join('\n'))
+        setTell(x => ({ png: t.png, mic: t.mic ?? x?.mic ?? 'granted', dictation: t.dictation ?? x?.dictation ?? false }))
+        setErr(!t.edited && cloudVoice() && t.mic === 'denied' ? 'mic' : '')
+        // macOS dictation once the bar has the keyboard (cloud voice: PromptInput starts it with the picture)
+        if (t.edited || !t.dictation || cloudVoice()) return
+        const go = () => (document.querySelector<HTMLTextAreaElement>('.quick-bar textarea')?.focus(), setTimeout(() => bridge?.dictate?.(), 150))
+        if (document.hasFocus()) setTimeout(go, 50)
+        else window.addEventListener('focus', go, { once: true })
+      }),
+    [],
+  )
   useEffect(() => void (document.title = 'New task — Laki'), [])
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('.quick-bar')
@@ -250,12 +270,8 @@ export function QuickWindow() {
     setBusy(true)
     setErr('')
     try {
-      if (t.kind === 'new') {
-        const last = load<LastNew>(LAST_NEW, {})
-        const same = last.project === t.project
-        await api.call('wsNew', { project: t.project, prompt: body, place: same && last.place ? last.place : 'top', ...(same && { preset: last.preset, cmd: last.cmd, local: last.local, model: last.model, effort: last.effort, perm: last.perm, fast: last.fast, sandbox: last.sandbox }) })
-      } else if (t.kind === 'send') await api.call('send', { target: t.tab, text: body, whenIdle: true, agent: true })
-      else await api.call('aiAsk', { text, images: images.map(i => i.path), queue: true })
+      const c = handOff(t, text, images.map(i => i.path), load<LastNew>(LAST_NEW, {}))
+      await api.call(c.method, c.params)
       window.close()
     } catch (e) {
       setErr((e as Error).message) // the text stays
@@ -267,6 +283,8 @@ export function QuickWindow() {
     if (e.key === 'Tab' && (e.target as HTMLElement).tagName === 'TEXTAREA') return e.preventDefault(), turn(e.shiftKey ? -1 : 1)
     if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'm') return e.preventDefault(), mic()
     if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 's') return e.preventDefault(), snap()
+    // Q7: E draws on the picture first (an empty box: what you'd say isn't typed yet; ⌘E any time)
+    if (tell && e.key.toLowerCase() === 'e' && !e.altKey && !e.ctrlKey && !e.shiftKey && (e.metaKey || !text.trim())) return e.preventDefault(), bridge?.quickAnnotate?.(tell.png)
   }
   return (
     <div className="quick-bar" onKeyDownCapture={keys}>
@@ -293,7 +311,7 @@ export function QuickWindow() {
         enter
         rows={1}
         shot={shot}
-        placeholder={t?.kind === 'send' ? 'Tell the agent…' : t?.kind === 'ai' ? 'Ask Laki AI…' : 'What should the agent do?'}
+        placeholder={tell ? (cloudVoice() || tell.dictation ? 'Say what to do with it… (or type)' : 'Type what to do with it…') : t?.kind === 'send' ? 'Tell the agent…' : t?.kind === 'ai' ? 'Ask Laki AI…' : 'What should the agent do?'}
         tools={
           <>
             <IconButton icon="mic" title="Speak (⌘⇧M)" onClick={mic} />
@@ -306,10 +324,20 @@ export function QuickWindow() {
           </button>
         }
       />
-      {err && (
+      {tell && !err && <p className="muted small quick-tell">⏎ sends the picture and the words · E draws on it first · Esc drops both</p>}
+      {err === 'mic' ? (
         <p className="field-err" role="alert">
-          {err}
+          Microphone is off for Laki: type instead, or turn Laki on in{' '}
+          <button type="button" className="link" onClick={() => bridge?.privacyPane?.('microphone')}>
+            System Settings › Privacy &amp; Security › Microphone
+          </button>
         </p>
+      ) : (
+        err && (
+          <p className="field-err" role="alert">
+            {err}
+          </p>
+        )
       )}
       <AskHost />
       <VoiceBar />

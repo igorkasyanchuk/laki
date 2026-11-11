@@ -125,6 +125,12 @@ changing it: [AGENTS.md](../AGENTS.md).
   ⏎ sends and closes it, and you're back in the app you were in; Esc closes it; if the send fails, your text stays.
   The mic (⌘⇧M) and a screenshot of a part of the screen (⌘⇧S) are on it; *More…* opens the whole new-workspace page
   with the text (project, agent, template). The menu bar's and the bubbles' *New task* open it too.
+- **Show and tell** (off until you turn it on: Settings › General or Keys › Global hotkey, ⌃⌥⌘T suggested; the menu
+  bar's *Show and Tell…* and the bubbles' + have it too): from any app, pick a part of the screen, and the quick bar
+  opens with the picture in it and the mic on (Settings › Voice's cloud voice, or macOS dictation when it's on; without
+  either, type). Say what to do with it; ⏎ sends both to the bar's target (an agent tab, a new task, Laki AI), E (or ⌘E)
+  draws on it first, Esc drops both. Without Screen Recording or Microphone for Laki it says which one and opens its
+  pane in System Settings.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the start of the status bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Layout › *Buttons and bars* hides it, the video's and the timers' buttons, and the status bar itself (its buttons then at the sidebar's foot).
@@ -2027,6 +2033,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌃⌥⌘L | from any app: bring Laki forward (Settings › Keys or General › *Global hotkey*: off, or other keys; Help shows the ones in use) |
 | ⌃⌥⌘S | from any app (*Screenshot to Laki AI*, on by default with Laki AI; the menu bar has it too): a part of the screen to Laki AI's window, the mic listening |
 | ⌥Space | from any app (*Quick bar*, off until turned on and its keys picked): a line to a new workspace, an agent that waits or Laki AI; Tab changes where, ⏎ sends, Esc closes |
+| ⌃⌥⌘T | from any app (*Show and tell*, off until turned on): a part of the screen, then the quick bar with it and the mic on; ⏎ sends both, E draws on it first, Esc drops both |
 | ⌘O | open a project folder (or drop one on the window or on Laki's Dock icon, even while Laki is closed; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
 | ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |

@@ -49,7 +49,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
-import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, SHOT_KEY } from './ui'
+import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -2128,12 +2128,14 @@ export function App() {
   tipKeys.map = kb // keyTip's, for tooltips outside App
   const kt = keyTip // a tooltip with its keys, drawn as keycaps (ui.tsx tipText)
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
-  const [held, setHeld] = useState({ open: false, shot: false, quick: false }) // main took the keys (Help shows only those)
+  const [held, setHeld] = useState({ open: false, shot: false, quick: false, tell: false }) // main took the keys (Help shows only those)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey).then(open => setHeld(h => ({ ...h, open })))), [hotkey])
   const shotKey = !view ? null : settings.shotAsk !== false && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey).then(shot => setHeld(h => ({ ...h, shot })))), [shotKey])
   const quickKey = !view ? null : settings.quickOn === true ? settings.quickKey ?? QUICK_KEY : '' // Q1: the quick bar's ('' none: off until turned on)
   useEffect(() => void (quickKey !== null && bridge?.quickKey?.(quickKey).then(quick => setHeld(h => ({ ...h, quick })))), [quickKey])
+  const tellKey = !view ? null : settings.tellOn === true ? settings.tellKey ?? TELL_KEY : '' // Q7: show and tell's ('' none: off until turned on)
+  useEffect(() => void (tellKey !== null && bridge?.tellKey?.(tellKey).then(tell => setHeld(h => ({ ...h, tell })))), [tellKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
   const updateDelay = settings.updateDelay ?? 0 // and its Update delay, days
   useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto, updateDelay)), [updateAuto, updateDelay])
@@ -3603,7 +3605,7 @@ export function App() {
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
     extInserts, extItems, extMenus, extModal, extOn, extRun, extWs, fail, find, findIn, fitFoot, floated, floatTab,
     flowItems, flowMenu, flowsHere, flowsOn, fold, folded, fontSize, footButtons, forkWs, full, gallery, gated, git,
-    going, group, groupMoves, groups, held, hereCtx, hist, histNav, historyOn, hotkey, quickKey, inBrowser, info, inReader,
+    going, group, groupMoves, groups, held, hereCtx, hist, histNav, historyOn, hotkey, quickKey, tellKey, inBrowser, info, inReader,
     inViewer, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutsOn, layoutWait,
     listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,

@@ -186,13 +186,14 @@ export type AppBase = {
   group: Layout | null
   groupMoves: (ws_: WorkspaceView[]) => MenuItem[]
   groups: Layout[]
-  held: { open: boolean; shot: boolean; quick: boolean }
+  held: { open: boolean; shot: boolean; quick: boolean; tell: boolean }
   hereCtx: () => WidgetCtx
   hist: RefObject<{ at: Place[]; i: number; going?: string | undefined }>
   histNav: false | React.JSX.Element
   historyOn: boolean
   hotkey: string | null
   quickKey: string | null // Q1: the quick bar's ('' off)
+  tellKey: string | null // Q7: show and tell's ('' off)
   inBrowser: (w: WorkspaceView, path: string) => undefined
   info: boolean
   inReader: (id: string) => boolean

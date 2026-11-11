@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
@@ -240,6 +240,8 @@ export type AppSettings = Paint & {
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
   quickOn?: boolean // Q1: the quick bar's global hotkey (unset: off)
   quickKey?: string // its keys (unset: QUICK_KEY)
+  tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
+  tellKey?: string // its keys (unset: TELL_KEY)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   updateDelay?: number // a release is offered once it's this many days old (Update delay; unset: at once)
   recording?: boolean // not this page's (⌘K's, the menu bar's): App's onSave leaves it out, as it does modelEfforts
@@ -1096,6 +1098,18 @@ export function SettingsPage(p: {
           bind={k => bridge!.quickKey!(k || '')}
           onOn={quickOn => set({ quickOn })}
           onKeys={quickKey => set({ quickKey })}
+        />
+      )}
+      {bridge.tellKey && (
+        <HotkeyField
+          on={s.tellOn === true}
+          keys={s.tellKey ?? TELL_KEY}
+          def={TELL_KEY}
+          title="Show and tell"
+          hint="From any app: pick a part of the screen, then the quick bar opens with it and the mic on. Say what to do with it, ⏎ sends both to an agent or a new task; E draws on it first, Esc drops both. The menu bar's and the bubbles' Show and tell too."
+          bind={k => bridge!.tellKey!(k || '')}
+          onOn={tellOn => set({ tellOn })}
+          onKeys={tellKey => set({ tellKey })}
         />
       )}
     </Group>

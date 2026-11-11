@@ -890,3 +890,20 @@ the text and says why. Its mic (⌘⇧M: cloud voice, else macOS dictation) and 
 `screenshot` with the bar hidden; its PNG into the box as `PromptInput`'s `shot`); *More…*: `quick-more`, the bar closed
 and `newWsWin(text)`. Its height follows the page (`quick-height`). Every IPC checks its sender (the quick window's
 webContents, `from(e, 'quick')`). ui-smoke's `quick-bar` step: the link, a line typed, Send, one more workspace.
+
+Show and tell (Q7): main's `tellShot` (its global hotkey `tell`: Settings' `tellOn` and `tellKey`, off until turned on,
+`TELL_KEY` ⌃⌥⌘T suggested, `tell-hotkey`; the menu bar's *Show and Tell…*; the bubbles' + › *Show and tell*,
+`floater-act` `tell`): `screenshot(true)` (the bubbles out of it), its PNG kept (`tellPng`) and `quickWin()`; the page's
+`bridge.onTell` says `quick-tell-ready` as it's up (`quickReady`, false again on a new window or a reload) and main sends
+`quick-tell` `{ png, mic, dictation }`: Laki's Microphone access (`getMediaAccessStatus`) and macOS dictation on
+(`defaults read com.apple.HIToolbox AppleDictationAutoEnable`). `QuickWindow`: the picture replaces any before it, into
+`PromptInput` as its `shot` (cloud voice starts with it); macOS dictation once the bar has the keyboard; neither: the box
+to type in (its placeholder says which). ⏎ sends both (`tell.ts` `handOff`, the quick bar's own send: the path in the
+words as a pasted image's for `send` and `wsNew`, an image for `aiAsk`); E in an empty box, or ⌘E, is `quick-annotate`:
+the bar hidden, `annotate(png, 'quick')`, whose Done sends `quick-tell` back (`edited`, its note added to the words) and
+whose close shows the bar again; Esc drops both. Screen Recording refused (`screenOff`: denied or restricted before the
+shot; not granted after one that brought no picture): `privacySay`, a notification naming it, a click opening its pane
+(`x-apple.systempreferences:…Privacy_ScreenCapture`); a cloud-voice Microphone refused: the bar says so with a link
+(`privacy-pane`). Never tried again by itself. Tests: `test/tell.test.ts` (`handOff`, and a path and words reaching an
+agent tab and a new workspace through the daemon); ui-smoke's `show-and-tell` step skips screencapture (the app's icon as
+the picture) and checks the bar has it.
