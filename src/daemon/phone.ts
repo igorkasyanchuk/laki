@@ -78,15 +78,19 @@ let tapping = false
 let tapFailed = '' // the last failure, logged once until a poll works
 let tapFor = '' // the webhook tapCursor is for: another one (Settings changed meanwhile) starts over
 const tapStart = (w: Webhook) => ((tapFor = `${w.format}|${w.url}`), (tapCursor = w.format === 'telegram' ? '' : String(Math.floor(Date.now() / 1000) - 5)))
+// the asks past their day, or no longer on screen as pushed: their taps dropped
+const prune = () => awaiting.forEach((a, k) => (a.until < Date.now() || !stillAsks(a)) && awaiting.delete(k))
 function listen(w: Webhook) {
-  if (tapStop || w.format === 'webpush') return // its taps come to /tap: nothing to poll
+  if (w.format === 'webpush') return prune() // its taps come to /tap: nothing to poll; the stale ones go as each new one comes
+  if (tapStop) return
   tapStart(w)
   tapStop = register('phoneTick', 5000, () => void phoneTick())
 }
 export async function phoneTick() {
   if (tapping) return
   const w = state.settings?.webhook
-  for (const [k, a] of awaiting) if (a.until < Date.now() || !stillAsks(a)) awaiting.delete(k)
+  prune()
+  if (w?.format === 'webpush') return void (tapStop?.(), (tapStop = undefined)) // switched to Web Push: its taps come to /tap, its asks kept
   if (!awaiting.size || !w?.answer || !w.url) return void (tapStop?.(), (tapStop = undefined), awaiting.clear())
   if (tapFor !== `${w.format}|${w.url}`) tapStart(w)
   tapping = true

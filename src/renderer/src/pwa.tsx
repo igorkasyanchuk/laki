@@ -16,15 +16,18 @@ const store = { on: (f: () => void) => (subs.add(f), () => void subs.delete(f)),
 
 export async function pwaStart() {
   if (!far) return
-  const add = (tag: string, attrs: Record<string, string>) => document.head.append(Object.assign(document.createElement(tag), attrs))
-  add('link', { rel: 'manifest', href: '/manifest.webmanifest' })
-  add('link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' })
-  add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' })
-  add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' })
-  add('meta', { name: 'theme-color', content: '#171412' })
-  window.addEventListener('beforeinstallprompt', e => (e.preventDefault(), (offer = e as unknown as typeof offer), seq++, tell()))
   stable = !!(await fetch('/manifest.webmanifest', { cache: 'no-store' }).catch(() => null))?.ok
-  if (stable && 'serviceWorker' in navigator) await navigator.serviceWorker.register('/sw.js').catch(() => {})
+  // an app's tags only at a stable address: iOS makes a Home Screen app of any page with apple-mobile-web-app-capable
+  const add = (tag: string, attrs: Record<string, string>) => document.head.append(Object.assign(document.createElement(tag), attrs))
+  if (stable) {
+    add('link', { rel: 'manifest', href: '/manifest.webmanifest' })
+    add('link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' })
+    add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' })
+    add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' })
+    add('meta', { name: 'theme-color', content: '#171412' })
+    window.addEventListener('beforeinstallprompt', e => (e.preventDefault(), (offer = e as unknown as typeof offer), seq++, tell()))
+    if ('serviceWorker' in navigator) await navigator.serviceWorker.register('/sw.js').catch(() => {})
+  }
   seq++
   tell()
 }
@@ -41,9 +44,12 @@ async function notifyOn() {
   const reg = await navigator.serviceWorker.ready
   const { key = '' } = await push({})
   const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
-  const j = (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw })).toJSON()
-  await push({ sub: { endpoint: j.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth } })
+  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw })
+  await told(s).catch(async e => (await s.unsubscribe().catch(() => {}), Promise.reject(e))) // the Mac said no: not left on as if it took it
 }
+// this device's subscription to the Mac: again at each start too, as a device paired anew (or one whose subscription
+// the Mac dropped) has none there while the browser still does
+const told = (s: PushSubscription) => (j => push({ sub: { endpoint: j.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth } }))(s.toJSON())
 const hid = (k: string) => {
   try {
     return localStorage.getItem(`laki.pwa.${k}`) === '1'
@@ -59,7 +65,7 @@ export function PwaBar() {
   const [said, setSaid] = useState('')
   const [, redraw] = useState(0)
   const [on, setOn] = useState(false)
-  useEffect(() => void (far && installed() && navigator.serviceWorker?.ready.then(r => r.pushManager.getSubscription()).then(s => setOn(!!s), () => {})), [])
+  useEffect(() => void (far && installed() && navigator.serviceWorker?.ready.then(r => r.pushManager.getSubscription()).then(s => s && told(s).then(() => setOn(true))).catch(() => {})), [])
   if (!far || stable === undefined) return null
   const kind = installed() ? (on || !('Notification' in window) ? '' : 'notify') : stable ? 'install' : 'unstable'
   if (!kind || hid(kind)) return null

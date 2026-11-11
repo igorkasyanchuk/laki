@@ -66,6 +66,8 @@ export function askMinutes(v: string): number | string {
   return n >= 1 && n <= ASK_WAIT_MAX ? n : `${v}? minutes or hours (90, 2h), a week at most`
 }
 export const askWait = (n: number) => (n % 60 ? `${n}` : `${n / 60}h`) // as the file says it
+// how long until a deadline, in words: 2h, 1h 12m, 45m (the run's log, its view)
+export const leftWords = (ms: number) => (m => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`))(Math.max(1, Math.ceil(ms / 60000)))
 
 export type Option = { label: string; to?: string }
 export type Block = {

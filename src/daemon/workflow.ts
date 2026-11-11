@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { queueOrder, ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
@@ -1300,13 +1300,11 @@ function waitTick(r: FlowRun, b: Block, now: number) {
 
 function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number } | { until: number; fallback?: string; remindAt?: number }) {
   Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind, question, ...(show && { show }), options, ...more } })
-  say(r, `asks you: ${question}${more && 'until' in more ? ` (no answer in ${left(more.until - Date.now())}: ${more.fallback})` : ''}`, show)
+  say(r, `asks you: ${question}${more && 'until' in more ? ` (no answer in ${leftWords(more.until - Date.now())}: ${more.fallback})` : ''}`, show)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
   flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, question, options, show)
 }
-// how long until a deadline, in words: 2h, 1h 12m, 45m
-const left = (ms: number) => (m => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`))(Math.max(1, Math.ceil(ms / 60000)))
 // W8: an ask with a deadline, at each tick: its reminder once (a notification, a push with its choices when it says
 // phone: yes), then past it its else, decided as no one's (you: false)
 function askTick(r: FlowRun, b: Block, w: Extract<FlowWait, { kind: 'ask' | 'confirm' | 'stuck' }>, now: number) {
@@ -1316,11 +1314,11 @@ function askTick(r: FlowRun, b: Block, w: Extract<FlowWait, { kind: 'ask' | 'con
     if (n < 0) return
     r.vars.answer = w.fallback
     Object.assign(r, { status: 'running' as FlowStatus, wait: undefined })
-    return leave(r, b, w.fallback, `no answer in ${left(b.deadline ? b.deadline * 60000 : w.until - (r.at ?? w.until))}: ${w.fallback}`)
+    return leave(r, b, w.fallback, `no answer in ${leftWords(b.deadline ? b.deadline * 60000 : w.until - (r.at ?? w.until))}: ${w.fallback}`)
   }
   if (w.remindAt === undefined || w.reminded || now < w.remindAt) return
   w.reminded = true
-  const text = `${w.question} (no answer in ${left(w.until - now)}: ${w.fallback})`
+  const text = `${w.question} (no answer in ${leftWords(w.until - now)}: ${w.fallback})`
   say(r, `reminds you: ${text}`)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text })

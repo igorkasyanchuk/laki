@@ -129,6 +129,4 @@ Where Laki is going next (the maintainer's call; it moves as releases do):
 
 - **A tighter binary**: the daemon, CLI and hooks on a helper binary of their own, so the app's `runAsNode` fuse can
   be turned off.
-- **The phone as an app**: remote access's page installable on a phone's home screen, with notifications that answer
-  an agent.
 - **Linux out of preview**: the AppImage tested and supported as macOS is.
