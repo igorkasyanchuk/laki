@@ -1635,7 +1635,10 @@ ipcMain.on('floater-drop', (e, to: unknown, d: unknown) => {
 // a picture dropped with no file of its own (from a page, say): saved as one, its path back
 ipcMain.handle('floater-image', async (e, data: unknown, ext: unknown) => {
   if (!floater || e.sender !== floater.webContents || typeof data !== 'string' || data.length > 28 << 20) return { error: 'not a picture' }
-  return rpc<{ path: string }>('imageSave', { data, ext: typeof ext === 'string' ? ext : 'png' }).catch((err: Error) => ({ error: err.message }))
+  return rpc<string>('imageSave', { data, ext: typeof ext === 'string' ? ext : 'png' }).then(
+    path => ({ path }),
+    (err: Error) => ({ error: err.message }),
+  )
 })
 ipcMain.handle('floater-drop-send', async (e, tab: unknown, text: unknown) => {
   if (!card || e.sender !== card.webContents || typeof tab !== 'string' || tab !== pinned.tab || dropFor?.tab !== tab) return { error: 'not the dropped-on card' }
