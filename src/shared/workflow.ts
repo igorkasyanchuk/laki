@@ -951,9 +951,9 @@ export const FLOW_ENDED: FlowStatus[] = ['done', 'stopped', 'failed']
 export const runOf = (r: { workflow: string; source: WorkflowSource; project: string }, w: { id: string; source: WorkflowSource; project?: string }) => r.workflow === w.id && r.source === w.source && (w.source !== 'project' || r.project === w.project)
 export type Decision = { at: number; block: string; exit: string; why: string; ms?: number; you?: boolean; bad?: boolean }
 // what a run waits on: an ask (yours, a confirm before an outward action, a stuck block), an agent's turn, a command,
-// a wait block, a usage limit, your Resume
+// a wait block, a usage limit, your Resume; sim: a simulated block's way, yours to pick (W7)
 export type FlowWait =
-  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number; capped?: boolean; until?: number; fallback?: string; remindAt?: number; reminded?: boolean } // until, fallback: an ask's deadline (W8: absolute, a restart keeps it) and the option it takes then; remindAt: when it reminds you (reminded: it did); tab, used: a stalled agent's or one past its $ budget mid turn (stuck), what its block's turn has had of its timeout; capped: that one's turn stopped at twice its budget (W2)
+  | { kind: 'ask' | 'confirm' | 'stuck' | 'sim'; question: string; show?: string; options: string[]; tab?: string; used?: number; capped?: boolean; until?: number; fallback?: string; remindAt?: number; reminded?: boolean } // until, fallback: an ask's deadline (W8: absolute, a restart keeps it) and the option it takes then; remindAt: when it reminds you (reminded: it did); tab, used: a stalled agent's or one past its $ budget mid turn (stuck), what its block's turn has had of its timeout; capped: that one's turn stopped at twice its budget (W2)
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
   | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
@@ -976,6 +976,7 @@ export type FlowRun = {
   where: Workflow['where']
   session: Workflow['session']
   dry?: boolean // outward actions said, not done
+  sim?: FlowSim // W7: simulated: nothing runs, each block's way given, replayed or picked
   task: string
   trigger: string
   by?: string // an agent started it (flowStart's by: 'agent') or its event did: whose; its flow.ended is that agent's too
@@ -1005,12 +1006,15 @@ export type FlowRun = {
   shown?: Shown[] // what its Show you blocks showed, the last 20
 }
 export type Shown = { at: number; block: string; title: string; body: string }
+// W7: a simulation's: the answers given (a block's exit, or one per visit, the last for the rest), the run it replays,
+// each block's visits so far, what each would have been sent (the newest SIM_SENT), its steps (SIM_STEPS at most)
+export type FlowSim = { from?: string; answers?: Record<string, string | string[]>; n: Record<string, number>; sent: { block: string; n: number; what: string }[]; steps?: number }
 export const SHOWN_MAX = 512 << 10 // a Show you's body
 export type FlowView = Omit<FlowRun, 'flow' | 'log' | 'decisions' | 'vars' | 'tabs' | 'resume' | 'shown'> & { name: string; block?: string; decisions: number; last?: Decision } // the view's: the details come from flowGet
 export const flowView = ({ flow, log, decisions, vars, tabs, resume, shown, ...r }: FlowRun): FlowView => {
   const b = flow.blocks.find(x => x.id === r.cur)
   const wait = r.wait && 'show' in r.wait ? { ...r.wait, show: undefined } : r.wait // an agent's whole answer: flowGet has it
-  return { ...r, wait, name: flow.name, block: b && blockName(b), decisions: decisions.length, last: decisions.at(-1) }
+  return { ...r, wait, name: flow.name, block: b && blockName(b), decisions: decisions.length, last: decisions.at(-1), ...(r.sim && { sim: { ...r.sim, sent: [] } }) } // a simulation's sent: flowGet's
 }
 
 // the format in words: MCP's laki_workflow_write and Laki AI's guide to writing one

@@ -82,6 +82,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow [ls]                             workflows and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…] [--budget "30 min, $2"]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs; --budget: its working time and AI cost, past either it asks)
   laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]  as if on an event (its on: unless named; the last one heard, else a sample in --ws; --dry: its variables and only when: tests first)
+  laki flow run <workflow> [project] [task] --simulate [--from <run>] [--answer block=exit…]  nothing runs: each block's way from --answer (again for the next visit), else that run's, else it asks; exit 0 at a done end
   laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki flow pause|resume <run>               pause after the block it's on (no next block starts) | go on from there
@@ -401,6 +402,7 @@ event or a schedule only once the user allows it as it is. answer is the user's 
   laki flow run fix-ci "Fix the failing check" --ws .
   laki flow run fix-ci --event --ws . --dry
   laki flow run fix-issue shop "Fix it" --set issue=1423 --set base=main
+  laki flow run fix-ci shop --simulate --answer test=fail --answer test=fail --answer test=ok
   laki flow check .laki/workflows/ship.md`,
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network

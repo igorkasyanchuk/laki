@@ -20,13 +20,14 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
+const answers: string[] = [] // --answer block=exit, again and again: a simulated run's ways (W7)
 const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const VALUED = new Set(['out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
+const BOOL = new Set(['simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -60,6 +61,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && !args.length && a === '--version') args.push('version') // A9: laki --version
   else if (!textOnly && args.length && args[0] !== 'hook' && /^--[a-z]/i.test(a) && optNo(a)) continue // never: optNo exits
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
+  else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--answer') answers.push(argv[++i] ?? '') // flow run --simulate's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
@@ -731,7 +733,24 @@ async function main() {
           const r: Tried = await rpc('flowEvent', { ...ask, go: true }, 180000)
           return out(r, `${r.run}  on ${r.name}`)
         }
-        if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | --event [<name>] [--event-json <file|->]')
+        if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | --event [<name>] [--event-json <file|->] | --simulate [--from <run>] [--answer block=exit…]')
+        if (flags.simulate) {
+          // W7: nothing runs: each block's way from --answer (once: every visit; again: one per visit, the last for the
+          // rest), else --from's run, else it stops to ask. Exit 0 when it reaches a done end
+          const ways: Record<string, string[]> = {}
+          for (const a of answers) {
+            const i = a.indexOf('=')
+            if (i < 1) throw new Error(`--answer ${a}? block=exit`)
+            ;(ways[a.slice(0, i).trim()] ??= []).push(a.slice(i + 1).trim())
+          }
+          const given = Object.fromEntries(Object.entries(ways).map(([k, v]) => [k, v.length === 1 ? v[0] : v]))
+          let r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), ...(sets.length && { inputs }), simulate: { ...(typeof flags.from === 'string' && { from: flags.from }), ...(answers.length && { answers: given }) }, caller: caller() })
+          for (let i = 0; i < 200 && r.status === 'running'; i++) r = await new Promise(ok => setTimeout(ok, 50)).then(() => rpc('flowGet', { id: r.id })) // it goes through at once, unless it asks
+          const name = (b: string) => blockName(r.flow.blocks.find(x => x.id === b) ?? { id: b, kind: 'agent' })
+          const asks = r.status === 'waiting' && r.wait && 'options' in r.wait ? [`asks: ${r.wait.question}`, ...r.wait.options.map((o, n) => `  ${n}. ${o}`), `(laki flow answer ${r.id} <n>)`] : []
+          if (r.status !== 'done') process.exitCode = 1
+          return out(r, [`${r.id}  simulated: ${status(r)}`, ...r.decisions.map(d => `${name(d.block)} → ${d.exit}: ${d.why}`), ...(r.sim?.sent.length ? ['', 'would be sent:', ...r.sim.sent.map(x => `${name(x.block)}${x.n > 1 ? ` (${x.n})` : ''}: ${x.what.replace(/\s+/g, ' ').slice(0, 160)}`)] : []), ...(asks.length ? ['', ...asks] : [])].join('\n'))
+        }
         const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }

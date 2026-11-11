@@ -1691,6 +1691,13 @@ one: no next block, try again or archive starts, its working time stops, and a r
 (`laki flow resume <run>`) goes on from there, without running a finished block again; while it's still pausing,
 *Keep going* takes the pause back. *Stop run* ends it at once (its agents stay as they are, in their tabs).
 
+*Simulate* (next to *Run* in the editor, `laki flow run … --simulate`) walks a workflow's blocks with nothing run: no
+workspace, agent, command or request. Each block shows what it would be sent (the prompt, the command, the request) and
+takes a way: the only one it has, else the way a run of it went at that visit (*Its ways*, `--from <run>`), else yours to
+pick on the run's page (`--answer test=fail`, once for every visit, again for the next ones). Loops, a block's *at
+most* and the ends work as in a run, so you see which path it takes before anything happens. A simulation doesn't
+count in a workflow's stats or its *at once*, and tells you nothing outside its page; the CLI exits 0 when it ends done.
+
 Each workflow's row says how its runs went: how many, ✓ the share of the last 30 days' that ended done, ⏱ a done run's
 median time and $ what a run spends on average (at API prices: its AI calls, decisions and Claude's and Codex's turns). A workflow
 that starts by itself (an event, a schedule) and fails 5 times in a row is paused: a notification says so, events and
@@ -1708,6 +1715,7 @@ laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is t
 laki flow run fix-ci --event --ws . --dry      # as if on its on: event (the last one, else a sample; --event-json <file|->: yours)
 laki flow run my-flow app "add CSV" --budget "30 min, $2"   # this run's budget: past it, it asks
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
+laki flow run fix-ci app --simulate --answer test=fail --answer test=ok   # nothing runs: the path its blocks take (--from <run>: that run's ways)
 laki flow on <workflow>                        # turn on again one paused after 5 failed runs in a row
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
 laki flow check .laki/workflows               # check workflow files (a folder: each .md), no app needed: CI, a hook

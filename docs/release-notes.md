@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- *Simulate* a workflow (next to *Run*, or `laki flow run … --simulate`): it walks the blocks with nothing run, shows what each would be sent, and goes the way you pick, or the way an earlier run went, so you see its path, loops and limits before anything happens. It counts in no stats and notifies no one.
 - Scheduled tasks stop at a time limit and take turns: a run stops after 60 minutes of its agent's working time (waiting for you isn't counted; its chat stays, to go on), told like a failure, and at most 2 run at once, the rest waiting their turn in order. Change both on a task's clock chip, for it or for every task.
 - Drop files, a picture, text or a link on a bubble: its card asks what to do with it and sends that with the files' paths to the agent (Laki never reads or uploads them); on the + the quick bar opens with them.
 - Say who it's for first: in the talk key's pill and the bubbles' *Say it*, "Checkout flow, fix the button" goes to that workspace's agent, "New task in Shop: …" to a new task there, and "Laki, …" to Laki AI. It shows where it goes for a moment (Tab changes it, Esc stops it). Settings › Voice › *Route by first words*.

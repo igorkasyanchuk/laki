@@ -827,7 +827,7 @@ function goingNow(agents: boolean) {
   const soon = Date.now() + WHEN_DONE_AHEAD
   return (
     agents ||
-    (state.flows ?? []).some(r => r.status === 'running' || r.status === 'waiting' || r.status === 'queued' || r.status === 'paused') ||
+    (state.flows ?? []).some(r => !r.sim && (r.status === 'running' || r.status === 'waiting' || r.status === 'queued' || r.status === 'paused')) || // a simulation (W7) does nothing
     (state.schedules ?? []).some(s => s.on && s.next !== undefined && s.next <= soon) ||
     state.workspaces.some(w => !w.archived && w.pending && !w.pending.failed && (w.pending.at === undefined || w.pending.at <= soon))
   )

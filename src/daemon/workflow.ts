@@ -311,7 +311,7 @@ const live = (r: FlowRun) => !FLOW_ENDED.includes(r.status)
 // #5: what a run causes (its workspace, tabs, ship, archive): its id and one hop more than the event that started it (core's Cause)
 const hop = (r: FlowRun) => (r.hops ?? 0) + 1
 const cause = (r: FlowRun) => ({ run: r.id, hops: hop(r) })
-const going = (r: FlowRun) => live(r) && r.status !== 'queued' // what at once: counts
+const going = (r: FlowRun) => live(r) && r.status !== 'queued' && !r.sim // what at once: counts (a simulation never)
 const procs = new Map<string, ChildProcess>() // a run block's command, by run
 const calls = new Map<string, AbortController>() // an AI call's or a webhook's request, by run
 const blockOf = (r: FlowRun, id?: string) => r.flow.blocks.find(b => b.id === id)
@@ -398,7 +398,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string; tab?: string } // evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string; tab?: string; simulate?: { from?: string; answers?: Record<string, string | string[]> } } // simulate (W7): simStart's; evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
 
 // the tab you picked in Run: an agent tab of the run's workspace, alive (picked() refuses a workspace a live run has);
 // its agent's blocks that run in the run's session (session: run) go to it, as `run:<preset>` keys. Never an agent's
@@ -438,6 +438,7 @@ function rerun(o: Start, old: FlowRun): Start {
 
 export async function flowStart(o: Start) {
   on()
+  if (o.simulate) return simStart(o)
   const old = o.again || o.from ? flowGet({ id: String(o.again ?? o.from?.run ?? '') }) : undefined
   if (old) o = rerun(o, old)
   const mine = o.tab ? tabOf(o.tab) : undefined // Run's Agent tab: a session of yours its agent's blocks go to
@@ -508,6 +509,103 @@ export async function flowStart(o: Start) {
   }
   touch()
   return begin(r)
+}
+
+// W7: a simulation: the engine's way through the blocks (visits, max, retries, Pause, ends) with nothing run: no
+// workspace, tab, process, request, notification or phone push. Each block's way: a block with one takes it; else your
+// answer (its exit, or a list by visit, the last for the rest); else the way the from run went at that visit; else it
+// asks you which (wait sim). Kept out of at once and the queue (going), stats (tally), events, schedules and budgets; a
+// schedule or an event never starts one (only flowStart's simulate). Not refused for trust: nothing of it runs, not even
+// a case's js (a choice or a case takes a way as any block does)
+const SIM_STEPS = 500 // blocks a simulation goes through at most: answers that go round a loop for ever stop there
+const SIM_SENT = 200
+const SIM_WHAT = 8000
+function simAnswers(v: unknown, wf: Workflow) {
+  if (v == null) return undefined
+  if (typeof v !== 'object' || Array.isArray(v)) throw new Error('answers? { block: exit } (or a list of exits, one per visit)')
+  const out: Record<string, string | string[]> = {}
+  for (const [id, a] of Object.entries(v as Record<string, unknown>)) {
+    const b = wf.blocks.find(x => x.id === id)
+    if (!b) throw new Error(`${id}: no such block in ${wf.name}`)
+    const ways = exitsOf(b).filter(e => !e.max).map(e => e.name)
+    const list = (Array.isArray(a) ? a : [a]).map(x => String(x ?? '').trim())
+    const bad = list.find(x => !ways.includes(x))
+    if (!list.length || bad !== undefined) throw new Error(`${id}=${bad ?? ''}? its ways: ${ways.join(', ') || 'none'}`)
+    out[id] = Array.isArray(a) ? list : list[0]
+  }
+  return Object.keys(out).length ? out : undefined
+}
+function simStart(o: Start) {
+  const ws = o.ws ? findWs(o.ws) : undefined
+  const project = ws?.project ?? o.project
+  if (!project) throw new Error('which project? (or a workspace: ws)')
+  const wf = flowFind({ id: o.workflow, source: o.source, project })
+  if (wf.source === 'builtin') throw template(wf.name)
+  if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
+  const proj = findProject(project)
+  const old = o.simulate!.from ? flowGet({ id: String(o.simulate!.from) }) : undefined
+  if (old && !runOf(old, wf)) throw new Error(`run ${old.id} is ${old.flow.name}'s, not ${wf.name}'s`)
+  const answers = simAnswers(o.simulate!.answers, wf)
+  const task = String(o.task ?? '').trim()
+  const start = wf.blocks.find(b => b.kind === 'start')!
+  const inputs = inputVals(start.inputs, Object.fromEntries(Object.entries(o.inputs ?? {}).map(([k, v]) => [k, String(v ?? '')])))
+  const { source, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, events: _e, budget: _b, ...flow } = wf
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, sim: { ...(old && { from: old.id }), ...(answers && { answers }), n: {}, sent: [] }, task, trigger: 'simulate', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), status: 'running', visits: {}, vars: { task, project: proj.name, ...inputs }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  runs().push(r)
+  say(r, `${wf.name} (simulated): ${task || 'started'}`)
+  say(r, `nothing runs: each block's way is ${answers ? 'your answer, else ' : ''}${old ? `the way run ${old.id} went, else ` : ''}yours to pick`)
+  touch()
+  enter(r, start)
+  return r
+}
+// what a block would have been sent: an agent's prompt, a command, a request, an AI call's prompt, an ask's question
+function simWhat(r: FlowRun, b: Block, vars: Record<string, string>): string {
+  const f = (t?: string) => (t ? fill(t, vars) : '')
+  switch (b.kind) {
+    case 'agent': {
+      const acts = (l?: RunAction[]) => l?.filter(a => a.target !== 'shell')
+      const action = findAction(acts(state.settings?.actions), acts(state.projects.find(p => p.id === r.project)?.config?.actions), b.use)
+      return [`${b.agent || 'claude'}${b.use && !action ? ` (no agent action “${b.use}” here)` : ''}:`, ...[action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => dataFill(r, t!, vars)), b.out?.length ? outAsk(b.out) : b.json && jsonAsk].filter(Boolean).join('\n\n')
+    }
+    case 'run':
+      return `$ ${f(b.cmd)}`
+    case 'llm':
+      return [b.system && `system: ${dataFill(r, b.system, vars)}`, dataFill(r, b.text ?? '', vars), b.out?.length && outAsk(b.out)].filter(Boolean).join('\n\n')
+    case 'decide':
+      return [...(b.qs ?? []).map(q => `${q.name}?`), f(b.text)].filter(Boolean).join('\n')
+    case 'webhook':
+      return `${b.method ?? 'POST'} ${f(b.url)}${b.from ? `\nbody: ${f(b.from)}` : b.text ? `\n${f(b.text)}` : ''}`
+    case 'action':
+      return `${ACTIONS[b.action!] ?? b.action}${b.text ? `: ${f(b.text)}` : ''}`
+    case 'popup':
+      return [f(b.title) || blockName(b), f(b.text)].filter(Boolean).join('\n\n')
+    case 'ask':
+      return [f(b.question), f(b.show)].filter(Boolean).join('\n\n')
+    case 'save':
+      return b.link ? `link ${f(b.link)}` : `${f(b.file)}${b.from ? ` (from ${f(b.from)})` : ''}`
+    case 'extension':
+      return `fetch ${b.extension ?? ''}`
+    default:
+      return '' // start, choice, case, wait: nothing goes out
+  }
+}
+async function simWork(r: FlowRun, b: Block, vars: Record<string, string>) {
+  await null // a step a microtask: a long way through doesn't grow the stack
+  if (!live(r) || r.cur !== b.id) return
+  const sim = r.sim!
+  if ((sim.steps = (sim.steps ?? 0) + 1) > SIM_STEPS) return stuck(r, b, `${SIM_STEPS} blocks simulated: the answers go round a loop`)
+  const n = (sim.n[b.id] = (sim.n[b.id] ?? 0) + 1)
+  const what = simWhat(r, b, vars).trim().slice(0, SIM_WHAT)
+  if (what) (sim.sent = [...sim.sent, { block: b.id, n, what }].slice(-SIM_SENT))
+  say(r, `${blockName(b)}${what ? ' would be sent' : ''} (simulated)`, what)
+  const ways = exitsOf(b).filter(e => !e.max).map(e => e.name)
+  const a = sim.answers?.[b.id]
+  const given = Array.isArray(a) ? a[Math.min(n, a.length) - 1] : a
+  const was = sim.from ? runs().find(x => x.id === sim.from)?.decisions.filter(d => d.block === b.id && ways.includes(d.exit))[n - 1] : undefined
+  if (ways.length === 1) return leave(r, b, ways[0], 'its one way')
+  if (given !== undefined) return leave(r, b, given, `your answer${Array.isArray(a) ? ` (visit ${n})` : ''}`)
+  if (was) return leave(r, b, was.exit, `as run ${sim.from} went (visit ${n})`)
+  ask(r, 'sim', `${blockName(b)}: which way does it go?`, what || undefined, [...ways, 'Stop the run'])
 }
 
 // a run gets its workspace (the one it was given, checked again: a queued one waited; else a new worktree or the
@@ -596,7 +694,7 @@ function retry(r: FlowRun, b: Block, why: string) {
   const n = r.tries?.[b.id] ?? 0
   if (!b.retry || !RETRY_KINDS.includes(b.kind) || n >= b.retry) return false
   if (b.kind === 'run' && b.retryOn?.length && !b.retryOn.includes(Number(r.vars[`steps.${b.id}.code`]))) return false
-  const secs = RETRY_WAIT[Math.min(n, RETRY_WAIT.length - 1)]
+  const secs = r.sim ? 0 : RETRY_WAIT[Math.min(n, RETRY_WAIT.length - 1)] // a simulation's: at once
   ;(r.tries ??= {})[b.id] = n + 1
   const until = Date.now() + secs * 1000
   Object.assign(r, { status: 'running' as FlowStatus, wait: { kind: 'retry', until } })
@@ -614,6 +712,7 @@ function again(r: FlowRun, b: Block, until?: number) {
 
 async function work(r: FlowRun, b: Block) {
   const vars = varsOf(r)
+  if (r.sim && b.kind !== 'end') return simWork(r, b, vars)
   switch (b.kind) {
     case 'start':
       return leave(r, b, 'next', r.dry ? 'started (dry run: outward actions are said, not done)' : 'started')
@@ -1328,16 +1427,17 @@ function waitTick(r: FlowRun, b: Block, now: number) {
   }
 }
 
-function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number } | { until: number; fallback?: string; remindAt?: number }) {
+function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck' | 'sim', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number } | { until: number; fallback?: string; remindAt?: number }) {
   Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind, question, ...(show && { show }), options, ...more } })
   say(r, `asks you: ${question}${more && 'until' in more ? ` (no answer in ${leftWords(more.until - Date.now())}: ${more.fallback})` : ''}`, show)
   touch()
+  if (r.sim) return // a simulation's: its page asks, nothing notifies
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
   flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, question, options, show)
 }
 // W8: an ask with a deadline, at each tick: its reminder once (a notification, a push with its choices when it says
 // phone: yes), then past it its else, decided as no one's (you: false)
-function askTick(r: FlowRun, b: Block, w: Extract<FlowWait, { kind: 'ask' | 'confirm' | 'stuck' }>, now: number) {
+function askTick(r: FlowRun, b: Block, w: Extract<FlowWait, { kind: 'ask' | 'confirm' | 'stuck' | 'sim' }>, now: number) {
   if (!w.until || !w.fallback) return
   if (now >= w.until) {
     const n = w.options.indexOf(w.fallback)
@@ -1396,6 +1496,7 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
     if (budgetAsked(w) && w.tab && tabStatus(w.tab) === 'running') coreInput(w.tab, '\x1b') // past its budget mid turn: the turn stops with it
     return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
   }
+  if (w.kind === 'sim') return leave(r, b, label, `you picked ${label}`, true), r // W7
   if (w.kind === 'stuck' && label.startsWith('Give it ') && r.budget) {
     // its budget, past: half of its first one more than it used (a turn may run past it), this run only; the block
     // again, its visit and turns as they were; an agent's turn still under way goes on instead (W2)
@@ -1436,7 +1537,7 @@ function sample(r: FlowRun, now = Date.now()) {
 // a dry run never stops for it
 function spend(r: FlowRun, now = Date.now()): 'time' | 'money' | undefined {
   sample(r, now)
-  if (!r.budget || r.dry) return
+  if (!r.budget || r.dry || r.sim) return
   if (r.budget.ms && (r.spent ?? 0) >= r.budget.ms) return 'time'
   if (r.budget.usd && costNow(r) >= r.budget.usd) return 'money'
 }
@@ -1483,6 +1584,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   tally(r)
   touch()
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
+  if (r.sim) return void next() // W7: no event, notification, push, schedule or archive
   widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, { ...(r.by && { from: { agent: r.by } }), hops: (r.hops ?? 0) + 1 }) // an agent's run: its end is the agent's event; one hop more than the event that started it
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
@@ -1495,7 +1597,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
 // starts them over, a stopped one leaves them be); the PAUSE_AFTERth in a row that started by itself pauses it. Cost:
 // its AI calls', decisions' and agents' turns' (not those of agents Laki can't price: uncounted)
 function tally(r: FlowRun) {
-  if (r.dry) return
+  if (r.dry || r.sim) return
   const k = agentKey(r.source, r.workflow, r.source === 'project' ? r.project : undefined)
   const st = ((state.flowStats ??= {})[k] ??= { total: 0, recent: [], fails: 0 })
   st.total++

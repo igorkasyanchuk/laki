@@ -82,7 +82,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
   }, [nav])
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
   const [startWs, setStartWs] = useState(first?.start?.ws) // Run workflow › from a workspace's menu or ⌘K: that one, fixed
-  const startIn = (w: WorkflowItem | null, ws?: string) => (setStartWs(ws), setStarting(w))
+  const [simming, setSimming] = useState(false) // W7: the sheet simulates instead
+  const startIn = (w: WorkflowItem | null, ws?: string, sim = false) => (setStartWs(ws), setSimming(sim), setStarting(w))
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
@@ -394,7 +395,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                     <span className="wf-status-dot" />
                     <b>{r.task || r.name}</b>
                     <span className="muted">
-                      {r.name} · {r.status === 'waiting' && r.wait?.kind === 'ask' && r.wait.until ? `waits for you · ${leftWords(r.wait.until - Date.now())} left` : statusWords(r)}
+                      {r.name}{r.sim ? ' (simulated)' : ''} · {r.status === 'waiting' && r.wait?.kind === 'ask' && r.wait.until ? `waits for you · ${leftWords(r.wait.until - Date.now())} left` : statusWords(r)}
                       {!ended(r) && r.block ? ` · ${atEnd(r) ? 'the end' : r.block}` : ''}
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
@@ -438,6 +439,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
               onSaved={w => (refresh(), setAt({ kind: 'wf', sel: w }))}
               onRemove={() => removeWf(cur).then(y => y && (drafts.delete(keyOf(cur)), setAt({ kind: 'index' })))}
               onRun={() => startIn(cur)}
+              onSim={() => startIn(cur, undefined, true)}
               onOpenRun={id => setAt({ kind: 'run', id })}
               onCopy={() => create(intoOf(cur), cur)}
               onTurnOn={() => turnOn(cur)}
@@ -449,7 +451,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
         </div>
       )}
       {using && <UseTemplate item={using} projects={projects} list={list ?? []} api={api} onClose={() => setUsing(null)} onMade={w => (setUsing(null), refresh(), setAt({ kind: 'wf', sel: w }))} />}
-      {starting && <StartRun item={starting} projects={projects} presets={presets} workspaces={view.workspaces} tabs={view.tabs} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
+      {starting && <StartRun item={starting} sim={simming ? (view.flows ?? []).filter(x => runOf(x, starting) && !x.sim && x.decisions > 1) : undefined} projects={projects} presets={presets} workspaces={view.workspaces} tabs={view.tabs} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
       {menu}
     </Page>
   )
@@ -762,7 +764,7 @@ function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, on
 
 // ---------- the editor: canvas and inspector, or the file
 
-function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy, onTurnOn, onUse }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void; onUse: () => void }) {
+function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onSim, onOpenRun, onCopy, onTurnOn, onUse }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onSim: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void; onUse: () => void }) {
   const ro = item.source === 'builtin' // a template: looked at here, changed in a copy (Use this…)
   const [text, setText] = useState(drafts.get(keyOf(item)) ?? item.text)
   const [mode, setMode] = useState<'canvas' | 'file'>('canvas')
@@ -958,6 +960,9 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
             ])
           }
         />
+        <button className="btn" disabled={problems.length > 0 || dirty} onClick={onSim} data-tip={problems[0] ?? (dirty ? 'Save it first' : 'Walk its blocks with nothing run: you pick each way, or replay a run of it')}>
+          <Icon name="flow" size={12} /> Simulate
+        </button>
         <button className="btn primary" disabled={problems.length > 0 || dirty} onClick={onRun} data-tip={problems[0] ?? (dirty ? 'Save it first' : 'Start a run')}>
           <Icon name="run" size={12} /> Run
         </button>
@@ -2170,14 +2175,16 @@ function UseTemplate({ item, projects, list, api, onClose, onMade }: { item: Wor
 
 type Tried = { name: string; from: string; last?: { at: number; ws?: string }; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string } // flowEvent's
 // fixed: the workspace it runs in (its ⋯ › Run workflow, ⌘K); runs in: here without one picks it here
-function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; tabs: RunTab[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
+// sim (W7): Simulate's: its runs to replay; no workspace, agent tab, event, budget or dry run, the task optional
+function StartRun({ item, sim, projects, presets, workspaces, tabs, fixed, api, onClose, onStarted }: { item: WorkflowItem; sim?: FlowView[]; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; tabs: RunTab[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
+  const [from, setFrom] = useState('')
   const fix = workspaces.find(w => w.id === fixed)
   const ok = projects.filter(p => !p.host && (item.source !== 'project' || p.id === item.project) && (item.where !== 'worktree' || p.git !== false || p.id === fix?.project))
   const [project, setProject] = useState(fix?.project ?? item.project ?? ok[0]?.id ?? '')
   const [ws, setWs] = useState('') // runs in: here, none fixed: one of the project's
   const choices = workspaces.filter(w => w.project === project && !w.archived && !w.host)
   const taskIs = item.blocks.find(b => b.kind === 'start')?.input
-  const needsTask = taskIs === 'task'
+  const needsTask = taskIs === 'task' && !sim
   const [task, setTask] = useState('')
   const [dry, setDry] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -2218,6 +2225,11 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
         r => onStarted(r.run!),
         e => (setBusy(false), setErr((e as Error).message)),
       )
+    if (sim)
+      return void api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, task, ...(inputs.length && { inputs: vals }), simulate: { ...(from && { from }) } }).then(
+        r => onStarted(r.id),
+        e => (setBusy(false), setErr((e as Error).message)),
+      )
     api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, budget, ...(runWs && { ws: runWs }), ...(inTab && { tab: inTab }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
@@ -2226,9 +2238,9 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
   return (
     <div className="overlay" onPointerDown={e => e.target === e.currentTarget && !busy && onClose()}>
       <form className="modal wf-start" onSubmit={e => (e.preventDefault(), go())} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), onClose())}>
-        <b>Run {item.name}</b>
-        <span className="wf-hint">{fix ? `Runs in ${fix.name ?? fix.id}, the workspace you picked` : WHERES[item.where]} · {SESSIONS[item.session]}</span>
-        {item.untrusted && <span className="wf-agent">From this repo, {item.changed ? 'changed since you allowed it' : 'not allowed yet'}: read it before you run it.</span>}
+        <b>{sim ? 'Simulate' : 'Run'} {item.name}</b>
+        <span className="wf-hint">{sim ? 'Nothing runs: no workspace, agent, command or request. Each block shows what it would be sent; you pick the way it goes, or a run of it decides.' : `${fix ? `Runs in ${fix.name ?? fix.id}, the workspace you picked` : WHERES[item.where]} · ${SESSIONS[item.session]}`}</span>
+        {item.untrusted && !sim && <span className="wf-agent">From this repo, {item.changed ? 'changed since you allowed it' : 'not allowed yet'}: read it before you run it.</span>}
         <label className="wf-field">
           <span>Project</span>
           <select value={project} onChange={e => (setProject(e.target.value), setWs(''))} disabled={item.source === 'project' || !!fix}>
@@ -2237,7 +2249,21 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
             ))}
           </select>
         </label>
-        {item.on && (
+        {sim && (
+          <label className="wf-field">
+            <span>Its ways</span>
+            <select value={from} onChange={e => setFrom(e.target.value)}>
+              <option value="">You pick each one</option>
+              {sim.slice(0, 20).map(x => (
+                <option key={x.id} value={x.id}>
+                  As run {x.id} went: {x.task || x.name}, {statusWords(x)}, {ago(x.started)}
+                </option>
+              ))}
+            </select>
+            <span className="wf-hint">{from ? 'Each block takes the way it took at that visit in that run; past what the run did, you pick' : 'A block with one way takes it'}</span>
+          </label>
+        )}
+        {item.on && !sim && (
           <div className="wf-field">
             <span>As if on an event</span>
             <div className="seg wf-ev">
@@ -2249,7 +2275,7 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
             </div>
           </div>
         )}
-        {((item.where === 'here' && ev !== 'last') || ev === 'sample') && !fix && (
+        {((item.where === 'here' && ev !== 'last') || ev === 'sample') && !fix && !sim && (
           <label className="wf-field">
             <span>{ev === 'sample' ? 'The event’s workspace' : 'Workspace'}</span>
             <select value={ws} onChange={e => setWs(e.target.value)}>
@@ -2260,7 +2286,7 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
             </select>
           </label>
         )}
-        {!ev && tabsHere.length > 0 && (
+        {!ev && !sim && tabsHere.length > 0 && (
           <label className="wf-field">
             <span>Agent tab</span>
             <select value={inTab} onChange={e => setTab(e.target.value)}>
@@ -2329,19 +2355,23 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
             </label>
           )
         })}
+        {!sim && (
         <label className="wf-field">
           <span>Budget</span>
           <input value={budget} placeholder="none: 60 min, $5" onChange={e => setBudget(e.target.value)} className={badBudget ? 'bad' : ''} />
           <span className={badBudget ? 'wf-hint wf-bad' : 'wf-hint'}>{badBudget || 'Its working time and its cost at API prices (AI calls, decisions, Claude’s and Codex’s turns); past either it asks you. This run only.'}</span>
         </label>
+        )}
+        {!sim && (
         <Switch className="switch-row" on={dry} onChange={setDry}>
           Dry run: opening a PR, approving, merging and archiving are said, not done
         </Switch>
-        {never.length > 0 && <span className="wf-err">Never asks: {never.join(', ')} {never.length === 1 ? 'runs' : 'run'} with bypass permissions, anything goes.</span>}
+        )}
+        {never.length > 0 && !sim && <span className="wf-err">Never asks: {never.join(', ')} {never.length === 1 ? 'runs' : 'run'} with bypass permissions, anything goes.</span>}
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || !!badBudget || (ev ? !tried?.start || missing : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || (sim ? missing : !!badBudget || (ev ? !tried?.start || missing : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws)))}>{busy ? 'Starting…' : sim ? 'Simulate ⌘⏎' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>
@@ -2353,7 +2383,7 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
 function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onAgain }: { id: string; entry?: FlowView; ahead: number; api: WorkflowsApi; pname: (id?: string) => string; ws: WorkspaceView[]; tabs: string[]; onGone: () => void; onDelete: (r: FlowView) => void; onAgain: (id: string, block?: string) => void }) {
   const [r, setR] = useState<FlowRun | null>(null)
   const [menu, openMenu] = useMenu()
-  const [tab, setTab] = useState<'decisions' | 'state'>('decisions')
+  const [tab, setTab] = useState<'decisions' | 'state' | 'sent'>('decisions')
   const [mode, setMode] = useState<'blocks' | 'log'>('blocks')
   const [typed, setTyped] = useState('')
   const [pick, setPick] = useState<string | null>(null)
@@ -2399,7 +2429,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           <b>{r.task || r.flow.name}</b>
           <span className="wf-src">
             {r.flow.name}
-            {r.dry ? ' · dry run' : ''} · {pname(r.project)} · started {ago(r.started)}
+            {r.sim ? ` · simulated${r.sim.from ? ` as run ${r.sim.from} went` : ''}` : r.dry ? ' · dry run' : ''} · {pname(r.project)} · started {ago(r.started)}
             {r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}
           </span>
         </div>
@@ -2425,7 +2455,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           <button className="btn" onClick={() => hold(true)} data-tip="The block it's on finishes; no next block, retry or archive starts until Resume"><Icon name="pause" size={11} /> Pause after this block</button>
         ))}
         {!over && <button className="btn" onClick={stop} data-tip="Ends the run now; its agents stay as they are, in their tabs"><Icon name="stop" size={11} /> Stop run</button>}
-        {over && (
+        {over && !r.sim && (
           <button className="btn" onClick={() => onAgain(r.id)} data-tip="A new run: its task and inputs, the workflow as it is now. A block’s right click: Run from here">
             <Icon name="refresh" size={11} /> Run again
           </button>
@@ -2442,7 +2472,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           <div className="wf-ask-q">
             <Icon name="help" size={14} />
             <b>{asking.kind === 'agent-ask' ? `${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur ?? '', kind: 'agent' })} asks: ${asking.question}` : asking.question}</b>
-            <span className="wf-hint">{asking.kind === 'confirm' ? 'before it does something others see' : asking.kind === 'stuck' ? 'it can’t go on by itself' : asking.kind === 'decide' ? 'the model isn’t sure' : asking.kind === 'agent-ask' ? (asking.ns.length ? 'its agent waits: a pick here answers in its tab' : 'its agent waits: answer it in its tab') : ''}</span>
+            <span className="wf-hint">{asking.kind === 'sim' ? 'simulated: pick the way it goes' : asking.kind === 'confirm' ? 'before it does something others see' : asking.kind === 'stuck' ? 'it can’t go on by itself' : asking.kind === 'decide' ? 'the model isn’t sure' : asking.kind === 'agent-ask' ? (asking.ns.length ? 'its agent waits: a pick here answers in its tab' : 'its agent waits: answer it in its tab') : ''}</span>
             {asking.kind === 'ask' && asking.until && asking.fallback && <Countdown until={asking.until} then={`it takes ${asking.fallback}`} />}
           </div>
           {'show' in asking && asking.show && (
@@ -2492,12 +2522,12 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
         <RunLog log={r.log} />
       ) : (
       <div className="wf-split">
-        <Canvas wf={r.flow} sel={pick} onPick={setPick} lit={lit} onMenu={over ? (e, b) => openMenu(e, [{ label: 'Run from here', sub: 'A new run in its workspace, its state kept: the blocks before it don’t run again', icon: 'run', run: () => onAgain(r.id, b) }]) : undefined} />
+        <Canvas wf={r.flow} sel={pick} onPick={setPick} lit={lit} onMenu={over && !r.sim ? (e, b) => openMenu(e, [{ label: 'Run from here', sub: 'A new run in its workspace, its state kept: the blocks before it don’t run again', icon: 'run', run: () => onAgain(r.id, b) }]) : undefined} />
         <div className="wf-insp wf-runside">
           <div className="seg">
-            {(['decisions', 'state'] as const).map(t => (
+            {(r.sim ? (['decisions', 'sent', 'state'] as const) : (['decisions', 'state'] as const)).map(t => (
               <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                {t === 'decisions' ? `Decisions ${r.decisions.length}` : 'State'}
+                {t === 'decisions' ? `Decisions ${r.decisions.length}` : t === 'sent' ? `Would send ${r.sim?.sent.length ?? 0}` : 'State'}
               </button>
             ))}
           </div>
@@ -2536,6 +2566,19 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
             ) : (
               <p className="wf-hint">No decisions yet.</p>
             ))}
+          {tab === 'sent' &&
+            ((l => (l.length ? l.map((x, i) => {
+              const b = r.flow.blocks.find(y => y.id === x.block)
+              return (
+                <div key={i} className="wf-dec">
+                  <div className="wf-dec-head">
+                    <b>{b ? blockName(b) : x.block}</b>
+                    {x.n > 1 && <span className="wf-hint">visit {x.n}</span>}
+                  </div>
+                  <pre className="wf-log">{x.what}</pre>
+                </div>
+              )
+            }) : <p className="wf-hint">Nothing yet: a block that sends something (a prompt, a command, a request) shows it here.</p>))([...(r.sim?.sent ?? [])].reverse().filter(x => !pick || x.block === pick)))}
           {tab === 'state' && (
             <div className="wf-state">
               <div className="wf-sub">Where</div>

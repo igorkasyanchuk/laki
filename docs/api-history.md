@@ -176,3 +176,4 @@ needs no bump: `settingsSet` keeps any field.
 168: remote access's answer level (D7): `remoteDeviceSet`, a device's `level`, a remote page's view `remote.level`, `settings.remoteLevel`.
 169: `diagnostics` (R6: `laki doctor --bundle`, Copy diagnostics) and the view's `trouble` (the daemon's uncaught errors).
 170: `agentContext`, `agentContextOpen` (F6: what an agent sees, read only).
+171: `flowStart`'s `simulate` (`from`, `answers`) and a run's `sim` (W7: a simulated run, nothing run; its `sim` wait).

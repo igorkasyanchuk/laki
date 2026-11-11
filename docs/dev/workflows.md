@@ -257,5 +257,19 @@ way: `flowTick` asks mid turn (`budgetAsk` with `{ tab, used }`: the turn goes o
 more* back to its `agent` wait, *Stop the run* Escs it), and at twice `budget.usd` Escs the turn (`capped`: *Give it
 more* then enters the block anew). The renderer's *Cost* and `StatChips` say *at API prices* (`PRICED`). RunView's `Meter`s (turns, time, cost), StartRun's and the settings' Budget;
 the CLI's `--budget`, MCP's `budget`.
+Simulate (W7, `simStart`, `flowStart`'s `simulate: { from?, answers? }`): a run with `sim` (`FlowSim`), its trigger
+`simulate`, no workspace, `pick`, budget or queue; no trust, `byAgent` or model check (nothing of it runs, a case's
+`js:` included). `work` hands every block but an end to `simWork` (a microtask a step, `SIM_STEPS` 500 at most, then
+`stuck`): its visit `n`, `simWhat` (an agent's prompt as `agent()` builds it, `$ <command>`, a request's method and URL,
+an AI call's prompt, an ask's question, a save's file; the newest `SIM_SENT` in `sim.sent`, each `SIM_WHAT` long, and a
+log line with it), then its way: the only one (`exitsOf` less `max`), else `answers[block]` (`simAnswers`: each
+checked against its ways; a list: one per visit, the last for the rest), else `from`'s run's nth decision of that block
+among those ways (a retry, a max, a stop or a confirm's yes aren't ways), else `ask` `sim` with its ways and Stop the
+run (`flowAnswer`: `leave` with `you`). `leave`, max, retries (at once: no wait), Pause and the ends are the engine's
+own. Out of: `going` (at once, the queue), `tally`, `spend`, `ask`'s broadcast and `flowAsk`, and `finish`'s
+`flow.ended`, broadcast, push, `scheduleFlowEnded` and `tidy`; core's `goingNow` (When done) too. The editor's
+*Simulate* (`StartRun` `sim`: the workflow's runs to replay, *Its ways*), RunView's *simulated* and *Would send* tab
+(by block and visit), the index row's *(simulated)*. The CLI's `--simulate [--from <run>] [--answer block=exit…]`
+waits until it ends or asks, prints the path and what each would be sent; exit 0 at done. `test/workflow-simulate.test.ts`.
 ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host; a resume that fails after
 `RESUMED` went (core drops the chat within `RESUME_FAIL`) is a closed tab, the block's error way.
