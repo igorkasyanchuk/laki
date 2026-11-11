@@ -86,8 +86,9 @@ what the view shows on the tab's runtime:
   `turnFork { ws, n }`: `wsNew` with the `after` commit as base, the branch put back to its parent (`reset`: the
   files stay, uncommitted; no commit of Laki's in the branch), then the source's base. Rewind and fork are the user's
   (`AGENT_NO`). `TurnStrip.tsx` (with `turnChanges` on): `TurnButton`, the status bar's
-  *Turns* for the focused agent tab (its count, the last turn's `turnWords` as its tip, a click: the newest 30 newest
-  first, each a submenu of the three actions); with the status bar off, `TurnStrip` in App's pane `foot` instead (a dot
+  *Turns* for the focused agent tab (keyed by the tab; its count, the last turn's `turnWords` as its tip, a click: App's
+  menu, the newest 30 newest first, each a submenu of the three actions); with the status bar off or in full screen,
+  `TurnStrip` in App's pane `foot` instead (a dot
   per kept turn, `turnWords` as its tip and its menu's head); both through `useTurns`, the three actions (`turnApi`: `turnNext.n` and the
   `laki-turn` event open Changes on it); Changes' *This turn* has a `<select>` of the workspace's turns (`PanelApi.turns`,
   `turnChanges(n)`). Tests: `test/turn-history.test.ts`. ponytail: files only, nothing git ignores, no hosts; a turn

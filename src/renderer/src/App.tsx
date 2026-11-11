@@ -3450,7 +3450,7 @@ export function App() {
                   {ctxPct(tab.context)}%
                 </span>
               )}
-              {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton tab={tab} api={turnApi(ws.id)} /> /* F1: the focused agent's kept turns */}
+              {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton key={tab.id} tab={tab} api={turnApi(ws.id)} onMenu={openMenu} /> /* F1: the focused agent's kept turns */}
               <BgButton tabs={view.tabs.filter(t => t.workspace === ws.id && t.preset === 'claude')} api={{ bgOutput: readerApi.bgOutput!, send: readerApi.send }} />
               {git && (
                 // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
@@ -3758,7 +3758,7 @@ export function App() {
                         <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
                         <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
-                        {noBar && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnApi(t.workspace)} /> /* the status bar's Turns, when there's none */}
+                        {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnApi(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}

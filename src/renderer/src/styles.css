@@ -32,7 +32,7 @@
      them all); elevation; control heights; the stacking order. --radius is --r-m's old name */
   --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px;
   --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px);
-  --r-pill: calc(var(--r-xl) * 999); /* a capsule, but square where every corner is (a look's, Corners' Square): no round tab among square cards */
+  --r-pill: calc(var(--r-xl) * 999); /* a capsule, but square where every corner is (a look's, Corners' Square): no round tab among square cards; a circle is 50% */
   --radius: var(--r-m);
   /* V6: corners by what they are, concentric: a window's (dialogs, menus, popovers), a panel's (cards), a control's
      (buttons, fields, rows, tabs, items), a chip's (counts, status); one inside another takes its parent's minus the gap */
@@ -570,7 +570,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .to-top { position: absolute; right: 24px; bottom: 22px; z-index: 6; display: grid; place-items: center; width: 34px; height: var(--h-l); padding: 0; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: var(--lift-2); cursor: pointer; animation: to-top-in 0.16s ease-out; } /* ui.tsx Page: scrolled well down */
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent); }
 @keyframes to-top-in { from { opacity: 0; transform: translateY(6px); } }
-.help-q { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; vertical-align: 1px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); font-size: var(--fs-1); font-weight: 600; line-height: 1; cursor: help; } /* SettingsKit's HelpQ: a setting's ? */
+.help-q { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; vertical-align: 1px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: var(--fs-1); font-weight: 600; line-height: 1; cursor: help; } /* SettingsKit's HelpQ: a setting's ? */
 .help-q::after { content: ''; position: absolute; inset: -6px; } /* a bigger target than it looks */
 .help-q:hover, .help-q:focus-visible { color: var(--accent-ink); border-color: var(--accent); outline: none; }
 .help-card { position: fixed; inset: auto; margin: 6px 0; position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; width: min(340px, calc(100vw - 32px)); padding: var(--sp-5) var(--sp-5); color: var(--fg); font-size: var(--fs-2); font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; cursor: auto; }
@@ -721,8 +721,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .status .sb-branch:hover { color: var(--fg); background: none; }
 .status .sb-flow { display: inline-flex; align-items: center; gap: var(--sp-3); flex: 0 1 auto; min-width: 0; max-width: 34ch; white-space: nowrap; line-height: 20px; padding: 0; border: none; background: none; color: inherit; }
 .status .sb-flow:hover { color: var(--fg); background: none; }
-.status .sb-turns { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; line-height: 20px; padding: 0; border: none; background: none; color: inherit; cursor: pointer; }
-.status .sb-turns:hover { color: var(--fg); background: none; }
+.status .sb-turns { flex: none; gap: var(--sp-2); } /* an .sb-flow: the bar's own button */
 .status .sb-flow-icon { display: grid; flex: none; }
 .status .sb-flow-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status .sb-flow[data-status='running'] .sb-flow-icon { color: var(--running); animation: sb-spin 2.4s linear infinite; }
@@ -2841,7 +2840,7 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .tab-compact { flex: none; margin-left: 4px; color: var(--muted); font-size: 0.9em; font-style: italic; } /* claude's PreCompact: summing up its chat */
 .ws-sched.ws-compact { flex: 0 100 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85em; font-style: italic; } /* gives way before the name does */
 .tab-alias { flex: none; margin-left: 4px; color: var(--accent-ink); font: 600 0.9em var(--mono); } /* a tab's @name (laki name) */
-.term-jump { position: absolute; top: 10px; right: 18px; z-index: 9; /* over xterm's layers (they go to 8) */ display: none; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: var(--lift-2); cursor: pointer; }
+.term-jump { position: absolute; top: 10px; right: 18px; z-index: 9; /* over xterm's layers (they go to 8) */ display: none; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: var(--lift-2); cursor: pointer; }
 .pane-body:hover > .term-jump, .term-jump.end, .term-jump:focus-visible { display: grid; } /* the scroll button: on hover; scrolled up (↓ back to the newest), always */
 .term-jump:hover { color: var(--fg); }
 /* Reader view (Reader.tsx): over the terminal, which stays attached under it */
@@ -3407,7 +3406,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
    inner: inside it, each a card of its own; parts: each its own card; tiles: every split pane a tile; float: the side
    panel and a preview floating over the terminals; pills: pill tabs (the tab line's :not lists above); joined: tabs
    opening into the card; shadow: cards lifted; lineless: no lines */
-.app[data-dz] { --d-gap: 8px; --d-r: min(12px, var(--r-xl)); --d-lift: 0 0 #0000; } /* the cards' corners: the look's and Corners' when smaller (a square look's square) */ /* no shadow, but one that can sit in a list */
+.app[data-dz] { --d-gap: 8px; --d-r: min(12px, var(--r-xl)); --d-lift: 0 0 #0000; } /* the cards' corners: the look's and Corners' when smaller (a square look's square); no shadow, but one that can sit in a list */
 .app[data-dz~='shadow'] { --d-lift: 0 1px 3px rgb(0 0 0 / 0.16); }
 .app[data-design='inset'] { --d-r: min(14px, var(--r-xl)); --d-lift: 0 2px 6px rgb(0 0 0 / 0.12), 0 14px 36px rgb(0 0 0 / 0.18); }
 .app[data-design='tiles'] { --d-gap: 6px; --d-r: min(10px, var(--r-xl)); }
@@ -3435,12 +3434,12 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .app[data-dz~='side-card'] .sidebar { position: relative; z-index: 1; isolation: isolate; padding: 0 0 var(--d-gap) var(--d-gap); } /* z-index: what it opens past its edge stays over the main area */
 .app[data-dz~='side-card'] .sidebar::before { content: ''; position: absolute; z-index: -1; inset: 40px 0 var(--d-gap) var(--d-gap); border: 1px solid var(--line); border-radius: var(--d-r); background: var(--side); box-shadow: var(--d-lift); pointer-events: none; }
 .app[data-dz~='boxed'] .side-scroll { padding-top: var(--d-gap, 8px); } /* the design's gap all round: the card's top, its sides, between projects */
-.app[data-dz~='boxed'] .side-scroll > .project { margin: 0 var(--d-gap, 8px) var(--d-gap, 8px); padding: var(--sp-1) 0 var(--sp-3); border: 1px solid var(--line); border-radius: max(0, calc(var(--d-r) - var(--r-s))); background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.app[data-dz~='boxed'] .side-scroll > .project { margin: 0 var(--d-gap, 8px) var(--d-gap, 8px); padding: var(--sp-1) 0 var(--sp-3); border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--r-s))); background: color-mix(in srgb, var(--fg) 3%, transparent); }
 /* the terminals and the side panel: one card, cards inside it, or each a card */
 .app[data-dz~='body'] .body { border: 1px solid var(--line); border-radius: var(--d-r); overflow: hidden; background: var(--app-bg, var(--bg)); box-shadow: var(--d-lift); }
 .app[data-dz~='inner'] .body { padding: var(--d-gap); gap: var(--d-gap); background: var(--side); }
 .app[data-dz~='parts'] .body { gap: var(--d-gap); }
-.app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border: 1px solid var(--line); border-radius: max(0, calc(var(--d-r) - var(--r-s))); }
+.app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--r-s))); }
 .app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap) { overflow: hidden; } /* a side tab strip scrolls, which clips it already */
 .app[data-dz] .body > :is(.side-panel, .pv-wrap) .sp-handle { left: 0; } /* inside its card, which clips: all of it to grab */
 .app[data-dz~='parts'] .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border-radius: var(--d-r); box-shadow: var(--d-lift); }
@@ -3512,7 +3511,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .dz[data-dz~='chrome']:not([data-dz~='side-card']) .dz-side { padding-right: var(--sp-1); }
 .dz[data-dz~='chrome']:not([data-dz~='side-card']) .dz-rail { border-right-color: var(--line); }
 .dz[data-dz~='side-card'] .dz-side { margin: 11px var(--g) var(--g); padding-top: var(--sp-2); border: 1px solid var(--line); border-radius: var(--dr); background: var(--side); }
-.dz[data-dz~='boxed'] .dz-proj { height: 16px; border: 1px solid var(--line); border-radius: max(0, calc(var(--dr) - var(--r-xs))); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.dz[data-dz~='boxed'] .dz-proj { height: 16px; border: 1px solid var(--line); border-radius: max(0px, calc(var(--dr) - var(--r-xs))); background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .dz[data-dz~='body'] .dz-body { border: 1px solid var(--line); border-radius: var(--dr); overflow: hidden; background: var(--term-bg, var(--bg)); }
 .dz[data-dz~='inner'] .dz-body { gap: var(--g); padding: var(--g); background: var(--side); }
 .dz[data-dz~='parts'] .dz-body { gap: var(--g); }
