@@ -242,7 +242,7 @@ export function PromptInput(p: {
   lead?: ReactNode // pickers right after +: then the mic goes to the right end, before send
   send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
-  shot?: { n: number; png: string } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on
+  shot?: { n: number; png: string; quiet?: boolean } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on (quiet: not, Q7's drawing back from the editor)
   inserts?: Inserts // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
@@ -296,7 +296,7 @@ export function PromptInput(p: {
   useEffect(() => {
     if (!p.shot) return
     void add([new File([Uint8Array.from(atob(p.shot.png), c => c.charCodeAt(0))], 'screenshot.png', { type: 'image/png' })])
-    if (!(cloud || p.dictate)) return
+    if (!(cloud || p.dictate) || p.shot.quiet) return
     const go = () => (cloud ? (box.current?.focus(), void voiceStart()) : dictate())
     if (document.hasFocus()) return void go()
     window.addEventListener('focus', go, { once: true })

@@ -815,6 +815,9 @@ test('D7: answer only: what a phone may do at each level, set on the Mac only, i
     ['tabClose', { tab: 'nope' }],
     ['fileWrite', { ws: 'nope', path: 'a', text: 'b' }],
     ['tabNew', { ws: ws.id, kind: 'shell' }],
+    ['tabNew', { ws: ws.id }], // no profile: tabNew's default is a shell
+    ['send', { target: agent, text: '!rm -rf ~' }], // the agent's shell mode
+    ['send', { target: agent, text: '!', enter: false }], // keys without Enter: a command in pieces
     ['tabNew', { ws: ws.id, preset: 'custom', cmd: 'touch pwned' }],
     ['wsNew', { project: pr.id, cmd: 'touch pwned' }],
     ['wsNew', { project: pr.id, preset: 'claude', perm: 'bypassPermissions' }],

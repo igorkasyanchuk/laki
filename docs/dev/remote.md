@@ -277,12 +277,15 @@ authenticator).
 
 Answer only (D7, `settings.remoteLevel`: a page with the link's token, a quick tunnel's tab, and what a device starts
 with as it pairs; `SavedDevice.level`, the Mac's Devices › *Answer only* / *Give full access*: `remoteDeviceSet`, FROM,
-REMOTE_NO and AGENT_NO; unset: full, today's rules). `levelOf(device)`: the device's, else the session's. main.ts' `call`:
+REMOTE_NO and AGENT_NO; unset: full, today's rules). `levelOf(device)`: the device's, else the session's; a device no longer paired (revoked or expired while its Laki AI
+ask runs) is answer. main.ts' `call`:
 after REMOTE_NO, at answer `answerNo` lets only `ANSWER`'s methods through, an allowlist (as S5's for agents): reading
 (the view, `screen`, diffs, files, turns, chats, PRs, extensions' and workflows' reads), answering (`answer`,
-`aiAnswer`, `alertAnswer`, `widgetToolAnswer`, `flowAnswer`, `secretGive`), `send` to an agent tab only (`tracked`),
+`aiAnswer`, `alertAnswer`, `widgetToolAnswer`, `flowAnswer`, `secretGive`), `send` to an agent tab only (`sendOk`:
+`resolveTarget` as `send` does, `tracked`, never `enter: false`, never a text that starts with `!`: the agents' shell
+mode) and its draft (`tabDraft`),
 Laki AI (`aiAsk` and its chat's own), `wsNew` and `tabNew` with an agent profile (`agentPreset`: no `cmd`, no `kind`,
-no key outside `NEW_KEYS`, no mode that `neverAsks`, no `sandbox: false`), `wsSet`'s `name`, `color`, `pinned` and
+no key outside `NEW_KEYS`, no mode that `neverAsks`, no `sandbox: false`; `agentOf`: tabNew with no profile is a shell), `wsSet`'s `name`, `color`, `pinned` and
 `railPin`, `timer`, the reminders; the rest refused (*answer only from here …: do that on the Mac itself, or give this
 device full access there*). Every api method is in `ANSWER` or `ANSWER_NO`, checked as the daemon loads, so a new one is
 classified before any test runs. The HTTP `/rpc` of a remote page calls with a Conn of its own (`remote`, its `device`),

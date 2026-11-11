@@ -859,7 +859,8 @@ const deviceById = (id: string) => state.remoteDevices?.find(d => d.id === id)
 export const lockGone = (id: string) => !passkeyOn() || !deviceById(id)?.pk
 // D7: a remote page's access: its device's (set on the Mac, Settings › Remote access › Devices), else the session's
 // (settings.remoteLevel: a quick tunnel's tab, a page with the link's token); unset: full, today's rules
-export const levelOf = (device?: string): 'answer' | 'full' => ((device ? deviceById(device)?.level : state.settings?.remoteLevel) === 'answer' ? 'answer' : 'full')
+// a device no longer paired (revoked or expired while its Laki AI ask still runs): answer, never more than it had
+export const levelOf = (device?: string): 'answer' | 'full' => (device ? (d => (d && d.level !== 'answer' ? 'full' : 'answer'))(deviceById(device)) : state.settings?.remoteLevel === 'answer' ? 'answer' : 'full')
 // the Mac's Answer only switch on a device (FROM, REMOTE_NO, AGENT_NO: never from a phone or an agent)
 export function remoteDeviceSet(p: { id?: unknown; level?: unknown }) {
   const d = typeof p.id === 'string' ? deviceById(p.id) : undefined

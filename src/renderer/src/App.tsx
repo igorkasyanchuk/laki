@@ -904,6 +904,14 @@ export function App() {
   // Q8: what the menu bar's icon shows (Settings › General › Menu bar's Show state, on unless off): idle, working,
   // waiting, blocked (the view as drawn: Recording mode's private workspaces out of it, as out of the count)
   const trayInfo = view && view.settings.trayState !== false ? stateOf(view) : undefined
+  // blocked by a plan limit: drawn again as the soonest one resets (nothing else may change the view then)
+  const [, trayTick] = useState(0)
+  const resetAt = trayInfo?.blocked ? Math.min(...view!.tabs.map(t => t.limit ?? 0).filter(l => l > Date.now())) : Infinity
+  useEffect(() => {
+    if (!Number.isFinite(resetAt)) return
+    const t = setTimeout(() => trayTick(n => n + 1), Math.min(resetAt - Date.now() + 500, 2 ** 31 - 1))
+    return () => clearTimeout(t)
+  }, [resetAt])
   const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked]])
   useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo), [trayKey])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top

@@ -100,7 +100,9 @@ each one) lets a phone read everything Laki shows, answer asks, message an agent
 set reminders, and nothing else: no typing in a terminal, no message to a shell, no merge, ship, archive or delete, no
 command, no mode that never asks, no settings. It's an allowlist the daemon checks on every call (a method no one has
 classified is refused; the daemon won't start with one), set on the Mac only. Laki AI asked from such a phone acts with
-the phone's rights, not the Mac's. *Full* is as before: everything but what never goes over remote access.
+the phone's rights, not the Mac's. A message to an agent can't start with `!` (the agents' shell mode). The agent
+itself still works in its own mode: what you ask it to do, and the asks you allow from the phone, it does as it would on
+the Mac. *Full* is as before: everything but what never goes over remote access.
 
 ### Auto-answer rules
 

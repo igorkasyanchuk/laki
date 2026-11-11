@@ -1,7 +1,7 @@
 // Q8: the menu bar icon's state (shared/tray.ts stateOf), its words, and its four pictures drawn to PNGs: a screenshot
 // of the menu bar can't be taken here, so each picture is checked as a file (made, not empty, none the same)
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -60,8 +60,9 @@ function png(bgra: Buffer, w: number, h: number) {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
 }
 
-test('Q8 its four pictures: template images (black, alpha only), each drawn, none the same; waiting is the mark as it was', () => {
+test('Q8 its four pictures: template images (black, alpha only), each drawn, none the same; waiting is the mark as it was', t => {
   const dir = mkdtempSync(join(tmpdir(), 'laki-tray-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
   const ink = (b: Buffer) => Array.from({ length: b.length / 4 }, (_, i) => b[i * 4 + 3]).reduce((n, a) => n + a, 0)
   const seen = new Set<string>()
   const inks: Record<string, number> = {}

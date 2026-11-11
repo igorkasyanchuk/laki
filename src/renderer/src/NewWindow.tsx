@@ -3,7 +3,7 @@
 // workspace made, or Esc: it closes; the app's sidebar shows the new one. Its Ask Laki AI: the AI page, compact, in one
 // too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
-import { type KeyboardEvent, useEffect, useState } from 'react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { type ActionFile, aiOn, veiled, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, daemonBase, openExternal, reportView } from './api'
 import { AiPage } from './Ai'
@@ -218,14 +218,16 @@ export function QuickWindow() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [shot, setShot] = useState<{ n: number; png: string }>()
+  const [shot, setShot] = useState<{ n: number; png: string; quiet?: boolean }>()
+  const tellAt = useRef(-1) // Q7: where its picture is among the images (PromptInput adds it last), for the drawing that replaces it
   const [tell, setTell] = useState<{ png: string; mic: string; dictation: boolean }>() // Q7: its picture now, Laki's Microphone access, macOS dictation on
   useEffect(() => void bridge?.onNewPrompt?.(p => setText(p)), []) // another New task with words: into the box
   useEffect(
     () =>
       void bridge?.onTell?.(t => {
-        setImages([]) // the picture replaces one before it (E's drawing too)
-        setShot(s => ({ n: (s?.n ?? 0) + 1, png: t.png })) // PromptInput: as if pasted, then the mic
+        // the drawing replaces the picture it was drawn on; a new picture goes after the ones already there
+        setImages(x => (y => ((tellAt.current = y.length), y))(t.edited ? x.filter((_, i) => i !== tellAt.current) : x))
+        setShot(s => ({ n: (s?.n ?? 0) + 1, png: t.png, ...(t.edited && { quiet: true }) })) // PromptInput: as if pasted, then the mic (not again for a drawing)
         if (t.note) setText(x => [x.trim(), t.note!.trim()].filter(Boolean).join('\n'))
         setTell(x => ({ png: t.png, mic: t.mic ?? x?.mic ?? 'granted', dictation: t.dictation ?? x?.dictation ?? false }))
         setErr(!t.edited && cloudVoice() && t.mic === 'denied' ? 'mic' : '')

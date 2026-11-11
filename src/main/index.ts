@@ -1576,7 +1576,9 @@ let quickReady = false // its page listens for show and tell's picture (quick-te
 let tellPng: string | null = null // the picture until it does
 function tellShot() {
   if (screenOff()) return privacySay('screen')
-  screenshot(true, undefined, png => ((tellPng = png), quickWin(), void tellSend()), () => screenOff(true) && privacySay('screen'))
+  const bar = quickW && !quickW.isDestroyed() && quickW.isVisible() ? quickW : null
+  bar?.hide() // out of the picture, as its own screenshot button's
+  screenshot(true, undefined, png => ((tellPng = png), quickWin(), void tellSend()), () => (bar?.isDestroyed() === false && bar.show(), screenOff(true) && privacySay('screen')))
 }
 async function tellSend() {
   const w = quickW
@@ -1590,8 +1592,10 @@ ipcMain.on('quick-tell-ready', e => {
   quickReady = true
   void tellSend()
 })
-// macOS dictation turned on (System Settings › Keyboard › Dictation): what the quick bar's mic starts, else it's a box
-const dictationOn = () => (mac ? new Promise<boolean>(r => execFile('defaults', ['read', 'com.apple.HIToolbox', 'AppleDictationAutoEnable'], { timeout: 2000 }, (err, out) => r(!err && out.trim() === '1'))) : Promise.resolve(false))
+// macOS dictation turned on (System Settings › Keyboard › Dictation): what the quick bar's mic starts, else it's a box.
+// macOS keeps the switch in either of two places, by version
+const defaultOn = (domain: string, key: string) => new Promise<boolean>(r => execFile('defaults', ['read', domain, key], { timeout: 2000 }, (err, out) => r(!err && out.trim() === '1')))
+const dictationOn = async () => mac && (await Promise.all([defaultOn('com.apple.HIToolbox', 'AppleDictationAutoEnable'), defaultOn('com.apple.assistant.support', 'Dictation Enabled')])).some(Boolean)
 // Screen Recording for Laki: refused (denied, restricted), or after a shot that brought no picture, not granted (asked,
 // and turned down; an Esc in screencapture leaves it granted)
 const screenOff = (after = false) => mac && (s => (after ? s !== 'granted' : s === 'denied' || s === 'restricted'))(systemPreferences.getMediaAccessStatus('screen'))
@@ -1887,7 +1891,7 @@ function annotate(png: string, to: 'app' | 'quick' = 'app') {
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', e => e.preventDefault())
   w.webContents.once('did-finish-load', () => w.webContents.send('annotate-image', png))
-  w.on('closed', () => annot === w && ((annot = null), to === 'quick' && quickBack()))
+  w.on('closed', () => (annot === w && (annot = null), to === 'quick' && quickBack())) // the bar back, even when another editor took this one's place
   w.loadURL(pageURL('annotate.html'))
 }
 ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
