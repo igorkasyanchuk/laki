@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Safer data: notes, Laki AI's chats, your prompt history, workflow and extension files and the file editor's saves are written whole or not at all, and one that can't be read is kept as `.broken-<time>` instead of being replaced. Laki keeps a backup of its state for each of the last 7 days, and data written by a newer Laki is copied aside (with a bar saying so) before this one saves.
 - *Copy diagnostics* (Help, About, ⌘K) and `laki doctor --bundle`: Laki's and each agent's versions, the checks and the logs' last lines for a bug report, with your home folder, tokens, keys and prompts masked. When something goes wrong inside Laki's daemon, a bar says so, with Copy diagnostics and Restart the daemon (your terminals stay).
 - Security: Laki AI on Claude Code or Codex no longer puts an agent tab's token on the command line, where any program of yours could read it with `ps`: it goes in a file only you can read, gone as the run ends.
 - More room for the terminal: an agent's turns are the status bar's *Turns* (a clock and a count; hover for the last, click for all of them with their changes, rewind and New workspace) instead of a row under each tab, and Full screen moved into the tab bar's ⋯ menu (⌘⇧⏎ as before).

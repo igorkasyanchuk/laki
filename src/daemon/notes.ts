@@ -33,11 +33,9 @@ const known = (id: unknown) => {
   if (!exists(fileOf(id))) throw new Error('no such note: deleted?')
 }
 function read(id: unknown): Note {
-  try {
-    return JSON.parse(readFileSync(fileOf(id), 'utf8'))
-  } catch {
-    throw new Error('no such note: deleted?')
-  }
+  const n = readJson<Note>(fileOf(id)) // R7: one that won't parse is set aside (.broken-<time>), never saved over
+  if (!n) throw new Error('no such note: deleted?')
+  return n
 }
 function write(n: Note) {
   writeAtomic(fileOf(n.id), JSON.stringify(n), 0o600)

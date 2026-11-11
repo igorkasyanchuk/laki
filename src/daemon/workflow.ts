@@ -23,7 +23,7 @@ import { linkAdd } from './artifacts.ts'
 import { flowAsk, flowPhone } from './phone.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
-import { copyTree, move, readCapped, readJson } from '../shared/conn.ts'
+import { copyTree, move, readCapped, readJson, writeAtomic } from '../shared/conn.ts'
 import { chatCost, chatCostBefore } from './meters.ts'
 
 const MAX_FILE = 256 << 10
@@ -184,7 +184,7 @@ export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem 
   const f = fileOf({ ...o, source: o.source ?? 'yours' })
   mkdirSync(f.d, { recursive: true })
   keepOld(histOf({ ...o, project: f.project }), f.path, text)
-  writeFileSync(f.path, text)
+  writeAtomic(f.path, text) // R7: whole or not at all
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), o.by === 'agent')
   if (o.by !== 'agent') trust(o.source ?? 'yours', o.id, f.project, text) // saved in the editor: you've read it
   flowFiles.at = Date.now()

@@ -55,8 +55,10 @@ test('state.json and its backup unreadable: an empty start, the file kept; no gh
   assert.deepEqual((await rig.rpc('state')).workspaces, [])
   // a good state.json whose backup can't be written (a folder there): it loads all the same
   await rig.stop()
-  rmSync(join(rig.data, 'state.json.bak'))
-  mkdirSync(join(rig.data, 'state.json.bak'))
+  const d = new Date()
+  const bak = join(rig.data, `state.json.bak-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`) // R7: today's
+  rmSync(bak, { force: true })
+  mkdirSync(bak)
   await rig.start()
   assert.deepEqual((await rig.rpc('state')).projects.map((x: any) => x.id), [p.id])
 })

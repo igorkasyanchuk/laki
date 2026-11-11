@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { copyTree, logLine, rotateLog } from '../src/shared/conn.ts'
+import { copyTree, logLine, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -589,4 +589,41 @@ test('F1: a kept turn in a line: its number, prompt, files, when, how long, the 
   const t = { n: 3, tab: 't', name: 'claude', before: 'a', after: 'b', files: [], prompt: 'change a, add b', started: at(14, 0, 56), ended: at(14, 2), add: 2, del: 0, count: 2, cost: 0.214 }
   assert.equal(turnWords(t, at(15, 0)), '#3 · change a, add b · 2 files +2 −0 · 14:02 · 1m 4s · $0.21')
   assert.equal(turnWords({ ...t, n: 4, prompt: undefined, started: undefined, cost: undefined, count: 1, add: 0, del: 5 }, at(15, 0)), '#4 · 1 file +0 −5 · 14:02')
+})
+
+// R7: writeAtomic leaves no temp file, keeps the mode of the file there, writes through a link; readJson sets aside a
+// broken store of Laki's own (the data folder's), once, and only reads anything else
+test('R7: writeAtomic and readJson', t => {
+  const was = process.env.LAKI_HOME
+  const d = mkdtempSync(join(tmpdir(), 'laki-r7-'))
+  t.after(() => (was === undefined ? delete process.env.LAKI_HOME : (process.env.LAKI_HOME = was), rmSync(d, { recursive: true, force: true })))
+  process.env.LAKI_HOME = join(d, 'data')
+  const f = join(d, 'data', 'notes', 'a.json')
+  writeAtomic(f, '{"a":1}', 0o600)
+  assert.equal(statSync(f).mode & 0o777, 0o600)
+  assert.deepEqual(readdirSync(join(d, 'data', 'notes')), ['a.json'], 'no temp file left')
+  const sh = join(d, 'run.sh')
+  writeFileSync(sh, 'echo 1', { mode: 0o755 })
+  writeAtomic(sh, 'echo 2')
+  assert.equal(statSync(sh).mode & 0o777, 0o755, 'its mode kept')
+  symlinkSync(sh, join(d, 'link.sh'))
+  writeAtomic(join(d, 'link.sh'), 'echo 3')
+  assert.equal(readlinkSync(join(d, 'link.sh')), sh, 'the link stays')
+  assert.equal(readFileSync(sh, 'utf8'), 'echo 3')
+
+  writeFileSync(f, '{"a":')
+  assert.equal(readJson(f), undefined)
+  const kept = readdirSync(join(d, 'data', 'notes'))
+  assert.equal(kept.length, 1)
+  assert.match(kept[0], /^a\.json\.broken-\d+$/)
+  assert.equal(readFileSync(join(d, 'data', 'notes', kept[0]), 'utf8'), '{"a":')
+  for (const other of [join(d, 'data', 'accounts', 'x', '.claude.json'), join(d, 'repo', '.laki.json')]) {
+    mkdirSync(join(other, '..'), { recursive: true })
+    writeFileSync(other, '{nope')
+    assert.equal(readJson(other), undefined)
+    assert.equal(readFileSync(other, 'utf8'), '{nope', `${other}: not Laki's own, left as it is`)
+  }
+  writeFileSync(join(d, 'data', 'empty.json'), '')
+  assert.equal(readJson(join(d, 'data', 'empty.json')), undefined)
+  assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
 })

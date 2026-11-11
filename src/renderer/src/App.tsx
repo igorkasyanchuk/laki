@@ -3675,6 +3675,14 @@ export function App() {
             <button onClick={() => setDialog({ section: 'resources' })}>What Laki holds</button>
           </div>
         )}
+        {connected && view.newerData && (
+          <div className="stale-bar" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>This data was written by a newer Laki.</b> This one may not keep what it added: a copy is in Laki's data folder as state.json.v{view.newerData}. Update Laki to the version you used last.
+            </span>
+          </div>
+        )}
         {connected && view.whenDone && (
           <div className="stale-bar soft" role="alert">
             <Icon name={view.whenDone.act === 'lock' ? 'lock' : view.whenDone.act === 'sleep' ? 'moon' : 'power'} size={16} />

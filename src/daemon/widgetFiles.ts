@@ -5,7 +5,7 @@ import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readF
 import { basename, dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { needsSample } from '../shared/widgetSchema.ts'
-import { copyTree, move, readJson } from '../shared/conn.ts'
+import { copyTree, move, readJson, writeAtomic } from '../shared/conn.ts'
 import { agents, AI_MAY, find, type Manifest, pathOf, readStore, refetch, repoSays, running, scanWidgets, secretsOf, setSecrets, stopAgents, storePath, widgetHome, widgets, widgetsView, wLog, writeStore } from './widgets.ts'
 import { filesHash, hashes, runsOf } from './widgetTrust.ts'
 import { fixturesOf } from './widgetDev.ts'
@@ -67,7 +67,7 @@ export function widgetFileSave(o: { id: string; path: string; text: string; was?
     if (o.path === 'widget.json' && (!j || typeof j !== 'object' || Array.isArray(j))) throw new Error('widget.json: an object')
   }
   if (w.dir === join(widgetHome(), w.id)) snapshot(w.id, w.dir)
-  writeFileSync(p, o.text)
+  writeAtomic(p, o.text) // R7: whole or not at all, its mode kept
   wLog(w, `edited by hand: ${o.path}`)
   if (!w.dev) {
     scanWidgets()
@@ -137,7 +137,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown>; age
     const p = join(d, n)
     const was = statOf(p)
     if (was && !was.isFile()) throw new Error(`${n} is a link or a folder there`)
-    writeFileSync(p, t as string)
+    writeAtomic(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
   const same = !!runs && runs === runsOf(d) // only its looks changed

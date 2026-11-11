@@ -4,6 +4,7 @@
 // memoryTick (every 30 minutes, with Laki AI on and settings.memoryCompact.on unless false) runs it every days (COMPACT_DAYS)
 // and as the learned ones reach MEMORY_MAX; a project's Memory tab's *Compact now* is memoryCompact.
 import { appendFileSync, readFileSync } from 'node:fs'
+import { rotateLog } from '../shared/conn.ts'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { aiOn, COMPACT_DAYS, type CompactLogLine, type CompactRun, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX } from '../shared/types.ts'
@@ -68,6 +69,7 @@ export async function memoryCompact(o: { project: string; why?: CompactRun['why'
     if (now) now.compacted = run
     try {
       const line: CompactLogLine = { ...run, project: p.id, was: given.map(m => m.text), ...(run.ok && { now: made.map(m => m.text) }) }
+      rotateLog(logPath) // R7: past 10 MB, the older ones in .1
       appendFileSync(logPath, JSON.stringify(line) + '\n', { mode: 0o600 })
     } catch {}
     save()

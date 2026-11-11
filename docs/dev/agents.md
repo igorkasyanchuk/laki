@@ -369,9 +369,16 @@ A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the ch
 
 ### Resume
 
-`state.json` keeps projects, workspaces, tabs and resume ids (`save`: fsync, then rename; `load` copies one that
-reads as `state.json.bak`, and moves one that doesn't to `state.json.broken-<ms>`, then loads the `.bak`: never
-empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts and each hour while it runs (conn.ts `rotateLog`, main.ts' `logTick`: copied and cut there, since the daemon's stdout holds it open). A full disk (R4): core.ts `save` catches `ENOSPC`/`EDQUOT`, keeps the state in memory, sets the view's `diskFull` (`{ free }`: App's bar over the main area, to Settings › Resources) and tries again at each save and every 30 s (`diskTick`); `worktreeAdd` refuses under 500 MB free (`roomFor`, `statfs`). The app's main process has its own `app.log` beside it (`logLine`: uncaught errors, a renderer or helper process gone, a window that stopped responding; after 10 s of that a dialog offers Wait or Reload). Starting the daemon brings every tab back:
+`state.json` keeps projects, workspaces, tabs and resume ids (`save`: `v` stamped (`STATE_V`), fsync, rename, the folder
+fsynced; `load` copies one that reads as today's `state.json.bak-YYYY-MM-DD` (R7: one a day, the 7 newest kept), and
+moves one that doesn't to `state.json.broken-<ms>`, then loads the newest backup that reads (then 0.47's `.bak`): never
+empty over it). One with a higher `v` than this build's (a newer Laki's) is copied to `state.json.v<N>` before the first
+save, and the view's `newerData` puts a bar over the main area. The other stores (R7, conn.ts): `writeAtomic` writes a
+temp file of its own (pid and random), fsyncs it, renames it over (a link followed, the mode there kept) and fsyncs the
+folder: AI chats, prompt history, workflow files, extension files and the editor's saves go through it. `readJson` sets
+aside one of Laki's own stores that won't parse (`OWN`: the data folder's JSON files, `notes/`, `ai-chats/`,
+`widget-data/`, `turns/`) as `<name>.broken-<ms>`, logged once; any other file (an account's `.claude.json`, a repo's
+`.laki.json`) is only read. `ai-calls.jsonl` and `memory-compact.jsonl` rotate as `daemon.log` does (`rotateLog`). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts and each hour while it runs (conn.ts `rotateLog`, main.ts' `logTick`: copied and cut there, since the daemon's stdout holds it open). A full disk (R4): core.ts `save` catches `ENOSPC`/`EDQUOT`, keeps the state in memory, sets the view's `diskFull` (`{ free }`: App's bar over the main area, to Settings › Resources) and tries again at each save and every 30 s (`diskTick`); `worktreeAdd` refuses under 500 MB free (`roomFor`, `statfs`). The app's main process has its own `app.log` beside it (`logLine`: uncaught errors, a renderer or helper process gone, a window that stopped responding; after 10 s of that a dialog offers Wait or Reload). Starting the daemon brings every tab back:
 `claude --resume <id>`, `codex resume <id>`, a few at a time (`restoreAll`: each in `queued`, as `asleep` meanwhile, the
 oldest first; a tracked agent whose `usedAt` (a tab's: made, or `turn()`'s every state but start; `keepShells` saves it at
 shutdown) is older than `sleepAfter` is `dormant`: queued, never started by `nextRestore`, only by `restoreNow`, its view

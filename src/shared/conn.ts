@@ -1,8 +1,9 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
+import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { oldName } from './caps.ts'
 
@@ -184,21 +185,74 @@ export function priorOf(pl: any, ws?: { path: string; host?: string }): string |
   }
 }
 
+// R7: one of Laki's own stores that won't parse (the data folder's JSON files, notes', AI chats', extensions' data, kept
+// turns': what writeAtomic writes, the daemon alone) is set aside as <name>.broken-<time>, logged once, instead of read
+// as nothing and then written over. Any other file (an agent's own config, a repo's .laki.json, an account's folder) is
+// only read, as it is
+const OWN = /^(?:[^/]+|(?:notes|ai-chats|widget-data|turns)\/.+)\.json$/
+const setAside = new Set<string>()
 export function readJson<T = any>(p: string): T | undefined {
+  let text: string
   try {
-    return JSON.parse(readFileSync(p, 'utf8'))
+    text = readFileSync(p, 'utf8')
   } catch {
+    return undefined
+  }
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    const rel = relative(dataDir(), p)
+    if (!text.trim() || !OWN.test(rel) || rel.startsWith('..') || isAbsolute(rel)) return undefined
+    const broken = `${p}.broken-${Date.now()}`
+    try {
+      renameSync(p, broken)
+      if (!setAside.has(p)) setAside.add(p), console.log(new Date().toISOString(), `${p} unreadable (${(e as Error).message}): kept as ${broken}`)
+    } catch {}
     return undefined
   }
 }
 
-// written whole or not at all (a temp file, then a rename): a crash mid-write leaves the last good one. mode: the
-// file's, also on a temp file an earlier crash left (a mode only counts for a new file)
-export function writeAtomic(p: string, data: string | Buffer, mode?: number) {
-  mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(`${p}.tmp`, data, mode === undefined ? undefined : { mode })
-  if (mode !== undefined) chmodSync(`${p}.tmp`, mode)
-  renameSync(`${p}.tmp`, p)
+// written whole or not at all: a temp file of its own (this process's, a random name: two writers never share one),
+// flushed to disk, renamed over, then the folder flushed (the rename on disk too). A crash leaves the last good one.
+// mode: the file's, else the one there keeps its own (an editor's save of a script stays executable). A link is
+// followed, as writeFileSync does: its file is written, the link stays
+export function writeAtomic(path: string, data: string | Buffer, mode?: number) {
+  const p = (() => {
+    try {
+      return realpathSync(path)
+    } catch {
+      return path // not there yet
+    }
+  })()
+  const d = dirname(p)
+  mkdirSync(d, { recursive: true })
+  const keep = mode ?? (st => (st?.isFile() ? st.mode & 0o7777 : undefined))(statSync(p, { throwIfNoEntry: false }))
+  const tmp = `${p}.${process.pid}-${randomBytes(4).toString('hex')}.tmp`
+  try {
+    const fd = openSync(tmp, 'wx', keep ?? 0o666)
+    try {
+      if (keep !== undefined) fchmodSync(fd, keep) // past the umask
+      writeFileSync(fd, data)
+      fsyncSync(fd)
+    } finally {
+      closeSync(fd)
+    }
+    renameSync(tmp, p)
+  } catch (e) {
+    rmSync(tmp, { force: true })
+    throw e
+  }
+  syncDir(d)
+}
+export function syncDir(d: string) {
+  try {
+    const fd = openSync(d, 'r')
+    try {
+      fsyncSync(fd)
+    } finally {
+      closeSync(fd)
+    }
+  } catch {} // a file system that can't: the rename stands all the same
 }
 
 // a file or folder renamed, or copied then removed across volumes (EXDEV)

@@ -12,7 +12,7 @@ import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { priorOf, readJson, writeAtomic } from '../shared/conn.ts'
+import { priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
@@ -123,9 +123,27 @@ const readState = (p: string): State => {
 // worktree, the row's next-step chip, memory compaction off until you turn it on (it sends text to Laki AI's model),
 // and no macOS notification as a turn finishes (asks still notify; finishes are in Needs you)
 const NEW_DEFAULTS = { syncBase: 'origin', rowMarks: { step: true }, memoryCompact: { on: false }, notifyOn: { done: false } } as const
+// R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
+// state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
+// may not survive
+export const STATE_V = 1
+let newerData: number | undefined
+// R7: a dated copy of each day's state as it loaded (state.json.bak-YYYY-MM-DD, today's replaced by a later start), the
+// BACKUPS newest kept; an unreadable state.json loads the newest that reads (then 0.47's single state.json.bak)
+const BACKUPS = 7
+const BAK = /^state\.json\.bak-\d{4}-\d{2}-\d{2}$/
+const backups = () => {
+  try {
+    return readdirSync(dir).filter(f => BAK.test(f)).sort().reverse().map(f => join(dir, f))
+  } catch {
+    return []
+  }
+}
+const today = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 export function load() {
   mkdirSync(runDir, { recursive: true, mode: 0o700 })
-  const had = existsSync(statePath) || existsSync(statePath + '.bak')
+  const had = existsSync(statePath) || existsSync(statePath + '.bak') || backups().length > 0
+  let from = statePath
   if (existsSync(statePath)) {
     try {
       state = readState(statePath)
@@ -134,17 +152,35 @@ export function load() {
       const broken = `${statePath}.broken-${Date.now()}`
       renameSync(statePath, broken)
       log(`state.json unreadable (${(e as Error).message}): kept as ${broken}`)
-      try {
-        state = readState(statePath + '.bak')
-        log('loaded state.json.bak')
-      } catch (e) {
-        log(`state.json.bak: ${(e as Error).message}; starting empty`)
-      }
+      from = ''
+      for (const b of [...backups(), statePath + '.bak'])
+        try {
+          state = readState(b)
+          from = b
+          log(`loaded ${basename(b)}`)
+          break
+        } catch (e) {
+          if (existsSync(b)) log(`${basename(b)}: ${(e as Error).message}`)
+        }
+      if (!from) log('no backup reads: starting empty')
     }
     try {
-      if (existsSync(statePath)) copyFileSync(statePath, statePath + '.bak'), chmodSync(statePath + '.bak', 0o600) // the last state that loaded
+      const bak = `${statePath}.bak-${today()}`
+      if (existsSync(statePath)) copyFileSync(statePath, bak), chmodSync(bak, 0o600) // today's: the last state that loaded
+      for (const old of backups().slice(BACKUPS)) rmSync(old, { force: true })
     } catch (e) {
-      log(`state.json.bak: ${(e as Error).message}`)
+      log(`state.json's backup: ${(e as Error).message}`)
+    }
+  }
+  const v = Number((state as { v?: unknown }).v) || 0
+  if (from && v > STATE_V) {
+    newerData = v
+    const aside = `${statePath}.v${v}`
+    try {
+      if (!existsSync(aside)) copyFileSync(from, aside), chmodSync(aside, 0o600)
+      log(`state.json is v${v}, written by a newer Laki (this one knows v${STATE_V}): kept as ${aside}`)
+    } catch (e) {
+      log(`state.json.v${v}: ${(e as Error).message}`)
     }
   }
   state.projects ??= []
@@ -217,12 +253,14 @@ export function save() {
     const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
     try {
       fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
+      state.v = STATE_V // R7
       writeFileSync(fd, JSON.stringify(state, null, 2))
       fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
     } finally {
       closeSync(fd)
     }
     renameSync(statePath + '.tmp', statePath)
+    syncDir(dir) // R7: the rename on disk too
   } catch (e) {
     if (!['ENOSPC', 'EDQUOT'].includes((e as NodeJS.ErrnoException).code ?? '')) throw e
     const first = !diskFull
@@ -264,7 +302,7 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
 // S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles)
-const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
+const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', `state.json.bak-${today()}`, 'state.json.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -720,6 +758,7 @@ export function view(): View {
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
     ...(updateIdle && { updateIdle }),
     ...(trouble && { trouble }),
+    ...(newerData && { newerData }),
     ...((m => m && { managed: m })(managedView())),
   }
 }
@@ -4195,7 +4234,7 @@ export function promptKeep(text: unknown, ws?: string) {
   prompts ??= (readJson(promptsFile()) as typeof prompts) ?? []
   prompts = [...prompts.filter(x => x.text !== t), { text: t, at: Date.now(), ...(ws && { ws }) }].slice(-PROMPTS_MAX)
   try {
-    writeFileSync(promptsFile(), JSON.stringify(prompts), { mode: 0o600 })
+    writeAtomic(promptsFile(), JSON.stringify(prompts), 0o600) // R7
   } catch {} // unwritable: kept for this run
 }
 export function promptList() {

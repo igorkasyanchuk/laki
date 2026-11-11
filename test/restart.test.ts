@@ -206,6 +206,41 @@ test('an unreadable state.json is kept aside and the last good one loads: nothin
   assert.ok(readdirSync(rig.data).some(f => f.startsWith('state.json.broken-')))
 })
 
+// R7: a state a newer Laki wrote (a higher v) is copied aside before the first save, and the view says so; one dated
+// backup a day, the 7 newest kept; a note that won't parse is set aside, never saved over
+test('R7: a newer state is copied aside, 7 dated backups, a broken note kept', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.stop()
+  const statePath = join(rig.data, 'state.json')
+  const s = JSON.parse(readFileSync(statePath, 'utf8'))
+  assert.equal(s.v, 1, 'stamped')
+  writeFileSync(statePath, JSON.stringify({ ...s, v: 99, future: 'theirs' }))
+  const day = (k: number) => (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(Date.now() - k * 86400_000))
+  for (const k of [2, 3, 4, 5, 6, 7, 8]) writeFileSync(join(rig.data, `state.json.bak-${day(k)}`), '{}') // 7 days before
+  await rig.start()
+  const v = await rig.rpc('state')
+  assert.equal(v.newerData, 99)
+  assert.ok(v.projects.some((x: any) => x.id === p.id))
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'state.json.v99'), 'utf8')).future, 'theirs', 'as the newer Laki wrote it')
+  await rig.rpc('settingsSet', { dimPanes: false }) // a save
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'state.json.v99'), 'utf8')).v, 99, 'the copy stays')
+  const baks = readdirSync(rig.data).filter(f => /^state\.json\.bak-/.test(f)).sort()
+  assert.equal(baks.length, 7, baks.join(' '))
+  assert.equal(baks.at(-1), `state.json.bak-${day(0)}`, "today's")
+  assert.ok(!baks.includes(`state.json.bak-${day(8)}`), 'the oldest gone')
+  assert.equal(JSON.parse(readFileSync(join(rig.data, baks.at(-1)!), 'utf8')).v, 99, 'the state that loaded')
+
+  const n = await rig.rpc('noteNew', { title: 'mine' })
+  const file = join(rig.data, 'notes', `${n.id}.json`)
+  writeFileSync(file, '{"id": "half')
+  assert.deepEqual((await rig.rpc('noteList')).map((x: any) => x.id), [])
+  const broken = readdirSync(join(rig.data, 'notes')).find(f => f.startsWith(`${n.id}.json.broken-`))
+  assert.ok(broken, 'set aside')
+  await assert.rejects(rig.rpc('noteSave', { id: n.id, title: 'over it', blocks: [], md: '' }), /no such note/)
+  assert.equal(readFileSync(join(rig.data, 'notes', broken!), 'utf8'), '{"id": "half', 'not written over')
+})
+
 test('a chat that cannot be resumed is dropped: Enter starts a new one', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -337,7 +372,7 @@ test('U1, U2: a new install starts small (Labs off, no achievements game); one f
   let s = (await rig.rpc('state')).settings
   assert.deepEqual([s.labs, s.notes, s.fun, s.desk, s.achievements, s.theme, s.themeAuto, s.syncBase, s.notifyOn], [true, true, false, undefined, undefined, undefined, undefined, undefined, undefined]) // its theme too, and U10's defaults
   await rig.stop()
-  for (const f of ['state.json', 'state.json.bak']) rmSync(join(rig.data, f), { force: true })
+  for (const f of readdirSync(rig.data).filter(f => f.startsWith('state.json'))) rmSync(join(rig.data, f), { force: true }) // its dated backups too (R7)
   await rig.start() // a new one
   s = (await rig.rpc('state')).settings
   assert.equal(s.labs, false)

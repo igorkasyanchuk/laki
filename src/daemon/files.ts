@@ -7,6 +7,7 @@ import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync,
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
+import { writeAtomic } from '../shared/conn.ts'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
 import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, noNested, q, run, save, state, within, wsLog } from './core.ts'
@@ -769,7 +770,7 @@ export async function fileWrite(o: { ws: string; path: string; text: string; was
   // there: inside() only read the path, so the shell checks where it leads (pwd -P: its folders' links followed; the
   // file itself no link), as realpath does here
   if (ws.host) await sshIn(ws.host, `r=$(cd ${q(ws.path)} && pwd -P) && d=$(cd ${q(dirname(abs))} && pwd -P) && f="$d"/${q(basename(abs))} && case "$f" in "$r"/*) [ -f "$f" ] && [ ! -L "$f" ] ;; *) false ;; esac || { echo ${q(`${o.path}: not a file inside the workspace`)} >&2; exit 3; }; cat > "$f"`, o.text)
-  else writeFileSync(abs, o.text)
+  else writeAtomic(abs, o.text) // R7: whole or not at all, its mode kept
   return { size: Buffer.byteLength(o.text) }
 }
 

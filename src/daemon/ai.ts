@@ -8,7 +8,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { readJson, writeAtomic } from '../shared/conn.ts'
+import { readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
 import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceFillers, voiceFix, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
@@ -31,6 +31,7 @@ const pastDir = join(dir, 'ai-chats') // the AI page's earlier chats: <at>-<hex>
 const PAST_MAX = 100 // ponytail: the newest kept; older ones go as a new one is kept
 const PAST_ID = /^\d+-[0-9a-f]{6}$/
 const callsPath = join(dir, 'ai-calls.jsonl')
+const logCall = (call: AiCall) => (rotateLog(callsPath), appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })) // R7: past 10 MB, the older ones in .1
 const home = join(dir, 'ai') // the CLI agents' folder: no repo, no project's CLAUDE.md or AGENTS.md
 const KEEP = 200 // the conversation's messages kept
 const TOOL_TEXT = 4000 // what a tool's result may give the model; the page shows less
@@ -231,7 +232,7 @@ function thread(id = ''): Thread {
 function changed(t: Thread) {
   t.chat = t.chat.slice(-KEEP)
   try {
-    writeFileSync(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), { mode: 0o600 })
+    writeAtomic(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), 0o600) // R7: whole or not at all
   } catch {}
   broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t) })
 }
@@ -253,7 +254,7 @@ export function aiNew(p: { chat?: string } = {}) {
 function shelve(t: Thread) {
   if (!t.chat.some(m => m.role === 'user')) return
   mkdirSync(pastDir, { recursive: true })
-  writeFileSync(join(pastDir, `${t.at}-${randomBytes(3).toString('hex')}.json`), JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at }), { mode: 0o600 })
+  writeAtomic(join(pastDir, `${t.at}-${randomBytes(3).toString('hex')}.json`), JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at }), 0o600)
   const all = pastFiles().sort((a, b) => parseInt(a) - parseInt(b))
   for (const f of all.slice(0, Math.max(0, all.length - PAST_MAX))) rmSync(join(pastDir, f), { force: true })
 }
@@ -439,7 +440,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     busy.delete(t.id)
     for (const p of perms.values()) if (p.chat === t.id) p.done(-1) // its agent is gone: nothing waits on them
     try {
-      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+      logCall(call)
     } catch {}
     const next = t.queue?.splice(0) ?? []
     changed(t)
@@ -666,7 +667,7 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
   } finally {
     call.ms = Date.now() - call.at
     try {
-      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+      logCall(call)
     } catch {}
   }
 }
@@ -737,7 +738,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
     call.ms = Date.now() - call.at
     o.onCall?.(call, answer) // an extension's log: its seconds, cost and answer
     try {
-      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+      logCall(call)
     } catch {}
   }
 }
@@ -767,7 +768,7 @@ export async function aiDecide(o: { model: string; state: unknown; questions: ob
   } finally {
     call.ms = Date.now() - call.at
     try {
-      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+      logCall(call)
     } catch {}
   }
 }
