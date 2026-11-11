@@ -86,6 +86,7 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
 const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
 // Appearance's corners (--radius) and where the tabs go
 const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'Off']]
+const VERT: [AppSettings['vertText'] | '', string][] = [['', 'As each place reads (default)'], ['down', 'Top to bottom'], ['up', 'Bottom to top']]
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
 const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
@@ -1707,6 +1708,16 @@ export function SettingsPage(p: {
                   Motion
                   <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>
                     {MOTION.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label data-tip="Sideways labels: the Board's empty columns, the strips of workspaces and of a review's files, a diagram's lanes. By default the ones on the left read from the bottom up, the rest from the top down">
+                  Vertical text
+                  <select value={s.vertText ?? ''} onChange={e => paint({ vertText: (e.target.value || undefined) as AppSettings['vertText'] })}>
+                    {VERT.map(([v, name]) => (
                       <option key={v} value={v}>
                         {name}
                       </option>

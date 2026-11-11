@@ -2118,7 +2118,9 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   keeps them on top), *Motion* (*Low* by default: menus, dialogs and ⌘K
   scale in and fade out, a new row or tab grows in, buttons give when pressed, a workspace that needs you breathes, a
   finished one ticks once; *High*: pages and lists come in too; *Off*: nothing moves, spinners stand still, as with the
-  system's *Reduce motion*), *High contrast mode* (off by default:
+  system's *Reduce motion*), *Vertical text* (how sideways labels read: the
+  Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
+  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *High contrast mode* (off by default:
   hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
   three rows as you set them; its font, any on this Mac; its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,

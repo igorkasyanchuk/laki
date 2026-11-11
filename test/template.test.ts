@@ -183,8 +183,15 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', design: undefined, uiFont: undefined, uiSize: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, translucent: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined, highContrast: undefined, background: undefined, themeAuto: undefined, themeLight: undefined, themeDark: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', design: undefined, uiFont: undefined, uiSize: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, translucent: undefined, motion: undefined, vertText: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined, highContrast: undefined, background: undefined, themeAuto: undefined, themeLight: undefined, themeDark: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]')
+  // Vertical text: --vt for every sideways label's writing-mode; unset: none, each label its own
+  applyTheme({ vertText: 'up' })
+  assert.equal(props.get('--vt'), 'sideways-lr')
+  applyTheme({ vertText: 'down' })
+  assert.equal(props.get('--vt'), 'vertical-rl')
+  applyTheme({})
+  assert.equal(props.get('--vt'), undefined)
   // the icons' size: what CSS sizes (a sidebar row's marks) scales by; 14, none
   applyTheme({ iconSize: 18 })
   assert.equal(props.get('--icon-k'), String(18 / 14))

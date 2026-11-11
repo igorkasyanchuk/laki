@@ -1117,10 +1117,10 @@ export const preview = (t: Theme) => {
 
 // what paints the window (Settings → Appearance): the theme, the interface's font ('system': the Mac's), glass
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
-// and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
+// and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual); vertText: --vt, the writing-mode of every sideways label
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'translucent', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; vertText?: 'down' | 'up'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'translucent', 'motion', 'vertText', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1303,6 +1303,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   root.dataset.look = o.design === 'frosted' ? 'frosted' : t.look ?? '' // Design's Frosted: its shapes over any theme's, the theme's colors kept
   root.dataset.motion = o.motion ?? 'low'
   root.classList.toggle('opaque', OPAQUE_LOOKS.has(root.dataset.look)) // V8: its floats solid
+  if (o.vertText) st.setProperty('--vt', o.vertText === 'up' ? 'sideways-lr' : 'vertical-rl') // Vertical text: each sideways label's writing-mode (unset: its own, styles.css' var(--vt, …) fallbacks)
   gateRules({ look: root.dataset.look, motion: root.dataset.motion })
   const icons = lookOf(o)
   setIconLook(icons)

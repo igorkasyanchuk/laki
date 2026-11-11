@@ -79,6 +79,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     // U10: Basic shows four heads, each only its cards (Look: Theme first); All again; Layout by its link
     ['settings-basic', async () => { await waitFor(() => has('.settings-view button'), 'Basic | All'); await clickText('.settings-view button', 'Basic'); await waitFor(() => hasText('.settings-nav button', 'Git & PRs'), 'the Basic heads'); await clickText('.settings-nav button', 'Look') }, async () => (await has('.settings-main[data-basic]')) && (await js<string>("document.querySelector('.settings-main .set-group h3')?.textContent ?? ''")) === 'Theme' && !(await hasText('.settings-main h3', 'Rail'))],
     ['settings-layout', async () => (await clickText('.settings-view button', 'All'), await link('laki://settings/layout?spot=Rail')()), async () => !(await has('.settings-main[data-basic]')) && (await hasText('.settings-main h2', 'Layout')) && (await hasText('.settings-main h3', 'Rail'))],
+    // All's list is taller than the window: it scrolls, no row squeezed under its text
+    ['settings-rows', null, () => js<boolean>(`[...document.querySelectorAll('.settings-nav > button')].every(b => b.scrollHeight <= b.clientHeight + 1)`)],
     ['board', link('laki://board'), '.board'],
     ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
     ['ai', link('laki://ai'), '.ai-page'],

@@ -90,7 +90,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
   - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` as it opens, the file's diff from `diff` (uncommitted) on a
     click (`diffByFile`), `gated` around `ship`; after an Open PR, the sheet's Merge when green and Send CI failures as
-    `wsSet` (no second ask: the box was it). ⌘↵ is Open PR.
+    `wsSet` (no second ask: the box was it). ⌘↵ is Open PR. In a short window each column scrolls (`.ship-cols`' one
+    `minmax(0, 1fr)` row); on a phone the files sit over the words, scrolling as one.
   - ⌘K commands' keys: `shared/keys.ts` `COMMANDS`, `settings.cmdKeys`; `keydown.ts` builds `paletteItems` only when a press matches and runs the item with that `id` (one that doesn't apply now lets the key go on).
   - Keys are handled in a capture-phase `keydown`; xterm never sees ⌘ keys. Settings › Keys' (`shared/keys.ts` `KEYS`:
     17 actions, an id, words and a default each; `settings.keys` over them, `keyMap`: '' none, one `keyOk` refuses (no
@@ -446,7 +447,9 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   else looks.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Motion, styles.css'
-  last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
+  last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `vertText`:
+  Appearance's Vertical text, `--vt` on <html> (`sideways-lr` up, `vertical-rl` down), which every sideways label's
+  `writing-mode: var(--vt, <its own>)` takes (`.fr-vert`, the Board's empty columns, plans.css' `.sd-lane .sd-label`); `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
   see-through `--app-bg` (with the glow's radial gradients), `--side` and `--rail-bg` (`glassSide`) and `--term-bg` (`#rrggbbaa`: xterm reads only
   that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
   (a clear body, `.main` alone on `--app-bg`; glass in the app too: the sidebar's slider is over the desktop, not the Window one's background) and the window's blur (`blurred`; the new-workspace window never: `NewWindow`'s paint); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:

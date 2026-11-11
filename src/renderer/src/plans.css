@@ -116,7 +116,7 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .sd-action { border-radius: var(--r-pill); background: var(--sd-paper); }
 .sd-action .sd-label::before { content: '▸ '; color: var(--accent); }
 .sd-lane { border-radius: 0; flex-direction: row; padding: 0; }
-.sd-lane .sd-label { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; height: 100%; padding: 8px 6px; border-left: 1px solid var(--sd-zone-stroke); }
+.sd-lane .sd-label { writing-mode: var(--vt, sideways-lr); text-align: center; height: 100%; padding: 8px 6px; border-right: 1px solid var(--sd-zone-stroke); } /* bottom up unless Vertical text says (--vt); was vertical-rl turned 180°, its left border then on the right */
 
 /* wireframes (web/diagram.tsx WIRES): UI components drawn from their text, lines in the node stroke */
 .sd-body { flex: 1; min-height: 0; display: flex; }
