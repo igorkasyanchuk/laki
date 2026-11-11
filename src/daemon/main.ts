@@ -52,6 +52,7 @@ import { device, sim } from './device.ts'
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
 delete process.env.LAKI_WORKSPACE
 delete process.env.LAKI_TAB
+delete process.env.LAKI_TAB_TOKEN_FILE // S13: Laki AI's codex's laki mcp's
 delete process.env.LAKI_TAB_TOKEN // S12: nor that tab's: what the daemon starts (Laki AI's laki mcp, the pty host) would call as its agent
 delete process.env.LAKI_APP_TOKEN // S1: nor the app's (a test's CLI has it), whatever this daemon's starter had
 const appPipe = process.env.LAKI_APP_PIPE === '3' // S1: the app (or the test rig) reads the app's token on fd 3

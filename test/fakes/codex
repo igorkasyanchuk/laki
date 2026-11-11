@@ -2,7 +2,10 @@
 // fake codex: records its args; each Enter ends a turn by running the notify program from -c notify=[…]
 const fs = require('fs'), { execFileSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'codex', tab: process.env.LAKI_TAB, args, env: { CODEX_HOME: process.env.CODEX_HOME } }) + '\n')
+// S13: a tab's token as a 0600 file's path in -c mcp_servers.laki.env (LAKI_TAB_TOKEN_FILE): its mode and token, logged
+const tf = /LAKI_TAB_TOKEN_FILE="([^"]+)"/.exec(args.find(a => a.startsWith('mcp_servers.laki.env=')) ?? '')?.[1]
+const tokenFile = tf ? (() => { try { return { path: tf, mode: fs.statSync(tf).mode & 0o777, token: fs.readFileSync(tf, 'utf8') } } catch { return null } })() : undefined
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ tokenFile, bin: 'codex', tab: process.env.LAKI_TAB, args, env: { CODEX_HOME: process.env.CODEX_HOME } }) + '\n')
 // app-server (agentModels): model/list after initialize, one hidden; FAKE_MODELS: none (empty), or it fails (fail)
 if (args[0] === 'app-server') {
   if (process.env.FAKE_MODELS === 'fail') return process.exit(1)

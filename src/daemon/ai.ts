@@ -8,7 +8,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { readJson } from '../shared/conn.ts'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
 import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceFillers, voiceFix, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
@@ -694,9 +694,10 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const model = agent ? o.preset!.model : s.models?.[backend]
   const effort = effortArgs(backend, agent ? (o.preset!.effort ?? '') : undefined)
   const call: AiCall = { at: Date.now(), backend, model: model || backend, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  const cfg = userCfg && backend === 'claude' ? secretFile(JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm! }) } }), 'json') : undefined
   const args =
     backend === 'claude'
-      ? ['-p', '--output-format', 'json', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(userCfg ? ['--mcp-config', JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm! }) } }), '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
+      ? ['-p', '--output-format', 'json', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(cfg ? ['--mcp-config', cfg, '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
       : ['exec', '--json', '--skip-git-repo-check', ...(userCfg ? [] : ['--ignore-user-config', ...CODEX_TOOLS.flatMap(f => ['-c', `features.${f}=false`])]), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)), ...(!userCfg && backend === 'claude' && { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }) } // claude.ai's connectors: --strict-mcp-config keeps them out too, this for an older claude
@@ -732,6 +733,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
     call.error = (e as Error).message
     throw e
   } finally {
+    if (cfg) rmSync(cfg, { force: true })
     call.ms = Date.now() - call.at
     o.onCall?.(call, answer) // an extension's log: its seconds, cost and answer
     try {
@@ -789,6 +791,18 @@ const asTab = (chat: string): Record<string, string> => {
   return { LAKI_TAB_TOKEN: token }
 }
 const mcpServer = (chat: string, perm = false) => mcpWith({ ...asTab(chat), LAKI_AI: '1', LAKI_AI_CHAT: chat, ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }) })
+// S13: what holds a tab's token (claude's --mcp-config, codex's token) goes in a 0600 file, its path in argv: any process
+// of yours reads argv with ps. Out of `home` (claude's cwd: its Read takes that unasked); gone as the child ends, and a
+// crash's left over goes at this daemon's first
+const runDir = join(dir, 'ai-run')
+let swept = false
+function secretFile(data: string, ext: string) {
+  if (!swept) (swept = true), rmSync(runDir, { recursive: true, force: true })
+  mkdirSync(runDir, { recursive: true, mode: 0o700 })
+  const p = join(runDir, `${randomBytes(8).toString('hex')}.${ext}`)
+  writeAtomic(p, data, 0o600)
+  return p
+}
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here
@@ -843,28 +857,33 @@ async function claude(o: Opts) {
   const sk = sessionKey('claude')
   const resume = o.t.resume
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer(o.t.id, true) } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--permission-prompt-tool', 'mcp__laki__laki_permission', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const cfg = secretFile(JSON.stringify({ mcpServers: { laki: mcpServer(o.t.id, true) } }), 'json')
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', cfg, '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--permission-prompt-tool', 'mcp__laki__laki_permission', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
-  await cli(o, 'claude', args, j => {
-    if (j.session_id) resume[sk] = j.session_id
-    if (j.type === 'system' && j.model) r.model = j.model
-    if (j.type === 'assistant')
-      for (const b of j.message?.content ?? []) {
-        if (b.type === 'tool_use') (r.calls++, say(o.t, 'tool', `${String(b.name).replace(/^mcp__laki__/, '')} ${JSON.stringify(b.input ?? {})}`))
+  try {
+    await cli(o, 'claude', args, j => {
+      if (j.session_id) resume[sk] = j.session_id
+      if (j.type === 'system' && j.model) r.model = j.model
+      if (j.type === 'assistant')
+        for (const b of j.message?.content ?? []) {
+          if (b.type === 'tool_use') (r.calls++, say(o.t, 'tool', `${String(b.name).replace(/^mcp__laki__/, '')} ${JSON.stringify(b.input ?? {})}`))
+        }
+      if (j.type === 'result') {
+        r.text = j.result ?? ''
+        r.cost = j.total_cost_usd
+        const u = j.usage ?? {}
+        r.in = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
+        r.out = u.output_tokens ?? 0
+        if (j.is_error) failed = j.result || j.subtype
       }
-    if (j.type === 'result') {
-      r.text = j.result ?? ''
-      r.cost = j.total_cost_usd
-      const u = j.usage ?? {}
-      r.in = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
-      r.out = u.output_tokens ?? 0
-      if (j.is_error) failed = j.result || j.subtype
-    }
-  }).catch(e => {
-    if (resume[sk] && /session|conversation/i.test(e.message)) resume[sk] = undefined // gone: the next ask starts afresh
-    throw failed ? new Error(failed) : e // its own words over the exit code
-  })
+    }).catch(e => {
+      if (resume[sk] && /session|conversation/i.test(e.message)) resume[sk] = undefined // gone: the next ask starts afresh
+      throw failed ? new Error(failed) : e // its own words over the exit code
+    })
+  } finally {
+    rmSync(cfg, { force: true })
+  }
   if (failed) throw new Error(failed)
 }
 
@@ -875,7 +894,9 @@ async function codex(o: Opts) {
   const resume = o.t.resume
   const m = mcpServer(o.t.id)
   const toml = (v: unknown) => JSON.stringify(v) // a TOML basic string or array of them reads as JSON does
-  const env = `{${Object.entries(m.env).map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`
+  const { LAKI_TAB_TOKEN: token, ...rest } = m.env as Record<string, string> // S13: a file's path in its -c flags, not the token
+  const tokenFile = token ? secretFile(token, 'token') : undefined
+  const env = `{${Object.entries({ ...rest, ...(tokenFile && { LAKI_TAB_TOKEN_FILE: tokenFile }) }).map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`
   const args = [
     'exec',
     ...(resume[sk] ? ['resume', resume[sk]!] : []),
@@ -896,17 +917,21 @@ async function codex(o: Opts) {
   ]
   const r = o.r
   let failed = ''
-  await cli(o, 'codex', args, j => {
-    if (j.type === 'thread.started' && j.thread_id) resume[sk] = j.thread_id
-    const it = j.item
-    if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say(o.t, 'tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
-    if (j.type === 'item.completed' && it?.type === 'agent_message') r.text = it.text ?? ''
-    if (j.type === 'turn.completed') (r.in += j.usage?.input_tokens ?? 0), (r.out += j.usage?.output_tokens ?? 0)
-    if (j.type === 'turn.failed' || j.type === 'error') failed = j.error?.message ?? j.message ?? 'failed'
-  }).catch(e => {
-    if (resume[sk] && /thread|session|conversation|not found/i.test(e.message + failed)) resume[sk] = undefined // gone: the next ask starts afresh
-    throw failed ? new Error(failed) : e // its own words over the exit code
-  })
+  try {
+    await cli(o, 'codex', args, j => {
+      if (j.type === 'thread.started' && j.thread_id) resume[sk] = j.thread_id
+      const it = j.item
+      if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say(o.t, 'tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
+      if (j.type === 'item.completed' && it?.type === 'agent_message') r.text = it.text ?? ''
+      if (j.type === 'turn.completed') (r.in += j.usage?.input_tokens ?? 0), (r.out += j.usage?.output_tokens ?? 0)
+      if (j.type === 'turn.failed' || j.type === 'error') failed = j.error?.message ?? j.message ?? 'failed'
+    }).catch(e => {
+      if (resume[sk] && /thread|session|conversation|not found/i.test(e.message + failed)) resume[sk] = undefined // gone: the next ask starts afresh
+      throw failed ? new Error(failed) : e // its own words over the exit code
+    })
+  } finally {
+    if (tokenFile) rmSync(tokenFile, { force: true })
+  }
   if (failed) throw new Error(failed)
 }
 

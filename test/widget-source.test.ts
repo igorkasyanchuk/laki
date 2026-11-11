@@ -154,7 +154,7 @@ test("an AI source's agent asks for a tool it may not use: the app's dialog; Alw
   assert.equal(q.perm, 'mcp__claude_ai_Slack__slack_read_channel')
   assert.deepEqual([q.widget, q.name, q.input], ['slack', 'Slack', { channel: 'eng' }])
   const call = rig.fakeLog().filter((l: any) => l.bin === 'claude' && l.args.includes('--output-format')).pop()
-  assert.equal(JSON.parse(call.args[call.args.indexOf('--mcp-config') + 1]).mcpServers.laki_ask.env.LAKI_PERM_EXT, 'slack', 'beside the user’s own servers, not instead')
+  assert.equal(call.mcp.cfg.mcpServers.laki_ask.env.LAKI_PERM_EXT, 'slack', 'beside the user’s own servers, not instead')
   assert.ok(!call.args.includes('--strict-mcp-config'))
   await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'deny' })
   await shows(/^[\s\S]*deny\|mcp__slack</)

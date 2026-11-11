@@ -1,6 +1,7 @@
 // `laki mcp`: Laki as an MCP server over stdio (JSON-RPC 2.0, a message per line), for Claude Code, Codex or
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { aiRpc, extCall, obj, skillTools, str, type Tool, tools } from '../shared/tools.ts'
@@ -19,6 +20,15 @@ export function extNames<T extends { id: string; action: string }>(ts: T[]): Map
 }
 const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools', { ws: process.env.LAKI_WORKSPACE }).catch(() => []) : []) // an extension's permission server: none
 
+// S13: Laki AI's codex gives a tab's token as a 0600 file's path (its -c flags show in ps); unreadable, none of yours either
+if (process.env.LAKI_TAB_TOKEN_FILE && !process.env.LAKI_TAB_TOKEN) {
+  try {
+    process.env.LAKI_TAB_TOKEN = readFileSync(process.env.LAKI_TAB_TOKEN_FILE, 'utf8').trim()
+  } catch {
+    process.stderr.write("laki mcp: the agent's token file is gone\n")
+    process.exit(1)
+  }
+}
 let daemon: Promise<unknown> | undefined
 const own = process.env.LAKI_AI === '1' ? aiRpc(conn, process.env.LAKI_AI_CHAT) : conn // Laki AI's claude or codex runs this laki mcp, for that chat
 // Laki AI's claude -p (LAKI_AI_PERM) asks through it (--permission-prompt-tool) before a tool it may not use unasked: the user's pick in

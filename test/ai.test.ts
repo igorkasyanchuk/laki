@@ -745,6 +745,29 @@ test("S2: Laki AI asked by an agent acts as that agent: another workspace's tab 
   await assert.rejects(rig.rpc('aiChats', { from: { ws: one.id, tab } }), /an agent can't open, delete or change the user's Laki AI chats/)
 })
 
+test("S13: an agent's Laki AI chat on claude -p or codex exec: its tab's token in a 0600 file, never in argv (ps shows it), gone as the run ends", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'claude' } })
+  assert.match((await rig.rpc('aiAsk', { text: 'how many?', from: { ws: ws.id, tab } })).text, /1 workspaces, asked: .*how many/s)
+  const run = rig.fakeLog().filter(l => l.bin === 'claude' && l.args[0] === '-p').at(-1)
+  const token = run.mcp.cfg.mcpServers.laki.env.LAKI_TAB_TOKEN
+  assert.match(token, /^[0-9a-f]{16,}$/, "the agent's tab's token, in the file")
+  assert.equal(run.mcp.mode, 0o600)
+  assert.ok(!run.args.some((a: string) => a.includes(token)), run.args.join(' '))
+  assert.throws(() => statSync(run.mcp.path), 'gone with the run')
+
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'codex' } })
+  assert.match((await rig.rpc('aiAsk', { text: 'projects?', from: { ws: ws.id, tab } })).text, /1 projects/, 'laki mcp read the file')
+  const cx = rig.fakeLog().filter(l => l.bin === 'codex' && l.args[0] === 'exec').at(-1)
+  assert.equal(cx.tokenFile.token, token)
+  assert.equal(cx.tokenFile.mode, 0o600)
+  assert.ok(!cx.args.some((a: string) => a.includes(token)), cx.args.join(' '))
+  assert.throws(() => statSync(cx.tokenFile.path))
+})
+
 test("A3: an Anthropic model's request marks the tools and the system prompt for its cache, another's doesn't; the cached tokens reach the call log", async t => {
   const usage = { prompt_tokens: 9000, completion_tokens: 10, cost: 0.003, prompt_tokens_details: { cached_tokens: 8000 } }
   const or = await openrouter(t, [

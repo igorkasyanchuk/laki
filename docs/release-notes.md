@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Security: Laki AI on Claude Code or Codex no longer puts an agent tab's token on the command line, where any program of yours could read it with `ps`: it goes in a file only you can read, gone as the run ends.
 - More room for the terminal: an agent's turns are the status bar's *Turns* (a clock and a count; hover for the last, click for all of them with their changes, rewind and New workspace) instead of a row under each tab, and Full screen moved into the tab bar's ⋯ menu (⌘⇧⏎ as before).
 - Square themes are square throughout: with Llama Amp, Brutalist, Receipt and the other square looks, a Design's cards and pill tabs are square like their dialogs and buttons (they stayed round before), and Appearance › Corners rounds them all alike. The Cards, Inset and Tiles designs' terminal and side panel cards, and Sections' project boxes, have their round corners again (a CSS slip dropped them). The Terminal/Reader switch sits in line with the tab bar's buttons in Classic and Inset, and a Delete button's focus ring is red.
 - A Markdown file's path or link in a terminal shows the file drawn on hover, as a picture's does (the workspace's files and its storage folder's: an agent's report.md).

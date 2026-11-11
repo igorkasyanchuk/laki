@@ -47,6 +47,10 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   `-c model_reasoning_effort`;
 - `codex`: `codex exec [resume <thread>] --json --skip-git-repo-check --ignore-user-config (its MCP servers) -c sandbox_mode="read-only"
   -c developer_instructions=… -c mcp_servers.laki.{command,args,env,tool_timeout_sec}`, `-i` per image; no cost.
+  S13: nothing in argv carries a tab's token (any process of yours reads argv with `ps`): claude's `--mcp-config` (the
+  chat's, and `aiOnce`'s `laki_ask`) is the path of a 0600 JSON file, codex's `env` has `LAKI_TAB_TOKEN_FILE`, a 0600
+  file `laki mcp` reads as it starts (unreadable: it exits, never your token); both `secretFile`s in `<data>/ai-run`
+  (out of `home`, claude's cwd, whose Read takes it unasked), removed as the child ends, the folder emptied at a daemon's first;
 Chats (`Thread`, `thread(id)`): `''` the AI page's (`<data>/ai-chat.json`), `plan:<project>/<kind>/<slug>` a spec's or
 brainstorm's (`shared/plans.ts` `planChat`; `plans.ts` `planOfChat`: its folder's `.chat.json`, which `filesOf` hides and
 `planWrite` refuses), `widget:<id>` an extension page's (`Chat`, `widgetFiles.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;

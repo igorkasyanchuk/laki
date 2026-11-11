@@ -4,7 +4,10 @@ const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
 // --version: $HOME/claude-version's, else 2.1.200 (not logged: tests count its runs)
 if (args[0] === '--version') return void process.stdout.write(`${(() => { try { return fs.readFileSync(`${process.env.HOME}/claude-version`, 'utf8').trim() } catch { return '2.1.200' } })()} (Claude Code)\n`)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, largs: Object.entries(process.env).filter(([k]) => k.startsWith('LAKI_ARG_')).map(([, v]) => v), env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS' || k === 'CLAUDE_CONFIG_DIR' || k === 'LAKI_STATUSLINE_CMD')) }) + '\n')
+// --mcp-config: a file's path (S13: never the JSON itself, ps shows argv); its mode and what it holds, logged
+const mcpCfg = () => { const v = args[args.indexOf('--mcp-config') + 1]; return JSON.parse(v.startsWith('{') ? v : fs.readFileSync(v, 'utf8')) }
+const mcp = args.includes('--mcp-config') ? (() => { const v = args[args.indexOf('--mcp-config') + 1]; try { return { mode: v.startsWith('{') ? null : fs.statSync(v).mode & 0o777, path: v, cfg: mcpCfg() } } catch { return null } })() : undefined
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ mcp, bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, largs: Object.entries(process.env).filter(([k]) => k.startsWith('LAKI_ARG_')).map(([, v]) => v), env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS' || k === 'CLAUDE_CONFIG_DIR' || k === 'LAKI_STATUSLINE_CMD')) }) + '\n')
 // -p (Laki's AI): stream-json, one laki_state call through the --mcp-config server; "fail…" fails, "slow…" waits;
 // a brainstorm writes its ideas.md
 // -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block,
@@ -32,7 +35,7 @@ if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
     if (tools.split(/[ ,]+/).includes(tool)) return said('allowed')
     if (!args.includes('--permission-prompt-tool')) return said('refused')
     const via = args[args.indexOf('--permission-prompt-tool') + 1]
-    return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki_ask, via.replace(/^mcp__laki_ask__/, ''), { tool_name: tool, input: { channel: 'eng' } }).then(t => said(JSON.parse(t).behavior))
+    return require('./mcp.cjs')(mcpCfg().mcpServers.laki_ask, via.replace(/^mcp__laki_ask__/, ''), { tool_name: tool, input: { channel: 'eng' } }).then(t => said(JSON.parse(t).behavior))
   }
   return done(`Found it.\n\n\`\`\`json\n{"text": "draft"}\n\`\`\`\n\nThe data:\n\n\`\`\`json\n${JSON.stringify({ text: prompt, tools, account: process.env.TEST_ACCOUNT ?? '' })}\n\`\`\`\n`)
 }
@@ -51,16 +54,16 @@ if (args[0] === '-p') {
   if (prompt.startsWith('slow')) return setTimeout(() => {}, 60000)
   // a brainstorm (the Specs page's): its ideas written into the brainstorm, as the prompt names it
   const b = prompt.startsWith('Brainstorm session') && /laki_plan_read \(project (\S+), kind brainstorm, slug (\S+)\)/.exec(prompt)
-  if (b) return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, 'laki_plan_write', { project: b[1], kind: 'brainstorm', slug: b[2], path: 'ideas.md', text: '# Two options' }).then(text =>
+  if (b) return require('./mcp.cjs')(mcpCfg().mcpServers.laki, 'laki_plan_write', { project: b[1], kind: 'brainstorm', slug: b[2], path: 'ideas.md', text: '# Two options' }).then(text =>
     out({ type: 'result', subtype: 'success', is_error: false, result: `wrote ${JSON.parse(text).path}`, session_id: session, total_cost_usd: 0.01, usage: { input_tokens: 1, output_tokens: 1 } }))
   // "read…": a Read it may not do unasked, through --permission-prompt-tool, as the real one: what the user said, back
   if (prompt.startsWith('read')) {
     const via = args[args.indexOf('--permission-prompt-tool') + 1]
-    return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, via.replace(/^mcp__laki__/, ''), { tool_name: 'Read', input: { file_path: '/etc/hosts' } }).then(text =>
+    return require('./mcp.cjs')(mcpCfg().mcpServers.laki, via.replace(/^mcp__laki__/, ''), { tool_name: 'Read', input: { file_path: '/etc/hosts' } }).then(text =>
       out({ type: 'result', subtype: 'success', is_error: false, result: `${JSON.parse(text).behavior}: ${JSON.parse(text).message ?? JSON.parse(text).updatedInput.file_path}`, session_id: session, usage: {} }))
   }
   out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__laki__laki_state', input: {} }] } })
-  return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, 'laki_state', {}).then(text => {
+  return require('./mcp.cjs')(mcpCfg().mcpServers.laki, 'laki_state', {}).then(text => {
     out({ type: 'user', message: { content: [{ type: 'tool_result', content: text }] } })
     const r = `${JSON.parse(text).workspaces.length} workspaces, asked: ${prompt}`
     out({ type: 'result', subtype: 'success', is_error: false, result: r, session_id: session, total_cost_usd: 0.0123, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 } })
