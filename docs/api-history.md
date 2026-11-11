@@ -175,3 +175,4 @@ needs no bump: `settingsSet` keeps any field.
 167: the app's pages on `app://laki` (S9): the daemon takes that Origin instead of `file://`.
 168: remote access's answer level (D7): `remoteDeviceSet`, a device's `level`, a remote page's view `remote.level`, `settings.remoteLevel`.
 169: `diagnostics` (R6: `laki doctor --bundle`, Copy diagnostics) and the view's `trouble` (the daemon's uncaught errors).
+170: `agentContext`, `agentContextOpen` (F6: what an agent sees, read only).

@@ -70,6 +70,7 @@ function lazyPage<P extends object>(load: () => Promise<ComponentType<P>>, title
   )
 }
 const SettingsPage = lazyPage(() => PRELOAD.settings().then(m => m.SettingsPage), 'Settings')
+const WhatItSees = lazy(() => PRELOAD.settings().then(m => ({ default: m.WhatItSees }))) // F6's, from Info: with Settings' chunk
 const ExtensionPage = lazyPage(() => PRELOAD.extension().then(m => m.ExtensionPage), 'Extension')
 const UiKitPage = lazyPage(() => PRELOAD.uikit().then(m => m.UiKitPage), 'UI kit')
 const HelpPage = lazyPage(() => PRELOAD.help().then(m => m.HelpPage), 'Help')
@@ -86,7 +87,7 @@ const StarterPicker = (p: Parameters<typeof StarterLazy>[0]) => (
 
 // the pages in the main area, over the panes
 export function Pages({ app }: { app: AppCtx }) {
-  const { nextNeed, achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, quickKey, tellKey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere } = app
+  const { nextNeed, achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, quickKey, tellKey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere , termType } = app
   // a page's own move that isn't a place of its own (a Settings section, an extension page's tab): the place it's at
   // says it, so Back or Forward to it opens there, not where it was opened
   // (after App's own effect: a page's first report comes from its effects, which run before App's records its place)
@@ -196,6 +197,7 @@ export function Pages({ app }: { app: AppCtx }) {
           skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
           accounts={layoutsOn ? accountsApi : undefined}
           hooks={hasCap(view, 'hooks.seen') ? () => api.call('hooksSeen') : undefined}
+          typeIn={(cmd, project) => void termType(cmd, project)}
           ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
           bg={{
             url: bgUrl,
@@ -309,6 +311,13 @@ export function Pages({ app }: { app: AppCtx }) {
       {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={extOf(dialog.back ?? null) ? placeName({ d: dialog.back!, ws: null }) : backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
       {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '', quick: held.quick ? quickKey || '' : '', tell: held.tell ? tellKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom * own} onClose={() => setDialog(null)} />}
       {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+      {dialog && typeof dialog === 'object' && 'sees' in dialog && (
+        <Modal title={`What ${dialog.sees === 'claude' ? 'Claude Code' : 'Codex'} sees`} onClose={() => setDialog(null)}>
+          <Suspense fallback={<p className="muted small">Reading…</p>}>
+            <WhatItSees agent={dialog.sees} project={dialog.in} projects={view.projects.filter(p => !p.kind).map(p => ({ id: p.id, name: p.name }))} onType={(cmd, project) => void termType(cmd, project)} />
+          </Suspense>
+        </Modal>
+      )}
       {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
       {dialog === 'desk' && deskOn && (
         <DeskPage

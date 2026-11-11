@@ -2379,10 +2379,14 @@ export async function openIn(o: { ws?: string; project?: string; widget?: string
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
   const inWs = (w: Workspace) => (o.storage ? (w.storage && !w.host ? { ...w, path: w.storage } : openFail({ message: 'no storage folder' })) : w)
   const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(inWs(findWs(o.ws!)), o.file!) : o.ws ? inWs(findWs(o.ws)).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
-  const s = state.settings ?? {}
   const pid = o.ws ? findWs(o.ws).project : o.widget ? undefined : findProject(o.project ?? '').id // editors are by id
-  const app = o.app === 'editor' ? (pid && s.editors?.[pid]) || s.editor || 'cursor' : o.app // the project's, else Settings'
   const host = o.ws ? (o.storage ? undefined : findWs(o.ws).host) : o.widget ? undefined : findProject(o.project ?? '').host
+  return openPath(path, o.app, pid, host, file)
+}
+// a path (the daemon's own: openIn's, a rule file agentContext lists) in an app; editor: the project's, else Settings'
+export async function openPath(path: string, as: string, pid?: string, host?: string, file = true) {
+  const s = state.settings ?? {}
+  const app = as === 'editor' ? (pid && s.editors?.[pid]) || s.editor || 'cursor' : as
   if (host) {
     // a folder or file on an SSH host: the editors with Remote - SSH open it there
     const scheme = ({ vscode: 'vscode', cursor: 'cursor', windsurf: 'windsurf' } as Record<string, string>)[app]

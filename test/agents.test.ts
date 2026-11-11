@@ -1,6 +1,6 @@
 // Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, gemini's hooks, opencode's plugin.
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, until } from './helpers.ts'
@@ -206,4 +206,54 @@ test("claude's PreToolUse and PostToolUse run in the background (async); a late 
   assert.equal((await rig.tab(ws.id)).status, 'waiting', 'started with the ask (its node a little later): still waiting')
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } }, at: at + 1000 })
   assert.equal((await rig.tab(ws.id)).status, 'running', 'answered: its tool ran')
+})
+
+// F6: what an agent sees, from fake config files under the test's HOME: claude's CLAUDE.md files and @imports in load
+// order, its .claude.json's and .mcp.json's servers; codex's AGENTS.md files and config.toml's; env values, headers and
+// tokens masked; refused for an agent
+test("F6: agentContext lists an agent's rule files and MCP servers, masked; an agent can't read it", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = (f: string, text: string) => (mkdirSync(join(f, '..'), { recursive: true }), writeFileSync(f, text))
+  w(join(rig.home, '.claude', 'CLAUDE.md'), 'Be brief.\n@~/.claude/style.md\n`@not/this.md`\n')
+  w(join(rig.home, '.claude', 'style.md'), 'Short words.\n')
+  w(join(rig.repo, 'CLAUDE.md'), '# Repo\n@docs/notes.md\n')
+  w(join(rig.repo, 'docs', 'notes.md'), 'notes\n')
+  w(join(rig.repo, '.mcp.json'), JSON.stringify({ mcpServers: { db: { command: 'npx', args: ['db-mcp', '--token', 'tok-xyz-123'], env: { DB_PASSWORD: 'sekret-1' } } } }))
+  w(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { remote: { type: 'http', url: 'https://me:pw-999@mcp.example/x?token=abc-777', headers: { Authorization: 'Bearer zzz-555' } } }, projects: { [realpathSync(rig.repo)]: { mcpServers: { mine: { command: 'node', args: ['srv.js', '--api-key=key-444'] } } } } }))
+  w(join(rig.home, '.codex', 'AGENTS.md'), 'codex rules\n')
+  w(join(rig.repo, 'AGENTS.md'), 'repo rules\n')
+  w(join(rig.home, '.codex', 'config.toml'), 'model = "gpt-5"\n\n[mcp_servers.docs]\ncommand = "npx" # the runner\nargs = [\n  "-y",\n  "docs-mcp",\n]\n\n[mcp_servers.docs.env]\nDOCS_KEY = "sekret-2"\n\n[mcp_servers."web search"]\nurl = "https://search.example/mcp"\nenabled = false\n')
+
+  const c = await rig.rpc('agentContext', { agent: 'claude', project: p.id })
+  const repo = (x?: string) => x?.replace(realpathSync(rig.repo), '<repo>')
+  const size = (f: string) => readFileSync(f).length
+  assert.deepEqual(c.rules.map((r: any) => [repo(r.at), r.scope, r.size, repo(r.from)]), [
+    ['~/.claude/CLAUDE.md', 'user', size(join(rig.home, '.claude', 'CLAUDE.md')), undefined],
+    ['~/.claude/style.md', 'user', size(join(rig.home, '.claude', 'style.md')), '~/.claude/CLAUDE.md'],
+    ['<repo>/CLAUDE.md', 'project', size(join(rig.repo, 'CLAUDE.md')), undefined],
+    ['<repo>/docs/notes.md', 'project', 6, '<repo>/CLAUDE.md'],
+  ])
+  assert.deepEqual(c.servers.map((s: any) => [s.name, s.scope, s.transport]), [['mine', 'local', 'stdio'], ['db', 'project', 'stdio'], ['remote', 'user', 'http']])
+  const db = c.servers.find((s: any) => s.name === 'db')
+  assert.deepEqual([db.command, db.args, db.env], ['npx', ['db-mcp', '--token', '••••'], ['DB_PASSWORD']])
+  assert.deepEqual(c.servers.find((s: any) => s.name === 'mine').args, ['srv.js', '--api-key=••••'])
+  assert.deepEqual(c.servers.find((s: any) => s.name === 'remote').headers, ['Authorization'])
+  assert.equal(c.memory.global, 0)
+  for (const x of ['tok-xyz-123', 'sekret-1', 'pw-999', 'abc-777', 'zzz-555', 'key-444']) assert.ok(!JSON.stringify(c).includes(x), x)
+
+  const x = await rig.rpc('agentContext', { agent: 'codex', project: p.id })
+  assert.deepEqual(x.rules.map((r: any) => [repo(r.at), r.scope]), [['~/.codex/AGENTS.md', 'user'], ['<repo>/AGENTS.md', 'project']])
+  assert.deepEqual(x.servers, [
+    { name: 'docs', scope: 'user', file: '~/.codex/config.toml', transport: 'stdio', command: 'npx', args: ['-y', 'docs-mcp'], env: ['DOCS_KEY'] },
+    { name: 'web search', scope: 'user', file: '~/.codex/config.toml', transport: 'http', url: 'https://search.example/mcp', off: true },
+  ])
+  assert.ok(!JSON.stringify(x).includes('sekret-2'))
+
+  // an agent's call: refused (its user's files, not its own); a path not on the list isn't opened
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'peek' })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  await assert.rejects(rig.rpc('agentContext', { agent: 'claude', project: p.id, from: { ws: ws.id, tab } }), /an agent can't read what an agent sees/)
+  await assert.rejects(rig.rpc('agentContextOpen', { agent: 'claude', project: p.id, path: '/etc/hosts' }), /not one of its rule files/)
+  await assert.rejects(rig.rpc('agentContext', { agent: 'gemini' }), /claude or codex/)
 })

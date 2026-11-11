@@ -26,7 +26,7 @@ import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import type { AllowRule } from '../../shared/ask'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
-import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
+import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
@@ -789,6 +789,7 @@ export function SettingsPage(p: {
   presets: Preset[] // the daemon's: the settings', or its defaults
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   hooks?: () => Promise<Record<string, HookSeen>> // Agents & profiles: each agent's last hook (the daemon's hooksSeen)
+  typeIn?: (cmd: string, project?: string) => void // F6's What it sees: the agent's CLI command typed in a terminal (App's termType)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
   onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
   achievements?: AchievementsApi // App's: the count, on or off, the page
@@ -2594,6 +2595,12 @@ export function SettingsPage(p: {
               </p>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
+                  {(agent === 'claude' || agent === 'codex') && p.typeIn && (
+                    <details className="sees-box">
+                      <summary>What it sees: its rules and MCP servers</summary>
+                      <WhatItSees agent={agent} projects={(p.projects ?? []).map(x => ({ id: x.id, name: x.name }))} onType={p.typeIn} />
+                    </details>
+                  )}
                   {isAccountAgent(agent) && p.accounts && (
                     <AccountsBlock agent={agent} api={p.accounts} views={accts} usage={usage} use={accts.find(v => v.agent === agent && v.default)?.id ?? HOME_ACCOUNT} onUse={id => (set({ accountUse: { ...s.accountUse, [agent]: id } }), setAccts(v => v.map(x => (x.agent === agent ? { ...x, default: x.id === id } : x))))} reload={loadAccts} fallback={s.limitFallback?.[agent]} onFallback={ids => set({ limitFallback: { ...s.limitFallback, [agent]: ids } })} />
                   )}

@@ -3015,18 +3015,22 @@ export function App() {
   // U4: Welcome's Install or Sign in: a terminal with the command typed (not run), `; exit` after it, so it ends as the
   // command does; as it exits, it goes and Welcome is back (its checks run again as it shows)
   const [fixTab, setFixTab] = useState<{ tab: string; ws: string; seen?: boolean } | null>(null) // seen: its tab in the view once (the socket's view can lag the state call)
-  const welcomeRun = async (cmd: string) => {
-    const w = await call<WorkspaceView>('quickNew', { kind: 'shells' }).catch(() => null)
+  const welcomeRun = (cmd: string) => termType(`${cmd}; exit`, undefined, (tab, ws) => setFixTab({ tab, ws }))
+  // a terminal (a project's, else Terminals') with a command typed, not run (Welcome's; F6's Add a server…, Remove…: the
+  // agent's own CLI changes its config, never Laki)
+  const termType = async (cmd: string, project?: string, opened?: (tab: string, ws: string) => void) => {
+    const w = await call<WorkspaceView>('quickNew', { kind: 'shells', ...(project && { project }) }).catch(() => null)
     if (!w) return
     for (let i = 0; i < 50; i++) {
       const t = (await api.call<View>('state').catch(() => null))?.tabs.find(x => x.workspace === w.id)
       if (t) {
-        setFixTab({ tab: t.id, ws: w.id })
-        await call('send', { target: t.id, text: `${cmd}; exit`, enter: false }).catch(() => {})
+        opened?.(t.id, w.id)
+        await call('send', { target: t.id, text: cmd, enter: false }).catch(() => {})
         break
       }
       await new Promise(r => setTimeout(r, 100))
     }
+    setDialog(null)
     showNew(w.id)
   }
   useEffect(() => {
@@ -3627,7 +3631,7 @@ export function App() {
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
     openInItems, openMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
-    pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarKey, radarOf, rail,
+    pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail,
     railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
     reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
     schedulesFor, selectGroup, selectTab, sendLater, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal,
@@ -3919,6 +3923,8 @@ export function App() {
                 onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
                 onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
                 onDetach={() => detachPr(ws)}
+                sees={(['claude', 'codex'] as const).filter(a => !ws.host && view.tabs.some(t => t.workspace === ws.id && tabAgent(t, view.presets) === a))}
+                onSees={a => setDialog({ sees: a, in: ws.project })}
                 onStorage={bridge?.openPath && ws.storage ? () => void bridge!.openPath!(ws.storage!).then(r => r === 'missing' && toast('Nothing kept yet: its folder is made with its first tab')) : undefined}
                 />
               }

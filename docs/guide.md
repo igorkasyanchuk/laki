@@ -2299,6 +2299,11 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   sandbox off): Settings and the new-workspace page refuse the pair and say why. `laki preset set <name> --sandbox`.
   The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them; *Add a profile for…* adds another agent's). Edit `claude` or `codex` to change how every new one starts; a tab started from a profile uses its current settings when it restarts or resumes.
+- *What it sees* (Claude Code and Codex, in their group in *Agents & profiles*; a workspace's Info has *What claude
+  sees* too): the rule files the agent loads in that project, in order and with their sizes (CLAUDE.md files and what
+  they import, AGENTS.md files), how much of Laki's memory it gets, and the MCP servers its own config gives it (env
+  values and tokens hidden). *Open* opens a file in your editor; *Add a server…*, *Remove…* and *Check health…* open a
+  terminal with the agent's own `mcp` command typed for you to finish and run: Laki never changes the agent's config.
 - *Accounts* (Claude Code and Codex, at the top of each one's group in *Agents & profiles*): your other sign-ins, say a
   work and a personal plan. *Add … account* makes a folder for it in Laki's data folder (given to the agent as
   `CLAUDE_CONFIG_DIR` or `CODEX_HOME`) and opens a terminal with the agent's own sign-in there (`claude auth login`,

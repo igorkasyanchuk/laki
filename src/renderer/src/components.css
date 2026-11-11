@@ -113,3 +113,12 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :where(html.glass) .settings-page { background: color-mix(in srgb, var(--bg) 88%, transparent); }
 :where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
 :where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
+
+/* F6: What it sees (SettingsAgents.tsx WhatItSees): its rule files and MCP servers, a row each */
+.sees-box > summary { cursor: pointer; padding: var(--sp-2) 0; color: var(--muted); }
+.sees { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-4); }
+.sees h4 { margin: var(--sp-3) 0 0; font-size: var(--fs-2); }
+.sees-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.sees-list > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sees-list > li > button { margin-left: auto; }
+.sees-cmd { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }

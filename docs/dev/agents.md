@@ -36,6 +36,26 @@ the popup each (Usage.tsx `mostRoom`: 20 points ahead). `accountRm` (refused whi
 links, not their targets) and claude's Keychain item. Laki AI's claude/codex backends take the preset's account, else
 the default. Tested in `test/accounts.test.ts` (the fake `security` keeps an account's item in `$HOME/keychain-<name>`).
 
+### What it sees (F6)
+
+`sees.ts` `agentContext({ agent, project })`, read only, for claude and codex (refused for an agent's caller, over
+remote access, and for a project on an SSH host): `rules`, the files the agent loads in its order, each with its size
+and scope: Claude Code's managed CLAUDE.md, the default account's folder's (`configDir`: its `CLAUDE_CONFIG_DIR`, else
+`~/.claude`) CLAUDE.md and `rules/*.md`, then for each folder from `/` down to the project's (`chain`) its CLAUDE.md,
+`.claude/CLAUDE.md` (the project's own `.claude/rules/*.md`) and CLAUDE.local.md, each with its `@path` imports (`from`;
+code spans and fences skipped, 5 deep, each file once by its real path); Codex's folder's `AGENTS.override.md` or
+`AGENTS.md`, then one per folder from the repo's root down. `memory`: how many global, yours and learned items, and the
+bytes of `memoryNote` (what claude's `--append-system-prompt` and codex's instructions get). `servers`: Claude Code's
+`.claude.json` (the project's local ones, then `.mcp.json`'s project ones, then the user's), Codex's `config.toml`
+(`tomlServers`: a TOML subset, `[mcp_servers.<name>]` and its `.env`; a project's `.codex/config.toml` too); env and
+headers by name only, a token-shaped string, a URL's password and the value after a `--token`/`--api-key`… masked. No
+health: `claude mcp list` starts every server, so it's typed for you (*Check health…*), not run. `agentContextOpen`
+opens one of the listed files only (core's `openPath`, the editor). The page (SettingsAgents.tsx `WhatItSees`):
+Settings › Agents & profiles › Claude Code or Codex › *What it sees*, and a workspace's Info (*What claude sees*: the
+dialog `{ sees, in }`); *Add a server…*, *Remove…* and *Check health…* open a terminal in the project with the agent's
+`mcp add`, `mcp remove <name> -s <scope>` or `mcp list` typed, not run (App's `termType`, Welcome's way). Never a write
+to `~/.claude` or `~/.codex`. Tested in `test/agents.test.ts` (fake files under the test's HOME).
+
 ### Layouts
 
 A workspace's tabs, each a split tree of sessions (`shared/layout.ts`), are the daemon's: `state.layouts` (by workspace,

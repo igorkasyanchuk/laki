@@ -538,6 +538,8 @@ export function InfoTab(p: {
   onUnrelate?: (url: string) => void // off the related list
   onDetach?: () => void // its PR, only linked, to related
   onLabel?: LabelApi // its PR's labels
+  sees?: ('claude' | 'codex')[] // F6: its agents' What it sees (their rules and MCP servers)
+  onSees?: (agent: 'claude' | 'codex') => void
 }) {
   const { w } = p
   return (
@@ -562,6 +564,18 @@ export function InfoTab(p: {
           <Row k="path" tip={w.path} copy={() => p.onCopy(w.path)}>
             <span className="mono">{shortPath(w.path)}</span>
           </Row>
+          {!!p.sees?.length && p.onSees && (
+            <Row k="sees" tip="The rule files and MCP servers each of its agents loads here">
+              {p.sees.map((a, i) => (
+                <span key={a}>
+                  {i ? ' · ' : ''}
+                  <a href="#" onClick={e => (e.preventDefault(), p.onSees!(a))}>
+                    What {a} sees
+                  </a>
+                </span>
+              ))}
+            </Row>
+          )}
           {w.storage && (
             <Row k="storage" tip={`${w.storage}: what its agents keep for you ($LAKI_STORAGE_FOLDER)`} copy={() => p.onCopy(w.storage!)}>
               {p.onStorage ? (

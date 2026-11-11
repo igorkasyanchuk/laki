@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- *What it sees* (Settings › Agents & profiles › Claude Code or Codex, and a workspace's Info): the rule files the agent loads in a project, in order with their sizes, Laki's memory it gets, and its MCP servers with secrets hidden. Add or remove a server, or check their health, with the agent's own command typed in a terminal for you. [Try it](laki://settings/presets)
 - Safer data: notes, Laki AI's chats, your prompt history, workflow and extension files and the file editor's saves are written whole or not at all, and one that can't be read is kept as `.broken-<time>` instead of being replaced. Laki keeps a backup of its state for each of the last 7 days, and data written by a newer Laki is copied aside (with a bar saying so) before this one saves.
 - *Copy diagnostics* (Help, About, ⌘K) and `laki doctor --bundle`: Laki's and each agent's versions, the checks and the logs' last lines for a bug report, with your home folder, tokens, keys and prompts masked. When something goes wrong inside Laki's daemon, a bar says so, with Copy diagnostics and Restart the daemon (your terminals stay).
 - Security: Laki AI on Claude Code or Codex no longer puts an agent tab's token on the command line, where any program of yours could read it with `ps`: it goes in a file only you can read, gone as the run ends.

@@ -1,8 +1,8 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceSettings } from '../../shared/types'
+import { type Account, type AccountAgent, type AccountView, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceSettings } from '../../shared/types'
 import { useEffect, useState } from 'react'
-import { bridge } from './api'
+import { api, bridge } from './api'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
 import { BACKENDS, money, tokens } from './Ai'
@@ -491,5 +491,103 @@ export function SkillSection({ api }: { api: SkillApi }) {
         </>
       )}
     </>
+  )
+}
+
+// F6: what an agent sees in a project (the daemon's agentContext): the rule files it loads in order, Laki's memory it
+// gets, the MCP servers its own config gives it (env values and tokens masked). Read only: Open file (your editor), and
+// Add a server…, Remove… and Check health: the agent's own CLI command typed in a terminal for you to run
+const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`)
+const sh = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`)
+export function WhatItSees({ agent, projects, project: first, onType }: { agent: 'claude' | 'codex'; projects: { id: string; name: string }[]; project?: string; onType: (cmd: string, project?: string) => void }) {
+  const [project, setProject] = useState(first ?? projects[0]?.id ?? '')
+  const [c, setC] = useState<AgentContext | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    setC(null)
+    setErr('')
+    void api.call<AgentContext>('agentContext', { agent, project: project || undefined }).then(setC, (e: Error) => setErr(e.message))
+  }, [agent, project])
+  const at = project || undefined
+  return (
+    <div className="sees">
+      <div className="row">
+        <label className="small">
+          In{' '}
+          <select value={project} aria-label="Project" onChange={e => setProject(e.target.value)}>
+            <option value="">no project (your own only)</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {err && <p className="err small">{err}</p>}
+      {!c && !err && <p className="muted small">Reading…</p>}
+      {c && (
+        <>
+          <h4>Rules, in the order it reads them</h4>
+          {c.rules.length ? (
+            <ul className="sees-list">
+              {c.rules.map(r => (
+                <li key={r.path}>
+                  <span className="mono" title={r.path}>
+                    {r.at}
+                  </span>
+                  <span className="muted small">
+                    {' '}
+                    · {r.scope} · {kb(r.size)}
+                    {r.from && ` · imported by ${r.from}`}
+                  </span>
+                  <button className="ghost sm" onClick={() => void api.call('agentContextOpen', { agent, project: at, path: r.path }).catch((e: Error) => setErr(e.message))}>
+                    Open
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted small">No {agent === 'claude' ? 'CLAUDE.md' : 'AGENTS.md'} files.</p>
+          )}
+          <p className="muted small">
+            Laki's memory, added to its instructions: {c.memory.global} global, {c.memory.mine} of this project's from you, {c.memory.learned} learned ({kb(c.memory.bytes)}).
+          </p>
+          <h4>MCP servers</h4>
+          {c.servers.length ? (
+            <ul className="sees-list">
+              {c.servers.map(s => (
+                <li key={`${s.scope}:${s.name}`}>
+                  <b>{s.name}</b>
+                  <span className="muted small">
+                    {' '}
+                    · {s.transport} · {s.scope}
+                    {s.off && ' · off'}
+                  </span>
+                  <span className="mono small sees-cmd" title={s.file}>
+                    {s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ')}
+                    {s.env && ` · env ${s.env.join(', ')}`}
+                    {s.headers && ` · headers ${s.headers.join(', ')}`}
+                  </span>
+                  <button className="ghost sm" onClick={() => onType(agent === 'claude' ? `claude mcp remove ${sh(s.name)} -s ${s.scope}` : `codex mcp remove ${sh(s.name)}`, at)}>
+                    Remove…
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted small">None in its config.</p>
+          )}
+          <div className="row">
+            <button className="sm" data-tip={`${agent} mcp add, typed in a terminal for you to finish and run`} onClick={() => onType(`${agent} mcp add `, at)}>
+              Add a server…
+            </button>
+            <button className="ghost sm" data-tip={`${agent} mcp list: it starts each server to check it`} onClick={() => onType(`${agent} mcp list`, at)}>
+              Check health…
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }

@@ -1042,6 +1042,12 @@ export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent'
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 // Settings › Agents & profiles: an agent's last hook (this daemon's), its live tabs, how many aren't heard (hooksSeen)
 export type HookSeen = { at?: number; tabs: number; deaf: number; native?: NativeSeen }
+// F6: what an agent sees in a project (sees.ts agentContext): its rule files in load order (at: the path with ~; from:
+// the file that @imports it), Laki's memory it gets (how many of each, its bytes), its MCP servers (env and headers by
+// name only, tokens masked; off: turned off in its config)
+export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
+export type AgentServer = { name: string; scope: 'user' | 'project' | 'local'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
+export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 // A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
 export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && process.platform === 'darwin'): [string, string, string?][] {
@@ -1195,7 +1201,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 169
+export const API = 170
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
