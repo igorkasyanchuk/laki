@@ -2072,6 +2072,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
 | hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it; *Send as you stop talking* sends it too) |
+| the talk key (⌃⌥⌘M, off until set) | from any app: a pill records you; the key again or ⏎ sends it to the agent that asked last (Tab: another), Esc drops it (Settings › Voice on *Cloud*) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -2417,7 +2418,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   meant (`lucky, lakey → Laki`, `work tree → worktree`); whole words in any case, done in Laki after the transcript
   comes back (nothing more goes to OpenRouter), and the bar says what it changed (⌘Z in the field takes it back).
   *Remove filler words* (on) drops standalone hesitations (um, uh, hmm, äh, euh, えーと, 嗯, эээ…) the same way; words that
-  mean something stay.
+  mean something stay. *Talk key* (Cloud only, off until set; ⌃⌥⌘M suggested): from any app, press it and talk: a pill
+  at the pointer records (a red dot while the microphone is on, a level, the time) and names who gets it: the agent
+  that asked last, else the one you last sent to, else a new task (Tab, ⇧Tab: another). Press it again or ⏎ to send
+  (an agent at work gets it when its turn ends, and *Undo* takes it back for 4 s; typed into an idle one's terminal it
+  can't be), Esc to drop it. macOS asks for the microphone the first time.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

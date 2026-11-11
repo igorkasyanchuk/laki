@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('laki', {
   quickMore: (text: string) => ipcRenderer.send('quick-more', text), // the quick bar's More: the whole new-workspace page with its text
   quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
   tellKey: (label: string): Promise<boolean> => ipcRenderer.invoke('tell-hotkey', label), // Q7: show and tell's global keys ('' none)
+  talkKey: (label: string): Promise<boolean> => ipcRenderer.invoke('talk-hotkey', label), // Q2: the talk key ('' none)
   // the quick bar's: show and tell's picture (Laki's Microphone access, macOS dictation on), or the editor's drawing on it
   onTell: (cb: (t: object) => void) => {
     ipcRenderer.on('quick-tell', (_e, t: object) => cb(t))
@@ -122,6 +123,14 @@ contextBridge.exposeInMainWorld('laki', {
     onIsland: (cb: (c: object, colors: Record<string, string>) => void) => ipcRenderer.on('island', (_e, c, colors) => cb(c, colors)),
     islandSize: (h: number) => ipcRenderer.send('island-size', h),
     islandEv: (ev: string) => ipcRenderer.send('island-ev', ev),
+    // Q2: the talk pill (#talk): who it may go to and the mic's state in, the key's second press, the recording written
+    // down, sent (no tab: a new task), taken back from a queue, closed
+    onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
+    onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
+    talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
+    talkSend: (tab: string, text: string): Promise<{ error?: string; queued?: boolean; new?: boolean }> => ipcRenderer.invoke('talk-send', tab, text),
+    talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
+    talkClose: () => ipcRenderer.send('talk-close'),
   },
   // cards on screen (ask.html): the cards in, the page's height, a choice, ×, Close all and Open out (by each card's key)
   ask: {

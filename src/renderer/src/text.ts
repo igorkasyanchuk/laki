@@ -467,6 +467,12 @@ export function applySuggestions(text: string, edits: Suggestion[]) {
 }
 
 // Voice's recording as a WAV file (voice.ts, for OpenRouter's speech-to-text): one channel of samples (-1..1) as 16-bit PCM
+// bytes as base64, a chunk at a time (a recording's WAV: voice.ts, the talk pill's)
+export const base64 = (b: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000))
+  return btoa(s)
+}
 export function wavOf(samples: Float32Array, rate: number) {
   const b = new DataView(new ArrayBuffer(44 + samples.length * 2))
   const str = (at: number, s: string) => [...s].forEach((c, i) => b.setUint8(at + i, c.charCodeAt(0)))

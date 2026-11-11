@@ -302,6 +302,7 @@ export const HOTKEY = '⌃⌥⌘L' // the global hotkey's keys (settings.hotkey 
 export const SHOT_KEY = '⌃⌥⌘S' // Screenshot to Laki AI's (settings.shotKey unset)
 export const QUICK_KEY = '⌥Space' // Q1: the quick bar's suggested keys (off until turned on: settings.quickOn)
 export const TELL_KEY = '⌃⌥⌘T' // Q7: show and tell's suggested keys (off until turned on: settings.tellOn)
+export const TALK_KEY = '⌃⌥⌘M' // Q2: the talk key's suggested keys (off until turned on: settings.talkOn)
 
 // an edge between two columns (the full review's, Notes'): dragged (to: the pointer's x in the columns' box), double-clicked back to its width
 export function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {

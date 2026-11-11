@@ -6,7 +6,7 @@
     <style>
       :root { --bg: #161a21; --fg: #d5d9e3; --muted: #7a8294; --line: #232833; --running: #7aa2f7; --waiting: #e0af68; --done: #9ece6a; --idle: var(--muted); --accent: #7aa2f7; --font: -apple-system, system-ui, sans-serif; color-scheme: dark; }
       html, body { margin: 0; background: transparent; overflow: hidden; color: var(--fg); font: 12px/1.35 var(--font); user-select: none; -webkit-user-select: none; }
-      body:not([data-mode='bar']) #bar, body:not([data-mode='card']) #card, body:not([data-mode='voice']) #voice, body:not([data-mode='menu']) #menu { display: none; }
+      body:not([data-mode='bar']) #bar, body:not([data-mode='card']) #card, body:not([data-mode='voice']) #voice, body:not([data-mode='menu']) #menu, body:not([data-mode='talk']) #talk { display: none; }
       /* the drop: 44px wide (main's BAR), against the screen's edge (data-side); its shape (.shape) melts into the edge
          at the top and bottom (the flares), wobbles a little, and is a round blob while it's dragged */
       #bar { position: relative; isolation: isolate; width: 44px; box-sizing: border-box; padding: 20px 0 20px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: grab; touch-action: none; animation: fl-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
@@ -88,6 +88,21 @@
       #card .perm .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
       #card .last { margin-top: 6px; color: var(--fg); opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
       /* the voice prompt (main's VOICE: 320 by 186) */
+      /* Q2: the talk pill (main's TALK, 320 by 78): a red dot while it records (the mic is open only then), its level,
+         the time, who gets it (Tab: another), what it's doing; Undo while a send is still queued */
+      #talk { box-sizing: border-box; height: 78px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 39px; }
+      .t-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
+      .t-rec { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+      #talk.rec .t-rec { background: #f7768e; animation: t-pulse 1.2s ease-in-out infinite; }
+      @keyframes t-pulse { 50% { opacity: 0.35; } }
+      .t-level { flex: none; width: 64px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 10%, var(--bg)); overflow: hidden; }
+      .t-level > i { display: block; height: 100%; width: 0; background: var(--running); transition: width 0.06s; }
+      .t-time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
+      .t-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-to.moved { color: var(--waiting); }
+      .t-undo { flex: none; font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; padding: 2px 9px; cursor: pointer; }
+      .t-note { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-note.bad { color: #f7768e; white-space: normal; }
       #voice { box-sizing: border-box; height: 186px; display: flex; flex-direction: column; gap: 7px; padding: 10px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; user-select: text; -webkit-user-select: text; }
       .v-head { display: flex; align-items: center; justify-content: space-between; }
       #voice button, #voice select, #voice textarea { font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; }
@@ -178,6 +193,10 @@
         <button class="v-send">Send</button>
       </div>
       <div class="v-note">Dictation starts by itself · ⏎ sends · ⇧⏎ a new line · Esc closes</div>
+    </div>
+    <div id="talk" role="dialog" aria-label="Talk to an agent">
+      <div class="t-row"><i class="t-rec" title="Recording"></i><span class="t-level"><i></i></span><span class="t-time">0:00</span><b class="t-to"></b><button class="t-undo" hidden>Undo</button></div>
+      <div class="t-note"></div>
     </div>
     <script type="module" src="/src/floater.ts"></script>
   </body>

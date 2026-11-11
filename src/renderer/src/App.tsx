@@ -50,7 +50,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
-import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -1008,7 +1008,8 @@ export function App() {
   // answer and how long its turn took (runs: each tab's last turn start, as the view gave it while it ran)
   for (const t of view?.tabs ?? []) if (t.runAt) turnAt.current[t.id] = t.runAt
   const islandOf = (t: TabView) => ({ agent: t.preset ?? t.name, at: t.needAt, ...(t.status === 'waiting' && t.ask && { ask: t.ask }), ...(t.last && { answer: t.last.slice(0, 2000) }), ...(t.done && t.needAt && turnAt.current[t.id] && { took: t.needAt - turnAt.current[t.id] }) })
-  const atWork = fs?.floater === false ? [] : live.flatMap(w => {
+  const talkOn = fs?.talkOn === true && fs?.voice?.on !== false && fs?.voice?.engine === 'cloud' // Q2: the talk key: its pill needs the cloud engine
+  const atWork = fs?.floater === false && !talkOn ? [] : live.flatMap(w => {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
@@ -1030,7 +1031,7 @@ export function App() {
   // drawn as idle; its right click's Seen stays (unseen: main's menu)
   const doneAlert = fs?.floaterDone !== false
   const freshDone = (t: TabView) => t.done && !isStale(t, staleMin)
-  const recent = (!recentN && !doneAlert) || fs?.floater === false ? [] : live
+  const recent = (!recentN && !doneAlert) || (fs?.floater === false && !talkOn) ? [] : live
     .filter(w => !atWork.some(f => view!.tabs.find(t => t.id === f.tab)?.workspace === w.id))
     .flatMap(w => {
       const t = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited' && active.current[t.id]).sort((a, b) => active.current[b.id] - active.current[a.id])[0]
@@ -1039,9 +1040,10 @@ export function App() {
     .sort((a, b) => Number(freshDone(b.t)) - Number(freshDone(a.t)) || b.at - a.at)
     .filter((x, i) => i < recentN || (doneAlert && freshDone(x.t)))
     .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (freshDone(t) ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...(t.done && { unseen: true }), ...islandOf(t), ...floatMore(w) }))
-  const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
+  const pool = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
+  const floats = fs?.floater === false ? [] : pool // the talk pill's are the same, with the bubbles off too
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge' }
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(talkOn && { talk: pool }) }
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   const asking = view?.tabs.filter(t => t.status === 'waiting').map(t => t.id).join(' ') // none: not connected, nothing known
   useEffect(() => void (asking !== undefined && bridge?.asking?.(asking ? asking.split(' ') : [])), [asking]) // asks on screen: an answered one's card goes
@@ -2151,6 +2153,8 @@ export function App() {
   useEffect(() => void (quickKey !== null && bridge?.quickKey?.(quickKey).then(quick => setHeld(h => ({ ...h, quick })))), [quickKey])
   const tellKey = !view ? null : settings.tellOn === true ? settings.tellKey ?? TELL_KEY : '' // Q7: show and tell's ('' none: off until turned on)
   useEffect(() => void (tellKey !== null && bridge?.tellKey?.(tellKey).then(tell => setHeld(h => ({ ...h, tell })))), [tellKey])
+  const talkKey = !view ? null : talkOn ? settings.talkKey ?? TALK_KEY : '' // Q2: the talk key ('' none: off until turned on, the cloud engine only)
+  useEffect(() => void (talkKey !== null && bridge?.talkKey?.(talkKey)), [talkKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
   const updateDelay = settings.updateDelay ?? 0 // and its Update delay, days
   useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto, updateDelay)), [updateAuto, updateDelay])

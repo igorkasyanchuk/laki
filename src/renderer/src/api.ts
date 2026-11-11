@@ -39,6 +39,7 @@ type Bridge = {
   quickMore?(text: string): void // the quick bar's More: the whole new-workspace page with its text
   quickShot?(): Promise<string> // its screenshot button: a part of the screen ('' cancelled)
   tellKey?(label: string): Promise<boolean> // Q7: show and tell's global keys ('' none)
+  talkKey?(label: string): Promise<boolean> // Q2: the talk key ('' none)
   onTell?(cb: (t: { png: string; mic?: string; dictation?: boolean; note?: string; edited?: boolean }) => void): void // the quick bar's: show and tell's picture (and the editor's, edited)
   quickAnnotate?(png: string): void // its E: the picture in the editor first, back here
   privacyPane?(which: 'microphone' | 'screen'): void // System Settings › Privacy & Security's pane

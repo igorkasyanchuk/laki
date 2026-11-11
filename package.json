@@ -116,7 +116,7 @@
       "hardenedRuntime": false,
       "minimumSystemVersion": "13.0",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice).",
+        "NSMicrophoneUsageDescription": "Laki listens only while you dictate a prompt: the mic in a prompt box, holding Fn, or the talk key's pill (Settings › Voice).",
         "ElectronSquirrelPreventDowngrades": true,
         "CFBundleDocumentTypes": [
           {

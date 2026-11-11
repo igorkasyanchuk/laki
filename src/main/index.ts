@@ -10,6 +10,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
+import { talkDefault } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -126,6 +127,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       if (quickW && !quickW.isDestroyed()) writeFileSync(join(dir, 'show-and-tell-window.png'), (await quickW.webContents.capturePage()).toPNG())
       await q("document.querySelector('.quick-bar textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
     }, async () => !quickW || quickW.isDestroyed()],
+    // Q2: the talk key's pill at the pointer (no microphone opened in a smoke run): recording, who gets it; Esc drops it
+    ['talk-pill', async () => {
+      talk()
+      const t = <T>(code: string) => (talkW && !talkW.isDestroyed() ? (talkW.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => t<boolean>("!!document.querySelector('#talk.rec') && document.querySelector('.t-to').textContent.startsWith('→ ')"), 'the talk pill recording')
+      if (talkW && !talkW.isDestroyed()) writeFileSync(join(dir, 'talk-pill-window.png'), (await talkW.webContents.capturePage()).toPNG())
+      await t("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
+    }, async () => !talkW || talkW.isDestroyed()],
     // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
     ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
@@ -747,9 +756,9 @@ function accelOf(label: string) {
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
   return accel(m)
 }
-type Key = 'open' | 'shot' | 'quick' | 'tell' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1); tell: show and tell (Q7, tellShot)
-const keys: Record<Key, string> = { open: '', shot: '', quick: '', tell: '' } // what each holds
-const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show], tell: ['', show] } // what each asked for
+type Key = 'open' | 'shot' | 'quick' | 'tell' | 'talk' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1); tell: show and tell (Q7, tellShot); talk: the talk pill (Q2, talk)
+const keys: Record<Key, string> = { open: '', shot: '', quick: '', tell: '', talk: '' } // what each holds
+const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show], tell: ['', show], talk: ['', show] } // what each asked for
 let shotOn = false // Screenshot to Laki AI is on (Settings › General): the menu bar has it too
 function grab(which: Key) {
   const [a, fn] = wants[which]
@@ -775,6 +784,8 @@ ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label
 ipcMain.handle('quick-hotkey', (e, label: unknown) => from(e) && bindKey('quick', label, () => quickWin()))
 // Q7: show and tell's keys ('' none: off until set, Settings › General)
 ipcMain.handle('tell-hotkey', (e, label: unknown) => from(e) && bindKey('tell', label, () => tellShot()))
+// Q2: the talk key ('' none: off until set, Settings › Voice): the pill at the pointer, recording; again: it sends
+ipcMain.handle('talk-hotkey', (e, label: unknown) => from(e) && bindKey('talk', label, () => talk()))
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // updates (./update.ts): its state to the app window as it changes. Installing quits for good: quitAndInstall emits
@@ -1141,7 +1152,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch' }
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[] } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2)
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
@@ -1321,6 +1332,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     doneAlert: o.doneAlert !== false,
     ai: o.ai === true,
     at: o.at === 'notch' ? 'notch' : 'edge',
+    ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
@@ -1489,6 +1501,7 @@ ipcMain.handle('procs', e => {
   }
   for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
   for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
+  if (talkW && !talkW.isDestroyed()) add(talkW.webContents.getOSProcessId(), 'Talk pill', 'floater') // Q2: its own
   if (cardWin && !cardWin.isDestroyed()) add(cardWin.webContents.getOSProcessId(), 'Cards on screen')
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
   if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
@@ -1502,7 +1515,7 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
   if (what === 'floater') {
     parked = floatState()
     hover = null
-    for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) f.destroy()
+    for (const f of [floater, card, menu, voice, talkW]) if (f && !f.isDestroyed()) f.destroy()
   } else if (what.startsWith('browse:')) {
     const a = agentWins.get(what.slice(7))
     if (!a) return
@@ -1760,6 +1773,72 @@ ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
   return {}
 })
 ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.close())
+
+// Q2: the talk key's pill: a small focusable panel at the pointer (floater.html #talk, its own renderer), recording at
+// once (the cloud engine: voiceText), with a live level, the time and who gets it (talkDefault: the agent that asked
+// last, else the one you last sent to, else a new task; Tab changes it). The key again or ⏎: it stops, is written down
+// and sent (send whenIdle, as Say it's; a new task: the new-workspace window with it); Esc drops it. The mic is open
+// only while it records. ponytail: press to start, press to stop: globalShortcut has no key-up, so holding the key to
+// talk needs a native helper (a CGEventTap) later
+const TALK = { width: 320, height: 78 }
+let talkW: BrowserWindow | null = null
+let talkTo = new Set<string>() // the agents the pill offered
+let talkLast = '' // the one you last sent to (talkDefault's second choice)
+let talkUndo: { tab: string; text: string } | null = null // a send that's still in its queue: Undo takes it back
+const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }) }))
+function talk() {
+  if (talkW && !talkW.isDestroyed()) return void talkW.webContents.send('talk-key') // the second press: stop, send
+  const p = screen.getCursorScreenPoint()
+  const d = screen.getDisplayNearestPoint(p).workArea
+  const w = (talkW = new BrowserWindow({ ...floatOpts(TALK.width, TALK.height), x: clamp(p.x + 14, d.x, d.x + d.width - TALK.width), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
+  const url = pageURL('floater.html', '#talk')
+  pin(w, url)
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null)))
+  w.webContents.on('did-finish-load', () => {
+    const list = talkList()
+    talkTo = new Set(list.map(f => f.tab))
+    w.webContents.send('talk', { list, to: talkDefault(list, talkLast), colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke })
+    w.show()
+    w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
+  })
+  void w.loadURL(url)
+}
+const fromTalk = (e: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => !!talkW && !talkW.isDestroyed() && e.sender === talkW.webContents
+// what it heard, written down (the daemon's voiceText: Settings › Voice's cloud model, its word fixes)
+ipcMain.handle('talk-text', async (e, audio: unknown) => {
+  if (!fromTalk(e)) return { error: 'not the talk pill' }
+  if (typeof audio !== 'string' || !audio || audio.length > 24 << 20) return { error: 'no recording' }
+  return rpc<{ text: string }>('voiceText', { audio }).catch((err: Error) => ({ error: err.message }))
+})
+ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown) => {
+  if (!fromTalk(e)) return { error: 'not the talk pill' }
+  if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
+  if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
+  if (typeof tab !== 'string') return { error: 'who gets it?' }
+  if (!tab) return newWsWin(text.trim()), { new: true }
+  if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
+  const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
+  if ('error' in r) return r
+  talkLast = tab
+  talkUndo = r?.queued ? { tab, text: text.trim() } : null
+  return { queued: !!r?.queued }
+})
+// Undo: only a send still in its queue (typed into a terminal, it can't be taken back)
+ipcMain.handle('talk-undo', async e => {
+  if (!fromTalk(e) || !talkUndo) return { error: 'nothing to take back' }
+  const { tab, text } = talkUndo
+  talkUndo = null
+  const t = (await rpc<View>('state').catch(() => null))?.tabs.find(x => x.id === tab)
+  const was = t?.queue ?? []
+  const i = was.lastIndexOf(text)
+  if (i < 0) return { error: 'it was sent already' }
+  return rpc('queueSet', { tab, queue: was.filter((_, j) => j !== i), was }).then(
+    () => ({}),
+    (err: Error) => ({ error: err.message }),
+  )
+})
+ipcMain.on('talk-close', e => fromTalk(e) && talkW!.close())
 ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
   if (!floater || e.sender !== floater.webContents || floats.at === 'notch') return
   if (phase === 'start') {
@@ -1812,7 +1891,7 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 })
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
-const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== newWin && w !== aiW // the bubbles stay over another app while the new-workspace or AI window is up
+const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== talkW && w !== newWin && w !== aiW // the bubbles stay over another app while the new-workspace or AI window is up
 const setFront = (on: boolean) => on !== front && ((front = on), placeFloater(), win?.webContents.send('front', on)) // the app window: its animations pause behind another app (App's away)
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after

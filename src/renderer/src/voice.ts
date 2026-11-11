@@ -6,7 +6,8 @@
 import { useSyncExternalStore } from 'react'
 import type { TabView, VoiceSettings } from '../../shared/types'
 import { api } from './api'
-import { wavOf } from './text'
+import { base64, wavOf } from './text'
+import { VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 
 let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
@@ -17,8 +18,8 @@ export const cloudVoice = () => settings.on !== false && settings.engine === 'cl
 export const voiceSends = () => cloudVoice() && settings.send === true
 
 const RATE = 16000 // what speech models take; a minute is about 2 MB of WAV
-const MAX_MS = 5 * 60000 // a recording stops by itself after this
-const SHORT_MS = 150 // shorter: nothing to write down (Fn's taps never open the mic: HOLD_MS)
+const MAX_MS = VOICE_MAX_MS // a recording stops by itself after this
+const SHORT_MS = VOICE_SHORT_MS // shorter: nothing to write down (Fn's taps never open the mic: HOLD_MS)
 
 // what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went)
 export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string }
@@ -100,11 +101,6 @@ function say(said: string) {
   saidT = setTimeout(() => now.said === said && set({ phase: 'idle' }), 6000)
 }
 
-const base64 = (b: Uint8Array) => {
-  let s = ''
-  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000))
-  return btoa(s)
-}
 
 // as typed where the cursor was: a field gets a space before it after a word; a terminal or a one-line field gets one
 // line (a newline there is Enter: it would run or send what's half said), and no field anything but newlines and tabs

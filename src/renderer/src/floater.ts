@@ -11,7 +11,8 @@ import './floater.css'
 import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
-import { initials, noteWhole } from './text'
+import { base64, initials, noteWhole, wavOf } from './text'
+import { type TalkTo, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -58,14 +59,23 @@ type Bridge = {
     onIsland: (cb: (c: IslandCard, colors: Colors) => void) => void
     islandSize: (h: number) => void
     islandEv: (ev: string) => void
+    onTalk: (cb: (c: Talk) => void) => void
+    onTalkKey: (cb: () => void) => void
+    talkText: (audio: string) => Promise<{ text?: string; error?: string }>
+    talkSend: (tab: string, text: string) => Promise<{ error?: string; queued?: boolean; new?: boolean }>
+    talkUndo: () => Promise<{ error?: string }>
+    talkClose: () => void
   }
 }
+// Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
+// npm run test:ui's (no microphone opened)
+type Talk = { list: TalkTo[]; to: string; colors: Colors; mic: string; smoke?: boolean }
 
 const laki = (window as unknown as { laki?: Bridge }).laki
 const bridge = laki?.floater
 const bar = document.getElementById('bar')!
 const card = document.getElementById('card')!
-const mode = /^#(card|voice|menu)$/.exec(location.hash)?.[1] ?? 'bar'
+const mode = /^#(card|voice|menu|talk)$/.exec(location.hash)?.[1] ?? 'bar'
 const page = (hash: string) => window.open(`${location.href.split('#')[0]}#${hash}`) // main allows #card, #menu and #voice
 // on the top or bottom edge the drop is a row: a circle's place and its length are across it, not down
 const across = () => document.body.dataset.side === 'top' || document.body.dataset.side === 'bottom'
@@ -128,6 +138,7 @@ if (mode === 'card') {
   })
 } else if (mode === 'voice') voicePage()
 else if (mode === 'menu') menuPage()
+else if (mode === 'talk') talkPage()
 else {
   page('card')
   // a drag from anywhere on the drop (a circle too: less than 4px is its click); main moves the window, the pointer's
@@ -529,3 +540,126 @@ function voicePage() {
     dictate()
   })
 }
+
+// Q2: the talk key's pill: recording as it opens (the mic open only until it stops: the red dot says so), its level
+// from an AnalyserNode on the same stream, the time, who gets it (Tab, ⇧Tab: another). The key again or ⏎: stopped,
+// written down (main's talk-text: the daemon's voiceText), sent; Esc drops it. Then "Sent to …" for 4 s, with Undo
+// while it's still queued (typed into a terminal, it can't be taken back)
+function talkPage() {
+  const box = document.getElementById('talk')!
+  const toEl = box.querySelector<HTMLElement>('.t-to')!
+  const timeEl = box.querySelector<HTMLElement>('.t-time')!
+  const level = box.querySelector<HTMLElement>('.t-level > i')!
+  const note = box.querySelector<HTMLElement>('.t-note')!
+  const undo = box.querySelector<HTMLButtonElement>('.t-undo')!
+  let list: TalkTo[] = []
+  let to = ''
+  let phase: 'wait' | 'rec' | 'writing' | 'sending' | 'sent' = 'wait'
+  let stopRec: ((send: boolean) => void) | undefined
+  const close = () => bridge?.talkClose()
+  const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
+  const show = () => (toEl.textContent = `→ ${talkName(list, to)}`)
+  const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey) return
+    if (e.key === 'Escape') return void (e.preventDefault(), stopRec ? stopRec(false) : close())
+    if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait')) return void (e.preventDefault(), (to = talkNext(list, to, e.shiftKey)), show())
+    if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
+  })
+  bridge?.onTalkKey(() => (phase === 'rec' ? stopRec?.(true) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  undo.onclick = async () => {
+    undo.disabled = true
+    const r = await bridge?.talkUndo()
+    undo.hidden = true
+    say(r?.error ? `Not taken back: ${r.error}` : 'Taken back', !!r?.error)
+    setTimeout(close, 1200)
+  }
+  bridge?.onTalk(c => {
+    paint(c.colors)
+    list = c.list
+    to = c.to
+    show()
+    if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
+    if (c.mic === 'not-determined') say('macOS asks once: Laki hears what you say to an agent, and only while this pill shows red')
+    else say(HINT)
+    void record(!!c.smoke)
+  })
+  async function record(smoke: boolean) {
+    let stream: MediaStream | undefined
+    if (!smoke)
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+      } catch (e) {
+        return say(`Microphone: ${(e as Error).message}`, true)
+      }
+    const at = Date.now()
+    phase = 'rec'
+    box.classList.add('rec')
+    say(HINT)
+    const ctx = stream && new AudioContext()
+    const an = ctx?.createAnalyser()
+    if (an && ctx && stream) (an.fftSize = 512), ctx.createMediaStreamSource(stream).connect(an)
+    const buf = new Uint8Array(512)
+    const tick = setInterval(() => {
+      timeEl.textContent = talkTime(Date.now() - at)
+      if (!an) return void (level.style.width = `${30 + 20 * Math.sin(Date.now() / 200)}%`)
+      an.getByteTimeDomainData(buf)
+      let sum = 0
+      for (const v of buf) sum += (v - 128) ** 2
+      level.style.width = `${Math.min(100, Math.sqrt(sum / buf.length) * 3)}%`
+    }, 60)
+    const r = stream && new MediaRecorder(stream)
+    const chunks: Blob[] = []
+    r?.addEventListener('dataavailable', e => chunks.push(e.data))
+    r?.start()
+    const limit = setTimeout(() => stopRec?.(true), VOICE_MAX_MS)
+    stopRec = send => {
+      stopRec = undefined
+      clearTimeout(limit)
+      clearInterval(tick)
+      const done = () => {
+        stream?.getTracks().forEach(t => t.stop()) // the mic off
+        void ctx?.close()
+        box.classList.remove('rec')
+        level.style.width = '0'
+        if (!send) return close()
+        if (Date.now() - at < VOICE_SHORT_MS) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
+        void heard(smoke ? 'smoke test' : undefined, r && new Blob(chunks, { type: r.mimeType }))
+      }
+      if (r && r.state !== 'inactive') (r.onstop = done), r.stop()
+      else done()
+    }
+  }
+  async function heard(given?: string, audio?: Blob | null) {
+    phase = 'writing'
+    say('Writing it down…')
+    let text = given ?? ''
+    if (!given && audio) {
+      try {
+        const b = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await audio.arrayBuffer())
+        const w = await bridge?.talkText(base64(wavOf(b.getChannelData(0), 16000)))
+        if (w?.error) return void (say(w.error, true), setTimeout(close, 4000))
+        text = w?.text?.trim() ?? ''
+      } catch (e) {
+        return void (say((e as Error).message, true), setTimeout(close, 4000))
+      }
+    }
+    if (!text) return void (say('Nothing heard', true), setTimeout(close, 1500))
+    await send(text)
+  }
+  async function send(text: string) {
+    phase = 'sending'
+    const name = talkName(list, to)
+    const r = await bridge?.talkSend(to, text)
+    phase = 'sent'
+    if (r?.error) {
+      const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
+      return void (say(`Not sent: ${r.error}${copied ? '. Copied, paste it' : ''}`, true), setTimeout(close, 5000))
+    }
+    if (r?.new) return close() // the new task's window has it
+    say(r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`)
+    undo.hidden = !r?.queued
+    setTimeout(close, 4000)
+  }
+}
+

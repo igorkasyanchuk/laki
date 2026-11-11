@@ -429,6 +429,19 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `floater-reply` → `replyTo`: #voice with `replyFor` (`sendVoice`: no pick row, its last answer, a waiting one's
   options as buttons; text refused while it shows a menu; queued: *Queued*, then it closes); the hover card's *Right-click or ⌥-click to reply*, once
   a session. Tested in `test/island.test.ts`.
+- **The talk pill** (Q2, `settings.talkOn` with the cloud engine, `talkKey`, unset `TALK_KEY` ⌃⌥⌘M; App's `talkKey` to
+  main's `talk-hotkey`, `bindKey('talk')`): main's `talk()` opens `floater.html#talk` as a focusable panel window of its
+  own at the pointer (`TALK` 320 by 78), or, open already, sends `talk-key` (the second press). The page (floater.ts
+  `talkPage`) records at once (`getUserMedia`, stopped with the recording: the mic is open only while `#talk.rec`'s dot
+  is red), an `AnalyserNode` on the same stream for the level, `talkTime`; who gets it: shared/talk.ts `talkDefault`
+  (the newest waiting one, else `talkLast`, else a new task) over `talkList` (the floats' `talk`: App sends the bubbles'
+  list there while the talk key is on, the bubbles off too), Tab `talkNext`. The key again or ⏎: `talk-text` (main's
+  `rpc('voiceText')`), then `talk-send` (`send` `whenIdle`, only to a tab the pill offered, `talkTo`; '': `newWsWin`);
+  queued: `talkUndo`, *Undo* (`talk-undo`: `queueSet` without it, refused once it went). Esc drops it;
+  `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. macOS's own microphone prompt the first time (`mic`
+  `not-determined`: the pill says why first). ponytail: press to start and to stop: globalShortcut has no key-up, a
+  hold mode needs a native helper. `npm run test:ui`'s `talk-pill` opens it (`smoke`: no microphone). Tested in
+  `test/talk.test.ts`.
 - **A floated tab** (main's `tabWins`, `tab-float` IPC through App's `floatTab`: the tab's menu › *Float in its own window* (`popOut`), ⌘K, and the
   pane's *Show it* / *Bring it back*): `panelWin` `?window=tab&tab=<id>`, `NewWindow.tsx` `TabWindow` (its head the
   title bar; a `Term` of its own at the tab's ⌘± size: one more client of the session, the PTY sizes to whoever typed last;

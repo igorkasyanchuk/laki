@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
@@ -243,6 +243,8 @@ export type AppSettings = Paint & {
   quickKey?: string // its keys (unset: QUICK_KEY)
   tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
   tellKey?: string // its keys (unset: TELL_KEY)
+  talkOn?: boolean // Q2: the talk key (unset: off)
+  talkKey?: string // its keys (unset: TALK_KEY)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   updateDelay?: number // a release is offered once it's this many days old (Update delay; unset: at once)
   recording?: boolean // not this page's (⌘K's, the menu bar's): App's onSave leaves it out, as it does modelEfforts
@@ -2511,6 +2513,21 @@ export function SettingsPage(p: {
           )}
           {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
+          {sec === 'voice' && bridge?.talkKey && (
+            <Group title="Talk key">
+              <HotkeyField
+                on={s.talkOn === true}
+                keys={s.talkKey ?? TALK_KEY}
+                def={TALK_KEY}
+                title="Talk to an agent from any app"
+                hint="Press it and talk: a small pill at the pointer records (its red dot), shows how loud and who gets it: the agent that asked last, else the one you last sent to, else a new task (Tab changes it). Press it again or ⏎ to send, Esc to drop it. macOS asks for the microphone the first time; it's on only while the pill records."
+                off={s.voice?.on !== false && s.voice?.engine === 'cloud' ? undefined : 'Needs the cloud engine (Speech to text above): macOS dictation only types into a field you are in'}
+                bind={k => bridge!.talkKey!(k || '')}
+                onOn={talkOn => set({ talkOn })}
+                onKeys={talkKey => set({ talkKey })}
+              />
+            </Group>
+          )}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {on('pr') && (
             <>
