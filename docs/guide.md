@@ -773,7 +773,14 @@ something else: then that question is closed). It removes a memory item, a sched
 through such a question: *Yes, remove…* is yours to press, and Laki does it. Your sessions too: *stop the Rails
 agent* stops its turn as your Stop does (its chat stays), and *close that worktree* asks *Archive the workspace…?*:
 *Yes, archive it* archives it, its uncommitted changes kept for Restore (one with ignored files archiving would lose
-is left to its menu in the sidebar, which names them). A command for a shell too: it shows you
+is left to its menu in the sidebar, which names them). *Delete it* asks the same way, saying what would be lost
+(uncommitted files, commits not pushed). It moves the window when you ask: *show me the checkout session*, *open
+Settings › Voice*, *full screen*, *exit full screen*, *show the changes*, *close this page*; opens a workspace in your
+editor, Finder or terminal; finds a session by what you call it (a letter off is fine; when two fit it asks which), or
+the last few (*run git status in the last 3 sessions*: one Yes for their shells, what each printed in the chat); knows
+every project's groups and actions, global and the project's own. A command it runs at your Yes shows its tab, and
+what it printed comes back in the chat; with the talk key or *Say it*, its window opens so you see it work
+(Settings › AI › *Show its work*, on). A command for a shell too: it shows you
 the command and the tab, and *Yes, run it* runs it there. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
 so you look and turn it on in Settings › Extensions, or it asks you in the chat, with what it

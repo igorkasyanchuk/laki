@@ -539,6 +539,7 @@ export function App() {
   // window full screen too (main's, so Esc stays the terminal's)
   const [full, setFull] = useState(false)
   const toggleFull = (on = !full) => (setFull(on), bridge?.fullScreen?.(on))
+  const uiRef = useRef<(m: { do?: string; tab?: string; link?: string; on?: boolean; panel?: string }) => void>(undefined) // Q13: laki_ui's moves, with this render's state
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
@@ -1043,7 +1044,7 @@ export function App() {
   const pool = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floats = fs?.floater === false ? [] : pool // the talk pill's are the same, with the bubbles off too
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }), ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first words' names
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }), ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first words' names
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   const asking = view?.tabs.filter(t => t.status === 'waiting').map(t => t.id).join(' ') // none: not connected, nothing known
   useEffect(() => void (asking !== undefined && bridge?.asking?.(asking ? asking.split(' ') : [])), [asking]) // asks on screen: an answered one's card goes
@@ -1400,6 +1401,8 @@ export function App() {
         }
       } else if (m.ev === 'focus') {
         selectTab(m.tab) // Laki AI's "show me": that tab, in its workspace
+      } else if (m.ev === 'ui') {
+        uiRef.current?.(m as unknown as { do?: string }) // Q13: Laki AI's laki_ui
       } else if (m.ev === 'archived') {
         // several at once (the setting just turned on): one message, whose Undo brings them all back
         const all = (archived.current = [...archived.current, m.ws])
@@ -1753,6 +1756,13 @@ export function App() {
   }
   // the panel on the right, on a tab: Info (⌘I), Files, Changes, Review, Preview
   const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true), setReviewTight(false)) // asked for: it shows, beside a narrow Review tab too
+  uiRef.current = m => {
+    if (m.do === 'show' && m.tab) return void (setDialog(null), selectTab(m.tab))
+    if (m.do === 'link' && m.link) return void setLink(m.link)
+    if (m.do === 'full_screen') return void (m.on !== false && setDialog(null), toggleFull(m.on !== false))
+    if (m.do === 'panel') return void (m.panel === 'none' ? setPanelOpen(false) : showPanel(m.panel as PanelTab))
+    if (m.do === 'close') return void (full ? toggleFull(false) : setDialog(null))
+  }
   const panelShown = panelOpen
   const togglePanel = (t = panelTab) => (panelShown && !(reviewOn && reviewTight) && t === panelTab ? setPanelOpen(false) : showPanel(t)) // one U6 hid: a click brings it back
   const info = panelOpen && panelTab === 'info'

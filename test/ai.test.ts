@@ -4,9 +4,9 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { aiRpc, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
+import { aiRpc, findSessions, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
 import { aiTotals } from '../src/shared/types.ts'
-import { connect, fixtureWidgets, fresh, sleep, until } from './helpers.ts'
+import { connect, fixtureWidgets, fresh, seen, sleep, until } from './helpers.ts'
 
 // a fake OpenRouter: each request to `answers`' next, recorded
 async function openrouter(t: { after: (f: () => void) => void }, answers: object[]) {
@@ -508,6 +508,96 @@ test("ai: laki_stop stops an agent's turn; laki_archive asks, archives on Yes, k
   assert.equal(await live(), true)
 })
 
+// Q13: more of the app from Laki AI: the window (laki_ui), sessions found by words or time (laki_find), one command
+// in several shells at one Yes (laki_run's tabs), a delete only at Yes, an app opened, the actions all at once
+test('ai: laki_ui moves the window; laki_find; laki_run in several shells; laki_delete at Yes; laki_open_in; laki_actions', async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url, LAKI_RUN_SHOWN_MS: '300' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { ai: { on: true }, actions: [{ name: 'Lint', target: 'shell', text: 'npm run lint' }] })
+  await rig.rpc('projectSet', { id: p.id, config: { actions: [{ name: 'Review', target: 'any', text: 'review it' }] } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const app = await rig.connect()
+  t.after(() => app.close())
+  const tool = (name: string): ((a: object) => Promise<any>) => [...tools(rig.rpc), ...skillTools(rig.rpc)].find(x => x.name === name)!.run
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'fix checkout totals', name: 'checkout-totals' })
+  await sleep(1100) // a second apart: the newest is b
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'dark mode', name: 'dark-mode' })
+
+  // the window: a tab shown, a page, full screen on and off, a panel, close; a bad link or panel refused
+  await tool('laki_ui')({ do: 'show', ws: a.id })
+  await seen(app, (e: any) => e.ev === 'ui' && e.do === 'show' && e.tab === (await0(a.id)), 'show')
+  await tool('laki_ui')({ do: 'link', link: 'laki://settings/voice' })
+  await tool('laki_ui')({ do: 'full_screen', on: false })
+  await tool('laki_ui')({ do: 'panel', panel: 'changes' })
+  await tool('laki_ui')({ do: 'close' })
+  await seen(app, (e: any) => e.ev === 'ui' && e.do === 'close', 'close')
+  assert.deepEqual(app.events.filter((e: any) => e.ev === 'ui').map((e: any) => [e.do, e.link ?? e.on ?? e.panel ?? '']), [['show', ''], ['link', 'laki://settings/voice'], ['full_screen', false], ['panel', 'changes'], ['close', '']])
+  await assert.rejects(tool('laki_ui')({ do: 'link', link: 'https://evil.example' }), /a laki:\/\/ link/)
+  await assert.rejects(tool('laki_ui')({ do: 'panel', panel: 'nope' }), /a panel: info/)
+  function await0(ws: string) { return app.events.findLast((e: any) => e.ev === 'state')?.view.tabs.find((x: any) => x.workspace === ws && x.kind === 'agent')?.id }
+
+  // found by words (a letter off is fine), or the newest first
+  const f = await tool('laki_find')({ query: 'chekout' })
+  assert.deepEqual(f.sessions.map((s: any) => s.id), [a.id])
+  assert.equal((await tool('laki_find')({ last: 1 })).sessions[0].id, b.id, 'the newest first')
+  assert.equal((await tool('laki_find')({ query: 'nothing like it' })).found, 0)
+  const st = (await tool('laki_state')({})) as any
+  assert.match(st.workspaces[0].created, /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/)
+
+  // the actions: the global ones and each project's own
+  assert.deepEqual(await tool('laki_actions')({}).then((x: any) => [x.global.map((y: any) => y.name), x.projects.map((y: any) => [y.project, y.actions.map((z: any) => z.name)])]), [['Lint'], [[p.id, ['Review']]]])
+
+  // one command in two shells: one question, one Yes, both run, each one's output in the chat
+  const s1 = await rig.rpc('tabNew', { ws: a.id, preset: 'shell' })
+  const s2 = await rig.rpc('tabNew', { ws: b.id, preset: 'shell' })
+  await sleep(1500)
+  or.answers.push(call('c1', 'laki_run', { tabs: [s1.id, b.id, 'nope'], text: 'echo both-$((20+1))' })) // b: a session, its shell at its prompt
+  await rig.rpc('aiAsk', { text: 'run it in both' })
+  const q = (await rig.rpc('aiState')).chat.at(-1)
+  assert.match(q.text, /^Run this in 2 shells: “.+” \(checkout-totals\), “.+” \(dark-mode\)\?/)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), { ran: true })
+  const ran = (await rig.rpc('aiState')).chat.at(-1).text
+  assert.equal(ran.match(/both-21/g)?.length, 2, ran)
+  await seen(app, (e: any) => e.ev === 'focus' && e.tab === s1.id, 'its tab shown (Show its work)')
+
+  // delete: what it would lose said, nothing deleted by the model, Yes deletes
+  writeFileSync(join(b.path, 'wip.txt'), 'x')
+  or.answers.push(call('c2', 'laki_delete', { id: b.id }))
+  await rig.rpc('aiAsk', { text: 'delete dark mode' })
+  const d = (await rig.rpc('aiState')).chat.at(-1)
+  assert.match(d.text, /^Delete the workspace “dark-mode” for good\? .+deleted, with 1 uncommitted file: nothing brings it back/)
+  assert.ok((await rig.rpc('state')).workspaces.some((w: any) => w.id === b.id))
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: d.ask.id, n: 0 }), { deleted: true })
+  assert.ok(!(await rig.rpc('state')).workspaces.some((w: any) => w.id === b.id))
+
+  // open in an app: the fake open records it
+  await tool('laki_open_in')({ ws: a.id, app: 'finder' })
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes(a.path), 'open with its folder')
+  await assert.rejects(tool('laki_open_in')({ app: 'finder' }), /a workspace or a project/)
+})
+
+test('ai: findSessions ranks by name, then branch and the rest; filters; says when two fit about as well', () => {
+  const s: any = {
+    projects: [{ id: 'p1', name: 'Shop' }, { id: 'p2', name: 'Site' }],
+    workspaces: [
+      { id: 'w1', name: 'checkout-flow', project: 'p1', group: 'Payments', branch: 'laki/checkout-flow', created: '2026-11-10 09:00', active: '2026-11-10 09:00' },
+      { id: 'w2', name: 'cart totals', project: 'p1', branch: 'laki/checkout-cart', created: '2026-11-11 09:00', active: '2026-11-12 09:00' },
+      { id: 'w3', name: 'header', project: 'p2', branch: 'laki/header', created: '2026-11-09 09:00', active: '2026-11-09 09:00' },
+    ],
+    tabs: [{ id: 't1', workspace: 'w1', name: 'claude', kind: 'agent', agent: 'claude', status: 'idle', done: true }, { id: 't2', workspace: 'w2', name: 'codex', kind: 'agent', agent: 'codex', status: 'running', last: 'fixed the header' }],
+  }
+  assert.deepEqual(findSessions(s, { query: 'checkout' }).sessions.map((x: any) => x.id), ['w1', 'w2'], 'its name beats a branch')
+  assert.deepEqual(findSessions(s, {}).sessions.map((x: any) => x.id), ['w2', 'w1', 'w3'], 'no words: the last at work first')
+  assert.deepEqual(findSessions(s, { last: 2, project: 'shop' }).sessions.map((x: any) => x.id), ['w2', 'w1'])
+  assert.deepEqual(findSessions(s, { group: 'payments' }).sessions.map((x: any) => x.id), ['w1'])
+  assert.deepEqual(findSessions(s, { status: 'done' }).sessions.map((x: any) => x.id), ['w1'])
+  assert.deepEqual(findSessions(s, { agent: 'codex' }).sessions.map((x: any) => x.id), ['w2'])
+  assert.deepEqual(findSessions(s, { query: 'headr' }).sessions.map((x: any) => x.id), ['w3', 'w2'], 'a letter off; its last answer counts least')
+  assert.match(findSessions(s, { query: 'laki' }).unsure ?? '', /ask the user which/)
+})
+
 test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' }), call('c4', 'laki_extension_on', { id: 'sh' }), call('c5', 'laki_extension_on', { id: 'src' })])
@@ -736,7 +826,7 @@ test("ai: a command for a shell (laki_run, laki_shell's run) asks first; Laki ru
   assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), { ran: true })
   const out = (await until(async () => ((s: string) => (s.includes('\nran-42') ? s : null))(await screen()), 'run at Yes')) as string
   assert.doesNotMatch(out, /halfecho/)
-  assert.equal((await rig.rpc('aiState')).chat.at(-1).text, `Ran it in ${q.ask.act.label}.`)
+  assert.match((await rig.rpc('aiState')).chat.at(-1).text, new RegExp(`^Ran it in ${q.ask.act.label}\\.\\n\\n\`\`\`\\n[\\s\\S]*ran-42[\\s\\S]*\\n\`\`\`$`), 'what it printed, in the chat (Show its work)')
 
   // laki_shell's run: a new shell, the same question
   or.answers.push(call('c3', 'laki_shell', { ws: w.id, command: 'echo new-$((1+1))', run: true }))

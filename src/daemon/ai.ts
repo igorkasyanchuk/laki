@@ -971,25 +971,26 @@ function lookOf(v: unknown): AiLook | null {
 }
 export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unknown[]; act?: AiAct; chat?: string }) {
   const t = asking(p.chat) // the chat whose ask is at work
-  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }) } : undefined
+  const ids = p.act?.kind === 'run' && Array.isArray(p.act.ids) ? [...new Set(p.act.ids.filter((x): x is string => typeof x === 'string' && !!x))].slice(0, 12) : [] // Q13: one command in several shells
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(ids.length > 1 && { ids }), ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }), ...(p.act.kind === 'delete' && { text: String(p.act.text ?? '').replace(/[^\w ,]/g, '').slice(0, 120) }) } : undefined
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind === 'archive' ? 'workspace (not archived)' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
-  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : act.kind === 'archive' ? `Archive ${act.label}? Its agents and shells stop and its worktree goes; its branch and uncommitted changes are kept, and Archived in the sidebar brings it back.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : act.kind === 'archive' ? `Archive ${act.label}? Its agents and shells stop and its worktree goes; its branch and uncommitted changes are kept, and Archived in the sidebar brings it back.` : act.kind === 'delete' ? `Delete ${act.label} for good? Its agents and shells stop, and its worktree and branch are deleted${act.text ? `, with ${act.text}` : ''}: nothing brings it back. Archive keeps it instead.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   // each option with its look (an extension's chat: how it would show), the same option once
   const given = (Array.isArray(p.options) ? p.options : []).map((o, i) => [String(o).trim().slice(0, 200), lookOf(Array.isArray(p.looks) ? p.looks[i] : undefined)] as const).filter(([o], i, all) => o && all.findIndex(x => x[0] === o) === i).slice(0, 6)
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : act.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : act.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : act.kind === 'delete' ? ['Yes, delete it', 'No, keep it'] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
   if (options.length < 2) throw new Error('2 to 6 options')
   const looks = act || !given.some(([, l]) => l) ? undefined : given.map(([, l]) => l)
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? 'archives it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? 'archives it, Laki does' : act.kind === 'delete' ? 'deletes it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -1036,9 +1037,14 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
       return { on: true }
     }
     if (act.kind === 'run') {
-      await runAct(act, rpc)
-      say(t, 'ai', `Ran it in ${act.label}.`)
+      const fails = await runAct(act, rpc)
+      say(t, 'ai', `Ran it in ${act.label}${fails.length ? ` (not in ${fails.join('; ')})` : ''}.${await ranShown(act, rpc)}`)
       return { ran: true }
+    }
+    if (act.kind === 'delete') {
+      await rpc('wsRm', { id: act.id })
+      say(t, 'ai', `Deleted ${act.label}.`)
+      return { deleted: true }
     }
     if (act.kind === 'archive') {
       await archiveAct(act, rpc)
@@ -1063,16 +1069,38 @@ const turnOn = (a: AiAct, what: string) => `Turn on ${a.label}? ${what}`
 const RUN_MAX = 4000
 function runIn(a: AiAct) {
   const fence = '`'.repeat(Math.max(3, ...[...(a.text ?? '').matchAll(/`+/g)].map(m => m[0].length + 1)))
-  const ws = state.workspaces.find(w => w.id === state.tabs.find(x => x.id === a.id)?.workspace)
+  const ws = a.ids ? undefined : state.workspaces.find(w => w.id === state.tabs.find(x => x.id === a.id)?.workspace)
   return `Run this in ${a.label}${ws ? ` (${ws.name ?? ws.id})` : ''}?\n\n${fence}sh\n${a.text}\n${fence}`
 }
 // the user's Yes: the shell checked again (still at its prompt), the line cleared (⌃E ⌃U), the command and Enter
-async function runAct(a: AiAct, rpc: Rpc) {
-  const t = (await rpc<View>('state')).tabs.find(x => x.id === a.id)
-  if (!t || t.kind !== 'shell' || t.status === 'exited') throw new Error('that shell is gone')
-  if (t.status === 'running' || t.runs) throw new Error(`${t.name} is running something now: not run`)
-  await rpc('input', { tab: t.id, data: '\x05\x15' })
-  await rpc('send', { target: t.id, text: a.text })
+// several (Q13): each as one, those that can't said (all can't: the first's why)
+async function runAct(a: AiAct, rpc: Rpc): Promise<string[]> {
+  const v = await rpc<View>('state')
+  const fails: string[] = []
+  for (const id of a.ids ?? [a.id]) {
+    const t = v.tabs.find(x => x.id === id)
+    const why = !t || t.kind !== 'shell' || t.status === 'exited' ? 'that shell is gone' : t.status === 'running' || t.runs ? `${t.name} is running something now: not run` : ''
+    if (why) {
+      if (!a.ids) throw new Error(why)
+      fails.push(why)
+      continue
+    }
+    await rpc('input', { tab: id, data: '\x05\x15' })
+    await rpc('send', { target: id, text: a.text })
+  }
+  if (a.ids && fails.length === a.ids.length) throw new Error(fails[0])
+  return fails
+}
+// Q13: what a command printed, in the chat a moment later (the screen's last lines), and its tab shown in the app
+// (Settings › AI › Show its work, on unless off)
+const SHOWN_MS = Number(process.env.LAKI_RUN_SHOWN_MS ?? 1500)
+async function ranShown(a: AiAct, rpc: Rpc) {
+  const ids = a.ids ?? [a.id]
+  if (state.settings?.ai?.show !== false) void rpc('tabFocus', { tab: ids[0] }).catch(() => {})
+  await new Promise(r => setTimeout(r, SHOWN_MS))
+  const outs = await Promise.all(ids.slice(0, 4).map(id => rpc<string>('screen', { target: id, lines: 14 }).then(s => s.replace(/\s+$/, '').slice(-1200), () => '')))
+  const name = (id: string) => state.tabs.find(x => x.id === id)?.name ?? id
+  return outs.map((o, i) => (o ? `\n\n${ids.length > 1 ? `${name(ids[i])}:\n` : ''}\`\`\`\n${o.replace(/```/g, "'''")}\n\`\`\`` : '')).join('')
 }
 // laki_profiles: agent profiles Laki AI would add or change by name (the user's Yes saves them): an agent with its
 // model, effort, permission mode and fast mode; never a command, args or env of its own (what runs is the agent)
@@ -1135,9 +1163,19 @@ function whatOf(a: AiAct) {
     const x = state.schedules?.find(x => x.id === a.id)
     return x && `the scheduled task ${cut(x.name || x.prompt)}`
   }
+  if (a.kind === 'run' && a.ids) {
+    const xs = a.ids.map(id => state.tabs.find(x => x.id === id && x.kind === 'shell'))
+    if (xs.some(x => !x)) return undefined
+    return `${xs.length} shells: ${xs.map(x => `${cut(x!.name)} (${(w => w?.name || w?.id)(state.workspaces.find(w => w.id === x!.workspace))})`).join(', ')}`
+  }
   if (a.kind === 'tab' || a.kind === 'run') {
     const x = state.tabs.find(x => x.id === a.id && (a.kind === 'tab' || x.kind === 'shell'))
     return x && `the tab ${cut(x.name)}`
+  }
+  if (a.kind === 'delete') {
+    const x = state.workspaces.find(x => x.id === a.id)
+    if (x && x.kind !== 'worktree') throw new Error(`${x.name || x.id} is a project's own folder: Laki doesn't delete it`)
+    return x && `the workspace ${cut(x.name || x.id)}`
   }
   if (a.kind === 'archive') {
     const x = state.workspaces.find(x => x.id === a.id && !x.archived)

@@ -162,6 +162,7 @@ export const FIND: [string, string, string?][] = [
   ['voice', 'Speech to text', 'voice dictation dictate microphone mic speak talk speech transcribe whisper cloud openrouter engine'],
   ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
   ['voice', 'Route by first words', 'voice route address name workspace agent first words pause comma say send to laki ai new task'],
+  ['ai', 'Show its work', 'laki ai window open talk key say it command output tab shown result'],
   ['voice', 'Talk key', 'global hotkey talk agent voice mic microphone from any app pill press record send push to talk laki ai screenshot screen it goes to'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
   ['voice', 'Send as you stop talking', 'auto send submit enter release let go stop talking voice dictation agent prompt'],

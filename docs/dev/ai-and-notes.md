@@ -8,7 +8,14 @@ with `settings.ai.skill` unset or true, Laki's skill: `shared/tools.ts` `skillTo
 `laki_stop` (Q12: an agent tab's turn, Esc through `input`, only while it runs), `laki_archive` (Q12: an `aiQuestion` act
 `archive`, a worktree workspace only; its Yes, `archiveAct`: `wsArchive` `ifClean` first, refused when ignored files or a
 submodule's work would go (the sidebar's ask names them), else archived with its uncommitted files kept, R2; a gate's
-hold said),
+hold said), `laki_delete` (Q13: an `aiQuestion` act `delete`, `wsPeek`'s uncommitted and unpushed counts as its `text`,
+Laki's words only; Yes: `wsRm`), `laki_open_in` (`openIn`: editor, finder, terminal, default), `laki_ui` (`uiDo`),
+`laki_find` (`findSessions`, pure: the user's words scored over name 5, branch 3, group, project, tabs and the PR's
+title 2, the last answer 1, a word a letter or two off half; no words: the last at work first; `unsure` when the top
+two are within a point: the skill has it ask), `laki_run`'s `tabs` (`runMany`: agents get it as a message each, the
+shells at their prompt one `run` act with `ids`; `runAct` runs each, one that can't said; `ranShown`: the first tab
+shown unless `ai.show` is false, each one's last 14 lines in the chat after `SHOWN_MS`), `laki_actions` without a
+project (the global ones and each project's own), `laki_state`'s `created` and `active` per workspace,
 `laki_prs`, `laki_project`, `laki_notes_write`, `laki_memory_write`, `laki_rename`, `laki_shell`: a new shell, a command typed with
 `enter: false`, or with `run` an `aiQuestion` act `run`; `laki_run`: `send` into a tab that's open (a shell at its prompt: an
 `aiQuestion` act `run`, the command in a fence, whose Yes (`runAct`: still at its prompt) is ⌃E ⌃U through `input`, then the

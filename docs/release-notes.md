@@ -5,6 +5,9 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki AI drives the app: "show me the checkout session", "open Settings › Voice", "full screen", "show the changes", "close this", "open it in my editor", "delete dark mode" (it says what would be lost and asks first), "run git status in the last 3 sessions" (one Yes, each one's output in the chat). It finds a session by what you call it and asks which when two fit, and knows every project's groups and actions.
+- See what Laki AI did: a command it runs at your Yes shows its tab and puts what it printed in the chat, and asking it with the talk key or *Say it* opens its window (Settings › AI › *Show its work*).
+
 - The talk key can go to Laki AI (Settings › Voice › Talk key › *It goes to*): say what you want done and Laki AI does it; say "screenshot" or "my screen" and your screen goes with it. Tab in the pill reaches Laki AI either way, and "Laki AI, …" said first is understood even when it's written down as "Lucky AI". [Try it](laki://settings/voice?spot=Talk%20key)
 - Laki AI controls your sessions: "stop the Rails agent" stops its turn, and "close that worktree" asks, then archives the workspace on your Yes (its uncommitted changes kept for Restore).
 - Settings › Voice shows each speech-to-text model's price, OpenRouter's current one (and its other models under *More on OpenRouter*), or the date of the prices Laki knows when it can't reach OpenRouter.

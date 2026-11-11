@@ -831,7 +831,7 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex'
 // preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
 // skill: Laki's skill for it (unset: on): more tools (PRs, projects' notes and memory, tabs and shells, actions, templates) and
 // asking you with options; hideCost: no $ on the AI page
-export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean; alerts?: boolean } // alerts: it may send laki_alert on its own (off: only when you ask in the chat or Your instructions name alerts: ai.ts aiMayAlert); efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
+export type AiSettings = { show?: boolean; on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean; alerts?: boolean } // alerts: it may send laki_alert on its own (off: only when you ask in the chat or Your instructions name alerts: ai.ts aiMayAlert); efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const aiOn = (s?: { ai?: AiSettings }) => s?.ai?.on !== false // Settings › AI: on unless turned off
 export const AI_STEPS = 20
@@ -845,8 +845,8 @@ export type AiAsk = { id: string; options: string[]; looks?: (AiLook | null)[]; 
 // an option's look: a UI kit element over its own data (size: cells across × down; none: as a full view)
 export type AiLook = { ui: Record<string, unknown>; data?: unknown; size?: [number, number] }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
-export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile', 'archive'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); profile: agent profiles saved (text: them as JSON); archive: a workspace archived (Q12, id: its id); the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile', 'archive', 'delete'] as const // widget: turning an extension on; run: a command in a shell (id: its tab; ids: more shells, Q13); profile: agent profiles saved (text: them as JSON); archive, delete: a workspace archived (Q12) or deleted for good (Q13; text: what it would lose, Laki's words), id: its id; the rest a removal
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; ids?: string[]; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string } // cachedIn: of in, the tokens read from the provider's prompt cache (A3)
@@ -1218,7 +1218,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 172
+export const API = 173
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

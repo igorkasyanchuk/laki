@@ -317,6 +317,9 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
           <Switch className="switch-row" on={ai.float !== false} onChange={v => onChange({ ...ai, float: v })}>
             <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
           </Switch>
+          <Switch className="switch-row" on={ai.show !== false} onChange={v => onChange({ ...ai, show: v ? undefined : false })}>
+            <Says title="Show its work" hint="Its window opens when you talk to it (the talk key, Say it), so you see what it does and its Yes / No; and a command it runs at your Yes shows its tab, with what it printed in the chat" />
+          </Switch>
           <Switch className="switch-row" on={!!ai.alerts} onChange={v => onChange({ ...ai, alerts: v || undefined })}>
             <Says title="Important alerts on its own" hint="Off: Laki AI puts an important alert on your screen only when you ask for one in the chat, or Your instructions say when. On: also when it thinks you should know" />
           </Switch>

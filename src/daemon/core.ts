@@ -4460,6 +4460,35 @@ export function tabFocus(p: { tab: string }) {
   return { ok: true }
 }
 
+// Q13: the app's window moved as the user asks Laki AI (laki_ui): a workspace or tab shown, a laki:// link opened (a
+// page, a Settings section: links select and fill in, never create or run), the tab full screen or back, a side panel
+// tab shown or the panel shut, the open page closed. Said to every window; App's 'ui' does it
+export const UI_PANELS = ['info', 'files', 'changes', 'commits', 'review', 'preview', 'side', 'none'] as const
+export function uiDo(p: { do?: unknown; ws?: unknown; tab?: unknown; link?: unknown; on?: unknown; panel?: unknown }) {
+  if (p.do === 'show') {
+    const t = typeof p.tab === 'string' && p.tab ? findTab(p.tab) : undefined
+    const w = t ? findWs(t.workspace) : findWs(String(p.ws ?? ''))
+    if (w.archived) throw new Error(`${w.name || w.id} is archived: Restore brings it back`)
+    const tab = t ?? state.tabs.find(x => x.workspace === w.id && x.kind === 'agent') ?? state.tabs.find(x => x.workspace === w.id)
+    if (!tab) throw new Error(`${w.name || w.id} has no tabs`)
+    broadcast({ ev: 'ui', do: 'show', tab: tab.id })
+    return { shown: tab.id }
+  }
+  if (p.do === 'link') {
+    const link = String(p.link ?? '')
+    if (!/^laki:\/\/[\w/?=&%.#:-]{1,500}$/.test(link)) throw new Error('a laki:// link: laki://settings/voice, laki://board, laki://ws/<id>…')
+    broadcast({ ev: 'ui', do: 'link', link })
+    return { opened: link }
+  }
+  if (p.do === 'full_screen') return broadcast({ ev: 'ui', do: 'full_screen', on: p.on !== false }), { full: p.on !== false }
+  if (p.do === 'panel') {
+    if (!UI_PANELS.includes(p.panel as (typeof UI_PANELS)[number])) throw new Error(`a panel: ${UI_PANELS.join(', ')}`)
+    return broadcast({ ev: 'ui', do: 'panel', panel: p.panel }), { panel: p.panel }
+  }
+  if (p.do === 'close') return broadcast({ ev: 'ui', do: 'close' }), { closed: true }
+  throw new Error('do: show, link, full_screen, panel or close')
+}
+
 // ---------- accounts (accounts.ts): a tab moved to another, a sign-in
 
 // Restart on another account: the tab's chat again on that account (the chats are shared: accounts.ts SHARED). A

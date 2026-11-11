@@ -1186,7 +1186,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1370,6 +1370,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     at: o.at === 'notch' ? 'notch' : 'edge',
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
     ...(o.talkAi === true && { talkAi: true }),
+    ...(o.aiShow === true && { aiShow: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
@@ -1915,8 +1916,9 @@ ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.
 // only while it records. ponytail: press to start, press to stop: globalShortcut has no key-up, so holding the key to
 // talk needs a native helper (a CGEventTap) later
 const TALK = { width: 320, height: 78 }
-// Laki AI asked in the background (its chat has the answer: the AI page); only while it's on
-const aiAsked = (text: string, images?: string[]) => (floats.ai ? (void rpc('aiAsk', { text, ...(images && { images }) }).catch(() => {}), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
+// Laki AI asked in the background (its chat has the answer: the AI page); only while it's on. Settings › AI › Show its
+// work (aiShow, on unless off): its window opens with the ask (Q13: what it does, its Yes / No, without the app)
+const aiAsked = (text: string, images?: string[]) => (floats.ai ? (void rpc('aiAsk', { text, ...(images && { images }) }).catch(() => {}), floats.aiShow && setTimeout(aiWin, 300), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
 // Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
 // (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
 async function aiTalk(text: string): Promise<{ ai?: boolean; shot?: boolean; noShot?: string; error?: string }> {

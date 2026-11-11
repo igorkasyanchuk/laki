@@ -144,7 +144,8 @@ time and AI money per run (`budget: 60 min, $5`).
   PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also
   lists your PRs and others', runs your actions and templates, keeps a project's notes and memory, and asks you with options when unsure (it
   removes something only when you press Yes); it stops an agent's turn or archives a workspace when you ask (archiving at your Yes); a chat button on every page that knows what you're looking at; timers, reminders and messages for later on request;
-  the talk key can go to it from any app, your screen with it when you say so;
+  the talk key can go to it from any app, your screen with it when you say so; it moves the window (a session, a page, full screen, a panel),
+  opens a workspace in your editor, finds sessions by name or the last few and runs one command in several at one Yes;
   it tells you where a setting is, with a link that opens it;
   on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
 - **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
