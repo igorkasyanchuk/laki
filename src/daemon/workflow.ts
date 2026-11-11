@@ -10,6 +10,7 @@ import { runInNewContext } from 'node:vm'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tabAgent } from '../shared/install.ts'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { queueOrder, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
@@ -397,7 +398,20 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string } // evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string; tab?: string } // evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
+
+// the tab you picked in Run: an agent tab of the run's workspace, alive (picked() refuses a workspace a live run has);
+// its agent's blocks that run in the run's session (session: run) go to it, as `run:<preset>` keys. Never an agent's
+// call: your chat is yours
+function yourTab(wf: WorkflowItem, o: Start, t: Tab | undefined, pick?: Workspace): string[] {
+  if (o.by === 'agent') throw new Error("an agent can't run a workflow in your tab: start it yourself, or leave out tab")
+  if (!t || t.kind !== 'agent' || !isLive(t)) throw new Error('that tab is gone, or not an agent’s')
+  if (!pick || t.workspace !== pick.id) throw new Error(`that tab is in another workspace than the run's`)
+  const ag = tabAgent(t, presets())
+  const keys = [...new Set(wf.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run') && agentOf(b.agent) === ag).map(b => `run:${b.agent || 'claude'}`))]
+  if (!keys.length) throw new Error(`${wf.name} has no ${ag ?? 'such'} block that runs in the run's session: its agents get tabs of their own`)
+  return keys
+}
 
 // Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
 // task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
@@ -419,6 +433,8 @@ export async function flowStart(o: Start) {
   on()
   const old = o.again || o.from ? flowGet({ id: String(o.again ?? o.from?.run ?? '') }) : undefined
   if (old) o = rerun(o, old)
+  const mine = o.tab ? tabOf(o.tab) : undefined // Run's Agent tab: a session of yours its agent's blocks go to
+  if (o.tab && !o.ws && mine) o = { ...o, ws: mine.workspace }
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
@@ -443,6 +459,7 @@ export async function flowStart(o: Start) {
         throw new Error(`${wf.name} can't run: ${blockName(b)}: ${(e as Error).message}`)
       }
   }
+  const yours = o.tab ? yourTab(wf, o, mine, pick) : []
   const never = bypass(wf).map(blockName)
   if (o.by === 'agent' && never.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${never.join(', ')}): start it yourself`)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
@@ -466,6 +483,7 @@ export async function flowStart(o: Start) {
   const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, events: _e, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
+  for (const k of yours) r.tabs[k] = mine!.id
   if (budget) (r.budget = { ...budget }), (r.flow.budget = { ...budget }) // the run's copy: Give it more raises it by half of this
   else delete r.flow.budget
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
@@ -473,6 +491,7 @@ export async function flowStart(o: Start) {
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}${old ? (o.from ? ` (from run ${old.id}, at ${blockName(blockOf(r, o.from.block)!)})` : ` (again: run ${old.id})`) : ''}`)
   if (r.dry && never.length) say(r, `dry run: ${never.join(', ')} would run with bypass permissions (never asks)`)
   if (r.budget) say(r, `budget: ${budgetText(r.budget)}${r.dry ? " (a dry run doesn't stop for it)" : ''}`)
+  if (yours.length) say(r, `its ${yours.map(k => k.slice(4)).join(', ')} blocks in your tab ${mine!.name}`)
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
     touch()

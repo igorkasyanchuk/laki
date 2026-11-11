@@ -3600,3 +3600,6 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 /* V2: the status bar in the interface font; only what you'd type stays mono: the branch, the port */
 .status * { font-family: inherit; }
 .status :is(.sb-branch, .port-item, .port-item *) { font-family: var(--mono); }
+.link-peek.md { width: 360px; }
+.link-peek .lp-md { max-height: 320px; overflow: auto; overscroll-behavior: contain; } /* the card scrolls: the pointer on it keeps it */
+.link-peek .lp-md .md { font-size: var(--fs-2); }

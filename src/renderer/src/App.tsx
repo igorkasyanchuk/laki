@@ -1750,12 +1750,8 @@ export function App() {
     else setAiFloat(true)
     void whereNow().then(context => api.call('aiAsk', { text: said, context })).catch(fail)
   }
-  const replyTo = (id: string) => {
-    const t = byId(id)
-    if (!t) return []
-    if ((t.kind === 'agent' || t.runs) && t.status !== 'exited') return [t]
-    return tabs.filter(x => x.workspace === t.workspace && x.id !== t.id && x.kind === 'agent' && x.status !== 'exited')
-  }
+  // Reply's agent: the tab's own (an agent tab, or a shell running one); a plain shell's terminal has no Reply
+  const replyTo = (id: string) => (t => (t && (t.kind === 'agent' || t.runs) && t.status !== 'exited' ? [t] : []))(byId(id))
   // a picture's path hovered in a terminal: the workspace's file, its storage folder's, a pasted one. One not there (an
   // agent names og.png, it's site/og.png): the workspace's one file of that name or tail; none or several: null, no card
   const fileLists = useRef(new Map<string, { at: number; list: Promise<FileList | null> }>()) // a workspace's files, a minute: one listing for many hovers
@@ -1777,9 +1773,11 @@ export function App() {
     const kept = w.storage ? (await api.call<{ path: string }[]>('artifactList', { ws: w.id }).catch(() => [])).find(f => named(f.path))?.path : undefined
     return kept ? { path: kept, storage: true } : undefined
   }
-  const peekImage = (id: string) => (path: string) => {
+  // a hovered file of the tab's workspace or its storage folder (one not there: the workspace's file of that name),
+  // fileRead's answer's `what` (a picture's data URL, a text's); null: no card; undefined: not one of the workspace's
+  const peekFile = (id: string, path: string, what: 'image' | 'text') => {
     const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
-    const read = (storage: boolean, p = path) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r.image)
+    const read = (storage: boolean, p = path) => api.call<{ image?: string; text?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r[what])
     if (w && path.startsWith(`${w.path}/`))
       return read(false).catch(async e => {
         if (!/ENOENT|no such file/i.test(String(e?.message ?? e))) throw e // a real failure is said, not hidden
@@ -1787,6 +1785,13 @@ export function App() {
         return f ? read(!!f.storage, f.path) : null
       })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
+  }
+  // a Markdown file's card: the workspace's and its storage folder's only (anywhere else on this Mac: no card)
+  const peekText = (id: string) => (path: string) => peekFile(id, path, 'text') ?? Promise.resolve(null)
+  const peekImage = (id: string) => (path: string) => {
+    const mine = peekFile(id, path, 'image')
+    if (mine) return mine
+    const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
     if (w?.host) return Promise.reject(new Error('Not a file of this workspace')) // a full path on its host: not this Mac's
     // anywhere on this Mac: a scratchpad's, /tmp's; refused (remote access, a daemon before API 151): a pasted one's
     return api.call<{ image?: string }>('imageRead', { path }).then(
@@ -2626,7 +2631,7 @@ export function App() {
     !flowsOn || rawKind(w) !== 'projects' || w.term || w.host || w.archived || view?.projects.find(p => p.id === w.project)?.config?.workflows !== true // its project's Applicable for Workflows (off unless on)
       ? []
       : (l => [{ label: 'Run workflow', icon: 'flow', key: 'w', items: l.length ? l.map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }])(flowsHere(w))
-  const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
+  const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws, at: Date.now() } })
   // a git workspace on a branch with no PR found: one can be attached by hand (prAttach)
   const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && !w.term && view?.projects.find(p => p.id === w.project)?.git !== false
   // the status bar's branch, short: Laki's prefix (Settings › Git & worktrees) off
@@ -3631,6 +3636,7 @@ export function App() {
                     onCode={openCode(id)}
                     codeTo={settings.fileClick === 'editor' ? 'editor' : 'preview'}
                     image={peekImage(id)}
+                    text={peekText(id)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                   />
                   {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}

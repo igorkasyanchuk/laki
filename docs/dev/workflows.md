@@ -24,7 +24,12 @@ Terminals', Browsers' or host's, no run going there, checked again in `begin` fo
 no `ws.flow` mark (that means made by the run), whatever `runs in:` says; `runs in: here` refuses to start without
 one. The status bar's `.sb-flow` also finds a live run by `r.ws`. App's `flowItems` (`flowList` as `flowFiles`
 moves): a workspace's ⋯ › *Run workflow ›* (`flowMenu`) and ⌘K's *Run workflow: <name>* open the page's StartRun
-with it fixed (dialog `start`, `FlowStartAt`); StartRun's own *Workspace* for a `here` one without. `flowStart`
+with it fixed (dialog `start`, `FlowStartAt`, its `at` the ask's time: Workflows.tsx `startsShown`, so Back or
+Forward to that place shows the page or the run, never the sheet again); StartRun's own *Workspace* for a `here` one
+without. *Agent tab* (StartRun: the workspace's live agent tabs whose agent has blocks in the run's session, `tabAgent`):
+`flowStart` `tab` (never `by: 'agent'`; its workspace is the run's `ws` when none is given), `yourTab` checks it and
+sets `tabs['run:<preset>']` to it for each such preset, so `agent()` sends the prompt there (`send`, after its turn).
+Start's `input`: `task` (needed), `task?` (taken if given), `none` (StartRun shows no Task box). `flowStart`
 `again` (an ended run's id: `rerun`, its workflow's file as it is now, its project, task, inputs from its
 `inputs.*` vars that the Start still has, dry or not, its workspace when the file says `runs in: here`; trigger
 `again <id>`) and `from` (`{ run, block }`: its workspace, live and not archived, as `pick`; the block in the file

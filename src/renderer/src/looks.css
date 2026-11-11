@@ -2347,7 +2347,7 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 :where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])), :where([data-look='frosted']) select, :where([data-look='frosted']) textarea { border: 1px solid var(--f-edge); border-radius: var(--rs, 8px); transition: border-color 0.12s, box-shadow 0.12s; }
 :where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])):focus, :where([data-look='frosted']) select:focus, :where([data-look='frosted']) textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--f-ring); }
 [data-look='frosted'] .menu-filter { box-shadow: none; }
-[data-look='frosted'] :is(.chip-field input, .chips-input input, .finder > input, .sp-tools input, .fr-filter input, .wf-make input, .notes-find input, .tunnel-host input, .nw-chip-input, .nw-composer textarea, .pin-boxes input, .csv-input) { box-shadow: none; background-color: transparent; } /* over html.glass' tint */
+[data-look='frosted'] :is(.chip-field input, .chips-input input, .finder > input, .sp-tools input, .fr-filter input, .notes-find input, .tunnel-host input, .nw-chip-input, .nw-composer textarea, .pin-boxes input, .csv-input) { box-shadow: none; background-color: transparent; } /* over html.glass' tint */
 /* a select is a Mac pop-up button, as the font picker (.pick-btn) beside it: filled and raised; only what you type in is recessed */
 [data-look='frosted'] select:not([multiple], [size]) { border-color: transparent; background-color: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
 [data-look='frosted'] select:not([multiple], [size]):hover { background-color: var(--f-fill-up); }

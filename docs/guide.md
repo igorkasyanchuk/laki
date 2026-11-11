@@ -1613,7 +1613,7 @@ how it tells you), then writes it, and the workflow opens as it's written. A row
 ⋯ in a workflow's head. A deleted one goes to the trash for 30 days: *Undo* on the note brings it back, and so does
 `laki flow restore <id>` (`laki flow trash` lists them). Each save keeps the file it replaces (the last 20): the head's
 ⋯ › *History…* shows them, newest first, and *Put this one back* saves one again.
-Laki AI and your agents (the laki skill) write them too: ask for one, read it, then *Save* it before it runs. For example: a plan
+Laki AI and your agents (the laki skill) write them too (*New workflow ▾ › With Laki AI…* opens a box to say what it should do, ⌘⏎ makes it): ask for one, read it, then *Save* it before it runs. For example: a plan
 you approve, the build, tests until they pass (at most 3 fixes), a PR, CI until green. A workflow opens on a canvas: drag blocks, pick one to change it
 on the right (its prompt, model, where each exit goes). The sidebar on the left has *Blocks* (a click adds one after the
 picked block, else at the end; a drag onto the canvas drops it where you let go) and *Variables*. A block's right
@@ -1622,7 +1622,11 @@ on the empty canvas; drag one of them to move them all. With the canvas clicked,
 ⌘A picks every block and Esc none; ⌘Z undoes a change (a deletion too) while you aren't typing in a box. *File* shows the
 same workflow as Markdown, the way agents write one (`laki_workflow_write`).
 
-*Run* asks for a project and a task. Each run works in a new worktree (a sidebar row, with a workflow mark), the
+*Run* asks for a project and a task: Start's *Task* says whether it needs one (*Required*, `input: task` in the file),
+takes one if given (*Optional*, `input: task?`) or asks for none (*None*, `input: none`: no Task box, for a workflow
+that needs no words, such as a review of the workspace's PR). In a workspace you have, *Agent tab* picks one of its
+agent tabs: the workflow's blocks of that agent (those in the run's session) go to that chat as it is, instead of a
+new tab (a claude tab takes the claude blocks; others get tabs of their own). Each run works in a new worktree (a sidebar row, with a workflow mark), the
 project's folder, or a workspace you have: a workspace's ⋯ (or right click) › *Run workflow ›* and ⌘K's *Run
 workflow: <name>* start one there, for a PR to review or the CI of the branch you're on (`runs in: here` in its file:
 it always needs one; `--ws <workspace>` on `laki flow run`, `.` for the tab's own). One run at a time in a workspace;
@@ -2051,7 +2055,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
 | ⌘-click a file path | in a terminal's text (`src/app.ts:42`, `./lib/x.go`, `App.tsx:42`): a file of the workspace opens in Laki's preview at that line, ⌘⌥-click in your editor (Settings › Terminal › *A file path clicked* swaps them) |
 | ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's. A link behind words (Claude Code's) opens on ⌘-click only; hovering shows where any link goes. Resting on a GitHub PR or issue link shows its card (title, state, author, size; a click opens it on GitHub), and on a picture (a file of the workspace, a pasted screenshot, any picture on this Mac by its full path such as `/tmp/…/shot.png`, an https one) shows the picture |
-| select, then *Reply* | in a terminal: the pill under the selected text quotes it to the agent (that tab's, or from a shell its workspace's: a pick when there are several) with your words; ⏎ puts both in its prompt for you to finish, ⌘⏎ sends them (after its turn if it's working) |
+| select, then *Reply* | in a terminal: the pill under the selected text quotes it to that tab's agent (an agent tab, or a shell running one; a plain shell has no Reply, ⌥ still offers a new workspace, tab or Laki AI) with your words; ⏎ puts both in its prompt for you to finish, ⌘⏎ sends them (after its turn if it's working) |
 | select, hold ⌥ | the pill offers more: *New workspace* (the new-workspace page with the text as its prompt), *New tab here* (your default agent, started with it), *Ask Laki AI* |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |

@@ -292,15 +292,18 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
   xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
-- **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own when one
-  runs in it, else its workspace's live agent tabs): a pill (`.term-reply`) where the mouse let go of a selection, gone
+- **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own, an agent
+  tab or a shell running one; a plain shell has none): a pill (`.term-reply`) where the mouse let go of a selection, gone
   at a key, a press, a scroll or an empty selection; it opens panels.tsx' `ReplyPop` (the quote, your words, a pick of
   agents; ⏎ `send` `enter: false` into the prompt, ⌘⏎ `send` (`whenIdle` for an agent tab); ⌥ held (`alt`, `USES`,
   `onSelection`: App's `selectionTo`): *New workspace* (`newWs` with the text as its prompt), *New tab here* (`tabNew`
   with Settings' agent), *Ask Laki AI* (`aiAsk` with `whereNow`), the pill shown with ⌥ alone when no agent can be
   replied to), text.ts `replyText`: *From
   <tab>:* (*your output* from its own), the quote fenced, the words). A link's hover card (`LinkPeek.tsx`, 400 ms on,
-  250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension): from the OSC 8 handler, the
+  250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension; a Markdown file, `MD`, a
+  local path only, drawn by MarkdownView's `Markdown` (its first 30,000 characters; App's `peekText`, `peekFile` as
+  `peekImage`'s, but no file outside the workspace and its storage folder: no card), also from the `CODE` provider's
+  hover): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
   ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click on the picture or its ⤢ (`.lp-open`) opens it larger: Term's `big`, panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.

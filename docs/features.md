@@ -74,9 +74,10 @@ time and AI money per run (`budget: 60 min, $5`).
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
   your home folder and a browser (any website, sign-ins kept, Google's too; a screenshot of what's in sight or the whole page, copied or saved) live in the sidebar too, from + at its top. A tab floats
-  out in a window of its own, over every app (its right click › *Float in its own window*). Select text and *Reply*: it
+  out in a window of its own, over every app (its right click › *Float in its own window*). Select text in an agent's terminal and *Reply*: it
   goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
-  or issue link shows its card on hover, a picture's path or link the picture (a click opens it larger); a file's path
+  or issue link shows its card on hover, a picture's path or link the picture (a click opens it larger), a Markdown file's
+  (the workspace's or its storage folder's) the page it's written to be; a file's path
   (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees), or let it sleep, lock or shut down once everything is done (a minute's countdown first, once). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over

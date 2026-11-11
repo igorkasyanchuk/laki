@@ -598,3 +598,48 @@ test('workflow ask deadline: answered in time; no answer: its else, as no one’
   assert.deepEqual([r.status, r.decisions.at(-1).exit, r.decisions.at(-1).why, r.decisions.at(-1).you, r.vars.answer], ['stopped', 'Not now', 'no answer in 2h: Not now', undefined, 'Not now'])
   assert.equal(pushed.filter(x => x.includes('Ship it?')).length, asked + 1, 'no reminder after')
 })
+
+// a workflow's task: required (input: task), optional (task?) or none asked (none)
+test('workflow task setting: input: task needs one to run, task? and none run without; a bad value is a problem; read back as written', async t => {
+  const flow = (input: string) => `# T\nruns in: main\n\n## start\ninput: ${input}\nnext: e\n\n## e\nend: success\n`
+  for (const v of ['task', 'task?', 'none']) {
+    const { workflow, problems } = parse(flow(v), 't')
+    assert.deepEqual([problems, workflow.blocks[0].input], [[], v])
+    assert.equal(toFile(workflow).includes(`input: ${v}\n`), true)
+  }
+  assert.match(parse(flow('maybe'), 't').problems.join(), /input: task \(Run needs one\), task\? \(optional\) or none/)
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  for (const [id, v] of [['need', 'task'], ['maybe', 'task?'], ['none', 'none']]) await rig.rpc('flowSave', { id, text: flow(v) })
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'need', project: p.id }), /what should it work on\?/)
+  for (const id of ['maybe', 'none']) {
+    const run = await rig.rpc('flowStart', { workflow: id, project: p.id })
+    assert.equal((await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await rig.rpc('flowGet', { id: run.id })), 'the end')).status, 'done')
+  }
+})
+
+// Run's Agent tab: a claude tab of yours runs the run's claude blocks (its session), not an agent's call's, nor another
+// workspace's, nor one a live run has
+test('workflow in your tab: its claude blocks go to the claude tab you picked, in its workspace; refused from an agent, another workspace, a busy one', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'one', text: AGENT('claude', 'fix {{task}}') })
+  const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' })
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'other' })
+  const tab = await rig.rpc('tabNew', { ws: mine.id, preset: 'claude' })
+  const away = await rig.rpc('tabNew', { ws: other.id, preset: 'claude' })
+  await until(async () => /fake claude/.test(await rig.rpc('screen', { target: tab.id })), 'its claude started')
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'one', tab: tab.id, task: 'x', by: 'agent' }), /an agent can't run a workflow in your tab/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'one', ws: mine.id, tab: away.id, task: 'x' }), /in another workspace/)
+  const run = await rig.rpc('flowStart', { workflow: 'one', tab: tab.id, task: 'the cart' })
+  assert.deepEqual([run.ws, run.tabs['run:claude']], [mine.id, tab.id], 'its workspace: the tab’s')
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'one', tab: tab.id, task: 'y' }), /mine has a run going: Agent/, 'a live run’s workspace')
+  const r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 20000)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  assert.equal(r.tabs.work, tab.id, 'the block ran in your tab')
+  assert.ok(r.log.some((l: string) => /its claude blocks in your tab claude/.test(l)), r.log.join('\n'))
+  assert.match(await rig.rpc('screen', { target: tab.id }), /fix the cart/)
+  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === mine.id && x.kind === 'agent').length, 1, 'no tab made')
+})

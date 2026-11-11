@@ -193,8 +193,7 @@
 .wf-var code { font: 12px var(--mono); overflow-wrap: anywhere; }
 .wf-var span { color: var(--muted); font-size: var(--fs-3); }
 /* Workflows: Make it with Laki AI */
-.wf-make { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); color: var(--muted); }
-.wf-make input { flex: 1; min-width: 0; border: none; background: none; color: var(--fg); font: inherit; outline: none; }
+.wf-make { display: grid; gap: var(--sp-3); min-width: min(560px, 80vw); }
 /* the editor's left sidebar: blocks to add (a click, or a drag onto the canvas) and the variables */
 .wf-palette { width: 228px; flex: none; overflow-y: auto; border-right: 1px solid var(--line); padding: 10px 10px 24px; display: flex; flex-direction: column; gap: 8px; }
 .wf-palette > .seg { align-self: stretch; display: flex; }
@@ -271,4 +270,3 @@
 .wf-meter[data-level='over'] i { background: var(--error); }
 
 /* U11: its field has no border of its own: the box rings as you type in it */
-.wf-make:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }

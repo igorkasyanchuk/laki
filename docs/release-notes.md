@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- A Markdown file's path or link in a terminal shows the file drawn on hover, as a picture's does (the workspace's files and its storage folder's: an agent's report.md).
+- Workflows: *Run* in a workspace you have can pick one of its agent tabs (*Agent tab*): the workflow's blocks of that agent go to that chat, as it is, instead of a new tab. Start's *Task* says whether a run needs one: *Required*, *Optional* or *None* (no Task box; `input: task`, `task?`, `none` in the file). *New workflow ▾ › With Laki AI…* opens a modal with room to say what it should do.
+- Back from a workflow's run you opened the workspace from shows the run again, not its Run sheet.
+- The Reply pill shows only in an agent's terminal (or a shell running an agent), not in a plain shell.
 - Laki on your phone as an app: at a stable remote access address (Tailscale or My domain) the page adds to the Home Screen, opens full screen and shows *Offline: your Mac is not reachable* when it can't reach the Mac. Settings › Phone pushes › *This phone (Web Push)* sends its notifications there, encrypted on your Mac for each paired phone, with the first and last choice as buttons that answer the agent (where the browser shows them: Android's Chrome does, an iPhone's Safari doesn't). A quick tunnel's page says why it can't be added.
 - A trust page, [docs/trust.md](trust.md) (About › *No account, no telemetry*): what stays on your Mac and where, every host Laki connects to with what it sends, when and how to turn it off, how to check the build's signature, notarization and fuses, and who maintains Laki.
 - Workflows' *Ask you* blocks can have a deadline: *No answer within* `2h` and *Then take* one of its options go on that way when no one answers, freeing the run's slot and the queue behind it; the option must be the safe one (Laki refuses one that leads to a PR, merge or archive). *Remind me before* sends a notification, and with `phone: yes` a push with the choices. The run's page counts down and says what it will pick; its row says *waits for you · 1h 12m left*.

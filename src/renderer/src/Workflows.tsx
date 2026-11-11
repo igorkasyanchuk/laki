@@ -10,6 +10,7 @@ import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EV
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
 import { queueOrder, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, hints, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { tabAgent } from '../../shared/install'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -30,9 +31,12 @@ export type WorkflowsApi = {
   setGlobals?: (v: Record<string, string>) => Promise<unknown>
 }
 export type Sel = { id: string; source: WorkflowSource; project?: string }
-export type FlowStartAt = Sel & { ws?: string } // the page opened on a workflow's Run sheet, in that workspace
+export type FlowStartAt = Sel & { ws?: string; at?: number } // the page opened on a workflow's Run sheet, in that workspace; at: when it was asked (once)
+// the Run sheets already shown, by their ask's time: Back or Forward to that place shows the page, not the sheet again
+const startsShown = new Set<number>()
 const WHERE_TAGS: Record<string, string> = { worktree: 'worktree', main: 'project folder', here: 'a workspace you pick' }
 type Ext = { id: string; name: string; on: boolean; every?: number } // what an extension block can fetch
+type RunTab = { id: string; workspace?: string; kind?: string; preset?: string; name?: string; status?: string } // Run's Agent tab picks among them
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
 const W = 180
 const H = 58
@@ -58,7 +62,7 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
 // nav, onNav: where it is (the index, a workflow, a run) as App's dialog has it, so Back and Forward go through them
-export function WorkflowsPage({ view, projects, presets, actions, at: first, nav, onNav, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; nav?: string; onNav?: (nav: string | undefined) => void; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, nav, onNav, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: RunTab[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; nav?: string; onNav?: (nav: string | undefined) => void; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   // Back and Forward: each move here is a place of App's (onNav; the one it opened at is no nav), and a place travelled
   // to (nav) is shown again, also as it mounts there; drafts stay in `drafts`, so nothing typed is lost on the way
@@ -87,8 +91,13 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
   // opened to start one: its Run sheet once the list is in
   const [asked, setAsked] = useState(first?.start)
   useEffect(() => {
-    const w = asked && list?.find(x => same(asked, x))
-    if (asked && list) setAsked(undefined), w ? (w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w, asked.ws)) : api.toast('That workflow is gone') // one with problems: its page says them
+    if (!asked || !list) return
+    setAsked(undefined)
+    if (asked.at !== undefined && startsShown.has(asked.at)) return // travelled back to: the run it started, or the page, is what's there now
+    if (asked.at !== undefined) startsShown.add(asked.at)
+    const w = list.find(x => same(asked, x))
+    if (w) w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w, asked.ws) // one with problems: its page says them
+    else api.toast('That workflow is gone')
   }, [list])
   const [want, setWant] = useState('') // With Laki AI's
   const [making, setMaking] = useState(false) // its box, open
@@ -250,14 +259,21 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
             </span>
           </header>
           {api.ai && making && (
-            <form className="wf-make" onSubmit={e => (e.preventDefault(), make())}>
-              <Icon name="ai" />
-              <input autoFocus value={want} placeholder="What should it do? e.g. every morning, read my unread Slack, and if anything is urgent, start an agent on it" aria-label="What the workflow should do" onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.preventDefault(), setMaking(false))} />
-              <button type="submit" className="btn primary" disabled={!want.trim()} data-tip="Laki AI asks you a few questions, then writes it; it opens here, you read it and save it">
-                Make it
-              </button>
-              <IconButton icon="x" title="Close" onClick={() => setMaking(false)} />
-            </form>
+            <Modal title="New workflow with Laki AI" onClose={() => setMaking(false)}>
+              <form className="wf-make" onSubmit={e => (e.preventDefault(), make())}>
+                <label className="wf-field">
+                  <span>What should it do?</span>
+                  <textarea autoFocus rows={5} value={want} placeholder="e.g. every morning, read my unread Slack, and if anything is urgent, start an agent on it" onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), make())} />
+                  <span className="wf-hint">Laki AI asks you a few questions, then writes it: it opens here, you read it and save it.</span>
+                </label>
+                <div className="wf-start-foot">
+                  <button type="button" className="btn" onClick={() => setMaking(false)}>Cancel</button>
+                  <button type="submit" className="btn primary" disabled={!want.trim()}>
+                    <Icon name="ai" /> Make it ⌘⏎
+                  </button>
+                </div>
+              </form>
+            </Modal>
           )}
           {awaiting && !making && (
             <div className="wf-make wf-awaiting">
@@ -433,7 +449,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
         </div>
       )}
       {using && <UseTemplate item={using} projects={projects} list={list ?? []} api={api} onClose={() => setUsing(null)} onMade={w => (setUsing(null), refresh(), setAt({ kind: 'wf', sel: w }))} />}
-      {starting && <StartRun item={starting} projects={projects} presets={presets} workspaces={view.workspaces} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
+      {starting && <StartRun item={starting} projects={projects} presets={presets} workspaces={view.workspaces} tabs={view.tabs} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
       {menu}
     </Page>
   )
@@ -577,7 +593,7 @@ function outHint(b: Block) {
 
 function subOf(b: Block, wf: Workflow) {
   switch (b.kind) {
-    case 'start': return b.input === 'task' ? 'a task' : ''
+    case 'start': return b.input === 'task' ? 'a task' : b.input === 'task?' ? 'a task, if given' : ''
     case 'agent': return [b.agent || 'claude', b.use, b.model, b.effort, permWords(permOf(wf, b), b.fast, b.agent || 'claude')].filter(Boolean).join(' · ')
     case 'run': return b.cmd ?? ''
     case 'llm': return [b.model || 'Settings › AI’s model', b.out?.length && `→ ${b.out.join(', ')}`].filter(Boolean).join(' · ')
@@ -1377,6 +1393,16 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           </span>
         )}
       </div>
+      {b.kind === 'start' &&
+        field(
+          'Task',
+          <select value={b.input ?? 'task'} onChange={e => set(x => void (x.input = e.target.value as Block['input']))}>
+            <option value="task">Required</option>
+            <option value="task?">Optional</option>
+            <option value="none">None: Run asks for no task</option>
+          </select>,
+          'What Run’s Task box is: {{task}} is what was typed (empty without one)',
+        )}
       {b.kind === 'start' && field('Inputs', text(b.inputs?.map(inputText).join(', '), (x, v) => (x.inputs = v.trim() ? inputsOf(v) : undefined), false, 'issue:number, base:branch=main, size:choice(s|m|l)=m'), 'Besides the task, what Run asks for: name, ? when optional, :number, :branch or :choice(a|b), =its default. Each is {{inputs.<name>}}; a scheduled run takes the defaults.')}
       {b.kind !== 'start' && field('Name', text(b.name, (x, v) => (x.name = v || undefined), false, b.id))}
       {b.kind !== 'start' && <IdField key={b.id} id={b.id} rename={to => (edit(w => void renameBlock(w, b.id, to)), onPick(to))} check={to => renameBlock(JSON.parse(JSON.stringify(wf)), b.id, to)} />}
@@ -2144,13 +2170,14 @@ function UseTemplate({ item, projects, list, api, onClose, onMade }: { item: Wor
 
 type Tried = { name: string; from: string; last?: { at: number; ws?: string }; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string } // flowEvent's
 // fixed: the workspace it runs in (its ⋯ › Run workflow, ⌘K); runs in: here without one picks it here
-function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
+function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; tabs: RunTab[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
   const fix = workspaces.find(w => w.id === fixed)
   const ok = projects.filter(p => !p.host && (item.source !== 'project' || p.id === item.project) && (item.where !== 'worktree' || p.git !== false || p.id === fix?.project))
   const [project, setProject] = useState(fix?.project ?? item.project ?? ok[0]?.id ?? '')
   const [ws, setWs] = useState('') // runs in: here, none fixed: one of the project's
   const choices = workspaces.filter(w => w.project === project && !w.archived && !w.host)
-  const needsTask = item.blocks.find(b => b.kind === 'start')?.input === 'task'
+  const taskIs = item.blocks.find(b => b.kind === 'start')?.input
+  const needsTask = taskIs === 'task'
   const [task, setTask] = useState('')
   const [dry, setDry] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -2164,6 +2191,12 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
     api.call<{ branches: string[] }>('branches', { project }).then(r => setBranches(r.branches), () => setBranches([]))
   }, [project])
   const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
+  // Agent tab: one of yours in the run's workspace whose agent has blocks in the run's session: they go to its chat
+  const runWs = fixed || ws
+  const sessionAgents = new Set(item.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run')).map(b => tabAgent({ preset: b.agent || 'claude' }, presets)))
+  const tabsHere = runWs && !item.on ? tabs.filter(t => t.workspace === runWs && t.kind === 'agent' && t.status !== 'exited' && sessionAgents.has(tabAgent(t, presets))) : []
+  const [tab, setTab] = useState('')
+  const inTab = tabsHere.some(t => t.id === tab) ? tab : '' // a workspace picked since: none
   const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
   // As if on an event (one with on:): the last one heard, or a sample in the workspace picked; what it would get first
   const [budget, setBudget] = useState(item.budget ? budgetText(item.budget) : '') // this run's, over the file's
@@ -2183,7 +2216,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         r => onStarted(r.run!),
         e => (setBusy(false), setErr((e as Error).message)),
       )
-    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, budget, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
+    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, budget, ...(runWs && { ws: runWs }), ...(inTab && { tab: inTab }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
     )
@@ -2225,6 +2258,21 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
             </select>
           </label>
         )}
+        {!ev && tabsHere.length > 0 && (
+          <label className="wf-field">
+            <span>Agent tab</span>
+            <select value={inTab} onChange={e => setTab(e.target.value)}>
+              <option value="">A new one for this run</option>
+              {tabsHere.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.status === 'running' ? ' (working: after its turn)' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="wf-hint">Its {[...new Set(tabsHere.map(t => tabAgent(t, presets)))].join(', ')} blocks go to that chat, as it is</span>
+          </label>
+        )}
         {tried && (
           <div className="wf-tried">
             <details>
@@ -2244,7 +2292,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
             <span className={tried.start ? 'ok' : 'wf-bad'}>{tried.start ? `It starts, as on ${tried.name}` : `It wouldn't start: ${tried.why}`}</span>
           </div>
         )}
-        {!ev && (
+        {!ev && taskIs !== 'none' && (
         <label className="wf-field">
           <span>Task</span>
           <textarea autoFocus rows={4} value={task} placeholder={needsTask ? 'What should it work on?' : 'What should it work on? (optional)'} onChange={e => setTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), go())} />

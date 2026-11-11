@@ -9,7 +9,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
-import { type Big, LinkPeek, type Peek, peekOf } from './LinkPeek'
+import { type Big, LinkPeek, MD, type Peek, peekOf } from './LinkPeek'
 import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './settingsBase'
 import { wordTrim } from './text'
@@ -52,6 +52,7 @@ export function Term({
   onCode,
   codeTo = 'preview',
   image,
+  text,
   cwd,
 }: {
   tab: string
@@ -69,6 +70,7 @@ export function Term({
   onCode?: (path: string, line: number | undefined, other: boolean) => void // a file path in its text clicked (other: ⌥ held)
   codeTo?: 'preview' | 'editor' // where a click opens one (Settings' fileClick), for its hover's words
   image?: (path: string) => Promise<string | undefined | null> // a hovered picture's data URL (an absolute path); null: no card
+  text?: (path: string) => Promise<string | undefined | null> // a hovered Markdown file's text (an absolute path); null: no card
   cwd?: string // the workspace's folder: a relative picture path's
 }) {
   const copy = useRef(copyOnSelect)
@@ -78,8 +80,8 @@ export function Term({
   const box = useRef<HTMLDivElement>(null)
   const file = useRef(onFile)
   file.current = onFile
-  const props = useRef({ onReply, onSelection, onCode, codeTo, image, cwd })
-  props.current = { onReply, onSelection, onCode, codeTo, image, cwd }
+  const props = useRef({ onReply, onSelection, onCode, codeTo, image, text, cwd })
+  props.current = { onReply, onSelection, onCode, codeTo, image, text, cwd }
   // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both. xterm
   // drops the hovered link as its rows redraw and finds it again at once (a leave, then a hover): a TUI that redraws
   // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
@@ -95,14 +97,16 @@ export function Term({
     const path = filePath(uri) || (/^[a-z]+:/i.test(uri) ? '' : uri)
     const abs = path && absOf(path)
     const at = abs || uri
-    // a file's picture needs a reader; a web one, https (the daemon's /img)
-    if ((path && !abs) || !peekOf(at) || (abs ? !props.current.image : !/^https:/i.test(at))) return false
+    const kind = peekOf(at)
+    const read = kind === 'md' ? props.current.text : props.current.image
+    // a file's picture or Markdown needs a reader; a web picture, https (the daemon's /img)
+    if ((path && !abs) || !kind || (abs ? !read : kind === 'md' || !/^https:/i.test(at))) return false
     clearTimeout(hideT.current)
     if (peekAt.current === at) return true
     clearTimeout(showT.current)
     peekAt.current = at
     const { clientX: x, clientY: y } = e
-    showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, image: abs ? () => props.current.image!(abs) : undefined }), 400)
+    showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, read: abs ? () => read!(abs) : undefined }), 400)
     return true
   }
   const peekGone = () => (clearTimeout(showT.current), clearTimeout(hideT.current), (peekAt.current = ''), setPeek(null))
@@ -176,8 +180,8 @@ export function Term({
                   range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
                   text: m[0],
                   activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && props.current.onCode?.(absOf(t.replace(/(:\d+)+$/, '')), m[1] ? Number(m[1]) : undefined, e.altKey),
-                  hover: () => ((over = true), box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`)),
-                  leave: () => ((over = false), box.current && (box.current.title = '')),
+                  hover: (e: MouseEvent, t: string) => ((over = true), (MD.test(t) && peekOn(e, t)) || (box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`))), // a Markdown file's: its card
+                  leave: () => ((over = false), peekOff(), box.current && (box.current.title = '')),
                 })),
               ]
             : undefined,
