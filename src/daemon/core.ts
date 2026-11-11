@@ -6,14 +6,14 @@
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
-import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
-import { homedir, userInfo } from 'node:os'
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
+import { homedir, release, userInfo } from 'node:os'
 import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson, writeAtomic } from '../shared/conn.ts'
-import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
@@ -22,7 +22,7 @@ import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir, inRig } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
-import { transcriptOf } from './share.ts'
+import { redact, transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
@@ -719,6 +719,7 @@ export function view(): View {
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
     ...(updateIdle && { updateIdle }),
+    ...(trouble && { trouble }),
     ...((m => m && { managed: m })(managedView())),
   }
 }
@@ -4535,6 +4536,69 @@ export async function doctor(): Promise<Doctor> {
   )
   return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk() }
 }
+// R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
+// version, counts, the Labs on, the logs' last lines; redacted (diagRedact)
+export async function diagnostics(): Promise<string> {
+  const [d, versions] = await Promise.all([doctor(), Promise.all(AGENTS.map(id => (onPath(id) ? run(id, ['--version'], { timeout: 5000, env: { ...process.env, ...state.settings?.env } }).then(r => /\d+\.\d+[\w.+-]*/.exec(r.stdout)?.[0] ?? '?', () => '?') : Promise.resolve('not found')).then(v => `${id} ${v}`)))])
+  const s = state.settings ?? {}
+  const labs = LABS.filter(k => (s as Record<string, unknown>)[k] !== false)
+  const live = state.workspaces.filter(w => !w.archived)
+  const text = [
+    `Laki ${VERSION}${BUILT ? `, built ${BUILT}` : ' (from source)'}, API ${API}`,
+    `${process.platform} ${release()} ${process.arch}; node ${process.versions.node}${process.versions.electron ? `, Electron ${process.versions.electron}` : ''}`,
+    `${state.projects.filter(p => !p.archived).length} projects, ${live.length} workspaces (${state.workspaces.length - live.length} archived), ${state.tabs.length} tabs (${sessions.size} running)`,
+    `Labs on: ${labs.join(', ') || 'none'} (the Labs switch ${s.labs ? 'on' : 'off'})`,
+    ...(trouble ? [`${trouble.n} uncaught error${trouble.n === 1 ? '' : 's'} since the daemon started, the last: ${trouble.last}`] : []),
+    '',
+    '## Agents',
+    ...versions,
+    '',
+    '## Doctor',
+    doctorText(doctorRows(d)),
+    ...(['daemon.log', 'app.log'] as const).flatMap(f => ['', `## ${f} (the last 200 lines)`, tailOf(join(dir, f), 200)]),
+  ].join('\n')
+  return `${diagRedact(text)}\n`
+}
+// a file's last n lines (of its last 512 KB: a log rotates at 10 MB)
+function tailOf(path: string, n: number) {
+  try {
+    const fd = openSync(path, 'r')
+    try {
+      const size = fstatSync(fd).size
+      const buf = Buffer.alloc(Math.min(size, 512 << 10))
+      readSync(fd, buf, 0, buf.length, size - buf.length)
+      return buf.toString('utf8').trimEnd().split('\n').slice(-n).join('\n') || '(empty)'
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return '(none)'
+  }
+}
+// R6: never in the diagnostics: your home folder (~), a token or key (share.ts' shapes), an env value (NAME=value), the
+// password or token before a remote URL's @, a prompt (JSON's prompt/text/message, --prompt's, an alert's words).
+// ponytail: shapes, as share.ts' redact: a prompt logged some other way stays
+export function diagRedact(t: string) {
+  let s = t
+  for (const h of new Set([homedir(), (() => { try { return realpathSync(homedir()) } catch { return homedir() } })()])) if (h.length > 1) s = s.split(h).join('~')
+  s = redact(s)
+  s = s.replace(/\b[0-9a-f]{48,}\b/gi, '••••') // Laki's own tokens (32 bytes in hex): longer than a commit's 40
+  s = s.replace(/\b([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/@'"<>]{1,256}@/gi, '$1••••@')
+  s = s.replace(/\b([A-Z][A-Z0-9_]{1,63})=(?:"[^"\n]*"|'[^'\n]*'|[^\s"',}]+)/g, '$1=••••')
+  s = s.replace(/("(?:prompt|text|ask|message|note|said|input|data)"\s*:\s*)"(?:[^"\\\n]|\\.)*"/g, '$1"••••"')
+  s = s.replace(/(--prompt[= ])(?:"[^"\n]*"|\S+)/g, '$1••••')
+  s = s.replace(/^(\S+ (?:alert|notice) [^\n:]*: ).+$/gm, '$1••••')
+  return s
+}
+// R6: the daemon's uncaught errors (main.ts' process handlers): counted, the last one's first line, in the view's trouble
+let trouble: View['trouble']
+export function troubled(e: unknown) {
+  try {
+    trouble = { n: (trouble?.n ?? 0) + 1, last: diagRedact(firstLine(e instanceof Error ? (e.stack ?? e.message) : e)), at: Date.now() }
+    changed()
+  } catch {}
+}
+
 // U4: whether a found agent is signed in, by where it keeps its sign-in being there (never read): claude's credentials
 // file or Keychain item (security without -w: the item's attributes, not its secret), codex's auth.json, Gemini CLI's
 // oauth_creds.json, or the API key in the environment. undefined: no cheap way to tell (grok, opencode)

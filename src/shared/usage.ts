@@ -4,6 +4,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki help [command]                         this, or one command's details and examples (laki <command> --help too)
   laki version | --version                    this CLI's version; with a daemon running, its version and API too
   laki doctor [--json]                        what Laki needs, checked: git, gh, the agents, hooks; a fix for each (exit 1: one failed)
+  laki doctor --bundle [--out <file>]         diagnostics for a bug report: versions, the doctor, counts, the logs' ends (redacted)
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
   laki limits [--agent claude] [--json]       how much of each agent's plan is used, and when it resets
@@ -233,8 +234,15 @@ note when it isn't this CLI's (the app's status bar restarts it: tabs resume).
 workspaces), cloudflared (remote access, Expose to the world), idb (the simulator's hands), each agent (found, signed
 in) and Laki's hooks (they reach the daemon). ✓ fine, ● optional or worth a look, ✗ broken: exit 1.
 
+--bundle prints diagnostics to paste in a bug report instead: Laki's version, build and API, the OS, node and Electron,
+the doctor, each agent's version, how many projects, workspaces and tabs, the Labs on, and the last 200 lines of
+daemon.log and app.log. Your home folder shows as ~; tokens, keys, env values, remote URLs' passwords and prompts are
+masked. Not from an agent's tab, not over remote access.
+
   laki doctor
-  laki doctor --json                          the daemon's doctor as it is`,
+  laki doctor --json                          the daemon's doctor as it is
+  laki doctor --bundle | pbcopy               the diagnostics, on the clipboard
+  laki doctor --bundle --out laki-diag.txt    in a file (only you can read it)`,
   screen: `Prints the bottom of a tab's screen (30 lines unless --lines): what the agent shows now, its question too.
 laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and apps' windows instead (shot prints a
 PNG's path: read it). From an agent's tab, a tab in another workspace: the user is asked in the app first.

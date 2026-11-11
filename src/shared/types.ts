@@ -1043,6 +1043,21 @@ export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent'
 // Settings › Agents & profiles: an agent's last hook (this daemon's), its live tabs, how many aren't heard (hooksSeen)
 export type HookSeen = { at?: number; tabs: number; deaf: number; native?: NativeSeen }
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
+// A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
+export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && process.platform === 'darwin'): [string, string, string?][] {
+  return [
+    d.git ? ['✓', 'git'] : ['✗', 'git not found', 'xcode-select --install (or your package manager)'],
+    d.gh === 'in' ? ['✓', 'gh signed in'] : d.gh === 'out' ? ['●', 'gh not signed in: no PRs, checks or issues', 'gh auth login'] : ['●', 'gh not found: no PRs, checks or issues', 'brew install gh'],
+    ...(d.gh === 'in' && d.ghCodespace === false ? [['●', 'gh has no codespace scope: no cloud workspaces', 'gh auth refresh -s codespace'] as [string, string, string]] : []),
+    d.cloudflared ? ['✓', 'cloudflared'] : ['●', 'cloudflared not found: no remote access or Expose to the world over Cloudflare', 'brew install cloudflared'],
+    ...(mac ? [d.idb ? (['✓', 'idb'] as [string, string]) : (['●', "idb not found: laki screen can't tap the simulator", 'brew install idb-companion && pipx install fb-idb'] as [string, string, string])] : []),
+    ...d.agents.map((a): [string, string, string?] => (!a.found ? ['●', `${a.id} not found`, `install ${a.id}, then laki doctor again`] : a.signedIn === false ? ['●', `${a.id} found, not signed in`, `run ${a.id} in a terminal and sign in`] : ['✓', `${a.id}${a.signedIn ? ' signed in' : ''}`])),
+    ...(d.agents.some(a => a.found) ? [] : [['✗', 'no agent found', 'install claude or codex'] as [string, string, string]]),
+    ...(d.hooks ? [d.hooks.ok ? (['✓', "Laki's hooks reach the daemon"] as [string, string]) : (['✗', `Laki's hooks don't reach the daemon: ${d.hooks.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
+    ...(d.hookFiles ? [d.hookFiles.ok ? (['✓', "agents' hook files"] as [string, string]) : (['✗', `agents' hook files: ${d.hookFiles.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
+  ]
+}
+export const doctorText = (rows: [string, string, string?][]) => rows.map(([m, what, fix]) => `${m} ${what}${fix ? `\n    fix: ${fix}` : ''}`).join('\n')
 
 // a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
 // minutes (none: no fetch command or script); size: cells, 1–4 across the sidebar's grid by 1–4 down; full: it has a
@@ -1121,7 +1136,7 @@ export type ArchivedProject = { id: string; name: string; path: string; host?: s
 // that ended (their answer's), PRs that moved
 export type DigestRow = { kind: 'wait' | 'done' | 'pr'; ws: string; tab?: string; name: string; text: string }
 export type Digest = { since: number; until: number; rows: DigestRow[] }
-export type View = { digest?: Digest; dnd?: { until: number } /* U8: Do not disturb is on, until then: no notifications but an important workspace's ask */; modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; diskFull?: { free: number } /* R4: the state couldn't be saved, the disk is full (bytes free): kept in memory, tried again */; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[]; allowRules?: false } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; remoteDevices?: RemoteDevice[] /* D3: remote access's paired devices, kept while it's off too */; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+export type View = { digest?: Digest; dnd?: { until: number } /* U8: Do not disturb is on, until then: no notifications but an important workspace's ask */; modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; diskFull?: { free: number } /* R4: the state couldn't be saved, the disk is full (bytes free): kept in memory, tried again */; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[]; allowRules?: false } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; remoteDevices?: RemoteDevice[] /* D3: remote access's paired devices, kept while it's off too */; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number }; trouble?: { n: number; last: string; at: number } /* R6: the daemon's uncaught errors since it started: how many, the last one's first line */ } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // S7: the view an agent, MCP or Laki AI gets while Recording mode is on: no private workspace (its own or its project's
 // private), its tabs, layout and today's use, nor a private project; the app's window gets them all and veils the rows
 export function recorded(v: View): View {
@@ -1180,7 +1195,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 168
+export const API = 169
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

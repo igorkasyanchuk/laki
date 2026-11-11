@@ -2570,6 +2570,7 @@ laki ask @backend "which endpoint lists teams?"         # typed in when its turn
 laki wait fix-the-login dark --timeout 20m              # until neither's agent works: a line each; exit 0 idle, 2 one asks, 3 timed out
 laki --version                                          # this CLI's version, and the daemon's when it runs
 laki doctor                                             # git, gh, the agents, hooks: ✓ ● ✗ and a fix each; exit 1 on a ✗
+laki doctor --bundle | pbcopy                           # diagnostics for a bug report (redacted): Help › Copy diagnostics too
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
 laki alert "Ship it?" --choice Ship --choice Wait       # an important card on your screen; prints your pick

@@ -5,7 +5,7 @@
 import { type CSSProperties, Fragment, isValidElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { Glyph } from './Glyph'
-import { REPO } from './panels'
+import { CopyDiagnostics, REPO } from './panels'
 import { Icon, IconButton, usePageMark, useToTop } from './ui'
 import { type KeyId, type KeyMap, keyShow } from '../../shared/keys'
 
@@ -336,6 +336,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
       <div className="settings-head">
         <b>Help</b>
         <span className="grow" />
+        <CopyDiagnostics className="ghost sm" />
         <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
       </div>
       <div className="settings-body">

@@ -13,7 +13,7 @@ import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type Labe
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { notInstalled, tabAgent } from '../../shared/install'
-import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
+import { type Artifact, CopyDiagnostics, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
 import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
@@ -2015,6 +2015,9 @@ export function App() {
   // it, an edit, half a folder): a bar with Update, read as it connects and on the window's focus (a minute apart);
   // not one another Laki set up (foreign: Update there would point it here). Not now: until the app starts again
   const [oldSkills, setOldSkills] = useState<SkillInfo[]>([])
+  const [troubleSeen, setTroubleSeen] = useState(0) // R6: the trouble bar's ×: until another error
+  // the daemon restarted, terminals kept (shutdown keep): the stale bar's and the trouble bar's; the app's own way when it isn't asked as you
+  const restartDaemon = () => api.call('shutdown', { keep: true }).catch((e: Error) => (bridge?.restartDaemon && /who's calling/.test(e.message) ? bridge.restartDaemon().then(ok => ok || Promise.reject(e)) : Promise.reject(e)))
   const skillsAt = useRef(0)
   const skillsLater = useRef(false)
   const stale = (rows: SkillInfo[]) => setOldSkills(skillsLater.current ? [] : rows.filter(r => r.state === 'outdated' && !r.foreign))
@@ -3651,7 +3654,18 @@ export function App() {
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
-        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown', { keep: true }).catch((e: Error) => (bridge?.restartDaemon && /who's calling/.test(e.message) ? bridge.restartDaemon().then(ok => ok || Promise.reject(e)) : Promise.reject(e)))} />}
+        {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
+        {connected && view.trouble && view.trouble.n > troubleSeen && (
+          <div className="stale-bar soft" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>Something went wrong inside Laki's daemon</b> ({view.trouble.n === 1 ? 'an error' : `${view.trouble.n} errors`} since it started; the last: {view.trouble.last}). It goes on running; a restart keeps your terminals.
+            </span>
+            <CopyDiagnostics />
+            <button onClick={() => void restartDaemon().catch(fail)}>Restart the daemon</button>
+            <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.n)} />
+          </div>
+        )}
         {connected && view.diskFull && (
           <div className="stale-bar" role="alert">
             <Icon name="alertCircle" size={16} />

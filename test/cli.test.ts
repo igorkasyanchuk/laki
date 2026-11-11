@@ -1,7 +1,7 @@
 // The laki CLI against a daemon in a temp home.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -446,6 +446,31 @@ test('A5: laki wait: idle when the turn ends, waiting when it asks, 3 on timeout
   assert.equal(r.code, 2, r.err)
   assert.match(r.out, /waiting: Bash: npm test/)
   assert.match((await rig.cli('wait', ws.id, '--timeout', 'soon')).err, /a length like 90s/)
+})
+
+// R6: laki doctor --bundle: versions, the doctor, counts and the logs' ends, with no home path, token, key, env value,
+// remote password or prompt; --out a 0600 file
+test('R6: laki doctor --bundle', async t => {
+  const rig = await fresh(t)
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+  await rig.cli('project', 'add', rig.repo)
+  const secrets = ['sk-ant-api03-abcdefghijklmnopqrstuvwxyz', 'ghp_abcdefghijklmnopqrstuvwxyz0123', 'hunter2pass', 'e'.repeat(64), 'my-env-value', 'the secret plan']
+  appendFileSync(join(rig.data, 'daemon.log'), `${new Date().toISOString()} opened ${rig.home}/code/app with ${secrets[0]} and ${secrets[1]}\n${new Date().toISOString()} clone https://me:${secrets[2]}@github.com/x/y.git token ${secrets[3]}\n${new Date().toISOString()} env MY_VAR=${secrets[4]} {"prompt":"${secrets[5]}"}\n`)
+  writeFileSync(join(rig.data, 'app.log'), `${new Date().toISOString()} uncaught: Error at ${rig.home}/x.js\n`)
+  const r = await rig.cli('doctor', '--bundle')
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, new RegExp(`^Laki ${pkg.replace(/\./g, '\\.')}.*, API \\d+$`, 'm'))
+  assert.match(r.out, /node \d+\.\d+/)
+  assert.match(r.out, /^claude 2\.1\.200$/m, "each agent's version")
+  assert.match(r.out, /^1 projects, 0 workspaces/m)
+  assert.match(r.out, /^## Doctor\n✓ git$/m)
+  assert.match(r.out, /opened ~\/code\/app/, 'the home folder as ~')
+  assert.match(r.out, /at ~\/x\.js/, "app.log's too")
+  for (const x of [rig.home, realpathSync(rig.home), ...secrets]) assert.ok(!r.out.includes(x), `no ${x} in:\n${r.out}`)
+  const out = join(rig.home, 'diag.txt')
+  assert.equal((await rig.cli('doctor', '--bundle', '--out', out)).code, 0)
+  assert.equal(statSync(out).mode & 0o777, 0o600)
+  assert.match(readFileSync(out, 'utf8'), /^## daemon\.log/m)
 })
 
 // A9: laki --version needs no daemon; with one, its version and API; laki doctor's lines, exit 1 on a ✗

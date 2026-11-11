@@ -1,11 +1,11 @@
 // laki: the command line for the daemon. `laki hook <state>` is hook.ts: it never fails or blocks the agent for more
 // than a second.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
-import { AGENTS, API, type AgentUsage, type Doctor, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
@@ -25,8 +25,8 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
-const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
+const VALUED = new Set(['out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const BOOL = new Set(['bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -565,21 +565,18 @@ async function main() {
       return
     }
     case 'doctor': {
+      // R6: --bundle: the diagnostics to paste in a bug report (versions, the doctor, counts, Labs, the logs' ends;
+      // redacted by the daemon), printed or --out a file (0600)
+      if (flags.bundle) {
+        const text: string = await rpc('diagnostics', {}, 60000)
+        if (typeof flags.out === 'string' && flags.out) return (writeFileSync(flags.out, text, { mode: 0o600 }), console.log(`diagnostics in ${flags.out}: read it before you paste it anywhere`))
+        return void process.stdout.write(text)
+      }
       // A9: the daemon's doctor as lines: ✓ fine, ● optional or worth a look, ✗ broken (exit 1), a fix for each not fine
       const d: Doctor = await rpc('doctor', {}, 30000)
       if (json) return out(d)
-      const rows: [string, string, string?][] = [
-        d.git ? ['✓', 'git'] : ['✗', 'git not found', 'xcode-select --install (or your package manager)'],
-        d.gh === 'in' ? ['✓', 'gh signed in'] : d.gh === 'out' ? ['●', 'gh not signed in: no PRs, checks or issues', 'gh auth login'] : ['●', 'gh not found: no PRs, checks or issues', 'brew install gh'],
-        ...(d.gh === 'in' && d.ghCodespace === false ? [['●', 'gh has no codespace scope: no cloud workspaces', 'gh auth refresh -s codespace'] as [string, string, string]] : []),
-        d.cloudflared ? ['✓', 'cloudflared'] : ['●', 'cloudflared not found: no remote access or Expose to the world over Cloudflare', 'brew install cloudflared'],
-        ...(process.platform === 'darwin' ? [d.idb ? (['✓', 'idb'] as [string, string]) : (['●', "idb not found: laki screen can't tap the simulator", 'brew install idb-companion && pipx install fb-idb'] as [string, string, string])] : []),
-        ...d.agents.map((a): [string, string, string?] => (!a.found ? ['●', `${a.id} not found`, `install ${a.id}, then laki doctor again`] : a.signedIn === false ? ['●', `${a.id} found, not signed in`, `run ${a.id} in a terminal and sign in`] : ['✓', `${a.id}${a.signedIn ? ' signed in' : ''}`])),
-        ...(d.agents.some(a => a.found) ? [] : [['✗', 'no agent found', 'install claude or codex'] as [string, string, string]]),
-        ...(d.hooks ? [d.hooks.ok ? (['✓', "Laki's hooks reach the daemon"] as [string, string]) : (['✗', `Laki's hooks don't reach the daemon: ${d.hooks.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
-        ...(d.hookFiles ? [d.hookFiles.ok ? (['✓', "agents' hook files"] as [string, string]) : (['✗', `agents' hook files: ${d.hookFiles.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
-      ]
-      console.log(rows.map(([m, what, fix]) => `${m} ${what}${fix ? `\n    fix: ${fix}` : ''}`).join('\n'))
+      const rows = doctorRows(d)
+      console.log(doctorText(rows))
       if (rows.some(r => r[0] === '✗')) process.exitCode = 1
       return
     }

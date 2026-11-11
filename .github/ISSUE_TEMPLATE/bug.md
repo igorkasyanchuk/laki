@@ -12,4 +12,11 @@ labels: bug
 
 **Agent** (claude, codex, …) and its version, if it's about an agent:
 
-Logs help: `~/.laki/daemon.log` (its last lines). Security problems: not here, see SECURITY.md.
+**Diagnostics** (Help › *Copy diagnostics*, or `laki doctor --bundle | pbcopy`), pasted here. They hold the versions,
+Laki's checks and the logs' last lines, with your home folder, tokens, keys and prompts masked: read them first.
+
+```
+paste here
+```
+
+Security problems: not here, see SECURITY.md.

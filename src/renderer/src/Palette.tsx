@@ -4,7 +4,7 @@ import { type IconName, type MenuItem, Icon, ON, ProjectMark, act } from './ui'
 import { type ReactNode, useState, useMemo, useRef, useEffect } from 'react'
 import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
 import { Glyph, rollup } from './Glyph'
-import { Modal } from './panels'
+import { copyDiagnostics, Modal } from './panels'
 import { type Action, wsName } from './appCtx'
 import { aiOn, HOME_ACCOUNT, AGENT_NAMES } from '../../shared/types'
 const LAB_PAGES = [['calendar', 'Calendar', 'calendar'], ['desk', 'My Desk', 'desk'], ['notes', 'Notes', 'note'], ['todoList', 'To-dos', 'listChecks'], ['specs', 'Specs & Brainstorms', 'spec'], ['workflows', 'Workflows', 'flow']] as const
@@ -122,7 +122,7 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
 
 // ⌘K's items: for the workspace you're in first, then every workspace, tab and action
 export function paletteItems(app: AppCtx): PaletteItem[] {
-  const { accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
+  const { accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
   const items: PaletteItem[] = []
   const cmds = cmdMap(settings.cmdKeys)
   const a = (x: Action & { id?: string }) => items.push({ ...x, hint: (x.id && cmds[x.id] && keyShow(cmds[x.id])) || (x.hint ?? 'action') }) // id: a key can be given it (Settings › Keys)
@@ -205,6 +205,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ id: 'resources', label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
   a({ label: 'Help: keys and commands', icon: 'help', hint: kh('help'), run: () => setDialog('help') })
   a({ id: 'about', label: 'About Laki', icon: 'info', run: () => setDialog('about') })
+  a({ id: 'diagnostics', label: 'Copy diagnostics: versions, checks and logs for a bug report (redacted)', icon: 'copy', run: () => void copyDiagnostics().then(() => done('Diagnostics copied: paste them in a bug report'), fail) })
   a({ id: 'collapseAll', label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
   a({ id: 'expandAll', label: 'Expand all projects', icon: 'chevron', run: () => setFolded([]) })
   a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: kh('sidebar'), run: () => setSideOpen(o => !o) })

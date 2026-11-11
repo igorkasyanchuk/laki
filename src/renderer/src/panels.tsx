@@ -550,6 +550,23 @@ const openNotices = () => {
   else openExternal(NOTICES)
 }
 
+// R6: Copy diagnostics (Help, About, ⌘K's, the trouble bar): the daemon's bundle, redacted (versions, checks, the logs'
+// last lines), on the clipboard; what happened said on the button
+export function CopyDiagnostics({ className }: { className?: string }) {
+  const [said, setSaid] = useState('')
+  useEffect(() => {
+    if (!said || said === 'Copying…') return
+    const t = setTimeout(() => setSaid(''), 3000)
+    return () => clearTimeout(t)
+  }, [said])
+  return (
+    <button className={className} disabled={said === 'Copying…'} data-tip="Versions, checks and the logs' last lines, with your home folder, tokens, keys and prompts masked: paste them in a bug report" onClick={() => (setSaid('Copying…'), void copyDiagnostics().then(() => setSaid('Copied'), (e: Error) => setSaid(`Not copied: ${e.message}`)))}>
+      {said || 'Copy diagnostics'}
+    </button>
+  )
+}
+export const copyDiagnostics = () => api.call<string>('diagnostics').then(t => navigator.clipboard.writeText(t))
+
 export function About({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="About Laki" onClose={onClose}>
@@ -568,6 +585,7 @@ export function About({ onClose }: { onClose: () => void }) {
         <a className="small" href={NOTICES} onClick={e => (e.preventDefault(), openNotices())}>
           Open-source licenses
         </a>
+        <CopyDiagnostics className="ghost sm" />
       </div>
     </Modal>
   )

@@ -174,3 +174,4 @@ needs no bump: `settingsSet` keeps any field.
 166: a scheduled task's `trigger` (on an event: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`; and `marks`, `seen`: the daemon's), `keep`, `emptyGone`, `kept`, `fails`, `pausedWhy`, `pausedField`, `again`; a run's `event`, `held`, `retry`, `asked`; `eventTick`, `scheduleRelease` (T4, T5, T6).
 167: the app's pages on `app://laki` (S9): the daemon takes that Origin instead of `file://`.
 168: remote access's answer level (D7): `remoteDeviceSet`, a device's `level`, a remote page's view `remote.level`, `settings.remoteLevel`.
+169: `diagnostics` (R6: `laki doctor --bundle`, Copy diagnostics) and the view's `trouble` (the daemon's uncaught errors).

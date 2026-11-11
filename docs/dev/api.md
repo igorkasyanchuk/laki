@@ -423,7 +423,14 @@ one or two `rpc` calls (`shared/tools.ts` `tools(rpc)`: Laki AI passes the daemo
 usage.ts `FLAGS`, each command's options read off its USAGE lines (`EXTRA` in main.ts for a few it doesn't list), and
 `TEXT_AFTER`, where a free-text command's words start; `laki version` (A9: shared/version.ts' `VERSION`, the build's
 `__VERSION__` or package.json beside the source; `ping { caps: true }`'s `version` for the daemon's) and `laki doctor`
-(`doctor`'s fields as ✓ ● ✗ lines with a fix each). Its `state` (also `laki ls --json`, which the skill has agents
+(`doctor`'s fields as ✓ ● ✗ lines with a fix each: `types.ts` `doctorRows`, `doctorText`). R6: `laki doctor --bundle [--out f]`
+(`diagnostics`, core.ts; FROM, refused for an agent's caller (`notAgent`), REMOTE_NO and ANSWER_NO): the version, build,
+API, OS, node and Electron, `doctorText`, each agent's `--version`, counts, the Labs on, `tailOf` daemon.log and app.log's
+last 200 lines, all through `diagRedact` (the home folder as ~, share.ts' `redact`, 48+ hex characters, `NAME=value`,
+what's before a URL's @, JSON's prompt/text/message…, `--prompt`, an alert's words). Help's head, About and ⌘K's *Copy
+diagnostics* (panels.tsx `CopyDiagnostics`) copy it. The daemon's uncaughtException and unhandledRejection (main.ts)
+count in `troubled`: the view's `trouble { n, last, at }`, the app's bar (Copy diagnostics, Restart the daemon: `shutdown
+{ keep: true }`, ×: until the next one). Its `state` (also `laki ls --json`, which the skill has agents
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
 tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, for every local client, its Origin or not (`/rpc`'s
 `req.socket`, a WebSocket's `local`; not remote access's page, whose Origin takes only its own token: `tokenOk`) and the
