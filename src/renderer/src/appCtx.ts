@@ -392,7 +392,7 @@ export type AppBase = {
   wsActions: Action[]
   wsAt: (d: number) => WorkspaceView | undefined
   wsHere: string | null
-  wsMore: () => MenuItem[]
+  wsMore: (extra?: MenuItem[]) => MenuItem[] // extra: after the next step's item (the tab bar's Layout)
   zoom: (d: number) => void
 }
 

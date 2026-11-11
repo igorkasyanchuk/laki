@@ -526,7 +526,7 @@ selected workspace's PR is in the status bar.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
-- **Layouts**: the tab bar's layers button (Settings › Keys can give it a key) has the splits people make most, each
+- **Layouts**: *Layout* in the tab bar's ⋯ menu (Settings › Keys can give it a key) has the splits people make most, each
   filled from the workspace's tabs: *Just the agent*, *Agent | Preview* and *Agent | Changes* (the side panel on
   that tab), *Agent | dev server* (starts the run script when there's no Run tab), *Agent / shell* (opens a shell
   when there's none) and, with two agents or more, *All agents* (side by side; three or four as 2 × 2). The other tabs
