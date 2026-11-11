@@ -1187,7 +1187,7 @@ for you or finished while you looked away (muted ones aside); so does Laki's mar
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
 small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
 and *Screenshot to Laki AI* (on by default) has its item there with its keys.
-Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Layout), a
+Settings › General › *Menu bar icon* hides the mark. Its *Show state* (on) shapes the mark by how things stand: its outline when nothing runs, a dot under it while an agent works, filled when one needs you, a bar under it (and ! beside the count) when one is blocked by a plan limit or an error; hover it for the same in words. With *Turn timers* on (Settings › Layout), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes
 when this turn ends*): ✎ edits one in place (⌘⏎ saves, Esc cancels), ✕ removes it (with Undo), its handle drags it

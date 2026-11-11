@@ -2,6 +2,7 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the link's key alone in the hash (#t=…, S11) on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+import type { TrayInfo } from '../../shared/tray'
 import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
 
@@ -52,7 +53,7 @@ type Bridge = {
   simFloating?(): Promise<string[]> // the devices in windows of their own
   onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
-  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean): void // the Dock's count; the menu bar's item (its Recording Mode ticked)
+  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: TrayInfo): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip)
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void

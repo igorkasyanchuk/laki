@@ -660,6 +660,7 @@ export type Settings = {
   archiveIdle?: number // days: a worktree nobody touched for so long is archived when it loses nothing, with Undo (unset, 0: off)
   archiveIdleKeepPR?: boolean // archiveIdle leaves one with an open PR alone (unset: on)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
+  trayState?: boolean // Q8: its picture shows idle, working, waiting or blocked (unset: on; off: the filled mark always)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
   floaterStyle?: 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still' // how a working agent's bubble looks (unset: gradient)
   floaterRecent?: number // the bubbles' agents used last, idle or done, after the ones at work: 0-5 (unset: 3)

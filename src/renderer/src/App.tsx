@@ -33,6 +33,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { needsTab, nextStep, type Step, type StepId } from '../../shared/nextStep'
+import { stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
 import { type TurnApi, TurnStrip } from './TurnStrip'
@@ -900,8 +901,11 @@ export function App() {
     const asks = t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') || 'waiting for you' : 'finished'
     return { tab: t.id, label: `${w ? wsName(w) : t.workspace} · ${t.name}: ${asks.replace(/\s+/g, ' ').slice(0, 60)}` }
   })
-  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording])
-  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording), [trayKey])
+  // Q8: what the menu bar's icon shows (Settings › General › Menu bar's Show state, on unless off): idle, working,
+  // waiting, blocked (the view as drawn: Recording mode's private workspaces out of it, as out of the count)
+  const trayInfo = view && view.settings.trayState !== false ? stateOf(view) : undefined
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked]])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo), [trayKey])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])

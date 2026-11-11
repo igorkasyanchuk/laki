@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
+import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
 import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
@@ -1106,15 +1107,20 @@ function trayMenu() {
   )
 }
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
-ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false) => {
+// st (Q8, Settings › General › Menu bar's Show state): the state its picture shows (stateOf's), its title's ! and its
+// tooltip's words; none (off, or an older page): the filled mark and the count, as before
+ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false, st?: Partial<TrayInfo>) => {
   if (!from(e)) return
   recording = rec === true
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
   if (!on) return void (tray?.destroy(), (tray = null))
-  tray ??= new Tray(trayIcon())
-  tray.setTitle(count, { fontType: 'monospacedDigit' })
-  tray.setToolTip(count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
+  const num = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : 0)
+  const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked) } : undefined
+  tray ??= new Tray(trayIcon(info?.state))
+  tray.setImage(trayIcon(info?.state)) // a state change swaps the picture (the same one: its cached image, nothing redrawn)
+  tray.setTitle(info ? trayTitle(info) : count, { fontType: 'monospacedDigit' })
+  tray.setToolTip(info ? trayTip(info, app.name) : count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
   trayTabs = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
   trayMenu()
 })
@@ -1895,24 +1901,17 @@ ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
 })
 ipcMain.on('annotate-cancel', e => annot && e.sender === annot.webContents && annot.destroy())
 
-// the menu bar's icon: Laki's mark (a chevron and a dot) drawn as a 32×32 template image (@2x): macOS colors it for a
-// light or dark menu bar from its alpha alone
-function trayIcon() {
-  const S = 32
-  const px = Buffer.alloc(S * S * 4) // BGRA, black
-  const seg = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
-    const [dx, dy] = [bx - ax, by - ay]
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
-    return Math.hypot(x - ax - t * dx, y - ay - t * dy)
+// the menu bar's icon: Laki's mark (a chevron and a dot) as a 32×32 template image (@2x), one per state (Q8: shared/
+// tray.ts' trayBitmap: idle, working, waiting, blocked), made once each: macOS colors it for a light or dark menu bar
+// and the highlight from its alpha alone
+const trayIcons = new Map<TrayState, Electron.NativeImage>()
+function trayIcon(state: TrayState = 'waiting') {
+  let img = trayIcons.get(state)
+  if (!img) {
+    img = nativeImage.createFromBitmap(trayBitmap(state), { width: TRAY_PX, height: TRAY_PX, scaleFactor: 2 })
+    img.setTemplateImage(true)
+    trayIcons.set(state, img)
   }
-  for (let y = 0; y < S; y++)
-    for (let x = 0; x < S; x++) {
-      const [cx, cy] = [x + 0.5, y + 0.5]
-      const d = Math.min(Math.min(seg(cx, cy, 6, 23, 15, 12), seg(cx, cy, 15, 12, 24, 23)) - 2.6, Math.hypot(cx - 25, cy - 7) - 3)
-      px[(y * S + x) * 4 + 3] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - d))) // antialiased edges
-    }
-  const img = nativeImage.createFromBitmap(px, { width: S, height: S, scaleFactor: 2 })
-  img.setTemplateImage(true)
   return img
 }
 // the preview pane's screenshot: a webview of this window's, as a PNG in base64

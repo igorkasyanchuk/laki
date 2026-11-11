@@ -196,7 +196,12 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
       base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); its More starts closed.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
-    `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
+    `Tray`, `trayIcon` drawn in code as a template image (Q8: one per state, `shared/tray.ts` `trayBitmap`: idle the mark's
+    outline, working the outline and a dot, waiting filled, blocked filled with a bar; App's `stateOf(view)` with the
+    badge, `settings.trayState` (*Show state*, on unless off): blocked (a plan limit not yet reset, a turn ended on an
+    error) over waiting (`needsTab`) over working (an agent tab running), muted and archived aside; its title the count
+    and ! when blocked, its tooltip in words (`trayTip`); a change swaps the cached image, nothing animates; off: the
+    filled mark always; `test/tray.test.ts` draws the four to PNGs); the count as its title, a menu of those tabs, waiting first
     with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`), the screenshots and *Open Laki* (the global hotkey as its `accelerator`, `registerAccelerator: false`; the `hotkey` IPC builds the menu again); `settings.menuBar === false` destroys it: Settings › General › *Menu bar icon*). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
