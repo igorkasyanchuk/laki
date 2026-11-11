@@ -383,7 +383,7 @@ export function aiState(p: { chat?: string } = {}) {
 
 // ---------- asking
 
-type Run = { text: string; model: string; calls: number; in: number; out: number; cost?: number }
+type Run = { text: string; model: string; calls: number; in: number; out: number; cached?: number; cost?: number }
 // r: what the ask spent so far, kept when it fails too
 type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run }
 
@@ -435,7 +435,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     say(t, 'error', msg)
     throw new Error(msg)
   } finally {
-    Object.assign(call, { model: r.model, in: r.in, out: r.out, cost: r.cost, tools: r.calls, ms: Date.now() - t0 })
+    Object.assign(call, { model: r.model, in: r.in, out: r.out, ...(r.cached && { cachedIn: r.cached }), cost: r.cost, tools: r.calls, ms: Date.now() - t0 })
     busy.delete(t.id)
     for (const p of perms.values()) if (p.chat === t.id) p.done(-1) // its agent is gone: nothing waits on them
     try {
@@ -490,14 +490,25 @@ const history = (t: Thread) =>
     .slice(-20)
     .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text || '(an image)' }))
 
+// A3: Anthropic's models on OpenRouter cache a prompt only up to a cache_control breakpoint (others cache on their own):
+// one after the tools (tools come first in its prefix: cached even when the system prompt changes) and one after the
+// system prompt, so each round and the next ask read them back at a tenth of the price. ponytail: none on the history,
+// which grows each round (a moving breakpoint on the last message would save the tool rounds' too)
+const EPHEMERAL = { type: 'ephemeral' }
+export const cachesByMark = (model: string) => model.startsWith('anthropic/')
+// the cached tokens of a reply's usage (OpenRouter's prompt_tokens_details)
+const cachedOf = (u: any) => Number(u?.prompt_tokens_details?.cached_tokens) || 0
+
 async function openrouter(o: Opts) {
   const key = readKey()
   const s = state.settings?.ai ?? {}
   const model = s.models?.openrouter || AI_MODEL
+  const mark = cachesByMark(model)
   const list = toolsFor(o.rpc, o.t.id)
-  const fns = list.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema } }))
+  const fns = list.map((t, i) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema }, ...(mark && i === list.length - 1 && { cache_control: EPHEMERAL }) }))
   const pics = o.images.map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))
-  const messages: object[] = [{ role: 'system', content: system(o.t) }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
+  const sys = system(o.t)
+  const messages: object[] = [{ role: 'system', content: mark ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
   r.cost = 0
   for (let i = 0; ; i++) {
@@ -512,6 +523,7 @@ async function openrouter(o: Opts) {
     r.model = j.model || model
     r.in += j.usage?.prompt_tokens ?? 0
     r.out += j.usage?.completion_tokens ?? 0
+    r.cached = (r.cached ?? 0) + cachedOf(j.usage)
     r.cost! += j.usage?.cost ?? 0
     const m = j.choices?.[0]?.message
     if (!m) throw new Error('OpenRouter: no answer')
@@ -551,7 +563,7 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
     })
     const j: any = await res.json().catch(() => ({}))
     if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
-    Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, cost: j.usage?.cost })
+    Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, ...(cachedOf(j.usage) && { cachedIn: cachedOf(j.usage) }), cost: j.usage?.cost })
     const text = j.choices?.[0]?.message?.content
     if (typeof text !== 'string') throw new Error('OpenRouter: no answer')
     call.ok = true

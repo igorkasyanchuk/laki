@@ -365,7 +365,7 @@ export function AiPage({
                       <span className="ai-ask">{c.ask || '(an image)'}</span>
                       {cost && <span className="mono">{c.backend === 'codex' ? 'plan' : money(c.cost)}</span>}
                       <span className="ai-meta">
-                        {BACKENDS[c.backend]} · <span className="mono">{c.model}</span> · {tokens(c.in)} → {tokens(c.out)} tokens · {(c.ms / 1000).toFixed(1)}s
+                        {BACKENDS[c.backend]} · <span className="mono">{c.model}</span> · {tokens(c.in)}{c.cachedIn ? ` (${tokens(c.cachedIn)} cached)` : ''} → {tokens(c.out)} tokens · {(c.ms / 1000).toFixed(1)}s
                         · {ago(c.at)}
                       </span>
                     </div>

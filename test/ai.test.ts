@@ -363,8 +363,8 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'do the thing' }), { text: '' })
   const names = or.hits[0].body.tools.map((x: any) => x.function.name)
   for (const n of ['laki_ask', 'laki_remove', 'laki_prs', 'laki_project', 'laki_memory_write', 'laki_notes_write', 'laki_run_action', 'laki_templates', 'laki_shell', 'laki_run']) assert.ok(names.includes(n), n)
-  assert.match(or.hits[0].body.messages[0].content, /laki_ask/, "the skill's words in its instructions")
-  assert.match(or.hits[0].body.messages[0].content, /own instructions for you[^\n]*\nOur staging is on fly\.io\.$/, 'Your instructions, last')
+  assert.match(or.hits[0].body.messages[0].content[0].text, /laki_ask/, "the skill's words in its instructions")
+  assert.match(or.hits[0].body.messages[0].content[0].text, /own instructions for you[^\n]*\nOur staging is on fly\.io\.$/, 'Your instructions, last')
   assert.equal(or.hits.length, 1, 'no round after the question')
   let a = await rig.rpc('aiState')
   const q = a.chat.at(-1)
@@ -737,4 +737,34 @@ test("S2: Laki AI asked by an agent acts as that agent: another workspace's tab 
   assert.doesNotMatch(JSON.stringify(its), /say hi/)
   assert.deepEqual(its.calls, [])
   await assert.rejects(rig.rpc('aiChats', { from: { ws: one.id, tab } }), /an agent can't open, delete or change the user's Laki AI chats/)
+})
+
+test("A3: an Anthropic model's request marks the tools and the system prompt for its cache, another's doesn't; the cached tokens reach the call log", async t => {
+  const usage = { prompt_tokens: 9000, completion_tokens: 10, cost: 0.003, prompt_tokens_details: { cached_tokens: 8000 } }
+  const or = await openrouter(t, [
+    reply({ content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'laki_state', arguments: '{}' } }] }, usage),
+    reply({ content: 'Done.' }, usage),
+    { ...reply({ content: 'Plain.' }), model: 'openai/gpt-5.6-sol' },
+  ])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'how is it going?' }), { text: 'Done.' })
+  for (const h of or.hits.slice(0, 2)) {
+    const b = h.body
+    assert.deepEqual(b.messages[0].content.map((p: any) => [p.type, p.cache_control]), [['text', { type: 'ephemeral' }]], 'the system prompt: one part, its breakpoint')
+    assert.deepEqual(b.tools.at(-1).cache_control, { type: 'ephemeral' }, 'the last tool: its breakpoint')
+    assert.equal(b.tools.filter((x: any) => x.cache_control).length, 1)
+    assert.equal(JSON.stringify(b.messages.slice(1)).includes('cache_control'), false, 'none on the history')
+  }
+  let calls = (await rig.rpc('aiState')).calls
+  assert.equal(calls.at(-1).cachedIn, 16000, 'both rounds')
+  assert.equal(calls.at(-1).in, 18000)
+
+  await rig.rpc('settingsSet', { ai: { on: true, models: { openrouter: 'openai/gpt-5.6-sol' } } })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'and now?' }), { text: 'Plain.' })
+  const b = or.hits[2].body
+  assert.equal(typeof b.messages[0].content, 'string', 'caches on its own: the system prompt as it was')
+  assert.equal(JSON.stringify(b).includes('cache_control'), false)
+  calls = (await rig.rpc('aiState')).calls
+  assert.equal('cachedIn' in calls.find((c: any) => c.ask === 'and now?'), false, 'nothing cached: no count')
 })

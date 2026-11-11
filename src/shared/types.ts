@@ -824,7 +824,7 @@ export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'p
 export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
-export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
+export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string } // cachedIn: of in, the tokens read from the provider's prompt cache (A3)
 export type AiTotals = { today: AiSum; month: AiSum }
 export type AiSum = { calls: number; in: number; out: number; cost: number }
 // today's and this month's calls, on this Mac's clock

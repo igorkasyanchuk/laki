@@ -25,7 +25,10 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   earlier asks and answers (`history`, 20) go with each ask, not the tools' results. A pasted image (only from
   `<data>/images`, `imageOk`: nothing else of the Mac goes to a model) as a data URL. The key: `<data>/ai-key`, 0600
   (`aiKey`), never in state.json, the view or `aiState` (only whether there is one). Model: `models.openrouter`, else
-  `AI_MODEL`;
+  `AI_MODEL`. Prompt caching (A3): an `anthropic/*` model (`cachesByMark`) caches only up to a `cache_control`
+  breakpoint, so its last tool definition and its system prompt (sent as one text part) each carry
+  `{ type: 'ephemeral' }`: the tools and instructions are read back from the cache each round and on the next ask
+  within 5 minutes. Other models cache on their own: their request is unchanged. The history has no breakpoint;
 - `claude`: `claude -p --output-format stream-json --verbose --mcp-config <laki mcp, LAKI_HOME> --strict-mcp-config
   --tools Read --allowedTools mcp__laki --permission-prompt-tool mcp__laki__laki_permission --append-system-prompt …`
   (a Read outside its folder: `laki mcp`'s `laki_permission`, `LAKI_AI_PERM` only (claude's), waits on `aiPermission`: a chat message
@@ -57,7 +60,7 @@ Both run in `<data>/ai` with `MCP_TOOL_TIMEOUT` 5 minutes (a `wsNew` takes a whi
 `ai.preset` (Settings › AI's *Your agent presets*: a claude or codex preset), that preset's env over it (an account of
 its own; its args are a tab's, not used); `resume` is kept per `sessionKey` (the agent and the preset). Each tool call is a `tool`
 message, shown in the conversation. `<data>/ai-chat.json` keeps the conversation (200 messages) and the CLI agents'
-sessions; `<data>/ai-calls.jsonl` a line per ask (`AiCall`: tokens, cost, tools, ms, ok, error; a failed ask keeps what
+sessions; `<data>/ai-calls.jsonl` a line per ask (`AiCall`: tokens, `cachedIn` (of them, read from the prompt cache: usage's `prompt_tokens_details.cached_tokens`, the Calls tab's and `laki ai log`'s *cached*), cost, tools, ms, ok, error; a failed ask keeps what
 it spent; a CLI agent's failure is its own words, not its exit code; shutdown stops an ask, else its `laki mcp`
 would start a daemon again), `aiTotals` (shared/types.ts) today's and this month's. Links: `SYSTEM` has it link each
 workspace or tab it names (`laki://ws/<id>?tab=<tab>`), and the page links the bold names it didn't (`links.ts`

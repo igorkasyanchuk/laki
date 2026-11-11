@@ -937,7 +937,7 @@ async function main() {
         const a: { chat: AiMsg[]; calls: AiCall[]; totals: AiTotals } = await rpc('aiState')
         if (!rest.length) return out(a.chat, a.chat.map(m => `${{ user: '>', ai: '', tool: '  ·', error: '  ✗' }[m.role]} ${m.text}`.trim()).join('\n') || 'no conversation yet: laki ai <ask>')
         const t = (k: 'today' | 'month') => `${k}: ${a.totals[k].calls} calls, ${a.totals[k].in} in / ${a.totals[k].out} out, ${money(a.totals[k].cost)}`
-        return out(a, [t('today'), t('month'), ...a.calls.map(c => `${new Date(c.at).toLocaleString()}  ${c.ok ? '✓' : '✗'}  ${c.backend} ${c.model}  ${c.in}/${c.out}  ${money(c.cost)}  ${(c.ms / 1000).toFixed(1)}s  ${c.ask}`)].join('\n'))
+        return out(a, [t('today'), t('month'), ...a.calls.map(c => `${new Date(c.at).toLocaleString()}  ${c.ok ? '✓' : '✗'}  ${c.backend} ${c.model}  ${c.in}/${c.out}${c.cachedIn ? ` (${c.cachedIn} cached)` : ''}  ${money(c.cost)}  ${(c.ms / 1000).toFixed(1)}s  ${c.ask}`)].join('\n'))
       }
       // an image goes through the daemon's images folder: the only one the AI may send to a model
       const img = typeof flags.image === 'string' ? [await rpc('imageSave', { data: readFileSync(flags.image).toString('base64'), ext: extname(flags.image).slice(1).toLowerCase() })] : []

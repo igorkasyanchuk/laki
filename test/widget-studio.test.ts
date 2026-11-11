@@ -35,7 +35,7 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   assert.equal(id, 'open-prs-list')
   answers.push(reply({ content: '', tool_calls: [call('c1', 'laki_extension_write', { id, files: files('Open PRs') })] }), reply({ content: '', tool_calls: [call('c2', 'laki_extension_check', { id })] }), reply({ content: 'Made it: its fetch runs gh pr list.' }))
   assert.deepEqual(await rig.rpc('aiAsk', { chat: `widget:${id}`, text: 'Show my open PRs as a list with CI status' }), { text: 'Made it: its fetch runs gh pr list.' })
-  const sys = hits[0].messages[0].content
+  const sys = hits[0].messages[0].content[0].text
   assert.match(sys, /page of a new Laki extension: its id is open-prs-list/)
   assert.match(sys, /Always write fixtures\/sample\.json/)
   assert.match(sys, /`list` \(/, 'the kit catalog')
@@ -51,8 +51,8 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   // the next ask sees its files; a second write, then Undo back to the first, then to none
   answers.push(reply({ content: '', tool_calls: [call('c3', 'laki_extension_write', { id, files: { 'widget.json': manifest('PRs v2') } })] }), reply({ content: 'Renamed.' }))
   await rig.rpc('aiAsk', { chat: `widget:${id}`, text: 'Call it PRs v2' })
-  assert.match(hits[3].messages[0].content, /<file name="widget\.json">[\s\S]*Open PRs/)
-  assert.match(hits[3].messages[0].content, /Its last check/)
+  assert.match(hits[3].messages[0].content[0].text, /<file name="widget\.json">[\s\S]*Open PRs/)
+  assert.match(hits[3].messages[0].content[0].text, /Its last check/)
   w = await view(id)
   assert.equal(w.name, 'PRs v2')
   assert.equal(w.history.length, 2)
