@@ -543,6 +543,7 @@ declare const __BUILT__: string // electron.vite.config.ts' define
 // the build's THIRD_PARTY_NOTICES.txt (electron.vite.config.ts' notices), beside the app's page: opened in TextEdit;
 // from the dev server or a browser elsewhere, the summary on GitHub
 const NOTICES = `${REPO}/blob/main/THIRD_PARTY_LICENSES.md`
+const TRUST = `${REPO}/blob/main/docs/trust.md` // M3: what stays, every host, verify the build
 const openNotices = () => {
   const path = fileOf(new URL('THIRD_PARTY_NOTICES.txt', location.href).href)
   if (path && bridge?.openPath) void bridge.openPath(path).then(r => r === 'missing' && openExternal(NOTICES))
@@ -560,6 +561,9 @@ export function About({ onClose }: { onClose: () => void }) {
         <p>Coding agents side by side, each task in its own git worktree.</p>
         <a href={SITE} onClick={e => (e.preventDefault(), openExternal(SITE))}>
           {SITE.replace('https://', '')}
+        </a>
+        <a className="small" href={TRUST} onClick={e => (e.preventDefault(), openExternal(TRUST))}>
+          No account, no telemetry: what Laki sends
         </a>
         <a className="small" href={NOTICES} onClick={e => (e.preventDefault(), openNotices())}>
           Open-source licenses

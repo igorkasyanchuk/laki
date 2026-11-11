@@ -144,7 +144,8 @@ project's test script is, which the agent can edit.
 
 ## No telemetry
 
-Laki sends no analytics and no crash reports. With nothing set up, it calls:
+Laki sends no analytics and no crash reports. [docs/trust.md](docs/trust.md) lists every host it connects to, what
+stays on your Mac and how to verify the build. With nothing set up, it calls:
 
 - Nothing for plan limits: they come from what Claude Code (its status line) and Codex (its session files) report
   themselves. Anthropic (`api.anthropic.com`), OpenAI (`chatgpt.com`) and Google are asked, with the agent's own sign-in,

@@ -69,7 +69,8 @@ laki ship fix-the-login -m "Fix the login redirect"
 | [Install & build](docs/install.md) | The dmg, Homebrew, building it yourself, Linux and Windows (WSL 2), troubleshooting |
 | [Extensions](docs/extensions.md) | The SDK: widgets for the sidebar, bars and My Desk, the UI kit, events, tools for agents |
 | [Headless](docs/headless.md) | Laki on a server with no screen, in your browser |
-| [Security](SECURITY.md) | What Laki calls, what stays on your Mac, how to report a vulnerability |
+| [Trust](docs/trust.md) | No account, no telemetry: what stays on your Mac, every host Laki connects to, how to verify the build, who maintains it |
+| [Security](SECURITY.md) | The threat model, known limits, how to report a vulnerability |
 | [Release notes](docs/release-notes.md) | What changed in each version |
 | [Contributing](CONTRIBUTING.md) | Build, test, the demo world, the rules; [AGENTS.md](AGENTS.md): how the code works |
 
