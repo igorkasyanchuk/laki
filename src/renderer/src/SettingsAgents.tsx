@@ -1,6 +1,6 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceSettings } from '../../shared/types'
+import { type Account, type AccountAgent, type AccountView, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
 import { useEffect, useState } from 'react'
 import { api, bridge } from './api'
 import { Group, Says } from './SettingsKit'
@@ -52,25 +52,33 @@ function OpenRouterKey({ has, save }: { has?: boolean; save: (key: string) => Pr
 }
 
 // Settings › Voice (voice.ts): the mic and hold Fn, on this Mac (macOS dictation) or in the cloud (Laki records,
-// OpenRouter's speech-to-text writes it down). The models: OpenRouter's speech-to-text ones, the first the default;
+// OpenRouter's speech-to-text writes it down). The models: OpenRouter's speech-to-text ones, the first the default, each
+// with its price as of PRICED (Q11: OpenRouter's now when its list loads, voiceModels; its other models under them);
 // Another model… takes any id
-const VOICE_MODELS: [string, string][] = [
-  [VOICE_MODEL, 'MAI-Transcribe 2 · Microsoft: 60 languages, mixed in one sentence too'],
-  ['openai/whisper-large-v3-turbo', 'Whisper Large v3 Turbo · about 100 languages, fast and cheap'],
-  ['nvidia/parakeet-tdt-0.6b-v3', 'Parakeet TDT v3 · NVIDIA: 25 European languages'],
-  ['openai/gpt-4o-transcribe', 'GPT-4o Transcribe · OpenAI'],
-  ['openai/gpt-4o-mini-transcribe', 'GPT-4o mini Transcribe · OpenAI'],
-  ['elevenlabs/scribe-v2', 'Scribe v2 · ElevenLabs'],
-  ['deepgram/nova-3', 'Nova-3 · Deepgram'],
-  ['google/gemini-3.5-transcribe', 'Gemini 3.5 Transcribe · Google'],
-  ['mistralai/voxtral-mini-transcribe', 'Voxtral Mini Transcribe · Mistral'],
+const PRICED = '11 Nov 2026'
+const VOICE_MODELS: [string, string, string][] = [
+  [VOICE_MODEL, 'MAI-Transcribe 2 · Microsoft: 60 languages, mixed in one sentence too', '$0.10/h'],
+  ['openai/whisper-large-v3-turbo', 'Whisper Large v3 Turbo · about 100 languages, fast and cheap', '$0.012/h'],
+  ['nvidia/parakeet-tdt-0.6b-v3', 'Parakeet TDT v3 · NVIDIA: 25 European languages', '$0.06/h'],
+  ['openai/gpt-4o-transcribe', 'GPT-4o Transcribe · OpenAI', '$2.50 / $10 per M tokens'],
+  ['openai/gpt-4o-mini-transcribe', 'GPT-4o mini Transcribe · OpenAI', '$1.25 / $5 per M tokens'],
+  ['elevenlabs/scribe-v2', 'Scribe v2 · ElevenLabs', '$0.22/h'],
+  ['deepgram/nova-3', 'Nova-3 · Deepgram', '$0.26/h'],
+  ['google/gemini-3.5-transcribe', 'Gemini 3.5 Transcribe · Google', '$2 / $12 per M tokens'],
+  ['mistralai/voxtral-mini-transcribe', 'Voxtral Mini Transcribe · Mistral', '$0.18/h'],
 ]
 export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
   const [has, setHas] = useState<boolean>()
   useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])
   const cloud = v.engine === 'cloud' && v.on !== false // turned off before it was on by default: this Mac's until Cloud is picked again
   const model = v.model || VOICE_MODEL
+  const [live, setLive] = useState<{ at: number; models: VoiceModel[] } | { error: string } | null>(null) // OpenRouter's list now
+  useEffect(() => void (cloud && !live && api.call<{ at: number; models: VoiceModel[] }>('voiceModels').then(setLive, (e: Error) => setLive({ error: e.message }))), [cloud])
+  const now = live && 'models' in live ? live.models : undefined
+  const priceOf = (id: string, was: string) => (now ? now.find(m => m.id === id)?.price : was)
+  const more = now?.filter(m => !VOICE_MODELS.some(x => x[0] === m.id)) ?? []
   const [other, setOther] = useState(!VOICE_MODELS.some(m => m[0] === model)) // Another model…: a typed id
+  const isMore = other && more.some(m => m.id === model)
   return (
     <>
       <h2>Voice</h2>
@@ -100,19 +108,36 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
             <label>
               Model
               <select
-                value={other ? '' : model}
-                onChange={e => (e.target.value ? (setOther(false), onChange({ ...v, model: e.target.value === VOICE_MODEL ? undefined : e.target.value })) : setOther(true))}
+                value={isMore ? model : other ? '' : model}
+                onChange={e => (e.target.value ? (setOther(!VOICE_MODELS.some(m => m[0] === e.target.value)), onChange({ ...v, model: e.target.value === VOICE_MODEL ? undefined : e.target.value })) : (setOther(true), isMore && onChange({ ...v, model: undefined })))}
               >
-                {VOICE_MODELS.map(([id, says]) => (
+                {VOICE_MODELS.map(([id, says, was]) => (
                   <option key={id} value={id}>
                     {says}
                     {id === VOICE_MODEL ? ' (default)' : ''}
+                    {(p => (p ? ` · ${p}` : ''))(priceOf(id, was))}
                   </option>
                 ))}
+                {more.length > 0 && (
+                  <optgroup label="More on OpenRouter">
+                    {more.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} · {m.price}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
                 <option value="">Another model…</option>
               </select>
             </label>
-            {other ? (
+            <p className="muted small">
+              {now
+                ? `Prices: OpenRouter's now (${new Date((live as { at: number }).at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}); /h is an hour of audio`
+                : live
+                  ? `Prices as of ${PRICED}: OpenRouter's list didn't load (${(live as { error: string }).error}); /h is an hour of audio`
+                  : `Prices as of ${PRICED}, OpenRouter's now in a moment; /h is an hour of audio`}
+            </p>
+            {other && !isMore ? (
               <label>
                 Model id
                 <input className="mono" value={v.model ?? ''} placeholder={VOICE_MODEL} spellCheck={false} autoFocus onChange={e => onChange({ ...v, model: e.target.value.trim() || undefined })} />

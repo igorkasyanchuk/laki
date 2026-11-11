@@ -132,6 +132,42 @@ test("voice: the cloud's recording goes to OpenRouter's speech-to-text with the 
   assert.equal(or.hits.length, 12) // 3 tries at most
 })
 
+// Q11: Settings › Voice's prices: OpenRouter's speech-to-text list now, no key sent, kept an hour; odd entries left out
+test("voice: voiceModels lists OpenRouter's speech-to-text models with prices, no key, kept; offline an error", async t => {
+  const asked: { url?: string; auth?: string }[] = []
+  let down = false
+  const data = [
+    { id: 'microsoft/mai-transcribe-2', name: 'Microsoft AI: MAI-Transcribe 2', pricing: { prompt: '0.1', completion: '0' } },
+    { id: 'nvidia/parakeet-tdt-0.6b-v3', name: 'NVIDIA: Parakeet TDT 0.6B v3', pricing: { prompt: '0.0000166667', completion: '0' } },
+    { id: 'openai/gpt-4o-transcribe', pricing: { prompt: '0.0000025', completion: '0.00001' } },
+    { id: 'no price/x', pricing: {} },
+    { id: '../../etc', pricing: { prompt: '0' } },
+    { name: 'no id', pricing: { prompt: '0' } },
+  ]
+  const srv = createServer((q, r) => {
+    asked.push({ url: q.url, auth: q.headers.authorization })
+    if (down) return void r.writeHead(503).end('{}')
+    r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data }))
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const rig = await fresh(t, { env: { LAKI_AI_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-never-sent' })
+  const r = await rig.rpc('voiceModels')
+  assert.deepEqual(r.models, [
+    { id: 'microsoft/mai-transcribe-2', name: 'Microsoft AI: MAI-Transcribe 2', price: '$0.10/h' },
+    { id: 'nvidia/parakeet-tdt-0.6b-v3', name: 'NVIDIA: Parakeet TDT 0.6B v3', price: '$0.06/h' },
+    { id: 'openai/gpt-4o-transcribe', name: 'openai/gpt-4o-transcribe', price: '$2.50 / $10 per M tokens' },
+  ])
+  assert.equal(typeof r.at, 'number')
+  assert.deepEqual(asked, [{ url: '/models?output_modalities=transcription', auth: undefined }], 'its public list: no key')
+  down = true
+  assert.deepEqual(await rig.rpc('voiceModels'), r, 'kept: asked once an hour')
+  assert.equal(asked.length, 1)
+  const other = await fresh(t, { env: { LAKI_AI_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  await assert.rejects(other.rpc('voiceModels'), /OpenRouter 503: its model list/)
+})
+
 test('ai: a pasted image goes to OpenRouter as a data URL; one from elsewhere never does; Stop ends an ask', async t => {
   const or = await openrouter(t, [reply({ content: 'Three PRs.' }), { slow: true }])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
@@ -419,6 +455,57 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
   await rig.rpc('aiAsk', { text: 'hi' })
   const off = or.hits.at(-1)!.body.tools.map((x: any) => x.function.name)
   assert.ok(!off.includes('laki_ask') && off.includes('laki_state'))
+})
+
+// Q12: the user's sessions from Laki AI: a turn stopped as their Stop; a workspace archived only on their Yes (its
+// uncommitted file kept for Restore), and never one with ignored files archiving would lose
+test("ai: laki_stop stops an agent's turn; laki_archive asks, archives on Yes, keeps what's uncommitted", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const tool = (name: string): ((a: object) => Promise<any>) => skillTools(rig.rpc).find(x => x.name === name)!.run
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'slow work' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.screen(tab.id)).includes('esc to interrupt'), 'its agent at work')
+  await sleep(200) // its keys read (raw mode)
+  await assert.rejects(tool('laki_stop')({ target: 'nope' }), /no agent tab nope/)
+  await rig.rpc('send', { target: tab.id, text: 'later', whenIdle: true })
+  assert.match(await tool('laki_stop')({ target: ws.id }), /^stopped .+; its 1 queued message held$/)
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'its turn interrupted (Esc), not killed')
+  assert.equal((await rig.tab(ws.id)).queueHeld, true, 'its queue held, as Stop all holds it')
+  assert.match(await tool('laki_stop')({ target: `${ws.id}/${tab.id}` }), /isn't working \(idle\): nothing to stop/)
+
+  // archive: a question first, nothing archived by the model; No keeps it; Yes archives it, its change kept
+  writeFileSync(join(ws.path, 'wip.txt'), 'half done')
+  or.answers.push(call('c1', 'laki_archive', { id: ws.id }), call('c2', 'laki_archive', { id: ws.id }))
+  await rig.rpc('aiAsk', { text: 'close that worktree' })
+  const q = (await rig.rpc('aiState')).chat.at(-1)
+  assert.match(q.text, /^Archive the workspace “[^”]+”\? Its agents and shells stop/)
+  assert.deepEqual(q.ask.options, ['Yes, archive it', 'No, keep it'])
+  const live = async () => !(await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived
+  assert.equal(await live(), true, 'not archived by the AI')
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 1 }), { kept: true })
+  assert.equal(await live(), true)
+  await rig.rpc('aiAsk', { text: 'yes really, close it' })
+  const q2 = (await rig.rpc('aiState')).chat.at(-1).ask
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q2.id, n: 0 }), { archived: true })
+  assert.equal(await live(), false)
+  assert.match((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).path, /./)
+  assert.match((await rig.rpc('aiState')).chat.at(-1).text, /^Archived the workspace “[^”]+”: Archived in the sidebar brings it back\.$/)
+  await rig.rpc('wsRestore', { id: ws.id })
+  assert.equal(readFileSync(join(ws.path, 'wip.txt'), 'utf8'), 'half done', 'its uncommitted file back with Restore')
+
+  // ignored files archiving would lose: refused on Yes, the sidebar's own ask is the way
+  writeFileSync(join(ws.path, '.gitignore'), 'secret.env\n')
+  writeFileSync(join(ws.path, 'secret.env'), 'KEY=fake-secret')
+  or.answers.push(call('c3', 'laki_archive', { id: ws.id }))
+  await rig.rpc('aiAsk', { text: 'archive it again' })
+  const q3 = (await rig.rpc('aiState')).chat.at(-1).ask
+  await assert.rejects(rig.rpc('aiAnswer', { id: q3.id, n: 0 }), /1 ignored file that archiving would lose: archive it from its menu/)
+  assert.equal(await live(), true)
 })
 
 test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {

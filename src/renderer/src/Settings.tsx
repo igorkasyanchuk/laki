@@ -245,6 +245,7 @@ export type AppSettings = Paint & {
   tellKey?: string // its keys (unset: TELL_KEY)
   talkOn?: boolean // Q2: the talk key (unset: off)
   talkKey?: string // its keys (unset: TALK_KEY)
+  talkTo?: 'ai' // Q10: who it goes to: Laki AI (unset: an agent, Q2's)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   updateDelay?: number // a release is offered once it's this many days old (Update delay; unset: at once)
   recording?: boolean // not this page's (⌘K's, the menu bar's): App's onSave leaves it out, as it does modelEfforts
@@ -578,10 +579,9 @@ function HotkeyField(p: { on: boolean; keys: string; def: string; title: string;
         <Says title={p.title} hint={p.on && p.off ? p.off : p.hint} />
       </Switch>
       {live && (
-        <div className="row">
-          <Says title="Hotkey" hint={taken ? "These keys can't be Laki's: record others" : 'Two of ⌃ ⌥ ⌘ with a key, or one of them with Space'} />
-          <span className="grow" />
+        <div className="switch-row">
           <KeyField value={p.keys} def={p.def} onSet={p.onKeys} />
+          <Says title="Hotkey" hint={taken ? "These keys can't be Laki's: record others" : 'Two of ⌃ ⌥ ⌘ with a key, or one of them with Space'} />
         </div>
       )}
       {live && taken && <p className="field-err">{p.keys}: another app (or macOS, or Laki's other hotkey) has these keys, or they need two of ⌃ ⌥ ⌘ (one is enough with Space or an F key)</p>}
@@ -1492,10 +1492,9 @@ export function SettingsPage(p: {
                   <Says title="Development mode" hint="Keeps each workspace's and extension's log: ⋯ › Logs" />
                 </Switch>
                 {s.devMode && (
-                  <div className="row">
-                    <Says title="Pick an element" hint="Its hotkey, over any page or dialog: what's under the pointer, to copy into a prompt (also the rail's Pick)" />
-                    <span className="grow" />
+                  <div className="switch-row">
                     <KeyField value={s.pickerKey ?? PICKER_KEY} def={PICKER_KEY} onSet={pickerKey => set({ pickerKey })} />
+                    <Says title="Pick an element" hint="Its hotkey, over any page or dialog: what's under the pointer, to copy into a prompt (also the rail's Pick)" />
                   </div>
                 )}
                 {s.devMode && p.logs && (
@@ -2526,6 +2525,26 @@ export function SettingsPage(p: {
                 onOn={talkOn => set({ talkOn })}
                 onKeys={talkKey => set({ talkKey })}
               />
+              {s.talkOn === true && (
+                <div className="setting-box">
+                  <label className="switch-row">
+                    <select value={s.talkTo === 'ai' ? 'ai' : 'agent'} onChange={e => set({ talkTo: e.target.value === 'ai' ? 'ai' : undefined })}>
+                      <option value="agent">An agent</option>
+                      <option value="ai">Laki AI</option>
+                    </select>
+                    <Says
+                      title="It goes to"
+                      hint={
+                        s.talkTo === 'ai'
+                          ? aiOn(s)
+                            ? 'Laki AI does what you say (start a task, check a PR, answer a question); its answer is on the AI page. Say "screenshot" or "my screen" and the screen under the pill goes with it. Tab still picks an agent'
+                            : 'Laki AI is off (Settings › AI): it goes to an agent until it is on'
+                          : 'An agent gets what you say as its prompt: the one that asked last, else the one you last sent to, else a new task. Tab picks another, or Laki AI'
+                      }
+                    />
+                  </label>
+                </div>
+              )}
             </Group>
           )}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}

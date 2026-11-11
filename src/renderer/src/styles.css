@@ -1949,10 +1949,23 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .page-body > .new-ws { margin: max(0px, calc(50vh - 230px)) auto 0; } /* in the middle as it opens (its usual height), anchored
    from the top: a template's preview, More or the busy strip that comes and goes grows it down and never moves the prompt */
 /* the new-workspace window (NewWindow.tsx, main's newWsWin): the form alone, from the top, tight; the window takes its height */
-.new-window .page-body { padding: var(--sp-5) var(--sp-5) var(--sp-5); }
+.new-window .page-body { padding: 0 var(--sp-5) var(--sp-5); overflow-x: hidden; scrollbar-width: thin; }
 .new-window .page-body > .new-ws { max-width: none; margin: 0; gap: var(--sp-4); }
 .new-window .nw-composer textarea { min-height: 64px; height: 92px; resize: vertical; }
 .new-window .new-ws .nw-foot { margin-top: 0; }
+/* its head as Laki AI's window's: a mark, the title and the project under it, on a glow in the accent; no bar line */
+.nw-head { display: inline-flex; align-items: center; gap: var(--sp-4); min-width: 0; }
+.nw-mark { flex: none; width: 24px; height: 24px; color: var(--nw-tint); background: color-mix(in srgb, var(--nw-tint) 16%, transparent); }
+.new-window .settings-page { background: var(--app-bg, var(--bg)); isolation: isolate; }
+.new-window .settings-page::before { content: ''; position: absolute; inset: 0 0 auto; z-index: -1; height: 200px; background: radial-gradient(100% 100% at 50% -30%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%); opacity: 0.8; pointer-events: none; }
+.new-window .settings-head { height: 54px; padding: 0 var(--sp-4) 0 var(--sp-5); border-bottom: none; background: transparent; }
+.new-window .nw-mark { width: 30px; height: 30px; }
+/* a window as narrow as it may be: the chips take a second row, the prompt's picks give way, never a sideways scroll */
+.new-window .nw-top { flex-wrap: wrap; margin: 0 0 -6px; }
+.new-window .prompt-tools { min-width: 0; }
+.new-window .prompt-tools > .nw-pick { flex-shrink: 1; min-width: 0; }
+.new-window .prompt-tools > .nw-pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.new-window .prompt-tools-end { flex-wrap: nowrap; }
 /* Q1: the quick bar (NewWindow.tsx QuickWindow): one line in a panel, its chip above */
 .quick-window, .quick-window body { background: var(--panel); }
 .quick-bar { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) var(--sp-3); -webkit-app-region: drag; }

@@ -5,13 +5,13 @@
 // ponytail: the bubbles' Say it (floater.ts, its own window without this module) keeps macOS dictation in the cloud too
 import { useSyncExternalStore } from 'react'
 import type { TabView, VoiceSettings } from '../../shared/types'
-import { api } from './api'
+import { api, bridge } from './api'
 import { base64, wavOf } from './text'
 import { VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 
 let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
-api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []))))
+api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []), fnAsk())))
 export const cloudVoice = () => settings.on !== false && settings.engine === 'cloud' // off: the mic is macOS dictation
 // Send as you stop talking (settings' send): where the text goes, it's sent too (insert, below)
 // ponytail: cloud only; macOS dictation's stop is macOS's, so its text is only typed
@@ -150,16 +150,31 @@ let held = false
 let soon: ReturnType<typeof setTimeout> | undefined // Fn is down, the mic not open yet
 const release = (send: boolean, only = false) => ((held = false), clearTimeout(soon), voiceStop(send, only))
 const isFn = (e: KeyboardEvent) => e.key === 'Fn' || e.code === 'Fn'
+const fnOn = () => cloudVoice() && settings.fn !== false
+// the keys held now, by when each went down (or repeated): Fn with one of them (Fn ←, Fn ⌫) is that key's, never the mic.
+// A keyup that went elsewhere (a webview took the focus) stops counting after DOWN_MS (macOS's longest repeat delay)
+const DOWN_MS = 2500
+const down = new Map<string, number>()
+const keyHeld = () => [...down.values()].some(t => Date.now() - t < DOWN_MS)
+const fnDown = () => !held && !keyHeld() && ((held = true), (soon = setTimeout(() => held && void voiceStart(), HOLD_MS)))
+// macOS: Fn from main (preload's onFn), its own key events never reach a page; elsewhere, or a build without it, keydown's
+let fnAsked: boolean | undefined
+const fnAsk = () => fnOn() !== fnAsked && bridge?.fnWatch && bridge.fnWatch((fnAsked = fnOn()))
+bridge?.onFn?.(on => (on ? fnOn() && fnDown() : held && release(true)))
 // immediate: the app's other window listeners (Settings' Esc, popovers') come after this one, on the same target
 const eat = (e: KeyboardEvent) => (e.preventDefault(), e.stopImmediatePropagation())
+window.addEventListener('keyup', e => void down.delete(e.code), true)
 window.addEventListener(
   'keydown',
   e => {
     if (isFn(e)) {
-      if (!cloudVoice() || settings.fn === false) return
+      if (!fnOn()) return
       eat(e)
-      if (!e.repeat && !held) (held = true), (soon = setTimeout(() => held && void voiceStart(), HOLD_MS))
-    } else if (held) release(false)
+      if (!e.repeat) fnDown()
+      return
+    }
+    if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) down.set(e.code, Date.now())
+    if (held) release(false)
     else if (e.key === 'Escape' && rec) eat(e), voiceStop(false)
     else if (e.key === 'Escape' && now.phase === 'writing') eat(e), writing++, set({ phase: 'idle' })
   },
@@ -174,4 +189,4 @@ window.addEventListener(
   },
   true,
 )
-window.addEventListener('blur', () => held && release(true, true)) // typed, not sent: Fn wasn't let go
+window.addEventListener('blur', () => (down.clear(), held && release(true, true))) // typed, not sent: Fn wasn't let go

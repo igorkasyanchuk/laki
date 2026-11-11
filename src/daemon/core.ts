@@ -3845,8 +3845,8 @@ function deliver(id: string) {
 
 // U8: Stop all agents (⌘K, the menu): each agent turn under way gets its own interrupt key (Esc, as a long turn's Stop
 // does), nothing is killed; what was queued for it stays, held (queueHeld) until its Resume queue
-export function stopAll() {
-  const tabs = state.tabs.filter(t => t.kind === 'agent' && rt.get(t.id)?.status === 'running' && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+export function stopAll(only?: string) {
+  const tabs = state.tabs.filter(t => t.kind === 'agent' && (!only || t.id === only) && rt.get(t.id)?.status === 'running' && sessions.get(t.id) && !sessions.get(t.id)!.exited)
   for (const t of tabs) {
     if (t.queue?.length) t.queueHeld = true
     input(t.id, '\x1b')

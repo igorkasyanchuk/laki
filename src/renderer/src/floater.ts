@@ -12,7 +12,7 @@ import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
-import { type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { AI_TO, type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
@@ -70,18 +70,17 @@ type Bridge = {
     onTalk: (cb: (c: Talk) => void) => void
     onTalkKey: (cb: () => void) => void
     talkText: (audio: string) => Promise<{ text?: string; error?: string }>
-    talkSend: (tab: string, text: string, project?: string) => Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean }>
+    talkSend: (tab: string, text: string, project?: string) => Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }>
     talkUndo: () => Promise<{ error?: string }>
     talkClose: () => void
   }
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
-// npm run test:ui's (no microphone opened)
-type Talk = { list: RouteTab[]; to: string; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg }
+// npm run test:ui's (no microphone opened); ai: Laki AI is on (Tab goes to it too)
+type Talk = { list: RouteTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg }
 // Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
 // the project last sent to (a route into another one shows a little longer)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; aiOn?: boolean; fixes?: string; last?: string; lastTab?: string }
-const AI_TO = '@ai' // Laki AI as a target (main's)
 const ROUTE_MS = 1500 // a route shown before it goes; into another project than the last one: ROUTE_FAR_MS
 const ROUTE_FAR_MS = 3000
 // a route's target as the pages send it: a tab, '' (a new task, maybe in a project) or Laki AI; null: the default
@@ -727,19 +726,20 @@ function talkPage() {
   let to = ''
   let toProject: string | undefined // a new task's project (Q5)
   let cfg: RouteCfg | undefined
+  let ai = false // Laki AI on: a Tab target
   let phase: 'wait' | 'rec' | 'writing' | 'route' | 'sending' | 'sent' = 'wait'
   let routed: { text: string; t: ReturnType<typeof setTimeout> } | undefined // Q5: shown before it goes
   let stopRec: ((send: boolean) => void) | undefined
   const close = () => bridge?.talkClose()
   const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
-  const show = () => (toEl.textContent = `→ ${to === AI_TO ? 'Laki AI' : to ? talkName(list, to) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
+  const show = () => (toEl.textContent = `→ ${to ? talkName(list, to) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   document.addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey) return
     if (e.key === 'Escape') return void (e.preventDefault(), routed && clearTimeout(routed.t), stopRec ? stopRec(false) : close())
     if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait' || phase === 'route')) {
       e.preventDefault()
-      to = talkNext(list, to === AI_TO ? '' : to, e.shiftKey)
+      to = talkNext(list, to, e.shiftKey, ai)
       toProject = undefined
       toEl.classList.remove('moved')
       if (routed) clearTimeout(routed.t), (routed.t = setTimeout(() => void send(routed!.text), ROUTE_MS)) // the new one, a moment again
@@ -760,6 +760,7 @@ function talkPage() {
     paint(c.colors)
     list = c.list
     to = c.to
+    ai = !!c.ai
     cfg = c.route
     show()
     if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
@@ -844,7 +845,7 @@ function talkPage() {
   async function send(text: string) {
     if (phase === 'sending' || phase === 'sent') return
     phase = 'sending'
-    const name = to === AI_TO ? 'Laki AI' : talkName(list, to)
+    const name = talkName(list, to)
     const r = await bridge?.talkSend(to, text, to ? undefined : toProject)
     phase = 'sent'
     if (r?.error) {
@@ -852,7 +853,7 @@ function talkPage() {
       return void (say(`Not sent: ${r.error}${copied ? '. Copied, paste it' : ''}`, true), setTimeout(close, 5000))
     }
     if (r?.new) return close() // the new task's window has it
-    if (r?.ai) return void (say('Asked Laki AI: its answer is on the AI page'), setTimeout(close, 2500))
+    if (r?.ai) return void (say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is on the AI page${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), setTimeout(close, r.noShot ? 5000 : 2500))
     say(r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`)
     undo.hidden = !r?.queued
     setTimeout(close, 4000)

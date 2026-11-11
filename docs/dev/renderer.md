@@ -455,7 +455,11 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   list there while the talk key is on, the bubbles off too), Tab `talkNext`. The key again or ⏎: `talk-text` (main's
   `rpc('voiceText')`), then `talk-send` (`send` `whenIdle` `agent: true`, only to a tab the pill offered, `talkTo`; '': `newWsWin`);
   queued: `talkUndo`, *Undo* (`talk-undo`: `queueSet` without it, refused once it went). Esc drops it;
-  `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. macOS's own microphone prompt the first time (`mic`
+  `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. Q10: Settings › Voice › Talk key's *It goes to* (`settings.talkTo`:
+  `ai`; App's floats `talkAi` while Laki AI is on) makes Laki AI (`AI_TO`) the pill's first target, and Tab goes on to
+  it either way while it's on (`talkNext`'s `ai`); sent to it, main's `aiTalk`: words that ask for the screen
+  (`talkShot`: screen, скрін, екран, Bildschirm…) take the screen under the pill (`screenshot` `-R`, the pill hidden
+  meanwhile, `imageSave`) as the ask's image; no Screen Recording: asked without it, said on the pill. macOS's own microphone prompt the first time (`mic`
   `not-determined`: the pill says why first). ponytail: press to start and to stop: globalShortcut has no key-up, a
   hold mode needs a native helper. `npm run test:ui`'s `talk-pill` opens it (`smoke`: no microphone). Tested in
   `test/talk.test.ts`.

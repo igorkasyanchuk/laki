@@ -1049,7 +1049,22 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const agentTint = (a => (a ? `var(--tc-${a})` : tint))(AGENT_COLORS[starts ?? ''])
   const who = other ? undefined : p.preset
   return (
-    <Page title="New workspace" onClose={onClose}>
+    <Page
+      title="New workspace"
+      head={
+        /* as Laki AI's window: a mark in the project's color, the title and where it starts (the window hides nw-hello) */
+        <span className="nw-head" style={{ '--nw-tint': tint } as CSSProperties}>
+          <span className="ai-mark nw-mark">
+            <Icon name="plus" size={14} />
+          </span>
+          <span className="ai-title">
+            <b>New workspace</b>
+            {proj && <span className="ai-sub">{[proj.name, who].filter(Boolean).join(' · ')}</span>}
+          </span>
+        </span>
+      }
+      onClose={onClose}
+    >
       {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
       <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy} style={{ '--nw-tint': tint, '--nw-agent': agentTint } as CSSProperties}>
         {proj && (

@@ -40,6 +40,8 @@ type Bridge = {
   quickShot?(): Promise<string> // its screenshot button: a part of the screen ('' cancelled)
   tellKey?(label: string): Promise<boolean> // Q7: show and tell's global keys ('' none)
   talkKey?(label: string): Promise<boolean> // Q2: the talk key ('' none)
+  fnWatch?(on: boolean): void // hold Fn: main watches Fn for this page (voice.ts; Chromium drops Fn's key events on macOS)
+  onFn?(cb: (down: boolean) => void): void
   onTell?(cb: (t: { png: string; mic?: string; dictation?: boolean; note?: string; edited?: boolean }) => void): void // the quick bar's: show and tell's picture (and the editor's, edited)
   quickAnnotate?(png: string): void // its E: the picture in the editor first, back here
   privacyPane?(which: 'microphone' | 'screen'): void // System Settings › Privacy & Security's pane

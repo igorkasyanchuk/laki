@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('laki', {
   quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
   tellKey: (label: string): Promise<boolean> => ipcRenderer.invoke('tell-hotkey', label), // Q7: show and tell's global keys ('' none)
   talkKey: (label: string): Promise<boolean> => ipcRenderer.invoke('talk-hotkey', label), // Q2: the talk key ('' none)
+  // hold Fn (voice.ts): main watches Fn while this page asks (Chromium never gives a page Fn's own key events on macOS)
+  fnWatch: (on: boolean) => ipcRenderer.send('fn-watch', on),
+  onFn: (cb: (down: boolean) => void) => ipcRenderer.on('fn', (_e, down: boolean) => cb(down === true)),
   // the quick bar's: show and tell's picture (Laki's Microphone access, macOS dictation on), or the editor's drawing on it
   onTell: (cb: (t: object) => void) => {
     ipcRenderer.on('quick-tell', (_e, t: object) => cb(t))
@@ -134,7 +137,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
-    talkSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean }> => ipcRenderer.invoke('talk-send', tab, text, project),
+    talkSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project), // Q10: shot: the screen went with it to Laki AI
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
     talkClose: () => ipcRenderer.send('talk-close'),
   },

@@ -177,3 +177,4 @@ needs no bump: `settingsSet` keeps any field.
 169: `diagnostics` (R6: `laki doctor --bundle`, Copy diagnostics) and the view's `trouble` (the daemon's uncaught errors).
 170: `agentContext`, `agentContextOpen` (F6: what an agent sees, read only).
 171: `flowStart`'s `simulate` (`from`, `answers`) and a run's `sim` (W7: a simulated run, nothing run; its `sim` wait).
+172: `voiceModels` (Q11: OpenRouter's speech-to-text models and prices now) and Laki AI's `archive` act (Q12: `laki_archive`, `laki_stop`).

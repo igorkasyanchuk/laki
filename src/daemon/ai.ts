@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceFillers, voiceFix, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, modelCheck, presets, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -181,6 +181,24 @@ export async function voiceText(o: { audio?: unknown }) {
   }
 }
 const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map(Number) // ms before each try again (tests: shorter)
+
+// Q11: OpenRouter's speech-to-text models with their prices, as it lists them now (its public model list: no key, nothing
+// of yours sent), kept an hour; Settings › Voice shows them. Offline: an error, and the page shows the prices Laki came with
+let sttList: { at: number; models: VoiceModel[] } | undefined
+const STT_KEEP = 3600e3
+export async function voiceModels(): Promise<{ at: number; models: VoiceModel[] }> {
+  if (sttList && Date.now() - sttList.at < STT_KEEP) return sttList
+  const res = await fetch(`${api()}/models?output_modalities=transcription`, { headers: { 'x-title': 'Laki' }, signal: AbortSignal.timeout(15000) }).catch((e: Error) => {
+    throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 15 seconds' : e.message}`)
+  })
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: its model list`)
+  const j: any = await res.json().catch(() => ({}))
+  const models: VoiceModel[] = (Array.isArray(j?.data) ? j.data : []).slice(0, 300).flatMap((m: any) => {
+    const price = voicePrice(m?.pricing)
+    return typeof m?.id === 'string' && /^[\w.-]+\/[\w.:-]+$/.test(m.id) && price ? [{ id: m.id.slice(0, 120), name: String(m.name ?? m.id).slice(0, 120), price }] : []
+  })
+  return (sttList = { at: Date.now(), models })
+}
 
 // laki_alert from Laki AI (alerts.ts): only when you asked for one in that chat's last message, Your instructions name
 // alerts, or Settings › AI's Important alerts on its own is on: never a card over every app for news it picked itself
@@ -956,22 +974,22 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unkn
   const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }) } : undefined
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
-  if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
+  if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind === 'archive' ? 'workspace (not archived)' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
-  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : act.kind === 'archive' ? `Archive ${act.label}? Its agents and shells stop and its worktree goes; its branch and uncommitted changes are kept, and Archived in the sidebar brings it back.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   // each option with its look (an extension's chat: how it would show), the same option once
   const given = (Array.isArray(p.options) ? p.options : []).map((o, i) => [String(o).trim().slice(0, 200), lookOf(Array.isArray(p.looks) ? p.looks[i] : undefined)] as const).filter(([o], i, all) => o && all.findIndex(x => x[0] === o) === i).slice(0, 6)
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : act.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
   if (options.length < 2) throw new Error('2 to 6 options')
   const looks = act || !given.some(([, l]) => l) ? undefined : given.map(([, l]) => l)
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? 'archives it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -1021,6 +1039,11 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
       await runAct(act, rpc)
       say(t, 'ai', `Ran it in ${act.label}.`)
       return { ran: true }
+    }
+    if (act.kind === 'archive') {
+      await archiveAct(act, rpc)
+      say(t, 'ai', `Archived ${act.label}: Archived in the sidebar brings it back.`)
+      return { archived: true }
     }
     if (act.kind === 'profile') {
       await saveProfiles(act, rpc)
@@ -1116,6 +1139,11 @@ function whatOf(a: AiAct) {
     const x = state.tabs.find(x => x.id === a.id && (a.kind === 'tab' || x.kind === 'shell'))
     return x && `the tab ${cut(x.name)}`
   }
+  if (a.kind === 'archive') {
+    const x = state.workspaces.find(x => x.id === a.id && !x.archived)
+    if (x && x.kind !== 'worktree') throw new Error(`${x.name || x.id} is a project's own folder: only a worktree workspace can be archived`)
+    return x && `the workspace ${cut(x.name || x.id)}`
+  }
   if (a.kind === 'todo') {
     const x = state.todos?.find(x => x.id === a.id)
     return x && `the to-do ${cut(x.text)}`
@@ -1126,6 +1154,20 @@ function whatOf(a: AiAct) {
   }
   const x = state.projects.find(x => x.id === a.project)?.memory?.find(m => m.id === a.id)
   return x && `the memory ${cut(x.text)}`
+}
+
+// Q12: the user's Yes to laki_archive: as the sidebar's Archive, but what archiving would lose (ignored files, a
+// submodule's work: unsaved's) is never lost on a model's ask: those go back to the sidebar's own ask, which names them
+async function archiveAct(a: AiAct, rpc: Rpc) {
+  const held = (r?: { held?: GateHeld[] }) => r?.held?.length && new Error(`held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}`)
+  const first = await rpc<{ dirty?: number; subs?: string[]; ignored?: string[]; held?: GateHeld[] } | undefined>('wsArchive', { id: a.id, ifClean: true })
+  const no = held(first)
+  if (no) throw no
+  if (first?.subs?.length || first?.ignored?.length) throw new Error(`it has ${[first.subs?.length && 'submodule changes', first.ignored?.length && `${first.ignored.length} ignored file${first.ignored.length > 1 ? 's' : ''}`].filter(Boolean).join(' and ')} that archiving would lose: archive it from its menu in the sidebar, which asks about them`)
+  if (first?.dirty) {
+    const again = held(await rpc<{ held?: GateHeld[] } | undefined>('wsArchive', { id: a.id })) // its uncommitted changes kept for Restore (R2)
+    if (again) throw again
+  }
 }
 
 async function remove(a: AiAct, rpc: Rpc) {

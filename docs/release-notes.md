@@ -5,6 +5,13 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The talk key can go to Laki AI (Settings › Voice › Talk key › *It goes to*): say what you want done and Laki AI does it; say "screenshot" or "my screen" and your screen goes with it. Tab in the pill reaches Laki AI either way, and "Laki AI, …" said first is understood even when it's written down as "Lucky AI". [Try it](laki://settings/voice?spot=Talk%20key)
+- Laki AI controls your sessions: "stop the Rails agent" stops its turn, and "close that worktree" asks, then archives the workspace on your Yes (its uncommitted changes kept for Restore).
+- Settings › Voice shows each speech-to-text model's price, OpenRouter's current one (and its other models under *More on OpenRouter*), or the date of the prices Laki knows when it can't reach OpenRouter.
+- Hold Fn to talk works now: macOS never passed the Fn key itself to Laki's window, so holding it did nothing.
+- The new-workspace window looks like Laki AI's, with the project under its title, and no longer scrolls sideways when its chips don't fit: they take a second row.
+- Settings' hotkeys line up on the right, as the rest of the keys do.
+
 - *Simulate* a workflow (next to *Run*, or `laki flow run … --simulate`): it walks the blocks with nothing run, shows what each would be sent, and goes the way you pick, or the way an earlier run went, so you see its path, loops and limits before anything happens. It counts in no stats and notifies no one.
 - Scheduled tasks stop at a time limit and take turns: a run stops after 60 minutes of its agent's working time (waiting for you isn't counted; its chat stays, to go on), told like a failure, and at most 2 run at once, the rest waiting their turn in order. Change both on a task's clock chip, for it or for every task.
 - Drop files, a picture, text or a link on a bubble: its card asks what to do with it and sends that with the files' paths to the agent (Laki never reads or uploads them); on the + the quick bar opens with them.

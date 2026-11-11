@@ -147,7 +147,8 @@ export function NewWindow() {
     if (!form || !body || !bridge?.fitNew) return
     const fit = () => {
       const pad = getComputedStyle(body)
-      bridge!.fitNew!(Math.ceil((document.querySelector<HTMLElement>('.settings-head')?.offsetHeight ?? 0) + parseFloat(pad.paddingTop) + form.offsetHeight + parseFloat(pad.paddingBottom)))
+      const rows = Math.max(form.offsetHeight, form.scrollHeight) // nw-top's negative margin, a wrapped row: all of it, never a scrollbar
+      bridge!.fitNew!(Math.ceil((document.querySelector<HTMLElement>('.settings-head')?.offsetHeight ?? 0) + parseFloat(pad.paddingTop) + rows + parseFloat(pad.paddingBottom)) + 1)
     }
     const o = new ResizeObserver(fit)
     o.observe(form)

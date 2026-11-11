@@ -5,6 +5,10 @@
 `daemon/ai.ts` (`settings.ai`, `AiSettings`; on unless `on` is false, `aiOn`): a conversation that works Laki with `shared/tools.ts`'s
 `tools(rpc)`, given the daemon's own `call` (no HTTP), less `laki_progress`: nothing archives, deletes, ships or merges;
 with `settings.ai.skill` unset or true, Laki's skill: `shared/tools.ts` `skillTools` (`laki_ask`, `laki_remove`: `aiQuestion` names it from state, `whatOf`; `aiAnswer` refuses a question with an ask of yours after it,
+`laki_stop` (Q12: an agent tab's turn, Esc through `input`, only while it runs), `laki_archive` (Q12: an `aiQuestion` act
+`archive`, a worktree workspace only; its Yes, `archiveAct`: `wsArchive` `ifClean` first, refused when ignored files or a
+submodule's work would go (the sidebar's ask names them), else archived with its uncommitted files kept, R2; a gate's
+hold said),
 `laki_prs`, `laki_project`, `laki_notes_write`, `laki_memory_write`, `laki_rename`, `laki_shell`: a new shell, a command typed with
 `enter: false`, or with `run` an `aiQuestion` act `run`; `laki_run`: `send` into a tab that's open (a shell at its prompt: an
 `aiQuestion` act `run`, the command in a fence, whose Yes (`runAct`: still at its prompt) is ⌃E ⌃U through `input`, then the

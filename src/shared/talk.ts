@@ -17,15 +17,29 @@ export function talkDefault(list: TalkTo[], last?: string): string {
   return ''
 }
 
-// Tab (⇧Tab: back): the next target, the list's agents then a new task, round
-export function talkNext(list: TalkTo[], cur: string, back = false): string {
-  const all = [...list.map(f => f.tab), '']
+// Laki AI as a target (its name said first, the talk key set to Laki AI, Tab to it)
+export const AI_TO = '@ai'
+
+// Tab (⇧Tab: back): the next target, the list's agents then a new task, then Laki AI while it's on, round
+export function talkNext(list: TalkTo[], cur: string, back = false, ai = false): string {
+  const all = [...list.map(f => f.tab), '', ...(ai ? [AI_TO] : [])]
   const i = Math.max(0, all.indexOf(cur))
   return all[(i + (back ? all.length - 1 : 1)) % all.length]
 }
 
-// its name on the pill: the workspace's, else a new task
-export const talkName = (list: TalkTo[], tab: string) => list.find(f => f.tab === tab)?.name ?? 'new task'
+// its name on the pill: Laki AI, the workspace's, else a new task
+export const talkName = (list: TalkTo[], tab: string) => (tab === AI_TO ? 'Laki AI' : list.find(f => f.tab === tab)?.name ?? 'new task')
+
+// Q10: what's said to Laki AI asks for the screen with it ("take a screenshot", "look at my screen", скріншот, на екрані):
+// the screen under the pill goes to Laki AI's model with it, so only when it's asked for in so many words: never
+// "fullscreen", "screening", "екранування" (escaping). ponytail: a few languages' words
+const SHOT = [
+  /\bscreen ?shots?\b|\b(?:my|the|this|on|at) screen\b|\bscreen grab\b/i,
+  /скр[іи]н/iu, // скрін, скріншот, скрин, скриншот
+  /(?<!\p{L})[еэ]кран[іиеуа]?(?!\p{L})/iu, // екран, на екрані, экран, на экране
+  /\bbildschirm(?:foto)?\b|\bpantalla\b|écran(?!\p{L})|\bzrzut ekranu\b|\bekran(?:ie|u)?\b/iu,
+]
+export const talkShot = (text: string) => SHOT.some(r => r.test(text))
 
 // the recording's time on the pill: 0:07, 1:02
 export const talkTime = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`
@@ -67,6 +81,10 @@ const near = (heard: string, name: string) => {
   return !!n && (h === n || (n.length >= 4 && dist(h, n) <= (n.length > 5 ? 2 : 1)))
 }
 const exact = (heard: string, name: string) => heard.replace(/ /g, '') === name.replace(/ /g, '')
+// Laki AI's name as heard: its word, with or without "AI" after it ("Laki AI"), and Laki as speech-to-text often writes
+// it (Lucky, Lackey, Lakey; Лакі is laki already)
+const LAKI_HEARD = /^(?:lucky|lucki|lacky|lackey|lakey|lakki|lakie)$/
+const aiSaid = (head: string, word?: string) => (h => near(h, norm(word || 'Laki')) || (!word && LAKI_HEARD.test(h.replace(/ /g, ''))))(head.replace(/ (?:a i|ai|ei ai|eiai|ai i)$/, ''))
 const NEW = /^(?:a |the )?new (?:task|session|workspace)(?: (?:in|for|on) (.+))?$/
 export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: string; name: string }[]; aiOn?: boolean; aiWord?: string; fixes?: string; fix?: (t: string, fixes?: string) => { text: string } }): Route {
   const said = (o.fix ? o.fix(text, o.fixes).text : text).trim()
@@ -77,7 +95,7 @@ export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: str
   const rest = m[2].trim()
   const n = NEW.exec(head) // its project's name 4 words at most too
   if (!head || head.split(' ').length > (n?.[1] ? 7 : 4)) return none
-  if (o.aiOn && near(head, norm(o.aiWord || 'Laki'))) return { target: { kind: 'ai' }, rest, how: 'Laki AI' }
+  if (o.aiOn && aiSaid(head, o.aiWord)) return { target: { kind: 'ai' }, rest, how: 'Laki AI' }
   if (n) {
     if (!n[1]) return { target: { kind: 'new' }, rest, how: 'a new task' }
     const p = o.projects.find(p => exact(n[1], norm(p.name))) ?? o.projects.find(p => near(n[1], norm(p.name)))

@@ -2,7 +2,7 @@
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
-import { execFile, spawnSync } from 'node:child_process'
+import { type ChildProcess, execFile, spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,7 +10,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
-import { talkDefault } from '../shared/talk.ts'
+import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -1186,7 +1186,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1369,6 +1369,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ai: o.ai === true,
     at: o.at === 'notch' ? 'notch' : 'edge',
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
+    ...(o.talkAi === true && { talkAi: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
@@ -1914,9 +1915,23 @@ ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.
 // only while it records. ponytail: press to start, press to stop: globalShortcut has no key-up, so holding the key to
 // talk needs a native helper (a CGEventTap) later
 const TALK = { width: 320, height: 78 }
-const AI_TO = '@ai' // Q5: Laki AI as a route's target (its name said first)
 // Laki AI asked in the background (its chat has the answer: the AI page); only while it's on
-const aiAsked = (text: string) => (floats.ai ? (void rpc('aiAsk', { text }).catch(() => {}), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
+const aiAsked = (text: string, images?: string[]) => (floats.ai ? (void rpc('aiAsk', { text, ...(images && { images }) }).catch(() => {}), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
+// Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
+// (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
+async function aiTalk(text: string): Promise<{ ai?: boolean; shot?: boolean; noShot?: string; error?: string }> {
+  if (!floats.ai) return aiAsked(text)
+  if (!talkShot(text) || !mac) return aiAsked(text)
+  if (screenOff()) return (privacySay('screen'), { ...aiAsked(text), noShot: 'Laki has no Screen Recording' })
+  const w = talkW
+  const on = screen.getDisplayMatching(w && !w.isDestroyed() ? w.getBounds() : { ...screen.getCursorScreenPoint(), width: 1, height: 1 }).bounds
+  w?.hide()
+  const png = await new Promise<string>(done => screenshot(false, on, done, () => done('')))
+  if (w && !w.isDestroyed()) w.showInactive()
+  if (!png) return (screenOff(true) && privacySay('screen'), { ...aiAsked(text), noShot: 'no picture: Screen Recording for Laki' })
+  const path = await rpc<string>('imageSave', { data: png, ext: 'png' }).catch(() => '')
+  return path ? { ...aiAsked(text, [path]), shot: true } : { ...aiAsked(text), noShot: "the picture wasn't saved" }
+}
 let talkW: BrowserWindow | null = null
 let talkTo = new Set<string>() // the agents the pill offered
 let talkLast = '' // the one you last sent to (talkDefault's second choice)
@@ -1936,7 +1951,7 @@ function talk() {
   w.webContents.on('did-finish-load', () => {
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { list, to: talkDefault(list, talkLast), colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
+    w.webContents.send('talk', { list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -1956,7 +1971,7 @@ ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unkn
   if (typeof tab !== 'string') return { error: 'who gets it?' }
   const pid = typeof project === 'string' && floats.route?.projects.some(p => p.id === project) ? project : undefined
   if (!tab) return (talkProject = pid ?? talkProject), newWsWin(text.trim(), pid), { new: true }
-  if (tab === AI_TO) return aiAsked(text.trim())
+  if (tab === AI_TO) return aiTalk(text.trim())
   if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
   talkProject = ((floats.talk ?? floats.items) as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
   const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true, agent: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message })) // agent: never a shell
@@ -2037,7 +2052,43 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
 const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== talkW && w !== newWin && w !== aiW // the bubbles stay over another app while the new-workspace or AI window is up
-const setFront = (on: boolean) => on !== front && ((front = on), placeFloater(), win?.webContents.send('front', on)) // the app window: its animations pause behind another app (App's away)
+const setFront = (on: boolean) => on !== front && ((front = on), placeFloater(), fnWatch(), win?.webContents.send('front', on)) // the app window: its animations pause behind another app (App's away)
+
+// hold Fn to talk (Settings › Voice, the cloud; voice.ts): Chromium drops Fn's own key events on macOS (a flagsChanged of
+// keyCode 63, as Safari does), so no page ever sees Fn go down. Main watches its flag instead, only while Laki is the
+// front app and a page with a prompt asked (fn-watch: the app, the new-workspace and AI windows): osascript's JXA reads
+// NSEvent's modifier flags every FN_MS and says each change of Fn's (NSEventModifierFlagFunction); the focused page that
+// asked gets 'fn' true or false. Off-Mac Fn never reaches an app. ponytail: a poll (about 2% of a core while Laki is in
+// front), a native NSEvent monitor later
+const FN_MS = 40
+const FN_JXA = `ObjC.import('Cocoa'); let was = 0; for (;;) { const f = Number($.NSEvent.modifierFlags) & 0x800000 ? 1 : 0; if (f !== was) { was = f; console.log(f) } delay(${FN_MS / 1000}) }`
+const fnWant = new Set<Electron.WebContents>()
+let fnProc: ChildProcess | null = null
+let fnFails = 0 // quick exits in a row: at 3 it waits until Laki is in front again (osascript refused, say)
+function fnWatch() {
+  const on = mac && front && fnWant.size > 0
+  if (!on) return void (fnProc?.kill(), (fnProc = null), front || (fnFails = 0))
+  if (fnProc || fnFails >= 3) return
+  const at = Date.now()
+  const p = (fnProc = spawn('/usr/bin/osascript', ['-l', 'JavaScript', '-e', FN_JXA], { stdio: ['ignore', 'ignore', 'pipe'] }))
+  let buf = ''
+  p.stderr!.on('data', (d: Buffer) => {
+    buf += d.toString()
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    const to = BrowserWindow.getFocusedWindow()?.webContents
+    for (const l of lines) if ((l === '0' || l === '1') && to && fnWant.has(to)) to.send('fn', l === '1') // JXA's console.log is stderr
+  })
+  p.on('exit', () => fnProc === p && ((fnProc = null), (fnFails = Date.now() - at < 10e3 ? fnFails + 1 : 0), setTimeout(fnWatch, 2000))) // gone by itself: again in a moment
+  p.on('error', () => {})
+}
+ipcMain.on('fn-watch', (e, on: unknown) => {
+  if (!from(e, 'new', 'ai')) return
+  const wc = e.sender
+  if (on === true && !fnWant.has(wc)) (fnWant.add(wc), wc.once('destroyed', () => (fnWant.delete(wc), fnWatch())))
+  else if (on !== true) fnWant.delete(wc)
+  fnWatch()
+})
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
 app.on('did-resign-active', () => setFront(false))

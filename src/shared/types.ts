@@ -711,6 +711,7 @@ export type Settings = {
   tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
   tellKey?: string // its keys (unset: ui.tsx TELL_KEY)
   talkOn?: boolean // Q2: the talk key, from any app (unset: off; the cloud engine only)
+  talkTo?: 'ai' // Q10: the talk key goes to Laki AI (unset: an agent, Q2's)
   talkKey?: string // its keys (unset: ui.tsx TALK_KEY)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
@@ -809,6 +810,18 @@ export function voiceFillers(text: string): { text: string; n: number } {
   return { text: out.trim(), n }
 }
 export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
+// Q11: a speech-to-text model's price, from OpenRouter's pricing: by the second of audio, said an hour's; by the token
+// (GPT-4o Transcribe, Gemini), $ per million in / out. ponytail: OpenRouter gives most per second but Microsoft's MAI
+// per hour ($0.10, $0.36): over a cent a second ($36 an hour) is taken as an hour's. Nothing usable: undefined
+export function voicePrice(p?: { prompt?: unknown; completion?: unknown }): string | undefined {
+  const a = Number(p?.prompt)
+  const b = Number(p?.completion ?? 0)
+  if (p?.prompt == null || p.prompt === '' || !Number.isFinite(a) || a < 0 || !Number.isFinite(b) || b < 0) return undefined
+  const usd = (x: number) => (n => `$${n >= 0.1 ? (Number.isInteger(n) ? String(n) : n.toFixed(2)) : String(Number(n.toPrecision(2)))}`)(Math.round(x * 1e6) / 1e6)
+  if (b > 0) return `${usd(a * 1e6)} / ${usd(b * 1e6)} per M tokens`
+  return a === 0 ? 'free' : `${usd(a > 0.01 ? a : a * 3600)}/h`
+}
+export type VoiceModel = { id: string; name: string; price: string }
 export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false // Settings › Voice: on unless turned off
 
 // Laki's own AI (daemon/ai.ts): on unless turned off, it works Laki through the MCP server's tools, only when asked. backend:
@@ -832,7 +845,7 @@ export type AiAsk = { id: string; options: string[]; looks?: (AiLook | null)[]; 
 // an option's look: a UI kit element over its own data (size: cells across × down; none: as a full view)
 export type AiLook = { ui: Record<string, unknown>; data?: unknown; size?: [number, number] }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
-export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); profile: agent profiles saved (text: them as JSON); the rest a removal
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile', 'archive'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); profile: agent profiles saved (text: them as JSON); archive: a workspace archived (Q12, id: its id); the rest a removal
 export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
@@ -1205,7 +1218,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 171
+export const API = 172
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
