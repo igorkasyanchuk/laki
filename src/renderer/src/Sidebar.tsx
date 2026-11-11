@@ -355,7 +355,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       </div>
     )
   }
-  // an open PR's marks (settings.prMarks, each unset on): ✓ approved, ✓✓ approved by you too, 👀 you commented
+  // an open PR's marks (settings.prMarks, each unset on): ✓ approved, ✓✓ approved by you too, an eye: you commented
   const marksAt = settings.prMarks?.at ?? 'end'
   const prMarks = (pr?: PR) => {
     const m = settings.prMarks ?? {}
@@ -374,7 +374,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         )}
         {eyes && (
           <span className="ws-eyes" data-tip={`You commented on ${prName(pr)}`}>
-            👀
+            <Icon name="eye" size={11} />
           </span>
         )}
       </span>

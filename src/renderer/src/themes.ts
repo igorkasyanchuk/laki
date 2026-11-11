@@ -31,7 +31,8 @@ export type Theme = { id: string; name: string; aka?: string; light?: boolean; c
 export const THEMES: Theme[] = [
   { id: 'default', name: 'Midnight' },
   // B2: Laki's own pair: the mark's orange (icon.svg's #ff7a45) as the accent, neutrals a little warm, and status colors
-  // of their own, apart from the accent and from each other (blue runs, yellow waits, green is done, a pink-red fails).
+  // of their own, apart from each other (blue runs, green is done, a pink-red fails). V1: the orange is attention: an
+  // agent waiting for you is the accent itself (waiting), and a selection is neutral (sel), not a tint of it.
   // A new install starts on it, following the system (core.ts load); one from before keeps its theme, Midnight if unset
   {
     id: 'laki',
@@ -39,7 +40,7 @@ export const THEMES: Theme[] = [
     aka: 'brand orange warm signature',
     c: {
       bg: '#171412', side: '#1c1917', panel: '#211d1a', raised: '#2b2622', line: '#38322d', fg: '#ece6df', muted: '#a39a90',
-      accent: '#ff7a45', accentFg: '#1a0f08', sel: '#3a2a20', running: '#6cb6ff', waiting: '#f2c14e', done: '#7ec98f', error: '#ff6b8e',
+      accent: '#ff7a45', accentFg: '#1a0f08', sel: '#322c28', running: '#6cb6ff', waiting: '#ff7a45', done: '#7ec98f', error: '#ff6b8e',
       orange: '#ff9e64', pink: '#f38ba8', purple: '#b79cf2',
     },
     ansi: ['#2b2622', '#f0627a', '#7ec98f', '#e8b84a', '#6cb6ff', '#b79cf2', '#5fc9c0', '#cfc7be',
@@ -52,7 +53,7 @@ export const THEMES: Theme[] = [
     light: true,
     c: {
       bg: '#fbf8f4', side: '#f3eee8', panel: '#ffffff', raised: '#ebe4dc', line: '#ddd4c9', fg: '#2a2420', muted: '#6b6259',
-      accent: '#c2410c', accentFg: '#ffffff', sel: '#f8dccb', running: '#0b62c4', waiting: '#855600', done: '#166b32', error: '#c01f4a',
+      accent: '#c2410c', accentFg: '#ffffff', sel: '#e6dfd7', running: '#0b62c4', waiting: '#b43c0b', done: '#166b32', error: '#c01f4a',
       orange: '#b8480c', pink: '#b83280', purple: '#7a4fd0',
     },
     ansi: ['#ebe4dc', '#c4253f', '#1b7a3a', '#946200', '#0b62c4', '#7a4fd0', '#0f7a7a', '#5c544c',

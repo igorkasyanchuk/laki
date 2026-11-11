@@ -215,6 +215,9 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 /* the rail layout (App's railBar, Settings › Appearance › Layout): a column of kinds left of the list, Slack's; the traffic
    lights sit over it, so the list's head starts at its edge */
 :root { --rail-bg: color-mix(in srgb, var(--side) 82%, #000); }
+/* V1: the accent is for what needs you (Needs you, the waiting mark, the rail's count) and a view's one primary
+   button; what's picked or on (a tab, a switch, a segment, a selected row) is this strong neutral instead */
+:root { --neutral-strong: color-mix(in srgb, var(--fg) 72%, var(--bg)); --sel-fill: color-mix(in srgb, var(--fg) 9%, transparent); }
 .rail { flex: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-4); background: var(--rail-bg); border-right: 1px solid var(--line); }
 .electron .rail { padding-top: 46px; }
 .electron.rail-on .side-head { padding-left: max(6px, calc(76px - var(--rail-w, 68px))); } /* past the traffic lights (76px from the window's edge) */
@@ -429,14 +432,15 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .project { padding: var(--proj-gap, 6px) 0; } /* Settings › Appearance › The sidebar: Between projects */
 /* the sidebar's lines and rows: looks set these variables, Settings › Appearance › The sidebar overrides them */
 .project + .project { border-top: var(--proj-divider, 1px solid var(--line)); } /* a line between projects */
-.project-head { display: flex; align-items: center; gap: 1px; min-height: var(--ph-h, 28px); padding: 0 var(--sp-3) 0 var(--sp-5); font-size: var(--fs-1); text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg); font-weight: 700; }
+.project-head { display: flex; align-items: center; gap: 1px; min-height: var(--ph-h, 28px); padding: 0 var(--sp-3) 0 var(--sp-5); font-size: var(--fs-2); color: var(--fg); font-weight: 600; } /* V1: sentence case, no spacing; the project's color is its bar */
 .project-ws { margin-left: var(--ws-indent, 11px); border-left: var(--ws-guide, none); } /* its workspaces: indented under the chevron; a guide line only where a look draws one (looks.css), or Settings' */
 .project-ws:empty { display: none; }
 /* the Needs you list (Needs.tsx) above Pinned: a card each, waiting ones edged in --waiting, done ones in --done */
 .needs-cards { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-1) var(--sp-4) var(--sp-4) var(--sp-4); }
-.need { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: var(--r-panel); background: color-mix(in srgb, var(--fg) 3%, transparent); cursor: pointer; font-size: var(--fs-2); min-width: 0; }
+.need { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-4); border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: var(--r-panel); background: color-mix(in srgb, var(--raised) 70%, var(--panel)); box-shadow: var(--lift-1); cursor: pointer; font-size: var(--fs-2); min-width: 0; } /* V1: the sidebar's center, raised over the rows */
+.need.need-wait .need-q { font-size: var(--fs-3); }
 .need.need-done { border-left-color: var(--done); }
-.need:hover { background: var(--hover); }
+.need:hover { background: color-mix(in srgb, var(--raised) 85%, var(--fg) 4%); }
 .need:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .need-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .need-ws { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -473,11 +477,10 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 :where(.sidebar[data-ph-size]) .project-name { font-size: var(--ph-size); }
 :where(.sidebar[data-ph-weight]) .project-name { font-weight: var(--ph-weight); }
 :where(.sidebar[data-ph-font='custom']) .project-name { font-family: var(--ph-font); } /* a font picked by name (Appearance › Sidebar) */
-/* Color: the accent as text (readable on the sidebar: themes.ts readable), unset (auto) too; Each project's own: its color.
+/* Color: the text's (V1: unset, auto, and Each project's own: its color stays its bar), or the accent when picked.
    Every theme but the looks whose head is a filled band of their own (its text there is theirs) */
-:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar:is([data-ph-color='auto'], [data-ph-color='accent'])) .project-name,
-:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar[data-ph-color='own']) .project-head:not(.tinted) .project-name { color: var(--accent-ink); }
-:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar[data-ph-color='own']) .project-head.tinted .project-name { color: var(--tab-c); } /* its own color (⋯ › Color) */
+:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar[data-ph-color='accent']) .project-name { color: var(--accent-ink); }
+:where(.needs-list) > .project-head .project-name { color: var(--accent-ink); } /* Needs you's: what needs you is the accent's */
 .sidebar[data-side-font] { font-family: var(--side-font); } /* the sidebar's own font, over the interface's */
 /* Appearance › Interface › Text size (themes.ts' --ui-size): tabs, menus, dropdowns, the status bar, tooltips and the
    side panel's tabs as one, their small print a step under it; unset, each keeps its own */
@@ -500,7 +503,7 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .ws { --ws-bar: color-mix(in srgb, var(--tab-c, transparent) 70%, transparent); display: flex; align-items: center; gap: var(--sp-3); height: var(--ws-h, 28px); margin: var(--ws-gap, 1px) 8px; padding: 0 var(--sp-4) 0 var(--sp-4); border-radius: var(--r-control); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
-.ws.sel { --ws-bar: var(--tab-c, transparent); background-color: color-mix(in srgb, var(--accent) 20%, transparent); } /* V6: an accent fill; a bar only in the workspace's own color */
+.ws.sel { --ws-bar: var(--tab-c, transparent); background-color: var(--sel-fill); } /* V1: a neutral fill; a bar only in the workspace's own color */
 .ws.needs .ws-name { font-weight: 600; }
 .ws-new { color: var(--muted); }
 .ws-new:hover { color: var(--fg); }
@@ -521,9 +524,12 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .empty-side { padding: var(--sp-5); }
 .archived .ws { cursor: default; }
 
-.glyph { width: 14px; flex: none; text-align: center; font-size: var(--fs-1); line-height: 1; display: inline-block; }
+.glyph { width: 14px; flex: none; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.glyph:is(.g-waiting, .g-done) > svg { fill: currentColor; } /* V1: a filled mark (the pack's shape) for what's new to you */
+.glyph.g-waiting > svg { transform: rotate(45deg); } /* ◆: the pack's square on its corner */
 .g-waiting { color: var(--waiting); }
 .g-done { color: var(--done); }
+.ws > .glyph:is(.g-done, .g-limit, .g-ok, .g-finished) { color: var(--muted); } /* V1: quiet rows; Needs you shows what's done */
 .g-idle { color: var(--muted); }
 .ws.sel .g-idle, .tab .g-idle { color: inherit; } /* the row's or tab's own text color: a muted ring on a selection won't read */
 .g-exited { color: var(--error); }
@@ -576,7 +582,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .settings-nav button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: none; text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--muted); }
 .settings-nav button:hover { background: var(--hover); color: var(--fg); }
 .settings-nav button.on { background: var(--sel); color: var(--fg); }
-.set-new { flex: none; margin-left: auto; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-1); line-height: 16px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); } .switch-text .set-new { margin-left: 6px; vertical-align: 1px; }
+.set-new { flex: none; margin-left: auto; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-1); line-height: 16px; font-weight: 600; color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); } .switch-text .set-new { margin-left: 6px; vertical-align: 1px; }
 .settings-main { flex: 1; overflow-y: auto; padding: 22px 28px 48px; max-width: 720px; gap: var(--sp-6); }
 .settings-main h2 { margin: 0; font-size: var(--fs-5); color: var(--fg); }
 .settings-main p { margin: 0; }
@@ -600,7 +606,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
    color with the accent's mark, so where it starts and ends shows */
 .set-subgroup { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-5) var(--sp-5) var(--sp-1); border: 1px solid var(--line); border-radius: calc(var(--radius) + var(--r-xs)); background: color-mix(in srgb, var(--fg) 3%, transparent); }
 .set-subgroup > .set-sub { display: flex; align-items: center; gap: var(--sp-4); margin: 0; font-size: var(--fs-3); color: var(--fg); }
-.set-subgroup > .set-sub::before { content: ''; width: 3px; height: 13px; border-radius: var(--r-xs); background: var(--accent); }
+.set-subgroup > .set-sub::before { content: ''; width: 3px; height: 13px; border-radius: var(--r-xs); background: var(--neutral-strong); }
 .set-subgroup > .setting-box { border: none; padding: 0; margin: 0; }
 .rail-buttons { display: flex; flex-direction: column; gap: var(--sp-4); }
 .rail-items { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; }
@@ -611,9 +617,9 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .rail-items .rail-check { display: flex; flex-direction: row; align-items: center; gap: var(--sp-4); flex: 1; cursor: pointer; color: var(--fg); font-size: var(--fs-3); } /* over .form label's column */
 .rail-check input { width: auto; flex: none; margin: 0; }
 /* the global lists' note (Settings' Prompt templates, Actions): everywhere, in the accent */
-.set-scope { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-4) var(--sp-5); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: calc(var(--radius) + var(--r-s)); background: color-mix(in srgb, var(--accent) 7%, transparent); font-size: var(--fs-3); line-height: 1.5; }
+.set-scope { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-4) var(--sp-5); border: 1px solid var(--line); border-radius: calc(var(--radius) + var(--r-s)); background: color-mix(in srgb, var(--fg) 4%, transparent); font-size: var(--fs-3); line-height: 1.5; }
 .set-scope button.link, .two-ways > p button.link, .set-links button.link { padding: 0; font: inherit; } /* a link inside a sentence */
-.set-scope > .set-scope-tag { flex: none; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 600; }
+.set-scope > .set-scope-tag { flex: none; color: var(--fg); border-color: var(--line); font-weight: 600; }
 .set-group .preset { background: var(--bg); }
 .preset { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); }
 .preset-head { align-items: center; }
@@ -639,7 +645,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .action-slug-row .action-slug.bad { border-color: var(--error); }
 .vars { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .vars .muted { margin-right: 2px; }
-.vars .var { font-size: var(--fs-2); padding: 1px var(--sp-3); border-radius: var(--r-pill); color: var(--accent-ink); background: var(--bg); }
+.vars .var { font-size: var(--fs-2); padding: 1px var(--sp-3); border-radius: var(--r-pill); color: var(--fg); background: var(--bg); }
 .vars .var:hover { border-color: var(--accent); }
 .sample { padding: var(--sp-4) var(--sp-5); background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); white-space: nowrap; overflow: hidden; }
 .tabbar { height: 40px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 var(--sp-3); border-bottom: 1px solid var(--line); background: var(--side); }
@@ -649,7 +655,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 /* the selected tab: joined to the terminal (--tab-sel: its background, or a lift over a gradient), a bar on
    top in its color or the accent; the others only a faint line in theirs (--tab-c, set inline) */
 .tab { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tab.sel { color: var(--fg); background: var(--tab-sel, var(--term-bg)); border-color: var(--line); box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)); }
+.tab.sel { color: var(--fg); background: var(--tab-sel, var(--term-bg)); border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); } /* V1: underlined, as every tab and segment */
 .tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 14%, var(--hover)); }
 /* a real tab (the top bar's): the bar's line runs up to the selected tab, up its sides and over its top, and never
    under it, so the tab opens into its terminal (a see-through one, glass, can't show it either). The bar's ::before and
@@ -684,16 +690,16 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .tabstrip > .ib { align-self: center; margin: 2px; }
 .tabstrip.bottom { height: var(--h-l); align-items: flex-start; padding: 0 var(--sp-3); border-top: 1px solid var(--line); }
 .tabstrip.bottom .tab { border: 1px solid transparent; border-top: none; border-radius: 0 0 var(--radius) var(--radius); margin: -1px 0 0; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.bottom .tab.sel { border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--accent)); }
+.tabstrip.bottom .tab.sel { border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
 .tabstrip:is(.left, .right) { width: 180px; flex-direction: column; overflow-y: auto; padding: var(--sp-3) 0; }
 .tabstrip.left { border-right: 1px solid var(--line); }
 .tabstrip.right { border-left: 1px solid var(--line); }
 .tabstrip:is(.left, .right) > .ib { align-self: flex-start; margin: 2px 8px; }
 .tabstrip:is(.left, .right) .tab { flex: none; max-width: none; height: var(--h-m); margin: 0; border: 1px solid transparent; border-radius: 0; }
 .tabstrip.left .tab { border-right: none; box-shadow: inset 2px 0 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.left .tab.sel { border-color: var(--line); border-right: none; box-shadow: inset 2px 0 0 var(--tab-c, var(--accent)); }
+.tabstrip.left .tab.sel { border-color: var(--line); border-right: none; box-shadow: inset 2px 0 0 var(--tab-c, var(--neutral-strong)); }
 .tabstrip.right .tab { border-left: none; box-shadow: inset -2px 0 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.right .tab.sel { border-color: var(--line); border-left: none; box-shadow: inset -2px 0 0 var(--tab-c, var(--accent)); }
+.tabstrip.right .tab.sel { border-color: var(--line); border-left: none; box-shadow: inset -2px 0 0 var(--tab-c, var(--neutral-strong)); }
 .body { flex: 1; display: flex; min-height: 0; }
 .term-wrap { flex: 1; min-width: 0; position: relative; background: var(--term-bg); }
 .term { position: absolute; inset: 6px 4px 4px 10px; }
@@ -890,7 +896,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .seg button { border-radius: 0; margin-left: var(--seg-overlap, -1px); }
 .seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.seg button.on { background: var(--sel); position: relative; }
+.seg button.on { background: none; color: var(--fg); box-shadow: inset 0 -2px 0 var(--neutral-strong); position: relative; } /* V1: underlined, as the tabs */
 .buttons { display: flex; gap: var(--sp-4); align-items: center; margin-top: 4px; }
 .seg.wrap { flex-wrap: wrap; row-gap: var(--sp-2); }
 /* the new-workspace page: what to run, then Advanced (folded, its choices in words) */
@@ -1332,9 +1338,9 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .toggle:hover { background: none; color: var(--fg); }
 .toggle.on { color: var(--fg); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: var(--r-m); background: var(--line); transition: background 0.15s; }
-.toggle.on .toggle-track { background: var(--accent); }
+.toggle.on .toggle-track { background: var(--neutral-strong); } /* V1: on is neutral, not the accent */
 .toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: var(--lift-1); transition: left 0.15s; }
-.toggle.on .toggle-knob { left: 12px; background: var(--accent-fg); }
+.toggle.on .toggle-knob { left: 12px; background: var(--bg); }
 .info .toggle { font-size: var(--fs-2); }
 .info .row { flex-wrap: wrap; }
 
@@ -1348,7 +1354,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .sp-tabs { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-3) var(--sp-3) 0; border-bottom: 1px solid var(--line); }
 .sp-tabs > button:not(.ib) { display: inline-flex; align-items: center; gap: var(--sp-3); background: none; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; padding: var(--sp-3) var(--sp-4); margin-bottom: -1px; color: var(--muted); }
 .sp-tabs > button:not(.ib):hover { color: var(--fg); background: var(--hover); }
-.sp-tabs > button.on { color: var(--fg); background: var(--bg); border-color: var(--line); }
+.sp-tabs > button.on { color: var(--fg); box-shadow: inset 0 -2px 0 var(--neutral-strong); } /* V1: underlined, as the tabs */
 .sp-tabs > .ib { align-self: center; margin-bottom: 4px; }
 .sp-tabs { container-type: inline-size; } /* not the panel: containment would anchor its fixed menus to it */
 @container (max-width: 420px) { .sp-tabs > button:not(.on, .ib) .sp-tab-label { display: none; } } /* a narrow panel: the other tabs as icons */
@@ -1608,7 +1614,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .ws-step:hover { color: var(--fg); background: var(--hover); }
 .ws-step.t-ask { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 45%, transparent); }
 .ws-step.t-bad { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
-.ws-step.t-go { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ws-step.t-go { color: var(--fg); } /* V1: a step that's yours to take but not waiting on you: neutral */
 .run-btn { display: inline-flex; align-items: stretch; margin-left: 6px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; height: 24px; }
 .run-btn button { display: inline-flex; align-items: center; gap: var(--sp-3); border: none; border-radius: 0; background: var(--panel); padding: 0 var(--sp-4); font-size: var(--fs-2); }
 .run-btn button:hover { background: var(--hover); }
@@ -1684,7 +1690,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .pv-tabs { flex: none; display: flex; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); background: var(--panel); }
 .pv-tab { flex: none; display: flex; align-items: center; gap: var(--sp-3); max-width: 200px; padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); border-right: 1px solid var(--line); color: var(--muted); font-size: var(--fs-2); cursor: pointer; }
 .pv-tab:hover { color: var(--fg); background: var(--hover); }
-.pv-tab.on { color: var(--fg); background: var(--bg); box-shadow: inset 0 -2px 0 var(--accent); }
+.pv-tab.on { color: var(--fg); background: var(--bg); box-shadow: inset 0 -2px 0 var(--neutral-strong); }
 .pv-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv-dirty { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--accent); }
 .pv-tab .pv-tab-x { width: 18px; height: 18px; opacity: 0; }
@@ -2274,7 +2280,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .narrow .ai-examples { grid-template-columns: minmax(0, 1fr); }
 /* Settings › Release notes: a card per version, Next (the coming one) in the accent */
 .release-notes > div > h2 { margin: 22px 0 8px; padding-top: var(--sp-6); border-top: 1px solid var(--line); font-size: var(--fs-4); }
-.release-notes > div > h2:first-child { margin-top: 4px; padding-top: 0; border-top: none; color: var(--accent-ink); }
+.release-notes > div > h2:first-child { margin-top: 4px; padding-top: 0; border-top: none; }
 .release-notes li { margin: 3px 0; line-height: 1.5; }
 .sched-stats.ai-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* Settings › AI: today, this month */
 .ai-call { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-1) var(--sp-5); padding: var(--sp-4) var(--sp-5); font-size: var(--fs-3); }
@@ -2352,9 +2358,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ws-pr { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; color: var(--done); }
 .avatar { flex: none; border-radius: 50%; vertical-align: -3px; background: var(--hover); }
 /* a row's marks, the PR's author and GitHub's mark alike: one size (Settings › Appearance › Icon size) */
-/* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, 👀 you commented */
+/* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, an eye: you commented */
 .ws-yes { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; color: var(--done); }
-.ws-eyes { font-size: calc(var(--ws-icon, calc(13px * var(--icon-k, 1))) - 1px); line-height: 1; }
+.ws-eyes { display: inline-flex; line-height: 1; }
 .ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes, .ws-radar) :is(.icon-svg, .avatar) { width: var(--ws-icon, calc(13px * var(--icon-k, 1))); height: var(--ws-icon, calc(13px * var(--icon-k, 1))); } /* --icon-k: Appearance's icon size, unless the sidebar's own is set */
 .pr-by { display: inline-flex; align-items: center; gap: var(--sp-2); }
 /* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
@@ -2411,7 +2417,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ready-hero { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); }
 .ready-mark { display: grid; place-items: center; margin-bottom: 2px; }
 .ready-mark img { width: 64px; height: 64px; filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--accent) 45%, transparent)); } /* the mark alone, a glow of the accent under it */
-.ready-proj { font-size: var(--fs-2); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); }
+.ready-proj { font-size: var(--fs-2); font-weight: 600; color: var(--muted); }
 .ready h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--fg); overflow-wrap: anywhere; }
 .ready p { margin: 0; max-width: 480px; line-height: 1.55; font-size: var(--fs-3); }
 .ready-branch { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-3); border-radius: var(--r-pill); font: var(--fs-2) var(--mono); color: var(--fg); background: color-mix(in srgb, var(--fg) 7%, transparent); vertical-align: 1px; }
@@ -3264,8 +3270,8 @@ button.tag.ext-problems { cursor: pointer; border: none; font: inherit; }
 @media (hover: none) { .ach-hide.ib { opacity: 1; } } /* a phone: no hover to show it */
 .status .sb-trophy { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; padding: 0 var(--sp-1); border: none; background: none; color: inherit; line-height: 20px; }
 .status .sb-trophy:hover, .status .sb-trophy.on { color: var(--fg); background: none; }
-.status .sb-update { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; padding: 0 var(--sp-3); border: none; border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font: 600 var(--fs-1)/18px var(--ui-font); min-height: 18px; } /* a newer release: until you update */
-.status .sb-update:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.status .sb-update { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; padding: 0 var(--sp-3); border: none; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); font: 600 var(--fs-1)/18px var(--ui-font); min-height: 18px; } /* a newer release: until you update */
+.status .sb-update:hover { background: color-mix(in srgb, var(--fg) 16%, transparent); }
 .status .sb-update.sb-ready { background: var(--accent); color: var(--accent-fg); } /* not .ready: Ready's card (a workspace with no tabs) would make it a 680px column */
 .ach-toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: calc(var(--z-page) + 1); /* over a page (30) */ display: flex; align-items: center; gap: var(--sp-4); max-width: min(480px, calc(100vw - 32px)); padding: var(--sp-4) var(--sp-5); border-color: color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); border-radius: var(--r-pill); color: var(--fg); font: inherit; cursor: pointer; animation: ach-in 0.25s ease-out; }
 .ach-toast.up { bottom: 84px; } /* over a toast shown with it */
@@ -3445,12 +3451,12 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .app[data-dz~='pills'] .tabbar > .tab.sel { border-color: var(--line); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, var(--accent)) 45%, transparent), var(--d-lift); }
 .app[data-dz~='pills'] .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='pills'] .tabbar > .tab.review-tab { flex: none; justify-content: center; width: 34px; padding: 0; } /* only its icon: in the middle (a tab's room is for its ✕) */
-/* V6: Classic's tabs (no Design traits; not on a phone or the pill looks, which have their own): segments on
-   --r-control, the open one a soft fill instead of the top line; a tab's color a line under it, its marks as they are */
+/* V6, V1: Classic's tabs (no Design traits; not on a phone or the pill looks, which have their own): on --r-control,
+   the open one underlined in its color or the strong neutral, no fill; its marks as they are */
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar { align-items: center; }
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { height: var(--h-m); margin: 0 1px; border: 1px solid transparent; border-radius: var(--r-control); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab.sel { background: color-mix(in srgb, var(--fg) 9%, transparent); } /* a look's own selected tab wins */
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, transparent); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab.sel { background: none; } /* a look's own selected tab wins */
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='joined'] .tabbar { padding-left: max(6px, var(--d-r)); }
 .app[data-dz~='joined'] .tabbar::before, .app[data-dz~='joined'] .tabbar::after { display: none; } /* the card's own edge is the line */

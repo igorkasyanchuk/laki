@@ -29,7 +29,7 @@ export const ROW_MARKS: [RowMark, string, string][] = [
   ['author', "Author's picture", "The PR author's GitHub picture beside the mark"],
   ['approved', '✓ Approved', 'Its reviews approve it (GitHub\'s decision, or an approval where none is required)'],
   ['mine', '✓✓ Approved by you too', 'Approved, and your approval is one of them'],
-  ['commented', '👀 You commented', "Someone else's PR you commented on or reviewed with comments"],
+  ['commented', 'You commented (an eye)', "Someone else's PR you commented on or reviewed with comments"],
   ['conflict', 'Conflicts', 'A warning when its PR has merge conflicts'],
   ['ci', 'Failing checks', 'A red mark when its PR\'s checks fail'],
   ['radar', 'Overlaps', 'How many other workspaces change the same lines (Collision radar)'],

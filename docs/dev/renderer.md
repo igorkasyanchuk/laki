@@ -864,6 +864,17 @@ starts with `themeAuto` on the Laki pair (B2). With it on, the `glass` IPC gets 
 leaves `nativeTheme.themeSource` at `system` (forced, the page's `prefers-color-scheme` would stop following the Mac).
 ponytail: the bubbles, the cards on screen and the Dock icon keep what they had.
 
+The accent is attention (V1): an agent waiting for you (Needs you's head and cards, the waiting mark, the rail's count,
+a row's *Answer*) and a view's one `button.primary`. The Laki pair's `waiting` is its accent (Laki Light's a shade
+darker, for AA on its raised color) and its `sel` a neutral. What's picked or on is `--neutral-strong` (styles.css'
+`:root`, the text toward the background): a tab, a side panel tab, a preview tab and a `.seg` segment all underlined
+in it (one idiom; a tab's own color over it), a switch's track, a Settings subgroup's mark; a selected row's fill is
+`--sel-fill`. Project heads are sentence case, 12px/600, in the text's color (*Accent* in Settings › Appearance still
+picks it; a project's color is its bar). Rows are quiet: done, limit and ended marks muted (Needs you shows what's
+done), a step that isn't waiting on you (`t-go`: Merge, Ship) neutral. Status marks (Glyph.tsx `MARKS`) are the icon
+pack's shapes, not a font's characters: ◆ the pack's square on its corner and ● filled, ○ ✖ ✓ ◷ as lines; the PR's
+*you commented* mark the pack's eye. Other themes take the same rules; their own colors stay theirs.
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).
 
 ### The quick bar (Q1)

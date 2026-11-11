@@ -125,7 +125,7 @@ export type AppSettings = Paint & {
   keyOverlay?: boolean // Settings › Keys: hold ⌘ for the keys (unset: on)
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
-  prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
+  prMarks?: PRMarks // the sidebar's ✓, ✓✓ and eye on an open PR
   hideEmpty?: boolean // Appearance › Sidebar rows › Empty projects off: a project with no row to show is left out
   simpleRow?: boolean // B4: a row is its name and one chip
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // the sidebar rows' other marks (ROW_MARKS)
@@ -1857,7 +1857,7 @@ export function SettingsPage(p: {
                   </Fragment>
                 )))}
                 <label>
-                  Where ✓, ✓✓ and 👀 go
+                  Where ✓, ✓✓ and the eye go
                   <select value={s.prMarks?.at ?? 'end'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
                     {MARKS_AT.map(([v, name]) => (
                       <option key={v} value={v}>
