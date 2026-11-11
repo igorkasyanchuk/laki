@@ -75,7 +75,7 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('folders-ready') // then main sends the ones that came first
     return () => void ipcRenderer.removeListener('open-folders', f)
   },
-  onNewPrompt: (cb: (prompt: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string) => cb(p)), // the new-workspace window's
+  onNewPrompt: (cb: (prompt: string, project?: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string, project?: string) => cb(p, project)), // the new-workspace window's (project: Q5's new task in it)
   fitNew: (height: number) => ipcRenderer.send('new-fit', height), // its height: what the page needs
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
   pageShot: (webContentsId: number, whole: boolean, save: boolean): Promise<string> => ipcRenderer.invoke('page-shot', webContentsId, whole, save), // a Browsers page's: copied, or saved (its path)
@@ -114,8 +114,8 @@ contextBridge.exposeInMainWorld('laki', {
     replySend: (tab: string, text: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-reply-send', tab, text), // the pinned card's one-line answer
     cardSize: (tab: string, w: number, h: number) => ipcRenderer.send('floater-card', tab, w, h),
     // the voice prompt's window: the agents it can go to, then the text out (no tab: a new session's page)
-    onVoice: (cb: (items: object[], colors: Record<string, string>, to: string, reply?: object) => void) => ipcRenderer.on('voice', (_e, items, colors, to, reply) => cb(items, colors, to, reply)), // reply: the one agent it answers (a circle's Reply…)
-    voiceSend: (tab: string, text: string): Promise<{ error?: string; queued?: boolean }> => ipcRenderer.invoke('voice-send', tab, text),
+    onVoice: (cb: (items: object[], colors: Record<string, string>, to: string, reply?: object, route?: object) => void) => ipcRenderer.on('voice', (_e, items, colors, to, reply, route) => cb(items, colors, to, reply, route)), // route: Q5's names // reply: the one agent it answers (a circle's Reply…)
+    voiceSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; ai?: boolean }> => ipcRenderer.invoke('voice-send', tab, text, project),
     voiceClose: () => ipcRenderer.send('voice-close'),
     // a circle's right click (Reply…, Open tab, Seen) and ⌥-click (Reply…): main's menu and the reply window
     menuTab: (tab: string) => ipcRenderer.send('floater-menu-tab', tab),
@@ -131,7 +131,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
-    talkSend: (tab: string, text: string): Promise<{ error?: string; queued?: boolean; new?: boolean }> => ipcRenderer.invoke('talk-send', tab, text),
+    talkSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean }> => ipcRenderer.invoke('talk-send', tab, text, project),
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
     talkClose: () => ipcRenderer.send('talk-close'),
   },

@@ -1013,7 +1013,7 @@ export function App() {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...(t.status === 'waiting' && t.ask?.tool && { perm: { tool: t.ask.tool, what: t.ask.what ?? '' } }), ...islandOf(t), ...floatMore(w) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), pid: w.project, ...(t.alias && { alias: t.alias }), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...(t.status === 'waiting' && t.ask?.tool && { perm: { tool: t.ask.tool, what: t.ask.what ?? '' } }), ...islandOf(t), ...floatMore(w) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
@@ -1039,11 +1039,11 @@ export function App() {
     })
     .sort((a, b) => Number(freshDone(b.t)) - Number(freshDone(a.t)) || b.at - a.at)
     .filter((x, i) => i < recentN || (doneAlert && freshDone(x.t)))
-    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (freshDone(t) ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...(t.done && { unseen: true }), ...islandOf(t), ...floatMore(w) }))
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), pid: w.project, ...(t.alias && { alias: t.alias }), status: (freshDone(t) ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...(t.done && { unseen: true }), ...islandOf(t), ...floatMore(w) }))
   const pool = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floats = fs?.floater === false ? [] : pool // the talk pill's are the same, with the bubbles off too
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(talkOn && { talk: pool }) }
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(talkOn && { talk: pool }), ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first words' names
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   const asking = view?.tabs.filter(t => t.status === 'waiting').map(t => t.id).join(' ') // none: not connected, nothing known
   useEffect(() => void (asking !== undefined && bridge?.asking?.(asking ? asking.split(' ') : [])), [asking]) // asks on screen: an answered one's card goes

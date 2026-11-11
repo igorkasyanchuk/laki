@@ -1172,7 +1172,8 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[] } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2)
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
@@ -1237,7 +1238,7 @@ const pin = (f: BrowserWindow, to?: string) => {
 function sendVoice(w: BrowserWindow) {
   const to = replyFor ? floats.items.find(x => x.tab === replyFor) : undefined
   voiceTabs = new Set(to ? [to.tab] : floats.voiceTo === 'new' ? [] : floats.items.map(x => x.tab))
-  w.webContents.send('voice', to ? [] : floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo, to)
+  w.webContents.send('voice', to ? [] : floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo, to, to ? undefined : routeFor())
   if (floats.at === 'notch' && pill) w.setPosition(Math.round(pill.x + pill.width / 2 - VOICE.width / 2), pill.y + pill.height + 4)
   else if (barAt) (p => w.setPosition(p.x, p.y))(beside(VOICE.width, VOICE.height, barLen() - (across() ? VOICE.width : VOICE.height))) // by the bar's end
 }
@@ -1354,6 +1355,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ai: o.ai === true,
     at: o.at === 'notch' ? 'notch' : 'edge',
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
+    ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
@@ -1626,12 +1628,12 @@ ipcMain.on('floater-menu-close', e => (e.sender === floater?.webContents || e.se
 // at a time: another + brings it up, a prompt fills it. As tall as the page (new-fit). It closes once the workspace is
 // made, or on Esc.
 let newWin: BrowserWindow | null = null
-function newWsWin(prompt?: string) {
+function newWsWin(prompt?: string, project?: string) {
   if (newWin && !newWin.isDestroyed()) {
-    if (prompt) newWin.webContents.send('new-prompt', prompt)
+    if (prompt) newWin.webContents.send('new-prompt', prompt, project)
     return void newWin.focus()
   }
-  const w = (newWin = panelWin({ window: 'new', ...(prompt && { prompt }) }, 640, 340, { minWidth: 480, minHeight: 200 })) // then new-fit: as tall as the page
+  const w = (newWin = panelWin({ window: 'new', ...(prompt && { prompt }), ...(project && { project }) }, 640, 340, { minWidth: 480, minHeight: 200 })) // then new-fit: as tall as the page; project: Q5's new task in it
   w.on('closed', () => newWin === w && (newWin = null))
 }
 // Q1: the quick bar (?window=quick: NewWindow.tsx' QuickWindow), its global hotkey, the menu bar's and the bubbles' New
@@ -1819,13 +1821,16 @@ ipcMain.on('new-fit', (e, h: unknown) => {
 // the voice prompt: to an agent of the list (send, as the app's, queued while it works), or a new session's page
 // the island's finished card's reply box too (the card's window); a reply queued (it works again meanwhile): the page
 // says so, then closes
-ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
+ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown, project: unknown) => {
   const fromCard = !!card && e.sender === card.webContents && floats.at === 'notch'
   if ((!voice || e.sender !== voice.webContents) && !fromCard) return { error: 'not a bubble' }
   if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
   if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
+  if (tab === AI_TO && !fromCard) return (r => ('ai' in r && voice?.close(), r))(aiAsked(text.trim())) // Q5: its name said first
   if (typeof tab === 'string' && tab) {
     if (fromCard ? !floats.items.some(x => x.tab === tab) : !voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
+    talkProject = (floats.items as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
+    if (!fromCard) talkLast = tab
     const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
     if ('error' in r) return r
     if (!r?.queued) fromCard ? fold() : voice?.close() // (it may have shut meanwhile); queued: the page says so first
@@ -1833,7 +1838,9 @@ ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
   }
   if (!voice || fromCard) return { error: 'nothing to send' }
   voice.close()
-  newWsWin(text.trim())
+  const pid = typeof project === 'string' && floats.route?.projects.some(p => p.id === project) ? project : undefined
+  if (pid) talkProject = pid
+  newWsWin(text.trim(), pid)
   return {}
 })
 ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.close())
@@ -1845,11 +1852,16 @@ ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.
 // only while it records. ponytail: press to start, press to stop: globalShortcut has no key-up, so holding the key to
 // talk needs a native helper (a CGEventTap) later
 const TALK = { width: 320, height: 78 }
+const AI_TO = '@ai' // Q5: Laki AI as a route's target (its name said first)
+// Laki AI asked in the background (its chat has the answer: the AI page); only while it's on
+const aiAsked = (text: string) => (floats.ai ? (void rpc('aiAsk', { text }).catch(() => {}), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
 let talkW: BrowserWindow | null = null
 let talkTo = new Set<string>() // the agents the pill offered
 let talkLast = '' // the one you last sent to (talkDefault's second choice)
 let talkUndo: { tab: string; text: string } | null = null // a send that's still in its queue: Undo takes it back
-const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }) }))
+const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string; pid?: string; alias?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }), ...(f.pid && { project: f.pid }), ...(f.alias && { alias: f.alias }) }))
+let talkProject = '' // Q5: the project of the last talk or Say it sent: a route into another one shows a little longer
+const routeFor = () => floats.route && { ...floats.route, aiOn: floats.ai, last: talkProject, lastTab: talkLast }
 function talk() {
   if (talkW && !talkW.isDestroyed()) return void talkW.webContents.send('talk-key') // the second press: stop, send
   const p = screen.getCursorScreenPoint()
@@ -1862,7 +1874,7 @@ function talk() {
   w.webContents.on('did-finish-load', () => {
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { list, to: talkDefault(list, talkLast), colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke })
+    w.webContents.send('talk', { list, to: talkDefault(list, talkLast), colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -1875,13 +1887,16 @@ ipcMain.handle('talk-text', async (e, audio: unknown) => {
   if (typeof audio !== 'string' || !audio || audio.length > 24 << 20) return { error: 'no recording' }
   return rpc<{ text: string }>('voiceText', { audio }).catch((err: Error) => ({ error: err.message }))
 })
-ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown) => {
+ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unknown) => {
   if (!fromTalk(e)) return { error: 'not the talk pill' }
   if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
   if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
   if (typeof tab !== 'string') return { error: 'who gets it?' }
-  if (!tab) return newWsWin(text.trim()), { new: true }
+  const pid = typeof project === 'string' && floats.route?.projects.some(p => p.id === project) ? project : undefined
+  if (!tab) return (talkProject = pid ?? talkProject), newWsWin(text.trim(), pid), { new: true }
+  if (tab === AI_TO) return aiAsked(text.trim())
   if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
+  talkProject = ((floats.talk ?? floats.items) as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
   const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
   if ('error' in r) return r
   talkLast = tab

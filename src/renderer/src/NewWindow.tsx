@@ -137,8 +137,8 @@ export function AiWindow() {
 export function NewWindow() {
   const view = useView()
   const [err, setErr] = useState('')
-  const [ask, setAsk] = useState({ n: 0, prompt: new URLSearchParams(location.search).get('prompt') ?? undefined }) // another voice prompt: the page anew with it
-  useEffect(() => void bridge?.onNewPrompt?.(prompt => setAsk(a => ({ n: a.n + 1, prompt }))), [])
+  const [ask, setAsk] = useState(() => (q => ({ n: 0, prompt: q.get('prompt') ?? undefined, project: q.get('project') ?? undefined }))(new URLSearchParams(location.search))) // another voice prompt: the page anew with it; project: Q5's new task in it
+  useEffect(() => void bridge?.onNewPrompt?.((prompt, project) => setAsk(a => ({ n: a.n + 1, prompt, project }))), [])
   // the window as tall as the page: the head, the form and the body's padding, again as the form changes
   const ready = !!view
   useEffect(() => {
@@ -160,7 +160,7 @@ export function NewWindow() {
         key={ask.n}
         view={{ ...view, projects: view.projects.filter(p => !p.kind) } /* Terminals and Browsers make theirs with + */}
         agent={view.settings.agent}
-        initial={ask.prompt ? { prompt: ask.prompt } : undefined}
+        initial={ask.prompt ? { prompt: ask.prompt, ...(ask.project && view.projects.some(p => p.id === ask.project) && { project: ask.project }) } : undefined}
         inserts={project => windowInserts(view, project)}
         onClose={() => window.close()}
         onCreate={async p => {

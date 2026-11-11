@@ -741,7 +741,7 @@ export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
 // model's id (unset: VOICE_MODEL). fn: cloud only, hold Fn to talk anywhere in Laki, let go to insert (unset: on)
 // on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
-export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean; fixes?: string; fillers?: boolean } // send: Send as you stop talking (cloud, off unless true: voice.ts); fixes: Word fixes, a line each (voiceFix); fillers: Remove filler words (voiceFillers, unset: on)
+export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean; fixes?: string; fillers?: boolean; route?: boolean; aiWord?: string } // route: Q5's Route by first words (the bubbles' Say it, the talk pill; unset: on); aiWord: the word for Laki AI there (unset: Laki); send: Send as you stop talking (cloud, off unless true: voice.ts); fixes: Word fixes, a line each (voiceFix); fillers: Remove filler words (voiceFillers, unset: on)
 // Settings › Voice's Word fixes on a cloud transcript: a line each, `heard → meant` (or -> or =; heard may be several
 // words, or several forms with commas: `lucky, lakey → Laki`), each heard form as a whole word in any case, the
 // longest first. What changed comes back for the bar to say. ponytail: VOICE_FIXES lines at most; no fuzzy matching

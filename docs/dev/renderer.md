@@ -450,6 +450,19 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `not-determined`: the pill says why first). ponytail: press to start and to stop: globalShortcut has no key-up, a
   hold mode needs a native helper. `npm run test:ui`'s `talk-pill` opens it (`smoke`: no microphone). Tested in
   `test/talk.test.ts`.
+- **Route by first words** (Q5, `settings.voice.route`, unset on; `aiWord`): shared/talk.ts `routeOf` (pure, tested
+  in `test/talk.test.ts`): the words before the first comma, colon, spaced dash or pause (…, a sentence's end), 4 at
+  most (a new task's project 4 more), after the word fixes (`voiceFix`: the Say it window's macOS dictation; the
+  cloud's voiceText has them in): Laki AI's word (`aiWord`, else Laki; while it's on) → `@ai` (main's `aiAsked`:
+  `aiAsk` in the background); `new task [in <project>]` → a new workspace there (`newWsWin(prompt, project)`: the
+  new window's `?project=` and `new-prompt`'s); a workspace's name or a tab's `alias`, `norm`ed (marks off, Cyrillic
+  in Latin letters, `- _ . / @` as spaces) and compared without spaces, exact first, else `dist` 1 (2 past 5
+  letters); two candidates: none. App's floats carry `pid` and `alias`, `floatOpts.route` the projects, `aiWord`
+  and `fixes`; main's `routeFor` adds `aiOn`, `last` (`talkProject`) and `lastTab`. The talk pill shows the match
+  (`.t-to.moved`) `ROUTE_MS` 1.5 s, `ROUTE_FAR_MS` 3 s into another project than the last; Tab another, ⏎ or the key
+  now, Esc not at all. Say it (voicePage): ⏎ routes once (`decided`): the text without its address, the select on
+  its target, *sends in a moment* unless Esc, a keystroke or another pick stops it; no match with nothing picked:
+  `talkDefault`'s. Only the floats' agent tabs, never a shell; nothing it routes runs a command.
 - **A floated tab** (main's `tabWins`, `tab-float` IPC through App's `floatTab`: the tab's menu › *Float in its own window* (`popOut`), ⌘K, and the
   pane's *Show it* / *Bring it back*): `panelWin` `?window=tab&tab=<id>`, `NewWindow.tsx` `TabWindow` (its head the
   title bar; a `Term` of its own at the tab's ⌘± size: one more client of the session, the PTY sizes to whoever typed last;

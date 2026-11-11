@@ -161,6 +161,19 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
           </Group>
         </>
       )}
+      <Group title="Route by first words">
+        <div className="setting-box">
+          <Switch className="switch-row" on={v.route !== false} onChange={route => onChange({ ...v, route })}>
+            <Says title="Route by first words" hint="In the bubbles' Say it and the talk key's pill: start with who gets it, then a pause or a comma. “Checkout flow, fix the button” goes to that workspace's agent, “@pay: retry” to that agent, “New task in Shop, add a dark mode” to a new task there, and its name for Laki AI to Laki AI. Shown a moment first: Tab changes it, Esc stops it. Never a terminal" />
+          </Switch>
+        </div>
+        {v.route !== false && (
+          <label>
+            Laki AI's name, said first
+            <input value={v.aiWord ?? ''} placeholder="Laki" maxLength={40} onChange={e => onChange({ ...v, aiWord: e.target.value.trim() || undefined })} />
+          </label>
+        )}
+      </Group>
     </>
   )
 }

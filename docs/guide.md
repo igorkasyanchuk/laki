@@ -2425,7 +2425,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   at the pointer records (a red dot while the microphone is on, a level, the time) and names who gets it: the agent
   that asked last, else the one you last sent to, else a new task (Tab, ⇧Tab: another). Press it again or ⏎ to send
   (an agent at work gets it when its turn ends, and *Undo* takes it back for 4 s; typed into an idle one's terminal it
-  can't be), Esc to drop it. macOS asks for the microphone the first time.
+  can't be), Esc to drop it. macOS asks for the microphone the first time. *Route by first words* (on; the talk
+  key's pill and the bubbles' *Say it*): start with who gets it and a pause or a comma: "Checkout flow, fix the
+  button" goes to that workspace's agent (its name as you say it, a letter or two off is fine), "@pay: retry" to the
+  agent named pay, "New task in Shop: add a dark mode" to a new task in that project, and *Laki AI's name* (Laki
+  unless you set another) to Laki AI. It shows where it goes for a moment first (Tab picks another, Esc stops it),
+  then sends the rest; with no name first it goes where it would have. Never a terminal.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

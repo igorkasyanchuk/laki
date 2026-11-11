@@ -12,7 +12,8 @@ import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, initials, noteWhole, wavOf } from './text'
-import { type TalkTo, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { voiceFix } from '../../shared/types'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -53,8 +54,8 @@ type Bridge = {
     pin: (ev: 'esc') => void
     replySend: (tab: string, text: string) => Promise<{ error?: string }>
     cardSize: (tab: string, w: number, h: number) => void
-    onVoice: (cb: (items: Float[], colors: Colors, to: string, reply?: Float) => void) => void
-    voiceSend: (tab: string, text: string) => Promise<{ error?: string; queued?: boolean }>
+    onVoice: (cb: (items: Float[], colors: Colors, to: string, reply?: Float, route?: RouteCfg) => void) => void
+    voiceSend: (tab: string, text: string, project?: string) => Promise<{ error?: string; queued?: boolean; ai?: boolean }>
     voiceClose: () => void
     menuTab: (tab: string) => void
     reply: (tab: string) => void
@@ -65,14 +66,23 @@ type Bridge = {
     onTalk: (cb: (c: Talk) => void) => void
     onTalkKey: (cb: () => void) => void
     talkText: (audio: string) => Promise<{ text?: string; error?: string }>
-    talkSend: (tab: string, text: string) => Promise<{ error?: string; queued?: boolean; new?: boolean }>
+    talkSend: (tab: string, text: string, project?: string) => Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean }>
     talkUndo: () => Promise<{ error?: string }>
     talkClose: () => void
   }
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
 // npm run test:ui's (no microphone opened)
-type Talk = { list: TalkTo[]; to: string; colors: Colors; mic: string; smoke?: boolean }
+type Talk = { list: RouteTab[]; to: string; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg }
+// Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
+// the project last sent to (a route into another one shows a little longer)
+type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; aiOn?: boolean; fixes?: string; last?: string; lastTab?: string }
+const AI_TO = '@ai' // Laki AI as a target (main's)
+const ROUTE_MS = 1500 // a route shown before it goes; into another project than the last one: ROUTE_FAR_MS
+const ROUTE_FAR_MS = 3000
+// a route's target as the pages send it: a tab, '' (a new task, maybe in a project) or Laki AI; null: the default
+const routeTo = (r: Route) => (r.target.kind === 'tab' ? { tab: r.target.tab } : r.target.kind === 'ai' ? { tab: AI_TO } : r.target.kind === 'new' ? { tab: '', project: r.target.project } : null)
+const routeLong = (r: Route, list: RouteTab[], c: RouteCfg) => (p => (p && c.last && p !== c.last ? ROUTE_FAR_MS : ROUTE_MS))(r.target.kind === 'tab' ? list.find(f => f.tab === (r.target as { tab: string }).tab)?.project : r.target.kind === 'new' ? r.target.project : undefined)
 
 const laki = (window as unknown as { laki?: Bridge }).laki
 const bridge = laki?.floater
@@ -540,34 +550,58 @@ function voicePage() {
   const lastBox = box.querySelector<HTMLElement>('.v-last')!
   const opts = box.querySelector<HTMLElement>('.v-opts')!
   let reply: Float | undefined // a circle's Reply…: the one agent it goes to
+  let items: Float[] = []
+  let route: RouteCfg | undefined // Q5: Route by first words, on
+  let routing: ReturnType<typeof setTimeout> | undefined // a route shown, about to go
+  let decided = false // routed once (or stopped): ⏎ sends to what's picked
+  let newIn: string | undefined // a new task's project
+  const later = (what: string, ms: number) => ((note.textContent = `→ ${what}: sends in a moment · Esc stops it`), note.classList.remove('bad'), (decided = true), (routing = setTimeout(() => ((routing = undefined), void go()), ms)))
   const go = async () => {
     if (!text.value.trim() || send.disabled) return
     // an agent in a menu: typed keys would pick one of its options
     if (reply && replyOf(reply) === 'options') return void ((note.textContent = 'Pick an option, or Open the tab'), note.classList.add('bad'))
+    if (routing) clearTimeout(routing), (routing = undefined) // ⏎ while it's shown: now
+    else if (!reply && route && !decided) {
+      // Q5: its first words name who gets it (the word fixes first: macOS's dictation has none of its own); else the
+      // agent that asked last or the one last sent to, as the talk pill's
+      const tabs: RouteTab[] = items.map(f => ({ tab: f.tab, name: f.name, status: f.status, at: f.at, project: (f as Float & { pid?: string }).pid, alias: (f as Float & { alias?: string }).alias }))
+      const r = routeOf(text.value, { tabs, projects: route.projects, aiOn: route.aiOn, aiWord: route.aiWord, fixes: route.fixes, fix: voiceFix })
+      const at = routeTo(r)
+      if (at && !r.rest) return void ((note.textContent = `Nothing after “${r.how}”: say what to do`), note.classList.add('bad'))
+      if (at && [...to.options].some(o => o.value === at.tab)) return void ((text.value = r.rest), (to.value = at.tab), (newIn = at.project), later(r.how, routeLong(r, tabs, route)))
+      if (to.value === PICK) {
+        const d = talkDefault(tabs, route.lastTab)
+        return void ((to.value = d), later(d ? talkName(tabs, d) : 'a new session', ROUTE_MS))
+      }
+    }
     if (!reply && to.value === PICK) return void ((note.textContent = 'Pick who gets it first'), note.classList.add('bad'), to.focus())
     send.disabled = true
-    const r = await bridge?.voiceSend(reply ? reply.tab : to.value, text.value)
+    const r = await bridge?.voiceSend(reply ? reply.tab : to.value, text.value, !reply && !to.value ? newIn : undefined)
     send.disabled = false
     if (r?.error) (note.textContent = r.error), note.classList.add('bad') // its text kept
     else if (r?.queued) (note.textContent = 'Queued: it gets it when its turn ends'), note.classList.remove('bad'), setTimeout(() => bridge?.voiceClose(), 1200)
   }
   send.onclick = go
-  text.oninput = calm
+  text.oninput = () => (calm(), routing ? (clearTimeout(routing), (routing = undefined), (note.textContent = 'Stopped: ⏎ sends to what’s picked')) : (decided = false))
   text.onkeydown = e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) e.preventDefault(), go()
   }
   // Esc shuts it; with words in it, a second Esc (the first may be meant for dictation)
   let esc = false
   document.onkeydown = e => {
+    if (e.key === 'Escape' && routing) return void (clearTimeout(routing), (routing = undefined), (note.textContent = 'Stopped: ⏎ sends to what’s picked')) // Q5: not at all yet
     if (e.key !== 'Escape') return void (esc && ((esc = false), (note.textContent = hint))) // re-armed: the mode's note again
     if (!text.value.trim() || esc) return bridge?.voiceClose()
     esc = true
     note.textContent = 'Esc again to throw it away'
     note.classList.remove('bad')
   }
-  to.onchange = () => to.value !== PICK && calm()
-  bridge?.onVoice((items, colors, where, to1) => {
+  to.onchange = () => (routing && (clearTimeout(routing), (routing = undefined), (note.textContent = hint)), (newIn = undefined), to.value !== PICK && calm())
+  bridge?.onVoice((list, colors, where, to1, r) => {
     paint(colors)
+    items = list
+    route = r
+    decided = false
     reply = to1
     box.classList.toggle('reply', !!reply)
     title.textContent = reply ? `Reply to ${reply.agent ?? 'it'} · ${reply.name}` : 'Say a prompt'
@@ -598,6 +632,7 @@ function voicePage() {
     to.replaceChildren(
       ...(where === 'new' ? [] : [opt(PICK, 'Pick who gets it…', { disabled: true, selected: true })]),
       ...items.map(f => opt(f.tab, `${f.name} · ${WORDS[f.status] ?? f.status}`)),
+      ...(route?.aiOn ? [opt(AI_TO, 'Laki AI')] : []),
       opt('', 'A new session…', { selected: where === 'new' }),
     )
     to.hidden = where === 'new'
@@ -617,21 +652,32 @@ function talkPage() {
   const level = box.querySelector<HTMLElement>('.t-level > i')!
   const note = box.querySelector<HTMLElement>('.t-note')!
   const undo = box.querySelector<HTMLButtonElement>('.t-undo')!
-  let list: TalkTo[] = []
+  let list: RouteTab[] = []
   let to = ''
-  let phase: 'wait' | 'rec' | 'writing' | 'sending' | 'sent' = 'wait'
+  let toProject: string | undefined // a new task's project (Q5)
+  let cfg: RouteCfg | undefined
+  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'sending' | 'sent' = 'wait'
+  let routed: { text: string; t: ReturnType<typeof setTimeout> } | undefined // Q5: shown before it goes
   let stopRec: ((send: boolean) => void) | undefined
   const close = () => bridge?.talkClose()
   const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
-  const show = () => (toEl.textContent = `→ ${talkName(list, to)}`)
+  const show = () => (toEl.textContent = `→ ${to === AI_TO ? 'Laki AI' : to ? talkName(list, to) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   document.addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey) return
-    if (e.key === 'Escape') return void (e.preventDefault(), stopRec ? stopRec(false) : close())
-    if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait')) return void (e.preventDefault(), (to = talkNext(list, to, e.shiftKey)), show())
+    if (e.key === 'Escape') return void (e.preventDefault(), routed && clearTimeout(routed.t), stopRec ? stopRec(false) : close())
+    if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait' || phase === 'route')) {
+      e.preventDefault()
+      to = talkNext(list, to === AI_TO ? '' : to, e.shiftKey)
+      toProject = undefined
+      toEl.classList.remove('moved')
+      if (routed) clearTimeout(routed.t), (routed.t = setTimeout(() => void send(routed!.text), ROUTE_MS)) // the new one, a moment again
+      return void show()
+    }
     if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
+    else if (e.key === 'Enter' && phase === 'route' && routed) e.preventDefault(), clearTimeout(routed.t), void send(routed.text) // now
   })
-  bridge?.onTalkKey(() => (phase === 'rec' ? stopRec?.(true) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  bridge?.onTalkKey(() => (phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
   undo.onclick = async () => {
     undo.disabled = true
     const r = await bridge?.talkUndo()
@@ -643,6 +689,7 @@ function talkPage() {
     paint(c.colors)
     list = c.list
     to = c.to
+    cfg = c.route
     show()
     if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
     if (c.mic === 'not-determined') say('macOS asks once: Laki hears what you say to an agent, and only while this pill shows red')
@@ -710,18 +757,31 @@ function talkPage() {
       }
     }
     if (!text) return void (say('Nothing heard', true), setTimeout(close, 1500))
-    await send(text)
+    // Q5: its first words name who gets it: shown a moment (Tab: another, ⏎: now, Esc: not at all), then the rest goes
+    const r = cfg && routeOf(text, { tabs: list, projects: cfg.projects, aiOn: cfg.aiOn, aiWord: cfg.aiWord })
+    const at = r && routeTo(r)
+    if (!r || !at) return send(text)
+    if (!r.rest) return void (say(`Nothing after “${r.how}”: say it again with what to do`, true), setTimeout(close, 3000))
+    to = at.tab
+    toProject = at.project
+    show()
+    toEl.classList.add('moved')
+    phase = 'route'
+    say(`${r.how}: sends in a moment · Tab: another · ⏎ now · Esc stops it`)
+    routed = { text: r.rest, t: setTimeout(() => void send(r.rest), routeLong(r, list, cfg!)) }
   }
   async function send(text: string) {
+    if (phase === 'sending' || phase === 'sent') return
     phase = 'sending'
-    const name = talkName(list, to)
-    const r = await bridge?.talkSend(to, text)
+    const name = to === AI_TO ? 'Laki AI' : talkName(list, to)
+    const r = await bridge?.talkSend(to, text, to ? undefined : toProject)
     phase = 'sent'
     if (r?.error) {
       const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
       return void (say(`Not sent: ${r.error}${copied ? '. Copied, paste it' : ''}`, true), setTimeout(close, 5000))
     }
     if (r?.new) return close() // the new task's window has it
+    if (r?.ai) return void (say('Asked Laki AI: its answer is on the AI page'), setTimeout(close, 2500))
     say(r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`)
     undo.hidden = !r?.queued
     setTimeout(close, 4000)
