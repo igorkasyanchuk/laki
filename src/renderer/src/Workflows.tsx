@@ -9,7 +9,7 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { queueOrder, ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, hints, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, hints, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -378,7 +378,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                     <span className="wf-status-dot" />
                     <b>{r.task || r.name}</b>
                     <span className="muted">
-                      {r.name} · {statusWords(r)}
+                      {r.name} · {r.status === 'waiting' && r.wait?.kind === 'ask' && r.wait.until ? `waits for you · ${leftWords(r.wait.until - Date.now())} left` : statusWords(r)}
                       {!ended(r) && r.block ? ` · ${atEnd(r) ? 'the end' : r.block}` : ''}
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
@@ -464,6 +464,17 @@ function BudgetField({ budget, onBudget }: { budget?: Budget; onBudget: (b: Budg
       {typeof b === 'string' && <span className="wf-hint wf-bad">{b}</span>}
     </>
   )
+}
+
+// W8: an ask's deadline: how long is left (1h 12m) and what it picks then, a minute at a time
+const leftWords = (ms: number) => (m => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`))(Math.max(1, Math.ceil(ms / 60000)))
+function Countdown({ until, then }: { until: number; then: string }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick(n => n + 1), 30000)
+    return () => clearInterval(t)
+  }, [])
+  return <span className="wf-hint wf-deadline" data-tip="No answer by then: it goes on that way">{until > Date.now() ? `${leftWords(until - Date.now())} left, then ${then}` : `${then} now`}</span>
 }
 
 // a run's use of a limit: a bar when it has one
@@ -1521,6 +1532,20 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
         <>
           {field('Question', text(b.question, (x, v) => (x.question = v)))}
           {field('Show with it', text(b.show, (x, v) => (x.show = v || undefined), false, '{{steps.plan.answer}}'), 'What you typed with your pick is {{answer}}.')}
+          <div className="wf-row2">
+            {field('No answer within', <Typed value={b.deadline ? askWait(b.deadline) : ''} placeholder="never: 2h, 90" onText={v => set(x => void (x.deadline = (n => (typeof n === 'number' ? n : undefined))(v.trim() ? askMinutes(v) : '')))} />, 'Then it takes the option below; time it waits doesn’t count toward its budget')}
+            {field(
+              'Then take',
+              <select value={b.fallback ?? ''} onChange={e => set(x => void (x.fallback = e.target.value || undefined))}>
+                <option value="">none</option>
+                {(b.options ?? []).map(o => (
+                  <option key={o.label}>{o.label}</option>
+                ))}
+              </select>,
+              'The safe way: never one that ships, merges or archives',
+            )}
+          </div>
+          {b.deadline !== undefined && field('Remind me before (minutes)', <Typed value={b.remind ? askWait(b.remind) : ''} placeholder="none: 30" onText={v => set(x => void (x.remind = (n => (typeof n === 'number' ? n : undefined))(v.trim() ? askMinutes(v) : '')))} />, 'A notification then; with phone: yes in its file, a push with its choices')}
         </>
       )}
       {b.kind === 'choice' && (
@@ -2369,6 +2394,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
             <Icon name="help" size={14} />
             <b>{asking.kind === 'agent-ask' ? `${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur ?? '', kind: 'agent' })} asks: ${asking.question}` : asking.question}</b>
             <span className="wf-hint">{asking.kind === 'confirm' ? 'before it does something others see' : asking.kind === 'stuck' ? 'it can’t go on by itself' : asking.kind === 'decide' ? 'the model isn’t sure' : asking.kind === 'agent-ask' ? (asking.ns.length ? 'its agent waits: a pick here answers in its tab' : 'its agent waits: answer it in its tab') : ''}</span>
+            {asking.kind === 'ask' && asking.until && asking.fallback && <Countdown until={asking.until} then={`it takes ${asking.fallback}`} />}
           </div>
           {'show' in asking && asking.show && (
             <div className="wf-ask-show">

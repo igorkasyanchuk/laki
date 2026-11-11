@@ -1507,7 +1507,7 @@ picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in 
 *Run command* (`npm test`: ok or fail by its exit code; its `{{…}}` go in as environment variables, never as text the shell reads: write them bare or in double quotes, not single), *If / else* (two ways, by what a block said: contains, matches,
 equals), *Case* (if / elsif / else: its branches in order, the first that holds wins, *else* last; each tests the case's
 variable or one of its own, so *if the change is only specs → approve, else → a full review* is a Case on what an agent
-answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`), *Laki action* (open a PR, approve,
+answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`; *No answer within* `2h` and *Then take* one of its options make it go on that way when no one answers by then, a safe one: check refuses one that leads to a PR, merge or archive; *Remind me before*, a notification, and a push with its choices with `phone: yes`. Its page counts down and says what it will pick), *Laki action* (open a PR, approve,
 merge, the dev server, archive), *Wait* (until its PR's checks pass or fail; on a fail, `{{steps.<id>.log}}` is the end of up to three failed GitHub Actions logs, fenced and marked as the PR's own output, for the agent after it), *Save* (into the workspace's storage
 folder, its Artifacts: text such as an agent's answer, a file or folder of the workspace, or a link such as its PR),
 *AI call* (one prompt to a model on OpenRouter with Laki AI's key, no tools: a summary, a title, a pick; 5 minutes

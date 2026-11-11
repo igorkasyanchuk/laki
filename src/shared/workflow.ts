@@ -58,6 +58,14 @@ export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'exten
 export const RETRY_MAX = 5
 export const TIMEOUT_MAX = 1440 // a block's timeout: a day at most
 export const AGENT_TIMEOUT = 60 // an agent block's minutes for its turn, unless it says (time it waits for you doesn't count)
+export const ASK_WAIT_MAX = 7 * 1440 // W8: an ask's wait: (its deadline), a week at most
+// an ask's wait: or remind: 90, 90 min, 2h: minutes; a string: what's wrong
+export function askMinutes(v: string): number | string {
+  const m = /^(\d+)\s*(h|hours?|m|min|minutes?)?$/i.exec(v.trim())
+  const n = m ? Number(m[1]) * (/^h/i.test(m[2] ?? '') ? 60 : 1) : NaN
+  return n >= 1 && n <= ASK_WAIT_MAX ? n : `${v}? minutes or hours (90, 2h), a week at most`
+}
+export const askWait = (n: number) => (n % 60 ? `${n}` : `${n / 60}h`) // as the file says it
 
 export type Option = { label: string; to?: string }
 export type Block = {
@@ -93,6 +101,9 @@ export type Block = {
   retry?: number // agent, run, llm, decide, extension: tries again after a bad exit (fail, error), 1 to RETRY_MAX times
   retryOn?: number[] // run: only these exit codes are tried again (unset: any but 0)
   question?: string // ask
+  deadline?: number // ask (wait:): minutes it waits for you, then it takes fallback (W8)
+  fallback?: string // ask (else:): the option's label it takes when no one answers by then: the safe way
+  remind?: number // ask: minutes before its deadline: a notification (and with phone: yes, a push with its choices)
   title?: string // popup: its title ({{vars}})
   show?: string // ask: what goes with the question ({{vars}})
   of?: string // choice, case: a variable (steps.review.answer) or a block's id (its answer or output); a case's branch may name its own
@@ -109,7 +120,7 @@ export type Block = {
   notify?: boolean // end, popup: a macOS notification too
   popover?: boolean // end, popup: a card in the window's corner (Open, ✕), the run going on
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
-  phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
+  phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes); ask: its reminder pushed too
 }
 export type Workflow = { id: string; name: string; desc?: string; group?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; when?: string[]; budget?: Budget; vars?: Record<string, string>; blocks: Block[] } // group: the Workflows page's collapsible head it's under (none: no group); budget: a run's working time and AI money (budgetOf); when: only when: tests on the event's fields, each must hold (whenProblem); vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project' | 'builtin' // builtin: a template that comes with Laki (workflows/), never run or saved
@@ -249,7 +260,7 @@ export function exitsOf(b: Block): Exit[] {
 // are lines named after them (next:, ok:, fail:…), a choice's and an ask's options are - label → block; > lines are its
 // text; max: 3 → stuck limits it; at: x,y is where the canvas draws it.
 
-export const WHOLE = new Set(['inputs', 'name', 'ask', 'show', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
+export const WHOLE = new Set(['inputs', 'name', 'ask', 'show', 'else', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
 const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', extension: 'extension', end: 'end' }
 
 export function parse(text: string, id = ''): { workflow: Workflow; problems: string[] } {
@@ -402,6 +413,8 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
     }
     case 'ask': return void (b.question = v)
     case 'show': return void (b.show = v || undefined)
+    case 'else': return void (b.fallback = v || undefined)
+    case 'remind': return void (n => (typeof n === 'string' ? problems.push(`${at}: remind: ${n}`) : (b.remind = n)))(askMinutes(v))
     case 'if':
     case 'choice': {
       // choice: steps.review.answer contains "LGTM" (if: is the same), or a number's: steps.triage.urgent.p >= 0.8
@@ -415,6 +428,7 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       return void (b.action = v)
     case 'ask first': return void (b.confirm = yes(v))
     case 'wait':
+      if (b.kind === 'ask') return void (n => (typeof n === 'string' ? problems.push(`${at}: wait: ${n}`) : (b.deadline = n)))(askMinutes(v)) // W8: an ask's deadline
       if (!(v in WAITS)) problems.push(`${at}: wait: ${Object.keys(WAITS).join(', ')}`)
       return void (b.for = v)
     case 'save': return void (b.file = v)
@@ -455,7 +469,12 @@ export function toFile(wf: Workflow): string {
       case 'webhook': L.push(`webhook: ${one(b.url)}`); if (b.method && b.method !== 'POST') L.push(`method: ${b.method}`); for (const h of b.headers ?? []) L.push(`header: ${one(h)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'run': L.push(`run: ${one(b.cmd)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'extension': L.push(`extension: ${one(b.extension)}`.trimEnd()); break
-      case 'ask': L.push(`ask: ${one(b.question)}`); if (b.show) L.push(`show: ${one(b.show)}`); break
+      case 'ask':
+        L.push(`ask: ${one(b.question)}`)
+        if (b.show) L.push(`show: ${one(b.show)}`)
+        if (b.deadline || b.remind || b.phone) L.push([b.deadline && `wait: ${askWait(b.deadline)}`, b.remind && `remind: ${askWait(b.remind)}`, b.phone && 'phone: yes'].filter(Boolean).join(' · '))
+        if (b.fallback) L.push(`else: ${one(b.fallback)}`)
+        break
       case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.modal === false) L.push('modal: no'); if (b.popover) L.push('popover: yes'); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
       case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
       case 'case': L.push(`case: ${b.of ?? ''}`.trimEnd()); break
@@ -476,6 +495,31 @@ export function toFile(wf: Workflow): string {
     if (b.at) L.push(`at: ${Math.round(b.at[0])},${Math.round(b.at[1])}`)
   }
   return L.join('\n') + '\n'
+}
+
+// W8: an ask's deadline: else: is one of its options, and the safe way: nothing it leads to (until another ask, where
+// you decide again) does what others see (OUTWARD); remind: before it
+function deadlineProblems(b: Block, by: Map<string, Block>): string[] {
+  const out: string[] = []
+  if (b.deadline === undefined) {
+    if (b.fallback || b.remind) out.push(`${blockName(b)}: ${b.fallback ? 'else:' : 'remind:'} needs wait: (how long it waits for you)`)
+    return out
+  }
+  const opt = b.options?.find(o => o.label === b.fallback)
+  if (!b.fallback) return [`${blockName(b)}: wait: needs else: (the option it takes when no one answers)`]
+  if (!opt) return [`${blockName(b)}: else: ${b.fallback}? one of its options (${(b.options ?? []).map(o => o.label).join(', ')})`]
+  if (b.remind !== undefined && b.remind >= b.deadline) out.push(`${blockName(b)}: remind: before its wait: is up (under ${askWait(b.deadline)})`)
+  const seen = new Set<string>()
+  const go = [opt.to]
+  while (go.length) {
+    const x = by.get(go.pop() ?? '')
+    if (!x || seen.has(x.id) || x === b) continue
+    seen.add(x.id)
+    if (x.kind === 'action' && OUTWARD.includes(x.action ?? '')) return [...out, `${blockName(b)}: else: ${b.fallback} leads to ${blockName(x)} (${ACTIONS[x.action!].toLowerCase()}): the answer no one gave must be the safe way`]
+    if (x.kind === 'ask') continue // you decide there again
+    go.push(...exitsOf(x).map(e => e.to))
+  }
+  return out
 }
 
 // what keeps it from running: no start, a block nothing leads to, one with no way out, an exit to no block, a loop
@@ -522,6 +566,7 @@ export function check(wf: Workflow): string[] {
     if (b.retryOn?.length && b.kind !== 'run') out.push(`${blockName(b)}: retry on: is for run blocks (their exit codes)`)
     else if (b.retryOn?.length && !b.retry) out.push(`${blockName(b)}: retry on: needs retry: (how many times)`)
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)
+    if (b.kind === 'ask') out.push(...deadlineProblems(b, by))
     if (b.kind === 'popup' && !b.text?.trim()) out.push(`${blockName(b)} shows nothing`)
     if (b.kind === 'popup' && b.modal === false && !b.popover && !b.notify) out.push(`${blockName(b)}: shown nowhere (a window, a card or a notification)`)
     if (b.kind === 'save' && !b.file?.trim()) out.push(`${blockName(b)} has no file`)
@@ -906,7 +951,7 @@ export type Decision = { at: number; block: string; exit: string; why: string; m
 // what a run waits on: an ask (yours, a confirm before an outward action, a stuck block), an agent's turn, a command,
 // a wait block, a usage limit, your Resume
 export type FlowWait =
-  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number; capped?: boolean } // tab, used: a stalled agent's or one past its $ budget mid turn (stuck), what its block's turn has had of its timeout; capped: that one's turn stopped at twice its budget (W2)
+  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number; capped?: boolean; until?: number; fallback?: string; remindAt?: number; reminded?: boolean } // until, fallback: an ask's deadline (W8: absolute, a restart keeps it) and the option it takes then; remindAt: when it reminds you (reminded: it did); tab, used: a stalled agent's or one past its $ budget mid turn (stuck), what its block's turn has had of its timeout; capped: that one's turn stopped at twice its budget (W2)
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
   | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
@@ -981,7 +1026,7 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked. Its inputs, besides the task, on one line: "inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m" (name[?][:kind][=default]; kinds text (the default), number, branch, choice(a|b|…); ? optional): each is {{inputs.<name>}}, asked for as the run starts (laki_workflow_run's inputs); a scheduled run takes the defaults.
 - agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed). perm: how freely it acts (claude and codex; unset: the head's perm:, else its profile's (Settings › Agents & profiles), else the agent's own, which asks, and an unattended run stops at its first permission prompt): ${PERM_IDS.map(id => `${id} (${PERMS.claude!.find(p => p[0] === id)![2].replace(/;/g, ',')})`).join(', ')}; codex's are its sandbox and approvals in the same spirit (plan: read only). An agent can't start a workflow with a bypassPermissions block. fast: yes is fast mode (claude, codex: more speed, more usage; unset: its profile's). Blocks sharing a tab (session run of the same agent, or session: <block>) need the same perm and fast: the tab starts once.
 - run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines. Its {{vars}} go in as environment variables, never as text the shell reads: write them bare or in double quotes ("{{event.pr.title}}"), never in single quotes (check says so).
-- ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.
+- ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}. A deadline: "wait: 2h · remind: 30 · phone: yes" (minutes or hours, a week at most; remind: minutes before it, a notification, and a push with its choices with phone: yes) and "else: <one of its options' labels>" on its own line (needed with wait:): no answer by then, it takes that one; it must be the safe way (nothing it leads to ships, approves, merges or archives before another ask).
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.
 - case: <variable or block id>, then its branches in order, the first that holds wins: "- contains|matches|equals "<text>" → <block>", a branch may test another variable ("- steps.size.output equals "0" → <block>"), a number's "- steps.triage.urgent.p >= 0.8 → <block>", a JS expression's "- js: num('steps.triage.urgency') >= 2 && vars['steps.triage.team'] === 'payments' → <block>" (vars: every variable, num(name), json(name)), and "- else → <block>" last (needed). if/elsif/else, or a switch on one value. To route on what an agent found, tell it to answer with one word (only_specs, code…) and test {{steps.<id>.answer}}.
 - action: ship|approve|merge|dev|archive (ship's commit message as "> " lines). ship, approve, merge and archive ask the user first unless "ask first: no". Exits ok, error.

@@ -510,3 +510,91 @@ end: success
   assert.ok(!/fake-secret|fake-proj/.test(posted[0]))
   assert.equal(r.vars['steps.post.output'], 'got •••• back', 'its response, kept')
 })
+
+// W8: an ask with a deadline: wait: 2h, its else, a reminder before it
+const DEADLINE = `# Deadline
+runs in: main
+
+## start
+input: task
+next: q
+
+## q
+ask: Ship it?
+wait: 2h · remind: 30 · phone: yes
+else: Not now
+- Yes → e
+- Not now → later
+
+## e
+end: success
+
+## later
+end: stopped
+`
+
+test('workflow ask deadline: answered in time; no answer: its else, as no one’s, after one reminder (pushed with its choices); a restart keeps it; check names a bad else', async t => {
+  // the file: read back as written; check's problems
+  const { workflow, problems } = parse(DEADLINE, 'deadline')
+  assert.deepEqual([problems, check(workflow)], [[], []])
+  assert.deepEqual([workflow.blocks[1].deadline, workflow.blocks[1].remind, workflow.blocks[1].fallback, workflow.blocks[1].phone], [120, 30, 'Not now', true])
+  assert.deepEqual(parse(toFile(workflow), 'deadline').workflow, workflow)
+  const bad = (f: string) => check(parse(f, 'x').workflow)
+  assert.deepEqual(bad(DEADLINE.replace('else: Not now\n', '')), ['q: wait: needs else: (the option it takes when no one answers)'])
+  assert.deepEqual(bad(DEADLINE.replace('else: Not now', 'else: Later')), ['q: else: Later? one of its options (Yes, Not now)'])
+  assert.deepEqual(bad(DEADLINE.replace('remind: 30', 'remind: 3h')), ['q: remind: before its wait: is up (under 2h)'])
+  assert.deepEqual(bad(DEADLINE.replace('wait: 2h · ', '').replace('else: Not now\n', '')), ['q: remind: needs wait: (how long it waits for you)'])
+  assert.match(parse(DEADLINE.replace('wait: 2h', 'wait: 8 days'), 'x').problems.join(), /wait: 8 days\? minutes or hours/)
+  const merges = DEADLINE.replace('runs in: main', 'runs in: worktree').replace('## later\nend: stopped', '## later\naction: merge\nok: e\nerror: e')
+  assert.deepEqual(bad(merges), ['q: else: Not now leads to later (merge its pr): the answer no one gave must be the safe way'])
+  assert.deepEqual(bad(merges.replace('- Not now → later', '- Not now → e').replace('- Yes → e', '- Yes → later')), [], 'Yes may merge: you said it')
+
+  // a fake phone push receiver
+  const pushed: string[] = []
+  const srv = createServer(async (q, res) => {
+    let body = ''
+    for await (const c of q) body += c
+    pushed.push(body)
+    res.writeHead(200).end('{}')
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true, webhook: { url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}/push`, format: 'json' } })
+  await rig.rpc('flowSave', { id: 'deadline', text: DEADLINE })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const asking = (id: string) => until(async () => (x => x.status === 'waiting' && x)(await get(id)), 'it asks')
+
+  // answered in time
+  const one = await rig.rpc('flowStart', { workflow: 'deadline', project: p.id, task: 'x' })
+  let r = await asking(one.id)
+  assert.ok(Math.abs(r.wait.until - (Date.now() + 2 * 3600e3)) < 10e3, 'two hours on')
+  assert.deepEqual([r.wait.fallback, r.wait.remindAt], ['Not now', r.wait.until - 30 * 60e3])
+  assert.match(r.log.join('\n'), /asks you: Ship it\? \(no answer in 2h: Not now\)/)
+  await rig.rpc('flowAnswer', { id: one.id, n: 0 })
+  r = await get(one.id)
+  assert.deepEqual([r.status, r.decisions.at(-1).exit, r.decisions.at(-1).you], ['done', 'Yes', true])
+
+  // not answered: a restart keeps its deadline; one reminder; then its else
+  const two = await rig.rpc('flowStart', { workflow: 'deadline', project: p.id, task: 'y' })
+  r = await asking(two.id)
+  const { until: deadline, remindAt } = r.wait
+  await rig.stop()
+  await rig.start()
+  assert.equal((await get(two.id)).wait.until, deadline, 'absolute: a restart keeps it')
+  const asked = pushed.filter(x => x.includes('Ship it?')).length
+  await rig.rpc('flowTick', { now: remindAt - 1000 })
+  assert.equal((await get(two.id)).wait.reminded, undefined, 'not yet')
+  await rig.rpc('flowTick', { now: remindAt + 1000 })
+  await rig.rpc('flowTick', { now: remindAt + 60e3 })
+  r = await get(two.id)
+  assert.equal(r.log.filter((l: string) => / reminds you: Ship it\? \(no answer in 30m: Not now\)$/.test(l)).length, 1, r.log.join('\n'))
+  await until(() => pushed.filter(x => x.includes('Ship it?')).length === asked + 1, 'its reminder pushed, once')
+  assert.match(pushed.at(-1)!, /Not now/)
+  assert.equal(r.status, 'waiting')
+  await rig.rpc('flowTick', { now: deadline + 1000 })
+  r = await get(two.id)
+  assert.deepEqual([r.status, r.decisions.at(-1).exit, r.decisions.at(-1).why, r.decisions.at(-1).you, r.vars.answer], ['stopped', 'Not now', 'no answer in 2h: Not now', undefined, 'Not now'])
+  assert.equal(pushed.filter(x => x.includes('Ship it?')).length, asked + 1, 'no reminder after')
+})

@@ -630,8 +630,11 @@ async function work(r: FlowRun, b: Block) {
       }
       throw new Error('no branch matched, and no else')
     }
-    case 'ask':
-      return ask(r, 'ask', fill(b.question ?? '', vars), fill(b.show ?? '', vars), (b.options ?? []).map(o => o.label))
+    case 'ask': {
+      // W8: wait: a deadline (absolute: a restart keeps it), then its else; remind: before it
+      const until = b.deadline && b.fallback ? Date.now() + b.deadline * 60000 : undefined
+      return ask(r, 'ask', fill(b.question ?? '', vars), fill(b.show ?? '', vars), (b.options ?? []).map(o => o.label), until ? { until, fallback: b.fallback, ...(b.remind && { remindAt: until - b.remind * 60000 }) } : undefined)
+    }
     case 'action':
       if (OUTWARD.includes(b.action!) && b.confirm !== false && !r.dry) return ask(r, 'confirm', `${ACTIONS[b.action!]}?`, b.action === 'ship' ? `Commit message: ${fill(b.text || '{{task}}', vars)}` : undefined, ['Do it', 'Stop the run'])
       return act(r, b)
@@ -1295,12 +1298,33 @@ function waitTick(r: FlowRun, b: Block, now: number) {
   }
 }
 
-function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number }) {
+function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number } | { until: number; fallback?: string; remindAt?: number }) {
   Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind, question, ...(show && { show }), options, ...more } })
-  say(r, `asks you: ${question}`, show)
+  say(r, `asks you: ${question}${more && 'until' in more ? ` (no answer in ${left(more.until - Date.now())}: ${more.fallback})` : ''}`, show)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
   flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, question, options, show)
+}
+// how long until a deadline, in words: 2h, 1h 12m, 45m
+const left = (ms: number) => (m => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`))(Math.max(1, Math.ceil(ms / 60000)))
+// W8: an ask with a deadline, at each tick: its reminder once (a notification, a push with its choices when it says
+// phone: yes), then past it its else, decided as no one's (you: false)
+function askTick(r: FlowRun, b: Block, w: Extract<FlowWait, { kind: 'ask' | 'confirm' | 'stuck' }>, now: number) {
+  if (!w.until || !w.fallback) return
+  if (now >= w.until) {
+    const n = w.options.indexOf(w.fallback)
+    if (n < 0) return
+    r.vars.answer = w.fallback
+    Object.assign(r, { status: 'running' as FlowStatus, wait: undefined })
+    return leave(r, b, w.fallback, `no answer in ${left(b.deadline ? b.deadline * 60000 : w.until - (r.at ?? w.until))}: ${w.fallback}`)
+  }
+  if (w.remindAt === undefined || w.reminded || now < w.remindAt) return
+  w.reminded = true
+  const text = `${w.question} (no answer in ${left(w.until - now)}: ${w.fallback})`
+  say(r, `reminds you: ${text}`)
+  touch()
+  broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text })
+  if (b.phone) flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, text, w.options, w.show)
 }
 function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop the run'], more?: { tab: string; used: number }) {
   if (!live(r)) return
@@ -1593,7 +1617,8 @@ export function flowTick(now = Date.now()) {
       continue
     }
     if (!b) continue
-    if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
+    if (r.wait?.kind === 'ask' && r.status === 'waiting') askTick(r, b, r.wait, now)
+    else if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
     else if (r.wait?.kind === 'retry' && now >= r.wait.until) again(r, b)
     else if ((r.wait?.kind === 'agent' || r.wait?.kind === 'agent-ask' || r.wait?.kind === 'limit') && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
     else if (r.wait?.kind === 'agent-ask' && tabStatus(r.wait.tab) !== 'waiting') {
