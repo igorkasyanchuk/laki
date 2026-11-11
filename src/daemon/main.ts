@@ -1198,17 +1198,22 @@ function unlocked(c: core.Conn) {
   return true
 }
 // D6: a passkey device's page with no call for its idle minutes locks (its next call would too): told at once
-// and one whose device no longer locks (passkeys turned off, remote access off its stable address) opens
+// and a locked one whose lock is gone for good (passkeys turned off, its passkey gone: lockGone) opens
 function idleLock(now = Date.now()) {
   const idle = remoteMod.idleMs()
   for (const c of core.clients)
-    if (c.device && !remoteMod.deviceLocks(c.device)) c.locked && unlocked(c)
-    else if (c.device && idle > 0 && !c.locked && now - (c.at ?? now) > idle) lock(c)
+    if (c.device && c.locked && remoteMod.lockGone(c.device)) unlocked(c)
+    else if (c.device && idle > 0 && !c.locked && remoteMod.deviceLocks(c.device) && now - (c.at ?? now) > idle) lock(c)
 }
 // just paired: its page offers to set a passkey up
 const offer = (c: core.Conn) => c.device && remoteMod.passkeyOffer(c.device) && c.send({ ev: 'passkey', offer: true })
 remoteMod.onGone(ids => {
   for (const [ws, id] of devSocks) if (ids.includes(id)) ws.close(4401, 'revoked')
+})
+// remote access's sockets (a page token's and the paired devices'): closed as it stops
+const farSocks = new Set<import('ws').WebSocket>()
+remoteMod.onStopped(() => {
+  for (const ws of farSocks) ws.close(4401, 'remote access stopped')
 })
 const wss = new WebSocketServer({ noServer: true, maxPayload: 34 << 20 }) // an attached 25 MB file (fileSave), in base64. ponytail: /rpc stays at 16 MB: the app's own go over the socket
 let clientSeq = 0
@@ -1241,6 +1246,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   })
   function opened(ws: import('ws').WebSocket, device?: string) {
     if (device) devSocks.set(ws, device), ws.once('close', () => devSocks.delete(ws))
+    if (far) farSocks.add(ws), ws.once('close', () => farSocks.delete(ws))
     const locked = !!device && remoteMod.deviceLocks(device) // D6: its page unlocks first (a passkey, or the PIN)
     const app = isApp(url.searchParams.get('token'), req.headers.origin) // S1: the app's window: yours, never looked up
     // S7: its process is in an agent's tab, couldn't be found, or it's remote access's page (a phone is on camera too): in
@@ -1289,15 +1295,13 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         return
       }
       // D6: a paired device's page: its last call kept; a passkey one's locked again after its idle minutes, and while
-      // locked only the unlock calls; one whose device no longer locks opens
+      // locked only the unlock calls (even with remote access stopped meanwhile); one whose lock is gone for good opens
       if (c.device) {
         const now = Date.now()
-        if (!remoteMod.deviceLocks(c.device)) c.locked && unlocked(c)
-        else {
-          if (!c.locked && remoteMod.idleMs() > 0 && now - (c.at ?? now) > remoteMod.idleMs()) lock(c)
-          if (c.locked && m.id !== undefined) c.asked?.add(m.id)
-          if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
-        }
+        if (c.locked && remoteMod.lockGone(c.device)) unlocked(c)
+        else if (!c.locked && remoteMod.deviceLocks(c.device) && remoteMod.idleMs() > 0 && now - (c.at ?? now) > remoteMod.idleMs()) lock(c)
+        if (c.locked && m.id !== undefined) c.asked?.add(m.id)
+        if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
         c.at = now
       }
       if (m.method === 'attach') {

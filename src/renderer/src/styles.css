@@ -84,7 +84,7 @@ html.side-clear:not(.glass) :is(.sidebar, .rail) { --hover: color-mix(in srgb, v
 html.material .app:not([data-dz], .narrow, .full) { background: var(--side); }
 html.material .app:not([data-dz], .narrow, .full) :is(.rail, .sidebar, .status.wide) { background: none; }
 html.material .app:not([data-dz], .narrow, .full) .sidebar { border-right: none; }
-html.material .app:not([data-dz], .narrow, .full) :is(.rail, .sidebar, .status.wide) { --fg: var(--side-fg); --muted: var(--side-muted); } /* made to read over any wallpaper (themes.ts materialInk; set with html.material) */
+html.material .app:not([data-dz], .narrow, .full) :is(.rail, .sidebar, .status.wide) { --fg: var(--side-fg); --muted: var(--side-muted); --neutral-strong: color-mix(in srgb, var(--fg) 72%, var(--bg)); --sel-fill: color-mix(in srgb, var(--fg) 9%, transparent); } /* made to read over any wallpaper (themes.ts materialInk; set with html.material) */
 html.material .app:not([data-dz], .narrow, .full) .status.wide { border-top: none; }
 html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) var(--sp-4) var(--sp-2) var(--sp-4); border: 0.5px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--lift-2); overflow: hidden; }
 /* V8: one floating surface for menus, ⌘K and the other dialogs, tooltips, popovers and toasts: the panel's color at

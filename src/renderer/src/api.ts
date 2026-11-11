@@ -250,8 +250,17 @@ export const api = new Api()
 const b64u = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 export const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
 export const passkeys = () => typeof window !== 'undefined' && !!window.PublicKeyCredential && !bridge
+// Safari runs WebAuthn only close to the tap: the daemon's challenge is asked for before it (passkeyReady, as the card
+// shows), so the tap goes straight to Face ID; one older than 50 s (the daemon's last a minute) is asked again
+const early: Partial<Record<'passkeyOptions' | 'passkeyChallenge', { at: number; p: Promise<any> }>> = {}
+export const passkeyReady = (m: 'passkeyOptions' | 'passkeyChallenge') => void (early[m] = { at: Date.now(), p: api.call(m) }).p.catch(() => {})
+const challenge = <T,>(m: 'passkeyOptions' | 'passkeyChallenge'): Promise<T> => {
+  const e = early[m]
+  delete early[m]
+  return e && Date.now() - e.at < 50_000 ? e.p : api.call<T>(m)
+}
 export async function passkeySetUp() {
-  const o = await api.call<{ challenge: string; rpId: string; user: { id: string; name: string } }>('passkeyOptions')
+  const o = await challenge<{ challenge: string; rpId: string; user: { id: string; name: string } }>('passkeyOptions')
   const c = (await navigator.credentials.create({
     publicKey: { rp: { id: o.rpId, name: 'Laki' }, user: { id: unb64u(o.user.id), name: o.user.name, displayName: o.user.name }, challenge: unb64u(o.challenge), pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { userVerification: 'required', residentKey: 'discouraged' }, attestation: 'none', timeout: 60000 },
   })) as PublicKeyCredential | null
@@ -262,7 +271,7 @@ export async function passkeySetUp() {
   return api.call('passkeyRegister', { id: b64u(c.rawId), clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.getAuthenticatorData()), publicKey: b64u(key), alg: r.getPublicKeyAlgorithm() })
 }
 export async function passkeyUnlock() {
-  const ch = await api.call<{ challenge: string; rpId: string; id: string }>('passkeyChallenge')
+  const ch = await challenge<{ challenge: string; rpId: string; id: string }>('passkeyChallenge')
   const c = (await navigator.credentials.get({ publicKey: { challenge: unb64u(ch.challenge), rpId: ch.rpId, allowCredentials: [{ type: 'public-key', id: unb64u(ch.id) }], userVerification: 'required', timeout: 60000 } })) as PublicKeyCredential | null
   if (!c) throw new Error('cancelled')
   const r = c.response as AuthenticatorAssertionResponse

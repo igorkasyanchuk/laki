@@ -755,6 +755,7 @@ export function remoteStop(why?: string) {
   if (!r) return
   if (why) phoneRemote(`Laki: remote access stopped: ${why}`, { open: r.open })
   remote = undefined
+  stopped() // its pages off now: My domain's connector and Tailscale's serve outlive it, and their sockets with them
   clearTimeout(r.timer)
   r.cf?.stop()
   if (r.host) void connect().catch(() => {}) // My domain's off the connector's ingress
@@ -790,6 +791,8 @@ const deviceDays = () => (n => (Number.isInteger(n) && n >= 1 && n <= 90 ? n : 3
 export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, pk, regUntil: __, ...d }) => ({ ...d, ...(push && { notify: true }), ...(pk && { passkey: true }) })) : undefined) // never its hash, its push keys or its passkey
 let gone: (ids: string[]) => void = () => {}
 export const onGone = (f: (ids: string[]) => void) => void (gone = f) // main.ts: a revoked or expired device's sockets closed
+let stopped = () => {}
+export const onStopped = (f: () => void) => void (stopped = f) // main.ts: every remote socket closed as remote access stops
 const cookieOf = (header: string | undefined) => {
   for (const part of (header ?? '').split(';')) {
     const at = part.indexOf('=')
@@ -851,6 +854,9 @@ const CHALLENGE_MS = 60_000
 const challenges = new Map<string, { device: string; kind: 'create' | 'get'; until: number }>()
 export const passkeyOn = () => state.settings?.remotePasskey !== false
 const deviceById = (id: string) => state.remoteDevices?.find(d => d.id === id)
+// a locked page may open without a signature only when its lock is gone for good: passkeys off, or the device has none
+// (not while remote access is stopped or off its stable address: then it stays locked)
+export const lockGone = (id: string) => !passkeyOn() || !deviceById(id)?.pk
 // whether a device's pages lock: it has a passkey, passkeys are on, at a stable address
 export const deviceLocks = (id: string) => passkeyOn() && !!remote?.url && stable(remote) && !!deviceById(id)?.pk
 export const idleMs = () => (m => (Number.isFinite(m) && m >= 0 ? m : 15) * 60e3)(Number(state.settings?.remoteIdle ?? 15))

@@ -259,10 +259,16 @@ device `regUntil` (10 minutes) when passkeys are on; `passkeyOffer` (stable addr
 taken before the check, so a failed check uses it too; with `pin`: `pinFallback`, the setting and a PIN), `passkeyUnlock`,
 `passkeyPin` (`pinIs`, a wrong one counted as `/pin`'s: `wrongPin`). `deviceLocks(id)`: on, running at a stable address,
 the device has a key. main.ts: each socket of such a device starts `locked` (core's Conn): it gets `{ ev: 'locked', pin }`
-and nothing else (`send` drops all but `LOCK_EVS` and replies), and only `UNLOCK`'s calls (ping and the three above);
-`unlocked` then says hello, its asks and notices, as a new page. `c.at`: its last call; a call after `idleMs` locks it
-first, and `idleLock` (on `remoteTick`, every 15 s) locks an idle one at once. `/rpc` with a locking device's cookie:
-423. The page (App.tsx): `UnlockForm` on the splash (or over the window, `.lock-over`, when it locks mid-session) runs
+and nothing else (`send` drops all but `LOCK_EVS` and the answers to the calls it made while locked: `asked`), and only
+`UNLOCK`'s calls (ping and the three above), even if remote access stops meanwhile; `unlocked` then says hello, its asks
+and notices, as a new page, and the page (api.ts) emits `open` once that state comes, so its terminals attach again, its
+view is told and its lists come. `c.at`: its last call (set as it connects); a call after `idleMs` locks it first, and
+`idleLock` (on `remoteTick`, every 15 s) locks an idle one at once; `lock` takes it off its terminals (no responder left
+waiting on it). A locked page opens without a signature only when its lock is gone for good (`lockGone`: passkeys off, or
+its passkey gone), at its next call or tick. `/rpc` with a locking device's cookie: 423. Stop (`remoteStop`) closes every
+remote socket (`onStopped`, main.ts' `farSocks`): My domain's connector and Tailscale's serve outlive it. The page asks
+for its challenge before the tap (api.ts `passkeyReady`, as the lock card or the offer shows; 50 s): Safari runs WebAuthn
+only close to a tap. The page (App.tsx): `UnlockForm` on the splash (or over the window, `.lock-over`, when it locks mid-session) runs
 `api.ts`' `passkeyUnlock` (`navigator.credentials.get`, `allowCredentials` its id), *Use PIN instead* opens PinForm on
 `passkeyPin`; the `passkey` event's offer shows a bar, *Set up* runs `passkeySetUp` (`navigator.credentials.create`,
 rp the page's host, `userVerification: 'required'`, `residentKey: 'discouraged'`). Settings › Remote access › Devices:

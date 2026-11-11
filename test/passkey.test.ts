@@ -183,4 +183,8 @@ test('D6: a paired device sets a passkey up, then each page is locked until its 
   assert.equal(await z.call('ping'), 'pong')
   await until(() => z.events.slice(m).some(e => e.ev === 'state'), 'the state once passkeys are off')
   assert.ok(Array.isArray((await z.call('state')).projects))
+  // Stop: every remote socket closed (My domain's connector outlives it), none left to get the view
+  const closed = new Promise<number>(res => z.ws.once('close', code => res(code)))
+  await rig.rpc('remoteStop')
+  assert.equal(await closed, 4401)
 })

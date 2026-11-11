@@ -5,7 +5,7 @@ import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
-import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeys, passkeySetUp, passkeyUnlock } from './api'
+import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeyReady, passkeys, passkeySetUp, passkeyUnlock } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
@@ -244,6 +244,7 @@ function UnlockForm({ pin }: { pin: boolean }) {
   const [usePin, setUsePin] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  useEffect(() => passkeyReady('passkeyChallenge'), []) // its challenge before the tap (api.ts: Safari's)
   if (usePin) return <PinForm unlock onPin={code => api.call('passkeyPin', { pin: code })} />
   const go = () => {
     if (busy) return
@@ -251,7 +252,7 @@ function UnlockForm({ pin }: { pin: boolean }) {
     setErr('')
     passkeyUnlock().then(
       () => setBusy(false),
-      e => (setBusy(false), setErr(/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) ? 'Not unlocked: try again' : String(e?.message ?? e))),
+      e => (setBusy(false), passkeyReady('passkeyChallenge'), setErr(/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) ? 'Not unlocked: try again' : String(e?.message ?? e))),
     )
   }
   return (
@@ -1259,7 +1260,7 @@ export function App() {
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'locked') setLocked({ pin: !!m.pin })
-      else if (m.ev === 'passkey' && m.offer && passkeys()) setKeyOffer(true)
+      else if (m.ev === 'passkey' && m.offer && passkeys()) (setKeyOffer(true), passkeyReady('passkeyOptions')) // its challenge before Set up's tap
       else if (m.ev === 'remote') {
         // remote access stopped by a wrong PIN on its page: said here, and as a notification
         toast(m.text, () => setDialog({ section: 'remote' }), 'Settings')
@@ -3677,7 +3678,7 @@ export function App() {
             <span>
               <b>Unlock Laki here with Face ID or Touch ID?</b> A passkey of this device's: each time you open Laki here, and after a while without using it.
             </span>
-            <button onClick={() => void passkeySetUp().then(() => (setKeyOffer(false), toast('Passkey set up: this device unlocks with it')), e => !/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) && toast(String(e?.message ?? e)))}>Set up</button>
+            <button onClick={() => void passkeySetUp().then(() => (setKeyOffer(false), toast('Passkey set up: this device unlocks with it')), e => (passkeyReady('passkeyOptions'), !/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) && toast(String(e?.message ?? e))))}>Set up</button>
             <button className="ghost" onClick={() => setKeyOffer(false)}>
               Not now
             </button>

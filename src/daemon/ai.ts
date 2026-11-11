@@ -591,7 +591,8 @@ async function openrouter(o: Opts) {
   const messages: object[] = [{ role: 'system', content: mark ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
   r.cost = 0
-  // the text so far to the page (its partial, under the chat until the message comes), 10 a second at most
+  // the text so far to the page (its partial, under the chat until the message comes), 10 a second at most. ponytail:
+  // the whole text each time (a 40 KB answer: ~8 MB to each window); deltas with a sequence if long answers drag
   let shown = 0
   const partial = (text: string) => Date.now() - shown >= 100 && ((shown = Date.now()), broadcast({ ev: 'ai', of: o.t.id, partial: text }))
   for (let i = 0; ; i++) {
