@@ -237,7 +237,7 @@ function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: strin
     if (!chat) return
     return daemon.on(m => {
       if (m.ev === 'open') void load()
-      else if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended })
+      else if (m.ev === 'ai' && m.of === chat && m.chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended })
     })
   }, [chat])
   useEffect(() => {

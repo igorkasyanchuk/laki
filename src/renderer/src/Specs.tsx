@@ -464,7 +464,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
     void load()
     return daemon.on(m => {
       if (m.ev === 'open') return void load()
-      if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended, queue: m.queue }) // another chat's ask doesn't hold this one up
+      if (m.ev === 'ai' && m.of === chat && m.chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended, queue: m.queue }) // another chat's ask doesn't hold this one up
     })
   }, [])
   useEffect(() => onBusy(!!d?.busy), [d?.busy])

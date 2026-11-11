@@ -499,6 +499,67 @@ export const cachesByMark = (model: string) => model.startsWith('anthropic/')
 // the cached tokens of a reply's usage (OpenRouter's prompt_tokens_details)
 const cachedOf = (u: any) => Number(u?.prompt_tokens_details?.cached_tokens) || 0
 
+// A7: one round's answer as it streams (SSE, stream: true): its text and tool calls as they come (a call's arguments
+// in pieces, by index), reasoning kept for the next request, the model and usage from the chunks (usage: the last).
+// onText: the text so far; alive: a chunk came. A JSON answer (an error, a reply that doesn't stream) is read whole
+type Round = { model?: string; usage?: any; message?: any }
+async function roundOf(res: Response, onText: (text: string) => void, alive: () => void): Promise<Round> {
+  if (!res.ok || !/text\/event-stream/.test(res.headers.get('content-type') ?? '')) {
+    const j: any = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+    return { model: j.model, usage: j.usage, message: j.choices?.[0]?.message }
+  }
+  const m: any = { role: 'assistant', content: '' }
+  const calls: any[] = []
+  const details: any[] = []
+  const r: Round = { message: m }
+  const dec = new TextDecoder()
+  let buf = ''
+  const line = (l: string) => {
+    if (!l.startsWith('data:')) return // its keep-alive comments (: OPENROUTER PROCESSING), blank lines
+    const data = l.slice(5).trim()
+    if (!data || data === '[DONE]') return
+    let j: any
+    try {
+      j = JSON.parse(data)
+    } catch {
+      return
+    }
+    if (j.error) throw new Error(`OpenRouter: ${j.error.message ?? j.error}`)
+    r.model = j.model || r.model
+    r.usage = j.usage ?? r.usage
+    const d = j.choices?.[0]?.delta
+    if (!d) return
+    if (d.content) onText((m.content += d.content))
+    if (d.reasoning) m.reasoning = (m.reasoning ?? '') + d.reasoning
+    // a reasoning detail in pieces: one by its index, its text (summary, data) joined
+    for (const x of Array.isArray(d.reasoning_details) ? d.reasoning_details : []) {
+      const at = x.index !== undefined ? details.find(y => y.index === x.index && y.type === x.type) : undefined
+      if (!at) details.push({ ...x })
+      else for (const k of Object.keys(x)) at[k] = typeof x[k] === 'string' && typeof at[k] === 'string' && ['text', 'summary', 'data'].includes(k) ? at[k] + x[k] : x[k]
+    }
+    for (const c of Array.isArray(d.tool_calls) ? d.tool_calls : []) {
+      const at = (calls[c.index ?? calls.length] ??= { id: '', type: 'function', function: { name: '', arguments: '' } })
+      if (c.id) at.id = c.id
+      if (c.function?.name) at.function.name += c.function.name
+      if (c.function?.arguments) at.function.arguments += c.function.arguments
+    }
+  }
+  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+    alive()
+    buf += dec.decode(chunk, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()!
+    lines.forEach(l => line(l.trim()))
+  }
+  line(buf.trim())
+  if (calls.length) m.tool_calls = calls.filter(Boolean)
+  if (details.length) m.reasoning_details = details
+  return r
+}
+// A7: no chunk for this long ends a round (a stream that goes on isn't cut off however long it takes)
+const QUIET_MS = Number(process.env.LAKI_AI_QUIET_MS) || 120_000
+
 async function openrouter(o: Opts) {
   const key = readKey()
   const s = state.settings?.ai ?? {}
@@ -511,21 +572,32 @@ async function openrouter(o: Opts) {
   const messages: object[] = [{ role: 'system', content: mark ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
   r.cost = 0
+  // the text so far to the page (its partial, under the chat until the message comes), 10 a second at most
+  let shown = 0
+  const partial = (text: string) => Date.now() - shown >= 100 && ((shown = Date.now()), broadcast({ ev: 'ai', of: o.t.id, partial: text }))
   for (let i = 0; ; i++) {
-    const res = await fetch(`${api()}/chat/completions`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
-      body: JSON.stringify({ model, messages, tools: fns, usage: { include: true } }),
-      signal: AbortSignal.any([o.signal, AbortSignal.timeout(120000)]),
-    })
-    const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+    const quiet = new AbortController()
+    let timer: NodeJS.Timeout | undefined
+    const alive = () => (clearTimeout(timer), (timer = setTimeout(() => quiet.abort(new Error(`OpenRouter sent nothing for ${Math.round(QUIET_MS / 1000)} s`)), QUIET_MS)))
+    alive()
+    let j: Round
+    try {
+      const res = await fetch(`${api()}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
+        body: JSON.stringify({ model, messages, tools: fns, stream: true, usage: { include: true } }),
+        signal: AbortSignal.any([o.signal, quiet.signal]),
+      })
+      j = await roundOf(res, partial, alive)
+    } finally {
+      clearTimeout(timer)
+    }
     r.model = j.model || model
     r.in += j.usage?.prompt_tokens ?? 0
     r.out += j.usage?.completion_tokens ?? 0
     r.cached = (r.cached ?? 0) + cachedOf(j.usage)
     r.cost! += j.usage?.cost ?? 0
-    const m = j.choices?.[0]?.message
+    const m = j.message
     if (!m) throw new Error('OpenRouter: no answer')
     if (!m.tool_calls?.length) return void (r.text = m.content ?? '')
     if (i >= (s.steps || AI_STEPS)) throw new Error(`stopped after ${i} rounds of tools (Settings › AI › Steps)`)

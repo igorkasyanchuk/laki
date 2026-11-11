@@ -2057,7 +2057,7 @@ export function App() {
     const chats = () => void api.call<StudioChat[]>('studioChats').then(setStudioChats, () => {})
     chats()
     const off = api.on(m => {
-      if (m.ev === 'ai') t ??= setTimeout(() => ((t = undefined), chats()), 1500)
+      if (m.ev === 'ai' && m.chat) t ??= setTimeout(() => ((t = undefined), chats()), 1500) // not a streamed partial (A7)
     })
     return () => (off(), clearTimeout(t))
   }, [studioOn, connected])

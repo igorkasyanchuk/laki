@@ -17,6 +17,12 @@ async function openrouter(t: { after: (f: () => void) => void }, answers: object
     hits.push({ auth: q.headers.authorization, body: JSON.parse(body) })
     const a = answers[hits.length - 1] ?? { error: { message: 'no more answers' } }
     if ('slow' in a) return // never answers: a stop ends it
+    if ('sse' in a) {
+      // A7: a streamed answer, a chunk at a time (gap ms apart), after a keep-alive comment
+      r.writeHead(200, { 'content-type': 'text/event-stream' }).write(': OPENROUTER PROCESSING\n\n')
+      for (const c of a.sse as object[]) await new Promise(ok => setTimeout(ok, Number((a as any).gap ?? 120))), r.write(`data: ${JSON.stringify(c)}\n\n`)
+      return void r.end('data: [DONE]\n\n')
+    }
     r.writeHead('status' in a ? Number(a.status) : 'error' in a ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify(a))
   })
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
@@ -767,4 +773,42 @@ test("A3: an Anthropic model's request marks the tools and the system prompt for
   assert.equal(JSON.stringify(b).includes('cache_control'), false)
   calls = (await rig.rpc('aiState')).calls
   assert.equal('cachedIn' in calls.find((c: any) => c.ask === 'and now?'), false, 'nothing cached: no count')
+})
+
+test('A7: OpenRouter streams: its text as it comes (partial), tool calls in pieces, usage from the last chunk; the answer as a whole reply gives it; a stream that goes quiet ends', async t => {
+  const M = 'anthropic/claude-sonnet-5.5'
+  const delta = (d: object, more: object = {}) => ({ model: M, choices: [{ delta: d }], ...more })
+  const usage = { prompt_tokens: 100, completion_tokens: 10, cost: 0.002 }
+  const or = await openrouter(t, [
+    { sse: [delta({ role: 'assistant', content: '', tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'laki_state', arguments: '' } }] }), delta({ tool_calls: [{ index: 0, function: { arguments: '{' } }] }), delta({ tool_calls: [{ index: 0, function: { arguments: '}' } }] }), delta({}, { usage })] },
+    { sse: [delta({ content: 'One project' }), delta({ content: ', no ' }), delta({ content: 'workspaces.' }), delta({}, { usage })] },
+    reply({ content: 'One project, no workspaces.' }), // the same answer, whole
+    { sse: [delta({ content: 'a' }), delta({ content: 'b' }), delta({ content: 'c' }), delta({ content: 'd' }), delta({}, { usage })], gap: 250 },
+    { slow: true },
+  ])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url, LAKI_AI_QUIET_MS: '600' } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const ws = await rig.connect()
+  t.after(() => ws.close())
+  const streamed = await rig.rpc('aiAsk', { text: 'what is going on?' })
+  assert.equal(or.hits[0].body.stream, true)
+  assert.deepEqual(or.hits[0].body.usage, { include: true })
+  // the call's arguments, joined from their pieces, ran the tool; the assistant's message went back as it streamed
+  const back = or.hits[1].body.messages
+  assert.deepEqual(back.at(-2).tool_calls, [{ id: 'c1', type: 'function', function: { name: 'laki_state', arguments: '{}' } }])
+  assert.equal(back.at(-1).role, 'tool')
+  assert.equal(JSON.parse(back.at(-1).content).projects.length, 0)
+  const parts = ws.events.filter(e => e.ev === 'ai' && e.partial !== undefined).map(e => e.partial)
+  assert.ok(parts.includes('One project'), `the first piece as it came: ${JSON.stringify(parts)}`)
+  assert.ok(parts.every(p => 'One project, no workspaces.'.startsWith(p)), 'each the text so far')
+  assert.ok(!ws.events.some(e => e.ev === 'ai' && e.partial !== undefined && e.chat), 'a partial carries no chat')
+  const whole = await rig.rpc('aiAsk', { text: 'what is going on?' })
+  assert.deepEqual(streamed, whole, 'the same answer as a whole reply')
+  const a = await rig.rpc('aiState')
+  assert.deepEqual(a.chat.filter((m: any) => m.role === 'ai').map((m: any) => m.text), ['One project, no workspaces.', 'One project, no workspaces.'])
+  assert.deepEqual([a.calls[0].in, a.calls[0].out].map(Number), [100, 10])
+  assert.deepEqual([a.calls.at(-1).in, a.calls.at(-1).out], [200, 20], 'both rounds: usage from each last chunk')
+  // the limit is a quiet one: a second of chunks 250 ms apart goes through; nothing for 600 ms ends it
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'slowly' }), { text: 'abcd' })
+  await assert.rejects(rig.rpc('aiAsk', { text: 'and?' }), /OpenRouter sent nothing for 1 s/)
 })

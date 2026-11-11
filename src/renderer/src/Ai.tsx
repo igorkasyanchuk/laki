@@ -74,6 +74,7 @@ export function AiPage({
   complete?: Complete // # and / for the project in the context (no files)
 }) {
   const [d, setD] = useState<AiData>()
+  const [partial, setPartial] = useState('') // A7: the answer as it streams, until its message comes
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
   const [side, sideBtn] = usePageSide('ai') // the earlier chats' list
   const [text, setText, images, setImages] = useDraft('ai:') // the AI page's, the floating chat's and the AI window's are one
@@ -96,6 +97,8 @@ export function AiPage({
     return api.on(m => {
       if (m.ev === 'open') return void (load(), loadPast()) // a daemon started again: its conversation, not the busy one we had
       if (m.ev !== 'ai' || m.of) return // another chat's (a spec's, an extension's)
+      if (m.partial !== undefined) return void setPartial(m.partial)
+      setPartial('')
       setD(x => x && { ...x, chat: m.chat, busy: m.busy, queue: m.queue })
       if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
@@ -105,7 +108,7 @@ export function AiPage({
   useEffect(() => {
     const el = end.current?.closest('.ai-thread')
     if (el) el.scrollTop = el.scrollHeight
-  }, [d?.chat.length, d?.busy, tab])
+  }, [d?.chat.length, d?.busy, tab, partial.length > 0 && Math.floor(partial.length / 400)]) // a streaming answer: down as it grows
   const backend = settings.backend ?? 'openrouter'
   const ready = settings.on !== false && (backend !== 'openrouter' || !!d?.key)
   const can = ready && !saving && (!!text.trim() || !!images.length) // while it answers: queued (the daemon says when too many wait), all of it the next ask
@@ -190,6 +193,7 @@ export function AiPage({
                 ) : (
                   groups.map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} live={!!d?.busy && i === groups.length - 1} /> : <Message key={i} m={g} link={link} busy={!!d?.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
                 )}
+                {d?.busy && partial && <Message m={{ role: 'ai', text: partial, at: 0 }} link={link} busy onPick={pick} />}
                 {d?.busy && (
                   <div className="ai-working">
                     <span className="ai-dots">

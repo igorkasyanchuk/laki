@@ -21,7 +21,13 @@ made or one the user let it (the Extension page's chat: `widgetSet` `ai`, then `
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask per chat, `AI_AT_ONCE` (4) chats at once (`busy`: each chat's stop; `refuseBusy`, set before the first await); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
-  and `usage: { include: true }` (its `cost`), looping over `tool_calls` up to `steps` rounds (`AI_STEPS`, 20); the
+  and `usage: { include: true }` (its `cost`), looping over `tool_calls` up to `steps` rounds (`AI_STEPS`, 20). Each
+  round streams (A7, `stream: true`; `roundOf`): its SSE lines (keep-alive comments skipped) build the message as it
+  comes, the text, the tool calls by `index` (their `arguments` in pieces), `reasoning` and `reasoning_details` (pieces
+  of one joined), the model and the usage (the last chunk's); the text so far goes to the page as `ev: 'ai'`
+  `{ of, partial }` (10 a second at most; no `chat`: the other `ai` listeners skip it), drawn under the chat until the
+  message comes. A JSON reply (an error, one that doesn't stream) is read whole. The 2 minutes are a quiet limit, reset
+  by each chunk (`QUIET_MS`, `LAKI_AI_QUIET_MS`: tests'), not a total; `aiStop` aborts the stream; the
   earlier asks and answers (`history`, 20) go with each ask, not the tools' results. A pasted image (only from
   `<data>/images`, `imageOk`: nothing else of the Mac goes to a model) as a data URL. The key: `<data>/ai-key`, 0600
   (`aiKey`), never in state.json, the view or `aiState` (only whether there is one). Model: `models.openrouter`, else
@@ -51,7 +57,7 @@ Settings › Extensions' *Where you left off* (`StudioSessions`) and a new exten
 of the id yet, or at work; a new one's first ask renames its dialog (`nameExt`, `extKey`: drawn once) and its history
 place. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
 what was said kept; the next ask starts it again empty (`fresh`), `aiContinue` keeps its session. `planRm` drops it
-(`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply. The AI page's earlier chats:
+(`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply (and `partial`, A7, a streaming answer's text instead of the chat). The AI page's earlier chats:
 `aiNew` on its chat keeps it first (`shelve`, once something was asked) as `<data>/ai-chats/<at>-<hex>.json` (its
 messages, `resume`, `at`; `PAST_MAX`, 100: the oldest go); `aiChats` lists them newest first (`AiPast`: its first ask as
 the title), `aiOpen` makes one the page's chat again (the one there shelved first; its `resume` too, so its claude or
