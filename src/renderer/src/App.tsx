@@ -3556,7 +3556,7 @@ export function App() {
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
-        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown', { keep: true })} />}
+        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown', { keep: true }).catch((e: Error) => (bridge?.restartDaemon && /who's calling/.test(e.message) ? bridge.restartDaemon().then(ok => ok || Promise.reject(e)) : Promise.reject(e)))} />}
         {connected && view.diskFull && (
           <div className="stale-bar" role="alert">
             <Icon name="alertCircle" size={16} />

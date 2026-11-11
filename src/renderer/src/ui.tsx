@@ -460,6 +460,7 @@ export class Boundary extends Component<{ title?: string; onClose?: () => void; 
 // it. The status bar says so; restarting it (a second click to confirm) ends the agents, which resume.
 export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
   const [step, setStep] = useState<'' | 'sure' | 'busy'>('')
+  const [err, setErr] = useState('') // why it didn't restart: said, not swallowed
   useEffect(() => {
     if (!step) return
     const t = setTimeout(() => setStep(''), step === 'sure' ? 5000 : 15000) // busy: unless the new daemon answers first (this goes)
@@ -471,9 +472,9 @@ export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
       <Icon name="conflict" size={16} />
       <span>
         <b>Restart Laki's daemon.</b> It's older than this app, so what's new in it fails until it restarts. Every agent stops and resumes; a turn in
-        progress is cut off.
+        progress is cut off.{err && <span className="stale-err"> It didn't restart: {err}</span>}
       </span>
-      <button disabled={step === 'busy'} onClick={() => (step === 'sure' ? (setStep('busy'), restart().catch(() => setStep(''))) : setStep('sure'))}>
+      <button disabled={step === 'busy'} onClick={() => (step === 'sure' ? (setStep('busy'), setErr(''), restart().catch((e: Error) => (setStep(''), setErr(e.message)))) : setStep('sure'))}>
         {step === 'busy' ? 'Restarting…' : step === 'sure' ? 'Click again to restart' : 'Restart the daemon'}
       </button>
     </div>

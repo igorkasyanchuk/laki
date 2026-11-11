@@ -9,6 +9,7 @@ import { sendAs } from '../../shared/caps'
 export type NotifyAction = { text: string; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
+  restartDaemon?(): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown)
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card): void
   asking?(tabs: string[]): void // the tabs that wait (cards on screen)
   cardGone?(key: string): void // a laki alert over: its card goes

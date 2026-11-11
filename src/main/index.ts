@@ -8,7 +8,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { appToken, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
+import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -666,6 +666,28 @@ ipcMain.handle('update', (e, op: unknown) =>
 // Settings' Check for updates and Update delay (days)
 ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.auto(on === true, typeof days === 'number' && days > 0 && days <= 365 ? days : 0))
 
+// the stale-daemon bar's Restart when the daemon refuses this window's shutdown: one another Laki started (another
+// bundle's path: appPair gives the app's token to its own binary only, S1), so it can't tell this app is the user's.
+// This app asks it to stop as any of the user's processes can (SIGTERM: its own shutdown), then starts one from this
+// bundle. Only daemon.json's pid, and only while that pid is a Laki daemon
+const running = (pid: number) => {
+  try {
+    return process.kill(pid, 0), true
+  } catch {
+    return false
+  }
+}
+ipcMain.handle('daemon-restart', async e => {
+  if (!from(e) || quitting) return false
+  const pid = daemonInfo()?.pid
+  if (!pid || !/\bout\/main\/daemon\.js\b/.test(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
+  logLine(join(dataDir(), 'daemon.log'), `the app restarts the daemon (pid ${pid}): it refused this app's shutdown (another Laki started it)`)
+  process.kill(pid, 'SIGTERM')
+  for (let i = 0; i < 60 && running(pid); i++) await new Promise(r => setTimeout(r, 250))
+  if (running(pid)) return false
+  await daemon()
+  return true
+})
 ipcMain.handle('conn', async e => {
   if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon

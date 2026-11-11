@@ -3322,6 +3322,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 @media (prefers-reduced-motion: no-preference) {
   :where(.ws, .tab, .menu-item, .palette-item, .sp-row, .rail-icon, .ib, button) { transition: background-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), scale var(--t-fast) var(--ease-out); }
   :where(.ws, .tab, .menu-item, .palette-item, .sp-row, button):active { scale: 0.985; }
+  .menu-item, .palette-item { transition: scale var(--t-fast) var(--ease-out); } /* the highlight moves at once, as in a native menu: a fade left the last one lit beside the new */
   :where(.side-panel) { animation: m-side var(--t-mid) var(--ease-out); }
   :where(.sidebar) { animation: m-row var(--t-mid) var(--ease-out); }
   :where(.overlay) { animation: v-fade-in var(--t-mid) var(--ease-out); }

@@ -5,7 +5,7 @@
 `src/daemon/main.ts` `api`: the same methods over HTTP and WebSocket. `API` (`src/shared/types.ts`) is in
 every view as `api`; a running daemon below the renderer's (it outlives app updates), or from an older build (the view's `built`:
 electron.vite.config.ts' `__BUILT__`, the build's time, in the daemon and the renderer alike; none from source), gets a yellow bar at the
-top of the main area, *Restart Laki's daemon* (`StaleDaemon` in `ui.tsx`, `.stale-bar`; two clicks: `shutdown`, then main starts the new one).
+top of the main area, *Restart Laki's daemon* (`StaleDaemon` in `ui.tsx`, `.stale-bar`; two clicks: `shutdown`, then main starts the new one; a daemon another Laki started refuses this app's `shutdown` (core's `WHO`), so main's `daemon-restart` IPC sends daemon.json's pid a SIGTERM, only when `ps` shows it's Laki's `out/main/daemon.js`, and starts one from this bundle; a failure is said on the bar).
 
 Namespaces and caps (`src/shared/caps.ts`, the plan: `docs/rpc-namespaces.md`): `RPC_NAMES` maps a namespaced name to
 the flat one the `api` table keeps (`note.list` → `noteList`; Notes only so far). `call()` resolves it first
