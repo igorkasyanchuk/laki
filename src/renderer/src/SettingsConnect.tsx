@@ -11,6 +11,7 @@ const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
   ['slack', 'Slack', 'https://hooks.slack.com/services/…'],
   ['telegram', 'Telegram', 'https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>'],
   ['json', 'Generic JSON', 'https://example.com/hook'],
+  ['webpush', 'This phone (Web Push)', ''],
 ]
 
 const DETAILS: [Webhook['detail'], string][] = [[undefined, 'The question and its choices'], ['titles', 'Only who needs you']]
@@ -47,10 +48,18 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
           </select>
         </label>
       </div>
-      <label>
-        URL
-        <input className="mono" value={w.url ?? ''} placeholder={FORMATS.find(f => f[0] === format)?.[2]} spellCheck={false} onChange={e => onChange({ ...w, url: e.target.value })} />
-      </label>
+      {format === 'webpush' ? (
+        <p className="muted small">
+          To the phones paired with remote access (Settings › Remote access, at Tailscale's or My domain's address) that added Laki to their Home Screen and turned
+          its notifications on: encrypted on this Mac for each phone, through its browser's own push service, no URL and no other service. A notification's
+          buttons answer, as ntfy's do (the first and last choice).
+        </p>
+      ) : (
+        <label>
+          URL
+          <input className="mono" value={w.url ?? ''} placeholder={FORMATS.find(f => f[0] === format)?.[2]} spellCheck={false} onChange={e => onChange({ ...w, url: e.target.value })} />
+        </label>
+      )}
       {bad && <p className="muted small">{bad}</p>}
       </Group>
       <Group title="When">
@@ -77,7 +86,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
           : "The agent's name and workspace, the question it asks or its last question, and its numbered choices, as they are on its screen: a command or a file path may be among them."}
       </p>
       </Group>
-      <Group title="Answers" hint="A waiting agent's choices go as text, unless it sends titles only. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3)">
+      <Group title="Answers" hint="A waiting agent's choices go as text, unless it sends titles only. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3), Web Push the first and last">
       <div className="setting-box">
         <Switch
           className="switch-row"
@@ -87,7 +96,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
         >
           <Says
             title="Answer from the phone"
-            hint={`A tap picks that choice in an agent's question and a workflow's (its Ask you, a confirm, a stuck block), as a click here would: it can allow a command or an edit; typed answers only in Laki. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : 'Slack and JSON: the choices as text only.'}`}
+            hint={`A tap picks that choice in an agent's question and a workflow's (its Ask you, a confirm, a stuck block), as a click here would: it can allow a command or an edit; typed answers only in Laki. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : format === 'webpush' ? 'Web Push: the notification\'s buttons, signed by this Mac, from a paired phone only.' : 'Slack and JSON: the choices as text only.'}`}
           />
         </Switch>
         {w.answerOff && !w.answer && <p className="warn small">Laki turned this off as it updated: {ANSWER_WHY}, then turn it on again.</p>}
@@ -100,7 +109,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
       </Group>
       {test && (
         <div className="row-buttons">
-          <button type="button" disabled={!w.url?.trim()} onClick={() => (setSaid('Sending…'), test(w).then(() => setSaid('Sent: check your phone'), e => setSaid(`Didn't go: ${e.message}`)))}>
+          <button type="button" disabled={format !== 'webpush' && !w.url?.trim()} onClick={() => (setSaid('Sending…'), test(w).then(() => setSaid('Sent: check your phone'), e => setSaid(`Didn't go: ${e.message}`)))}>
             Send test
           </button>
           {said && <span className="muted small">{said}</span>}

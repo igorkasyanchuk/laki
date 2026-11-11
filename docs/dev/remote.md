@@ -206,6 +206,36 @@ stops it (final). Each wrong PIN and each wait: a log line and a `remote` event 
 (`CF-Connecting-IP` or `X-Forwarded-For`, Tailscale's `Tailscale-User-Login`; shown, never decided on). The view's
 `locked`, `wrong`. `stop`: the last wrong PIN stops it as before.
 
+The phone as an app (M4, a PWA). Design: remote access's token and origin end with each start, so the installed app
+holds neither. What it keeps is the trusted device's cookie (D3, `HttpOnly`, the origin's own): its start URL `/`
+opens with no link token, `api.ts`' `pinNeed` asks `/pin`, the cookie says `device`, and it connects; a new start (new
+link key, PIN and page token) changes nothing for it while the device is paired, and a revoked or expired one gets the
+PIN form, as a new tab does. So only a stable origin can hold an installed app: Tailscale's or My domain's (`stable`); a
+quick tunnel's is new each start, and an app installed there would open a dead address. `pwaOn()` (remote.ts): remote
+access running at a stable address. main.ts' `PWA` routes, closed (404) unless `pwaOn()` (the icons: while remote
+access runs at all): `GET /manifest.webmanifest` (name Laki, `display: standalone`, `start_url` and `scope` `/`, the
+Laki theme's `bg` and `accent`; the icons `src/renderer/public/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`,
+copied to `out/renderer` by the build), `GET /sw.js` (`swJs`, versioned by the page's build: caches `/assets/` and the
+icons only, network first; never `/rpc`, `/pin`, `/push`, `/tap`, the socket or the page itself (`no-store`, and it
+holds no token anyway); a navigation with no network gets an inline *Offline: your Mac is not reachable* page with
+Try again). The renderer's `pwa.ts` (the remote page only: http(s), no `bridge`) adds the manifest link and Apple's
+meta tags, registers the worker when the manifest answers, and `PwaBar` (App, on a phone) says *Add Laki to your Home
+Screen* (Android's install prompt when the browser offers one) or, when the manifest is closed (a quick tunnel), *Add to
+Home Screen works with a stable address*; installed (`display-mode: standalone`), *Notifications* subscribes.
+Web Push (push.ts, `format: 'webpush'`, Settings › Phone pushes › *This phone (Web Push)*, no URL): VAPID keys made on
+this Mac (`vapid.json`, 0600, P-256: `vapidNew`); `POST /push` from the page's origin with a paired device's cookie
+gives the public key (`{}`), keeps `{ sub }` on that device (`SavedDevice.push`: endpoint, p256dh, auth; the view says
+`notify` only) or drops it (`{ off: true }`); only a browser vendor's push service takes one (`PUSH_HOSTS`: FCM,
+Mozilla's, Apple's, Microsoft's; https). `pushTo` sends each paired, unexpired device's (`webPush.devices`, phone.ts)
+`webPushRequest`: the payload (title, body, tag, at most 2 actions: the first and last choice) encrypted per RFC 8291
+(`aes128gcm`: an ECDH P-256 key of its own, HKDF with the subscription's auth secret, AES-128-GCM, one record),
+`Authorization: vapid t=<ES256 JWT, aud the endpoint's origin, 12 h>, k=<public key>`, `TTL` a day; a 404 or 410 drops
+that subscription (`webPush.gone`). No relay of Laki's: the bytes go to the vendor's service and only the device can
+read them. Actions: each is the tap ntfy's buttons send, `nonce:n:<tapSig>` (phone.ts' `awaiting`, `tapKey`); the
+worker's `notificationclick` posts it to `POST /tap` (the page's origin, a paired device's cookie, the signature
+checked: `tapOf`), and phone.ts' `takeTap` answers it exactly as a polled ntfy or Telegram tap. Nothing to poll, so
+`listen` doesn't for webpush. A click elsewhere on the notification opens the app.
+
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's

@@ -782,7 +782,7 @@ const DEVICE_COOKIE = '__Host-laki-device'
 const PAIR_MS = 10 * 60e3
 const stable = (r: RemoteRun) => !!(r.host || r.via)
 const deviceDays = () => (n => (Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30))(Number(state.settings?.remoteDeviceDays))
-export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, ...d }) => d) : undefined)
+export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, ...d }) => ({ ...d, ...(push && { notify: true }) })) : undefined) // never its hash or its push keys
 let gone: (ids: string[]) => void = () => {}
 export const onGone = (f: (ids: string[]) => void) => void (gone = f) // main.ts: a revoked or expired device's sockets closed
 const cookieOf = (header: string | undefined) => {
@@ -808,6 +808,20 @@ export function deviceOf(cookie: string | undefined, now = Date.now()): string |
   if (!d || d.until <= now) return undefined
   if (now - d.seenAt > 60000) (d.seenAt = now), save(), changed()
   return d.id
+}
+// M4: the page as an app (main.ts' manifest and service worker) only at a stable address: an installed app keeps its
+// origin, and its device's cookie is its way back in after each start (a quick tunnel's address is new each time)
+export const pwaOn = () => !!remote?.url && stable(remote)
+export const remoteOn = () => !!remote?.url
+// a paired device's Web Push subscription (push.ts subOk: a browser vendor's push service), kept on it; undefined: off
+export function devicePush(id: string, sub: { endpoint: string; p256dh: string; auth: string } | undefined) {
+  const d = state.remoteDevices?.find(x => x.id === id)
+  if (!d) throw new Error('not a paired device')
+  if (sub) d.push = { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }
+  else delete d.push
+  save()
+  log(`remote access: ${d.name} (${d.id}) turned notifications ${sub ? 'on' : 'off'}`)
+  changed()
 }
 function pair(r: RemoteRun, o: Asker) {
   const t = hex()

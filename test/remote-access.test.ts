@@ -2,7 +2,7 @@
 // restarts (D2). remote.ts; api.test.ts has the rest of remote access
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
@@ -300,4 +300,46 @@ test('D5: wrong PINs wait 1, 5, then 30 minutes instead of stopping; a right one
   assert.equal(await view(), undefined)
   assert.match((await until(async () => app.events.find(e => e.ev === 'remote' && /20 wrong PINs today/.test(e.text)), 'told')).text, /Remote access stopped: 20 wrong PINs today on its page/)
   app.close()
+})
+
+test('M4: at a stable address the page is an app: its manifest and service worker; a paired device turns on Web Push (its subscription kept, never in the view), taps refused unsigned', async t => {
+  const rig = await fresh(t)
+  await named(rig)
+  const url = 'https://laki.example.dev'
+  const page = rig.env.LAKI_PAGE
+  mkdirSync(join(page, 'assets'), { recursive: true })
+  writeFileSync(join(page, 'index.html'), '<title>Laki</title>')
+  const on = await rig.rpc('remoteStart', { hours: 1, host: '' })
+  const { port } = rig.info()
+  const at = `http://127.0.0.1:${port}`
+  const m = await fetch(`${at}/manifest.webmanifest`)
+  assert.equal(m.headers.get('content-type'), 'application/manifest+json')
+  const man = await m.json()
+  assert.deepEqual([man.name, man.display, man.start_url, man.background_color, man.icons.length], ['Laki', 'standalone', '/', '#171412', 2])
+  const sw = await fetch(`${at}/sw.js`)
+  assert.equal(sw.headers.get('content-type'), 'text/javascript; charset=utf-8')
+  const js = await sw.text()
+  assert.doesNotThrow(() => new Function(js), 'it parses')
+  assert.match(js, /Offline: your Mac is not reachable/)
+  assert.match(js, /fetch\('\/tap'/)
+  assert.ok(!/\/rpc|\/pin|token/.test(js.replace(/OFFLINE = .*/, '')), 'it caches no API and holds no token')
+  // a paired device: the key to subscribe with, its subscription (a browser vendor's service only)
+  const { cookie } = await pinRaw(port, url, { token: on.link.split('#t=')[1], pin: on.pin }, UA)
+  const jar = cookie!.split(';')[0]
+  const push = (body: object, c = jar) => fetch(`${at}/push`, { method: 'POST', headers: { origin: url, cookie: c }, body: JSON.stringify(body) }).then(async r => [r.status, await r.json()])
+  const [code, { key }] = await push({})
+  assert.equal(code, 200)
+  assert.match(key, /^[\w-]{87}$/)
+  assert.equal((statSync(join(rig.data, 'vapid.json')).mode & 0o777).toString(8), '600')
+  const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: `B${'a'.repeat(86)}`, auth: 'b'.repeat(22) }
+  assert.equal((await push({ sub: { ...sub, endpoint: 'https://127.0.0.1:9/x' } }))[0], 400)
+  assert.equal((await push({ sub }, '__Host-laki-device=' + 'f'.repeat(64)))[0], 401)
+  assert.deepEqual(await push({ sub }), [200, { ok: true }])
+  const [dev] = (await rig.rpc('state')).remoteDevices
+  assert.deepEqual([dev.notify, dev.push], [true, undefined], 'the view says it takes them, never its keys')
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).remoteDevices[0].push.endpoint, sub.endpoint)
+  const tap = (body: string) => fetch(`${at}/tap`, { method: 'POST', headers: { origin: url, cookie: jar }, body }).then(r => r.status)
+  assert.equal(await tap('0123456789abcdef:1:0123456789abcdef'), 400, 'a signature this Mac never made')
+  assert.deepEqual(await push({ off: true }), [200, { ok: true }])
+  assert.equal((await rig.rpc('state')).remoteDevices[0].notify, undefined)
 })

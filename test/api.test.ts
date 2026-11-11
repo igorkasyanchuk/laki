@@ -1352,3 +1352,23 @@ test("linked tickets: a project's Ticket script, run per workspace, its JSON or 
   assert.deepEqual(ws.ticket, { key: 'ENG-42', title: `On ${w.branch}`, status: 'Todo' })
   assert.deepEqual(ticketFrom('A-1\u001b[31m red'), { key: 'A-1 [31m', title: 'red' }) // a line's control characters out
 })
+
+test('remote access as an app (M4): its manifest, service worker and icons closed while remote access is off; at a quick tunnel only the icons (no stable address to install); /push and /tap only for a paired device', async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  const at = `http://127.0.0.1:${port}`
+  const page = rig.env.LAKI_PAGE
+  mkdirSync(join(page, 'assets'), { recursive: true })
+  writeFileSync(join(page, 'index.html'), '<title>Laki</title>')
+  writeFileSync(join(page, 'icon-192.png'), 'png')
+  const status = (path: string) => fetch(at + path).then(r => r.status)
+  for (const path of ['/manifest.webmanifest', '/sw.js', '/icon-192.png']) assert.equal(await status(path), 404, `${path}: remote access is off`)
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  const on = await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev' })
+  assert.equal(await status('/icon-192.png'), 200)
+  assert.deepEqual([await status('/manifest.webmanifest'), await status('/sw.js')], [404, 404], 'a quick tunnel: its address is new each start')
+  const post = (path: string, origin: string, body = '{}') => fetch(at + path, { method: 'POST', headers: { origin }, body }).then(r => r.status)
+  assert.deepEqual([await post('/push', 'https://evil.example'), await post('/push', on.url), await post('/tap', on.url, '0123456789abcdef:1:0123456789abcdef')], [403, 401, 401])
+  await rig.rpc('remoteStop')
+  assert.equal(await status('/icon-192.png'), 404)
+})

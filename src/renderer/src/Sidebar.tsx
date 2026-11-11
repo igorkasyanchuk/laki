@@ -1,6 +1,7 @@
 // The sidebar: its head, the picked rows' bar, Needs you, Pinned, each project's workspaces (its groups, the ones being
 // made), the timers and the foot (Sidebar), and what its rows are made of (sideOf: a workspace's row, a group's head,
 // the peek card App shows over everything). App renders them with what appCtx.ts says they read.
+import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
 import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act } from './ui'
@@ -730,6 +731,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
       ))}
       <WidgetGrid widgets={ownWidgets} api={widgetApi} desk={settings.desk !== false} />
       {(steps => !onboard.off && steps.some(x => !onboardDone.has(x.id)) && dialog !== 'onboard' && <OnboardBar key={steps.filter(x => onboardDone.has(x.id)).length /* a step done: a new bar, its pulse again */} done={steps.filter(x => onboardDone.has(x.id)).length} of={steps.length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />)(stepsOf(settings))}
+      <PwaBar />
       {!wideBar && (
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           {footButtons(labels)}

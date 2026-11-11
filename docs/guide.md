@@ -683,6 +683,14 @@ email address only, unless you leave the email out on purpose (below).
   until when; *Add a device* makes a new link (and PIN) for another, good for 10 minutes and once; *Revoke* drops one
   at once, *Revoke all* (or *Forget devices* while it's off) every one. Laki says when a new device joins. With a
   quick tunnel, the link opens one tab as before.
+- As an app on your phone: at a stable address, the page's bar says *Add Laki to your Home Screen* (Safari: Share ›
+  Add to Home Screen; Android: *Install*). It opens full screen, gets in by the paired device's cookie each time (a new
+  start of remote access changes nothing for it; a revoked or expired device asks for the link and PIN again), and
+  shows *Offline: your Mac is not reachable* when it can't reach the Mac. It keeps only the page's static files, never
+  a token or anything from your agents. Installed, *Turn on* notifications, then pick *This phone (Web Push)* in
+  Settings › *Phone pushes*: each push is encrypted on your Mac for that phone and goes through its browser's own push
+  service; the first and last choice are buttons that answer the agent. A quick tunnel's page says *Add to Home
+  Screen works with a stable address*.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.

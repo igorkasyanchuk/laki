@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { FloatNotices } from './Shown'
 import { Boundary } from './ui'
 import { exits } from './motion'
+import { pwaStart } from './pwa'
 import './styles.css'
 import './fonts.css'
 import './components.css'
@@ -13,6 +14,7 @@ import './looks.css'
 // E8: when the first sidebar row is painted, as performance's laki-sidebar mark (test:ui prints it)
 new MutationObserver((_, o) => document.querySelector('.sidebar .ws') && (o.disconnect(), requestAnimationFrame(() => performance.mark('laki-sidebar')))).observe(document, { childList: true, subtree: true })
 exits(document.body) // V7: what floats fades out as it closes
+if (!new URLSearchParams(location.search).get('window')) void pwaStart() // M4: remote access's page as an app
 const vv = window.visualViewport
 vv?.addEventListener('resize', () => document.documentElement.style.setProperty('--vh', `${vv.height * vv.scale}px`))
 

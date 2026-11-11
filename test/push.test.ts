@@ -4,7 +4,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { pushRequest, replies, tapSig } from '../src/daemon/push.ts'
+import { createDecipheriv, createECDH, createPublicKey, hkdfSync, verify } from 'node:crypto'
+import { pushRequest, replies, subOk, tapOf, tapSig, vapidNew, webPushRequest } from '../src/daemon/push.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 const p = { event: 'waiting', workspace: 'fix-login', tab: 't1', agent: 'claude', question: 'Run rm -rf build?' } as const
@@ -345,4 +346,55 @@ test('U8: Do not disturb: no push for a finish or an ask; ended, one notice says
   assert.deepEqual(await rig.rpc('dndSet', { seen: true }), { seen: true })
   assert.equal((await rig.rpc('state')).digest, undefined)
   assert.deepEqual(await rig.rpc('dndSet', { off: true }), { ended: false })
+})
+
+// M4: Web Push, as a phone's browser would read it: RFC 8291 (aes128gcm) decrypted with the subscription's own key,
+// RFC 8292's VAPID JWT checked against the key it names
+test('push format webpush: encrypted for the subscription, a VAPID JWT for its service, the first and last choice as signed taps', () => {
+  const ua = createECDH('prime256v1')
+  ua.generateKeys()
+  const auth = Buffer.from('0123456789abcdef')
+  const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc:def', p256dh: ua.getPublicKey().toString('base64url'), auth: auth.toString('base64url') }
+  assert.ok(subOk(sub))
+  for (const endpoint of ['http://fcm.googleapis.com/x', 'https://127.0.0.1/x', 'https://evil.example/x', 'https://fcm.googleapis.com.evil.example/x']) assert.equal(subOk({ ...sub, endpoint }), false, endpoint)
+  assert.ok(subOk({ ...sub, endpoint: 'https://web.push.apple.com/QGx' }) && subOk({ ...sub, endpoint: 'https://updates.push.services.mozilla.com/wpush/v2/x' }))
+  const v = vapidNew()
+  const now = Date.parse('2026-11-11T12:00:00Z')
+  const opts = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again" }, { n: 3, label: 'No' }]
+  const r = webPushRequest({ format: 'webpush' }, sub, { ...p, options: opts, nonce: '0123456789abcdef', key: 'k3y' }, v, now)
+  assert.equal(r.url, sub.endpoint)
+  const h = r.init.headers as Record<string, string>
+  assert.deepEqual([h['content-encoding'], h['content-type'], h.ttl, h.urgency], ['aes128gcm', 'application/octet-stream', '86400', 'high'])
+  // VAPID: t=<header.claims.sig>, k=<our public key>; signed by it, for the push service's origin, 12 hours
+  const [, jwt, k] = /^vapid t=([^,]+), k=(\S+)$/.exec(h.authorization)!
+  assert.equal(k, v.pub)
+  const [head, claims, sig] = jwt.split('.')
+  assert.deepEqual(JSON.parse(Buffer.from(head, 'base64url').toString()), { typ: 'JWT', alg: 'ES256' })
+  assert.deepEqual(JSON.parse(Buffer.from(claims, 'base64url').toString()), { aud: 'https://fcm.googleapis.com', exp: now / 1000 + 12 * 3600, sub: 'https://laki.sh' })
+  const raw = Buffer.from(k, 'base64url')
+  const pub = createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: raw.subarray(1, 33).toString('base64url'), y: raw.subarray(33).toString('base64url') }, format: 'jwk' })
+  assert.ok(verify('sha256', Buffer.from(`${head}.${claims}`), { key: pub, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url')))
+  // the body: salt, record size, the sender's key, then one record only this subscription's key opens
+  const body = r.init.body as Buffer
+  const salt = body.subarray(0, 16)
+  assert.equal(body.readUInt32BE(16), 4096)
+  const as = body.subarray(21, 21 + body[20])
+  const ikm = Buffer.from(hkdfSync('sha256', ua.computeSecret(as), auth, Buffer.concat([Buffer.from('WebPush: info\0'), ua.getPublicKey(), as]), 32))
+  const key = (info: string, n: number) => Buffer.from(hkdfSync('sha256', ikm, salt, Buffer.from(`Content-Encoding: ${info}\0`), n))
+  const rec = body.subarray(21 + body[20])
+  const d = createDecipheriv('aes-128-gcm', key('aes128gcm', 16), key('nonce', 12))
+  d.setAuthTag(rec.subarray(-16))
+  const plain = Buffer.concat([d.update(rec.subarray(0, -16)), d.final()])
+  assert.equal(plain.at(-1), 2, 'the last record')
+  const msg = JSON.parse(plain.subarray(0, -1).toString())
+  assert.equal(msg.title, 'claude in fix-login is waiting for you')
+  assert.match(msg.body, /^Run rm -rf build\?\n1\. Yes\n/)
+  assert.equal(msg.tag, 't1')
+  assert.deepEqual(msg.actions.map((a: any) => a.title), ['Yes', 'No'], 'the first and the last')
+  assert.deepEqual(tapOf(msg.actions[1].tap, 'k3y'), { nonce: '0123456789abcdef', n: 3 }, 'signed as ntfy\'s taps are')
+  assert.equal(tapOf(msg.actions[1].tap, 'another key'), undefined)
+  assert.equal(tapOf('0123456789abcdef:3', 'k3y'), undefined, 'unsigned: not a tap')
+  // titles only: nothing off the screen, no buttons
+  const t = webPushRequest({ format: 'webpush', detail: 'titles' }, sub, { ...p, options: opts, nonce: '0123456789abcdef', key: 'k3y' }, v, now)
+  assert.notDeepEqual(t.init.body, r.init.body)
 })

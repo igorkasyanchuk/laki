@@ -29,6 +29,7 @@ import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
+import { subOk } from './push.ts'
 import { policy, policyTick } from './policy.ts'
 import * as ticks from './ticks.ts'
 import { hookAdd, hookExpose, hookList, hookRm, hookSecret, hookStop, inboundStart } from './inbound.ts'
@@ -156,6 +157,52 @@ function page(path: string, res: ServerResponse) {
   const html = extname(file) === '.html'
   res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': html ? 'no-store' : 'no-cache', 'x-content-type-options': 'nosniff' })
   res.end(body)
+}
+
+// M4: the remote page as an app (docs/dev/remote.md): its manifest and service worker at a stable address only
+// (remoteMod.pwaOn: an installed app keeps its origin), its icons while remote access runs; 404 otherwise. The Laki
+// theme's colors
+const PWA_ICONS = new Set(['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'])
+export const PWA = new Set([...PWA_ICONS, '/manifest.webmanifest', '/sw.js'])
+const MANIFEST = JSON.stringify({ name: 'Laki', short_name: 'Laki', description: 'Your coding agents, from your phone', id: '/', start_url: '/', scope: '/', display: 'standalone', background_color: '#171412', theme_color: '#171412', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] })
+// the service worker: the static shell only (/assets/, the icons: network first, the cache when it fails), never the
+// API, the socket, /pin, /push, /tap or the page itself (no-store: it goes through the sign-in); a navigation with no
+// network gets the offline page. A notification's action posts its tap to /tap; a click elsewhere opens the app.
+// Versioned by the page's build, so an update's assets replace the old ones
+const OFFLINE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laki: offline</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#171412;color:#ece6df;font:16px -apple-system,system-ui,sans-serif;text-align:center}p{color:#a39a90;max-width:20em;margin:8px auto 20px}button{font:inherit;padding:10px 18px;border-radius:10px;border:0;background:#ff7a45;color:#1a0f08}</style><main><h1>Offline: your Mac is not reachable</h1><p>Laki runs on your Mac. Wake it, check its connection and that remote access is on, then try again.</p><button onclick="location.reload()">Try again</button></main>`
+const swJs = () => `const CACHE = 'laki-shell-${(() => { try { return statSync(join(pageDir ?? '', 'index.html')).mtimeMs } catch { return 0 } })()}'
+const SHELL = ['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png']
+const OFFLINE = ${JSON.stringify(OFFLINE)}
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())))
+self.addEventListener('fetch', e => {
+  const r = e.request
+  const u = new URL(r.url)
+  if (r.method !== 'GET' || u.origin !== location.origin) return
+  if (r.mode === 'navigate') return e.respondWith(fetch(r).catch(() => new Response(OFFLINE, { headers: { 'content-type': 'text/html; charset=utf-8' } })))
+  if (!u.pathname.startsWith('/assets/') && !SHELL.includes(u.pathname)) return
+  e.respondWith(fetch(r).then(res => {
+    if (res.ok && res.type === 'basic' && !res.redirected) { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)) }
+    return res
+  }).catch(() => caches.match(r).then(x => x || Response.error())))
+})
+self.addEventListener('push', e => {
+  let d = {}
+  try { d = e.data ? e.data.json() : {} } catch {}
+  e.waitUntil(self.registration.showNotification(d.title || 'Laki', { body: d.body || '', tag: d.tag, icon: '/icon-192.png', data: d, actions: (d.actions || []).map(a => ({ action: a.tap, title: a.title })) }))
+})
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  if (e.action) return e.waitUntil(fetch('/tap', { method: 'POST', body: e.action, credentials: 'same-origin' }))
+  e.waitUntil(clients.matchAll({ type: 'window' }).then(l => (l[0] ? l[0].focus() : clients.openWindow('/'))))
+})
+`
+function pwaPage(path: string, res: ServerResponse) {
+  const no = () => (res.writeHead(404, { 'content-type': 'text/plain' }), res.end('not found'))
+  if (PWA_ICONS.has(path)) return remoteMod.remoteOn() ? page(path, res) : no()
+  if (!remoteMod.pwaOn()) return no()
+  res.writeHead(200, path === '/sw.js' ? { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', 'service-worker-allowed': '/' } : { 'content-type': 'application/manifest+json', 'cache-control': 'no-cache' })
+  res.end(path === '/sw.js' ? swJs() : MANIFEST)
 }
 
 // GET /artifact/<key>/<ws>/<path>: a file of a workspace's Artifacts for the app's viewer (an HTML report, its CSS,
@@ -1013,6 +1060,7 @@ const server = createServer(async (req, res) => {
     if (u.pathname.startsWith('/mcp-app/')) return void mcpPage(u.pathname, u.searchParams).then(r => (res.writeHead(r.code, r.headers), res.end(r.body))) // an MCP App's page (mcpApps.ts): its own key, its own CSP
     if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
     if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
+    if (PWA.has(u.pathname)) return pwaPage(u.pathname, res) // M4: the page as an app, while remote access runs
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
     const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)
     res.writeHead(r.code, r.headers)
@@ -1037,6 +1085,30 @@ const server = createServer(async (req, res) => {
       return reply(200, out)
     } catch (e) {
       return reply(200, { error: (e as Error).message })
+    }
+  }
+  // M4: a paired device's Web Push ({}: the key to subscribe with; { sub }: its subscription, a browser vendor's push
+  // service's; { off: true }) and its notification's taps (/tap: nonce:n:sig, as ntfy's): from the page's origin, with
+  // the device's cookie (remoteMod.deviceOf: a stable address, not expired)
+  if (req.method === 'POST' && (req.url === '/push' || req.url === '/tap')) {
+    if (!req.headers.origin || req.headers.origin !== remoteMod.remoteOrigin()) return reply(403, { error: 'origin not allowed' })
+    const id = remoteMod.deviceOf(req.headers.cookie)
+    if (!id) return reply(401, { error: 'not a paired device' })
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 8192) return reply(413, { error: 'too big' })
+    }
+    if (req.url === '/tap') return phoneMod.tapIn(body).then(() => reply(200, { ok: true }), e => reply(400, { error: (e as Error).message }))
+    try {
+      const o = JSON.parse(body || '{}') ?? {}
+      if (o.off === true) return remoteMod.devicePush(id, undefined), reply(200, { ok: true })
+      if (o.sub === undefined) return reply(200, { key: phoneMod.vapid().pub })
+      if (!subOk(o.sub)) return reply(400, { error: "not a subscription from a browser's push service" })
+      remoteMod.devicePush(id, o.sub)
+      return reply(200, { ok: true })
+    } catch (e) {
+      return reply(400, { error: (e as Error).message })
     }
   }
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })

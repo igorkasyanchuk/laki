@@ -377,6 +377,8 @@ export function webhookUrl(url?: string) {
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname))) throw new Error('the webhook URL must start with https://')
   return u.href
 }
+// pushes set up: a URL, or Web Push (the paired phones that turned notifications on: no URL)
+export const pushOn = (w?: Webhook): w is Webhook => !!w && (w.format === 'webpush' || !!w.url?.trim())
 // Answer from the phone over ntfy needs a topic only you read: ntfy.sh's are public (anyone reading one could tap), so an
 // access token (?auth=) or a server of your own. Telegram checks the chat; Slack and JSON have no taps
 export function answerOk(w: Webhook) {
@@ -834,7 +836,7 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
 // Settings › Phone pushes: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
 // answer: Answer from the phone (Telegram's and ntfy's buttons; off: the choices as text only); replyTopic: the random
 // part of ntfy's reply topic (<topic>-<it>), made as answer turns on
-export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean; detail?: 'titles' } // detail titles: who needs you only, nothing off the screen (no question, choices or buttons); answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
+export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json' | 'webpush' /* M4: the paired phones' own notifications, no URL */; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean; detail?: 'titles' } // detail titles: who needs you only, nothing off the screen (no question, choices or buttons); answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* any other: a font's name */ case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string; color?: 'auto' | 'theme' | 'accent' | 'own' } // color: the theme's accent as text (unset, auto; accent: an earlier build's), the theme's own ('theme'), or each project's own color; not over a look whose head is a filled band
@@ -902,8 +904,8 @@ export type Remote = { mail: string; open?: boolean; pin?: string; tries?: numbe
 export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
 // locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
 // a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
-export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number }
-export type SavedDevice = RemoteDevice & { hash: string }
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean } // notify: it takes Web Push notifications (M4)
+export type SavedDevice = Omit<RemoteDevice, 'notify'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string } } // push: its Web Push subscription (push.ts WebSub)
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)
