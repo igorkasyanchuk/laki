@@ -594,6 +594,9 @@ export type Settings = {
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // tailscale: a PIN as well
   remoteFunnel?: boolean // tailscale: tailscale funnel, the internet (a PIN always)
+  remotePasskey?: boolean // D6: paired devices unlock with a passkey (Face ID, Touch ID) at a stable address (unset: offered)
+  remotePinFallback?: boolean // D6: a locked device may unlock with the PIN instead (unset: yes)
+  remoteIdle?: number // D6: minutes without a call before a passkey device locks again (unset: 15; 0: only at each page load)
   remotePush?: boolean // D4: remote access's link (and its start, a new address, a stop on its own, a new device) to the phone webhook; off unless true, never with anyone-with-the-link
   remoteWrong?: 'wait' | 'stop' // D5: after the wrong PINs, no PIN taken for a while (wait, unset too) or remote access stops
   remoteDeviceDays?: number // D3: how long a paired device stays in (1-90 days; unset: 30)
@@ -906,8 +909,8 @@ export type Remote = { mail: string; open?: boolean; pin?: string; tries?: numbe
 export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
 // locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
 // a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
-export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean } // notify: it takes Web Push notifications (M4)
-export type SavedDevice = Omit<RemoteDevice, 'notify'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string } } // push: its Web Push subscription (push.ts WebSub)
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean; passkey?: boolean } // notify: it takes Web Push notifications (M4); passkey: it unlocks with one (D6)
+export type SavedDevice = Omit<RemoteDevice, 'notify' | 'passkey'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string }; pk?: { id: string; jwk: Record<string, unknown>; count: number }; regUntil?: number } // push: its Web Push subscription (push.ts WebSub); pk: its passkey (D6: the credential's id, its public key as a JWK, the signature counter); regUntil: a just-paired device may set one up until then
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)

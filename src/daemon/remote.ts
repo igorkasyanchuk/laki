@@ -8,11 +8,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
-import { type Agent, AGENT_NAMES, type Remote, type RemoteDevice, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
+import { type Agent, AGENT_NAMES, type Remote, type RemoteDevice, REMOTE_TRIES, type SavedDevice, type Tunnel } from '../shared/types.ts'
 import { broadcast, changed, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
 import { dir } from './dir.ts'
 import { policyRemote } from './policy.ts'
 import { type Tail, tailOf } from './meters.ts'
+import { b64u, type Passkey, register, verifyGet } from './passkey.ts'
 import { phoneRemote } from './phone.ts'
 import { own } from './resources.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage } from './share.ts'
@@ -786,7 +787,7 @@ const DEVICE_COOKIE = '__Host-laki-device'
 const PAIR_MS = 10 * 60e3
 const stable = (r: RemoteRun) => !!(r.host || r.via)
 const deviceDays = () => (n => (Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30))(Number(state.settings?.remoteDeviceDays))
-export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, ...d }) => ({ ...d, ...(push && { notify: true }) })) : undefined) // never its hash or its push keys
+export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, pk, regUntil: __, ...d }) => ({ ...d, ...(push && { notify: true }), ...(pk && { passkey: true }) })) : undefined) // never its hash, its push keys or its passkey
 let gone: (ids: string[]) => void = () => {}
 export const onGone = (f: (ids: string[]) => void) => void (gone = f) // main.ts: a revoked or expired device's sockets closed
 const cookieOf = (header: string | undefined) => {
@@ -831,7 +832,7 @@ export function devicePush(id: string, sub: { endpoint: string; p256dh: string; 
 function pair(r: RemoteRun, o: Asker) {
   const t = hex()
   const now = Date.now()
-  const d = { id: randomUUID().slice(0, 8), name: deviceName(o.ua), hash: hashOf(t), addedAt: now, seenAt: now, until: now + deviceDays() * 86400e3 }
+  const d = { id: randomUUID().slice(0, 8), name: deviceName(o.ua), hash: hashOf(t), addedAt: now, seenAt: now, until: now + deviceDays() * 86400e3, ...(passkeyOn() && { regUntil: now + REG_MS }) }
   state.remoteDevices = [...(state.remoteDevices ?? []), d]
   Object.assign(r, { used: true, keyUntil: undefined })
   keepRemote() // saves
@@ -841,6 +842,85 @@ function pair(r: RemoteRun, o: Asker) {
   changed()
   return { need: false, device: true, cookie: `${DEVICE_COOKIE}=${t}; Path=/; Max-Age=${Math.floor((d.until - now) / 1000)}; HttpOnly; Secure; SameSite=Strict` }
 }
+// ---------- D6: passkeys. At a stable address (a quick tunnel's origin changes each start: a passkey is for one site)
+// a just-paired device may set one up (REG_MS); from then on each of its pages starts locked, and locks again after
+// remoteIdle minutes without a call (main.ts' Conn.locked: until then only these calls, no state, no events), until a
+// passkey's signature (passkey.ts) or, unless turned off, the PIN. Challenges: random, single use, a minute
+const REG_MS = 10 * 60_000
+const CHALLENGE_MS = 60_000
+const challenges = new Map<string, { device: string; kind: 'create' | 'get'; until: number }>()
+export const passkeyOn = () => state.settings?.remotePasskey !== false
+const deviceById = (id: string) => state.remoteDevices?.find(d => d.id === id)
+// whether a device's pages lock: it has a passkey, passkeys are on, at a stable address
+export const deviceLocks = (id: string) => passkeyOn() && !!remote?.url && stable(remote) && !!deviceById(id)?.pk
+export const idleMs = () => (m => (Number.isFinite(m) && m >= 0 ? m : 15) * 60e3)(Number(state.settings?.remoteIdle ?? 15))
+export const pinFallback = () => state.settings?.remotePinFallback !== false && !!remote?.pin
+// a just-paired device's offer: set a passkey up now (its page asks)
+export const passkeyOffer = (id: string) => (d => passkeyOn() && !!remote?.url && stable(remote) && !!d && !d.pk && (d.regUntil ?? 0) > Date.now())(deviceById(id))
+const site = () => {
+  if (!remote?.url || !stable(remote)) throw new Error('passkeys need a stable address (Tailscale or My domain)')
+  return { origin: remote.url, rpId: new URL(remote.url).hostname }
+}
+function challengeFor(device: string, kind: 'create' | 'get') {
+  const now = Date.now()
+  for (const [k, c] of challenges) if (c.until <= now) challenges.delete(k)
+  const c = b64u(randomBytes(32))
+  challenges.set(c, { device, kind, until: now + CHALLENGE_MS })
+  return c
+}
+// the challenge the browser signed (its clientDataJSON's), taken: used once, whatever the check says next
+function taken(r: any, device: string, kind: 'create' | 'get') {
+  let c: unknown
+  try {
+    c = JSON.parse(Buffer.from(String(r?.clientDataJSON ?? ''), 'base64url').toString('utf8'))?.challenge
+  } catch {}
+  const x = typeof c === 'string' ? challenges.get(c) : undefined
+  if (typeof c === 'string') challenges.delete(c)
+  if (!x || x.device !== device || x.kind !== kind || x.until <= Date.now()) throw new Error('passkey: that challenge is used or past its minute: try again')
+  return c as string
+}
+export function passkeyOptions(device: string) {
+  if (!passkeyOffer(device)) throw new Error('a passkey is set up just after pairing: pair this device again (Add a device on the Mac)')
+  const { rpId } = site()
+  return { challenge: challengeFor(device, 'create'), rpId, user: { id: b64u(Buffer.from(device)), name: deviceById(device)!.name } }
+}
+export function passkeyRegister(device: string, r: unknown) {
+  if (!passkeyOffer(device)) throw new Error('a passkey is set up just after pairing: pair this device again (Add a device on the Mac)')
+  const challenge = taken(r, device, 'create')
+  const d = deviceById(device)!
+  const pk: Passkey = register(r, { challenge, ...site() })
+  d.pk = pk as SavedDevice['pk']
+  delete d.regUntil
+  save()
+  log(`remote access: ${d.name} (${d.id}) unlocks with a passkey now`)
+  changed()
+  return { ok: true }
+}
+export function passkeyChallenge(device: string) {
+  const d = deviceById(device)
+  if (!d?.pk || !deviceLocks(device)) throw new Error('this device has no passkey')
+  return { challenge: challengeFor(device, 'get'), rpId: site().rpId, id: d.pk.id, pin: pinFallback() }
+}
+// true: unlocked (main.ts opens the connection); a throw: why not
+export function passkeyUnlock(device: string, r: unknown) {
+  const d = deviceById(device)
+  if (!d?.pk || !deviceLocks(device)) throw new Error('this device has no passkey')
+  const challenge = taken(r, device, 'get')
+  d.pk.count = verifyGet(r, { challenge, ...site(), key: d.pk as Passkey })
+  save()
+  return true
+}
+// Use PIN instead: remote access's PIN (shown on the Mac), its wrong ones counted as the link's are (D5)
+export function passkeyPin(device: string, pin: unknown, o: Asker = {}) {
+  const r = remote
+  if (!r || !deviceLocks(device)) throw new Error('this device has no passkey')
+  if (!pinFallback()) throw new Error('the PIN is off for unlocking: use the passkey')
+  const now = Date.now()
+  if (r.lockUntil && now < r.lockUntil) throw new Error(`Too many wrong PINs: try again in ${mins(r.lockUntil - now)}`)
+  if (pinIs(r, pin)) return true
+  wrongPin(r, o, now)
+}
+
 // Add a device: a new link (and PIN), good for 10 minutes and one use; only at a stable address
 export function remotePair(): Remote | undefined {
   const r = remote
@@ -915,7 +995,12 @@ export function remotePin(p: { token?: unknown; pin?: unknown }, o: Asker = {}):
   }
   if (r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }) // the wait is over
   if (p.pin === undefined) return { need: true, left: r.left }
-  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return use()
+  if (pinIs(r, p.pin)) return use()
+  wrongPin(r, o, now)
+}
+const pinIs = (r: RemoteRun, pin: unknown) => typeof pin === 'string' && !!r.pin && same(pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)
+// a wrong PIN (the link's, or D6's Use PIN instead): counted down, then a wait (D5) or a stop; always a throw
+function wrongPin(r: RemoteRun, o: Asker, now: number): never {
   r.left = (r.left ?? 1) - 1
   r.wrong = [...(r.wrong ?? []).filter(t => now - t < 86400e3), now]
   const from = o.ip ? ` from ${o.ip}` : ''

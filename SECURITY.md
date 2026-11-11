@@ -81,6 +81,18 @@ tunnel reports (`CF-Connecting-IP`, Tailscale's login: shown, never trusted). 20
 tries per wait and waits of 1, 5, 30, 30… minutes that's under 100 guesses a day without the cap, and with it at most 20
 a start out of 10^6 PINs (1 in 50,000), and only the Mac starts it again (a new PIN). Paired devices aren't affected.
 
+A paired device can add a passkey (on by default; Settings › Remote access › *Unlock with a passkey*), offered only in
+the 10 minutes after it pairs. Then every page it opens is locked until Face ID, Touch ID or the device's code signs a
+fresh challenge (32 random bytes, used once, 60 seconds), and again after 15 idle minutes (or only on open): a locked
+page gets no state, no events and no calls but the unlock's, and its cookie alone is refused on `/rpc` (423). So a
+stolen cookie, or a phone left unlocked with Laki open, no longer means access. The daemon checks the WebAuthn answer
+with node:crypto: ES256 only, user verification required, the challenge, the page's origin, the site's hash, a
+signature by the kept public key, and a sign counter that never goes back. Registration takes the public key the
+browser reports (attestation *none*) rather than the authenticator's signed statement: what makes it trusted is that
+only a device that just paired (with the link and PIN) can register one, on Laki's own page. *Use PIN instead* stays
+unless you turn off *Allow the PIN instead*; a wrong one counts as on the link's page. The passkey is the device's;
+Laki keeps only its public key, never in the view.
+
 ### Auto-answer rules
 
 A project's auto-answer rules (Settings › the project, or *Always allow in this project* on an ask's card) answer a

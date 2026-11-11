@@ -1773,6 +1773,8 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
    (--waiting on its tint is under 3:1 in the light themes) */
 .stale-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); padding: var(--sp-4) var(--sp-5); background: color-mix(in srgb, var(--waiting) 18%, var(--bg)); border-bottom: 1px solid var(--waiting); color: var(--fg); font: var(--fs-3)/1.4 var(--ui-font); }
 .stale-bar > svg { color: var(--waiting); flex: none; }
+/* D6: a passkey device locked again mid-session: the splash over everything */
+.splash.lock-over { position: fixed; inset: 0; z-index: var(--z-top); }
 /* U13: What's new, once a version: over the work, top right, under the tab bar */
 .whats-new { position: fixed; top: 56px; right: var(--sp-6); width: min(380px, calc(100vw - 32px)); z-index: var(--z-toast); padding: var(--sp-4) var(--sp-5); color: var(--fg); font: var(--fs-3)/1.45 var(--ui-font); }
 .whats-new > header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }

@@ -238,6 +238,31 @@ class Api {
 
 export const api = new Api()
 
+// D6: a paired device's passkey (remote access at a stable address): set up just after pairing, then the unlock of
+// each page. ES256 only, user verification required, attestation none: the key comes from getPublicKey() (the daemon
+// reads no CBOR: passkey.ts says why). Each part to the daemon as base64url
+const b64u = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+export const passkeys = () => typeof window !== 'undefined' && !!window.PublicKeyCredential && !bridge
+export async function passkeySetUp() {
+  const o = await api.call<{ challenge: string; rpId: string; user: { id: string; name: string } }>('passkeyOptions')
+  const c = (await navigator.credentials.create({
+    publicKey: { rp: { id: o.rpId, name: 'Laki' }, user: { id: unb64u(o.user.id), name: o.user.name, displayName: o.user.name }, challenge: unb64u(o.challenge), pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { userVerification: 'required', residentKey: 'discouraged' }, attestation: 'none', timeout: 60000 },
+  })) as PublicKeyCredential | null
+  if (!c) throw new Error('cancelled')
+  const r = c.response as AuthenticatorAttestationResponse
+  const key = r.getPublicKey()
+  if (!key) throw new Error("this browser doesn't give the passkey's key: unlock with the PIN")
+  return api.call('passkeyRegister', { id: b64u(c.rawId), clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.getAuthenticatorData()), publicKey: b64u(key), alg: r.getPublicKeyAlgorithm() })
+}
+export async function passkeyUnlock() {
+  const ch = await api.call<{ challenge: string; rpId: string; id: string }>('passkeyChallenge')
+  const c = (await navigator.credentials.get({ publicKey: { challenge: unb64u(ch.challenge), rpId: ch.rpId, allowCredentials: [{ type: 'public-key', id: unb64u(ch.id) }], userVerification: 'required', timeout: 60000 } })) as PublicKeyCredential | null
+  if (!c) throw new Error('cancelled')
+  const r = c.response as AuthenticatorAssertionResponse
+  return api.call('passkeyUnlock', { id: b64u(c.rawId), clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) })
+}
+
 // tell the daemon what this window shows (App's panes, a floated tab's window): it clears their ● and sets none while
 // you look. focused and shown (the window isn't hidden: closing it only hides it, so widgets fetch only while it's
 // open) are added here, again as they change and as the socket opens. The cleanup, for an effect

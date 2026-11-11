@@ -415,7 +415,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string } // wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
 // D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
 export function hookOf(w?: Webhook) {
   if (w?.format === 'webpush') return 'your paired phones'
@@ -718,6 +718,32 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             At a stable address (Tailscale or My domain), a device that opened a link is paired: it gets in by itself, as long as remote access runs, until its
             time is up. Laki tells you here when a new one joins. A quick tunnel's link opens one tab instead.
           </p>
+          <Switch on={opts.passkey} onChange={v => set({ passkey: v })} className="switch-row" tip="Just after pairing, the device is offered a passkey; then each time Laki opens there, and after the minutes below without use, it asks for Face ID, Touch ID or the device's code">
+            <span className="switch-text">
+              <span>Unlock with a passkey</span>
+              <span className="muted">Face ID or Touch ID on the paired device, each time it opens Laki</span>
+            </span>
+          </Switch>
+          {opts.passkey && (
+            <>
+              <Switch on={opts.pinBack} onChange={v => set({ pinBack: v })} className="switch-row" tip="A locked device can type remote access's PIN instead (wrong ones count as on the link's page)">
+                <span className="switch-text">
+                  <span>Allow the PIN instead</span>
+                  <span className="muted">Use PIN instead, when remote access has a PIN</span>
+                </span>
+              </Switch>
+              <div className="field">
+                <span>Lock again after</span>
+                <div className="seg" role="radiogroup" aria-label="Lock again after">
+                  {[5, 15, 60, 0].map(m => (
+                    <button key={m} type="button" role="radio" aria-checked={opts.idle === m} className={opts.idle === m ? 'on' : ''} onClick={() => set({ idle: m })}>
+                      {m ? `${m} min` : 'Only on open'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
           {api.devices?.map(d => (
             <div className="row" key={d.id}>
               <span>

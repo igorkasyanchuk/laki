@@ -548,6 +548,13 @@ const api: Record<string, Handler> = {
   remoteStop: () => remoteMod.remoteStop(),
   remotePair: () => remoteMod.remotePair(), // D3: Add a device
   remoteDeviceRm: p => remoteMod.remoteDeviceRm(p), // Revoke, Revoke all, Forget devices
+  // D6: a paired device's passkey (its page's only: c.device), set up just after pairing, then the unlock of each of
+  // its pages (a challenge, then the signature or the PIN), which opens that connection (unlocked)
+  passkeyOptions: (_p, c) => remoteMod.passkeyOptions(devOf(c)),
+  passkeyRegister: (p, c) => remoteMod.passkeyRegister(devOf(c), p),
+  passkeyChallenge: (_p, c) => remoteMod.passkeyChallenge(devOf(c)),
+  passkeyUnlock: (p, c) => remoteMod.passkeyUnlock(devOf(c), p) && unlocked(c!),
+  passkeyPin: (p, c) => remoteMod.passkeyPin(devOf(c), p?.pin) && unlocked(c!),
   remoteTick: p => remoteMod.remoteTick(p.now), // tests move the clock
   archivedTidy: p => core.archivedTidy(p.now), // tests move the clock
   shareTick: p => remoteMod.shareTick(p.now),
@@ -681,7 +688,7 @@ const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSa
 // S5: OPEN: what any caller may call, as it is (reads of the view and of a workspace's own facts, the ticks tests move,
 // a connection's own view and size, the hook: hookWho's). Every method of api is in FROM, CALLER or OPEN, checked as
 // the daemon loads (below api): a new one is classified, never open by default
-const OPEN = new Set(['ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hookTick', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'memoryTick', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'reminderTick', 'failDismiss', 'hookList', 'storageInfo', 'storageTidy', 'apps', 'reorder', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'sideState', 'secretsTidy', 'phoneTick', 'prList', 'prRefresh', 'meme', 'aiQuestion', 'aiPermission', 'aiImage', 'aiTick', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'skillSet', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'prViewed', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'accountAdd', 'accountSet', 'accountLogin', 'resources', 'shareStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'tabSleep', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'studioChats', 'widgetReload', 'widgetFiles', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowTrashTidy', 'flowHistory', 'flowStop', 'flowGet', 'flowForget', 'flowTick'])
+const OPEN = new Set(['passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hookTick', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'memoryTick', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'reminderTick', 'failDismiss', 'hookList', 'storageInfo', 'storageTidy', 'apps', 'reorder', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'sideState', 'secretsTidy', 'phoneTick', 'prList', 'prRefresh', 'meme', 'aiQuestion', 'aiPermission', 'aiImage', 'aiTick', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'skillSet', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'prViewed', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'accountAdd', 'accountSet', 'accountLogin', 'resources', 'shareStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'tabSleep', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'studioChats', 'widgetReload', 'widgetFiles', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowTrashTidy', 'flowHistory', 'flowStop', 'flowGet', 'flowForget', 'flowTick'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
@@ -1124,6 +1131,7 @@ const server = createServer(async (req, res) => {
   const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
   const mine = far ? undefined : core.tabOfToken(bearer)
   const device = far && !tokenOk(bearer, req.headers.origin) ? remoteMod.deviceOf(req.headers.cookie) : undefined // D3: a paired device's cookie, from its origin only
+  if (device && remoteMod.deviceLocks(device)) return reply(423, { error: 'this device unlocks on its page first (a passkey)' }) // D6: no call outside an unlocked page's socket
   if (!mine && !device && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
   const app = isApp(bearer, req.headers.origin)
   let body = ''
@@ -1157,6 +1165,32 @@ function refusedWs(who: string) {
 
 // D3: a paired device's sockets, by its id: closed the moment it's revoked or expires
 const devSocks = new Map<import('ws').WebSocket, string>()
+// D6: what a locked page (a passkey device's, before its unlock) may call and be sent
+const UNLOCK = new Set(['ping', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
+const LOCK_EVS = new Set(['locked', 'passkey'])
+const lockOk = (m: unknown) => typeof m === 'object' && m !== null && !Buffer.isBuffer(m) && (LOCK_EVS.has((m as any).ev) || ((m as any).ev === undefined && (m as any).id !== undefined))
+const devOf = (c?: core.Conn) => {
+  if (!c?.device) throw new Error("a paired device's page only")
+  return c.device
+}
+// locked: its page asks (pin: Use PIN instead is there); unlocked: the state and what waits, as a page that opened
+const lockedSay = (c: core.Conn) => c.send({ ev: 'locked', pin: remoteMod.pinFallback() })
+function unlocked(c: core.Conn) {
+  if (!c.locked) return true
+  c.locked = false
+  c.at = Date.now()
+  core.hello(c)
+  widgetAsks(c)
+  noticesTo(c)
+  return true
+}
+// D6: a passkey device's page with no call for its idle minutes locks (its next call would too): told at once
+function idleLock(now = Date.now()) {
+  const idle = remoteMod.idleMs()
+  if (idle > 0) for (const c of core.clients) if (c.device && !c.locked && remoteMod.deviceLocks(c.device) && now - (c.at ?? now) > idle) (c.locked = true), lockedSay(c)
+}
+// just paired: its page offers to set a passkey up
+const offer = (c: core.Conn) => c.device && remoteMod.passkeyOffer(c.device) && c.send({ ev: 'passkey', offer: true })
 remoteMod.onGone(ids => {
   for (const [ws, id] of devSocks) if (ids.includes(id)) ws.close(4401, 'revoked')
 })
@@ -1191,6 +1225,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   })
   function opened(ws: import('ws').WebSocket, device?: string) {
     if (device) devSocks.set(ws, device), ws.once('close', () => devSocks.delete(ws))
+    const locked = !!device && remoteMod.deviceLocks(device) // D6: its page unlocks first (a passkey, or the PIN)
     const app = isApp(url.searchParams.get('token'), req.headers.origin) // S1: the app's window: yours, never looked up
     // S7: its process is in an agent's tab, couldn't be found, or it's remote access's page (a phone is on camera too): in
     // Recording mode its state has no private workspace. Until its process is known, in that mode: as an agent's
@@ -1201,8 +1236,10 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
       id: ++clientSeq,
       remote: far,
       ...(device && { device }),
+      ...(locked && { locked: true }),
       send: msg => {
         if (ws.readyState !== ws.OPEN) return
+        if (c.locked && !lockOk(msg)) return // D6: locked, nothing of Laki's but how to unlock and its calls' answers
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
         // re-attaches from a snapshot
         if (ws.bufferedAmount > 32 << 20) return ws.terminate()
@@ -1221,13 +1258,12 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     core.clients.add(c)
     // the first state once it's known whose it is (S3: yours has the secrets, and it draws it once); remote's at once
     // a slow lookup (lsof under load): a masked one meanwhile, so the window isn't left with none
-    const first = () => ((known = true), core.clients.has(c) && core.hello(c))
+    const first = () => ((known = true), core.clients.has(c) && (c.locked ? lockedSay(c) : (core.hello(c), offer(c))))
     if (who) {
       const late = setTimeout(first, 500)
       void who.then(() => (clearTimeout(late), first()))
     } else first()
-    widgetAsks(c) // an extension's asks still waiting: this window shows them too
-    noticesTo(c) // and the notices up
+    if (!c.locked) widgetAsks(c), noticesTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
@@ -1235,6 +1271,13 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         m = JSON.parse(String(raw))
       } catch {
         return
+      }
+      // D6: a passkey device's page: locked again after its idle minutes; locked, only the unlock calls
+      if (c.device && remoteMod.deviceLocks(c.device)) {
+        const now = Date.now()
+        if (!c.locked && remoteMod.idleMs() > 0 && now - (c.at ?? now) > remoteMod.idleMs()) (c.locked = true), lockedSay(c)
+        if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
+        c.at = now
       }
       if (m.method === 'attach') {
         const sock = local.get(c)
@@ -1310,7 +1353,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps, { idle: 'slow' }) // Collision radar
   ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick, { idle: 'slow' }) // claude's and codex's transcripts: the tabs' context and usage
   ticks.register('watchLimits', 30000, () => core.watchLimits())
-  ticks.register('remoteTick', 15000, () => remoteMod.remoteTick())
+  ticks.register('remoteTick', 15000, () => (remoteMod.remoteTick(), idleLock()))
   ticks.register('shareTick', 15000, () => remoteMod.shareTick())
   ticks.register('tunnelTick', 15000, () => remoteMod.tunnelTick())
   scheduleMod.runOutcomes() // T1: a scheduled run's end, from its tab's turns

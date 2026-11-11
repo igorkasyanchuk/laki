@@ -20,6 +20,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Laki AI's answers (OpenRouter) appear as they're written instead of all at once at the end of each step, and a long answer is no longer cut off at 2 minutes while it's still coming.
 - A long Laki AI chat no longer sends all of itself with each ask: the newest turns go, up to a size, and the AI page marks where Laki AI's view of the chat starts, with *New chat* beside it.
 - Remote access can send its link to your phone (Settings › Remote access › *Send the link to my phone*, off until you turn it on): when it starts or gets a new address, a push you tap to open it, and a word when it stops on its own or a new device joins. Only with a PIN, an email or Tailscale, never its PIN; Settings says whose server sees the link.
+- Remote access can ask for Face ID or Touch ID: a paired phone is offered a passkey, then each time it opens Laki (and after 15 minutes without use) it unlocks with it, or with *Use PIN instead*. Settings › Remote access › Devices turns it off, the PIN off or picks the minutes.
 - Workflows keep secrets out of what they pass on: a token from Settings', the project's or a profile's env that a command prints shows as •••• in its output, the run's log, an agent's answer and a webhook's response, so it never reaches an AI call's prompt or a webhook's body. The command itself still gets it.
 
 ## 0.48.0 · Nov 11, 2026

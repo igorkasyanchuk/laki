@@ -5,7 +5,7 @@ import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
-import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
+import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeys, passkeySetUp, passkeyUnlock } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
@@ -238,11 +238,65 @@ const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.e
 // is typed; a wrong one shakes them, a right one turns the ring green with a check while the socket opens. Unlock is
 // always a button: short of six digits it says so
 const PIN_LEN = 6 // remote.ts' PIN
+// D6: a passkey device's page, locked (each page load, and after its idle minutes): Face ID or Touch ID, or the PIN
+// instead (pin: Settings allows it)
+function UnlockForm({ pin }: { pin: boolean }) {
+  const [usePin, setUsePin] = useState(false)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (usePin) return <PinForm unlock onPin={code => api.call('passkeyPin', { pin: code })} />
+  const go = () => {
+    if (busy) return
+    setBusy(true)
+    setErr('')
+    passkeyUnlock().then(
+      () => setBusy(false),
+      e => (setBusy(false), setErr(/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) ? 'Not unlocked: try again' : String(e?.message ?? e))),
+    )
+  }
+  return (
+    <div className="pin-card">
+      <div className="pin-brand">
+        <img src={icon} alt="" />
+        <b>Laki</b>
+        <span className="pin-tag">
+          <Icon name="globe" size={11} /> Remote access
+        </span>
+      </div>
+      <div className="pin-ring" aria-hidden>
+        <span>
+          <Icon name="fingerprint" size={22} />
+        </span>
+      </div>
+      <h1>Unlock Laki</h1>
+      <p className="pin-say">This device unlocks with its passkey: Face ID, Touch ID or its code.</p>
+      <button type="button" className="pin-go" autoFocus onClick={go} disabled={busy}>
+        {busy ? (
+          <>
+            <span className="btn-spin" /> Waiting for you…
+          </>
+        ) : (
+          <>
+            Unlock <Icon name="arrowRight" size={15} />
+          </>
+        )}
+      </button>
+      <div className="pin-foot">
+        {err ? <span className="pin-err" role="alert">{err}</span> : <span>Your Mac, through a private link</span>}
+        {pin && (
+          <button type="button" className="link small" onClick={() => setUsePin(true)}>
+            Use PIN instead
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 // what a notification shows whole, so its buttons may answer it: one short line of plain ASCII words, single spaces
 // between (macOS shows about two lines: a newline, a run of spaces or wide glyphs would push a tail out of sight; 40 of
 // its widest letter still fit)
 const shownWhole = (t: string) => t.length <= 40 && /^[!-~]+(?: [!-~]+)*$/.test(t)
-function PinForm({ left }: { left?: number }) {
+function PinForm({ left, onPin, unlock }: { left?: number; onPin?: (code: string) => Promise<unknown>; unlock?: boolean }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -255,7 +309,8 @@ function PinForm({ left }: { left?: number }) {
     if (c.length < PIN_LEN) return void (setErr(`Type all ${PIN_LEN} digits`), setShake(true), box.current?.focus())
     setBusy(true)
     setErr('')
-    api.pin(c).then(
+    const go = onPin ?? ((x: string) => api.pin(x))
+    go(c).then(
       () => (setOk(true), setBusy(false)), // the socket opens next (or the splash says why not)
       e => (setErr((e as Error).message), setCode(''), setShake(true), /stopped/.test((e as Error).message) && setOver(true), setBusy(false), box.current?.focus()),
     )
@@ -314,7 +369,7 @@ function PinForm({ left }: { left?: number }) {
             {err}
           </span>
         ) : (
-          <span>{ok ? 'Your Mac, through a private link' : left === undefined ? 'Paste works too' : left === 1 ? 'One wrong PIN stops remote access' : `${left} wrong PINs stop remote access`}</span>
+          <span>{ok ? 'Your Mac, through a private link' : left === undefined || unlock ? 'Paste works too' : left === 1 ? 'One wrong PIN stops remote access' : `${left} wrong PINs stop remote access`}</span>
         )}
       </div>
     </form>
@@ -365,6 +420,8 @@ export function App() {
   const [glow, setGlow] = useState<{ tab?: string; n: number } | null>(null) // Laki AI just looked (Settings › Experimental › Laki AI's glow)
   const [problem, setProblem] = useState<string | undefined>() // the remote page: why it can't connect
   const [pinAsk, setPinAsk] = useState<{ left?: number } | null>(null) // the remote page: Laki's PIN, asked for on the splash
+  const [locked, setLocked] = useState<{ pin: boolean } | null>(null) // D6: a passkey device's page, until it unlocks
+  const [keyOffer, setKeyOffer] = useState(false) // D6: just paired: set a passkey up?
   const [going, setGoing] = useState<Record<string, string>>({}) // workspaces being archived or deleted: a spinner on their rows
   const [picked, setPicked] = useState<string[]>([]) // the sidebar's ⌘-click and ⇧-click: workspaces to archive, mute, move or delete at once
   const anchor = useRef<string | null>(null) // ⇧-click's other end
@@ -1184,6 +1241,7 @@ export function App() {
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') {
+        setLocked(null) // D6: unlocked (its state comes only then)
         const v = veiled(m.view) // Recording mode: private workspaces out of everything drawn
         hid.current = v === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !v.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
         settle([...m.view.workspaces.map((w: WorkspaceView) => w.id), ...m.view.tabs.map((t: TabView) => t.id)]) // V7: what's here as the window opens doesn't grow in
@@ -1200,6 +1258,8 @@ export function App() {
       else if (m.ev === 'toolDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
+      else if (m.ev === 'locked') setLocked({ pin: !!m.pin })
+      else if (m.ev === 'passkey' && m.offer && passkeys()) setKeyOffer(true)
       else if (m.ev === 'remote') {
         // remote access stopped by a wrong PIN on its page: said here, and as a notification
         toast(m.text, () => setDialog({ section: 'remote' }), 'Settings')
@@ -3031,8 +3091,8 @@ export function App() {
   const pinning = pinAsk && !connected
   if (!view)
     return (
-      <div className={`splash ${pinning ? 'pinning' : ''}`}>
-        {pinning ? <PinForm left={pinAsk.left} /> : <Loading connected={connected} />}
+      <div className={`splash ${pinning || locked ? 'pinning' : ''}`}>
+        {pinning ? <PinForm left={pinAsk.left} /> : locked && connected ? <UnlockForm pin={locked.pin} /> : <Loading connected={connected} />}
         {problem && !connected && <div className="splash-problem">{problem}</div>}
       </div>
     )
@@ -3605,6 +3665,24 @@ export function App() {
           </div>
         )}
         {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
+        {locked && connected && (
+          // D6: locked again after its idle minutes: nothing comes until it unlocks, so nothing of it shows
+          <div className="splash pinning lock-over">
+            <UnlockForm pin={locked.pin} />
+          </div>
+        )}
+        {keyOffer && (
+          <div className="stale-bar soft" role="status">
+            <Icon name="fingerprint" size={16} />
+            <span>
+              <b>Unlock Laki here with Face ID or Touch ID?</b> A passkey of this device's: each time you open Laki here, and after a while without using it.
+            </span>
+            <button onClick={() => void passkeySetUp().then(() => (setKeyOffer(false), toast('Passkey set up: this device unlocks with it')), e => !/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) && toast(String(e?.message ?? e)))}>Set up</button>
+            <button className="ghost" onClick={() => setKeyOffer(false)}>
+              Not now
+            </button>
+          </div>
+        )}
         {connected && news.length > 0 && <WhatsNew version={appVersion} lines={news} onTry={setLink} onAll={() => (newsSeen(), setDialog({ section: 'notes' }))} onClose={newsSeen} />}
         <div className="body">
           {tabsAt === 'left' && <TabStrip app={app} />}

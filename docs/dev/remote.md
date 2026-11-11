@@ -246,6 +246,29 @@ Telegram's button, Slack's `<url|Open it>`, JSON's `url`, Web Push's payload (th
 access shows the switch only with a webhook and not open, and names whose server sees the link (`hookOf`; ntfy.sh is
 a third party).
 
+Passkeys (D6, `settings.remotePasskey`, on unless false; `remotePinFallback`, on unless false; `remoteIdle`, minutes,
+15, 0: only on open). `passkey.ts` checks WebAuthn with node:crypto alone (pure, no core import): ES256 only, user
+verification required; `register` takes the browser's `getPublicKey()` (SPKI) and `getPublicKeyAlgorithm()` with
+attestation `none` instead of decoding the attestation object's CBOR (the trade-off is in its header), checks the
+client data (type, challenge, origin, not cross-origin), the rpIdHash (the page's host), UP and UV and that the
+credential id is the authenticator's, and keeps `{ id, jwk, count }` as `SavedDevice.pk` (never in the view: it says
+`passkey`). `verifyGet`: the id, client data, rpIdHash, UV, the signature over `authenticatorData || SHA-256(clientData)`
+(DER ECDSA) by the kept key, the counter never back (0 and 0 pass: Apple's keep none). remote.ts: `pair` gives the new
+device `regUntil` (10 minutes) when passkeys are on; `passkeyOffer` (stable address, no key yet, in that time),
+`passkeyOptions` and `passkeyRegister` (once: `regUntil` goes); `passkeyChallenge` (32 random bytes, single use, 60 s,
+taken before the check, so a failed check uses it too; with `pin`: `pinFallback`, the setting and a PIN), `passkeyUnlock`,
+`passkeyPin` (`pinIs`, a wrong one counted as `/pin`'s: `wrongPin`). `deviceLocks(id)`: on, running at a stable address,
+the device has a key. main.ts: each socket of such a device starts `locked` (core's Conn): it gets `{ ev: 'locked', pin }`
+and nothing else (`send` drops all but `LOCK_EVS` and replies), and only `UNLOCK`'s calls (ping and the three above);
+`unlocked` then says hello, its asks and notices, as a new page. `c.at`: its last call; a call after `idleMs` locks it
+first, and `idleLock` (on `remoteTick`, every 15 s) locks an idle one at once. `/rpc` with a locking device's cookie:
+423. The page (App.tsx): `UnlockForm` on the splash (or over the window, `.lock-over`, when it locks mid-session) runs
+`api.ts`' `passkeyUnlock` (`navigator.credentials.get`, `allowCredentials` its id), *Use PIN instead* opens PinForm on
+`passkeyPin`; the `passkey` event's offer shows a bar, *Set up* runs `passkeySetUp` (`navigator.credentials.create`,
+rp the page's host, `userVerification: 'required'`, `residentKey: 'discouraged'`). Settings › Remote access › Devices:
+*Unlock with a passkey*, *Allow the PIN instead*, *Lock again after*. Tests: `test/passkey.test.ts` (a software P-256
+authenticator).
+
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
