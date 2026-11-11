@@ -33,7 +33,7 @@ function useTurns(tab: TabView, api: TurnApi) {
 export function TurnButton({ tab, api, onMenu }: { tab: TabView; api: TurnApi; onMenu: (e: MouseEvent, items: MenuItem[]) => void }) {
   const { turns, acts } = useTurns(tab, api)
   if (!turns.length) return null
-  const said = (s?: string) => (s && s.length > SAID ? `${s.slice(0, SAID - 1)}…` : s)
+  const said = (s?: string) => (c => (c.length > SAID ? `${c.slice(0, SAID - 1).join('')}…` : s))([...(s ?? '')]) // by code point: no emoji cut in half
   const items: MenuItem[] = [
     { head: `${tab.name}'s turns` },
     ...turns
