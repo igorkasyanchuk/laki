@@ -1335,7 +1335,8 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   if (size >= 8 && size <= 20) root.dataset.uiSize = String(size), st.setProperty('--ui-size', `${size}px`)
   else delete root.dataset.uiSize
   // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
-  // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); pills and circles stay
+  // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); circles stay, pills too unless it's
+  // square (styles.css' --r-pill), and the design's cards take it when smaller (--d-r)
   const pick = o.accent === 'system' ? sysAccent : o.accent
   if (pick && /^#[\da-f]{6}$/i.test(pick)) st.setProperty('--accent', pick), st.setProperty('--accent-fg', onAccent(pick))
   if (o.radius) st.setProperty('--radius', o.radius), st.setProperty('--rs', o.radius)

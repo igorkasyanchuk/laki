@@ -581,7 +581,9 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (SettingsProject.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
 - **Design tokens** (V2, styles.css `:root`): `--sp-1…6` (2, 4, 6, 8, 12, 16px), `--r-xs…xl` (each `var(--rs, n)`: Settings'
-  Corners over all; a look's `[data-look]` root sets its own from its `--radius`) and `--r-pill`, `--radius` = `--r-m`,
+  Corners over all; a look's `[data-look]` root sets its own from its `--radius`) and `--r-pill` (`--r-xl` × 999: a capsule,
+  square where every corner is, a square look's or Corners' Square), `--radius` = `--r-m`; a Design's cards' `--d-r` takes the
+  look's `--r-xl` when smaller (Llama Amp's Winamp look: square cards, tabs and dialogs alike),
   `--lift-1…3`, `--h-s/m/l` (22, 28, 34), `--z-dialog` 10 < toast < page < ask < pop < drag < tip < `--z-top` (a raw
   z-index only within a part, under 10). Chrome: heads and the tab bar 40px, rows and bars 28. A toast is neutral;
   `err` (App's `fail`, `toast(…, err)`) gives it the red edge. `test/css.test.ts` checks styles.css; looks.css next.

@@ -31,7 +31,8 @@
   /* V2: the design tokens. Space, a 2-4px grid; corners (each a look's own in looks.css; Settings' Corners, --rs, over
      them all); elevation; control heights; the stacking order. --radius is --r-m's old name */
   --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px;
-  --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px); --r-pill: 999px;
+  --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px);
+  --r-pill: calc(var(--r-xl) * 999); /* a capsule, but square where every corner is (a look's, Corners' Square): no round tab among square cards */
   --radius: var(--r-m);
   /* V6: corners by what they are, concentric: a window's (dialogs, menus, popovers), a panel's (cards), a control's
      (buttons, fields, rows, tabs, items), a chip's (counts, status); one inside another takes its parent's minus the gap */
@@ -683,6 +684,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .tab:hover .x, .tab.sel .x { visibility: visible; }
 .tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
 .tabbar > .ib { align-self: center; margin-left: 2px; }
+.tabbar > .reader-switch { align-self: center; } /* the bar keeps its tabs on its bottom line (flex-end); the switch sits with the buttons, not under them (Classic, Inset) */
 .actions { display: flex; gap: 1px; align-self: center; }
 /* the tabs elsewhere (Settings › Appearance › Tabs): a strip under the terminals, or a column beside them; the
    selected tab's bar on the side facing the terminal */
@@ -856,6 +858,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .ask-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-4); margin-top: 12px; }
 .ask-buttons button { min-width: 84px; padding: var(--sp-3) var(--sp-5); }
 .ask-buttons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ask-buttons button.danger:focus-visible { outline-color: var(--error); } /* Delete's ring in its own red, not the accent around it */
 .ask-box button.primary.danger { background: var(--error); border-color: var(--error); color: var(--on-error); }
 @keyframes ask-fade { from { opacity: 0; } }
 @keyframes ask-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
@@ -3404,10 +3407,10 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
    inner: inside it, each a card of its own; parts: each its own card; tiles: every split pane a tile; float: the side
    panel and a preview floating over the terminals; pills: pill tabs (the tab line's :not lists above); joined: tabs
    opening into the card; shadow: cards lifted; lineless: no lines */
-.app[data-dz] { --d-gap: 8px; --d-r: 12px; --d-lift: 0 0 #0000; } /* no shadow, but one that can sit in a list */
+.app[data-dz] { --d-gap: 8px; --d-r: min(12px, var(--r-xl)); --d-lift: 0 0 #0000; } /* the cards' corners: the look's and Corners' when smaller (a square look's square) */ /* no shadow, but one that can sit in a list */
 .app[data-dz~='shadow'] { --d-lift: 0 1px 3px rgb(0 0 0 / 0.16); }
-.app[data-design='inset'] { --d-r: 14px; --d-lift: 0 2px 6px rgb(0 0 0 / 0.12), 0 14px 36px rgb(0 0 0 / 0.18); }
-.app[data-design='tiles'] { --d-gap: 6px; --d-r: 10px; }
+.app[data-design='inset'] { --d-r: min(14px, var(--r-xl)); --d-lift: 0 2px 6px rgb(0 0 0 / 0.12), 0 14px 36px rgb(0 0 0 / 0.18); }
+.app[data-design='tiles'] { --d-gap: 6px; --d-r: min(10px, var(--r-xl)); }
 /* chrome */
 .app[data-dz~='chrome'] { --chrome: var(--rail-bg); background: var(--chrome); } /* the rail's own color, as in Classic: the rail, its look's pattern too, one with the window around the cards */
 .app[data-dz~='chrome'] .sidebar { background: none; }
@@ -3487,7 +3490,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .design-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .design-card > b { margin-top: 5px; font-size: var(--fs-3); }
 .design-card > .small { line-height: 1.35; }
-.dz { --g: 4px; --dr: 4px; --line: color-mix(in srgb, var(--fg) 24%, transparent); display: flex; height: 84px; box-sizing: border-box; border-radius: calc(var(--radius) - var(--r-xs)); overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
+.dz { --g: 4px; --dr: min(4px, var(--r-s)); --line: color-mix(in srgb, var(--fg) 24%, transparent); display: flex; height: 84px; box-sizing: border-box; border-radius: calc(var(--radius) - var(--r-xs)); overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
 .dz i { display: block; }
 .dz-rail { flex: none; width: 10px; background: var(--rail-bg); border-right: 1px solid var(--line); }
 .dz-side { flex: none; width: 30%; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-5) var(--sp-2) var(--sp-2); box-sizing: border-box; background: var(--side); border-right: 1px solid var(--line); }
