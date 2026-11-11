@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { procParent, procPeer } from '../src/daemon/peer.ts'
 import { connect, fresh, until } from './helpers.ts'
 
-test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys into an ask and remote access aren't an agent's; another workspace's terminal asks; one that can't be found is refused", async t => {
+test("M5: an agent's call is its tab's with Origin: app://laki too; answers, keys into an ask and remote access aren't an agent's; another workspace's terminal asks; one that can't be found is refused", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
@@ -23,7 +23,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   const out = join(rig.home, 'agent-out')
   // its Bash tool: curl with the daemon's token, saying it's the app
   const curl = (method: string, params: object, origin = true) =>
-    `curl -s ${origin ? "-H 'Origin: file://' " : ''}-H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
+    `curl -s ${origin ? "-H 'Origin: app://laki' " : ''}-H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
   const agent = async (...cmds: string[]) => {
     rmSync(out, { force: true })
     await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${cmds.join('; ')}; echo done >> ${out}` })
@@ -47,7 +47,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   await rig.rpc('settingsSet', { recording: false })
   await rig.rpc('wsRm', { id: hid.id })
   // the same from outside any tab, the app's Origin and token (S1: its own, not daemon.json's): yours
-  const app = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { origin: 'file://', authorization: `Bearer ${rig.app}` }, body: JSON.stringify({ method, params }) })).json()
+  const app = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { origin: 'app://laki', authorization: `Bearer ${rig.app}` }, body: JSON.stringify({ method, params }) })).json()
   assert.equal((await app('widgetSet', { id, on: true })).error, undefined)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
 
@@ -132,7 +132,7 @@ test("N14, N15: an agent's from: '' starts nothing that never asks; a project's 
   const { port, token } = rig.info()
   const out = join(rig.home, 'agent-out')
   const curl = (method: string, params: object) =>
-    `curl -s -H 'Origin: file://' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
+    `curl -s -H 'Origin: app://laki' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
   await rig.rpc('send', {
     target: `${ws.id}/${tab}`,
     text: `run ${[
@@ -301,7 +301,7 @@ test("an agent can't set When everything is done or its like, import worktrees, 
   const { port, token } = rig.info()
   const out = join(rig.home, 'agent-out')
   const curl = (method: string, params: object) =>
-    `curl -s -H 'Origin: file://' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
+    `curl -s -H 'Origin: app://laki' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
   // its own tab's state with its own key, as its hooks send it (the env's, so in a script of its own)
   const own = join(rig.home, 'own-hook.sh')
   writeFileSync(own, `curl -s -H 'Authorization: Bearer ${token}' --data "{\\"method\\":\\"hook\\",\\"params\\":{\\"tab\\":\\"$LAKI_TAB\\",\\"state\\":\\"running\\",\\"key\\":\\"$LAKI_HOOK\\"}}" http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}\n`)

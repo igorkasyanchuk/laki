@@ -9,6 +9,27 @@ workspace or tab, the new-workspace page filled in (`initial`: a prompt and a na
 page's *Filled in from a link* while the prompt is the link's), Scheduled tasks, the Board, Settings, Help, About, Get started (`onboard`: the Help menu's *Get Started Again…*), My Desk (`desk`), the UI kit (`uikit`, `/icons`: its icon gallery) and the starter picker (`starters`: App's dialog `'starters'`, UiKit.tsx' `StarterPicker`; a pick is `WidgetsApi.make`, its page with nothing behind). Links select and fill
 in; they never create or run anything.
 
+### The app's pages: app://laki (S9)
+
+The built pages (`index.html`, `ask.html`, `floater.html`, `annotate.html`) load from `app://laki/`, not `file://`:
+main registers `app` as a privileged standard scheme (`registerSchemesAsPrivileged`: standard, secure, fetch, code
+cache, stream) and serves it on the default session only (`serveApp`, `protocol.handle`): guards.ts `appFile` maps a
+URL to a file of `out/renderer` (another host, `..`, a NUL or a bad escape: 404), `net.fetch` of its `file:` URL gives
+the type. The preview, Browsers and the agent browser have no `app:` scheme. `pageURL(file, query or hash)` is what
+each window loads (dev: the dev server's URL instead). Why: on `file://` the CSP's `'self'` is any file on the disk,
+so an HTML injection could load a script an agent wrote into its worktree beside the preload's bridge; on
+`app://laki` it's out/renderer alone. The CSP (electron.vite.config.ts' `csp`, the build only) also says
+`script-src 'self'` and `object-src 'none'`.
+- guards.ts: `appPage` (the built origin by its prefix: node's URL gives a custom scheme's origin as `null`),
+  `fromApp`, and `tokenPage`/`fromTokenPage`: `conn` (the daemon's port and the app's token) answers index.html's
+  pages only (the app window, `?window=` new, ai, tab, sim, quick), never a card's, the bubbles' or the editor's.
+- The daemon takes Origin `app://laki` (not `file://`) or none (the CLI). A daemon from before (API < 167, still
+  running after an update) would refuse the window, which then can't see it's stale: main's `daemon()` pings it once
+  and asks it to `shutdown { keep: true }`, then starts this bundle's.
+- localStorage moved with the origin, once (`moveStorage`, userData's `storage-moved` marks it): a hidden window reads
+  the `file://` origin's on an empty page, then writes what `app://laki` lacks on `icon-192.png` (no app script runs
+  there). `moving` keeps that window's close from quitting on Linux (`window-all-closed`).
+
 ### Preview
 
 The side panel's Preview: a `<webview>` (`webviewTag`) made by hand in `SidePanel.tsx` `PreviewTab`. Its address bar
@@ -252,7 +273,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   - While a video plays, a closed sidebar is hidden (`hidden`), not unmounted, so it plays on. The video (`Video` in
     panels.tsx, the status bar's play button and ⌘K, the `video` dialog): `text.ts` `youtubeEmbed` turns a link into a `youtube-nocookie.com/embed` URL
     (else refused), an iframe sandboxed without top navigation; the CSP's `frame-src` allows that host, and main sets a
-    `Referer` on its requests (`dev.laki.app`): from a `file://` page YouTube's player refuses to play (Error 153).
+    `Referer` on its requests (`dev.laki.app`): from an `app://` page YouTube's player refuses to play (Error 153).
     `min`: only its bar (the iframe `hidden`, playing on). Its src has `enablejsapi=1`: `videoCommand` (panels.tsx)
     posts `playVideo`/`pauseVideo` to it.
   - Timers (App's `timers`, any number: the foot's button and `startMenu` add one; each a `TimerBar`, panels.tsx, over

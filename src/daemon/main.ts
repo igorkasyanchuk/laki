@@ -121,8 +121,9 @@ const token = randomBytes(32).toString('hex')
 // app that finds it running asks for it (appPair: its process checked), and its window gets it from main (conn IPC)
 const appToken = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
+// app://laki: the built app's pages (S9: main serves out/renderer on it; file:// pages are any file's on the disk).
 // LAKI_DEV_ORIGIN: a dev renderer's, on this Mac only (launchctl setenv reaches a daemon the CLI starts too)
-const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN?.split(',').filter(o => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)) ?? [])])
+const origins = new Set(['app://laki', ...(process.env.LAKI_DEV_ORIGIN?.split(',').filter(o => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)) ?? [])])
 // remote access (core.ts) adds its page's origin and its own token while it runs
 const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === remoteMod.remoteOrigin())
 const { same } = remoteMod
@@ -666,7 +667,7 @@ const remoteNo = (method: string, p: any) =>
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
-// Every local connection, its Origin or not (any tab can read daemon.json's token and say Origin: file://), but remote
+// Every local connection, its Origin or not (any tab can read daemon.json's token and say Origin: app://laki), but remote
 // access's page (its own token, REMOTE_NO) and the app's (its own token, S1: never looked up). Looked up once per connection as a method first needs it (a WebSocket's
 // as it opens), a hook's only without its key (hookWho); nothing found, or the client gone before the answer (its port may be another
 // process's by then), is refused: it fails closed. S1: so is one in no tab with no terminal of its own (setsid and a

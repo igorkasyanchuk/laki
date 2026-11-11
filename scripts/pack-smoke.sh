@@ -1,7 +1,7 @@
 #!/bin/bash
 # Smoke test of the packaged app: its daemon and CLI run as node from inside Laki.app (Electron's node,
 # node-pty from the bundle), fake agents report through the bundled hook command, then the app window
-# connects (file:// origin) and captures a screenshot. Temp home; nothing real is touched.
+# connects (app://laki origin) and captures a screenshot. Temp home; nothing real is touched.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 if [ "$(uname)" = Linux ]; then # a display from Xvfb; Chromium's sandbox wants a setuid helper or user namespaces

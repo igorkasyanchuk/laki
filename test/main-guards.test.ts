@@ -1,10 +1,10 @@
 // E3: Electron main's checks (src/main/guards.ts), on plain node: who may send IPC, which URLs get through
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { appPage, BROWSER, externalOf, fromApp, local, pageIs, PREVIEW, webviewOk } from '../src/main/guards.ts'
+import { appFile, appPage, BROWSER, externalOf, fromApp, fromTokenPage, local, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
-  const page = 'file:///Applications/Laki.app/Contents/Resources/app/out/renderer/index.html'
+  const page = 'app://laki/index.html'
   assert.equal(fromApp({ type: 'window', main: true, url: page }), true)
   assert.equal(fromApp({ type: 'window', main: true, url: `${page}?window=ai` }), true)
   for (const [s, why] of [
@@ -14,6 +14,9 @@ test('main guards: only the app window’s main frame on the app’s own page is
     [{ type: 'window', main: true, url: 'http://localhost:5199/' }, 'a dev origin, built'],
     [{ type: 'window', main: true }, 'no URL'],
     [{ type: 'browserView', main: true, url: page }, 'another kind'],
+    [{ type: 'window', main: true, url: 'file:///Applications/Laki.app/Contents/Resources/app/out/renderer/index.html' }, 'S9: a file:// page (any file on the disk)'],
+    [{ type: 'window', main: true, url: 'app://laki.evil/index.html' }, 'another app: host'],
+    [{ type: 'window', main: true, url: 'app://lakix/index.html' }, 'a look-alike host'],
   ] as const)
     assert.equal(fromApp(s), false, why)
   // a dev build: its dev server's origin only, not a look-alike
@@ -25,6 +28,27 @@ test('main guards: only the app window’s main frame on the app’s own page is
   assert.equal(pageIs(`${page}?window=newer`, 'new'), false)
   assert.equal(pageIs(`${page}#window=new`, 'new'), false)
   assert.equal(pageIs(undefined, 'new'), false)
+})
+
+test('S9: the token only to index.html’s pages; app:// requests stay in out/renderer', () => {
+  for (const u of ['app://laki/index.html', 'app://laki/', 'app://laki/index.html?window=new', 'app://laki/index.html?window=sim&id=x'])
+    assert.equal(tokenPage(u), true, u)
+  for (const u of ['app://laki/ask.html', 'app://laki/floater.html#bar', 'app://laki/floater.html#voice', 'app://laki/annotate.html', 'app://laki/icon-192.png', 'file:///x/index.html', undefined])
+    assert.equal(tokenPage(u), false, String(u))
+  assert.equal(fromTokenPage({ type: 'window', main: true, url: 'app://laki/index.html?window=ai' }), true)
+  assert.equal(fromTokenPage({ type: 'window', main: false, url: 'app://laki/index.html' }), false, 'a frame')
+  assert.equal(fromTokenPage({ type: 'window', main: true, url: 'app://laki/ask.html' }), false, 'a card')
+  // dev: the dev server's root and ?window= pages, not its other pages
+  assert.equal(tokenPage('http://localhost:5199/?window=new', 'http://localhost:5199'), true)
+  assert.equal(tokenPage('http://localhost:5199/floater.html#bar', 'http://localhost:5199'), false)
+  const root = '/A/out/renderer/'
+  assert.equal(appFile('app://laki/index.html', root), '/A/out/renderer/index.html')
+  assert.equal(appFile('app://laki/assets/x.js?v=1#h', root), '/A/out/renderer/assets/x.js')
+  for (const u of ['app://laki/', 'app://laki/assets/..%2f..%2fx', 'app://laki/a%5c..%5c..%5cx', 'app://laki/x%00.js', 'app://laki/%E0%A4%A', 'app://other/index.html', 'file:///etc/passwd', 'not a url'])
+    assert.equal(appFile(u, root), undefined, u)
+  // dot segments the URL parser resolves itself: still inside
+  for (const u of ['app://laki/%2e%2e/%2e%2e/etc/passwd', 'app://laki/../../etc/passwd', 'app://laki/a/../../b'])
+    assert.ok(appFile(u, root)?.startsWith(root), u)
 })
 
 test('main guards: localhost is this Mac’s, over http; userinfo, look-alikes and other schemes refused', () => {

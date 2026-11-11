@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -12,7 +12,7 @@ import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../sh
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
-import { AGENT_BROWSER, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, local, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -20,10 +20,16 @@ import { updater } from './update.ts'
 if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
 delete process.env.LAKI_TAB_TOKEN // S12: opened from a Laki tab (open passes the environment on): the app's own calls are yours, not that tab's agent's
 const dev = !!process.env.ELECTRON_RENDERER_URL
-// the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
+// the app's own pages, its windows' (built: app://laki/, nothing else serves one), not a site or a frame inside them
 const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''
 const appPage = (url: string | undefined) => isAppPage(url, devOrigin)
-const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => senderOk({ type: e.sender.getType(), main: e.senderFrame === e.sender.mainFrame, url: e.senderFrame?.url }, devOrigin)
+const sender = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => ({ type: e.sender.getType(), main: e.senderFrame === e.sender.mainFrame, url: e.senderFrame?.url })
+const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => senderOk(sender(e), devOrigin)
+// S9: the built pages on app://laki/ (out/renderer's files, nothing else; dev: the dev server's), a page by its file
+// name and its query or hash: what each window loads
+protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, codeCache: true, stream: true } }])
+const RENDERER = fileURLToPath(new URL('../renderer/', import.meta.url))
+const pageURL = (file: string, more = '') => (dev ? `${new URL(file === 'index.html' ? '' : file, `${process.env.ELECTRON_RENDERER_URL}/`).href}${more}` : `${APP_ORIGIN}/${file}${more}`)
 // from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
 // tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
 type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' // quick: the quick bar (Q1)
@@ -503,7 +509,7 @@ app.whenReady().then(() => {
   b.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (d, cb) =>
     cb({ requestHeaders: { ...Object.fromEntries(Object.entries(d.requestHeaders).filter(([k]) => !/^sec-ch-ua/i.test(k))), 'User-Agent': FIREFOX } }),
   )
-  // the sidebar's video: YouTube's embed plays only with a Referer, and a file:// page sends none (its Error 153);
+  // the sidebar's video: YouTube's embed plays only with a Referer, and an app:// page sends none (its Error 153);
   // the app's id, as YouTube asks of apps
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, cb) =>
     cb({ requestHeaders: { ...d.requestHeaders, Referer: d.requestHeaders.Referer || 'https://dev.laki.app/' } }),
@@ -516,7 +522,7 @@ app.whenReady().then(() => {
 })
 
 // S1: as the app: its token too (the user's), which only its windows get (conn)
-const daemon = () =>
+const start = () =>
   ensureDaemon(
     {
       ELECTRON_RUN_AS_NODE: '1',
@@ -525,6 +531,59 @@ const daemon = () =>
     },
     true,
   )
+// S9: a daemon from before app://laki (API 167, still running after an update) refuses the window's Origin, so the
+// window never sees it's stale (App.tsx staleDaemon) to restart it: main does, once, as the window would (keep: the pty
+// host's terminals go on). ponytail: one another Laki started refuses this shutdown (who's calling); the window then
+// stays unconnected until Quit Laki Completely
+const ORIGIN_API = 167
+let checked = false
+async function daemon() {
+  const info = await start()
+  if (checked) return info
+  checked = true
+  const r = await rpc<{ api?: number } | string>('ping', { caps: true }).catch(() => undefined)
+  if (r === undefined || (typeof r === 'object' && (r.api ?? 0) >= ORIGIN_API)) return info
+  appLog(`the daemon (pid ${info.pid}) is older than this app's window: restarted`)
+  await rpc('shutdown', { keep: true }).catch(() => {})
+  for (let i = 0; i < 60 && running(info.pid); i++) await new Promise(r => setTimeout(r, 250))
+  return start()
+}
+// S9: the built pages (out/renderer) on app://laki/, a file of that folder or a 404; other sessions (the preview,
+// Browsers, the agent browser) have no app: scheme at all
+function serveApp() {
+  protocol.handle(APP_SCHEME, req => {
+    const file = appFile(req.url, RENDERER)
+    return file && existsSync(file) ? net.fetch(pathToFileURL(file).href) : new Response('not found', { status: 404 })
+  })
+}
+// S9: localStorage (column widths, pins, review drafts, filters) moved from the file:// origin the window had to
+// app://laki, once: read in a hidden window on an empty file:// page, written on one of app://laki's (a picture: no
+// script of the app runs). A new install has nothing to move
+let moving = false // its hidden window gone before the app's opens: no window-all-closed quit (Linux)
+async function moveStorage() {
+  const mark = join(app.getPath('userData'), 'storage-moved')
+  if (dev || existsSync(mark)) return
+  moving = true
+  const blank = join(app.getPath('userData'), 'storage-moving.html')
+  const w = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } })
+  try {
+    writeFileSync(blank, '<!doctype html>')
+    await w.loadFile(blank)
+    const items: [string, string][] = await w.webContents.executeJavaScript('Object.entries(localStorage)')
+    if (items.length) {
+      await w.loadURL(`${APP_ORIGIN}/icon-192.png`)
+      const n: number = await w.webContents.executeJavaScript(`(items => { let n = 0; for (const [k, v] of items) if (localStorage.getItem(k) === null) localStorage.setItem(k, v), n++; return n })(${JSON.stringify(items)})`)
+      appLog(`localStorage moved to ${APP_ORIGIN}: ${n} of ${items.length} items`)
+    }
+    writeFileSync(mark, '')
+  } catch (e) {
+    appLog(`localStorage not moved: ${(e as Error).message}`)
+  } finally {
+    w.destroy()
+    rmSync(blank, { force: true })
+    setTimeout(() => (moving = false), 1000)
+  }
+}
 
 // where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it
 // was either. Only when they're on a screen still there (a monitor unplugged: maximized again, as the first start)
@@ -632,8 +691,7 @@ function create() {
     if (capture) setTimeout(async () => win && writeFileSync(capture, (await win.webContents.capturePage()).toPNG()), 3000)
     if (smoke) setTimeout(() => win && void uiSmoke(win, smoke), 1500)
   })
-  if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
-  else win.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)))
+  win.loadURL(pageURL('index.html'))
 }
 
 // an achievement only main sees (shared/achievements.ts): App's earn, as for a call
@@ -724,7 +782,7 @@ ipcMain.handle('daemon-restart', async e => {
   return true
 })
 ipcMain.handle('conn', async e => {
-  if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
+  if (!fromTokenPage(sender(e), devOrigin)) throw new Error('not the app') // the token: index.html's pages only (S9: not a card's, the bubbles' or the editor's)
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token: appToken() ?? token } // S1: the app's; daemon.json's only when it couldn't be had (its calls that ask who are refused)
@@ -793,8 +851,7 @@ function addCard(c: Card) {
     w.webContents.setWindowOpenHandler(({ url }) => (/^(https?:\/\/|mailto:)/i.test(url) && void shell.openExternal(url), { action: 'deny' })) // a card's link (its Markdown's: target _blank): the browser
     w.webContents.on('did-finish-load', sendCards)
     w.on('closed', () => cardWin === w && ((cardWin = null), (cardAt = null)))
-    if (dev) w.loadURL(new URL('ask.html', `${process.env.ELECTRON_RENDERER_URL}/`).href)
-    else w.loadFile(fileURLToPath(new URL('../renderer/ask.html', import.meta.url)))
+    w.loadURL(pageURL('ask.html'))
   } else sendCards()
 }
 const sendCards = () => (cards.length ? cardWin?.webContents.send('ask-cards', cards, floats.colors) : (cardWin?.hide(), (cardAt = null)))
@@ -1162,8 +1219,7 @@ function barWin() {
       w.focus() // the key window without bringing Laki's own forward (a panel): dictation and the keys go to it
     })
   })
-  if (dev) f.loadURL(`${new URL('floater.html', `${process.env.ELECTRON_RENDERER_URL}/`).href}#bar`)
-  else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash: 'bar' })
+  f.loadURL(pageURL('floater.html', '#bar'))
   return f
 }
 // the drop against an edge of the screen it's on (its spot's, or the main one's when that's on no screen: a laptop
@@ -1589,8 +1645,7 @@ function panelWin(query: Record<string, string>, width: number, height: number, 
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', e => e.preventDefault()) // a dropped file would load in place, bridge and all
   w.once('ready-to-show', () => (w.show(), w.focus()))
-  if (dev) w.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${new URLSearchParams(query)}`)
-  else w.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)), { query })
+  w.loadURL(pageURL('index.html', `?${new URLSearchParams(query)}`))
   return w
 }
 // the new-workspace window's height, as the page grows or shrinks (More, images, a template's preview); its top stays
@@ -1753,8 +1808,7 @@ function annotate(png: string) {
   w.webContents.on('will-navigate', e => e.preventDefault())
   w.webContents.once('did-finish-load', () => w.webContents.send('annotate-image', png))
   w.on('closed', () => annot === w && (annot = null))
-  if (dev) w.loadURL(new URL('annotate.html', `${process.env.ELECTRON_RENDERER_URL}/`).href)
-  else w.loadFile(fileURLToPath(new URL('../renderer/annotate.html', import.meta.url)))
+  w.loadURL(pageURL('annotate.html'))
 }
 ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
   if (!annot || e.sender !== annot.webContents || typeof png !== 'string') return
@@ -2041,12 +2095,13 @@ appMenu()
 
 app.whenReady().then(async () => {
   if (app.isPackaged) app.setAsDefaultProtocolClient('laki')
-  await daemon().catch(e => dialog.showErrorBox('Laki', `The daemon didn't start: ${e.message}`))
+  if (!dev) serveApp()
+  await Promise.all([daemon().catch(e => dialog.showErrorBox('Laki', `The daemon didn't start: ${e.message}`)), moveStorage()])
   create()
 })
 app.on('before-quit', () => (quitting = true))
 app.on('activate', () => show())
 // macOS: the app (and always the daemon) keeps running without windows
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin' && !moving) app.quit()
 })

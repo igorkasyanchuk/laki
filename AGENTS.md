@@ -112,7 +112,7 @@ Laki.app (Electron)                          daemon (Electron's node, detached; 
         notifications, folder picker          POST /rpc    Authorization: Bearer <token>
   preload: conn/notify/pick/openExternal      GET  /ws?token=<token>   (WebSocket)
   renderer: React + xterm.js (WebGL)  ◀─WS─▶  token in <data>/daemon.json (0600); Origin must be
-                                              file:// (the app) or absent (CLI); dev origins only via
+                                              app://laki (the app) or absent (CLI); dev origins only via
 laki CLI / hooks (node) ─────── /rpc ──────▶   LAKI_DEV_ORIGIN
 browser elsewhere ─ cloudflared ─ GET / ───▶   the built renderer (remote access); its own token and
                                               origin while remote access runs

@@ -24,7 +24,8 @@ What helps a report:
 ## Threat model
 
 Laki runs on one person's computer. Its daemon listens on 127.0.0.1 only, behind a 256-bit token (`daemon.json`,
-0600) and Origin and Host allow-lists. An agent in a tab can read that token too, so it says nothing of who calls: the
+0600) and Origin and Host allow-lists. The app's pages load from `app://laki`, a scheme Laki serves from its own
+bundle, so their Content Security Policy runs only the app's own scripts, never a file an agent wrote. An agent in a tab can read that token too, so it says nothing of who calls: the
 daemon tells an agent's calls from yours by the calling process (the tab whose process tree or terminal it runs in:
 lsof and ps, /proc on Linux), whatever Origin it sends. Only two callers in no tab are you: the app (its window and its
 own calls carry a second token the daemon hands the app alone, never written to disk) and a process with a terminal of
