@@ -106,7 +106,9 @@ export function Term({
     clearTimeout(showT.current)
     peekAt.current = at
     const { clientX: x, clientY: y } = e
-    showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, read: abs ? () => read!(abs) : undefined }), 400)
+    // a Markdown file with no card (not the workspace's): its path and ⌘-click as any file link's
+    const said = (s: string | null | undefined) => (s === null && kind === 'md' && peekAt.current === at && box.current && (box.current.title = `${abs}\n⌘-click to open`), s)
+    showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, read: abs ? () => read!(abs).then(said) : undefined }), 400)
     return true
   }
   const peekGone = () => (clearTimeout(showT.current), clearTimeout(hideT.current), (peekAt.current = ''), setPeek(null))

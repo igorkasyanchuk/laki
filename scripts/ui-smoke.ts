@@ -48,11 +48,13 @@ try {
   clearTimeout(timer)
   const result = join(home, 'shots/result.json')
   if (existsSync(result)) {
-    for (const s of JSON.parse(readFileSync(result, 'utf8')) as { name: string; ok: boolean; ms: number; why?: string }[]) console.log(`${s.ok ? 'ok  ' : 'FAIL'} ${s.name.padEnd(18)} ${String(s.ms).padStart(5)} ms${s.why ? `  ${s.why}` : ''}`)
+    const steps = JSON.parse(readFileSync(result, 'utf8')) as { name: string; ok: boolean; ms: number; why?: string }[]
+    for (const s of steps) console.log(`${s.ok ? 'ok  ' : 'FAIL'} ${s.name.padEnd(18)} ${String(s.ms).padStart(5)} ms${s.why ? `  ${s.why}` : ''}`)
     rmSync(shots, { recursive: true, force: true })
     cpSync(join(home, 'shots'), shots, { recursive: true })
-    // M1: the rich world's stills are the README's (docs/img/<name>.png)
-    if (process.env.LAKI_DEMO_RICH) for (const f of readdirSync(shots).filter(f => /^\d+-readme-(?!setup|done)/.test(f))) cpSync(join(shots, f), join(root, 'docs/img', f.replace(/^\d+-readme-/, '')))
+    // M1: the rich world's stills are the README's (docs/img/<name>.png), only when every step passed
+    if (process.env.LAKI_DEMO_RICH && !steps.every(s => s.ok)) console.log('docs/img left as it was: a step failed')
+    else if (process.env.LAKI_DEMO_RICH) for (const f of readdirSync(shots).filter(f => /^\d+-readme-(?!setup|done)/.test(f))) cpSync(join(shots, f), join(root, 'docs/img', f.replace(/^\d+-readme-/, '')))
     console.log(firstLoad())
     console.log(`screenshots: ${shots}`)
   } else console.log('the window never finished: no result.json (120 s at most)')
