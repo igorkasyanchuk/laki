@@ -692,9 +692,9 @@ function park(r: FlowRun, b: Block | undefined, again: boolean, end?: string) {
 // restart) takes it up too
 function retry(r: FlowRun, b: Block, why: string) {
   const n = r.tries?.[b.id] ?? 0
-  if (!b.retry || !RETRY_KINDS.includes(b.kind) || n >= b.retry) return false
+  if (r.sim || !b.retry || !RETRY_KINDS.includes(b.kind) || n >= b.retry) return false // a simulated way is the block's last (a run's recorded one came after its tries)
   if (b.kind === 'run' && b.retryOn?.length && !b.retryOn.includes(Number(r.vars[`steps.${b.id}.code`]))) return false
-  const secs = r.sim ? 0 : RETRY_WAIT[Math.min(n, RETRY_WAIT.length - 1)] // a simulation's: at once
+  const secs = RETRY_WAIT[Math.min(n, RETRY_WAIT.length - 1)]
   ;(r.tries ??= {})[b.id] = n + 1
   const until = Date.now() + secs * 1000
   Object.assign(r, { status: 'running' as FlowStatus, wait: { kind: 'retry', until } })

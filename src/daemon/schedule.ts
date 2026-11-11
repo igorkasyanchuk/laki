@@ -849,9 +849,12 @@ const MAX_MINUTES = 60
 const STEP = 2 * 60e3
 const count = (n: unknown, d: number) => (Number.isInteger(n) && (n as number) >= 0 ? (n as number) : d) // a setting as a client sent it
 const maxOf = (r: ScheduleRun) => (s => s?.maxMinutes ?? count(state.settings?.scheduleMaxMinutes, MAX_MINUTES))(state.schedules?.find(x => x.id === r.schedule))
+// a tab whose queue holds something is on a turn before the run's prompt (queued for its tab: yours, say): not the run's
+// time, and never Esc'd for it
+const delivered = (r: ScheduleRun) => !state.tabs.find(t => t.id === r.tab)?.queue?.length
 function sample(r: ScheduleRun, now: number) {
   const from = r.clock ?? r.at
-  if (r.tab && tabStatus(r.tab) === 'running' && now > from && now - from <= STEP) r.spent = (r.spent ?? 0) + (now - from)
+  if (r.tab && tabStatus(r.tab) === 'running' && delivered(r) && now > from && now - from <= STEP) r.spent = (r.spent ?? 0) + (now - from)
   r.clock = Math.max(now, from)
 }
 const timed = (r: ScheduleRun, now: number) => !!r.tab && !r.flow && (r.state === 'running' || r.state === 'waiting') && now - r.at < OUTCOME_MS
@@ -861,7 +864,7 @@ function timeTick(now: number) {
     sample(r, now) // saved with the next save (a restart's stale clock: one step not counted)
     const max = maxOf(r)
     if (!max || (r.spent ?? 0) < max * 60e3) continue
-    if (tabStatus(r.tab!) === 'running') input(r.tab!, '\x1b') // a wait isn't Esc'd: Esc would answer it
+    if (tabStatus(r.tab!) === 'running' && delivered(r)) input(r.tab!, '\x1b') // a wait isn't Esc'd: Esc would answer it
     const was = r.state
     Object.assign(r, { state: 'stopped', endedAt: Date.now(), said: `time limit ${max} min` })
     log(`scheduled run ${r.id} (${r.tab}): stopped, its time limit (${max} min)`)

@@ -301,8 +301,9 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // the daemon on 127.0.0.1) and nothing asked for a sandboxed command
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
-// S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles)
-const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', `state.json.bak-${today()}`, 'state.json.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
+// S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles); globs:
+// state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp)
+const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -4635,10 +4636,13 @@ export function diagRedact(t: string) {
 }
 // R6: the daemon's uncaught errors (main.ts' process handlers): counted, the last one's first line, in the view's trouble
 let trouble: View['trouble']
+// ponytail: a view pushed only if the error before was 5 s ago or more: one thrown by changed()'s own view() would otherwise
+// schedule another changed() that throws again, for ever (the count shows with the next change anyway)
 export function troubled(e: unknown) {
   try {
+    const quiet = !!trouble && Date.now() - trouble.at < 5000
     trouble = { n: (trouble?.n ?? 0) + 1, last: diagRedact(firstLine(e instanceof Error ? (e.stack ?? e.message) : e)), at: Date.now() }
-    changed()
+    if (!quiet) changed()
   } catch {}
 }
 

@@ -1,7 +1,7 @@
 // laki: the command line for the daemon. `laki hook <state>` is hook.ts: it never fails or blocks the agent for more
 // than a second.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
@@ -571,7 +571,7 @@ async function main() {
       // redacted by the daemon), printed or --out a file (0600)
       if (flags.bundle) {
         const text: string = await rpc('diagnostics', {}, 60000)
-        if (typeof flags.out === 'string' && flags.out) return (writeFileSync(flags.out, text, { mode: 0o600 }), console.log(`diagnostics in ${flags.out}: read it before you paste it anywhere`))
+        if (typeof flags.out === 'string' && flags.out) return (writeFileSync(flags.out, text, { mode: 0o600 }), chmodSync(flags.out, 0o600), console.log(`diagnostics in ${flags.out}: read it before you paste it anywhere`))
         return void process.stdout.write(text)
       }
       // A9: the daemon's doctor as lines: ✓ fine, ● optional or worth a look, ✗ broken (exit 1), a fix for each not fine

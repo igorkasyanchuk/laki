@@ -404,7 +404,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   over the bar and Laki isn't in front: a bar shown again keeps the circle it had under the mouse) and `#voice` (the
   microphone's: a focusable panel, `focus()` makes it key without bringing Laki's window forward; dictation 150 ms
   after the focus; `voiceTo` pick: a "Pick who gets it" row first, nothing sent until one is; new: no list, always a
-  new session; `voice-send`: `rpc('send', { whenIdle })` to a tab of the list, or `newWsWin(prompt)`). The card
+  new session; `voice-send`: `rpc('send', { whenIdle, agent: true })` to a tab of the list, or `newWsWin(prompt)`). The card
   and voice windows are the bar page's `window.open` (main's `setWindowOpenHandler` allows only `#card` and `#voice`
   of the same page, one each; `did-create-window` pins them, `pin`'s `to`: their own page's load is a navigation too,
   which `will-navigate` would block): one renderer process, one row in Settings › Resources.
@@ -432,7 +432,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **A pinned card** (Q4, edge): a circle's click is `floater-click`, main's `pinGo` (shared/island.ts `pinStep`): a
   waiting one's card is pinned (`pinned`: the card window takes clicks and the focus, `card` with `pinned` true;
   floater.ts `pinnedCard`: its options as the island's buttons, keys 1-9, else a line for an answer in words,
-  `floater-reply-send`: `send` `agent: true` now; a permission's `pinWhat`, its first `PIN_LINES` lines, cut: no buttons,
+  `floater-reply-send`: `send` now, as your answer (not `agent: true`: it refuses a tab that asks; a menu's tab is refused, its options are the answer); a permission's `pinWhat`, its first `PIN_LINES` lines, cut: no buttons,
   only *Open tab*); a click on the pinned one again (a double click: two) or one that doesn't wait opens its tab
   (`openTab`), as before. Esc (`floater-pin`), the card's blur (a click elsewhere; `PIN_GRACE`: the bar's press blurs it
   before its click), the answer (`floater-answer`, `floater-reply-send`) or its ask gone (each `floats`: `list`) unpin
@@ -443,7 +443,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   first link (`text/uri-list`, `text/plain`), then `floater-drop` (main's `dropOk`: absolute paths that exist, 50 at
   most, no control characters). On a circle main pins its card with the drop (`dropFor`; it stays while that bubble
   does: `list`), floater.ts `dropCard`: the names, the text, a line for what to do; ⏎ is `floater-drop-send` with
-  text.ts `dropText` (the words, the text, each path on a line, as `withPaths`): `send` `agent: true` (never a shell).
+  text.ts `dropText` (the words, the text, each path on a line, as `withPaths`): `send` `agent: true` (never a shell) and `whenIdle` (after its turn or its ask: never keys into a menu).
   On the +: `quickWin` with it (pictures as their paths; ponytail: a folder there is a path, never a project). Tested
   in `test/island.test.ts`; `npm run test:ui`'s `bubble-drop` drops a synthetic DataTransfer.
 - **The talk pill** (Q2, `settings.talkOn` with the cloud engine, `talkKey`, unset `TALK_KEY` ⌃⌥⌘M; App's `talkKey` to
@@ -453,7 +453,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   is red), an `AnalyserNode` on the same stream for the level, `talkTime`; who gets it: shared/talk.ts `talkDefault`
   (the newest waiting one, else `talkLast`, else a new task) over `talkList` (the floats' `talk`: App sends the bubbles'
   list there while the talk key is on, the bubbles off too), Tab `talkNext`. The key again or ⏎: `talk-text` (main's
-  `rpc('voiceText')`), then `talk-send` (`send` `whenIdle`, only to a tab the pill offered, `talkTo`; '': `newWsWin`);
+  `rpc('voiceText')`), then `talk-send` (`send` `whenIdle` `agent: true`, only to a tab the pill offered, `talkTo`; '': `newWsWin`);
   queued: `talkUndo`, *Undo* (`talk-undo`: `queueSet` without it, refused once it went). Esc drops it;
   `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. macOS's own microphone prompt the first time (`mic`
   `not-determined`: the pill says why first). ponytail: press to start and to stop: globalShortcut has no key-up, a

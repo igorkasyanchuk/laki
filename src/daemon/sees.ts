@@ -99,11 +99,15 @@ function codexRules(path?: string): AgentRule[] {
 // --api-key… masked (share.ts' redact)
 const MASK = '••••'
 const SECRET_FLAG = /^--?[\w-]*(?:token|key|secret|password|auth)[\w-]*$/i
+// NAME=value (-e API_TOKEN=…, docker's and env's) and --api-key=… by a secret's name; the rest by share.ts' shapes
+const SECRET_SET = /^(--?)?([\w.-]*(?:token|key|secret|pass|auth|cred)[\w.-]*)=/i
 const maskArgs = (args: unknown) =>
-  Array.isArray(args) ? args.map(String).map((a, i, all) => (i && SECRET_FLAG.test(all[i - 1]) ? MASK : /^--?[\w-]*(?:token|key|secret|password|auth)[\w-]*=/i.test(a) ? `${a.split('=')[0]}=${MASK}` : redact(a))) : undefined
+  Array.isArray(args) ? args.map(String).map((a, i, all) => (i && SECRET_FLAG.test(all[i - 1]) ? MASK : SECRET_SET.test(a) ? `${a.split('=')[0]}=${MASK}` : redact(a))) : undefined
+// a URL's password, and a query value by a secret's name (?api_key=…, &sig=…)
+const maskUrl = (u: string) => redact(u).replace(/(\/\/)[^/@\s]+@/, `$1${MASK}@`).replace(/([?&][^=&#]*(?:token|key|secret|pass|auth|sig|cred)[^=&#]*=)[^&#]+/gi, `$1${MASK}`)
 const names = (o: unknown) => (o && typeof o === 'object' && !Array.isArray(o) ? Object.keys(o) : undefined)
 function server(name: string, c: Record<string, unknown>, scope: AgentServer['scope'], file: string): AgentServer {
-  const url = typeof c.url === 'string' ? redact(c.url).replace(/(\/\/)[^/@\s]+@/, `$1${MASK}@`) : undefined
+  const url = typeof c.url === 'string' ? maskUrl(c.url) : undefined
   const env = names(c.env)
   const headers = names(c.headers ?? c.http_headers)
   return {

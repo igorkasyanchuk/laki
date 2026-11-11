@@ -220,7 +220,7 @@ test("F6: agentContext lists an agent's rule files and MCP servers, masked; an a
   w(join(rig.repo, 'CLAUDE.md'), '# Repo\n@docs/notes.md\n')
   w(join(rig.repo, 'docs', 'notes.md'), 'notes\n')
   w(join(rig.repo, '.mcp.json'), JSON.stringify({ mcpServers: { db: { command: 'npx', args: ['db-mcp', '--token', 'tok-xyz-123'], env: { DB_PASSWORD: 'sekret-1' } } } }))
-  w(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { remote: { type: 'http', url: 'https://me:pw-999@mcp.example/x?token=abc-777', headers: { Authorization: 'Bearer zzz-555' } } }, projects: { [realpathSync(rig.repo)]: { mcpServers: { mine: { command: 'node', args: ['srv.js', '--api-key=key-444'] } } } } }))
+  w(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { remote: { type: 'http', url: 'https://me:pw-999@mcp.example/x?api_key=plain777&page=2&sig=sig-888', headers: { Authorization: 'Bearer zzz-555' } } }, projects: { [realpathSync(rig.repo)]: { mcpServers: { mine: { command: 'node', args: ['srv.js', '--api-key=key-444', '-e', 'GITHUB_TOKEN=plain333'] } } } } }))
   w(join(rig.home, '.codex', 'AGENTS.md'), 'codex rules\n')
   w(join(rig.repo, 'AGENTS.md'), 'repo rules\n')
   w(join(rig.home, '.codex', 'config.toml'), 'model = "gpt-5"\n\n[mcp_servers.docs]\ncommand = "npx" # the runner\nargs = [\n  "-y",\n  "docs-mcp",\n]\n\n[mcp_servers.docs.env]\nDOCS_KEY = "sekret-2"\n\n[mcp_servers."web search"]\nurl = "https://search.example/mcp"\nenabled = false\n')
@@ -237,10 +237,11 @@ test("F6: agentContext lists an agent's rule files and MCP servers, masked; an a
   assert.deepEqual(c.servers.map((s: any) => [s.name, s.scope, s.transport]), [['mine', 'local', 'stdio'], ['db', 'project', 'stdio'], ['remote', 'user', 'http']])
   const db = c.servers.find((s: any) => s.name === 'db')
   assert.deepEqual([db.command, db.args, db.env], ['npx', ['db-mcp', '--token', '••••'], ['DB_PASSWORD']])
-  assert.deepEqual(c.servers.find((s: any) => s.name === 'mine').args, ['srv.js', '--api-key=••••'])
+  assert.deepEqual(c.servers.find((s: any) => s.name === 'mine').args, ['srv.js', '--api-key=••••', '-e', 'GITHUB_TOKEN=••••'])
+  assert.equal(c.servers.find((s: any) => s.name === 'remote').url, 'https://••••@mcp.example/x?api_key=••••&page=2&sig=••••') // by name: values that look like nothing
   assert.deepEqual(c.servers.find((s: any) => s.name === 'remote').headers, ['Authorization'])
   assert.equal(c.memory.global, 0)
-  for (const x of ['tok-xyz-123', 'sekret-1', 'pw-999', 'abc-777', 'zzz-555', 'key-444']) assert.ok(!JSON.stringify(c).includes(x), x)
+  for (const x of ['tok-xyz-123', 'sekret-1', 'pw-999', 'plain777', 'sig-888', 'zzz-555', 'key-444', 'plain333']) assert.ok(!JSON.stringify(c).includes(x), x)
 
   const x = await rig.rpc('agentContext', { agent: 'codex', project: p.id })
   assert.deepEqual(x.rules.map((r: any) => [repo(r.at), r.scope]), [['~/.codex/AGENTS.md', 'user'], ['<repo>/AGENTS.md', 'project']])

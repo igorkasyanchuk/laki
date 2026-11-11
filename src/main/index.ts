@@ -1643,7 +1643,7 @@ ipcMain.handle('floater-image', async (e, data: unknown, ext: unknown) => {
 ipcMain.handle('floater-drop-send', async (e, tab: unknown, text: unknown) => {
   if (!card || e.sender !== card.webContents || typeof tab !== 'string' || tab !== pinned.tab || dropFor?.tab !== tab) return { error: 'not the dropped-on card' }
   if (typeof text !== 'string' || !text.trim() || text.length > 40000) return { error: 'nothing to send' }
-  return rpc('send', { target: tab, text: text.trim(), agent: true }).then(
+  return rpc('send', { target: tab, text: text.trim(), agent: true, whenIdle: true }).then( // agent: never a shell; whenIdle: after its turn, or its ask (never keys into a menu)
     () => (pinGo({ kind: 'answered' }), {}),
     (err: Error) => ({ error: err.message }),
   )
@@ -1654,12 +1654,16 @@ ipcMain.on('floater-click', (e, tab: unknown) => {
   if (f) pinGo({ kind: 'click', tab, waiting: f.status === 'waiting' })
 })
 ipcMain.on('floater-pin', (e, ev: unknown) => card && e.sender === card.webContents && ev === 'esc' && pinned.tab && pinGo({ kind: 'esc' }))
-// the pinned card's one-line reply to an agent that asks in words (no menu): typed in now, as an answer (agent: an agent tab only)
+// the pinned card's one-line reply to an agent that asks in words (no menu): typed in now, as your answer. Not send's
+// agent: true, which refuses a tab that asks (only you answer it: this is you); the bubbles' tabs are agents' only, and
+// one with a menu gets its options instead (replyOf)
 ipcMain.handle('floater-reply-send', async (e, tab: unknown, text: unknown) => {
   if (!card || e.sender !== card.webContents || typeof tab !== 'string' || tab !== pinned.tab) return { error: 'not the pinned card' }
+  const f = floats.items.find(x => x.tab === tab)
+  if (!f || (f.status === 'waiting' && f.ask?.options.length)) return { error: 'pick one of its options' }
   if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
   if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
-  return rpc('send', { target: tab, text: text.trim(), agent: true }).then(
+  return rpc('send', { target: tab, text: text.trim() }).then(
     () => (pinGo({ kind: 'answered' }), {}),
     (err: Error) => ({ error: err.message }),
   )
@@ -1889,7 +1893,7 @@ ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown, project: unk
     if (fromCard ? !floats.items.some(x => x.tab === tab) : !voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
     talkProject = (floats.items as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
     if (!fromCard) talkLast = tab
-    const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
+    const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true, agent: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message })) // agent: never a shell
     if ('error' in r) return r
     if (!r?.queued) fromCard ? fold() : voice?.close() // (it may have shut meanwhile); queued: the page says so first
     return { queued: !!r?.queued }
@@ -1955,7 +1959,7 @@ ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unkn
   if (tab === AI_TO) return aiAsked(text.trim())
   if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
   talkProject = ((floats.talk ?? floats.items) as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
-  const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
+  const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true, agent: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message })) // agent: never a shell
   if ('error' in r) return r
   talkLast = tab
   talkUndo = r?.queued ? { tab, text: text.trim() } : null

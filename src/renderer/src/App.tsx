@@ -2017,7 +2017,7 @@ export function App() {
   // it, an edit, half a folder): a bar with Update, read as it connects and on the window's focus (a minute apart);
   // not one another Laki set up (foreign: Update there would point it here). Not now: until the app starts again
   const [oldSkills, setOldSkills] = useState<SkillInfo[]>([])
-  const [troubleSeen, setTroubleSeen] = useState(0) // R6: the trouble bar's ×: until another error
+  const [troubleSeen, setTroubleSeen] = useState(0) // R6: the trouble bar's ×: until another error (by its time: a restarted daemon counts from 1 again)
   // the daemon restarted, terminals kept (shutdown keep): the stale bar's and the trouble bar's; the app's own way when it isn't asked as you
   const restartDaemon = () => api.call('shutdown', { keep: true }).catch((e: Error) => (bridge?.restartDaemon && /who's calling/.test(e.message) ? bridge.restartDaemon().then(ok => ok || Promise.reject(e)) : Promise.reject(e)))
   const skillsAt = useRef(0)
@@ -3663,7 +3663,7 @@ export function App() {
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
-        {connected && view.trouble && view.trouble.n > troubleSeen && (
+        {connected && view.trouble && view.trouble.at > troubleSeen && (
           <div className="stale-bar soft" role="alert">
             <Icon name="alertCircle" size={16} />
             <span>
@@ -3671,7 +3671,7 @@ export function App() {
             </span>
             <CopyDiagnostics />
             <button onClick={() => void restartDaemon().catch(fail)}>Restart the daemon</button>
-            <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.n)} />
+            <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.at)} />
           </div>
         )}
         {connected && view.diskFull && (
