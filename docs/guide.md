@@ -2167,7 +2167,9 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   (state, checks, review, conflicts), diff size and ports; click to open it in Laki (one waiting for you: the click
   pins its card instead, to answer there: its options as buttons, 1–9 too, or a line to answer in words, and *Open
   tab*; a permission shows the tool and the first 3 lines of its command or file, and a longer one only *Open*, so you
-  read all of it first; a second click or a double click opens it, Esc or a click elsewhere puts the card away); a right click shows *Reply…*,
+  read all of it first; a second click or a double click opens it, Esc or a click elsewhere puts the card away; drop
+  files, a picture, text or a link on a circle and its card asks what to do with it, ⏎ sends that and the files'
+  paths to the agent: Laki itself never reads or uploads them; on the + it opens the quick bar with them); a right click shows *Reply…*,
   *Open tab* and, for a done one, *Seen* (no longer lit); ⌥-click is *Reply…*: a small window aimed at that agent, its
   last answer above the box, ⏎ sends (queued while it works; a closed tab says so and keeps your text), and an agent
   that asks with a menu shows its options as buttons instead; drag it from anywhere on it (a circle too)

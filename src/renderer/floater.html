@@ -151,6 +151,10 @@
       #card.pinned button:hover { border-color: var(--muted); }
       #card.pinned .i-opt.primary { border-color: var(--accent); }
       #card.pinned .i-send { padding: 2px 8px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; }
+      /* Q9: what was dropped on a circle, on its pinned card */
+      .drop-what { display: flex; flex-direction: column; gap: 2px; max-height: 120px; overflow: auto; font-size: 11px; }
+      .drop-what .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .drop-text { color: var(--fg); opacity: 0.85; overflow-wrap: anywhere; }
       .i-reply input { flex: 1; border: none; outline: none; background: none; color: inherit; font: inherit; min-height: 20px; }
       .i-head { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
       .i-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink, var(--running)); align-self: center; }

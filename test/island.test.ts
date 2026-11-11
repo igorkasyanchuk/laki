@@ -1,6 +1,7 @@
 // The bubbles' island (floaterAt notch) and replies from the bubbles: shared/island.ts' pure parts
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { dropText } from '../src/renderer/src/text.ts'
 import { cardQueue, cardRect, DONE_FOLD, dotsText, fullScreen, hasNotch, islandDisplay, lifeStep, NOTCH, type Pin, PIN_GRACE, type PinEv, pillRect, pinStep, pinWhat, plainLines, replyOf, tookText, WING } from '../src/shared/island.ts'
 
 // a MacBook's built-in screen (a 38-point menu bar around its notch), an external one (24), one with a full-screen app
@@ -115,4 +116,12 @@ test('Q4: pinWhat: a command its first 3 lines, longer is cut (no buttons then)'
   const long = pinWhat('x'.repeat(500))
   assert.equal(long.cut, true)
   assert.equal(long.shown.length, 400)
+})
+
+// Q9: what a drop on a bubble sends: your words, the text, then each path on its own line (quoted with a space)
+test('Q9: dropText: the words, the dropped text, the paths, as a paste gives them', () => {
+  assert.equal(dropText('', { paths: ['/tmp/a.png'] }), '/tmp/a.png')
+  assert.equal(dropText('fix this', { paths: ['/tmp/a.png', '/Users/me/My Notes/b.txt'] }), 'fix this\n\n/tmp/a.png\n"/Users/me/My Notes/b.txt"')
+  assert.equal(dropText(' look ', { text: 'https://example.com/x', paths: [] }), 'look\n\nhttps://example.com/x')
+  assert.equal(dropText('', { text: '  ', paths: [] }), '')
 })

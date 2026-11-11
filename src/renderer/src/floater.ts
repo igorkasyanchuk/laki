@@ -11,7 +11,7 @@ import './floater.css'
 import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
-import { base64, initials, noteWhole, wavOf } from './text'
+import { base64, dropText, initials, noteWhole, wavOf } from './text'
 import { type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 
@@ -19,6 +19,7 @@ import { voiceFix } from '../../shared/types'
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
 export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[]; agent?: string; at?: number; ask?: Ask; answer?: string; took?: number }
 type Colors = Record<string, string>
+type Drop = { text?: string; paths: string[] } // Q9: what was dropped on a bubble: text or a link, files' and pictures' paths
 type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean; at?: 'edge' | 'notch' }
 type IslandCard = { f?: Float; i?: number; n?: number; list?: Float[] }
 // the +'s actions, the menu bar's too: what, its name, what it does; Ask Laki AI while it's on (Settings › AI), last:
@@ -49,7 +50,10 @@ type Bridge = {
     menuClose: () => void
     onMenu: (cb: (open: boolean) => void) => void
     onVoiceOpen: (cb: () => void) => void
-    onCard: (cb: (f: Float, colors: Colors, pinned?: boolean) => void) => void
+    onCard: (cb: (f: Float, colors: Colors, pinned?: boolean, drop?: Drop) => void) => void
+    drop: (to: string, d: Drop) => void
+    dropImage: (data: string, ext: string) => Promise<{ path?: string; error?: string }>
+    dropSend: (tab: string, text: string) => Promise<{ error?: string }>
     click: (tab: string) => void
     pin: (ev: 'esc') => void
     replySend: (tab: string, text: string) => Promise<{ error?: string }>
@@ -84,7 +88,7 @@ const ROUTE_FAR_MS = 3000
 const routeTo = (r: Route) => (r.target.kind === 'tab' ? { tab: r.target.tab } : r.target.kind === 'ai' ? { tab: AI_TO } : r.target.kind === 'new' ? { tab: '', project: r.target.project } : null)
 const routeLong = (r: Route, list: RouteTab[], c: RouteCfg) => (p => (p && c.last && p !== c.last ? ROUTE_FAR_MS : ROUTE_MS))(r.target.kind === 'tab' ? list.find(f => f.tab === (r.target as { tab: string }).tab)?.project : r.target.kind === 'new' ? r.target.project : undefined)
 
-const laki = (window as unknown as { laki?: Bridge }).laki
+const laki = (window as unknown as { laki?: Bridge & { pathOf?: (f: File) => string } }).laki
 const bridge = laki?.floater
 const bar = document.getElementById('bar')!
 const card = document.getElementById('card')!
@@ -132,12 +136,13 @@ if (mode === 'card') {
     if (e.key === 'Escape') bridge?.pin('esc')
     else if (/^[1-9]$/.test(e.key) && (e.target as HTMLElement).tagName !== 'INPUT') card.querySelector<HTMLButtonElement>(`[data-n="${e.key}"]`)?.click()
   })
-  bridge?.onCard((f, colors, pin) => {
+  bridge?.onCard((f, colors, pin, drop) => {
     paint(colors)
     document.getElementById('island')!.replaceChildren() // the island's card or list, from before a switch to the edge: never under it (the window is this card's size: it showed cut)
     card.classList.toggle('pinned', !!pin)
     const draft = pin && pinned === f.tab ? (card.querySelector('input')?.value ?? '') : ''
     pinned = pin ? f.tab : ''
+    if (pin && drop) return dropCard(f, drop, draft)
     if (pin) return pinnedCard(f, draft)
     card.classList.toggle('tip', (f.status as string) === 'tip') // a stacked action's name
     if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
@@ -242,6 +247,47 @@ else {
   bar.addEventListener('pointerleave', () => notch() && bridge?.islandEv('leave'))
   bar.addEventListener('click', () => notch() && bridge?.islandEv('pill'))
   bar.onpointercancel = () => done(false)
+  // Q9: something dragged over a circle or the +: it lights, its card says where it goes; let go, it's sent to main (a
+  // file by its path only, a picture with no file saved first, text or a link). The island has no drop
+  const dropAt = (e: DragEvent) => (notch() ? null : (e.target as HTMLElement).closest<HTMLElement>('.fl-dot, .fl-btn[data-act="plus"]'))
+  let over = ''
+  bar.ondragover = e => {
+    const t = dropAt(e)
+    if (!t || !e.dataTransfer) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    const key = t.dataset.tab ?? '+'
+    if (over === key) return
+    over = key
+    hot(t)
+    const f = cur?.items.find(x => x.tab === t.dataset.tab)
+    bridge?.tip(f ? `Release to send to ${f.name}` : 'Release for a new task', f ? 'then say what to do with it' : 'the quick bar, with it in', along(t))
+  }
+  bar.ondragleave = e => {
+    if (bar.contains(e.relatedTarget as Node)) return
+    over = ''
+    hot()
+    hover('')
+  }
+  bar.ondrop = async e => {
+    const t = dropAt(e)
+    over = ''
+    hot()
+    hover('')
+    if (!t || !e.dataTransfer) return
+    e.preventDefault()
+    const paths: string[] = []
+    for (const file of [...e.dataTransfer.files]) {
+      const p = laki?.pathOf?.(file)
+      if (p) paths.push(p)
+      else if (/^image\/(png|jpe?g|gif|webp)$/.test(file.type) && file.size <= 20 << 20) {
+        const r = await bridge?.dropImage(base64(new Uint8Array(await file.arrayBuffer())), file.type.split('/')[1].replace('jpeg', 'jpg'))
+        if (r?.path) paths.push(r.path)
+      }
+    }
+    const text = paths.length ? '' : (e.dataTransfer.getData('text/uri-list').split('\n').find(l => l && !l.startsWith('#')) ?? '') || e.dataTransfer.getData('text/plain')
+    if (paths.length || text.trim()) bridge?.drop(t.dataset.tab ?? '+', { ...(text.trim() && { text }), paths })
+  }
   // hidden (Laki in front): the circle under the mouse then isn't under it as it comes back
   document.addEventListener('visibilitychange', () => document.hidden && (hovered = ''))
   const length = () => (across() ? bar.offsetWidth : bar.offsetHeight)
@@ -314,6 +360,31 @@ else {
     else if (hovered) hover('')
     bridge?.size(length(), up)
   }
+}
+
+// Q9: what was dropped on a circle, on its card: the files and pictures by name, the text, a line for what to do with it
+// (optional); ⏎ sends it all to that agent (dropText: the words, then each path on a line), Esc puts it away
+function dropCard(f: Float, drop: Drop, draft: string) {
+  const note = el('div', '', 'i-note')
+  const fit = () => bridge?.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
+  const what = el('div', '', 'drop-what')
+  for (const p of drop.paths) what.append(el('div', `📄 ${p.split('/').pop() || p}`, 'mono'))
+  if (drop.text) what.append(el('div', drop.text.length > 200 ? `${drop.text.slice(0, 199)}…` : drop.text, 'drop-text'))
+  const wrap = el('div', '', 'i-reply')
+  const input = Object.assign(document.createElement('input'), { placeholder: 'What to do with it (optional)…', spellcheck: false, value: draft })
+  const go = async () => {
+    const r = await bridge?.dropSend(f.tab, dropText(input.value, drop))
+    if (r?.error) (note.textContent = r.error), note.classList.add('bad'), fit()
+  }
+  input.onkeydown = e => {
+    if (e.key === 'Enter' && !e.isComposing) e.preventDefault(), go()
+  }
+  wrap.append(input, Object.assign(el('button', '↑', 'i-send'), { onclick: go, title: 'Send (⏎)' }))
+  const foot = el('div', '', 'i-foot')
+  foot.append(Object.assign(el('button', 'Open tab') as HTMLButtonElement, { onclick: () => bridge?.open(f.tab) }), el('span', 'Esc puts it away', 'i-sub'))
+  card.replaceChildren(el('b', `To ${f.name}`), el('div', `${f.agent ?? 'agent'} · ${f.project} · only the paths go: the agent reads the files itself`, 'meta'), what, wrap, note, foot)
+  fit()
+  setTimeout(() => input.focus(), 30)
 }
 
 // Q4: a waiting circle's card, pinned (main: clickable, focusable): what it asks; a permission's tool and its command or

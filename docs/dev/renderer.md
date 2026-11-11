@@ -437,6 +437,15 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   (`openTab`), as before. Esc (`floater-pin`), the card's blur (a click elsewhere; `PIN_GRACE`: the bar's press blurs it
   before its click), the answer (`floater-answer`, `floater-reply-send`) or its ask gone (each `floats`: `list`) unpin
   it. While pinned, hovers don't move the card. `npm run test:ui`'s `bubble-answer` answers a waiting demo tab there.
+- **A drop on a bubble** (Q9, edge): the bar's `dragover` on a circle or the + lights it (`.hot`) and names where it
+  goes in the card window (`floater-tip`); `drop`: each file by its path only (preload's `pathOf`: Laki never reads or
+  uploads it), a picture with no file of its own saved first (`floater-image`: `imageSave`), else the text or the
+  first link (`text/uri-list`, `text/plain`), then `floater-drop` (main's `dropOk`: absolute paths that exist, 50 at
+  most, no control characters). On a circle main pins its card with the drop (`dropFor`; it stays while that bubble
+  does: `list`), floater.ts `dropCard`: the names, the text, a line for what to do; ⏎ is `floater-drop-send` with
+  text.ts `dropText` (the words, the text, each path on a line, as `withPaths`): `send` `agent: true` (never a shell).
+  On the +: `quickWin` with it (pictures as their paths; ponytail: a folder there is a path, never a project). Tested
+  in `test/island.test.ts`; `npm run test:ui`'s `bubble-drop` drops a synthetic DataTransfer.
 - **The talk pill** (Q2, `settings.talkOn` with the cloud engine, `talkKey`, unset `TALK_KEY` ⌃⌥⌘M; App's `talkKey` to
   main's `talk-hotkey`, `bindKey('talk')`): main's `talk()` opens `floater.html#talk` as a focusable panel window of its
   own at the pointer (`TALK` 320 by 78), or, open already, sends `talk-key` (the second press). The page (floater.ts

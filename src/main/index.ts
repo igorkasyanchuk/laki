@@ -230,6 +230,20 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await c("document.querySelector('#card.pinned [data-n]').click()")
       ws.answered = { id: t } as View['workspaces'][number]
     }, async () => !(await rpc<View>('state')).tabs.some(t => t.id === ws.answered.id && t.status === 'waiting') && !pinned.tab],
+    // Q9: text and a picture (a synthetic DataTransfer: no file of its own, so it's saved) dropped on that circle: its
+    // card pins with them, a line said, ⏎: the agent's terminal has it
+    ['bubble-drop', async () => {
+      const t = ws.answered.id
+      await waitFor(async () => floats.items.some(x => x.tab === t) && !!floater && !floater.isDestroyed(), 'its bubble')
+      const b = <T>(code: string) => (floater && !floater.isDestroyed() ? (floater.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => b<boolean>(`!!document.querySelector('.fl-dot[data-tab="${t}"]')`), 'its circle')
+      const png = readFileSync(join(RENDERER, 'icon-192.png')).toString('base64')
+      await b(`(() => { const dt = new DataTransfer(); dt.setData('text/plain', 'see the header'); dt.items.add(new File([Uint8Array.from(atob(${q(png)}), c => c.charCodeAt(0))], 'shot.png', { type: 'image/png' })); const el = document.querySelector('.fl-dot[data-tab="${t}"]'); el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true })); el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })) })()`)
+      const c = <T>(code: string) => (card && !card.isDestroyed() ? (card.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => c<boolean>("!!document.querySelector('#card.pinned .drop-what .mono')"), 'the card with what was dropped')
+      writeFileSync(join(dir, 'bubble-drop-window.png'), (await card!.webContents.capturePage()).toPNG())
+      await c(`(e => { e.value = 'make it like this'; e.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })(document.querySelector('#card.pinned input'))`)
+    }, async () => !pinned.tab && (await rpc<string>('screen', { target: ws.answered.id, lines: 30 })).includes('make it like this')],
     ['bubble-front', async () => setFront(true), async () => !floater?.isVisible()],
     // U5: the Ship sheet on dark-mode (notes.txt uncommitted): its file with a box, the PR's title drafted, Open PR
     ['ship-sheet', async () => {
@@ -1363,7 +1377,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   if (floats.at !== was) (fold(), (pinned = { tab: '' }), card?.hide(), card?.setIgnoreMouseEvents(floats.at !== 'notch'), floats.at === 'edge' && floater && snap()) // to the edge again: where it was
   placeFloater()
   islandFloats()
-  if (pinned.tab) pinGo({ kind: 'list', waiting: floats.items.filter(x => x.status === 'waiting').map(x => x.tab) }), pinned.tab && pinCard() // Q4: answered elsewhere: unpinned; else its new text
+  if (pinned.tab) pinGo({ kind: 'list', waiting: floats.items.filter(x => x.status === 'waiting' || (dropFor?.tab === x.tab)).map(x => x.tab) }), pinned.tab && pinCard() // Q4: answered elsewhere: unpinned; else its new text (Q9: a drop's card stays while its bubble does)
 })
 // Stop (Settings › Resources): the bubbles' windows closed, until an agent's state changes
 let parked = ''
@@ -1575,7 +1589,7 @@ function pinGo(ev: PinEv) {
   const r = pinStep(pinned, ev, Date.now())
   pinned = r.pin
   if (card && !card.isDestroyed()) {
-    if (was && !pinned.tab) (pinSent = ''), card.setIgnoreMouseEvents(true), card.setFocusable(false), card.hide(), (hover = null)
+    if (was && !pinned.tab) (pinSent = ''), (dropFor = null), card.setIgnoreMouseEvents(true), card.setFocusable(false), card.hide(), (hover = null)
     if (pinned.tab && pinned.tab !== was) (pinTop = hover?.tab === pinned.tab ? hover.top : pinTop), (hover = null), pinCard()
   }
   if (r.open) openTab(r.open)
@@ -1583,13 +1597,54 @@ function pinGo(ev: PinEv) {
 function pinCard() {
   const f = floats.items.find(x => x.tab === pinned.tab)
   if (!card || card.isDestroyed() || !f) return
-  const msg = JSON.stringify([f, floats.colors])
+  const msg = JSON.stringify([f, floats.colors, dropFor])
   if (msg === pinSent) return
   pinSent = msg
   card.setIgnoreMouseEvents(false)
   card.setFocusable(true)
-  card.webContents.send('card', f, floats.colors, true)
+  card.webContents.send('card', f, floats.colors, true, dropFor?.tab === f.tab ? dropFor.drop : undefined)
 }
+// Q9: a drop on a circle or the +: files by their paths (preload's pathOf; Laki never reads or uploads one, the agent
+// gets the path and has your file access anyway), a picture with no file saved as one (imageSave), text or a link.
+// On a circle its card pins with a line for what to do with it; ⏎ sends to that agent (send agent: true: never a
+// shell). On the +: the quick bar with it (pictures as their paths too). ponytail: a folder on the + is a path in
+// the prompt, never a project added (only the main window's drop does that)
+type Drop = { text?: string; paths: string[] }
+let dropFor: { tab: string; drop: Drop } | null = null
+const dropOk = (d: unknown): Drop | null => {
+  if (!d || typeof d !== 'object') return null
+  const o = d as { text?: unknown; paths?: unknown }
+  const paths = (Array.isArray(o.paths) ? o.paths : []).filter((p): p is string => typeof p === 'string' && p.length < 4096 && p.startsWith('/') && !/[\0\n\r]/.test(p) && existsSync(p)).slice(0, 50)
+  const text = typeof o.text === 'string' ? o.text.slice(0, 20000) : undefined
+  return paths.length || text?.trim() ? { ...(text?.trim() && { text }), paths } : null
+}
+ipcMain.on('floater-drop', (e, to: unknown, d: unknown) => {
+  if (!floater || e.sender !== floater.webContents || typeof to !== 'string' || floats.at === 'notch') return
+  const drop = dropOk(d)
+  if (!drop) return
+  if (to === '+') return void quickWin([drop.text?.trim(), ...drop.paths.map(p => (/[\s"'\\]/.test(p) ? JSON.stringify(p) : p))].filter(Boolean).join('\n')) // as withPaths: a quoted one when it has a space
+  const f = floats.items.find(x => x.tab === to)
+  if (!f) return
+  dropFor = { tab: to, drop }
+  pinTop = hover?.tab === to ? hover.top : pinTop
+  pinned = { tab: to }
+  hover = null
+  pinSent = ''
+  pinCard()
+})
+// a picture dropped with no file of its own (from a page, say): saved as one, its path back
+ipcMain.handle('floater-image', async (e, data: unknown, ext: unknown) => {
+  if (!floater || e.sender !== floater.webContents || typeof data !== 'string' || data.length > 28 << 20) return { error: 'not a picture' }
+  return rpc<{ path: string }>('imageSave', { data, ext: typeof ext === 'string' ? ext : 'png' }).catch((err: Error) => ({ error: err.message }))
+})
+ipcMain.handle('floater-drop-send', async (e, tab: unknown, text: unknown) => {
+  if (!card || e.sender !== card.webContents || typeof tab !== 'string' || tab !== pinned.tab || dropFor?.tab !== tab) return { error: 'not the dropped-on card' }
+  if (typeof text !== 'string' || !text.trim() || text.length > 40000) return { error: 'nothing to send' }
+  return rpc('send', { target: tab, text: text.trim(), agent: true }).then(
+    () => (pinGo({ kind: 'answered' }), {}),
+    (err: Error) => ({ error: err.message }),
+  )
+})
 ipcMain.on('floater-click', (e, tab: unknown) => {
   if (!floater || e.sender !== floater.webContents || typeof tab !== 'string' || floats.at === 'notch') return
   const f = floats.items.find(x => x.tab === tab)

@@ -39,6 +39,9 @@ export function replyText(quote: string, words: string, from?: string) {
   return `${from ? `From ${from}:` : 'From your output:'}\n${fence}\n${q}\n${fence}${words.trim() ? `\n\n${words.trim()}` : ''}`
 }
 export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.map(pathText).join('\n')].filter(Boolean).join('\n\n')
+// Q9: what a drop on a bubble sends: what you said to do with it, the text or link dropped, then each file's or
+// picture's path on a line of its own, as a paste into a prompt box gives them (withPaths)
+export const dropText = (note: string, drop: { text?: string; paths: string[] }) => withPaths([note.trim(), drop.text?.trim() ?? ''].filter(Boolean).join('\n\n'), drop.paths)
 // a notification's body: past NOTE_MAX characters cut with … (never through an emoji's pair), so it never looks whole
 // when it isn't; one that's cut gets no Yes or Allow (App's): it would approve what you can't see
 export const NOTE_MAX = 200

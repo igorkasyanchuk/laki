@@ -108,7 +108,10 @@ contextBridge.exposeInMainWorld('laki', {
     menuClose: () => ipcRenderer.send('floater-menu-close'),
     onMenu: (cb: (open: boolean) => void) => ipcRenderer.on('floater-menu', (_e, open: boolean) => cb(open)),
     onVoiceOpen: (cb: () => void) => ipcRenderer.on('floater-voice', () => cb()), // the menu's Say it: the bar opens the window
-    onCard: (cb: (f: object, colors: Record<string, string>, pinned?: boolean) => void) => ipcRenderer.on('card', (_e, f, colors, pinned) => cb(f, colors, pinned)), // Q4: pinned, to answer from
+    onCard: (cb: (f: object, colors: Record<string, string>, pinned?: boolean, drop?: object) => void) => ipcRenderer.on('card', (_e, f, colors, pinned, drop) => cb(f, colors, pinned, drop)), // Q4: pinned, to answer from; Q9: with what was dropped on it
+    drop: (to: string, d: { text?: string; paths: string[] }) => ipcRenderer.send('floater-drop', to, d), // Q9: a drop on a circle (its tab) or the + ('+')
+    dropImage: (data: string, ext: string): Promise<{ path?: string; error?: string }> => ipcRenderer.invoke('floater-image', data, ext),
+    dropSend: (tab: string, text: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-drop-send', tab, text),
     click: (tab: string) => ipcRenderer.send('floater-click', tab), // Q4: an edge circle's click: main pins a waiting one's card, else opens it
     pin: (ev: 'esc') => ipcRenderer.send('floater-pin', ev),
     replySend: (tab: string, text: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-reply-send', tab, text), // the pinned card's one-line answer
