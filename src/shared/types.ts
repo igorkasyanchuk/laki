@@ -594,6 +594,7 @@ export type Settings = {
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // tailscale: a PIN as well
   remoteFunnel?: boolean // tailscale: tailscale funnel, the internet (a PIN always)
+  remotePush?: boolean // D4: remote access's link (and its start, a new address, a stop on its own, a new device) to the phone webhook; off unless true, never with anyone-with-the-link
   remoteWrong?: 'wait' | 'stop' // D5: after the wrong PINs, no PIN taken for a while (wait, unset too) or remote access stops
   remoteDeviceDays?: number // D3: how long a paired device stays in (1-90 days; unset: 30)
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)

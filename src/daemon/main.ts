@@ -196,6 +196,8 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close()
   if (e.action) return e.waitUntil(fetch('/tap', { method: 'POST', body: e.action, credentials: 'same-origin' }))
+  const u = e.notification.data && e.notification.data.url // D4: remote access's link
+  if (typeof u === 'string' && u.startsWith('https://')) return e.waitUntil(clients.openWindow(u))
   e.waitUntil(clients.matchAll({ type: 'window' }).then(l => (l[0] ? l[0].focus() : clients.openWindow('/'))))
 })
 `

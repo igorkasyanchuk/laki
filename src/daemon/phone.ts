@@ -153,6 +153,14 @@ export function flowAsk(run: { id: string; name: string; ws?: string }, question
   const where = ws ? ws.name || ws.id : undefined
   pushTo(w, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })), nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${run.name}: ${e.message}`))
 }
+// D4: remote access's link to your phone (settings.remotePush, off unless set): as it starts, moves to a new address,
+// stops on its own (why) or pairs a new device. Never with *anyone with the link* (open): the webhook's host sees the
+// link, so the page must ask for more (a PIN, an email, the tailnet). Never the PIN
+export function phoneRemote(title: string, o: { url?: string; open?: boolean } = {}) {
+  const w = state.settings?.webhook
+  if (state.settings?.remotePush !== true || !pushOn(w) || o.open) return
+  pushTo(w, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title, ...(o.url && { url: o.url }) }).catch(e => log(`push remote access: ${e.message}`))
+}
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)
 

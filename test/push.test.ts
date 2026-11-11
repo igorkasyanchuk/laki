@@ -1,6 +1,6 @@
 // Phone pushes (Settings › Phone pushes): each format's request, and a fake agent's turns against a local server.
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -401,4 +401,60 @@ test('push format webpush: encrypted for the subscription, a VAPID JWT for its s
   const long = webPushPayload({ format: 'webpush' }, { ...p, question: '允许运行这个命令吗？'.repeat(200), options: opts, nonce: '0123456789abcdef', key: 'k3y' })
   assert.ok(Buffer.byteLength(JSON.stringify(long)) <= PAYLOAD_MAX && long.body.length > 500, `${Buffer.byteLength(JSON.stringify(long))} bytes, ${long.body.length} characters`)
   assert.equal(long.actions.length, 2)
+})
+
+test('D4: remote access link in each format: the tap opens it (ntfy Click, Telegram button, Slack link, JSON url, Web Push data)', () => {
+  const r = { event: 'remote', workspace: '', tab: '', agent: 'Laki', title: 'Laki: remote access is on: tap to open it', url: 'https://fake.trycloudflare.com/#t=abc' } as const
+  assert.deepEqual(pushRequest({ format: 'ntfy' }, r).headers, { title: r.title, click: r.url })
+  assert.deepEqual(JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, r).body)).reply_markup, { inline_keyboard: [[{ text: 'Open it', url: r.url }]] })
+  assert.match(JSON.parse(String(pushRequest({ format: 'slack' }, r).body)).text, /\n<https:\/\/fake\.trycloudflare\.com\/#t=abc\|Open it>$/)
+  assert.equal(JSON.parse(String(pushRequest({ format: 'json' }, r).body)).url, r.url)
+  assert.equal(webPushPayload({ format: 'webpush' }, r).url, r.url)
+})
+
+test('D4: remote access pushes its link to the phone when asked (off by default), never its PIN, never with anyone-with-the-link', async t => {
+  const got: { head: string; body: string }[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', d => (body += d))
+    req.on('end', () => (got.push({ head: JSON.stringify(req.headers), body }), res.writeHead(200).end()))
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const rig = await fresh(t)
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  await rig.rpc('settingsSet', { webhook: { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`, format: 'json' } })
+  const stop = () => rig.rpc('remoteStop')
+
+  // off by default: nothing goes
+  await rig.rpc('remoteStart', { hours: 1, pin: true })
+  await sleep(300)
+  assert.equal(got.length, 0)
+  await stop()
+
+  // on: the link as its url, a short text, no PIN anywhere in the request
+  await rig.rpc('settingsSet', { remotePush: true })
+  const on = (await rig.rpc('remoteStart', { hours: 1, pin: true })) as { link: string }
+  const own = (await rig.rpc('stateOwn')).remote as { pin: string; link: string }
+  await until(() => got.length === 1, 'the push')
+  const b = JSON.parse(got[0].body)
+  assert.equal(b.event, 'remote')
+  assert.equal(b.url, on.link)
+  assert.match(b.message, /^Laki: remote access is on \(its PIN is on your Mac\): tap to open it$/)
+  assert.ok(!`${got[0].head}${got[0].body}`.includes(own.pin), 'never the PIN')
+  // stopped by you: no push; stopped on its own (its time is up): one, with no link
+  await stop()
+  await sleep(200)
+  assert.equal(got.length, 1)
+  await rig.rpc('remoteStart', { hours: 1, pin: true })
+  await until(() => got.length === 2, 'the second start')
+  await rig.rpc('remoteTick', { now: Date.now() + 2 * 3600e3 })
+  await until(() => got.length === 3, 'the stop')
+  assert.deepEqual([JSON.parse(got[2].body).message, JSON.parse(got[2].body).url], ['Laki: remote access stopped: its time is up', undefined])
+
+  // anyone with the link: never, the switch on or not
+  await rig.rpc('remoteStart', { hours: 1, open: true })
+  await sleep(300)
+  assert.equal(got.length, 3)
+  await stop()
 })

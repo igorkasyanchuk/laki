@@ -13,6 +13,7 @@ import { broadcast, changed, findWs, firstLine, log, onPath, projectConfig, reso
 import { dir } from './dir.ts'
 import { policyRemote } from './policy.ts'
 import { type Tail, tailOf } from './meters.ts'
+import { phoneRemote } from './phone.ts'
 import { own } from './resources.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage } from './share.ts'
 
@@ -433,7 +434,7 @@ function drop(t: TunnelRun) {
 // for good
 export function stopTunnels(ws?: string, permanent = false) {
   for (const t of [...tunnels.values()]) if ((!ws || t.ws === ws) && (!permanent || t.host)) drop(t)
-  if (permanent && !ws && remote?.host) remoteStop() // the connector's stop: remote access on My domain went with it
+  if (permanent && !ws && remote?.host) remoteStop('its tunnel stopped') // the connector's stop: remote access on My domain went with it
 }
 
 // shutdown: every cloudflared stopped, state.tunnels kept for the next start (tunnelsBack)
@@ -656,6 +657,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   }
   if (remote !== r) return undefined // stopped meanwhile
   keepRemote()
+  phoneRemote(`Laki: remote access is on${r.pin ? ' (its PIN is on your Mac)' : ''}: tap to open it`, { url: remoteView()?.link, open: r.open })
   log(`remote access at ${r.url} for ${ts ? `${funnel ? 'the internet (Tailscale Funnel)' : `the tailnet's devices (${peers} more online)`} with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
@@ -711,6 +713,7 @@ function remoteAt(r: RemoteRun, u: string | undefined) {
   if (r.moved) {
     Object.assign(r, { token: hex(), access: '', used: false, ...(r.pin && { pin: newPin(), left: triesOf() }) })
     log(`remote access: back at ${u} (was ${was}): a new link`)
+    phoneRemote(`Laki: remote access moved to a new address${r.pin ? ' with a new PIN (on your Mac)' : ''}: tap to open it`, { url: remoteView()?.link, open: r.open })
     broadcast({ ev: 'remote', text: 'Remote access is back at a new address: open its new link from Settings › Remote access (the old one has ended).' })
   } else log(`remote access: back at ${u}`)
   keepRemote()
@@ -745,10 +748,11 @@ export function remoteBack(now = Date.now()) {
     )
 }
 
-// stopped for good: by you, a wrong PIN's stop, its time up
-export function remoteStop() {
+// stopped for good: by you, a wrong PIN's stop, its time up; why: on its own (your phone hears it, D4), not by you
+export function remoteStop(why?: string) {
   const r = remote
   if (!r) return
+  if (why) phoneRemote(`Laki: remote access stopped: ${why}`, { open: r.open })
   remote = undefined
   clearTimeout(r.timer)
   r.cf?.stop()
@@ -833,6 +837,7 @@ function pair(r: RemoteRun, o: Asker) {
   keepRemote() // saves
   log(`remote access: a new device, ${d.name} (${d.id})${o.ip ? ` from ${o.ip}` : ''}, until ${new Date(d.until).toISOString()}`)
   broadcast({ ev: 'remote', text: `A new device joined remote access: ${d.name}${o.ip ? ` (${o.ip})` : ''}. Settings › Remote access › Devices lists it: Revoke it there if it isn't yours.` })
+  phoneRemote(`Laki: a new device joined remote access: ${d.name}${o.ip ? ` (${o.ip})` : ''}. Revoke it on your Mac if it isn't yours`, { open: r.open })
   changed()
   return { need: false, device: true, cookie: `${DEVICE_COOKIE}=${t}; Path=/; Max-Age=${Math.floor((d.until - now) / 1000)}; HttpOnly; Secure; SameSite=Strict` }
 }
@@ -918,7 +923,7 @@ export function remotePin(p: { token?: unknown; pin?: unknown }, o: Asker = {}):
   log(`remote access: a wrong PIN${from} (${r.wrong.length} today)`)
   const end = (why: string, page: string) => {
     log(`remote access ended: ${why}`)
-    remoteStop()
+    remoteStop(why)
     broadcast({ ev: 'remote', text: `Remote access stopped: ${why} on its page${from} at ${at}. Start it again for a new link and PIN.` })
     throw new Error(page)
   }
@@ -946,7 +951,7 @@ export function remoteTick(now?: number) {
   const at = now ?? Date.now()
   const woke = now === undefined && lastTick > 0 && at - lastTick > 60000
   if (now === undefined) lastTick = at
-  if (remote?.until && at >= remote.until) return log('remote access ended: its time is up'), remoteStop()
+  if (remote?.until && at >= remote.until) return log('remote access ended: its time is up'), remoteStop('its time is up')
   const r = remote
   if (r?.lockUntil && at >= r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }), changed() // D5: the wait is over
   devicesTidy(at)

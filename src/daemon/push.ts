@@ -8,7 +8,7 @@ import { createCipheriv, createECDH, createHmac, createPrivateKey, type ECDH, ge
 import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Option = { n: number; label: string }
-export type Push = { event: 'waiting' | 'done' | 'test' | 'long'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string } // title: its own (a workflow's); key: what signs ntfy's taps
+export type Push = { event: 'waiting' | 'done' | 'test' | 'long' | 'remote'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string; url?: string } // title: its own (a workflow's, remote access's); key: what signs ntfy's taps; url: D4, what a tap on it opens (remote access's link)
 
 // an ntfy tap is nonce:n:<sig>, signed with a key in Laki's data folder (never in settings): a tap made up without it
 // is ignored. ponytail: anyone who reads the pushed topic sees the taps too, so answers need a topic only you read (answerOk)
@@ -52,14 +52,14 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
       // name) as RFC 2047, which ntfy reads
       if (ntfyJson(w, p))
         return json({ topic: new URL(w.url!).pathname.replace(/^\/+|\/+$/g, ''), title, message: body || title, actions: taps.slice(0, 3).map(o => ({ action: 'http', label: cut(`${o.n}. ${o.label}`, 40), url: `${ntfyReplies(w)!.url}${ntfyReplies(w)!.query}`, method: 'POST', body: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}`, clear: true })) })
-      return { method: 'POST', headers: { title: /^[\x20-\x7e]*$/.test(title) ? title : `=?UTF-8?B?${Buffer.from(title).toString('base64')}?=` }, body: body || title }
+      return { method: 'POST', headers: { title: /^[\x20-\x7e]*$/.test(title) ? title : `=?UTF-8?B?${Buffer.from(title).toString('base64')}?=`, ...(p.url && { click: p.url }) }, body: body || title }
     }
     case 'slack': // Slack reads <…> as links and mentions (<!channel>)
-      return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') })
-    case 'telegram': // chat_id from the URL in the body too: Telegram reads either; a button per choice, a row each
-      return json({ chat_id: telegram(w.url)?.chat, text, ...(taps.length && { reply_markup: { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } }) })
+      return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (p.url ? `\n<${p.url}|Open it>` : '') })
+    case 'telegram': // chat_id from the URL in the body too: Telegram reads either; a button per choice, a row each (a link: one that opens it)
+      return json({ chat_id: telegram(w.url)?.chat, text, ...(taps.length ? { reply_markup: { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } } : p.url ? { reply_markup: { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } } : {}) })
     default:
-      return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ...(p.options?.length && { options: p.options }), ts: now })
+      return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ...(p.options?.length && { options: p.options }), ...(p.url && { url: p.url }), ts: now })
   }
 }
 
@@ -112,7 +112,7 @@ export function webPushPayload(w: Webhook, p: Push) {
   p = shown(w, p)
   const { title, body } = pushText(p)
   const taps = buttons(p)
-  const o = { title: cut(title, 200), body: cut(body, 1500), tag: p.tab || title, actions: (taps.length > 2 ? [taps[0], taps.at(-1)!] : taps).map(o => ({ title: cut(o.label, 40), tap: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}` })) }
+  const o = { title: cut(title, 200), body: cut(body, 1500), tag: p.tab || title, ...(p.url && { url: p.url }), actions: (taps.length > 2 ? [taps[0], taps.at(-1)!] : taps).map(o => ({ title: cut(o.label, 40), tap: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}` })) }
   while (Buffer.byteLength(JSON.stringify(o)) > PAYLOAD_MAX && o.body.length > 1) o.body = cut(o.body, Math.floor(o.body.length * 0.8))
   return o
 }

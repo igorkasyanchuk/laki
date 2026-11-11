@@ -234,7 +234,17 @@ that subscription (`webPush.gone`). No relay of Laki's: the bytes go to the vend
 read them. Actions: each is the tap ntfy's buttons send, `nonce:n:<tapSig>` (phone.ts' `awaiting`, `tapKey`); the
 worker's `notificationclick` posts it to `POST /tap` (the page's origin, a paired device's cookie, the signature
 checked: `tapOf`), and phone.ts' `takeTap` answers it exactly as a polled ntfy or Telegram tap. Nothing to poll, so
-`listen` doesn't for webpush. A click elsewhere on the notification opens the app.
+`listen` doesn't for webpush. A click elsewhere on the notification opens the app (its `url`, an https one: that page).
+
+The link to the phone (D4, `settings.remotePush`, off unless true; REMOTE_KEYS': not from a phone or an agent):
+phone.ts `phoneRemote` pushes through the phone webhook (`pushOn`) when remote access starts (`remoteStart`: the link,
+and *its PIN is on your Mac* with one), moves to a new address (`remoteAt` moved: the new link), stops on its own
+(`remoteStop(why)`: its time is up, wrong PINs, My domain's tunnel stopped; never your Stop) or pairs a new device
+(`pair`). Never when anyone with the link gets in (`open`): the webhook's host sees the link, so the page must ask for
+more (a PIN, an email, the tailnet); never the PIN. A push's `url` is what a tap opens: ntfy's `Click` header,
+Telegram's button, Slack's `<url|Open it>`, JSON's `url`, Web Push's payload (the worker opens it). Settings › Remote
+access shows the switch only with a webhook and not open, and names whose server sees the link (`hookOf`; ntfy.sh is
+a third party).
 
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the

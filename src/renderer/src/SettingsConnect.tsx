@@ -415,7 +415,16 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number } // wrong: after the wrong PINs (D5); days: a paired device's (D3)
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string } // wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+// D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
+export function hookOf(w?: Webhook) {
+  if (w?.format === 'webpush') return 'your paired phones'
+  try {
+    return w?.url?.trim() ? new URL(webhookUrl(w.url)).hostname : undefined
+  } catch {
+    return undefined
+  }
+}
 const DAYS = [1, 7, 14, 30, 60, 90] // how long a paired device stays in (the daemon takes 1-90)
 const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)']] // a quick tunnel's
 // D1: where it's published; a quick tunnel's address is new each start, the other two stay (a bookmark keeps working)
@@ -689,6 +698,19 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         </form>
       )}
       {err && <p className="field-err">{err}</p>}
+      {opts.hook && !(r ? r.open : open) && (
+        // D4: never with anyone-with-the-link: whoever reads the push could open it
+        <Switch on={opts.push} onChange={v => set({ push: v })} className="switch-row" tip="Phone pushes (Settings › Phone pushes) get the link as it starts or moves, and a word when it stops on its own or a new device joins. Never the PIN">
+          <span className="switch-text">
+            <span>Send the link to my phone</span>
+            <span className="muted">
+              {opts.hook === 'your paired phones'
+                ? 'Through Web Push, to your paired phones.'
+                : `Its address goes to ${opts.hook}${/(^|\.)ntfy\.sh$/.test(opts.hook) ? ', a third party: anyone who reads your topic sees the link (they still need the PIN or your email). A self-hosted ntfy or your own Telegram bot keeps it yours.' : ': whoever runs it sees the link.'}`}
+            </span>
+          </span>
+        </Switch>
+      )}
       {(!!api.devices?.length || (r ? !!(r.host || r.via) : ts || dom)) && (
         <div className="remote-devices">
           <h3>Devices</h3>
