@@ -2,35 +2,63 @@
 
 <h1 align="center">Laki</h1>
 
-<p align="center"><b>Run your coding agents side by side, each task in its own git worktree.</b><br>
+<p align="center"><b>Laki turns a dozen coding agents into one inbox: each in its own worktree, Laki says which needs
+you, checks its work and takes it to a merged PR.</b><br>
 Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linux preview) · MIT · <a href="https://laki.sh">laki.sh</a></p>
 
-<p align="center"><img src="docs/img/demo.gif" alt="Laki: projects and groups in the sidebar, agents at work, a PR with its checks and reviewers" width="900"></p>
+### One inbox for every agent
 
-## TL;DR
+*Needs you* lists each agent that asks, with its choices as buttons; *Allow all* answers the same ask from several at
+once, and ⌘J jumps to the next.
 
-- **A workspace per task**: a worktree, a branch and a `$PORT` each, set up by your scripts; start one from a prompt, a
-  GitHub issue or a PR, with the agent, model and permission mode you pick.
-- **See every agent at once**: running, needs you, done, on every tab and sidebar row; answer an agent from a
-  notification, the bubbles over other apps or your phone.
-- **From diff to merge in one window**: review the diff, comment on lines, send it back to the agent, ship (commit,
-  push, PR), watch CI and reviews, merge. Each workspace's ⋯ says its next step first (⌘G does it).
-- **Done means checked**: your tests and a second agent's review run as an agent finishes, failures go back to it;
-  two worktrees changing the same lines are flagged before merge day.
-- **Agents keep running** when the window is closed: a daemon holds the terminals, and they resume after a restart or a
-  usage limit.
-- **Drive it from anywhere**: `laki` on the command line (an MCP server too), Laki AI in plain words (it finds a setting
-  for you too), your phone over Cloudflare or Tailscale.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/needs-you-dark.png">
+  <img src="docs/img/needs-you-light.png" alt="Needs you: two agents asking to run a command, each with Yes, Yes and don't ask again, and No as buttons; Allow all (2) above them" width="900">
+</picture>
 
-## Why
+### Done means checked
 
-| | |
-|---|---|
-| **Parallel, not tangled** | Each agent on its own branch and folder: no stepping on each other's files, no stashing. |
-| **Nothing missed** | A waiting agent is a notification with its choices as buttons; ⌘J jumps to the next one that needs you. |
-| **Review where you work** | Diff, threads, checks and the dev server's preview beside the terminal, not in five browser tabs. |
-| **Your agents, your accounts** | Laki runs the agents you have, signed in as you are; it never writes their settings. |
-| **Make it yours** | 102 themes, extensions in the sidebar and status bar, workflows and scheduled prompts. |
+As an agent finishes, your lint and test scripts (and, if you like, a second agent's review) run; a failure goes back
+to the agent with its output. Collision radar flags two worktrees changing the same lines while both can still adjust.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/check-radar-dark.png">
+  <img src="docs/img/check-radar-light.png" alt="A workspace whose test failed after the agent's turn: lint passed, test failed, sent back to claude (try 1 of 3); its sidebar row shows the radar's conflict mark" width="900">
+</picture>
+
+### Close the window, answer from your phone
+
+A daemon holds the terminals: agents keep working with the window closed and come back after a restart or a plan
+limit. Remote access opens the same inbox on your phone, over Cloudflare or Tailscale.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/phone-dark.png">
+  <img src="docs/img/phone-light.png" alt="Laki on a phone-sized screen: Needs you with two agents' questions and their answer buttons" width="300">
+</picture>
+
+## What is different
+
+- **One next step per workspace**: its ⋯ says what it needs now (an answer, a review, failing CI, a merge), and ⌘G does
+  it.
+- **Done check**: your scripts and a second agent's review run as each agent finishes; a failure goes back to it, three
+  times at most, then to you.
+- **Collision radar**: two worktrees changing the same lines are flagged while the agents work, not on merge day.
+- **Agents outlive the window**: quit it, restart Laki or hit a plan limit, and they keep running or resume; *Auto
+  fallback* moves a tab at its limit to your next account.
+- **No account, MIT, your data stays local**: no sign-up and no telemetry; your agents run signed in as you.
+  [What Laki sends, and to whom](docs/trust.md).
+
+| | Laki | Agents in terminal tabs (tmux, iTerm) |
+|---|---|---|
+| A git worktree per task | Made, set up and cleaned up for you | By hand (`git worktree add`) |
+| Any CLI agent | Claude Code, Codex, Gemini, Grok, OpenCode, any command | Any |
+| A second agent checks the work | Done check, as each turn ends | No |
+| Conflicts between parallel tasks | Collision radar, while they work | At merge |
+| Account needed | None | None |
+| Platforms | macOS 13+; Linux (preview); Windows through WSL 2 | Any |
+
+Everything else (themes, extensions, workflows, scheduled prompts, the CLI and its MCP server):
+[docs/features.md](docs/features.md).
 
 ## Install
 

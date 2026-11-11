@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Notes for coding agents working on **Laki** (CLI `laki`): how the code works and how to change it
-safely. User-facing docs: `README.md` (the short version: a demo GIF, TL;DR, install, quick start, a table of the docs),
+safely. User-facing docs: `README.md` (the short version: the outcome in a line, three proof points with stills from `LAKI_DEMO_RICH=1 npm run test:ui` (`docs/img/*-dark.png`, `*-light.png`), what is different, a comparison, install, quick start, a table of the docs),
 `docs/features.md` (every feature, a few lines each), `docs/install.md` and `docs/guide.md` (the full guide); the product, in `requirements/`. Laki is a successor to wb
 (a tmux + iTerm workbench; its repo, if you have it, is read-only from here); ideas and code are ported
 from it (limits, hooks).
@@ -15,7 +15,7 @@ npm run check                     # typecheck, then test:fast: before a commit t
 npm test                          # node:test, every file, 4 at a time: ~5 min on an 8-core Mac (6 was no quicker there)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
-npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~25 s, screenshots in dist/ui-smoke
+npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~25 s, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
 npm run test:cov                  # the tests with node's coverage of src/daemon and src/shared (daemons too), the 10 least covered (scripts/cov.ts; not a gate)
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app

@@ -203,11 +203,44 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       for (const p of (await rpc<View>('state')).projects) await rpc('projectRm', { id: p.id }).catch(() => {})
     }, async () => (await has('.welcome')) && (await hasText('.welcome-checks .check', 'not signed in')) && (await hasText('.welcome-checks button', 'Sign in')) && (await has('.welcome-ready'))],
   ]
+  // M1: the rich demo world (LAKI_DEMO_RICH): the README's stills instead of the walk, each in Laki's two themes (dark,
+  // then light): Needs you with its answer buttons, a workspace's Done check and Collision radar, the phone's view
+  const readme: typeof steps = []
+  const size = (wd: number, h: number) => (w.isMaximized() && w.unmaximize(), w.setMinimumSize(Math.min(wd, 700), 400), w.setSize(wd, h), nap(600))
+  if (process.env.LAKI_DEMO_RICH) {
+    readme.push(['readme-setup', async () => {
+      await size(1440, 900)
+      ws.cart = await named('fix-cart-total')
+      ws.co = await named('checkout-flow')
+      await rpc('settingsSet', { radar: true })
+      await rpc('projectSet', { id: ws.cart.project, config: { lint: 'echo "eslint: 0 problems"', test: 'echo "✖ total rounds to cents: 0.30000000000000004 !== 0.3"; exit 1', check: { steps: ['lint', 'test'] } } })
+      // a collision: checkout-flow changes the lines fix-cart-total changes
+      writeFileSync(join(ws.co.path, 'src/cart.js'), 'export function total(items) {\n  return items.reduce((s, i) => s + i.price * i.qty, 0)\n}\n')
+      // two agents ask to run a command: Needs you's cards
+      const v = await rpc<View>('state')
+      const askers = await Promise.all(['rate-limiter', 'onboarding-screens'].map(async n => (await rpc<{ id: string }>('tabNew', { ws: (await named(n)).id, preset: 'claude' })).id))
+      for (const id of askers) await waitFor(async () => (await rpc<string>('screen', { target: id, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      for (const id of askers) await rpc('send', { target: id, text: 'perm bash :: npm test' })
+      // fix-cart-total's agent finishes a turn: its Done check runs
+      const tab = v.tabs.find(t => t.workspace === ws.cart.id && t.kind === 'agent')!
+      await rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'fix the cart total rounding' } })
+      await nap(300)
+      await rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done: totals round to cents.' } })
+      await click(row(ws.co.id))()
+      await click('.onboard-bar button')() // Get started's bar: hidden, as most have it by then
+    }, () => hasText('.needs-allow-all', 'Allow all (2)')])
+    for (const [theme, look] of [['laki', 'dark'], ['laki-light', 'light']]) {
+      readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await nap(800)), '.needs-cards'])
+      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), '.check-strip'])
+      readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844)), '.app.narrow'])
+    }
+    readme.push(['readme-done', () => size(1440, 900), async () => true])
+  }
   const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
   // E8: the page's start to its first sidebar row painted (main.tsx' mark): what a lazy page saves shows here
   const first = await js<number>("performance.getEntriesByName('laki-sidebar')[0]?.startTime ?? -1").catch(() => -1)
   out.push({ name: 'first-row', ok: first >= 0, ms: Math.round(first), ...(first < 0 && { why: 'no laki-sidebar mark' }) })
-  for (const [i, [name, go, sel]] of steps.entries()) {
+  for (const [i, [name, go, sel]] of (readme.length ? readme : steps).entries()) {
     const at = Date.now()
     const seen = errors.length
     let why: string | undefined
