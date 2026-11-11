@@ -233,7 +233,7 @@ function changed(t: Thread) {
   try {
     writeFileSync(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), { mode: 0o600 })
   } catch {}
-  broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t) })
+  broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t) })
 }
 const queueOf = (t: Thread) => t.queue?.map(q => q.text || `(${q.images.length} image${q.images.length === 1 ? '' : 's'})`) ?? []
 const say = (t: Thread, role: AiMsg['role'], text: string, images?: string[]) => (t.chat.push({ role, text, at: (t.at = Date.now()), ...(images?.length && { images }) }), changed(t))
@@ -378,7 +378,7 @@ export function aiForget(id: string) {
 export function aiState(p: { chat?: string } = {}) {
   const t = thread(p.chat)
   const calls = readCalls()
-  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
+  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t), key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
 }
 
 // ---------- asking
@@ -481,14 +481,33 @@ async function runTool(t: Thread, list: Tool[], name: string, args: unknown) {
   }
 }
 
-// the earlier asks and answers, for a model that keeps no session of its own (OpenRouter)
-// ponytail: the last 20, without the tools' results (it looks again); a summary of older ones if it forgets too much
-const history = (t: Thread) =>
-  t.chat
-    .slice(0, -1)
-    .filter(m => m.role === 'user' || m.role === 'ai')
-    .slice(-20)
-    .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text || '(an image)' }))
+// A8: the earlier asks and answers, for a model that keeps no session of its own (OpenRouter): whole turns (an ask and
+// what answered it), newest first while they fit HISTORY_CHARS, the newest always; older ones left out. The tools'
+// calls and results never go (the chat keeps no results; it looks again). Nothing stored or shown changes.
+// ponytail: a summary of the turns left out if it forgets too much
+const HISTORY_CHARS = 60_000
+function earlier(chat: AiMsg[]) {
+  const msgs = chat.filter(m => m.role === 'user' || m.role === 'ai')
+  let from = msgs.length
+  for (let i = msgs.length - 1, used = 0; i >= 0; ) {
+    let j = i
+    while (j > 0 && msgs[j].role !== 'user') j-- // back to the ask that began it
+    const size = msgs.slice(j, i + 1).reduce((n, m) => n + (m.text?.length || 12), 0)
+    if (from < msgs.length && used + size > HISTORY_CHARS) break
+    used += size
+    from = j
+    i = j - 1
+  }
+  return msgs.slice(from)
+}
+const history = (t: Thread) => earlier(t.chat.slice(0, -1)).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text || '(an image)' }))
+// the first message the model sees with the next ask (its at), when older ones are left out: the page marks it.
+// OpenRouter's only: claude and codex keep their own session
+const seenFrom = (t: Thread) => {
+  if ((state.settings?.ai?.backend ?? 'openrouter') !== 'openrouter') return undefined
+  const kept = earlier(t.chat)
+  return kept.length < t.chat.filter(m => m.role === 'user' || m.role === 'ai').length ? kept[0]?.at : undefined
+}
 
 // A3: Anthropic's models on OpenRouter cache a prompt only up to a cache_control breakpoint (others cache on their own):
 // one after the tools (tools come first in its prefix: cached even when the system prompt changes) and one after the

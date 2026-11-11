@@ -3,7 +3,7 @@
 // folded into one line, the composer at the bottom; Calls: each ask with its tokens, cost and time; Info: how it runs
 // and pays, what it spent, what it can do. Off, or OpenRouter without a key: a note.
 import { sendKeyName, sendTip } from '../../shared/keys'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { AI_MODEL, type AiCall, type AiMsg, type AiPast, type AiSettings, type AiTotals } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import { ago } from './Info'
@@ -15,7 +15,7 @@ import { ask as confirm, escapes, Icon, IconButton, Page, usePageSide } from './
 import type { UiSpec } from '../../shared/widgetUi'
 import { CELL_W, KitBody } from './Widgets'
 
-type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; key: boolean; calls: AiCall[]; totals: AiTotals } // queue: what you sent while it answered, the next ask as it ends
+type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; seenFrom?: number; key: boolean; calls: AiCall[]; totals: AiTotals } // queue: what you sent while it answered, the next ask as it ends; seenFrom: A8, the first message the model still sees (its at), when older ones are left out
 
 // what it can do, as you'd say it: a click puts it in the box
 const EXAMPLES = [
@@ -99,7 +99,7 @@ export function AiPage({
       if (m.ev !== 'ai' || m.of) return // another chat's (a spec's, an extension's)
       if (m.partial !== undefined) return void setPartial(m.partial)
       setPartial('')
-      setD(x => x && { ...x, chat: m.chat, busy: m.busy, queue: m.queue })
+      setD(x => x && { ...x, chat: m.chat, busy: m.busy, queue: m.queue, seenFrom: m.seenFrom })
       if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
     })
@@ -191,7 +191,26 @@ export function AiPage({
                     </div>
                   </div>
                 ) : (
-                  groups.map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} live={!!d?.busy && i === groups.length - 1} /> : <Message key={i} m={g} link={link} busy={!!d?.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
+                  groups.map((g, i) =>
+                    Array.isArray(g) ? (
+                      <Tools key={i} list={g} live={!!d?.busy && i === groups.length - 1} />
+                    ) : (
+                      <Fragment key={i}>
+                        {i > 0 && g.at === d?.seenFrom && (
+                          // A8: older messages no longer go with an ask (the model's history has a size)
+                          <div className="ai-seen-from" role="separator">
+                            <span>Laki AI sees the chat from here on</span>
+                            {!compact && (
+                              <button type="button" className="link small" disabled={d.busy} onClick={newChat}>
+                                New chat
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <Message m={g} link={link} busy={!!d?.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />
+                      </Fragment>
+                    ),
+                  )
                 )}
                 {d?.busy && partial && <Message m={{ role: 'ai', text: partial, at: 0 }} link={link} busy onPick={pick} />}
                 {d?.busy && (

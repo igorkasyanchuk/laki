@@ -812,3 +812,30 @@ test('A7: OpenRouter streams: its text as it comes (partial), tool calls in piec
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'slowly' }), { text: 'abcd' })
   await assert.rejects(rig.rpc('aiAsk', { text: 'and?' }), /OpenRouter sent nothing for 1 s/)
 })
+
+test("A8: a long chat's history goes by size: whole turns, newest first, under the budget; the page learns where the model's view starts", async t => {
+  const N = 30
+  const answer = (i: number) => `${i}: ${'all good. '.repeat(500)}` // 5 KB each
+  const or = await openrouter(t, Array.from({ length: N }, (_, i) => reply({ content: answer(i) })))
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  for (let i = 0; i < N; i++) await rig.rpc('aiAsk', { text: `ask ${i}` })
+  const body = or.hits.at(-1)!.body
+  const hist = body.messages.slice(1, -1)
+  const size = hist.reduce((n: number, m: any) => n + m.content.length, 0)
+  assert.ok(size <= 60_000, `history ${size} chars`)
+  assert.ok(hist.length >= 20, 'still a good part of it')
+  assert.deepEqual(body.messages.at(-1), { role: 'user', content: `ask ${N - 1}` })
+  // the newest turns whole, in order, starting with an ask
+  assert.deepEqual(hist.slice(-4), [{ role: 'user', content: `ask ${N - 3}` }, { role: 'assistant', content: answer(N - 3) }, { role: 'user', content: `ask ${N - 2}` }, { role: 'assistant', content: answer(N - 2) }])
+  assert.equal(hist[0].role, 'user')
+  // nothing stored or shown changed; the page's mark: the first message the model still sees
+  const a = await rig.rpc('aiState')
+  assert.equal(a.chat.length, 2 * N)
+  const first = a.chat.find((m: any) => m.at === a.seenFrom)
+  assert.equal(first?.role, 'user')
+  assert.ok(Number(first.text.split(' ')[1]) > 0, 'older ones left out')
+  // a short chat: all of it, no mark
+  await rig.rpc('aiNew')
+  assert.equal((await rig.rpc('aiState')).seenFrom, undefined)
+})

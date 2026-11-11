@@ -28,7 +28,10 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   `{ of, partial }` (10 a second at most; no `chat`: the other `ai` listeners skip it), drawn under the chat until the
   message comes. A JSON reply (an error, one that doesn't stream) is read whole. The 2 minutes are a quiet limit, reset
   by each chunk (`QUIET_MS`, `LAKI_AI_QUIET_MS`: tests'), not a total; `aiStop` aborts the stream; the
-  earlier asks and answers (`history`, 20) go with each ask, not the tools' results. A pasted image (only from
+  earlier asks and answers go with each ask (`history`, A8: `earlier`'s whole turns, newest first, while they fit
+  `HISTORY_CHARS`, 60 KB, the newest always), never the tools' calls or results; `seenFrom` (in `aiState` and the `ai`
+  event, OpenRouter's only) is the first message it still sees, where the page draws *Laki AI sees the chat from here
+  on* with New chat. What's stored and shown is the same. A pasted image (only from
   `<data>/images`, `imageOk`: nothing else of the Mac goes to a model) as a data URL. The key: `<data>/ai-key`, 0600
   (`aiKey`), never in state.json, the view or `aiState` (only whether there is one). Model: `models.openrouter`, else
   `AI_MODEL`. Prompt caching (A3): an `anthropic/*` model (`cachesByMark`) caches only up to a `cache_control`
