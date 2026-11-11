@@ -2138,11 +2138,10 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
 }
 
 // Reply to selected terminal text (Term's pill): the quote, a box for your words; Enter puts both in the agent's prompt
-// (unsent, for you to finish there), ⌘⏎ sends them (after its turn, if it's working). From a tab that isn't an agent's,
-// its workspace's agents: a pick when there are several. Esc or a click outside closes it
+// (unsent, for you to finish there), ⌘⏎ sends them (after its turn, if it's working). To the tab's own agent (App's
+// replyTo: an agent tab, a shell running one). Esc or a click outside closes it
 export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from: TabView; text: string; at: { x: number; y: number }; to: TabView[]; onAdd: (to: TabView, msg: string) => Promise<unknown>; onSend: (to: TabView, msg: string) => Promise<unknown>; onClose: () => void }) {
   const [words, setWords] = useState('')
-  const [pick, setPick] = useState(to[0]?.id)
   const [busy, setBusy] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const close = useRef(onClose) // App's is new each render: the listeners stay put
@@ -2154,7 +2153,7 @@ export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from:
     window.addEventListener('mousedown', click, true)
     return () => (window.removeEventListener('keydown', key, true), window.removeEventListener('mousedown', click, true))
   }, [])
-  const target = to.find(t => t.id === pick) ?? to[0]
+  const target = to[0]
   const msg = () => replyText(text, words, target?.id === from.id ? undefined : from.name)
   const go = (send: boolean) => {
     if (!target || busy) return
@@ -2178,17 +2177,7 @@ export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from:
         onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), go(e.metaKey || e.ctrlKey))}
       />
       <div className="row">
-        {to.length > 1 ? (
-          <select value={target?.id} onChange={e => setPick(e.target.value)} aria-label="To">
-            {to.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="muted small">{target ? `To ${target.name}` : 'No agent runs here now'}</span>
-        )}
+        <span className="muted small">{target ? `To ${target.name}` : 'No agent runs here now'}</span>
         <span className="spacer" />
         <button disabled={busy || !target} onClick={() => go(false)} data-tip="Into its prompt, unsent: you finish it there (Enter)">
           Add to prompt

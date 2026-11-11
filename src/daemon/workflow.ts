@@ -408,7 +408,11 @@ function yourTab(wf: WorkflowItem, o: Start, t: Tab | undefined, pick?: Workspac
   if (!t || t.kind !== 'agent' || !isLive(t)) throw new Error('that tab is gone, or not an agent’s')
   if (!pick || t.workspace !== pick.id) throw new Error(`that tab is in another workspace than the run's`)
   const ag = tabAgent(t, presets())
-  const keys = [...new Set(wf.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run') && agentOf(b.agent) === ag).map(b => `run:${b.agent || 'claude'}`))]
+  const mine = wf.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run') && agentOf(b.agent) === ag)
+  // a block's own permission mode (or the head's) is what it may do: a tab in another one would act otherwise
+  const off = mine.find(b => (p => p !== undefined && p !== (t.perm ?? profileOf(t.profile)?.perm))(permOf(wf, b, ag!)))
+  if (off) throw new Error(`${blockName(off)} runs in ${permWords(permOf(wf, off, ag!), undefined, ag!) || permOf(wf, off, ag!)} mode and ${t.name} doesn't: pick a tab in that mode, or a new one`)
+  const keys = [...new Set(mine.map(b => `run:${b.agent || 'claude'}`))]
   if (!keys.length) throw new Error(`${wf.name} has no ${ag ?? 'such'} block that runs in the run's session: its agents get tabs of their own`)
   return keys
 }
@@ -434,7 +438,8 @@ export async function flowStart(o: Start) {
   const old = o.again || o.from ? flowGet({ id: String(o.again ?? o.from?.run ?? '') }) : undefined
   if (old) o = rerun(o, old)
   const mine = o.tab ? tabOf(o.tab) : undefined // Run's Agent tab: a session of yours its agent's blocks go to
-  if (o.tab && !o.ws && mine) o = { ...o, ws: mine.workspace }
+  if (o.tab && !mine) throw new Error('that tab is gone, or not an agent’s')
+  if (o.tab && !o.ws) o = { ...o, ws: mine!.workspace }
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })

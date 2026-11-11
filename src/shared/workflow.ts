@@ -79,7 +79,7 @@ export type Block = {
   options?: Option[] // choice (yes, no), ask (buttons), case (its branches: a test each, else last)
   max?: { n: number; to?: string } // at most n times, then to
   text?: string // popup: what it shows (HTML when it starts with <, else Markdown); end: its notification's words; decide: the state it judges (a JSON template; none: the block before's result); agent, llm: the prompt (after its action's, with use); action ship: the commit message; save: what's written; webhook: its body
-  input?: 'task' | 'task?' | 'none' // start: Run's task required (task), optional (task?) or not asked (none)
+  input?: 'task' | 'task?' | 'none' // start: Run's task required (task), optional (task? or no input: line) or not asked (none)
   inputs?: FlowInput[] // start: what a run asks for besides the task, {{inputs.NAME}}
   agent?: string // a preset's name (claude, codex, one of Settings')
   use?: string // agent: an agent action's slug, or its name (Run ▾'s, Settings' or the project's: findAction): its prompt first
@@ -457,7 +457,7 @@ export function toFile(wf: Workflow): string {
     L.push('', `## ${b.id}`)
     if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
     switch (b.kind) {
-      case 'start': L.push(`input: ${b.input ?? 'task'}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
+      case 'start': if (b.input) L.push(`input: ${b.input}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
       case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.perm && `perm: ${b.perm}`, b.fast && 'fast: yes', b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'decide':

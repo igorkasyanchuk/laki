@@ -1396,7 +1396,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
       {b.kind === 'start' &&
         field(
           'Task',
-          <select value={b.input ?? 'task'} onChange={e => set(x => void (x.input = e.target.value as Block['input']))}>
+          <select value={b.input ?? 'task?'} onChange={e => set(x => void (x.input = e.target.value as Block['input']))}>
             <option value="task">Required</option>
             <option value="task?">Optional</option>
             <option value="none">None: Run asks for no task</option>
@@ -2194,7 +2194,7 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
   // Agent tab: one of yours in the run's workspace whose agent has blocks in the run's session: they go to its chat
   const runWs = fixed || ws
   const sessionAgents = new Set(item.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run')).map(b => tabAgent({ preset: b.agent || 'claude' }, presets)))
-  const tabsHere = runWs && !item.on ? tabs.filter(t => t.workspace === runWs && t.kind === 'agent' && t.status !== 'exited' && sessionAgents.has(tabAgent(t, presets))) : []
+  const tabsHere = runWs ? tabs.filter(t => t.workspace === runWs && t.kind === 'agent' && t.status !== 'exited' && sessionAgents.has(tabAgent(t, presets))) : []
   const [tab, setTab] = useState('')
   const inTab = tabsHere.some(t => t.id === tab) ? tab : '' // a workspace picked since: none
   const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
