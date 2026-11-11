@@ -75,7 +75,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   `dist/release/<v>`, then a draft on `build.publish`'s repo (`upload`, `publish` subcommands); `publish` also writes the
   Homebrew tap's `Casks/laki.rb` (`TAP`, `<owner>/homebrew-laki`, through GitHub's contents API; `tap`, `cask`
   subcommands; `test/release.test.ts`). Run it only when the user asks: it uploads.
-- Release notes: `docs/release-notes.md`, Settings › Release notes (with `devMode` only, its ⌘K item too; `?raw`, comments stripped). Each user-visible
+- Release notes: `docs/release-notes.md`, Settings › Release notes and its ⌘K item (`?raw`, comments stripped); a version's first three lines are the What's new card after an update (U13: `notesOf`, settings' `seenVersion`; a line's trailing `[Try it](laki://…)` its Try). Each user-visible
   addition gets a line under `## Next` (add that heading above the newest version when it isn't there); `npm run dmg`
   stamps it as the version it builds and the date (`scripts/notes.ts`).
 - Signing: the app is ad-hoc signed (`build.mac.identity: "-"`, `hardenedRuntime: false`), not notarized. Keep it:

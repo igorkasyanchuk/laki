@@ -377,6 +377,14 @@ app's Info.plist has `ElectronSquirrelPreventDowngrades` (`build.mac.extendInfo`
 older than the one running, whatever the release's tag says (an older signed build tagged as new). Settings ›
 General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no channels, no daemon restart.
 
+What's new (U13): settings' `seenVersion` is the version whose card was closed (core's `load`: a new install's own
+`VERSION`, one from before U13 `''`). While it isn't this app's version (package.json's), App loads the release notes
+(`?raw`, only then) and `update.ts` `notesOf` gives that version's first three lines (`## <version> ·`'s bullets), a
+line's trailing `[Try it](laki://…)` apart as its link. panels.tsx `WhatsNew` shows them top right: *Try* routes the
+link (App's `setLink`), *All changes* opens Settings › Release notes (for everyone now, its ⌘K item too), × or All
+changes sets `seenVersion`. A version with no section (a build between releases) shows nothing. ui-smoke's
+`whats-new` steps: shown for an old `seenVersion`, closed, gone after a reload.
+
 ### Usage
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when

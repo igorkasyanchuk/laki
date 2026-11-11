@@ -3,7 +3,8 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEff
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
-import type { UpdateState } from '../../shared/update'
+import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
+import { version as appVersion } from '../../../package.json'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -12,7 +13,7 @@ import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type Labe
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { notInstalled, tabAgent } from '../../shared/install'
-import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome } from './panels'
+import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
 import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
@@ -2078,6 +2079,17 @@ export function App() {
   // main's update.ts: a newer release stays in the status bar until you update (every check says so, a restart too);
   // a version a scheduled check found also toasts, once each (main's update.json). Its notes and Download: Settings
   const [upd, setUpd] = useState<UpdateState | null>(null)
+  // U13: What's new, once a version: the notes (loaded only then) of this one when settings' seenVersion is another;
+  // none for it (a build between releases): nothing shown
+  const [news, setNews] = useState<NewLine[]>([])
+  const seenV = view?.settings.seenVersion
+  useEffect(() => {
+    if (seenV === undefined || seenV === appVersion) return setNews([])
+    let on = true
+    void import('../../../docs/release-notes.md?raw').then(m => on && setNews(newLines(m.default, appVersion)))
+    return () => void (on = false)
+  }, [seenV])
+  const newsSeen = () => (setNews([]), void api.call('settingsSet', { seenVersion: appVersion }).catch(() => {}))
   // Update when idle (the daemon's view.updateIdle, so it outlives this window: Settings › Updates, an agent's laki
   // update --when-idle): the release looked for and downloaded, installed once no agent works or asks (the agent that
   // asked aside: its turn goes on, the daemon outlives the app), then, in the new app, the older daemon restarted once
@@ -3593,6 +3605,7 @@ export function App() {
           </div>
         )}
         {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
+        {connected && news.length > 0 && <WhatsNew version={appVersion} lines={news} onTry={setLink} onAll={() => (newsSeen(), setDialog({ section: 'notes' }))} onClose={newsSeen} />}
         <div className="body">
           {tabsAt === 'left' && <TabStrip app={app} />}
           <div className="term-wrap" data-review={reviewOn && ws ? '' : undefined}>

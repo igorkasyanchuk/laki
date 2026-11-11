@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { feedName, feedOf, heldUntil, newer, RELEASES, releaseOf, verdict } from '../src/shared/update.ts'
+import { feedName, feedOf, heldUntil, newer, notesOf, RELEASES, releaseOf, verdict } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -61,4 +61,41 @@ test('heldUntil: a release waits out the update delay from its publish date', ()
   assert.equal(heldUntil(at, 0, t), undefined) // no delay
   assert.equal(heldUntil(undefined, 7, t), undefined) // no date: offered, never held for good
   assert.equal(heldUntil('not a date', 7, t), undefined)
+})
+
+test("U13: What's new: a version's first three lines, each with its trailing laki:// link apart", () => {
+  const md = `<!-- a comment
+## 0.9.0 · in a comment -->
+
+## Next
+
+- Not out yet. [Try it](laki://board)
+
+## 0.49.0 · Nov 20, 2026
+
+- The quick bar opens from any app. [Try it](laki://quick)
+- A plain line, [a link](https://example.com) inside it.
+- Remote access keeps its address. [Open it](laki://settings/remote?spot=Address)
+- A fourth line.
+
+## 0.48.0 · Nov 11, 2026
+
+- Older.
+`
+  assert.deepEqual(notesOf(md, '0.49.0'), [
+    { text: 'The quick bar opens from any app.', link: 'laki://quick' },
+    { text: 'A plain line, [a link](https://example.com) inside it.' },
+    { text: 'Remote access keeps its address.', link: 'laki://settings/remote?spot=Address' },
+  ])
+  assert.deepEqual(notesOf(md, '0.48.0'), [{ text: 'Older.' }])
+  assert.deepEqual(notesOf(md, '0.4.0'), [], 'no section: nothing')
+  assert.deepEqual(notesOf(md, '0.9.0'), [], 'a heading in a comment is none')
+  assert.deepEqual(notesOf(md, '0.49'), [], 'a version exactly')
+  // the real file: every released version's lines parse, a link only ever laki://
+  const real = readFileSync(new URL('../docs/release-notes.md', import.meta.url), 'utf8')
+  for (const v of [...real.matchAll(/^## (\d+\.\d+\.\d+) ·/gm)].map(m => m[1]).slice(0, 5)) {
+    const lines = notesOf(real, v)
+    assert.ok(lines.length > 0 && lines.length <= 3, v)
+    for (const l of lines) assert.ok(!l.link || l.link.startsWith('laki://'), v)
+  }
 })

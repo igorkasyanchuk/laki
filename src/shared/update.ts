@@ -76,3 +76,22 @@ export function feedOf(version: string, arch: string, notes: string, at: string,
   const pub_date = at.replace(/\.\d+(?=Z$|[+-]\d\d:\d\d$)/, '')
   return JSON.stringify({ currentRelease: version, releases: [{ version, updateTo: { version, name: `Laki ${version}`, notes, pub_date, url } }] })
 }
+
+// U13: What's new after an update: the first three lines of a version's section of docs/release-notes.md (`## 0.49.0 ·
+// date`), each with its trailing `[Try it](laki://…)` link apart (a line may end with one; scripts/notes.ts keeps it).
+// None: no such section (a build between releases)
+export type NewLine = { text: string; link?: string }
+export function notesOf(md: string, version: string, n = 3): NewLine[] {
+  const text = md.replace(/<!--[\s\S]*?-->/g, '')
+  const at = text.search(new RegExp(`^## ${version.replace(/\./g, '\\.')}( ·|\\s*$)`, 'm'))
+  if (at < 0) return []
+  const body = text.slice(at).split('\n').slice(1)
+  const end = body.findIndex(l => l.startsWith('## '))
+  return (end < 0 ? body : body.slice(0, end))
+    .filter(l => l.startsWith('- '))
+    .slice(0, n)
+    .map(l => {
+      const m = /\s*\[[^\]]*\]\((laki:\/\/[^)\s]+)\)\s*$/.exec(l)
+      return { text: (m ? l.slice(0, m.index) : l).slice(2).trim(), ...(m && { link: m[1] }) }
+    })
+}

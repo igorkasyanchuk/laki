@@ -571,6 +571,7 @@ export type Settings = {
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
   usage?: Record<string, boolean> // R4: claude, codex, gemini: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
   usageNote?: boolean // R4: the one-time note in Settings › Resources that plan limits moved to the agents' own numbers
+  seenVersion?: string // U13: the version whose What's new card was closed (a new install: its own; '': from before U13, the next version's shows)
   labs?: boolean // Settings › General › Pages' Labs switch: LABS' pages and buttons all at once (core.ts load: a new install starts with false and each of them off)
   specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
   workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)

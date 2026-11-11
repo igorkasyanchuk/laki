@@ -1753,6 +1753,36 @@ const CLOUDFLARED_WHY =
 // the command typed, not run (App's onRun: as that terminal exits, Welcome is back and checks again); Check again last.
 // sample: Try it on a sample repo (a daemon with the sample cap)
 const LOGIN: Partial<Record<Agent, string>> = { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini' } // each agent's own sign-in (Gemini CLI asks as it starts)
+// U13: What's new after an update: the version's first three lines of its release notes (shared/update.ts notesOf),
+// Try on one with a laki:// link (routed as any), All changes: Settings › Release notes. × or All changes: seen
+export function WhatsNew({ version, lines, onTry, onAll, onClose }: { version: string; lines: { text: string; link?: string }[]; onTry: (link: string) => void; onAll: () => void; onClose: () => void }) {
+  return (
+    <section className="whats-new" aria-label={`New in ${version}`}>
+      <header>
+        <Icon name="ai" size={14} />
+        <b>New in {version}</b>
+        <span className="grow" />
+        <IconButton icon="x" title="Close" onClick={onClose} />
+      </header>
+      <ul>
+        {lines.map(l => (
+          <li key={l.text}>
+            <Markdown src={l.text} />
+            {l.link && (
+              <button type="button" className="small" onClick={() => onTry(l.link!)}>
+                Try
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="link small" onClick={onAll}>
+        All changes
+      </button>
+    </section>
+  )
+}
+
 export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor>; onRun?: (cmd: string) => void; onSample?: (agent?: Agent) => void }) {
   const [d, setD] = useState<Doctor | null>(null)
   const [busy, setBusy] = useState(false)

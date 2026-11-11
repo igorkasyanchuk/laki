@@ -203,6 +203,16 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       ws.keyed = (await named((await js<string>("document.activeElement?.dataset.row ?? ''")).slice(3)))
       await press('Enter')
     }, async () => !!ws.keyed && (await has(`.ws.sel${row(ws.keyed.id)}`))],
+    // U13: What's new after an update (seenVersion another version's): the card with this version's lines and All
+    // changes; closed, it's seen: gone, and not back after a reload
+    ['whats-new', async () => (await key('Escape')(), await rpc('settingsSet', { seenVersion: '0.0.1' })), async () => (await has('.whats-new li')) && (await hasText('.whats-new button', 'All changes'))],
+    ['whats-new-once', async () => {
+      await click('.whats-new header button')()
+      await waitFor(async () => (await rpc<View>('state')).settings.seenVersion !== '0.0.1', 'seenVersion set')
+      w.webContents.reload()
+      await nap(1500)
+      await waitFor(() => has('.sidebar, .welcome'), 'the window again')
+    }, async () => !(await has('.whats-new'))],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
       for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})

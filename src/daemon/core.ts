@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 import { priorOf, readJson, writeAtomic } from '../shared/conn.ts'
 import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
+import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
@@ -183,6 +184,8 @@ export function load() {
   // R4: plan limits no longer ask the agents' usage endpoints unless set to true: an install from before that left one
   // unset hears it once (Settings › Resources' note), a new one never
   if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
+  // U13: What's new shows once a version (App's WhatsNew): a new install has seen its own, one from before U13 none
+  if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
     state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs

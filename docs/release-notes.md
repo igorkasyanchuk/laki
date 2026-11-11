@@ -1,6 +1,7 @@
 <!-- Laki's release notes, shown in Settings › Release notes. Newest first. Each user-visible addition: a line under
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
-version it builds, with the date. -->
+version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
+the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
 ## Next
 
@@ -12,6 +13,7 @@ version it builds, with the date. -->
 - A trust page, [docs/trust.md](trust.md) (About › *No account, no telemetry*): what stays on your Mac and where, every host Laki connects to with what it sends, when and how to turn it off, how to check the build's signature, notarization and fuses, and who maintains Laki.
 - Workflows' *Ask you* blocks can have a deadline: *No answer within* `2h` and *Then take* one of its options go on that way when no one answers, freeing the run's slot and the queue behind it; the option must be the safe one (Laki refuses one that leads to a PR, merge or archive). *Remind me before* sends a notification, and with `phone: yes` a push with the choices. The run's page counts down and says what it will pick; its row says *waits for you · 1h 12m left*.
 - A workflow's $ budget and its cost count its agents' turns: what each Claude or Codex turn used (at API prices, as the cost meters) goes into the run's cost, the block's `{{steps.<id>.cost}}` and the workflow's stats, and a turn that passes the budget asks you while it works (*Stop the run* stops it; at twice the budget Laki stops it). Agents Laki can't price, such as Gemini, show as *+ agents not counted*.
+- After an update, *New in <version>* shows its three biggest changes once, each with *Try* where there's something to open; *All changes* opens Settings › Release notes, now there for everyone (and in ⌘K). A new install sees none. [Try it](laki://settings/notes)
 - Workflows keep secrets out of what they pass on: a token from Settings', the project's or a profile's env that a command prints shows as •••• in its output, the run's log, an agent's answer and a webhook's response, so it never reaches an AI call's prompt or a webhook's body. The command itself still gets it.
 
 ## 0.48.0 · Nov 11, 2026

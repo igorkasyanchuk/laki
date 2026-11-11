@@ -195,7 +195,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   // a Labs page that's off (a new install's): found here still, turned on from here
   for (const [k, label, icon] of LAB_PAGES) if (settings[k] === false) a({ label: `Turn on ${label} (Labs)`, icon, hint: 'Settings › General › Pages', run: () => void call('settingsSet', { [k]: true }).catch(() => {}) })
   if (aiOn(settings)) a({ id: 'ai', label: 'Laki AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
-  if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
+  a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
   for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
   a({ id: 'extensions', label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
   a({ id: 'newExtension', label: aiOn(settings) ? 'New extension…: make one with Laki AI, on its page' : 'New extension…: its page, the prompt for any AI chat', icon: 'plus', run: () => setDialog({ extension: '' }) })

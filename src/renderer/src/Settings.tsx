@@ -790,7 +790,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
   // U10: Basic (four heads of the cards most people change) or All (every section); a new install starts on Basic,
   // one with projects on All; a link to a section, or Find a setting, goes to All
   const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))

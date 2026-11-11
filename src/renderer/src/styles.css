@@ -93,7 +93,7 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
    Here, before their own rules, so what they keep (a peek's colored edge, a tooltip's small corners) wins. Solid under
    Reduce transparency, in glass (components.css: the window's blur is native, a backdrop-filter over it flickers) and
    in looks marked opaque (html.opaque: themes.ts OPAQUE_LOOKS). Never on a list's rows: only these float */
-:is(.menu, .modal, .finder, .tip, .help-card, .toast, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
+:is(.menu, .modal, .finder, .tip, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
@@ -1767,6 +1767,15 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
    (--waiting on its tint is under 3:1 in the light themes) */
 .stale-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); padding: var(--sp-4) var(--sp-5); background: color-mix(in srgb, var(--waiting) 18%, var(--bg)); border-bottom: 1px solid var(--waiting); color: var(--fg); font: var(--fs-3)/1.4 var(--ui-font); }
 .stale-bar > svg { color: var(--waiting); flex: none; }
+/* U13: What's new, once a version: over the work, top right, under the tab bar */
+.whats-new { position: fixed; top: 56px; right: var(--sp-6); width: min(380px, calc(100vw - 32px)); z-index: var(--z-toast); padding: var(--sp-4) var(--sp-5); color: var(--fg); font: var(--fs-3)/1.45 var(--ui-font); }
+.whats-new > header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+.whats-new > header > svg { color: var(--accent-ink); }
+.whats-new ul { margin: 0 0 var(--sp-3); padding: 0; list-style: none; }
+.whats-new li { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: 1px solid var(--line); }
+.whats-new li > .md { flex: 1; min-width: 0; padding: 0; line-height: 1.45; }
+.whats-new li > .md > p { margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.whats-new li > button { flex: none; }
 .stale-bar > span { flex: 1; min-width: 200px; }
 .stale-bar button { flex: none; background: var(--waiting); color: var(--on-waiting); border: none; border-radius: var(--r-m); padding: var(--sp-2) var(--sp-5); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .stale-bar button:hover:not(:disabled) { filter: brightness(1.1); }
