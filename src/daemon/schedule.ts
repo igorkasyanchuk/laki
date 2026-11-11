@@ -288,6 +288,7 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   const trig = triggerOf(s.trigger, s)
   const what = (t?: TaskTrigger) => JSON.stringify([t?.event, t?.branch, t?.label])
   if (!trig || what(trig) !== what(old?.trigger)) delete s.marks, delete s.seen
+  if (trig && (proj.host || proj.kind || proj.git === false || !onGitHub(proj.path))) throw new Error(`on an event: ${proj.name} isn't a GitHub repository on this Mac (its origin), so there's nothing to hear`)
   if (trig) Object.assign(s, { trigger: trig, when: '', rule: { days: [], times: [] } })
   else delete s.trigger
   if (!trig && (!old || o.when !== undefined || old.trigger)) {
@@ -463,18 +464,21 @@ async function eventsOf(s: Schedule, p: Project, ask: Ask): Promise<TaskEventIn[
 async function onEvent(s: Schedule, ev: TaskEventIn, now: number) {
   const t = s.trigger!
   const base: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '', event: ev.words }
+  const gap = (t.gap ?? EVENT_GAP) * 60e3
+  // runs a day, held ones too: outsiders' fork PRs can't fill the log or the notifications without end
+  const day = new Date(now).setHours(0, 0, 0, 0)
+  const mine = (state.runs ?? []).filter(r => r.schedule === s.id && r.event && !r.skipped && r.at >= day)
+  if (mine.length >= (t.perDay ?? EVENT_DAY)) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, ${mine.length} today already (its most)` })
   if (ev.fork) {
-    // a fork's PR (or a CI run of one): its text and code are a stranger's, so no agent starts on it until you say
+    // a fork's PR (or a CI run of one): its text and code are a stranger's, so no agent starts on it until you say;
+    // told once a gap at most
+    const quiet = mine.some(r => r.held && now - r.at < gap)
     const r = logRun({ ...base, what: `held: ${ev.words}, from a fork: it runs only when you start it`, held: ev })
     log(`scheduled task ${s.id}: ${r.what}`)
-    broadcast({ ev: 'scheduled', run: r.id, state: 'waiting', name: r.name, text: `${r.name}: ${ev.words} is from a fork, held until you start it (Scheduled tasks)` })
+    if (!quiet) broadcast({ ev: 'scheduled', run: r.id, state: 'waiting', name: r.name, text: `${r.name}: ${ev.words} is from a fork, held until you start it (Scheduled tasks)` })
     return
   }
-  const gap = t.gap ?? EVENT_GAP
-  if (s.last !== undefined && now - s.last < gap * 60e3) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, ${Math.round((now - s.last) / 60e3)} min after its last run (at least ${gap} apart)` })
-  const day = new Date(now).setHours(0, 0, 0, 0)
-  const today = (state.runs ?? []).filter(r => r.schedule === s.id && r.event && !r.skipped && !r.held && r.at >= day).length
-  if (today >= (t.perDay ?? EVENT_DAY)) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, it ran ${today} times today (its most)` })
+  if (s.last !== undefined && now - s.last < gap) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, ${Math.round((now - s.last) / 60e3)} min after its last run (at least ${t.gap ?? EVENT_GAP} apart)` })
   await runSchedule(s, now, { event: ev })
 }
 
@@ -510,17 +514,17 @@ export async function scheduleRelease(o: { run: string }) {
   const s = findSchedule(r.schedule)
   if (s.archived) throw new Error('this task is archived: restore it first')
   const ev = r.held!
-  delete r.held
-  r.what = `${ev.words}, from a fork: you started it`
+  state.runs = state.runs!.filter(x => x !== r) // its run's entry says it instead (one event, one entry)
   save()
   changed()
-  return runSchedule(s, Date.now(), { event: { ...ev, fork: false }, asked: true })
+  return runSchedule(s, Date.now(), { event: { ...ev, fork: false }, asked: true, late: 'you started it, from a fork' })
 }
 
 const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${widgetName(s.widget)}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
 
 const logRun = (r: ScheduleRun) => {
-  state.runs = [r, ...(state.runs ?? [])].slice(0, RUNS_KEPT)
+  const all = [r, ...(state.runs ?? [])]
+  state.runs = [...all.slice(0, RUNS_KEPT), ...all.slice(RUNS_KEPT).filter(x => x.held).slice(0, 50)] // a held one waits for your click past the cap
   save()
   changed()
   return r

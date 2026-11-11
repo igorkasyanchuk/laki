@@ -263,9 +263,10 @@ rule) reads each GitHub project on this Mac once per kind a tick, its tasks shar
 list --branch` (completed failures by run id; a `pull_request` run on the branch is a fork's), `gh pr list` (opened: a
 number past `marks.pr`; reviewed: a PR's newest `latestReviews` past `marks.reviews`; `branch`: the PR's base), `gh
 issue list` (past `marks.issue`, `--label`), `git ls-remote origin` (`push`: the head past `marks.head`); `by` asks `gh
-api user` once. A task's first read only sets `marks` and `seen`. `onEvent`: once per id (`seen`, the last 50), a
-fork's is a `held` run (no workspace, a `scheduled` event; `scheduleRelease`, the page's *Run it*, starts it: yours
-only), then the gap since `last` and the runs today (logged skips), then `runSchedule`'s `event`: its words before
+api user` once. A task's first read only sets `marks` and `seen`; a task on a project that isn't on GitHub here is
+refused. `onEvent`: once per id (`seen`, the last 50), the runs today first (held ones count: `perDay`), then a fork's
+is a `held` run (no workspace, a `scheduled` event once a gap at most; kept past the log's cap and the view's 50;
+`scheduleRelease`, the page's *Run it*, starts it in its place: yours only), then the gap since `last` (logged skips), then `runSchedule`'s `event`: its words before
 what it did (`r.event`), `fillEvent` (shared/fence.ts: `{{event.url}}`, `.number`, `.branch` inline when plain, the
 title fenced under `untrusted`'s line, never inline; none named: *What started it: …* appended) and a PR's event's
 workspace linked to it (wsNew `linked`, guessed); no other PR is guessed from the prompt (wsNew `outside`: the title may name any). ponytail: an incoming webhook doesn't feed them yet; an SSH host's

@@ -4,7 +4,9 @@ const still = () => document.documentElement.dataset.motion === 'none' || matchM
 
 // a sidebar row or a tab that's new since the window drew its first view: it grows in once. One that comes back as you
 // switch workspaces or unfold a project was seen already (every id in the first view counts as seen)
+// (born: when each new one was first drawn; it keeps its class through the renders of its animation, 400 ms)
 const seen = new Set<string>()
+const born = new Map<string, number>()
 let settled = false
 export function settle(ids: Iterable<string>) {
   if (settled) return
@@ -12,9 +14,14 @@ export function settle(ids: Iterable<string>) {
   settled = true
 }
 export function fresh(id: string | undefined): boolean {
-  if (!id || seen.has(id)) return false
-  seen.add(id)
-  return settled && !still()
+  if (!id || !settled || still()) return false
+  const now = performance.now()
+  if (!seen.has(id)) seen.add(id), born.set(id, now)
+  const at = born.get(id)
+  if (at === undefined) return false
+  if (now - at < 400) return true
+  born.delete(id)
+  return false
 }
 
 // what floats (a menu, a dialog, ⌘K, a tooltip, a toast) leaves in 120 ms: React has removed it; an inert copy goes back

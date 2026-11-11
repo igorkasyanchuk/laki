@@ -699,7 +699,7 @@ export function view(): View {
     remote: remoteView(),
     remoteDevices: remoteDevices(),
     schedules: state.schedules,
-    runs: state.runs?.slice(0, RUNS_SHOWN),
+    runs: state.runs && [...state.runs.slice(0, RUNS_SHOWN), ...state.runs.slice(RUNS_SHOWN).filter(r => r.held)], // T4: a held one, past the newest, still has its Run it
     todos: state.todos,
     ...(state.settings?.calendar !== false && { reminders: state.reminders!.filter(r => !r.done || r.at > Date.now() - REMINDERS_DONE) }), // done ones: the last few months'
     layouts: state.layouts,
