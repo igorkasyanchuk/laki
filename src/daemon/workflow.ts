@@ -329,7 +329,8 @@ export function flowGet(o: { id: string }): FlowRun {
 // a log entry: its time and line, then what went with it (a prompt, an answer, a command's output) on the lines after
 function say(r: FlowRun, line: string, detail?: string) {
   const t = new Date().toTimeString().slice(0, 8)
-  const d = String(detail ?? '').trim()
+  line = scrub(r, line)
+  const d = scrub(r, String(detail ?? '').trim())
   r.log.push(`${t} ${line}${d ? `\n${d.length > LOG_DETAIL ? `…${d.slice(-LOG_DETAIL)}` : d}` : ''}`)
   if (r.log.length > LOG_LINES) r.log.splice(0, r.log.length - LOG_LINES)
   let size = r.log.reduce((n, l) => n + l.length, 0)
@@ -877,8 +878,9 @@ turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) =
     // JSON mode: its answer is the JSON it ended with (none: its words, and said)
     const j = b.json ? lastJson(String(o.last ?? '')) : undefined
     if (b.json && j === undefined && o.last && !o.failed) say(r, `${blockName(b)}: no JSON in its answer (its words kept)`)
-    r.vars[`steps.${b.id}.answer`] = j !== undefined ? JSON.stringify(j).slice(0, ANSWER_MAX) : String(o.last ?? '').slice(-ANSWER_MAX) // JSON: its start, as out:'s
-    if (b.out?.length) outs(r, b, String(o.last ?? ''))
+    const last = scrub(r, String(o.last ?? ''))
+    r.vars[`steps.${b.id}.answer`] = j !== undefined ? scrub(r, JSON.stringify(j)).slice(0, ANSWER_MAX) : last.slice(-ANSWER_MAX) // JSON: its start, as out:'s
+    if (b.out?.length) outs(r, b, last)
     if (o.last) say(r, `${tab.name} answered`, String(o.last))
     Object.assign(r, { status: 'running' as FlowStatus, wait: undefined })
     // on after core's deliver (800 ms: the agent redraws its prompt after the hook), so what was queued goes first
@@ -925,7 +927,7 @@ function command(r: FlowRun, b: Block) {
     clearTimeout(timer)
     if (procs.get(r.id) !== child) return // stopped, or run again
     procs.delete(r.id)
-    const lines = out.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '').trimEnd().split('\n')
+    const lines = scrub(r, out.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '').trimEnd()).split('\n') // W3: what Laki's env gave it, masked
     r.vars[`steps.${b.id}.output`] = lines.slice(-OUTPUT_LINES).join('\n')
     r.vars[`steps.${b.id}.code`] = String(code ?? -1)
     if (b.out?.length) outs(r, b, lines.join('\n'))
@@ -971,8 +973,8 @@ async function sent(r: FlowRun, b: Block, send: Send) {
     const got = await send(q.signal, (line, detail) => say(r, line, detail))
     if (got.cost) r.cost = (r.cost ?? 0) + got.cost // spent, even when the run stopped meanwhile
     if (!q.mine()) return
-    Object.assign(r.vars, got.vars)
-    if (b.out?.length && got.text !== undefined) outs(r, b, got.text)
+    for (const [k, v] of Object.entries(got.vars)) r.vars[k] = scrub(r, v) // a webhook's response, a model's answer
+    if (b.out?.length && got.text !== undefined) outs(r, b, scrub(r, got.text))
     if (got.unsure?.length) return unsure(r, b, got.unsure)
     leave(r, b, got.exit, got.why)
   } catch (e) {
@@ -1130,6 +1132,17 @@ function hookSend(b: Block, vars: Record<string, string>, envs: Record<string, s
   return Object.assign(send, { dry: `dry run: would ${method} ${new URL(url).origin}` })
 }
 const envOf = (ws?: Workspace) => ({ ...state.settings?.env, ...(ws && projectConfig(ws).env) }) as Record<string, string>
+// W3: every value Laki itself puts in a command's env (Settings', the project's, a preset's; 8+ characters, the longest
+// first) masked in what a run keeps, logs and passes on (an AI call's prompt, a webhook's body). The command still gets
+// them, and a webhook's {{env.NAME}} sends them: that's its purpose.
+// ponytail: by value only: a secret transformed (base64, URL-encoded, split over lines) gets through as it is
+const MASK = '••••'
+function scrub(r: FlowRun, text: string) {
+  if (!text) return text
+  const ws = wsOf(r)
+  const vals = [...new Set([...Object.values(envOf(ws)), ...presets().flatMap(p => Object.values(p.env ?? {}))].map(String).filter(v => v.length >= 8))].sort((a, b) => b.length - a.length)
+  return vals.reduce((t, v) => (t.includes(v) ? t.split(v).join(MASK) : t), text)
+}
 // a run's variables as a webhook's default body: the task and what the blocks gave
 const runBody = (r: FlowRun) => ({ task: r.task, ...Object.fromEntries(Object.entries(r.vars).filter(([k]) => k.startsWith('steps.'))) })
 // what the block before gave: its answer, else its output (an AI decision's default state)
@@ -1228,7 +1241,7 @@ function waitTick(r: FlowRun, b: Block, now: number) {
     const then = (text: string) => {
       logging.delete(r.id)
       if (!live(r) || r.cur !== b.id || r.wait?.kind !== 'wait' || r.status !== 'running') return // stopped or moved on meanwhile
-      r.vars[`steps.${b.id}.log`] = text
+      r.vars[`steps.${b.id}.log`] = scrub(r, text)
       leave(r, b, 'fail', why)
     }
     void ciLogs(ws, bad.map(c => ({ name: c.name, link: c.url })), (n, e) => say(r, `${blockName(b)}: no log for ${n}: ${e.message}`)).then(

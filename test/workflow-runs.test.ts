@@ -2,6 +2,8 @@
 // have, Run again.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { QUEUE_MAX, check, FLOW_ENDED, flowVars, lastJson, parse, toFile } from '../src/shared/workflow.ts'
@@ -448,4 +450,63 @@ test('workflow Run again and Run from here: the task and inputs again on the fil
   await rig.rpc('wsArchive', { id: first.ws })
   await assert.rejects(rig.rpc('flowStart', { from: { run: first.id, block: 'check' } }), /is archived: Restore it \(the sidebar's Archived\), or Run again/)
   assert.ok((await rig.rpc('flowStart', { again: first.id })).id)
+})
+
+test('workflow secrets: what Laki put in a command’s env is •••• in its output, the log, the next AI call’s prompt and a webhook’s default body', async t => {
+  // a fake OpenRouter and a webhook's receiver, recording
+  const asked: any[] = []
+  const posted: string[] = []
+  const srv = createServer(async (q, res) => {
+    let body = ''
+    for await (const c of q) body += c
+    if (q.url === '/chat/completions') {
+      asked.push(JSON.parse(body))
+      return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ model: 'x/fast', choices: [{ message: { content: 'ok' } }] }))
+    }
+    posted.push(body)
+    res.writeHead(200, { 'content-type': 'text/plain' }).end('got fake-secret-123 back') // a response that echoes it
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const at = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`
+  const rig = await fresh(t, { env: { LAKI_AI_API: at } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true, env: { API_KEY: 'fake-secret-123', SHORT: 'abc' } })
+  await rig.rpc('projectSet', { id: p.id, config: { env: { PROJ_TOKEN: 'fake-proj-token-9' } } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const flow = `# Secrets
+runs in: main
+
+## start
+input: task
+next: x
+
+## x
+run: echo "key=$API_KEY proj=$PROJ_TOKEN short=$SHORT"
+ok: sum
+
+## sum
+llm: x/fast
+> Sum up: {{steps.x.output}}
+ok: post
+
+## post
+webhook: ${at}/hook
+ok: end
+
+## end
+end: success
+`
+  await rig.rpc('flowSave', { id: 'secrets', text: flow })
+  const run = await rig.rpc('flowStart', { workflow: 'secrets', project: p.id, task: 't' })
+  const r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 20000)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  assert.equal(r.vars['steps.x.output'], 'key=•••• proj=•••• short=abc', 'masked; a value under 8 characters stays')
+  assert.ok(!/fake-secret|fake-proj/.test(r.log.join('\n')), r.log.join('\n'))
+  assert.match(r.log.join('\n'), /key=•••• proj=••••/)
+  assert.match(asked[0].messages[0].content, /key=•••• proj=••••/)
+  assert.ok(!/fake-secret|fake-proj/.test(JSON.stringify(asked)))
+  assert.equal(JSON.parse(posted[0])['steps.x.output'], 'key=•••• proj=•••• short=abc', 'the default body')
+  assert.ok(!/fake-secret|fake-proj/.test(posted[0]))
+  assert.equal(r.vars['steps.post.output'], 'got •••• back', 'its response, kept')
 })

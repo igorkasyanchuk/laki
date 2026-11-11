@@ -2,6 +2,10 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Workflows keep secrets out of what they pass on: a token from Settings', the project's or a profile's env that a command prints shows as •••• in its output, the run's log, an agent's answer and a webhook's response, so it never reaches an AI call's prompt or a webhook's body. The command itself still gets it.
+
 ## 0.48.0 · Nov 11, 2026
 
 - *Restart the daemon* works when another copy of Laki started the daemon, and says why when it can't. A menu's highlight moves at once as you hover, with no fade leaving the last item lit.

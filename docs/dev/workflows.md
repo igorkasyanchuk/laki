@@ -215,7 +215,11 @@ webhook block's, and any `steps.<id>.log` (a CI log). An agent block's prompt (i
 prompt and system go through `dataFill` → `fillData`: such a value is a fenced block (shared/fence.ts `fenced`: longer
 than any backticks in it) under `untrusted`'s line naming the variable and whose it is, cut at `ANSWER_MAX`; one plain
 word (`plain`: a number, a branch, a URL) inline. Not a run's command (`shellFill`'s env), a case's test or a file's
-text. `hints(wf)`: the editor's (`.wf-hint`, not a problem: it runs), an agent block with perm auto, acceptEdits or
+text. Secrets out (W3): `scrub(r, text)` masks every value Laki itself puts in a command's env (Settings' `env`, the
+project's, every preset's; 8+ characters, the longest first) as `••••` in what a run keeps and passes on: a run block's
+output (before `out:` reads it), an agent's answer (and its `out:`), a request's vars (a webhook's response, a model's
+answer), a wait's `steps.<id>.log`, and every log line (`say`). The command still gets the real env and a webhook's
+`{{env.NAME}}` still sends it; by value only (ponytail: base64 or a URL-encoded form gets through). `hints(wf)`: the editor's (`.wf-hint`, not a problem: it runs), an agent block with perm auto, acceptEdits or
 bypassPermissions using one. The run's event is its trigger's (`event <name>`, `try <name>`). Kept: an outside event is
 `from: { agent }`, so bypassPermissions and run blocks refuse to start on it (`fromEvent`). `test/workflow-events.test.ts`.
 
