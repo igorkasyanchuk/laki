@@ -64,6 +64,9 @@ test('Q5: near misses and limits: no pause after it, more than 4 words, two it c
   assert.deepEqual(route('please could you check the checkout flow, then fix it').target, { kind: 'default' }, 'past the first 4 words')
   const twins = [...tabs, { tab: 't4', name: 'checkout-flow', status: 'idle', project: 'site' }]
   assert.deepEqual(routeOf('Checkout flow, fix it', { tabs: twins, projects }).target, { kind: 'default' }, 'two of that name: not a guess')
+  const short = [{ tab: 'u', name: 'ui', status: 'idle' }]
+  assert.deepEqual(routeOf('Hi, rename the button', { tabs: short, projects }).target, { kind: 'default' }, 'a short name only as it is')
+  assert.deepEqual(routeOf('UI, rename the button', { tabs: short, projects }).target, { kind: 'tab', tab: 'u' })
   assert.deepEqual(route('Lucky, how is it going', { fixes: 'lucky → Laki', fix: voiceFix }).target, { kind: 'ai' }, 'word fixes first')
   assert.deepEqual(route('Checkout flow.'), { target: { kind: 'tab', tab: 't1' }, rest: '', how: 'checkout-flow' }, 'nothing after it: the caller says so')
   assert.deepEqual(route('').target, { kind: 'default' })

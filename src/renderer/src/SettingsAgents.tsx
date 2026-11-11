@@ -517,9 +517,14 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
   const [c, setC] = useState<AgentContext | null>(null)
   const [err, setErr] = useState('')
   useEffect(() => {
+    let live = true // another project picked meanwhile: this answer is that one's no more
     setC(null)
     setErr('')
-    void api.call<AgentContext>('agentContext', { agent, project: project || undefined }).then(setC, (e: Error) => setErr(e.message))
+    void api.call<AgentContext>('agentContext', { agent, project: project || undefined }).then(
+      x => live && setC(x),
+      (e: Error) => live && setErr(e.message),
+    )
+    return () => void (live = false)
   }, [agent, project])
   const at = project || undefined
   return (
@@ -582,9 +587,13 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
                     {s.env && ` · env ${s.env.join(', ')}`}
                     {s.headers && ` · headers ${s.headers.join(', ')}`}
                   </span>
-                  <button className="ghost sm" onClick={() => onType(agent === 'claude' ? `claude mcp remove ${sh(s.name)} -s ${s.scope}` : `codex mcp remove ${sh(s.name)}`, at)}>
-                    Remove…
-                  </button>
+                  {agent === 'claude' || s.scope === 'user' ? (
+                    <button className="ghost sm" onClick={() => onType(agent === 'claude' ? `claude mcp remove ${sh(s.name)} -s ${s.scope}` : `codex mcp remove ${sh(s.name)}`, at)}>
+                      Remove…
+                    </button>
+                  ) : (
+                    <span className="muted small" title={s.file}> · in the project's {s.file.split('/').slice(-2).join('/')}: codex mcp remove only edits yours</span>
+                  )}
                 </li>
               ))}
             </ul>

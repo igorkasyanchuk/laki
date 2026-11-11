@@ -2145,7 +2145,7 @@ export function App() {
   tipKeys.map = kb // keyTip's, for tooltips outside App
   const kt = keyTip // a tooltip with its keys, drawn as keycaps (ui.tsx tipText)
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
-  const [held, setHeld] = useState({ open: false, shot: false, quick: false, tell: false }) // main took the keys (Help shows only those)
+  const [held, setHeld] = useState({ open: false, shot: false, quick: false, tell: false, talk: false }) // main took the keys (Help shows only those)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey).then(open => setHeld(h => ({ ...h, open })))), [hotkey])
   const shotKey = !view ? null : settings.shotAsk !== false && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey).then(shot => setHeld(h => ({ ...h, shot })))), [shotKey])
@@ -2154,7 +2154,7 @@ export function App() {
   const tellKey = !view ? null : settings.tellOn === true ? settings.tellKey ?? TELL_KEY : '' // Q7: show and tell's ('' none: off until turned on)
   useEffect(() => void (tellKey !== null && bridge?.tellKey?.(tellKey).then(tell => setHeld(h => ({ ...h, tell })))), [tellKey])
   const talkKey = !view ? null : talkOn ? settings.talkKey ?? TALK_KEY : '' // Q2: the talk key ('' none: off until turned on, the cloud engine only)
-  useEffect(() => void (talkKey !== null && bridge?.talkKey?.(talkKey)), [talkKey])
+  useEffect(() => void (talkKey !== null && bridge?.talkKey?.(talkKey).then(talk => setHeld(h => ({ ...h, talk })))), [talkKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
   const updateDelay = settings.updateDelay ?? 0 // and its Update delay, days
   useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto, updateDelay)), [updateAuto, updateDelay])
@@ -3629,7 +3629,7 @@ export function App() {
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
     extInserts, extItems, extMenus, extModal, extOn, extRun, extWs, fail, find, findIn, fitFoot, floated, floatTab,
     flowItems, flowMenu, flowsHere, flowsOn, fold, folded, fontSize, footButtons, forkWs, full, gallery, gated, git,
-    going, group, groupMoves, groups, held, hereCtx, hist, histNav, historyOn, hotkey, quickKey, tellKey, inBrowser, info, inReader,
+    going, group, groupMoves, groups, held, hereCtx, hist, histNav, historyOn, hotkey, quickKey, tellKey, talkKey, inBrowser, info, inReader,
     inViewer, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutsOn, layoutWait,
     listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,

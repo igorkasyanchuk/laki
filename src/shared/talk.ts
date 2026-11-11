@@ -33,7 +33,7 @@ export const talkTime = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math
 // Q5: a dictation routed by its first words (Settings › Voice › Route by first words, on unless false): the words
 // before the first comma, colon, dash or pause (… or a sentence's end), 4 at most, may name who gets it: "Laki" (or the
 // word set for it) → Laki AI; "new task [in <project>]" → a new workspace there; a workspace's name or an agent's
-// @name, fuzzy (normalized, an edit distance of 1, 2 past 5 letters) → that agent's tab. First match wins; no
+// @name, fuzzy (normalized, an edit distance of 1, 2 past 5 letters; under 4 letters exact) → that agent's tab. First match wins; no
 // boundary, more words, or no match: the default (talkDefault's). `rest`: what's sent, without the address. Only the
 // agent tabs given (never a shell); nothing here runs a command. The word fixes (Settings › Voice) go first: the
 // cloud's voiceText has them in already, a dictation typed by macOS doesn't
@@ -60,10 +60,11 @@ export function dist(a: string, b: string) {
   }
   return prev[b.length]
 }
-// the same name, as said: spaces left out (check out flow = checkout-flow), a letter or two off
+// the same name, as said: spaces left out (check out flow = checkout-flow), a letter or two off; one under 4 letters
+// only as it is ("Hi, …" isn't ui, "So, …" isn't go)
 const near = (heard: string, name: string) => {
   const [h, n] = [heard.replace(/ /g, ''), name.replace(/ /g, '')]
-  return !!n && (h === n || dist(h, n) <= (n.length > 5 ? 2 : 1))
+  return !!n && (h === n || (n.length >= 4 && dist(h, n) <= (n.length > 5 ? 2 : 1)))
 }
 const exact = (heard: string, name: string) => heard.replace(/ /g, '') === name.replace(/ /g, '')
 const NEW = /^(?:a |the )?new (?:task|session|workspace)(?: (?:in|for|on) (.+))?$/
