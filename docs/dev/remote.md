@@ -275,6 +275,23 @@ rp the page's host, `userVerification: 'required'`, `residentKey: 'discouraged'`
 *Unlock with a passkey*, *Allow the PIN instead*, *Lock again after*. Tests: `test/passkey.test.ts` (a software P-256
 authenticator).
 
+Answer only (D7, `settings.remoteLevel`: a page with the link's token, a quick tunnel's tab, and what a device starts
+with as it pairs; `SavedDevice.level`, the Mac's Devices › *Answer only* / *Give full access*: `remoteDeviceSet`, FROM,
+REMOTE_NO and AGENT_NO; unset: full, today's rules). `levelOf(device)`: the device's, else the session's. main.ts' `call`:
+after REMOTE_NO, at answer `answerNo` lets only `ANSWER`'s methods through, an allowlist (as S5's for agents): reading
+(the view, `screen`, diffs, files, turns, chats, PRs, extensions' and workflows' reads), answering (`answer`,
+`aiAnswer`, `alertAnswer`, `widgetToolAnswer`, `flowAnswer`, `secretGive`), `send` to an agent tab only (`tracked`),
+Laki AI (`aiAsk` and its chat's own), `wsNew` and `tabNew` with an agent profile (`agentPreset`: no `cmd`, no `kind`,
+no key outside `NEW_KEYS`, no mode that `neverAsks`, no `sandbox: false`), `wsSet`'s `name`, `color`, `pinned` and
+`railPin`, `timer`, the reminders; the rest refused (*answer only from here …: do that on the Mac itself, or give this
+device full access there*). Every api method is in `ANSWER` or `ANSWER_NO`, checked as the daemon loads, so a new one is
+classified before any test runs. The HTTP `/rpc` of a remote page calls with a Conn of its own (`remote`, its `device`),
+and Laki AI's tools for a remote ask (`aiAsk`, `aiAnswer`'s rpc) go through that Conn's gates, REMOTE_NO and the level
+(ponytail: a message queued behind another's ask runs with that ask's). The page's view has `remote.level` (main.ts'
+`send` adds it per remote connection; the Mac's view has none): menus.ts keeps only the items that level may do (by
+label), the rail only the Board, the Calendar and AI, and the terminals take no keys (`api.answerOnly`,
+`disableStdin`). Tests: `test/api.test.ts` *D7*.
+
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's

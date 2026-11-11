@@ -3344,13 +3344,15 @@ export function App() {
   ]
   // the user's order and the ones they put into More (Settings › Appearance › Rail), then the ones that don't fit
   const railHide = settings.railHide ?? []
-  const railShown = railSorted(railPages, settings.railOrder).filter(x => !railHide.includes(x.key))
+  // D7: a phone at answer only: the pages whose work it may do (the Board's and the Calendar's reminders, Laki AI)
+  const railOk = (x: { key: string }) => view.remote?.level !== 'answer' || ['board', 'calendar', 'ai'].includes(x.key)
+  const railShown = railSorted(railPages.filter(railOk), settings.railOrder).filter(x => !railHide.includes(x.key))
   const over = (o => (o.length > 1 ? o : []))(railWords && railShown.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railShown.some(x => x.key === k)).slice(0, railShown.length + 1 - (RAIL_FIT - 1)) : []) // one alone: More would save no room
   const railKept = railShown.filter(x => !over.includes(x.key))
   type RailRun = Extract<RailPage, { run: () => void }>
   const kindPage = ([k, label, icon]: (typeof RAIL)[number]): RailRun => (({ n, busy }) => ({ key: k, icon, label, on: railKind === k && !onPage, tip: `${label}${busy ? ' · at work' : ''}`, run: () => railTo(k), n }))(railSays(k))
   const aiPage: RailRun = { key: 'ai', icon: 'ai', label: 'AI', on: dialog === 'ai', tip: AI_TIP, run: toAi }
-  const railMore = [...railSorted(railPages, settings.railOrder).filter(x => railHide.includes(x.key) || over.includes(x.key)), ...(aiOn(settings) && railHide.includes('ai') ? [aiPage] : [])].map(x => ('kind' in x ? kindPage(x.kind) : x))
+  const railMore = [...railSorted(railPages.filter(railOk), settings.railOrder).filter(x => railHide.includes(x.key) || over.includes(x.key)), ...(aiOn(settings) && railHide.includes('ai') ? [aiPage] : [])].map(x => ('kind' in x ? kindPage(x.kind) : x))
   // a right click on the rail: put that button into More (or back), or the whole list in Settings
   const railMenu = (e: React.MouseEvent) => {
     const key = (e.target as Element).closest<HTMLElement>('[data-rail]')?.dataset.rail

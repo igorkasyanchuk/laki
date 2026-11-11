@@ -598,6 +598,7 @@ export type Settings = {
   remotePinFallback?: boolean // D6: a locked device may unlock with the PIN instead (unset: yes)
   remoteIdle?: number // D6: minutes without a call before a passkey device locks again (unset: 15; 0: only at each page load)
   remotePush?: boolean // D4: remote access's link (and its start, a new address, a stop on its own, a new device) to the phone webhook; off unless true, never with anyone-with-the-link
+  remoteLevel?: 'answer' | 'full' // D7: a remote page's access when it isn't a paired device's (a quick tunnel's tab), and what a new device starts with; unset: full
   remoteWrong?: 'wait' | 'stop' // D5: after the wrong PINs, no PIN taken for a while (wait, unset too) or remote access stops
   remoteDeviceDays?: number // D3: how long a paired device stays in (1-90 days; unset: 30)
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
@@ -901,7 +902,7 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+export type Remote = { mail: string; level?: 'answer' | 'full'; /* D7: a remote page's own (its view only) */ open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 // host: My domain's (D1: a hostname of your named tunnel, a PIN always); down: why it's starting again (D2: no url
 // meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
 // state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
@@ -909,7 +910,7 @@ export type Remote = { mail: string; open?: boolean; pin?: string; tries?: numbe
 export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
 // locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
 // a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
-export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean; passkey?: boolean } // notify: it takes Web Push notifications (M4); passkey: it unlocks with one (D6)
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean; passkey?: boolean; level?: 'answer' | 'full' } // notify: it takes Web Push notifications (M4); passkey: it unlocks with one (D6); level: D7, answer only or full (unset: full, paired before D7)
 export type SavedDevice = Omit<RemoteDevice, 'notify' | 'passkey'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string }; pk?: { id: string; jwk: Record<string, unknown>; count: number }; regUntil?: number } // push: its Web Push subscription (push.ts WebSub); pk: its passkey (D6: the credential's id, its public key as a JWK, the signature counter); regUntil: a just-paired device may set one up until then
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
@@ -1176,7 +1177,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 167
+export const API = 168
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

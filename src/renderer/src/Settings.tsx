@@ -168,6 +168,7 @@ export type AppSettings = Paint & {
   remotePasskey?: boolean // D6: passkeys for paired devices (unset: on)
   remotePinFallback?: boolean // D6: Use PIN instead (unset: on)
   remoteIdle?: number // D6: minutes before a passkey device locks again (unset: 15; 0: only on open)
+  remoteLevel?: 'answer' | 'full' // D7: a link page's and a new device's access (unset: full)
   remoteDeviceDays?: number // how long a paired device stays in (unset: 30)
   remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // Tailscale: a PIN as well
@@ -2366,8 +2367,8 @@ export function SettingsPage(p: {
             <RemoteSection
               other={p.tunnels && (() => openSec('tunnels'))}
               api={p.remote}
-              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel, host: s.remoteHost ?? '', wrong: s.remoteWrong === 'stop' ? 'stop' : 'wait', days: s.remoteDeviceDays ?? 30, push: s.remotePush === true, hook: hookOf(s.webhook), passkey: s.remotePasskey !== false, pinBack: s.remotePinFallback !== false, idle: s.remoteIdle ?? 15, domain: s.tunnel?.name?.trim() && s.tunnel.domain?.trim() ? s.tunnel.domain.trim().toLowerCase() : undefined }}
-              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }), ...(o.host !== undefined && { remoteHost: o.host }), ...(o.wrong !== undefined && { remoteWrong: o.wrong }), ...(o.days !== undefined && { remoteDeviceDays: o.days }), ...(o.push !== undefined && { remotePush: o.push }), ...(o.passkey !== undefined && { remotePasskey: o.passkey }), ...(o.pinBack !== undefined && { remotePinFallback: o.pinBack }), ...(o.idle !== undefined && { remoteIdle: o.idle }) })}
+              opts={{ level: s.remoteLevel === 'answer' ? 'answer' : 'full', mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel, host: s.remoteHost ?? '', wrong: s.remoteWrong === 'stop' ? 'stop' : 'wait', days: s.remoteDeviceDays ?? 30, push: s.remotePush === true, hook: hookOf(s.webhook), passkey: s.remotePasskey !== false, pinBack: s.remotePinFallback !== false, idle: s.remoteIdle ?? 15, domain: s.tunnel?.name?.trim() && s.tunnel.domain?.trim() ? s.tunnel.domain.trim().toLowerCase() : undefined }}
+              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }), ...(o.host !== undefined && { remoteHost: o.host }), ...(o.wrong !== undefined && { remoteWrong: o.wrong }), ...(o.days !== undefined && { remoteDeviceDays: o.days }), ...(o.push !== undefined && { remotePush: o.push }), ...(o.passkey !== undefined && { remotePasskey: o.passkey }), ...(o.pinBack !== undefined && { remotePinFallback: o.pinBack }), ...(o.idle !== undefined && { remoteIdle: o.idle }), ...(o.level !== undefined && { remoteLevel: o.level }) })}
             />
           )}
           {on('needs') && (

@@ -835,7 +835,7 @@ export function devicePush(id: string, sub: { endpoint: string; p256dh: string; 
 function pair(r: RemoteRun, o: Asker) {
   const t = hex()
   const now = Date.now()
-  const d = { id: randomUUID().slice(0, 8), name: deviceName(o.ua), hash: hashOf(t), addedAt: now, seenAt: now, until: now + deviceDays() * 86400e3, ...(passkeyOn() && { regUntil: now + REG_MS }) }
+  const d = { id: randomUUID().slice(0, 8), name: deviceName(o.ua), hash: hashOf(t), addedAt: now, seenAt: now, until: now + deviceDays() * 86400e3, ...(levelOf() === 'answer' && { level: 'answer' as const }), ...(passkeyOn() && { regUntil: now + REG_MS }) } // level: the session's answer only, as it pairs (D7; unset: full)
   state.remoteDevices = [...(state.remoteDevices ?? []), d]
   Object.assign(r, { used: true, keyUntil: undefined })
   keepRemote() // saves
@@ -857,6 +857,20 @@ const deviceById = (id: string) => state.remoteDevices?.find(d => d.id === id)
 // a locked page may open without a signature only when its lock is gone for good: passkeys off, or the device has none
 // (not while remote access is stopped or off its stable address: then it stays locked)
 export const lockGone = (id: string) => !passkeyOn() || !deviceById(id)?.pk
+// D7: a remote page's access: its device's (set on the Mac, Settings › Remote access › Devices), else the session's
+// (settings.remoteLevel: a quick tunnel's tab, a page with the link's token); unset: full, today's rules
+export const levelOf = (device?: string): 'answer' | 'full' => ((device ? deviceById(device)?.level : state.settings?.remoteLevel) === 'answer' ? 'answer' : 'full')
+// the Mac's Answer only switch on a device (FROM, REMOTE_NO, AGENT_NO: never from a phone or an agent)
+export function remoteDeviceSet(p: { id?: unknown; level?: unknown }) {
+  const d = typeof p.id === 'string' ? deviceById(p.id) : undefined
+  if (!d) throw new Error(`no paired device ${String(p.id)}`)
+  if (p.level !== 'answer' && p.level !== 'full') throw new Error('level: answer or full')
+  d.level = p.level
+  save()
+  log(`remote access: ${d.name} (${d.id}) has ${p.level === 'answer' ? 'answer-only' : 'full'} access now`)
+  changed()
+  return remoteDevices()
+}
 // whether a device's pages lock: it has a passkey, passkeys are on, at a stable address
 export const deviceLocks = (id: string) => passkeyOn() && !!remote?.url && stable(remote) && !!deviceById(id)?.pk
 export const idleMs = () => (m => (Number.isFinite(m) && m >= 0 ? m : 15) * 60e3)(Number(state.settings?.remoteIdle ?? 15))

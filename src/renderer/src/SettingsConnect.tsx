@@ -406,16 +406,16 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
 export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
-export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number }
+export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; level?: 'answer' | 'full' }
 // devices, pair, revoke (D3): the paired ones, Add a device, Revoke (one; none: all)
-export type RemoteApi = { state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type RemoteApi = { state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+type RemoteOpts = { level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
 // D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
 export function hookOf(w?: Webhook) {
   if (w?.format === 'webpush') return 'your paired phones'
@@ -698,6 +698,12 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         </form>
       )}
       {err && <p className="field-err">{err}</p>}
+      <Switch on={opts.level === 'answer'} onChange={v => set({ level: v ? 'answer' : 'full' })} className="switch-row" tip="A page with the link, and each device as it pairs (Devices below sets each one's own): it reads everything, answers asks, messages agents, starts new ones and sets reminders; no typing in a terminal, merge, ship, archive, delete or settings">
+        <span className="switch-text">
+          <span>Answer only</span>
+          <span className="muted">The phone reads, answers and messages agents; the rest stays on this Mac</span>
+        </span>
+      </Switch>
       {opts.hook && !(r ? r.open : open) && (
         // D4: never with anyone-with-the-link: whoever reads the push could open it
         <Switch on={opts.push} onChange={v => set({ push: v })} className="switch-row" tip="Phone pushes (Settings › Phone pushes) get the link as it starts or moves, and a word when it stops on its own or a new device joins. Never the PIN">
@@ -747,8 +753,11 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
           {api.devices?.map(d => (
             <div className="row" key={d.id}>
               <span>
-                <b>{d.name}</b> <span className="muted small">· last seen {ends(d.seenAt)} · until {ends(d.until)}</span>
+                <b>{d.name}</b> <span className="muted small">· last seen {ends(d.seenAt)} · until {ends(d.until)}{d.level === 'answer' ? ' · answer only' : ''}</span>
               </span>
+              <button onClick={() => api.level(d.id, d.level === 'answer' ? 'full' : 'answer').catch(fail)} title={d.level === 'answer' ? 'It may do anything from there again, as on the Mac (but what never goes over remote access)' : 'It reads, answers asks, messages agents and starts new ones; nothing else (no typing in a terminal, no merge, ship, archive or delete)'}>
+                {d.level === 'answer' ? 'Give full access' : 'Answer only'}
+              </button>
               <button onClick={() => api.revoke(d.id).catch(fail)} title="It's out at once, its connections closed">
                 Revoke
               </button>

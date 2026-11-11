@@ -203,5 +203,15 @@ export function menusOf(app: AppBase) {
   const canOverlap = (w: WorkspaceView) => w.kind === 'worktree' && !w.host && !w.archived && projOf(w)?.git !== false
 
   const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: [...ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })), null, { label: 'Empty projects', tip: 'Projects with no workspace to show (none, all archived, or all pinned); off: only ones with rows', hint: settings.hideEmpty === true ? undefined : ON, run: () => void call('settingsSet', { hideEmpty: settings.hideEmpty !== true }).catch(() => {}) }] }]
-  return { wsMenu, tabMenu, fileMenu, projectActions, showItems, canOverlap, checkOverlaps }
+  // D7: a phone at answer only (its view's remote.level): only what that level may do (main.ts' ANSWER), so nothing
+  // fails on a click: a workspace's name, color, pins and reminders, Info, copies, a new agent. ponytail: by label
+  const answerOnly = view?.remote?.level === 'answer'
+  const ANSWER_ITEMS = /^(Rename…|Info|Copy .+|Remind me…|Pin to top|Unpin|Pin to the rail|Unpin from the rail|Mark as unread|Workspace|New (?!terminal).+)$/
+  const only = (items: MenuItem[], colors = false): MenuItem[] => {
+    if (!answerOnly) return items
+    const kept = items.flatMap((i): MenuItem[] => (i === null || 'head' in i ? [i] : 'colors' in i ? (colors ? [i] : []) : !('label' in i) ? [] : i.items ? (sub => (sub.length ? [{ ...i, items: sub }] : []))(only(i.items)) : ANSWER_ITEMS.test(i.label) ? [i] : []))
+    // a head or a line with nothing of its own left under it goes too
+    return kept.filter((i, n) => (i === null ? n > 0 && kept[n - 1] !== null && n < kept.length - 1 : 'head' in i ? !!kept[n + 1] && !('head' in kept[n + 1]!) : true))
+  }
+  return { wsMenu: (w: WorkspaceView) => only(wsMenu(w), true), tabMenu: (ids: string[]) => only(tabMenu(ids)), fileMenu: (w: WorkspaceView, file: string, dir: boolean) => only(fileMenu(w, file, dir)), projectActions: (p: Project) => only(projectActions(p)), showItems: () => only(showItems()), canOverlap, checkOverlaps }
 }

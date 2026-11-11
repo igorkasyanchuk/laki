@@ -375,7 +375,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`, `pin`, `open`, `via`, `funnel`, `host`: My domain;
   resolves once there's a link), `remoteStop`, `remoteTick` (`now`: tests move the clock), `remotePair` (Add a device: a
-  new link for 10 minutes), `remoteDeviceRm` (`id`, or `all`: Revoke, Forget devices; the app's only, never remote's);
+  new link for 10 minutes), `remoteDeviceRm` (`id`, or `all`: Revoke, Forget devices; the app's only, never remote's), `remoteDeviceSet`
+  (`id`, `level`: `answer` or `full`, D7's Answer only; the app's only);
 - terminals: `screen` (`all`: the whole terminal, the scrollback too, each wrapped line joined, `Session.allText`: a
   tab's *Copy contents*, App's `copyTab`), `input`, `resize`, `view`, `detach`;
 - the agent browser: `browse` (`ws`, `op`: open, screenshot, click, fill, text; `url` (a path: the workspace's

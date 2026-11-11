@@ -93,6 +93,15 @@ only a device that just paired (with the link and PIN) can register one, on Laki
 unless you turn off *Allow the PIN instead*; a wrong one counts as on the link's page. The passkey is the device's;
 Laki keeps only its public key, never in the view.
 
+### Remote access: answer only
+
+*Answer only* (Settings › Remote access, for a link's page and each device as it pairs; Devices › *Answer only* for
+each one) lets a phone read everything Laki shows, answer asks, message an agent, start a new agent on a profile and
+set reminders, and nothing else: no typing in a terminal, no message to a shell, no merge, ship, archive or delete, no
+command, no mode that never asks, no settings. It's an allowlist the daemon checks on every call (a method no one has
+classified is refused; the daemon won't start with one), set on the Mac only. Laki AI asked from such a phone acts with
+the phone's rights, not the Mac's. *Full* is as before: everything but what never goes over remote access.
+
 ### Auto-answer rules
 
 A project's auto-answer rules (Settings › the project, or *Always allow in this project* on an ask's card) answer a

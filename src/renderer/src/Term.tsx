@@ -137,6 +137,7 @@ export function Term({
       fontFamily: fontStack(fontFamily),
       fontSize,
       ...look,
+      disableStdin: api.answerOnly, // D7
       scrollback: 5000,
       allowProposedApi: true,
       allowTransparency: transparent(),
@@ -270,6 +271,7 @@ export function Term({
       else if (m.tab === tab && m.ev === 'responder') responder = m.on
       else if (m.tab === tab && m.ev === 'exit' && m.code === -1) attach(true) // the daemon replaced its session (a restart, a wake): the new one's
       else if (m.ev === 'open') attach()
+      else if (m.ev === 'state') term.options.disableStdin = api.answerOnly // D7: answer only: no keys (the Reader's box sends to an agent)
     })
     // a keypress whose keydown went elsewhere isn't ours: Enter that closed a dialog and so focused this
     let down = false

@@ -173,3 +173,4 @@ needs no bump: `settingsSet` keeps any field.
 165: a scheduled task's `notify`, `missed`, `catchUntil`, `onlyIf` (and `lastHead`, `catchup`: the daemon's); a run's `state`, `endedAt`, `said`, `pr`, `cost`, `tokens`, `diff`, `skipped`, `flow`; the `scheduled` event; extensions' `schedule.done` (T1, T2, T3).
 166: a scheduled task's `trigger` (on an event: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`; and `marks`, `seen`: the daemon's), `keep`, `emptyGone`, `kept`, `fails`, `pausedWhy`, `pausedField`, `again`; a run's `event`, `held`, `retry`, `asked`; `eventTick`, `scheduleRelease` (T4, T5, T6).
 167: the app's pages on `app://laki` (S9): the daemon takes that Origin instead of `file://`.
+168: remote access's answer level (D7): `remoteDeviceSet`, a device's `level`, a remote page's view `remote.level`, `settings.remoteLevel`.

@@ -781,6 +781,87 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await until(() => stops() >= n + 1, 'the daemon takes remote access', 30000)
 })
 
+// D7: remote access's answer level, the session's (a quick tunnel's tab) and a paired device's: each family refused at
+// answer (typing, a shell's send, deleting, archiving, merging, shipping, a command, a mode that never asks, settings,
+// a workspace's other switches), allowed at full; reading, answering, an agent's message and a new agent go through
+test('D7: answer only: what a phone may do at each level, set on the Mac only, in its view as remote.level', async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  const at = `http://127.0.0.1:${port}`
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  const pr = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: pr.id, kind: 'local', name: 'far' })
+  const shell = (await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })).id
+  const agent = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
+  await rig.rpc('settingsSet', { remoteMail: 'me@x.dev', remoteLevel: 'answer' })
+  const on = await rig.rpc('remoteStart', { hours: 1 })
+  const url = `https://fake-${port}.trycloudflare.com`
+  const tok = (await fetch(`${at}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: on.link.split('#t=')[1] }) }).then(r => r.json())).token
+  const far = (method: string, params = {}) => fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  const c = await connect(rig, url, tok, true)
+  t.after(() => c.close())
+  await until(() => c.events.some(e => e.ev === 'state'), 'its view')
+  assert.equal(c.events.findLast(e => e.ev === 'state').view.remote.level, 'answer')
+  assert.equal((await rig.rpc('state')).remote.level, undefined, "the Mac's own view has none")
+
+  const refused: [string, object][] = [
+    ['input', { tab: shell, data: 'x' }],
+    ['send', { target: shell, text: 'rm -rf ~' }],
+    ['wsRm', { id: 'nope' }],
+    ['wsArchive', { id: 'nope' }],
+    ['prAct', { ws: 'nope', act: 'merge' }],
+    ['ship', { ws: 'nope' }],
+    ['run', { ws: 'nope' }],
+    ['tabClose', { tab: 'nope' }],
+    ['fileWrite', { ws: 'nope', path: 'a', text: 'b' }],
+    ['tabNew', { ws: ws.id, kind: 'shell' }],
+    ['tabNew', { ws: ws.id, preset: 'custom', cmd: 'touch pwned' }],
+    ['wsNew', { project: pr.id, cmd: 'touch pwned' }],
+    ['wsNew', { project: pr.id, preset: 'claude', perm: 'bypassPermissions' }],
+    ['wsSet', { id: ws.id, muted: true }],
+    ['settingsSet', { notify: false }],
+    ['projectSet', { id: pr.id, notes: 'x' }],
+  ]
+  for (const [m, p] of refused) assert.match((await far(m, p)).error ?? '', /answer only from here[^]*give this device full access there/, `${m} ${JSON.stringify(p)}`)
+  await assert.rejects(c.call('input', { tab: shell, data: 'x' }), /answer only from here/, 'the socket too')
+  // what it may: read, an agent's message, a new agent, a name and a pin, a reminder
+  for (const [m, p] of [['state', {}], ['screen', { target: agent }], ['diff', { ws: ws.id }], ['send', { target: agent, text: 'hi', whenIdle: true }], ['wsSet', { id: ws.id, name: 'from the phone', pinned: true }], ['reminderAdd', { text: 'look', at: Date.now() + 3600e3 }]] as const)
+    assert.doesNotMatch((await far(m, p)).error ?? '', /answer only/, m)
+  const made = await far('wsNew', { project: pr.id, preset: 'claude', prompt: 'a task', place: 'top' })
+  assert.ok(made.result?.id, `a new agent: ${made.error}`)
+  // its level is the Mac's to set
+  assert.match((await far('settingsSet', { remoteLevel: 'full' })).error ?? '', /not over remote access/)
+
+  // full: today's rules (each refused one gets past the level: what's left is its own error, or done)
+  await rig.rpc('settingsSet', { remoteLevel: 'full' })
+  for (const [m, p] of refused) assert.doesNotMatch((await far(m, p)).error ?? '', /answer only/, `${m} at full`)
+  await until(() => c.events.findLast(e => e.ev === 'state')?.view.remote.level === 'full', 'its view says full')
+})
+
+test('D7: a paired device keeps its own level (the session\'s as it paired), changed on the Mac only', async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  mkdirSync(join(rig.home, '.cloudflared'), { recursive: true })
+  writeFileSync(join(rig.home, '.cloudflared/cert.pem'), 'a certificate')
+  writeFileSync(join(rig.home, '.cloudflared/6f1e0c1a-0000-4000-8000-000000000001.json'), '{}')
+  await rig.rpc('settingsSet', { tunnel: { name: 'laki', domain: 'example.dev' }, remoteLevel: 'answer', remotePasskey: false })
+  const origin = 'https://laki.example.dev'
+  const on = await rig.rpc('remoteStart', { hours: 0, host: 'laki' })
+  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify({ token: on.link.split('#t=')[1], pin: on.pin }) })
+  const cookie = r.headers.get('set-cookie')!.split(';')[0]
+  const far = (method: string, params = {}) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin, cookie }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  const [d] = (await rig.rpc('state')).remoteDevices
+  assert.equal(d.level, 'answer', 'the session\'s as it paired')
+  await rig.rpc('settingsSet', { remoteLevel: 'full' })
+  assert.match((await far('wsRm', { id: 'nope' })).error, /answer only from here/, "its own, not the session's now")
+  assert.match((await far('remoteDeviceSet', { id: d.id, level: 'full' })).error, /not over remote access/)
+  await assert.rejects(rig.rpc('remoteDeviceSet', { id: d.id, level: 'root' }), /answer or full/)
+  await assert.rejects(rig.rpc('remoteDeviceSet', { id: 'nope', level: 'full' }), /no paired device/)
+  assert.equal((await rig.rpc('remoteDeviceSet', { id: d.id, level: 'full' }))[0].level, 'full')
+  assert.doesNotMatch((await far('wsRm', { id: 'nope' })).error ?? '', /answer only/)
+})
+
 test('diff size, archive only when clean, the first-run checks', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

@@ -141,6 +141,7 @@ class Api {
   private listeners = new Set<(m: Msg) => void>()
   private calls = new Set<(method: string, params: any, r: any) => void>() // each call that went well, with its result (App's achievements)
   connected = false
+  answerOnly = false // D7: a phone at answer only (its view's remote.level): its terminals take no keys
   locked = false // D6: the page waits for its unlock (a passkey device's): its state, once it comes, opens it as a new socket would
   private caps: string[] = [] // the daemon's, from its last view
 
@@ -177,7 +178,7 @@ class Api {
           if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): close this page and restart it from the yellow bar at the top (agents resume)` : m.error))
           else w?.res(m.result)
         } else {
-          if (m.ev === 'state') this.caps = m.view?.caps ?? [] // the namespaces it takes (caps.ts): call() sends the rest by their old names
+          if (m.ev === 'state') (this.caps = m.view?.caps ?? []), (this.answerOnly = m.view?.remote?.level === 'answer') // the namespaces it takes (caps.ts): call() sends the rest by their old names; D7: this page's access
           const opens = m.ev === 'state' && this.locked
           if (opens) this.locked = false
           this.emit(m)
