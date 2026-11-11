@@ -135,6 +135,12 @@ const isApp = (t: string | null | undefined, o: string | undefined) => !!t && !(
 // the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
 let port = 0
+// D5: the address the tunnel says a remote request came from (CF-Connecting-IP, Tailscale's login), for the log and the
+// Mac's notice only: shown, never decided on
+const ipOf = (req: IncomingMessage) => {
+  const h = (k: string) => String(req.headers[k] ?? '').split(',')[0].trim()
+  return [h('cf-connecting-ip') || h('x-forwarded-for'), h('tailscale-user-login')].filter(Boolean).join(' ').replace(/[^\w.:@ -]/g, '').slice(0, 80)
+}
 const hostOk = (h: string | undefined) => h === `127.0.0.1:${port}` || h === `localhost:${port}` || (!!h && h === (o => o && new URL(o).host)(remoteMod.remoteOrigin()))
 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
@@ -554,7 +560,7 @@ const api: Record<string, Handler> = {
   passkeyRegister: (p, c) => remoteMod.passkeyRegister(devOf(c), p),
   passkeyChallenge: (_p, c) => remoteMod.passkeyChallenge(devOf(c)),
   passkeyUnlock: (p, c) => remoteMod.passkeyUnlock(devOf(c), p) && unlocked(c!),
-  passkeyPin: (p, c) => remoteMod.passkeyPin(devOf(c), p?.pin) && unlocked(c!),
+  passkeyPin: (p, c) => remoteMod.passkeyPin(devOf(c), p?.pin, { ip: c?.ip }) && unlocked(c!), // ip: its wrong ones' address, as /pin's (D5)
   remoteTick: p => remoteMod.remoteTick(p.now), // tests move the clock
   archivedTidy: p => core.archivedTidy(p.now), // tests move the clock
   shareTick: p => remoteMod.shareTick(p.now),
@@ -1087,11 +1093,8 @@ const server = createServer(async (req, res) => {
       if (body.length > 4096) return reply(413, { error: 'too big' })
     }
     try {
-      // D3: a paired device's cookie; D5: the address the tunnel says it came from (CF-Connecting-IP, Tailscale's
-      // login), for the log and the Mac's notice only
-      const h = (k: string) => String(req.headers[k] ?? '').split(',')[0].trim()
-      const ip = [h('cf-connecting-ip') || h('x-forwarded-for'), h('tailscale-user-login')].filter(Boolean).join(' ').replace(/[^\w.:@ -]/g, '').slice(0, 80)
-      const { cookie, ...out } = remoteMod.remotePin(JSON.parse(body) ?? {}, { cookie: req.headers.cookie, ua: String(req.headers['user-agent'] ?? '').slice(0, 400), ip })
+      // D3: a paired device's cookie; D5: the address the tunnel says it came from (ipOf)
+      const { cookie, ...out } = remoteMod.remotePin(JSON.parse(body) ?? {}, { cookie: req.headers.cookie, ua: String(req.headers['user-agent'] ?? '').slice(0, 400), ip: ipOf(req) })
       if (cookie) res.setHeader('set-cookie', cookie) // HttpOnly: the page never reads it
       return reply(200, out)
     } catch (e) {
@@ -1168,16 +1171,26 @@ const devSocks = new Map<import('ws').WebSocket, string>()
 // D6: what a locked page (a passkey device's, before its unlock) may call and be sent
 const UNLOCK = new Set(['ping', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
 const LOCK_EVS = new Set(['locked', 'passkey'])
-const lockOk = (m: unknown) => typeof m === 'object' && m !== null && !Buffer.isBuffer(m) && (LOCK_EVS.has((m as any).ev) || ((m as any).ev === undefined && (m as any).id !== undefined))
+// a locked page gets how to unlock and the answers to the calls it made while locked (asked), not one made before
+const lockOk = (c: core.Conn, m: unknown) => typeof m === 'object' && m !== null && !Buffer.isBuffer(m) && (LOCK_EVS.has((m as any).ev) || ((m as any).ev === undefined && !!c.asked?.has((m as any).id)))
 const devOf = (c?: core.Conn) => {
   if (!c?.device) throw new Error("a paired device's page only")
   return c.device
 }
 // locked: its page asks (pin: Use PIN instead is there); unlocked: the state and what waits, as a page that opened
 const lockedSay = (c: core.Conn) => c.send({ ev: 'locked', pin: remoteMod.pinFallback() })
+// locked again (its idle minutes): off its terminals too, so none waits on it as their responder (its page attaches
+// again as it unlocks: api.ts' open)
+function lock(c: core.Conn) {
+  c.locked = true
+  c.asked = new Set()
+  for (const s of core.sessions.values()) s.detach(c)
+  lockedSay(c)
+}
 function unlocked(c: core.Conn) {
   if (!c.locked) return true
   c.locked = false
+  c.asked = undefined
   c.at = Date.now()
   core.hello(c)
   widgetAsks(c)
@@ -1185,9 +1198,12 @@ function unlocked(c: core.Conn) {
   return true
 }
 // D6: a passkey device's page with no call for its idle minutes locks (its next call would too): told at once
+// and one whose device no longer locks (passkeys turned off, remote access off its stable address) opens
 function idleLock(now = Date.now()) {
   const idle = remoteMod.idleMs()
-  if (idle > 0) for (const c of core.clients) if (c.device && !c.locked && remoteMod.deviceLocks(c.device) && now - (c.at ?? now) > idle) (c.locked = true), lockedSay(c)
+  for (const c of core.clients)
+    if (c.device && !remoteMod.deviceLocks(c.device)) c.locked && unlocked(c)
+    else if (c.device && idle > 0 && !c.locked && now - (c.at ?? now) > idle) lock(c)
 }
 // just paired: its page offers to set a passkey up
 const offer = (c: core.Conn) => c.device && remoteMod.passkeyOffer(c.device) && c.send({ ev: 'passkey', offer: true })
@@ -1235,11 +1251,11 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     const c: core.Conn = {
       id: ++clientSeq,
       remote: far,
-      ...(device && { device }),
-      ...(locked && { locked: true }),
+      ...(device && { device, at: Date.now(), ip: ipOf(req) }),
+      ...(locked && { locked: true, asked: new Set() }),
       send: msg => {
         if (ws.readyState !== ws.OPEN) return
-        if (c.locked && !lockOk(msg)) return // D6: locked, nothing of Laki's but how to unlock and its calls' answers
+        if (c.locked && !lockOk(c, msg)) return // D6: locked, nothing of Laki's but how to unlock and its calls' answers
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
         // re-attaches from a snapshot
         if (ws.bufferedAmount > 32 << 20) return ws.terminate()
@@ -1272,11 +1288,16 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
       } catch {
         return
       }
-      // D6: a passkey device's page: locked again after its idle minutes; locked, only the unlock calls
-      if (c.device && remoteMod.deviceLocks(c.device)) {
+      // D6: a paired device's page: its last call kept; a passkey one's locked again after its idle minutes, and while
+      // locked only the unlock calls; one whose device no longer locks opens
+      if (c.device) {
         const now = Date.now()
-        if (!c.locked && remoteMod.idleMs() > 0 && now - (c.at ?? now) > remoteMod.idleMs()) (c.locked = true), lockedSay(c)
-        if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
+        if (!remoteMod.deviceLocks(c.device)) c.locked && unlocked(c)
+        else {
+          if (!c.locked && remoteMod.idleMs() > 0 && now - (c.at ?? now) > remoteMod.idleMs()) lock(c)
+          if (c.locked && m.id !== undefined) c.asked?.add(m.id)
+          if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
+        }
         c.at = now
       }
       if (m.method === 'attach') {

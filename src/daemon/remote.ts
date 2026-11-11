@@ -879,13 +879,16 @@ function taken(r: any, device: string, kind: 'create' | 'get') {
   if (!x || x.device !== device || x.kind !== kind || x.until <= Date.now()) throw new Error('passkey: that challenge is used or past its minute: try again')
   return c as string
 }
-export function passkeyOptions(device: string) {
+const offered = (device: string) => {
   if (!passkeyOffer(device)) throw new Error('a passkey is set up just after pairing: pair this device again (Add a device on the Mac)')
+}
+export function passkeyOptions(device: string) {
+  offered(device)
   const { rpId } = site()
   return { challenge: challengeFor(device, 'create'), rpId, user: { id: b64u(Buffer.from(device)), name: deviceById(device)!.name } }
 }
 export function passkeyRegister(device: string, r: unknown) {
-  if (!passkeyOffer(device)) throw new Error('a passkey is set up just after pairing: pair this device again (Add a device on the Mac)')
+  offered(device)
   const challenge = taken(r, device, 'create')
   const d = deviceById(device)!
   const pk: Passkey = register(r, { challenge, ...site() })
@@ -917,6 +920,7 @@ export function passkeyPin(device: string, pin: unknown, o: Asker = {}) {
   if (!pinFallback()) throw new Error('the PIN is off for unlocking: use the passkey')
   const now = Date.now()
   if (r.lockUntil && now < r.lockUntil) throw new Error(`Too many wrong PINs: try again in ${mins(r.lockUntil - now)}`)
+  if (r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }) // the wait is over, as remotePin's
   if (pinIs(r, pin)) return true
   wrongPin(r, o, now)
 }

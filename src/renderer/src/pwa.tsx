@@ -3,6 +3,7 @@
 // service worker and offers Add to Home Screen; at a quick tunnel's it says why not. Installed, Notifications turns on
 // Web Push for this device (POST /push: its cookie says which)
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { unb64u } from './api'
 import { IconButton } from './ui'
 
 const far = typeof window !== 'undefined' && location.protocol === 'https:' && !(window as { bridge?: unknown }).bridge
@@ -43,8 +44,7 @@ async function notifyOn() {
   if ((await Notification.requestPermission()) !== 'granted') throw new Error("notifications are off for Laki in this phone's settings")
   const reg = await navigator.serviceWorker.ready
   const { key = '' } = await push({})
-  const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
-  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw })
+  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64u(key) })
   await told(s).catch(async e => (await s.unsubscribe().catch(() => {}), Promise.reject(e))) // the Mac said no: not left on as if it took it
 }
 // this device's subscription to the Mac: again at each start too, as a device paired anew (or one whose subscription

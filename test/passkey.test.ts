@@ -170,4 +170,17 @@ test('D6: a paired device sets a passkey up, then each page is locked until its 
   await until(() => z.events.some(e => e.ev === 'locked'), 'locked')
   assert.deepEqual(z.events.find(e => e.ev === 'locked'), { ev: 'locked', pin: false })
   await assert.rejects(z.call('passkeyPin', { pin: on.pin }), /PIN is off/)
+
+  // idle (remoteIdle's minutes, 0.3 s here): the unlocked page locks again at its next call, told so
+  await rig.rpc('settingsSet', { remoteIdle: 0.005 })
+  await sleep(500)
+  const n = q.events.length
+  await assert.rejects(q.call('state'), /locked/)
+  assert.ok(q.events.slice(n).some(e => e.ev === 'locked'), 'told it locked')
+  // passkeys turned off on the Mac: a locked page opens at its next call (the state comes), not stuck on its lock
+  await rig.rpc('settingsSet', { remotePasskey: false })
+  const m = z.events.length
+  assert.equal(await z.call('ping'), 'pong')
+  await until(() => z.events.slice(m).some(e => e.ev === 'state'), 'the state once passkeys are off')
+  assert.ok(Array.isArray((await z.call('state')).projects))
 })

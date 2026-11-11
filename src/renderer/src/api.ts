@@ -141,6 +141,7 @@ class Api {
   private listeners = new Set<(m: Msg) => void>()
   private calls = new Set<(method: string, params: any, r: any) => void>() // each call that went well, with its result (App's achievements)
   connected = false
+  locked = false // D6: the page waits for its unlock (a passkey device's): its state, once it comes, opens it as a new socket would
   private caps: string[] = [] // the daemon's, from its last view
 
   private fails = 0 // connects in a row that never opened
@@ -168,6 +169,7 @@ class Api {
       }
       ws.onmessage = e => {
         const m = JSON.parse(e.data)
+        if (m.ev === 'locked') this.locked = true // D6: a passkey device's page, until its state comes
         if (m.ev === undefined && m.id !== undefined) { // a reply; an event may carry an id of its own (a workflow run's)
           const w = this.waiting.get(m.id)
           this.waiting.delete(m.id)
@@ -176,12 +178,16 @@ class Api {
           else w?.res(m.result)
         } else {
           if (m.ev === 'state') this.caps = m.view?.caps ?? [] // the namespaces it takes (caps.ts): call() sends the rest by their old names
+          const opens = m.ev === 'state' && this.locked
+          if (opens) this.locked = false
           this.emit(m)
+          if (opens) this.emit({ ev: 'open' }) // D6: unlocked: as a socket that just opened (what it sent while locked was refused): its terminals attach, its view is told, its lists come
         }
       }
       ws.onclose = () => {
         const opened = this.connected
         this.connected = false
+        this.locked = false
         this.caps = [] // the next daemon's come with its first view: old names till then
         for (const w of this.waiting.values()) w.rej(new Error('disconnected'))
         this.waiting.clear()
@@ -242,7 +248,7 @@ export const api = new Api()
 // each page. ES256 only, user verification required, attestation none: the key comes from getPublicKey() (the daemon
 // reads no CBOR: passkey.ts says why). Each part to the daemon as base64url
 const b64u = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+export const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
 export const passkeys = () => typeof window !== 'undefined' && !!window.PublicKeyCredential && !bridge
 export async function passkeySetUp() {
   const o = await api.call<{ challenge: string; rpId: string; user: { id: string; name: string } }>('passkeyOptions')

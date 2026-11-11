@@ -3,7 +3,7 @@
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -563,7 +563,7 @@ async function daemon() {
 function serveApp() {
   protocol.handle(APP_SCHEME, req => {
     const file = appFile(req.url, RENDERER)
-    return file && existsSync(file) ? net.fetch(pathToFileURL(file).href) : new Response('not found', { status: 404 })
+    return file && statSync(file, { throwIfNoEntry: false })?.isFile() ? net.fetch(pathToFileURL(file).href) : new Response('not found', { status: 404 }) // a file: never a folder's listing
   })
 }
 // S9: localStorage (column widths, pins, review drafts, filters) moved from the file:// origin the window had to
