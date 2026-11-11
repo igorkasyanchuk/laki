@@ -571,12 +571,12 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .help-card b { font-size: var(--fs-3); }
 .help-k { margin-right: 4px; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: var(--fs-1); letter-spacing: 0.04em; }
 .page-body > * { max-width: 760px; margin: 0 auto; }
-.settings-nav { width: 180px; flex: none; padding: var(--sp-5) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--side); }
+.settings-nav { width: max-content; min-width: 180px; max-width: 280px; flex: none; padding: var(--sp-5) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--side); } /* as wide as its longest row (a bigger text size, a new badge), up to 280px */
 .settings-nav > * { flex-shrink: 0; } /* a long list (All, many projects) scrolls; its rows (overflow: hidden, for the ellipsis) were squeezed under their text */
 .settings-nav button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: none; text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--muted); }
 .settings-nav button:hover { background: var(--hover); color: var(--fg); }
 .settings-nav button.on { background: var(--sel); color: var(--fg); }
-.set-new { margin-left: auto; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-1); line-height: 16px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); } .switch-text .set-new { margin-left: 6px; vertical-align: 1px; }
+.set-new { flex: none; margin-left: auto; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-1); line-height: 16px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); } .switch-text .set-new { margin-left: 6px; vertical-align: 1px; }
 .settings-main { flex: 1; overflow-y: auto; padding: 22px 28px 48px; max-width: 720px; gap: var(--sp-6); }
 .settings-main h2 { margin: 0; font-size: var(--fs-5); color: var(--fg); }
 .settings-main p { margin: 0; }
@@ -1814,6 +1814,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .help-nav .sub { padding: var(--sp-2) var(--sp-4) var(--sp-2) 26px; font-size: var(--fs-2); }
 .help-nav .sub.on { background: none; color: var(--accent-ink); }
 .help-nav .help-guide { margin-top: auto; }
+.help-nav { width: 180px; min-width: 0; } /* Help's long headings ellipsize; Settings' column grows to its rows */
 .narrow .help-nav { flex-wrap: wrap; } /* the filter on a line of its own, the sections as chips under it */
 .narrow .help-nav .settings-find { flex: 1 0 100%; margin: 0 0 4px; }
 .narrow .help-nav .sub { display: none; }
