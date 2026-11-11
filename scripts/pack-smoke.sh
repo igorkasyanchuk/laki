@@ -31,8 +31,9 @@ echo "--- screen:"; laki screen packed
 $X "$BIN" $NOSB --user-data-dir="$H/userdata" --laki-capture="$H/shot.png" --laki-notify-log="$H/notify.log" > "$H/app.out" 2>&1 &
 APP_PID=$!
 for i in $(seq 100); do [ -f "$H/shot.png" ] && break; sleep 0.1; done
-# a turn that ends in a workspace the window doesn't show: the app posts a notification
-laki new repo --preset claude --name other --prompt "background work" > /dev/null
+# an agent that asks in a workspace the window doesn't show: the app posts a notification (a finished turn doesn't on a
+# new install, as this one is: core's NEW_DEFAULTS)
+laki new repo --preset claude --name other --prompt "menu" > /dev/null
 for i in $(seq 100); do [ -s "$H/notify.log" ] && break; sleep 0.1; done
 echo "--- notifications:"; cat "$H/notify.log"
 sleep 0.5; kill $APP_PID || true; laki stop
