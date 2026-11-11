@@ -361,7 +361,7 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       const m = /^(\d+)\s*(?:(?:→|->)\s*(\S+))?$/.exec(v)
       return void (m && Number(m[1]) >= 1 ? (b.max = { n: Number(m[1]), ...(to(m[2] ?? '') && { to: m[2] }) }) : problems.push(`${at}: max: 3 → block`))
     }
-    case 'input': return void (['task', 'task?', 'none'].includes(v) ? (b.input = v as Block['input']) : problems.push(`${at}: input: task (Run needs one), task? (optional) or none`))
+    case 'input': return void (b.input = ['task?', 'none'].includes(v) ? (v as Block['input']) : 'task') // any other word: task, as files before task? and none
     case 'inputs': return void (b.inputs = v.trim() ? inputsOf(v) : undefined)
     case 'agent': return void (b.agent = v || 'claude')
     case 'use': return void (b.use = v || undefined)

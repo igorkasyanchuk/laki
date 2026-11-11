@@ -14,7 +14,7 @@ import { tabAgent } from '../shared/install.ts'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { queueOrder, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
+import { addTab, rtOf, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
 import { ciLogs, prAct, scanPRs } from './pr.ts'
@@ -409,8 +409,11 @@ function yourTab(wf: WorkflowItem, o: Start, t: Tab | undefined, pick?: Workspac
   if (!pick || t.workspace !== pick.id) throw new Error(`that tab is in another workspace than the run's`)
   const ag = tabAgent(t, presets())
   const mine = wf.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run') && agentOf(b.agent) === ag)
-  // a block's own permission mode (or the head's) is what it may do: a tab in another one would act otherwise
-  const off = mine.find(b => (p => p !== undefined && p !== (t.perm ?? profileOf(t.profile)?.perm))(permOf(wf, b, ag!)))
+  // a block's own permission mode (or the head's) is what it may do: a tab in another one would act otherwise. The tab's
+  // now: claude's read off its screen (⇧⇥ changes it), else what it started in
+  const live = rtOf(t.id).mode
+  const now = (live === undefined ? (t.perm ?? profileOf(t.profile)?.perm) : live) || 'default'
+  const off = mine.find(b => (p => p !== undefined && (p || 'default') !== now)(permOf(wf, b, ag!)))
   if (off) throw new Error(`${blockName(off)} runs in ${permWords(permOf(wf, off, ag!), undefined, ag!) || permOf(wf, off, ag!)} mode and ${t.name} doesn't: pick a tab in that mode, or a new one`)
   const keys = [...new Set(mine.map(b => `run:${b.agent || 'claude'}`))]
   if (!keys.length) throw new Error(`${wf.name} has no ${ag ?? 'such'} block that runs in the run's session: its agents get tabs of their own`)

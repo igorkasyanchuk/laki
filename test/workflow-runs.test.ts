@@ -600,14 +600,14 @@ test('workflow ask deadline: answered in time; no answer: its else, as no one’
 })
 
 // a workflow's task: required (input: task), optional (task?) or none asked (none)
-test('workflow task setting: input: task needs one to run, task? and none run without; a bad value is a problem; read back as written', async t => {
+test('workflow task setting: input: task needs one to run, task? and none run without; another word is task, as before; read back as written', async t => {
   const flow = (input: string) => `# T\nruns in: main\n\n## start\ninput: ${input}\nnext: e\n\n## e\nend: success\n`
   for (const v of ['task', 'task?', 'none']) {
     const { workflow, problems } = parse(flow(v), 't')
     assert.deepEqual([problems, workflow.blocks[0].input], [[], v])
     assert.equal(toFile(workflow).includes(`input: ${v}\n`), true)
   }
-  assert.match(parse(flow('maybe'), 't').problems.join(), /input: task \(Run needs one\), task\? \(optional\) or none/)
+  assert.equal(parse(flow('the task'), 't').workflow.blocks[0].input, 'task', 'any other word: task, as before')
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true })

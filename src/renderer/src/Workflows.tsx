@@ -36,7 +36,7 @@ export type FlowStartAt = Sel & { ws?: string; at?: number } // the page opened 
 const startsShown = new Set<number>()
 const WHERE_TAGS: Record<string, string> = { worktree: 'worktree', main: 'project folder', here: 'a workspace you pick' }
 type Ext = { id: string; name: string; on: boolean; every?: number } // what an extension block can fetch
-type RunTab = { id: string; workspace?: string; kind?: string; preset?: string; name?: string; status?: string } // Run's Agent tab picks among them
+type RunTab = { id: string; workspace?: string; kind?: string; preset?: string; profile?: string; perm?: string; mode?: string; name?: string; status?: string } // Run's Agent tab picks among them
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
 const W = 180
 const H = 58
@@ -593,7 +593,7 @@ function outHint(b: Block) {
 
 function subOf(b: Block, wf: Workflow) {
   switch (b.kind) {
-    case 'start': return b.input === 'task' ? 'a task' : b.input === 'task?' ? 'a task, if given' : ''
+    case 'start': return b.input === 'task' ? 'a task' : b.input === 'none' ? '' : 'a task, if given'
     case 'agent': return [b.agent || 'claude', b.use, b.model, b.effort, permWords(permOf(wf, b), b.fast, b.agent || 'claude')].filter(Boolean).join(' · ')
     case 'run': return b.cmd ?? ''
     case 'llm': return [b.model || 'Settings › AI’s model', b.out?.length && `→ ${b.out.join(', ')}`].filter(Boolean).join(' · ')
@@ -2193,8 +2193,10 @@ function StartRun({ item, projects, presets, workspaces, tabs, fixed, api, onClo
   const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
   // Agent tab: one of yours in the run's workspace whose agent has blocks in the run's session: they go to its chat
   const runWs = fixed || ws
-  const sessionAgents = new Set(item.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run')).map(b => tabAgent({ preset: b.agent || 'claude' }, presets)))
-  const tabsHere = runWs ? tabs.filter(t => t.workspace === runWs && t.kind === 'agent' && t.status !== 'exited' && sessionAgents.has(tabAgent(t, presets))) : []
+  // (its mode as the blocks': the daemon's yourTab refuses another, so none is offered)
+  const sessionBlocks = item.blocks.filter(b => b.kind === 'agent' && (!b.session || b.session === 'run'))
+  const modeOk = (t: RunTab, ag?: string) => (now => sessionBlocks.every(b => tabAgent({ preset: b.agent || 'claude' }, presets) !== ag || (p => p === undefined || (p || 'default') === now)(permOf(item, b, ag))))((t.mode ?? t.perm ?? presets.find(p => p.name === t.profile)?.perm) || 'default')
+  const tabsHere = runWs ? tabs.filter(t => (ag => t.workspace === runWs && t.kind === 'agent' && t.status !== 'exited' && sessionBlocks.some(b => tabAgent({ preset: b.agent || 'claude' }, presets) === ag) && modeOk(t, ag))(tabAgent(t, presets))) : []
   const [tab, setTab] = useState('')
   const inTab = tabsHere.some(t => t.id === tab) ? tab : '' // a workspace picked since: none
   const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
