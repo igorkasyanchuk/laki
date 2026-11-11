@@ -1754,8 +1754,9 @@ back as they were before the turn, the ones it made removed; refused once one of
 committed or staged). Laki notes the worktree as each turn starts and ends (Codex has no start: its last turn's end),
 with an index of its own; Settings › Git & worktrees › *Each turn's changes* turns it off.
 
-Every turn that changed files is kept, per workspace, across restarts: a row of dots under an agent's tab (*Turns*), the
-newest in the accent color. Hover one for its prompt, files, time, length and cost; a click offers:
+Every turn that changed files is kept, per workspace, across restarts: the status bar's *Turns* (a clock and a count)
+for the agent tab you're in; hover it for the last turn, click it for all of them, newest first, each with its prompt,
+files, time, length and cost (with the status bar off: a row of dots under the agent's tab). A turn offers:
 
 - *Show its changes*: the side panel's Changes on that turn (its *This turn* has a picker of every kept turn).
 - *Rewind files to before it…* (asked first): every file goes back to what it was before that turn, later turns' changes
@@ -2051,7 +2052,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
 | ↑ in an empty prompt box, ⌥↑ | search your earlier prompts (Settings › Keys › *Prompt history*) |
 | ⌘⇧A | show / hide the workspace's artifacts over the status bar |
-| ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⤢ |
+| ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⋯ › *Full screen* |
 | ⌘K | palette |
 | ⌘P | find a file in the workspace |
 | ⌘D | changes (the side panel) |

@@ -158,14 +158,18 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
         await rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
         await waitFor(async () => (await rpc<unknown[]>('turnList', { tab: tab.id })).length, 'a kept turn')
       }
-      await waitFor(() => has('.turn-dot'), 'its turn strip')
-      await js(`[...document.querySelectorAll('.turn-dot')].at(-1).click()`)
+      await waitFor(() => has('.sb-turns'), "its Turns in the status bar")
+      await click('.sb-turns')()
+      await waitFor(() => hasText('.menu-item', '#'), 'its turns, newest first')
+      await js(`document.querySelector('.menu-item')?.click()`) // the newest: its actions beside
       await waitFor(() => hasText('.menu-item', 'Rewind files'), 'Rewind in its menu')
       await clickText('.menu-item', 'Rewind files')
       await answer('Rewind')
-    }, async () => !existsSync(checkout()) && (await has('.turn-dot.rewind'))],
+    }, async () => !existsSync(checkout()) && (await rpc<{ rewind?: boolean }[]>('turnList', { tab: (await rpc<View>('state')).tabs.find(t => t.workspace === ws.co.id && t.kind === 'agent')!.id })).some(t => t.rewind)],
     ['flow-rewind-undo', async () => {
-      await js(`document.querySelector('.turn-dot.rewind').click()`)
+      await click('.sb-turns')()
+      await waitFor(() => hasText('.menu-item', '· rewind'), 'the rewind, newest')
+      await clickText('.menu-item', '· rewind')
       await waitFor(() => hasText('.menu-item', 'Undo this rewind'), 'Undo in its menu')
       await clickText('.menu-item', 'Undo this rewind')
       await answer('Undo the rewind')

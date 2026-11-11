@@ -123,7 +123,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     and `kt` put the keys in use in menus' hints and tooltips; `bridge.keys` sends `settings.keys` to main. ⌘⇧N clicks the tab
     bar's + (`.newtab-btn`): a menu opened by a key's click (`detail` 0) has its first item picked (`Menu` `first`).
     ⌘⇧A is `toggleArtifacts` (the status bar's Artifacts strip, `gallery`); ⌘L is Send later (`canLater`); ⌘⇧⏎ is
-    `toggleFull` (the tab bar's ⤢): `.app.full` hides the chrome (styles.css), `.full-exit` brings it back, and main's
+    `toggleFull` (the tab bar's ⋯ › Full screen): `.app.full` hides the chrome (styles.css), `.full-exit` brings it back, and main's
     `full-screen` IPC puts the window full screen (`focusFull`: whether it was, restored after, and what `saveWin` keeps).
   - Per-viewer UI state is in `localStorage`:
     - `laki.ws`: the selected workspace;

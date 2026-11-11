@@ -145,6 +145,7 @@ export function TabStrip({ app }: { app: AppCtx }) {
 // the bar over the terminals: the tabs (unless they're in a strip), who made the workspace, the widgets, the buttons
 export function TabBar({ app }: { app: AppCtx }) {
   const { onePane, readSwitch, canLater, devRunning, devTab, editorName, editScripts, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setReveal, setSideOpen, setWsId, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
+  const full: MenuItem[] = ws ? [{ label: 'Full screen: just this tab', icon: 'maximize', hint: kh('full'), run: () => toggleFull(true) }] : [] // in ⋯, for the bar's room
   return (
     <div className="tabbar drag" data-tabbar>
       {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
@@ -157,10 +158,9 @@ export function TabBar({ app }: { app: AppCtx }) {
       <span className="spacer" />
       {onePane && readSwitch(tab?.id) /* U2: a split pane has it in its header */}
       {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
-      {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
       {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
         <div className="actions nodrag">
-          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
+          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(full), 'right')} />
         </div>
       )}
       {ws && ws.browser === undefined && project?.kind !== 'shells' && (
@@ -175,7 +175,7 @@ export function TabBar({ app }: { app: AppCtx }) {
           {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
           {narrow && <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} /> /* a phone has no ⌘K */}
           {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
-          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore([{ label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }]), 'right')} />
+          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore([...full, { label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }]), 'right')} />
           <RunButton
             running={devRunning}
             onRun={() => (ws.run ? run() : editScripts())}

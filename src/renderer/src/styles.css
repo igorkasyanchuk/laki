@@ -719,6 +719,8 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .status .sb-branch:hover { color: var(--fg); background: none; }
 .status .sb-flow { display: inline-flex; align-items: center; gap: var(--sp-3); flex: 0 1 auto; min-width: 0; max-width: 34ch; white-space: nowrap; line-height: 20px; padding: 0; border: none; background: none; color: inherit; }
 .status .sb-flow:hover { color: var(--fg); background: none; }
+.status .sb-turns { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; line-height: 20px; padding: 0; border: none; background: none; color: inherit; cursor: pointer; }
+.status .sb-turns:hover { color: var(--fg); background: none; }
 .status .sb-flow-icon { display: grid; flex: none; }
 .status .sb-flow-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status .sb-flow[data-status='running'] .sb-flow-icon { color: var(--running); animation: sb-spin 2.4s linear infinite; }

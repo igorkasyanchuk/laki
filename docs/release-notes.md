@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- More room for the terminal: an agent's turns are the status bar's *Turns* (a clock and a count; hover for the last, click for all of them with their changes, rewind and New workspace) instead of a row under each tab, and Full screen moved into the tab bar's ⋯ menu (⌘⇧⏎ as before).
 - A Markdown file's path or link in a terminal shows the file drawn on hover, as a picture's does (the workspace's files and its storage folder's: an agent's report.md).
 - Workflows: *Run* in a workspace you have can pick one of its agent tabs (*Agent tab*): the workflow's blocks of that agent go to that chat, as it is, instead of a new tab. Start's *Task* says whether a run needs one: *Required*, *Optional* or *None* (no Task box; `input: task`, `task?`, `none` in the file). *New workflow ▾ › With Laki AI…* opens a modal with room to say what it should do.
 - Back from a workflow's run you opened the workspace from shows the run again, not its Run sheet.

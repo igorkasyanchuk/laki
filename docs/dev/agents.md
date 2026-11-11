@@ -85,8 +85,10 @@ what the view shows on the tab's runtime:
   --source=<before>` and the files added since removed, every tab's card cleared: rewinding that turn undoes it;
   `turnFork { ws, n }`: `wsNew` with the `after` commit as base, the branch put back to its parent (`reset`: the
   files stay, uncommitted; no commit of Laki's in the branch), then the source's base. Rewind and fork are the user's
-  (`AGENT_NO`). `TurnStrip.tsx` (App's pane `foot`, agent tabs, with `turnChanges` on): a dot per kept turn of the tab
-  (the newest 30), `turnWords` as its tip and its menu's head, the three actions (`turnApi`: `turnNext.n` and the
+  (`AGENT_NO`). `TurnStrip.tsx` (with `turnChanges` on): `TurnButton`, the status bar's
+  *Turns* for the focused agent tab (its count, the last turn's `turnWords` as its tip, a click: the newest 30 newest
+  first, each a submenu of the three actions); with the status bar off, `TurnStrip` in App's pane `foot` instead (a dot
+  per kept turn, `turnWords` as its tip and its menu's head); both through `useTurns`, the three actions (`turnApi`: `turnNext.n` and the
   `laki-turn` event open Changes on it); Changes' *This turn* has a `<select>` of the workspace's turns (`PanelApi.turns`,
   `turnChanges(n)`). Tests: `test/turn-history.test.ts`. ponytail: files only, nothing git ignores, no hosts; a turn
   that changed nothing isn't kept; a rewind names every path on one command line;
