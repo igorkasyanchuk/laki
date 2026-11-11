@@ -1,7 +1,7 @@
 // claude's and codex's transcripts, read as they grow: a tab's context and usage meters, and today's spend. core.ts
 // imports it, and its users import it directly.
 
-import { closeSync, existsSync, openSync, readdirSync, readSync, rmSync, statSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
@@ -159,6 +159,30 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   }
   keepDays(tab, r.m)
   return true
+}
+
+// W2: what a tab's chat cost so far at API prices (its meter, read on now: look, its transcript looked for at once), the
+// workflows' agent turns; undefined: unknown (not claude or codex, a host's, no transcript yet, no price for its model)
+export function chatCost(tab: Tab, look = false): number | undefined {
+  if (meterRead(tab, look)) changed()
+  const r = meters.get(tab.id)
+  const m = r?.file?.endsWith(`${tab.resumeId}.jsonl`) ? r.m : undefined
+  return m?.priced ? m.cost : undefined
+}
+// what the chat's lines from before since cost (a forked chat's parent's, copied in; a tab whose transcript wasn't found
+// as its turn began), so a turn counts only its own. ponytail: the whole transcript read, once per such turn; by each
+// line's timestamp
+export function chatCostBefore(tab: Tab, since: number): number | undefined {
+  const f = meters.get(tab.id)?.file
+  if (!f?.endsWith(`${tab.resumeId}.jsonl`) || !tab.preset) return
+  let text: string
+  try {
+    text = readFileSync(f, 'utf8')
+  } catch {
+    return
+  }
+  const old = text.split('\n').filter(l => (t => Number.isFinite(t) && t < since)(Date.parse(/"timestamp":"([^"]+)"/.exec(l)?.[1] ?? '')))
+  return meterOf(tab.preset, old.join('\n'), meterNew()).cost
 }
 
 // each day's by agent and model, the Usage page's: <data>/usage-days.json by chat, its days USAGE_KEEP back. A chat's

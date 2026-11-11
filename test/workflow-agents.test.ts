@@ -1,9 +1,9 @@
 // Workflows' agent blocks: timeouts and nudges, sessions, permission prompts and modes, a restart mid block.
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { check, FLOW_ENDED, parse, toFile } from '../src/shared/workflow.ts'
+import { check, FLOW_ENDED, hints, parse, toFile } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 import { AGENT } from './flows.ts'
 
@@ -366,4 +366,91 @@ test('workflow failures: a restart mid agent block: its resumed chat told to fin
     return x.status === 'failed' && x
   }, 'its error way')
   assert.equal(r.decisions.at(-1).exit, 'error')
+})
+
+// W2: agents' turns in a run's cost, from their chats' transcripts (as test/meter.test.ts writes them): a claude answer's
+// usage, priced as the cost meters price it (claude-sonnet-4-5's output: $15 a million)
+const COSTS = `# Costs
+runs in: main · budget: $50
+
+## start
+input: task
+next: a
+
+## a
+agent: claude
+> plan {{task}}
+next: b
+
+## b
+agent: claude
+> build {{task}}
+next: c
+
+## c
+agent: gemini
+> look {{task}}
+next: e
+
+## e
+end: success
+`
+const said = (id: string, output: number) => `${JSON.stringify({ type: 'assistant', timestamp: new Date().toISOString(), message: { id, model: 'claude-sonnet-4-5', role: 'assistant', content: [{ type: 'text', text: 'x' }], usage: { input_tokens: 0, output_tokens: output } } })}\n`
+const chatFile = (home: string, chat: string) => (mkdirSync(join(home, '.claude/projects/-repo'), { recursive: true }), join(home, '.claude/projects/-repo', `${chat}.jsonl`))
+
+test("workflow cost: each agent turn's own cost (a shared session's second turn its own only), in the run's cost, steps.<id>.cost and the stats; an agent with none named", async t => {
+  const rig = await fresh(t, { env: { FAKE_TURN_MS: '2000' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  assert.deepEqual(hints(parse(COSTS, 'costs').workflow), ["budget: $50 leaves out gemini's turns: Laki can't read what it cost"])
+  assert.deepEqual(hints(parse(COSTS.replace('agent: gemini', 'agent: codex'), 'costs').workflow), [])
+  await rig.rpc('flowSave', { id: 'costs', text: COSTS })
+  const run = await rig.rpc('flowStart', { workflow: 'costs', project: p.id, task: 'x' })
+  const get = () => rig.rpc('flowGet', { id: run.id })
+  const tab = await until(async () => (async (id?: string) => id && (await rig.rpc('state')).tabs.find((x: any) => x.id === id && x.resumeId))((await get()).tabs.a), 'a’s chat')
+  const file = chatFile(rig.home, tab.resumeId)
+  appendFileSync(file, said('m1', 100000)) // a's turn: $1.50
+  await until(async () => (x => x.cur === 'b' && x.wait?.kind === 'agent')(await get()), 'b’s turn')
+  appendFileSync(file, said('m2', 200000)) // b's, in the same chat: $3
+  const r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get()), 'the end', 20000)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  assert.equal(r.tabs.a, r.tabs.b, 'one session')
+  assert.deepEqual([r.vars['steps.a.cost'], r.vars['steps.b.cost'], r.cost], ['1.5', '3', 4.5])
+  assert.deepEqual(r.uncounted, ['gemini'])
+  assert.ok(r.log.some((l: string) => /a: its turn cost \$1\.50 at API prices \(\$1\.50 so far\)/.test(l)), r.log.join('\n'))
+  assert.ok(r.log.some((l: string) => /c: its turn's cost unknown \(gemini\): not counted/.test(l)))
+  assert.equal((await rig.rpc('flowList', {})).find((w: any) => w.id === 'costs').stats.cost, 4.5, 'the stats take the whole cost')
+})
+
+test('workflow cost: an agent turn past the $ budget asks while it works; Give it more goes on; at twice it its turn stops; Stop counts what it used', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'dear', text: AGENT('claude', 'slow {{task}}').replace(/^runs in: .*$/m, l => `${l} · budget: $1`) })
+  const run = await rig.rpc('flowStart', { workflow: 'dear', project: p.id, task: 'x' })
+  const get = () => rig.rpc('flowGet', { id: run.id })
+  const status = async (id: string) => (await rig.rpc('state')).tabs.find((x: any) => x.id === id)?.status
+  let r = await until(async () => (x => x.wait?.kind === 'agent' && x)(await get()), 'its turn')
+  const tab = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === r.wait.tab && x.resumeId), 'its chat')
+  const file = chatFile(rig.home, tab.resumeId)
+  appendFileSync(file, said('m1', 100000)) // $1.50 of $1, its turn under way
+  await rig.rpc('flowTick', {})
+  r = await get()
+  assert.deepEqual([r.status, r.wait.kind, r.wait.question, r.wait.options, r.wait.tab], ['waiting', 'stuck', "its budget: $1 spent on AI calls and agents' turns", ['Give it $0.50 more', 'Stop the run'], tab.id])
+  assert.equal(await status(tab.id), 'running', 'not interrupted: it works on while you pick')
+  await rig.rpc('flowAnswer', { id: run.id, n: 0 })
+  r = await get()
+  assert.deepEqual([r.status, r.wait.kind, r.budget.usd], ['running', 'agent', 2], 'its turn goes on: half its budget more than it used')
+  appendFileSync(file, said('m2', 100000)) // $3 of $2: asked again
+  await rig.rpc('flowTick', {})
+  assert.equal((await get()).wait.kind, 'stuck')
+  appendFileSync(file, said('m3', 100000)) // $4.50: past twice its $2, stopped
+  await rig.rpc('flowTick', {})
+  r = await get()
+  assert.equal(r.wait.capped, true)
+  assert.ok(r.log.some((l: string) => /past twice its budget \(\$4\): its turn stopped/.test(l)), r.log.join('\n'))
+  await until(async () => /Interrupted/.test(await rig.rpc('screen', { target: tab.id })), 'its turn stopped (Esc)')
+  await rig.rpc('flowAnswer', { id: run.id, n: 1 })
+  r = await get()
+  assert.deepEqual([r.status, r.cost, r.vars['steps.work.cost']], ['stopped', 4.5, '4.5'])
 })

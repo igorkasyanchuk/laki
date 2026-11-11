@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- A workflow's $ budget and its cost count its agents' turns: what each Claude or Codex turn used (at API prices, as the cost meters) goes into the run's cost, the block's `{{steps.<id>.cost}}` and the workflow's stats, and a turn that passes the budget asks you while it works (*Stop the run* stops it; at twice the budget Laki stops it). Agents Laki can't price, such as Gemini, show as *+ agents not counted*.
 - Workflows keep secrets out of what they pass on: a token from Settings', the project's or a profile's env that a command prints shows as •••• in its output, the run's log, an agent's answer and a webhook's response, so it never reaches an AI call's prompt or a webhook's body. The command itself still gets it.
 
 ## 0.48.0 · Nov 11, 2026

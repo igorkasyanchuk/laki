@@ -1144,7 +1144,7 @@ test('workflow budget: the line reads back, check names a bad one; past its time
   await rig.rpc('flowSave', { id: 'ai', text: '# AI\nruns in: main · budget: $5\n\n## start\ninput: task\nnext: sum\n\n## sum\nllm: x/fast\n> {{task}}\nok: e\n\n## e\nend: success\n' })
   const ai = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$0.01' })
   r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(ai.id)), 'past $0.01')
-  assert.deepEqual([r.wait.question, r.wait.options[0], r.cost], ['its budget: $0.01 spent on AI calls', 'Give it $0.005 more', 0.02])
+  assert.deepEqual([r.wait.question, r.wait.options[0], r.cost], ['its budget: $0.01 spent on AI calls and agents\' turns', 'Give it $0.005 more', 0.02])
   await rig.rpc('flowAnswer', { id: ai.id, n: 0 }) // past it by a cent: more than it spent, not only than the cap
   r = await until(async () => (x => x.status !== 'running' && x)(await get(ai.id)), 'it goes on')
   assert.deepEqual([r.status, r.budget.usd], ['done', 0.025])

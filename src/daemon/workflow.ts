@@ -23,6 +23,7 @@ import { flowAsk, flowPhone } from './phone.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { copyTree, move, readCapped, readJson } from '../shared/conn.ts'
+import { chatCost, chatCostBefore } from './meters.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -540,6 +541,7 @@ function enter(r: FlowRun, b: Block, again = false, cut = false): void {
 }
 
 function leave(r: FlowRun, b: Block, exit: string, why: string, you = false): void {
+  if (r.meter?.block === b.id) counted(r) // its agent's turn, ended (or given up on): its cost, even when the run moved on
   if (!live(r) || r.cur !== b.id || r.wait?.kind === 'hold') return // a late event: the run moved on, ended, or is parked
   if (!you && BAD_EXITS.includes(exit) && retry(r, b, why)) return
   decide(r, b, exit, why, you)
@@ -747,6 +749,7 @@ function agent(r: FlowRun, b: Block) {
   if (same && back.chat && same.resumeId === back.chat) {
     if (drawing(same.id)) return void (r.resumed = back), later(r, b, agent)
     const queued = !!send(same.id, RESUMED).queued
+    if (r.meter?.tab !== same.id) metered(r, b, same, false) // the same chat: its turn's cost from where it began
     say(r, `${blockName(b)}: its chat resumed in ${same.name}: told to finish the step${queued ? ' (queued: it was busy)' : ''}`, RESUMED)
     r.wait = { kind: 'agent', tab: same.id, ...(queued && { queued: RESUMED }), since: Date.now(), used: 0 }
     return touch()
@@ -782,7 +785,9 @@ function agent(r: FlowRun, b: Block) {
   if (tab && drawing(tab.id)) return void (r.resumed = back), later(r, b, agent)
   if (back) say(r, `${blockName(b)}: ${same ? 'a new chat in its tab' : 'its tab is gone'} after the restart: the whole prompt again`)
   let queued = false
+  const made = !tab
   if (tab) {
+    metered(r, b, tab, false) // its chat's cost before this prompt
     queued = !!send(tab.id, prompt).queued // after the turn under way: until it's typed in, a turn's end isn't ours
     say(r, `${blockName(b)}: to ${tab.name}${queued ? ' (queued: it was busy)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   } else {
@@ -790,6 +795,7 @@ function agent(r: FlowRun, b: Block) {
     const mode = permWords(perm ?? profileOf(preset)?.perm, fast ?? profileOf(preset)?.fast, ag)
     say(r, `${blockName(b)}: a new ${preset} tab, ${tab.name}${mode ? ` (${mode})` : ''}${forkOf ? ' (the last run’s chat, forked)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   }
+  if (made) metered(r, b, tab, !forkOf) // a new chat costs nothing yet; a fork's copied lines aren't this turn's
   r.tabs[b.id] = tab.id
   if (key) r.tabs[key] = tab.id
   tab.flow = r.id // the session links back to the run
@@ -861,6 +867,44 @@ function later(r: FlowRun, b: Block, f: (r: FlowRun, b: Block) => void) {
   }, 500)
 }
 const send = (tab: string, text: string) => coreSend({ target: tab, text, whenIdle: true }) as { queued?: number }
+
+// W2: an agent block's turn's cost (meters.ts: claude's and codex's transcripts, the cost meters' prices): its chat's
+// cost as it began (none: its lines from before then, a fork's parent's or one not found yet), then what it grew by.
+// A shared or resumed session counts only this turn's. fresh: a new chat (nothing yet)
+function metered(r: FlowRun, b: Block, tab: Tab, fresh: boolean) {
+  if (r.meter) counted(r) // one before it, left without its end (Try again, a stall's skip): its cost so far
+  const from = fresh ? 0 : chatCost(tab, true)
+  r.meter = { block: b.id, tab: tab.id, since: Date.now(), ...(from !== undefined && { from }) }
+}
+// the turn under way: what it cost so far (undefined: unknown, an agent Laki can't price)
+function turnCost(r: FlowRun, look = false) {
+  const m = r.meter
+  const t = m && tabOf(m.tab)
+  if (!m || !t) return
+  const now = chatCost(t, look)
+  if (now === undefined) return
+  m.from ??= chatCostBefore(t, m.since)
+  return m.from === undefined ? undefined : Math.max(0, now - m.from)
+}
+// its turn ended (or the run left it): the cost into the run's and steps.<id>.cost; an agent with none to read named
+function counted(r: FlowRun) {
+  const m = r.meter!
+  const b = blockOf(r, m.block)
+  const c = turnCost(r, true)
+  delete r.meter
+  if (!b) return
+  if (c === undefined) {
+    const ag = agentOf(b.agent)
+    if (!(r.uncounted ?? []).includes(ag)) r.uncounted = [...(r.uncounted ?? []), ag]
+    return say(r, `${blockName(b)}: its turn's cost unknown (${ag}): not counted`)
+  }
+  r.cost = (r.cost ?? 0) + c
+  r.vars[`steps.${b.id}.cost`] = String(+c.toFixed(6))
+  say(r, `${blockName(b)}: its turn cost ${dollars(c)} at API prices (${dollars(r.cost)} so far)`)
+}
+// what it spent: its AI calls', decisions' and agents' ended turns', and the one under way
+const costNow = (r: FlowRun) => (r.cost ?? 0) + (turnCost(r) ?? 0)
+const budgetAsked = (w?: FlowWait) => w?.kind === 'stuck' && !!w.options[0]?.startsWith('Give it ')
 
 turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => {
   for (const r of runs()) {
@@ -1296,15 +1340,19 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
     return leave(r, b, routeOf(r, b), `you settled ${w.key}: ${label}`, true), r
   }
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
-  if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
+  if (o.n === w.options.length - 1) {
+    if (budgetAsked(w) && w.tab && tabStatus(w.tab) === 'running') coreInput(w.tab, '\x1b') // past its budget mid turn: the turn stops with it
+    return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
+  }
   if (w.kind === 'stuck' && label.startsWith('Give it ') && r.budget) {
     // its budget, past: half of its first one more than it used (a turn may run past it), this run only; the block
-    // again, its visit and turns as they were
+    // again, its visit and turns as they were; an agent's turn still under way goes on instead (W2)
     const base = r.flow.budget ?? r.budget
-    if (label.includes('$')) r.budget.usd = Math.max(r.budget.usd ?? 0, r.cost ?? 0) + (base.usd ?? 0) / 2
+    if (label.includes('$')) r.budget.usd = Math.max(r.budget.usd ?? 0, costNow(r)) + (base.usd ?? 0) / 2
     else r.budget.ms = Math.max(r.budget.ms ?? 0, r.spent ?? 0) + (base.ms ?? 0) / 2
     say(r, `its budget: ${budgetText(r.budget)} now`)
     decide(r, b, 'again', `you: ${label}`, true)
+    if (w.tab && !w.capped && tabStatus(w.tab) === 'running') return Object.assign(r, { wait: { kind: 'agent', tab: w.tab, since: Date.now(), used: w.used ?? 0 } }), touch(), r
     return enter(r, b, true), r
   }
   if (w.kind === 'stuck' && w.tab) {
@@ -1332,19 +1380,21 @@ function sample(r: FlowRun, now = Date.now()) {
   if (r.status === 'running' && now > from) r.spent = (r.spent ?? 0) + (now - from)
   r.clock = Math.max(now, from)
 }
-// past its budget (spent, or cost: its AI calls' and decisions'): what's used up; a dry run never stops for it
+// past its budget (spent, or cost: its AI calls', decisions' and agents' turns', the one under way too): what's used up;
+// a dry run never stops for it
 function spend(r: FlowRun, now = Date.now()): 'time' | 'money' | undefined {
   sample(r, now)
   if (!r.budget || r.dry) return
   if (r.budget.ms && (r.spent ?? 0) >= r.budget.ms) return 'time'
-  if (r.budget.usd && (r.cost ?? 0) >= r.budget.usd) return 'money'
+  if (r.budget.usd && costNow(r) >= r.budget.usd) return 'money'
 }
 // it asks as the turns limit does: Give it more (half the run's first budget, this run only) or Stop the run
-function budgetAsk(r: FlowRun, b: Block) {
+// more: an agent's turn under way (W2): it goes on meanwhile, its turn's end still taken; Stop the run stops it (Esc)
+function budgetAsk(r: FlowRun, b: Block, more?: { tab: string; used: number }) {
   const over = spend(r)
   const base = r.flow.budget ?? r.budget ?? {}
-  if (over === 'time') stuck(r, b, `its budget: ${minutes(r.budget!.ms!)} used`, [`Give it ${minutes(base.ms! / 2)} more`, 'Stop the run'])
-  else if (over === 'money') stuck(r, b, `its budget: ${dollars(r.budget!.usd!)} spent on AI calls`, [`Give it ${dollars(base.usd! / 2)} more`, 'Stop the run'])
+  if (over === 'time') stuck(r, b, `its budget: ${minutes(r.budget!.ms!)} used`, [`Give it ${minutes(base.ms! / 2)} more`, 'Stop the run'], more)
+  else if (over === 'money') stuck(r, b, `its budget: ${dollars(r.budget!.usd!)} spent on AI calls and agents' turns`, [`Give it ${dollars(base.usd! / 2)} more`, 'Stop the run'], more)
 }
 
 // stuck's Try again: the block again, its count and the turns given back
@@ -1370,6 +1420,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   if (!live(r)) return
   sample(r)
   kill0(r)
+  if (r.meter) counted(r) // an agent's turn under way: what it cost so far
   delete r.hold // a pause asked for: nothing left to pause
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
   say(r, `${status}: ${why}`)
@@ -1389,8 +1440,8 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
 }
 
 // a run that ended, in its workflow's tally (not a dry run's): its time and cost, failed ones in a row (a done one
-// starts them over, a stopped one leaves them be); the PAUSE_AFTERth in a row that started by itself pauses it.
-// ponytail: cost is its AI calls' and decisions' only, not its agents' turns
+// starts them over, a stopped one leaves them be); the PAUSE_AFTERth in a row that started by itself pauses it. Cost:
+// its AI calls', decisions' and agents' turns' (not those of agents Laki can't price: uncounted)
 function tally(r: FlowRun) {
   if (r.dry) return
   const k = agentKey(r.source, r.workflow, r.source === 'project' ? r.project : undefined)
@@ -1519,8 +1570,22 @@ export function flowTick(now = Date.now()) {
     // past its budget: it asks now when what it does can stop and run again (a command, a wait on checks, a retry's
     // wait); else (an agent's turn, an AI call, a webhook, ship, a turn just ended) the next block asks
     const stops = r.wait?.kind === 'wait' || r.wait?.kind === 'retry' || (r.wait?.kind === 'run' && procs.has(r.id))
-    if (b && spend(r, now) && r.status === 'running' && stops) {
+    const over = b && spend(r, now) // its working time sampled each tick, running or not
+    if (b && over && r.status === 'running' && stops) {
       budgetAsk(r, b)
+      continue
+    }
+    // W2: an agent's turn past the $ budget: asked now, the turn goes on until you pick; at twice it, stopped (Esc)
+    const w = r.wait
+    if (b && over === 'money' && r.status === 'running' && w?.kind === 'agent' && !(w.queued !== undefined && tabOf(w.tab)?.queue?.includes(w.queued))) {
+      budgetAsk(r, b, { tab: w.tab, used: (w.used ?? 0) + now - (w.since ?? now) })
+      continue
+    }
+    if (b && w?.kind === 'stuck' && w.tab && !w.capped && budgetAsked(w) && r.budget?.usd && !r.dry && costNow(r) >= 2 * r.budget.usd && tabStatus(w.tab) === 'running') {
+      coreInput(w.tab, '\x1b')
+      w.capped = true
+      say(r, `${blockName(b)}: past twice its budget (${dollars(2 * r.budget.usd)}): its turn stopped`)
+      touch()
       continue
     }
     if (r.ws && (!ws || ws.archived) && !(b?.kind === 'action' && b.action === 'archive')) {

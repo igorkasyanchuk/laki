@@ -478,6 +478,8 @@ function Meter({ label, now, max, say, tip }: { label: string; now: number; max?
   )
 }
 
+// W2: what a run's cost is, as the cost meters say theirs: a plan bills its own way
+const PRICED = "at API prices: its AI calls, decisions and Claude's and Codex's turns (an estimate; a plan bills its own way)"
 // a workflow's runs at a glance: how many, done of the last 30 days', a done run's median time, what a run spends
 function StatChips({ s }: { s: NonNullable<WorkflowItem['stats']> }) {
   return (
@@ -485,7 +487,7 @@ function StatChips({ s }: { s: NonNullable<WorkflowItem['stats']> }) {
       <span className="tag" data-tip="Runs so far">{s.runs} {s.runs === 1 ? 'run' : 'runs'}</span>
       {s.ok !== undefined && <span className="tag" data-tip="Done, of the runs that ended in the last 30 days">✓ {Math.round(s.ok * 100)}%</span>}
       {s.ms !== undefined && <span className="tag" data-tip="A done run's median time">⏱ {dur(s.ms)}</span>}
-      {s.cost !== undefined && <span className="tag" data-tip="What a run spends on average: its AI calls and decisions (agents' turns aren't counted)">{dollars(s.cost)}</span>}
+      {s.cost !== undefined && <span className="tag" data-tip={`What a run spends on average ${PRICED}`}>{dollars(s.cost)}</span>}
     </>
   )
 }
@@ -1312,7 +1314,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
         <div className="wf-field">
           <label>Budget</label>
           <BudgetField budget={wf.budget} onBudget={b => edit(w => void (w.budget = b))} />
-          <span className="wf-hint">A run’s working time (not while it waits for you) and its AI calls’ cost; past either it asks: more, or stop.</span>
+          <span className="wf-hint">A run’s working time (not while it waits for you) and its cost at API prices (AI calls, Claude’s and Codex’s turns); past either it asks: more, or stop.</span>
         </div>
         <div className="wf-field">
           <label>When a run is done</label>
@@ -2256,7 +2258,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         <label className="wf-field">
           <span>Budget</span>
           <input value={budget} placeholder="none: 60 min, $5" onChange={e => setBudget(e.target.value)} className={badBudget ? 'bad' : ''} />
-          <span className={badBudget ? 'wf-hint wf-bad' : 'wf-hint'}>{badBudget || 'Its working time and AI cost (calls and decisions; agents’ turns aren’t counted); past either it asks you. This run only.'}</span>
+          <span className={badBudget ? 'wf-hint wf-bad' : 'wf-hint'}>{badBudget || 'Its working time and its cost at API prices (AI calls, decisions, Claude’s and Codex’s turns); past either it asks you. This run only.'}</span>
         </label>
         <Switch className="switch-row" on={dry} onChange={setDry}>
           Dry run: opening a PR, approving, merging and archiving are said, not done
@@ -2359,7 +2361,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
       <div className="wf-meters">
         <Meter label="Agent turns" now={r.turns} max={r.flow.turns ?? TURNS} say={`${r.turns} of ${r.flow.turns ?? TURNS}`} />
         <Meter label="Working time" now={r.spent ?? 0} max={r.budget?.ms} say={`${dur(r.spent ?? 0)}${r.budget?.ms ? ` of ${minutes(r.budget.ms)}` : ''}`} tip="Not while it waits for you, a usage limit or its turn" />
-        <Meter label="AI cost" now={r.cost ?? 0} max={r.budget?.usd} say={`${dollars(r.cost ?? 0)}${r.budget?.usd ? ` of ${dollars(r.budget.usd)}` : ''}`} tip="Its AI calls and decisions; agents’ turns aren’t counted" />
+        <Meter label="Cost" now={r.cost ?? 0} max={r.budget?.usd} say={`${dollars(r.cost ?? 0)}${r.budget?.usd ? ` of ${dollars(r.budget.usd)}` : ''}${r.uncounted?.length ? ` + agents not counted: ${r.uncounted.join(', ')}` : ''}`} tip={`What it would cost ${PRICED}${r.uncounted?.length ? `; ${r.uncounted.join(', ')}’s turns have no cost Laki can read` : ''}`} />
       </div>
       {asking && (
         <div className={`wf-ask ${asking.kind === 'agent-ask' ? 'agent' : ''}`}>

@@ -1647,9 +1647,13 @@ run's, a dry run's, and a workspace it was given stay, and the run's log says wh
 *When a run is done*) keeps them all.
 
 A budget (its settings' *Budget*, `budget: 60 min, $5` in the head, either part) caps a run's working time (not while
-it waits for you, a usage limit or its turn in the queue) and what its AI calls and decisions cost (agents' turns
-aren't counted). Past either, it asks you, as 30 agent turns do: *Give it 30 min more* (half its budget, this run only;
-the file stays) or *Stop the run*. An agent's turn under way finishes first: it asks at the next block. *Run* takes
+it waits for you, a usage limit or its turn in the queue) and what it costs: its AI calls and decisions, and its
+Claude and Codex agents' turns, each turn's own (read from their chats, at API prices, as the cost meters: on a plan,
+what it would have cost). Gemini, Grok and OpenCode turns have no cost Laki can read: the run's *Cost* says *+ agents
+not counted*, and the editor says so for a $ budget. Past either, it asks you, as 30 agent turns do: *Give it 30 min
+more* (half its budget, this run only; the file stays) or *Stop the run*. A time budget lets an agent's turn under way
+finish first (it asks at the next block); a $ budget asks during the turn as soon as it's past, the agent working on
+until you pick: *Stop the run* stops its turn, and at twice the budget Laki stops the turn itself. *Run* takes
 another for that run (`laki flow run … --budget "30 min, $2"`), and a run shows its turns, time and cost against them.
 A dry run says its budget and never stops for it. An ended run's *Run again* (also its row's ⋯, `laki flow
 again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
@@ -1665,7 +1669,7 @@ one: no next block, try again or archive starts, its working time stops, and a r
 *Keep going* takes the pause back. *Stop run* ends it at once (its agents stay as they are, in their tabs).
 
 Each workflow's row says how its runs went: how many, ✓ the share of the last 30 days' that ended done, ⏱ a done run's
-median time and $ what a run spends on average (its AI calls and decisions; agents' turns aren't counted). A workflow
+median time and $ what a run spends on average (at API prices: its AI calls, decisions and Claude's and Codex's turns). A workflow
 that starts by itself (an event, a schedule) and fails 5 times in a row is paused: a notification says so, events and
 its schedules no longer start it (a scheduled run shows as failed, saying why), and *Run* still does. *Turn on again*
 (the note, its row's ⋯, its settings, `laki flow on <workflow>`) starts it again. A dry run counts nothing.

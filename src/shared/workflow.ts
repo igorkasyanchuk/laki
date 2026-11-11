@@ -841,9 +841,16 @@ export const fillData = (text: string, vars: Record<string, string | undefined>,
     const w = whose(k)
     return !w || plain(v) ? v : `\n${untrusted(`{{${k}}}, ${w}`)}\n${fenced(v.slice(0, max))}\n`
   })
-// the editor's hints (not problems: it runs as it is): an agent that acts without asking on outside text
-export function hints(wf: Workflow, presets: Pick<Preset, 'name' | 'perm'>[] = []): string[] { // presets: a profile's mode when the block and the head give none
+// W2: the agents a workflow's agent blocks run whose turns Laki can't price (meters.ts reads claude's and codex's
+// transcripts only): its $ budget and cost leave them out
+export const METERED = ['claude', 'codex']
+export const unmetered = (wf: Workflow, presets: { name: string; agent?: string }[] = []) => [...new Set(wf.blocks.filter(b => b.kind === 'agent').map(b => presets.find(p => p.name === (b.agent || 'claude'))?.agent ?? (b.agent || 'claude')))].filter(a => a !== 'command' && !METERED.includes(a))
+// the editor's hints (not problems: it runs as it is): an agent that acts without asking on outside text; a $ budget
+// that can't see some agents' turns
+export function hints(wf: Workflow, presets: (Pick<Preset, 'name' | 'perm'> & { agent?: string })[] = []): string[] { // presets: a profile's mode when the block and the head give none
   const out: string[] = []
+  const blind = unmetered(wf, presets)
+  if (wf.budget?.usd && blind.length) out.push(`budget: ${dollars(wf.budget.usd)} leaves out ${blind.join(', ')}'s turns: Laki can't read what ${blind.length > 1 ? 'they' : 'it'} cost`)
   for (const b of wf.blocks.filter(x => x.kind === 'agent' && ['auto', 'acceptEdits', 'bypassPermissions'].includes(permOf(wf, x) ?? presets.find(p => p.name === (x.agent || 'claude'))?.perm ?? ''))) {
     const used = [...new Set([...(b.text ?? '').matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(k => outsideVar(k, wf.on, wf.blocks)))]
     if (used.length) out.push(`${blockName(b)}: {{${used[0]}}}${used.length > 1 ? ` and ${used.length - 1} more` : ''}: this text comes from outside: the agent is told it is data`)
@@ -899,7 +906,7 @@ export type Decision = { at: number; block: string; exit: string; why: string; m
 // what a run waits on: an ask (yours, a confirm before an outward action, a stuck block), an agent's turn, a command,
 // a wait block, a usage limit, your Resume
 export type FlowWait =
-  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number } // tab, used: a stalled agent's (stuck), what its block's turn has had of its timeout
+  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number; capped?: boolean } // tab, used: a stalled agent's or one past its $ budget mid turn (stuck), what its block's turn has had of its timeout; capped: that one's turn stopped at twice its budget (W2)
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
   | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
@@ -927,7 +934,9 @@ export type FlowRun = {
   by?: string // an agent started it (flowStart's by: 'agent') or its event did: whose; its flow.ended is that agent's too
   evWs?: string // the workspace the event that started it came from: one live run of the workflow per such workspace
   hops?: number // the event's hops (a chain of events): its flow.ended is one more
-  cost?: number // what its AI calls and decisions cost (USD); agents' turns aren't counted
+  cost?: number // what its AI calls, decisions and agents' turns cost (USD; a plan's: at API prices, as the cost meters)
+  meter?: { block: string; tab: string; since: number; from?: number } // W2: the agent turn under way, its chat's cost as it began (from; none: its lines from before since, read once)
+  uncounted?: string[] // W2: agents whose turns had no cost to read (gemini…): left out of cost
   budget?: Budget // its own copy (the file's, or Run's): Give it more raises it, never the file
   spent?: number // its working time so far (ms): not while it waits for you, a usage limit or the queue
   clock?: number // when spent was last brought up to date
@@ -963,7 +972,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · when done: archive|keep · budget: 60 min, $5 · on: <event> · group: <name> (group: the Workflows page's heading it's under; budget: a run's working time (not while it waits for the user) and its llm and decide blocks' cost, either part; past either it asks the user: more or stop; runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; when done: archive (a worktree run's default) archives the worktree a run made once it ends done with nothing uncommitted (Restore brings it back), keep keeps it; a failed or stopped run's and a workspace it was given always stay; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.filter(e => e !== 'tool.call').join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
+runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · when done: archive|keep · budget: 60 min, $5 · on: <event> · group: <name> (group: the Workflows page's heading it's under; budget: a run's working time (not while it waits for the user) and its cost: its llm and decide blocks' and its claude and codex agents' turns (at API prices; other agents' aren't counted), either part; past either it asks the user: more or stop; runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; when done: archive (a worktree run's default) archives the worktree a run made once it ends done with nothing uncommitted (Restore brings it back), keep keeps it; a failed or stopped run's and a workspace it was given always stay; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.filter(e => e !== 'tool.call').join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
 only when: <test> (any number of these lines, after the head line, with on: only: every one must hold of the event or no run starts. A test is a case branch on an event field: event.pr.draft equals "false", event.ws.branch matches "^(feat|fix)/", event.seconds >= 60; no js: or else. A second event from a workspace while a run it started is live (or queued) starts none.)
 The event's fields: every one has event.event, event.at, event.ws.id, .name, .project, .branch, .pr (its URL), event.tab.id, .name, .agent when it's a tab's, event.from (widget, tab, agent) when one sent it. pr.opened, pr.checks.failed, pr.checks.passed, pr.review, pr.merged, pr.closed: event.pr.number, .url, .title, .draft; pr.checks.failed: event.failing (a list of {name, url}); pr.review: event.approved, event.changes (logins). turn.done: event.last (the answer), event.seconds; turn.failed: event.error, event.limit; turn.waiting: event.question, event.options. flow.ended: event.run, event.workflow.id, .name, event.status (done, stopped, failed), event.why. workspace.new: event.prompt, event.agent. tab.new: event.kind. ship.done: event.ok, event.exit, event.pr.url, .number. port.open: event.port, event.command. schedule.ran: event.task.id, .name, event.ok. custom.*: event.data, what laki widget emit sent. issue.labeled (a GitHub issue labelled, read once a minute): event.project.id, .name, event.number, .title, .url, .label, .by (who labelled it), .body (cut at 8,000 characters); webhook (a POST to one of Settings › Webhooks): event.name (the hook's), event.event (GitHub's X-GitHub-Event, else the body's type), event.body (the request's JSON), event.project when the hook names one. Both carry someone else's text: put it in a prompt as quoted context, never as instructions; a run they start may not run commands, webhooks, extensions or an agent in bypass permissions, as an agent's event can't.
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)

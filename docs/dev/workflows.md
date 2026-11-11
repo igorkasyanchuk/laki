@@ -169,8 +169,8 @@ skipped*; `flowStart` drops it from `r.flow`) and, once per file version (`told`
 `at.wf`, its editor; never an Allow there).
 Stats (`state.flowStats`, by `agentKey`; `FlowStats` in shared/workflow.ts): `finish`'s `tally` (not a dry run's; a
 refusal isn't a run) counts `total`, keeps the last `STATS_RECENT` 50 (`at`, `status`, `ms`, `cost`: `r.cost`, what the
-run's AI calls and decisions cost, `Got.cost` from `llmSend`/`decideSend` added up in `sent()`; agents' turns aren't
-counted) and `fails` in a row (done starts over, stopped leaves it); the `PAUSE_AFTER`th (5) failed one in a row whose
+run's AI calls, decisions and agents' turns cost, `Got.cost` from `llmSend`/`decideSend` added up in `sent()`, each
+turn's through `counted`) and `fails` in a row (done starts over, stopped leaves it); the `PAUSE_AFTER`th (5) failed one in a row whose
 trigger is `event ` or `schedule ` (not `try `) sets `paused` (`why`), broadcasts `flow` `kind: 'paused'` (`wf`, `text`;
 App: a notification, a toast with *Turn on again*), `flowPhone`s and bumps `flowFiles.at`. Paused: the listener refuses
 its events (after hops), `flowStart` an `event `/`schedule ` trigger (the schedule's failed run says so); Run, the CLI
@@ -239,10 +239,18 @@ Budget (`budget: 60 min, $5`, `budgetOf`/`budgetText`, either part; a bad one a 
 `flowStart` `budget` (a string, '' none) over the file's (an agent's: the file's or tighter, never none or more), the
 run's `budget` and `flow.budget` (its first: *Give it more* sets it to half of that more than it used, `flowAnswer`); `spent` is its working time, `sample` (at `enter`, each `flowTick` and `finish`) adding
 what passed while `running` since `clock` (not waiting, paused or queued; ponytail: a few seconds off per change);
-`spend` (none for a dry run) past `budget.ms` or `cost` past `budget.usd`: `budgetAsk`, a stuck with *Give it <half>
+`spend` (none for a dry run) past `budget.ms` or `costNow` past `budget.usd`: `budgetAsk`, a stuck with *Give it <half>
 more* and *Stop the run*, at `enter` and in `flowTick` (only what stops and runs again: a command, a checks wait, a
-retry's wait; an agent's turn, an AI call, a webhook or ship: the next block asks). `cost`:
-`Got.cost` (llm, decide) through `sent`. RunView's `Meter`s (turns, time, cost), StartRun's and the settings' Budget;
+retry's wait; an AI call, a webhook or ship: the next block asks; an agent's turn: below). `cost`:
+`Got.cost` (llm, decide) through `sent`, and agents' turns (W2): `metered` as `agent()` sends (`r.meter`: the block, its
+tab, `since`, `from`: meters.ts' `chatCost`, the tab's meter read on, the cost meters' `costOf` prices; 0 for a new chat;
+none for a fork or a chat not found yet: `chatCostBefore`, its lines older than `since`, read once), `counted` as the
+block is left (`leave`, `finish`, a next `metered`): what the chat grew by into `r.cost` and `steps.<id>.cost`, a log
+line; none to read (gemini, grok, opencode, a host's, an unpriced model) names its agent in `r.uncounted` (RunView's
+*Cost*: `+ agents not counted: …`; shared `unmetered`, `hints`' line for a $ budget). `costNow` adds the turn under
+way: `flowTick` asks mid turn (`budgetAsk` with `{ tab, used }`: the turn goes on, `turnEnds` still takes it, *Give it
+more* back to its `agent` wait, *Stop the run* Escs it), and at twice `budget.usd` Escs the turn (`capped`: *Give it
+more* then enters the block anew). The renderer's *Cost* and `StatChips` say *at API prices* (`PRICED`). RunView's `Meter`s (turns, time, cost), StartRun's and the settings' Budget;
 the CLI's `--budget`, MCP's `budget`.
 ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host; a resume that fails after
 `RESUMED` went (core drops the chat within `RESUME_FAIL`) is a closed tab, the block's error way.
