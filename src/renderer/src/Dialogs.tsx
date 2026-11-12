@@ -31,6 +31,8 @@ import { ShipSheet } from './Ship'
 import { type ComponentType, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
+// D9: Settings › Remote access › Activity's (one function: its effect loads once per open)
+const remoteLog = () => api.call<{ at: number; device?: string; line: string }[]>('remoteLog')
 
 const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
@@ -232,7 +234,7 @@ export function Pages({ app }: { app: AppCtx }) {
             stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
           }}
-          remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+          remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), log: remoteLog, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
           widgets={extCfg}
           logs={(key, title) => setDialog({ logs: key, title })}
           scriptLogs={() => setDialog('scriptLogs')}

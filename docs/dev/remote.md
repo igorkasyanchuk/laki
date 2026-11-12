@@ -141,6 +141,20 @@ notification) and `restartTunnel` (a quick one's `remoteAgain` and a stop; My do
 end does it). The rig fetches only `LAKI_CHECK_URL` (`LAKI_CHECK_MS`), never the internet. App's status bar badge is
 `unreachable` (yellow) with the why in its tip.
 
+D9, while the Mac is locked: main's `powerMonitor` `lock-screen` / `unlock-screen` call `screenLock` (`locked`; the
+app's only: FROM, AGENT_NO, REMOTE_NO). Locked, with `settings.remoteWhen` `locked` and `lockWhy()` empty (a stable
+address, My domain or Tailscale, and a paired device; Settings' select is off with the same why), it starts
+`remoteStart({ hours: 0, lock: true, … })` as Settings would (`byLock`); one already running is left alone. Unlocked: a
+`byLock` one gets `graceUntil` a minute on, and `remoteTick` (the test clock's `now`) stops it then with *you came back
+to the Mac*; locked again within it clears the grace. Devices stay paired. Headless never locks (no main).
+The activity log (`remoteLog.ts`): `activity()` appends a JSON line (`at`, `device`, `method`, `line`) to
+`<data>/remote-log.jsonl` (0600), moved to `remote-log.1.jsonl` past 1 MB (`LOG_MAX`); `activityList(n)` newest first,
+both files. The session's events (started and how, stopped and why, a device paired, a passkey unlock, the link
+opened, a wrong PIN) from remote.ts; a remote call's from main.ts' `call()`: `remoteLine` says what it did (a message
+and an answer with their tab's workspace and agent, `clip80`'d; a new workspace or tab; typing, once a minute a tab),
+skipping `READS` (D7's reading methods: the view, screens, diffs, chats). `remoteLog` (`n`, up to 1000; the app's only)
+for Settings › Remote access › Activity (its last 200) and `laki remote log`.
+
 `remote.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*

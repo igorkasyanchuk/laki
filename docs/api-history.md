@@ -180,3 +180,4 @@ needs no bump: `settingsSet` keeps any field.
 172: `voiceModels` (Q11: OpenRouter's speech-to-text models and prices now) and Laki AI's `archive` act (Q12: `laki_archive`, `laki_stop`).
 173: `uiDo` and its `ui` event (Q13: Laki AI's `laki_ui` moves the window), Laki AI's `delete` act and a `run` act's `ids`, `stopAll`'s `tab`.
 174: `remoteCheck` and the view's `remote.check` (D8: remote access reached from outside, its result), `settings.remoteAwake`.
+175: `screenLock` and `remoteLog` (D9: remote access while the Mac is locked, its activity log), `settings.remoteWhen`.

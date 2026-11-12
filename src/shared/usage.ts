@@ -120,7 +120,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               headless: the daemon and remote access, until stopped (docs/headless.md);
                                               --domain: at <name>.<your named tunnel's domain> (laki.…), a stable address, with a PIN;
                                               its link opens once, its PIN prints on a terminal only (else laki remote)
-  laki remote [stop]                          remote access's link and PIN now | stop it
+  laki remote [stop|log]                      remote access's link and PIN now | stop it | what was done over it
   --json prints machine-readable output; an option the command doesn't have is refused (did you mean…?);
   after -- every word is text: laki send ws -- --not-an-option`
 

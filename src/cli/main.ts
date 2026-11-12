@@ -258,6 +258,11 @@ async function main() {
     case 'remote': {
       // laki remote [stop]: remote access's link (and PIN) now, as Settings shows it; a headless server's way to it
       if (rest[0] === 'stop') return rpc('remoteStop').then(() => out({ ok: true }, 'stopped'))
+      // D9: what was done over remote access, newest first: when, which device, what
+      if (rest[0] === 'log') {
+        const l = await rpc<{ at: number; device?: string; line: string }[]>('remoteLog', { from: caller() })
+        return out(l, l.length ? l.map(e => `${new Date(e.at).toLocaleString()}  ${e.device ? `${e.device}: ` : ''}${e.line}`).join('\n') : 'nothing done over remote access yet')
+      }
       const r: Remote | undefined = (await rpc<View>('stateOwn', { from: caller() })).remote // S3: the view's has no link or PIN
       return out(r ?? null, remoteText(r))
     }

@@ -222,6 +222,8 @@ export const FIND: [string, string, string?][] = [
   ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server address my domain stable bookmark pin'],
   ['remote', 'Keep the Mac awake', 'sleep caffeinate power battery lid reachable'],
+  ['remote', 'Start it', 'locked lock screen away when unlock automatic start stop'],
+  ['remote', 'Activity', 'log history audit what was done device sent answered wrong pin paired'],
   ['remote', 'Answer only', 'phone access level read answer asks message agents no typing merge ship archive delete full access device'],
   ['remote', 'Unlock with a passkey', 'face id touch id passkey webauthn lock unlock idle pin instead device'],
   ['remote', 'Send the link to my phone', 'push link phone webhook ntfy telegram web push notification start stop new device'],

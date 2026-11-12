@@ -3720,3 +3720,5 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 .iso-var { display: flex; align-items: baseline; gap: var(--sp-4); } .iso-var code { flex: none; min-width: 22ch; font: var(--fs-2) var(--mono); }
 .iso-eg { margin-top: var(--sp-2); } .iso-eg-head { display: flex; align-items: center; justify-content: space-between; }
 .iso-eg pre { margin: var(--sp-1) 0 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-m); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }
+.remote-log { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 360px; overflow-y: auto; padding: var(--sp-4) var(--sp-5); } /* D9: Settings › Remote access › Activity */
+.remote-log-row { display: flex; gap: var(--sp-4); align-items: baseline; } .remote-log-row > :last-child { min-width: 0; overflow-wrap: anywhere; }

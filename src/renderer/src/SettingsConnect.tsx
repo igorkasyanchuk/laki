@@ -408,14 +408,14 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 export type Remote = { check?: import('../../shared/types').RemoteCheck; mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
 export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; level?: 'answer' | 'full' }
 // devices, pair, revoke (D3): the paired ones, Add a device, Revoke (one; none: all)
-export type RemoteApi = { check?: () => Promise<unknown>; state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type RemoteApi = { log?: () => Promise<{ at: number; device?: string; line: string }[]>; check?: () => Promise<unknown>; state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { awake: 'ac' | 'always' | 'off'; level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+type RemoteOpts = { when: 'manual' | 'locked'; awake: 'ac' | 'always' | 'off'; level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
 // D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
 export function hookOf(w?: Webhook) {
   if (w?.format === 'webpush') return 'your paired phones'
@@ -714,6 +714,19 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
           <span className="muted">The phone reads, answers and messages agents; the rest stays on this Mac</span>
         </span>
       </Switch>
+      {/* D9: on its own while the Mac is locked: only at a stable address with a paired device (the daemon's lockWhy, the same rule) */}
+      {(lockWhy => (
+        <label className="switch-row">
+          <select value={lockWhy ? 'manual' : opts.when} disabled={!!lockWhy && opts.when !== 'locked'} onChange={e => set({ when: e.target.value as RemoteOpts['when'] })}>
+            <option value="manual">When I start it</option>
+            <option value="locked" disabled={!!lockWhy}>While the Mac is locked</option>
+          </select>
+          <span className="switch-text">
+            <span>Start it</span>
+            <span className="muted">{lockWhy ? `While the Mac is locked: ${lockWhy}.` : 'While the Mac is locked: it starts as you lock it and stops a minute after you unlock (paired devices stay paired). Laki must be open; laki serve ignores it.'}</span>
+          </span>
+        </label>
+      ))(opts.auth !== 'tailscale' && opts.auth !== 'domain' ? 'it needs a stable address: Tailscale or My domain' : !api.devices?.length ? 'no device is paired yet: open its link on your phone once' : '')}
       <label className="switch-row">
         <select value={opts.awake} onChange={e => set({ awake: e.target.value as RemoteOpts['awake'] })}>
           <option value="ac">On power</option>
@@ -815,7 +828,31 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         </div>
       </div>
       )}
+      {api.log && <RemoteActivity load={api.log} key={r?.url ?? ''} />}
     </>
+  )
+}
+
+// D9: Activity: what was done over remote access and its session's events, newest first (the daemon's remote-log.jsonl:
+// the last 200; laki remote log prints them too)
+function RemoteActivity({ load }: { load: NonNullable<RemoteApi['log']> }) {
+  const [list, setList] = useState<Awaited<ReturnType<typeof load>> | null>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => void (open && load().then(setList, () => setList([]))), [open, load])
+  return (
+    <Group title="Activity" hint="What was done over remote access, from which device, and when it started, paired, unlocked, took a wrong PIN or stopped. Only on this Mac" act={<button type="button" onClick={() => (open ? load().then(setList, () => {}) : setOpen(true))}>{open ? 'Refresh' : 'Show'}</button>}>
+      {open && (
+        <div className="setting-box remote-log">
+          {!list ? <p className="muted small">Loading…</p> : !list.length ? <p className="muted small">Nothing yet.</p> : list.map((e, i) => (
+            <div key={i} className="remote-log-row small">
+              <span className="muted mono">{new Date(e.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+              {e.device && <b>{e.device}</b>}
+              <span>{e.line}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Group>
   )
 }
 

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Remote access can start by itself as you lock your Mac and stop a minute after you're back (Settings › Remote access › Start it), and its Activity list shows what each device did: messages and answers to agents, pairings, wrong PINs. `laki remote log` prints it.
 - Remote access stays reachable: the Mac is kept awake while it runs (on power, or always), Laki checks its address from outside every few minutes (*Check* in Settings for one now), and if it can't be reached the status bar badge turns yellow, you're notified and its tunnel starts again.
 - Workspaces stay apart: each gets ten ports, a slot number, a database suffix and a compose project name in its environment (Settings › a project › Isolation has examples to copy), and a dev server on another workspace's port is flagged on both.
 - On macOS 26 the app icon follows your icon style: light, dark, tinted and clear, built from layers.

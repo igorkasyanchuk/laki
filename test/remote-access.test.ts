@@ -140,11 +140,11 @@ function devSock(port: number, origin: string, cookie: string) {
   const shut = new Promise<number>(r => ws.once('close', code => r(code)))
   const open = new Promise<void>((res, rej) => (ws.once('open', () => (ws.send(JSON.stringify({ auth: 'device' })), res())), ws.once('error', rej)))
   let seq = 0
-  const call = (method: string) =>
+  const call = (method: string, params: object = {}) =>
     new Promise<any>((res, rej) => {
       const id = ++seq
       ws.on('message', raw => (m => m.id === id && (m.error ? rej(new Error(m.error)) : res(m.result)))(JSON.parse(String(raw))))
-      ws.send(JSON.stringify({ id, method, params: {} }))
+      ws.send(JSON.stringify({ id, method, params }))
     })
   return { ws, shut, open, call }
 }
@@ -390,4 +390,55 @@ test('D8: a self-check of its address at start, every 5 minutes (test clock) and
   assert.equal(on.mail, 'me@x.dev')
   await rig.rpc('remoteStop')
   await until(() => caf().at(-1) === 'caffeinate stopped', 'let go as it stops')
+})
+
+test('D9: remote access while the Mac is locked: started by the lock (My domain, a paired device), refused a minute after the unlock (test clock), the device kept; its activity log has a remote send and answer with the device, not a read, and the session', async t => {
+  const rig = await fresh(t)
+  await named(rig)
+  const url = 'https://laki.example.dev'
+  const remote = async () => (await rig.rpc('stateOwn')).remote
+  // a device paired once, by hand
+  const first = await rig.rpc('remoteStart', { hours: 1, host: '' })
+  const jar = (await pinRaw(rig.info().port, url, { token: first.link.split('#t=')[1], pin: first.pin }, UA)).cookie!.split(';')[0]
+  await rig.rpc('remoteStop')
+  await rig.rpc('screenLock', { locked: true })
+  assert.equal(await remote(), undefined, 'not asked for: a lock starts nothing')
+  await rig.rpc('screenLock', { locked: false })
+  await rig.rpc('settingsSet', { remoteAuth: 'domain', remoteWhen: 'locked' })
+  await rig.rpc('screenLock', { locked: true })
+  await until(async () => (await remote())?.url === url, 'started by the lock')
+  const { port } = rig.info()
+  const dev = devSock(port, url, jar)
+  await dev.open
+  t.after(() => dev.ws.close())
+  // from the phone: a read, a message, an answer
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'phone' })
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => /> $/m.test(await rig.rpc('screen', { target: tab.id })), 'the fake claude up')
+  await dev.call('state')
+  await dev.call('send', { target: tab.id, text: 'menu' })
+  await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.ask, 'its ask')
+  await dev.call('answer', { tab: tab.id, n: 1 })
+  const log = async () => (await rig.rpc('remoteLog')) as { at: number; device?: string; method?: string; line: string }[]
+  const mine = (await log()).filter(e => e.method)
+  assert.deepEqual(mine.map(e => e.method).reverse(), ['send', 'answer'], 'a read is not in it')
+  assert.ok(mine.every(e => e.device && e.device !== 'the link’s page'), 'each with its device')
+  assert.match(mine[1].line, /^to phone · claude: "menu"$/)
+  assert.match(mine[0].line, /^answered phone · claude: /)
+  assert.match((await log()).map(e => e.line).join('\n'), /started: My domain \(laki\.example\.dev\), as the Mac locked/)
+  assert.equal(statSync(join(rig.data, 'remote-log.jsonl')).mode & 0o777, 0o600)
+  // unlocked: a minute's grace, then it stops; the device stays paired
+  const t0 = Date.now()
+  await rig.rpc('screenLock', { locked: false })
+  await rig.rpc('remoteTick', { now: t0 + 30_000 })
+  assert.equal((await remote())?.url, url, 'within the grace')
+  await rig.rpc('remoteTick', { now: t0 + 61_000 })
+  await until(async () => !(await remote()), 'stopped after the grace')
+  assert.notEqual(await rpcAt(port, url, jar), 200, 'refused now')
+  assert.equal((await rig.rpc('stateOwn')).remoteDevices?.length, 1, 'still paired')
+  const lines = (await log()).map(e => e.line)
+  assert.deepEqual(lines.slice(0, 2), ['stopped: you came back to the Mac', 'the Mac unlocked: remote access stops in a minute'])
+  // the CLI prints it
+  assert.match((await rig.cli('remote', 'log')).out, /stopped: you came back to the Mac/)
 })

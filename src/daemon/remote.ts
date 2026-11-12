@@ -15,6 +15,7 @@ import { policyRemote } from './policy.ts'
 import { type Tail, tailOf } from './meters.ts'
 import { b64u, type Passkey, register, verifyGet } from './passkey.ts'
 import { phoneRemote } from './phone.ts'
+import { activity } from './remoteLog.ts'
 import { own } from './resources.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage } from './share.ts'
 
@@ -592,7 +593,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
 // left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
 // again (remoteAgain), its address before, why it's down
-type RemoteRun = { check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
+type RemoteRun = { byLock?: boolean; graceUntil?: number; check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
@@ -619,7 +620,7 @@ const forget = () => state.remote && (delete state.remote, save())
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
 // funnel: tailscale funnel, on the internet, so with a PIN only. host (D1, via cloudflare): My domain, that word (or
 // hostname) under settings.tunnel's domain ('': laki), a PIN always
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean; host?: string }): Promise<Remote | undefined> {
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean; host?: string; lock?: boolean }): Promise<Remote | undefined> {
   policyRemote() // a managed policy may turn it off
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
@@ -648,6 +649,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   if (remote) return remoteView() // started meanwhile
   const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: hex(), access: '', tries: 0, ...(open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel, peers }), ...(host && { host, named: n!.name }) }
   if (pin) Object.assign(r, { pin: newPin(), left: triesOf() })
+  if (o.lock === true) r.byLock = true // D9: the Mac's lock started it: its unlock stops it
   remote = r
   changed()
   try {
@@ -659,6 +661,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   if (remote !== r) return undefined // stopped meanwhile
   keepRemote()
   void selfCheck(r) // D8: reachable from outside?
+  activity({ line: `started: ${ts ? (funnel ? 'Tailscale Funnel' : 'Tailscale') : host ? `My domain (${host})` : open ? 'a quick tunnel, anyone with the link' : pin ? 'a quick tunnel with a PIN' : `a quick tunnel for ${mail}`}${hours ? `, ${hours} h` : ''}${o.lock ? ', as the Mac locked' : ''}` }) // D9
   phoneRemote(`Laki: remote access is on${r.pin ? ' (its PIN is on your Mac)' : ''}: tap to open it`, { url: remoteView()?.link, open: r.open })
   log(`remote access at ${r.url} for ${ts ? `${funnel ? 'the internet (Tailscale Funnel)' : `the tailnet's devices (${peers} more online)`} with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
@@ -755,6 +758,7 @@ export function remoteBack(now = Date.now()) {
 export function remoteStop(why?: string) {
   const r = remote
   if (!r) return
+  activity({ line: `stopped${why ? `: ${why}` : ' by you'}` }) // D9
   if (why) phoneRemote(`Laki: remote access stopped: ${why}`, { open: r.open })
   remote = undefined
   stopped() // its pages off now: My domain's connector and Tailscale's serve outlive it, and their sockets with them
@@ -842,6 +846,7 @@ function pair(r: RemoteRun, o: Asker) {
   Object.assign(r, { used: true, keyUntil: undefined })
   keepRemote() // saves
   log(`remote access: a new device, ${d.name} (${d.id})${o.ip ? ` from ${o.ip}` : ''}, until ${new Date(d.until).toISOString()}`)
+  activity({ device: d.name, line: `device paired: ${d.name}${o.ip ? ` from ${o.ip}` : ''}` }) // D9
   broadcast({ ev: 'remote', text: `A new device joined remote access: ${d.name}${o.ip ? ` (${o.ip})` : ''}. Settings › Remote access › Devices lists it: Revoke it there if it isn't yours.` })
   phoneRemote(`Laki: a new device joined remote access: ${d.name}${o.ip ? ` (${o.ip})` : ''}. Revoke it on your Mac if it isn't yours`, { open: r.open })
   changed()
@@ -934,6 +939,7 @@ export function passkeyUnlock(device: string, r: unknown) {
   const challenge = taken(r, device, 'get')
   d.pk.count = verifyGet(r, { challenge, ...site(), key: d.pk as Passkey })
   save()
+  activity({ device: d.name, line: `unlocked: ${d.name}, by its passkey` }) // D9
   return true
 }
 // Use PIN instead: remote access's PIN (shown on the Mac), its wrong ones counted as the link's are (D5)
@@ -1013,6 +1019,7 @@ export function remotePin(p: { token?: unknown; pin?: unknown }, o: Asker = {}):
     Object.assign(r, { used: true, access: hashOf(t) })
     keepRemote()
     changed()
+    activity({ line: `the link opened${r.pin ? ', its PIN right' : ''}${o.ip ? ` from ${o.ip}` : ''}` }) // D9
     return { need: false, token: t }
   }
   if (!r.pin) return use()
@@ -1033,6 +1040,7 @@ function wrongPin(r: RemoteRun, o: Asker, now: number): never {
   const from = o.ip ? ` from ${o.ip}` : ''
   const at = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   log(`remote access: a wrong PIN${from} (${r.wrong.length} today)`)
+  activity({ line: `a wrong PIN${from} (${r.wrong.length} today)` }) // D9
   const end = (why: string, page: string) => {
     log(`remote access ended: ${why}`)
     remoteStop(why)
@@ -1066,6 +1074,7 @@ export function remoteTick(now?: number) {
   if (remote?.until && at >= remote.until) return log('remote access ended: its time is up'), remoteStop('its time is up')
   const r = remote
   if (r?.lockUntil && at >= r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }), changed() // D5: the wait is over
+  if (r?.graceUntil && at >= r.graceUntil) return log('remote access: the Mac unlocked a minute ago: stopped'), remoteStop('you came back to the Mac') // D9
   devicesTidy(at)
   if (r?.url && (woke || at - (r.check?.at ?? 0) >= CHECK_EVERY)) void selfCheck(r, woke ? 1 : 2, at)
   if (r) void power()
@@ -1128,6 +1137,35 @@ function restartTunnel(r: RemoteRun, why: string) {
   const cf = r.cf
   remoteAgain(r, why) // before the stop: its close then isn't an end of its own
   cf?.stop()
+}
+
+// D9: remote access that follows the Mac's lock (settings.remoteWhen 'locked'; main's powerMonitor lock-screen and
+// unlock-screen, the app's only: laki serve has none, so it ignores it). Locked: started as Settings would (remoteAuth:
+// Tailscale or My domain, the stable address paired devices find again, forever); without one or a paired device it
+// can't (lockWhy: Settings greys the choice out; the log says so). Unlocked: one the lock started stops after GRACE (a
+// lock again meanwhile keeps it); paired devices stay paired
+const GRACE = 60_000
+export function lockWhy() {
+  const s = state.settings
+  if (s?.remoteAuth !== 'tailscale' && s?.remoteAuth !== 'domain') return 'it needs a stable address: Tailscale or My domain'
+  return state.remoteDevices?.length ? '' : 'no device is paired yet: open its link on your phone once'
+}
+export async function screenLock(p: { locked?: unknown; now?: number }) {
+  const now = typeof p.now === 'number' ? p.now : Date.now()
+  if (p.locked === true) {
+    if (remote) return void (remote.graceUntil && ((remote.graceUntil = undefined), changed())) // locked again in the grace: it stays
+    if (state.settings?.remoteWhen !== 'locked') return
+    const why = lockWhy()
+    if (why) return void log(`remote access when the Mac locks: not started, ${why}`)
+    const s = state.settings
+    await remoteStart({ hours: 0, lock: true, ...(s.remoteAuth === 'tailscale' ? { via: 'tailscale', pin: !!s.remoteTsPin, funnel: !!s.remoteFunnel } : { host: s.remoteHost ?? '' }) }).catch(e => log(`remote access when the Mac locks: ${firstLine(e)}`))
+    return
+  }
+  if (p.locked === false && remote?.byLock && !remote.graceUntil) {
+    remote.graceUntil = now + GRACE
+    activity({ line: 'the Mac unlocked: remote access stops in a minute' })
+    changed()
+  }
 }
 
 // D8: the Mac awake while remote access runs (core's keepAwake, its reason remote): settings.remoteAwake 'ac' (unset):

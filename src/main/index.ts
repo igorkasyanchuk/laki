@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, powerMonitor, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
 import { type ChildProcess, execFile, spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -1180,6 +1180,12 @@ function trayMenu() {
     ]),
   )
 }
+// D9: remote access that follows the Mac's lock (Settings › Remote access › Start it): the lock and the unlock to the
+// daemon, as the app (its token); laki serve has no app, so none
+app.whenReady().then(() => {
+  powerMonitor.on('lock-screen', () => void rpc('screenLock', { locked: true }).catch(() => {}))
+  powerMonitor.on('unlock-screen', () => void rpc('screenLock', { locked: false }).catch(() => {}))
+})
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
 // st (Q8, Settings › General › Menu bar's Show state): the state its picture shows (stateOf's), its title's ! and its
 // tooltip's words; none (off, or an older page): the filled mark and the count, as before

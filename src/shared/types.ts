@@ -592,6 +592,7 @@ export type Settings = {
   aiGlow?: boolean // Settings › AI: a glow over what Laki AI looks at (a tab's pane, else the window), on unless false
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
+  remoteWhen?: 'manual' | 'locked' // D9: remote access as you start it (unset), or on its own while the Mac is locked (remote.ts screenLock)
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs (core's caffeinate, reason remote): on AC power (unset), also on battery, or never
   remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); both at a quick tunnel's address; tailscale, your tailnet (tailscale serve); domain, My domain (D1: settings.tunnel's named tunnel, a PIN always)
   remoteHost?: string // domain: the word under the named tunnel's domain (unset: laki)
@@ -1221,7 +1222,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 174
+export const API = 175
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

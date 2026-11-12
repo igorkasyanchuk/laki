@@ -710,6 +710,14 @@ email address only, unless you leave the email out on purpose (below).
   Tailscale, which can't reach its own name from this Mac: `tailscale status`), and Settings says what it reached and
   how fast, with *Check* for one now. A failed check turns the status bar's badge yellow with why; two in a row notify
   you and start its tunnel again.
+- *Start it* › *While the Mac is locked* (D9): remote access starts as you lock the Mac and stops a minute after you
+  unlock it, so a phone can follow agents while you're away. It needs a stable address (My domain or Tailscale) and a
+  device you've paired already; your devices stay paired between times. Unlocked and locked again within the minute,
+  it keeps running.
+- *Activity* lists what happened over remote access, newest first: when it started and stopped and why, devices paired
+  and unlocked, wrong PINs, and what each device did (messages and answers to agents, new workspaces and tabs, typing);
+  reading isn't listed. `laki remote log` prints it. It's kept on this Mac only, in `remote-log.jsonl` (yours alone to
+  read), the older half dropped past 1 MB.
 - It won't start, or Cloudflare's sign-in won't let you in: run `cloudflared tunnel login` once in a terminal (a
   browser page opens to pick your Cloudflare account). Settings › *Remote access* and Help say so too.
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
@@ -2685,6 +2693,7 @@ laki stop [--keep]                                      # stop the daemon (agent
 laki daemon                                             # run the daemon in the foreground
 laki serve --tailscale                                  # headless: the daemon and remote access (headless.md)
 laki remote | remote stop                               # remote access's link (and PIN) | stop it
+laki remote log                                         # what was done over remote access, newest first
 ```
 
 `laki screen` shot and windows work on this Mac (an app's window needs Screen Recording for Laki: System Settings ›
