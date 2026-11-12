@@ -982,3 +982,28 @@ export function Num({ value }: { value: number | string }) {
     </span>
   )
 }
+
+// the capsules' light (styles.css .capsule::after): one listener for the window, the capsule under the pointer lit
+// where it is (--mx, --my, a frame at most), the one it left unlit
+let lit: HTMLElement | null = null
+let litAt: { x: number; y: number } | null = null
+let litFrame = 0
+if (typeof window !== 'undefined' && typeof document !== 'undefined')
+  window.addEventListener(
+    'pointermove',
+    e => {
+      litAt = { x: e.clientX, y: e.clientY }
+      const over = (e.target as Element | null)?.closest?.('.capsule') as HTMLElement | null
+      if (over !== lit) lit?.removeAttribute('data-lit'), (lit = over), over?.setAttribute('data-lit', '')
+      if (!lit || litFrame) return
+      litFrame = requestAnimationFrame(() => {
+        litFrame = 0
+        if (!lit || !litAt) return
+        const r = lit.getBoundingClientRect()
+        lit.style.setProperty('--mx', `${litAt.x - r.left}px`)
+        lit.style.setProperty('--my', `${litAt.y - r.top}px`)
+      })
+    },
+    { passive: true },
+  )
+if (typeof document !== 'undefined') document.documentElement?.addEventListener?.('pointerleave', () => (lit?.removeAttribute('data-lit'), (lit = null))) // out of the window: none lit

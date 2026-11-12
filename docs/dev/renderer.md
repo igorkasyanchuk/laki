@@ -1051,3 +1051,13 @@ open by a click (main.tsx sets `html[data-unfold]` for 400 ms on a click of an `
 `.help-q`) grows from 0 to its height (`@starting-style`): a project's rows (`.side-scroll .ws`), Needs you's cards and
 Earlier's, a ? card; the Reader's Show more moves `max-height` from 10lh to `max-content`. `.fold-chev` turns -90° when
 shut on the same spring. Closing is at once: folded content isn't drawn, so it stays out of the tab order.
+
+
+## Capsules' depth
+
+styles.css `.capsule` (the class is `capsule`, not `glass`: `html.glass` is the window's glass mode): `--glass-hi`,
+`--glass-lo`, `--glass-rim` (from `--fg` and #000 by color-mix) as inset shadows, and `::after`'s radial light at `--mx`,
+`--my` (`--glass-light`), shown with `[data-lit]`. ui.tsx: one passive `pointermove` on the window marks the capsule under
+the pointer and moves its light once a frame; leaving the window unlights it. All four tokens go transparent in
+`html.opaque` (flat looks), `html.away` (the window behind another app) and Reduce transparency; the light also with
+Motion: None.

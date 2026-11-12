@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The glass capsules (tab bar buttons, Terminal / Reader, the Reader's box, the status bar) have depth: a lit top edge, a soft shade below and a light that follows the pointer. Flat looks, Reduce transparency and Motion off keep them flat.
 - Folds open smoothly: a project's workspaces, Needs you and its Earlier, a long message's Show more and a setting's ? card grow to their height, the chevron turning with them (not with Motion off or Reduce motion).
 - Counts and meters slide to their new number (the rail, Needs you, a row's plan and changes, the context meter); not with Motion off or Reduce motion.
 - *Dim other panes* is gentler: a split's other panes keep most of their color, their cursor shows as an outline, and nothing dims while Laki is in the background.
