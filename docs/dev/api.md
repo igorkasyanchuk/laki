@@ -563,6 +563,14 @@ move, a connection's own `view`, `resize` and `detach`, `hook`, which `hookWho` 
 when a key of `api` is in none (and `test/agent-gates.test.ts` reads the source for it), so a method is never open by
 default. A method that's the user's alone also goes in `AGENT_NO` (in `FROM`: `notAgent` reads `from`).
 
+The agent gate is classified too (`src/daemon/gates.ts`, data only): every method is in exactly one of `AGENT_OK` (an
+agent may call it; a handler's own checks still hold), `AGENT_NO` (the user's, with why) or `AGENT_OWN` (a branch of
+`agentNo`'s or `boxNo`'s decides: `input`, `tabSet`, `tabClose`, `openIn`, `wsUpdate`, the file edits…), and for remote
+access at Full in `REMOTE_OK` or `REMOTE_NO`. main.ts' `classed` throws as the daemon loads when one is in none, in two,
+or a listed name isn't a method. Placed then: the ticks and tidies (`archivedTidy`, `scheduleTick`…: a far-off `now` ran
+them all), `accountAdd`, `accountSet`, `accountLogin`, `skillSet`, `tabSleep`, `prViewed`, `sideState`, `studioChats`,
+`aiImage` and the passkey calls are `AGENT_NO` (moved from `OPEN` to `FROM`).
+
 S5 classified what had been missed: `aiKey`, `cliInstall`, `cliRemove`, `remoteStop`, `webhookTest`, `resourceStop`,
 `flowTest`, and the notes and To-dos (`noteList`, `noteGet`, `noteFile`, `noteNew`, `noteSave`, `noteUpload`,
 `todoListGet`, `todoListSave`) are `AGENT_NO`; `prAttach`, `prDetach`, `prLabel` and `portKill` only in the agent's own

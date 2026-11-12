@@ -6,6 +6,7 @@ import { request } from 'node:http'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
+import { REMOTE_NO, REMOTE_OK } from '../src/daemon/gates.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
@@ -655,6 +656,9 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['hookAdd', { name: 'far' }], ['hookRm', { name: 'far' }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }], ['settingsSet', { editorCmd: 'sh -c evil' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
+  // what nobody had listed (gates.ts' REMOTE_NO): the clock, accounts, a reset of every setting, extensions' files, a clone
+  for (const [m, p] of [['archivedTidy', { now: 9e15 }], ['accountSet', { id: 'x', name: 'y' }], ['accountRm', { id: 'x' }], ['uiReset', {}], ['webhookTest', { url: 'https://example.com/x' }], ['widgetFileSave', { id: 'links', path: 'widget.json', text: '{}' }], ['widgetNew', { kind: 'number', name: 'Far' }], ['projectClone', { url: 'https://example.com/x.git' }], ['device', { op: 'shot' }]] as const)
+    assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   // S11: nor what goes on the internet, runs later or in every new workspace; a shell tab still opens (the phone's own)
   const pr = await rig.rpc('projectAdd', { path: rig.repo })
   const pws = await rig.rpc('wsNew', { project: pr.id, kind: 'local', name: 'far' })
@@ -784,6 +788,16 @@ test('remote access: the page, one email for some hours, a token of its own; gon
 // D7: remote access's answer level, the session's (a quick tunnel's tab) and a paired device's: each family refused at
 // answer (typing, a shell's send, deleting, archiving, merging, shipping, a command, a mode that never asks, settings,
 // a workspace's other switches), allowed at full; reading, answering, an agent's message and a new agent go through
+// M4: remote access at Full is classified as the answer level is: a method nobody listed is refused as the daemon loads
+test('M4: every api method is in REMOTE_OK or REMOTE_NO, once', () => {
+  const s = readFileSync(new URL('../src/daemon/main.ts', import.meta.url), 'utf8')
+  const at = s.indexOf('const api: Record<string, Handler> = {')
+  const keys = [...s.slice(at, s.indexOf('\n}\n', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
+  assert.ok(keys.length > 250, 'the api table read')
+  assert.deepEqual(keys.filter(k => REMOTE_OK.has(k) === REMOTE_NO.has(k)), [], 'each in exactly one')
+  assert.deepEqual([...REMOTE_OK, ...REMOTE_NO].filter(k => !keys.includes(k)), [], 'every name listed is a method')
+})
+
 test('D7: answer only: what a phone may do at each level, set on the Mac only, in its view as remote.level', async t => {
   const rig = await fresh(t)
   const { port } = rig.info()

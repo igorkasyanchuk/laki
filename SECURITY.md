@@ -102,7 +102,9 @@ command, no mode that never asks, no settings. It's an allowlist the daemon chec
 classified is refused; the daemon won't start with one), set on the Mac only. Laki AI asked from such a phone acts with
 the phone's rights, not the Mac's. A message to an agent can't start with `!` (the agents' shell mode). The agent
 itself still works in its own mode: what you ask it to do, and the asks you allow from the phone, it does as it would on
-the Mac. *Full* is as before: everything but what never goes over remote access.
+the Mac. *Full* is as before: everything but what never goes over remote access. That list is classified too: every
+method is marked as a phone's or not (the daemon won't start with one nobody placed), and a phone at Full can't change
+accounts, reset settings, send a test push, clone a repository, change an extension's files or move Laki's clock.
 
 ### Auto-answer rules
 

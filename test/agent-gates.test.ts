@@ -7,6 +7,7 @@ import { existsSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { AGENT_NO, AGENT_OK, AGENT_OWN } from '../src/daemon/gates.ts'
 import { recorded, type View } from '../src/shared/types.ts'
 import { connect, fresh, seen, until } from './helpers.ts'
 
@@ -210,6 +211,13 @@ test('S5: every api method is in FROM, CALLER or OPEN', () => {
   assert.ok(keys.length > 250, 'the api table read')
   assert.deepEqual(keys.filter(k => !from.has(k) && !caller.has(k) && !open.has(k)), [])
   assert.deepEqual(keys.filter(k => open.has(k) && (from.has(k) || caller.has(k))), [], 'in one class each')
+  // the agent gate's own classes (gates.ts): an agent's, the user's, or a branch of agentNo's or boxNo's: once each
+  const sets = [AGENT_OK, new Set(Object.keys(AGENT_NO)), AGENT_OWN]
+  assert.deepEqual(keys.filter(k => sets.filter(x => x.has(k)).length !== 1), [], 'each in exactly one of AGENT_OK, AGENT_NO, AGENT_OWN')
+  assert.deepEqual(sets.flatMap(x => [...x]).filter(k => !keys.includes(k)), [], 'every name listed is a method')
+  assert.deepEqual(Object.keys(AGENT_NO).filter(k => !from.has(k) && !caller.has(k)), [], "a refusal reads a from the daemon filled in")
+  const gate = s.slice(s.indexOf('function boxNo('), s.indexOf('const crossOk'))
+  assert.deepEqual([...AGENT_OWN].filter(k => !gate.includes(`'${k}'`) && !/^(file|hunk)/.test(k)), [], 'AGENT_OWN: a branch of its own names it')
 })
 
 test("S5: what was never classified: Laki AI's key, the CLI, remote access, a test push, Resources, notes and to-dos are yours; PR links and ports its own; removals ask", async t => {
@@ -236,6 +244,18 @@ test("S5: what was never classified: Laki AI's key, the CLI, remote access, a te
     ['noteUpload', { id: note.id, data: '' }],
     ['todoListGet', {}],
     ['todoListSave', { items: [] }],
+    // what nobody had listed (gates.ts): the clock, accounts, skills, the user's chats and review marks
+    ['archivedTidy', { now: 9e15 }],
+    ['flowTick', { now: 9e15 }],
+    ['accountAdd', { agent: 'claude', name: 'x' }],
+    ['accountSet', { id: 'x', name: 'y' }],
+    ['skillSet', { agent: 'claude', on: false }],
+    ['tabSleep', { tab }],
+    ['prViewed', { ws: one.id, path: 'a', viewed: true }],
+    ['sideState', { tab }],
+    ['studioChats', {}],
+    ['aiImage', { path: 'x' }],
+    ['passkeyPin', { pin: '0000' }],
   ]
   for (const [m, x] of no) await assert.rejects(rig.rpc(m, { ...x, from }), /an agent can't .*: it's the user's \(ask them\)/, m)
   for (const m of ['prAttach', 'prDetach', 'prLabel']) await assert.rejects(rig.rpc(m, { ws: two.id, pr: '1', label: 'x', on: true, from }), /its own workspace's PR only/, m)

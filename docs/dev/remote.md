@@ -170,7 +170,7 @@ takes the tunnel's URL as an Origin, and that token only with it (a client with 
 S11: its WebSocket carries no token in the URL: the upgrade goes through, and its first message must be
 `{ auth: <token> }` within 5 s, else the socket closes (4401) with nothing sent (the app and the CLI keep `?token=`);
 `remoteStop` drops both, so an old link is dead. A client from that Origin (`Conn.remote`, the `/rpc` call's) is
-refused `REMOTE_NO` (`remoteStart`, `cliInstall`, `cliRemove`, `shutdown`, `aiKey`, `skillSet`, `accountAdd`,
+refused `REMOTE_NO` (gates.ts: every method is in `REMOTE_OK` or `REMOTE_NO`, checked as the daemon loads, as `ANSWER` and `ANSWER_NO` are; also the ticks and tidies, `accountSet`, `accountRm`, `tabAccount`, `webhookTest`, `uiReset`, `projectClone`, `device`, and an extension's files: `widgetFileSave`, `widgetWrite`, `widgetNew`, `widgetRm`, `widgetRestore`, `widgetUndo`, `widgetRemix`, `widgetDev`, `widgetMock`, `widgetCheck`) (`remoteStart`, `cliInstall`, `cliRemove`, `shutdown`, `aiKey`, `skillSet`, `accountAdd`,
 `accountLogin`), `widgetSet` with `on: true`, `net: true` or a `source`, and `settingsSet` changing a `REMOTE_KEYS`
 setting (`remote*`, `webhook`, `widgetDirs`, `widgetDev`, `presets`, `env`, `tunnel`; sent back unchanged is fine: Settings saves
 them all) (M4); S11: also `tunnelStart`, `scheduleSet`, `shareStart` with `hours` 0 (its default) and `projectSet` changing a
