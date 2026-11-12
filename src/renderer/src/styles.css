@@ -3677,3 +3677,17 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 :is(.side-scroll, .reader-scroll, .fr-files, .settings-main)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); }
 .settings-main[data-scrolled]:has(.theme-find) { mask-image: none; } /* the themes' search stays at the top: never faded */
 .settings-head { border-bottom-color: transparent; }
+
+/* V12: continuous corners, as macOS draws them (a superellipse, not a circle's quarter): what takes the window's, a
+   panel's or a control's corner (dialogs, menus and other floats, cards, buttons, fields, the picked row, a menu's and
+   ⌘K's items, a tab). The three grow by 1.25 here, so the corner looks as big as the round one did. Pills, circles and
+   the Square look (--rs: 0, a squircle of 0 is a square) stay; so does what's in a capsule (its pill). ponytail: a list,
+   not every element: a pill or a circle can't be told apart by its value. A field's focus ring (box-shadow) follows the
+   shape: ui-smoke's Ship sheet */
+@supports (corner-shape: squircle) {
+  :root { --r-window: calc(var(--r-xl) * 1.25); --r-panel: calc(var(--r-l) * 1.25); --r-control: calc((var(--r-m) + 1px) * 1.25); }
+  :is(.menu, .modal, .finder, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick, .set-group, .need, .remote-risk, .ws, .menu-item, .palette-item, input, select, textarea, button:not([class]), button.primary, .buttons button),
+  html.material .app:not([data-dz], .narrow, .full) .main,
+  :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { corner-shape: squircle; }
+  .capsule, .capsule :is(button, textarea) { corner-shape: round; }
+}

@@ -928,6 +928,13 @@ cost, measured 12 Nov 2026 in the dev renderer (Chromium 156, `npm run demo`, a 
 twice each): mean 16.65 / 16.66 ms with the blur, 16.66 / 16.67 ms without, p95 17.5 ms in all four, no frame over 17.7
 ms. None is over the terminal's canvas, so its repaints don't redraw a blur.
 
+Continuous corners (V12): styles.css' last block, `@supports (corner-shape: squircle)` (Electron 45's Chromium 156 has
+it): `--r-window`, `--r-panel` and `--r-control` × 1.25 (a squircle's corner looks smaller than a circle's of the same
+radius), and `corner-shape: squircle` on a list of what takes them (floats, cards, fields, plain and primary buttons, the
+picked row, menu and ⌘K items, the frame's tab and main card). A list: a pill (`--r-pill`) or a circle (50%) can't be
+told by its value, and those stay round, as does a capsule and what's in it. The Square look's `--rs: 0` makes every
+token 0. floater.html (its own sheet): the bubbles' menu, voice window, card and reply box.
+
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);

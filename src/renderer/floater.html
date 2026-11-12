@@ -187,7 +187,12 @@
       .i-more { grid-column: 1 / -1; color: #9aa0ad; white-space: pre-line; padding: 0 6px 4px 20px; }
       @media (prefers-reduced-motion: reduce) { .isl-b.waiting { animation: none; } #island .i-chev { transition: none; } }
       @media (prefers-reduced-motion: reduce) { #bar, .shape, .fl-acts .fl-btn { animation: none; } .fl-dot, .fl-btn { transition: none; } }
-    </style>
+          /* V12: the bubbles' cards, menu and voice window: continuous corners (styles.css' note), a little bigger to look the same */
+      @supports (corner-shape: squircle) {
+        #menu, #voice { corner-shape: squircle; border-radius: 15px; }
+        #card, .i-reply { corner-shape: squircle; border-radius: 12px; }
+      }
+</style>
   </head>
   <body data-side="right" data-fstyle="glow">
     <div id="bar"><div class="shape"></div></div>
