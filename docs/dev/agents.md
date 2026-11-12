@@ -70,6 +70,16 @@ pane the newest focused window is on). `layoutMove` (beside another pane, or non
 
 ### Agent variables
 
+Isolation (F7, step 1): `shared/isolation.ts`. A live workspace's `port` is 3100 + 10 × n (`allocPort`: the first block
+no live one has), n its slot (`slotOf`; archived: port 0, none). `isolationEnv(port, project)`: `LAKI_SLOT`, `PORT_1`…`9`,
+`LAKI_DB_SUFFIX` (`_ws<n>`), `COMPOSE_PROJECT_NAME` (`<project id>-ws<n>`, lowercased, what compose allows), in
+`lakiEnv` beside `PORT` (every tab, setup, the Run tab, teardown: before archive zeroes the port) and in verify.ts' and
+workflow.ts' scripts. A restored workspace takes the first free block again, so its slot may change. `portClashes` (the
+sidebar: a ⚠ chip with the port on both rows, who has it in its tip): a workspace's listening `ports` (resources.ts) in
+another live one's block. Settings › a project › *Isolation* lists them, with a compose file, a `DATABASE_URL`, a
+setup and a teardown to copy; Teardown is Scripts' (archive and delete, its trust as setup's). Step 2 (a devcontainer
+per workspace) isn't built.
+
 `shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
 `{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
 (`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: fish's way under fish, else `q`) where the caller says `vars`: `send` (before a queue), `addTab`'s

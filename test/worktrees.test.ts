@@ -135,6 +135,22 @@ test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch
   assert.ok(existsSync(join(p.path, 'README.md')), 'deleting a local workspace keeps the repo')
 })
 
+test('F7: a workspace\'s slot, its ten ports, its database suffix and compose name reach setup and teardown; a second one has its own', async t => {
+  const line = 'echo "$LAKI_SLOT $PORT $PORT_1 $PORT_9 $LAKI_DB_SUFFIX $COMPOSE_PROJECT_NAME"'
+  const rig = await fresh(t, { config: { setup: `${line} > iso.txt`, teardown: `${line} >> "$HOME/teardown.txt"` } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'iso a' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'iso b' })
+  const said = (ws: { path: string }) => (f => (existsSync(f) ? readFileSync(f, 'utf8').trim() : ''))(join(ws.path, 'iso.txt'))
+  await until(() => said(a) && said(b), 'both setups')
+  const compose = p.id.toLowerCase().replace(/[^a-z0-9_-]+/g, '-')
+  assert.equal(said(a), `0 3100 3101 3109 _ws0 ${compose}-ws0`)
+  assert.equal(said(b), `1 3110 3111 3119 _ws1 ${compose}-ws1`)
+  await rig.rpc('wsRm', { id: b.id })
+  await until(() => existsSync(join(rig.env.HOME, 'teardown.txt')), 'its teardown')
+  assert.equal(readFileSync(join(rig.env.HOME, 'teardown.txt'), 'utf8').trim(), `1 3110 3111 3119 _ws1 ${compose}-ws1`, 'teardown has them too, before the port goes')
+})
+
 test("noSetup: a worktree without its setup script, its agent at once, .worktreeinclude's files still copied; run setup later", async t => {
   const rig = await fresh(t, { config: { setup: 'touch .setup-ran; sleep 60' } }) // ran: claude would wait a minute
   writeFileSync(join(rig.repo, '.env'), 'A=1\n')

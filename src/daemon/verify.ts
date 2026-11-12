@@ -14,6 +14,7 @@ import { diff, treeOf } from './files.ts'
 import { killGroup } from './resources.ts'
 import { phone } from './phone.ts'
 import { aiOnce } from './ai.ts'
+import { isolationEnv } from '../shared/isolation.ts'
 
 export const CHECK_TRIES = 3 // failures in a row sent back to the agent, then it's over to you
 const STEP_MIN = Number(process.env.LAKI_CHECK_MIN) || 10 // a script's minutes (tests' fewer)
@@ -62,7 +63,7 @@ const fence = (s: string) => (f => `${f}text\n${s}\n${f}`)('`'.repeat(Math.max(3
 function step(ws: Workspace, name: CheckStepName, cmd: string): Promise<{ code: number; out: string; late: boolean }> {
   return new Promise(ok => {
     const storage = storageOf(ws)
-    const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), LAKI_WORKSPACE: ws.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), CI: '1' } })
+    const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), ...isolationEnv(ws.port, ws.project), LAKI_WORKSPACE: ws.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), CI: '1' } })
     running.set(ws.id, child)
     let out = ''
     const take = (d: Buffer) => (out = (out + d.toString()).slice(-64000))

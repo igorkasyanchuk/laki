@@ -3713,3 +3713,10 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 ::view-transition { pointer-events: none; }
 ::view-transition-group(*) { animation-duration: var(--t-mid); animation-timing-function: var(--ease-out); }
 ::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--t-mid); }
+
+/* F7: a workspace's server on another's port block (shared/isolation.ts portClashes): a chip on both rows */
+.ws-clash { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; color: var(--waiting); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.iso { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); } /* F7: Settings › a project › Isolation */
+.iso-var { display: flex; align-items: baseline; gap: var(--sp-4); } .iso-var code { flex: none; min-width: 22ch; font: var(--fs-2) var(--mono); }
+.iso-eg { margin-top: var(--sp-2); } .iso-eg-head { display: flex; align-items: center; justify-content: space-between; }
+.iso-eg pre { margin: var(--sp-1) 0 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-m); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }

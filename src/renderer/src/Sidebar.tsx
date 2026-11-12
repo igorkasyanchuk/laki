@@ -20,6 +20,7 @@ import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
 import { bulkGroups } from '../../shared/ask'
 import { fresh } from './motion'
+import { BLOCK, type Clash, portClashes } from '../../shared/isolation'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
 
@@ -184,6 +185,10 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const needsShown = !find && (!rail || railKind === 'projects') && settings.needsList !== false && !folded.includes('needs')
   const needWs = needsShown ? undefined : needNext?.workspace
   const radarWhose = (c: Collision) => (c.ws ? wsName(view.workspaces.find(x => x.id === c.ws) ?? { id: c.ws }) : c.base!)
+  // F7: a dev server on a port of another workspace's block: a chip on both, saying who has the port
+  const clashes = portClashes(view.workspaces)
+  const clashTip = (cs: Clash[]) =>
+    cs.map(c => (o => (c.theirs ? `Port ${c.port} is ${o ? wsName(o) : c.other}'s (its ports: ${o?.port} to ${(o?.port ?? 0) + BLOCK - 1}): a server here listens on it` : `${o ? wsName(o) : c.other} listens on port ${c.port}, one of this workspace's`))(view.workspaces.find(x => x.id === c.other))).join('\n') + '\nEach workspace has its own ten: $PORT and $PORT_1…$PORT_9'
   const radarTip = (w: WorkspaceView) => radarOf(w).map(c => `${c.file}: ${c.ws ? `${radarWhose(c)} changes it too` : `${c.base} changed it since this branched`} (${spanText(c.theirs)}; here ${spanText(c.mine)})`).join('\n')
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
@@ -245,6 +250,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
         {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
+        {(cs => cs && (
+          <span className="ws-clash" data-tip={clashTip(cs)}>
+            <Icon name="triangle" size={11} />:{cs[0].port}
+          </span>
+        ))(clashes.get(w.id))}
         {mark('radar') && (n => n > 0 && (
           <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), setOverlapsAt({ w: w.id, list: radarOf(w) })))}>
             <Icon name="gitCompare" size={11} />

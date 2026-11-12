@@ -44,6 +44,7 @@ import { ticketOf } from './tickets.ts'
 import { managedView, policy, policyAgent, policySettings, policyTick } from './policy.ts'
 import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
+import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
 export const run = promisify(execFile)
 
@@ -1051,11 +1052,11 @@ const hasDir = async (proj: Project, id: string) =>
     ? exec({ host: proj.host, path: '/' }, 'test', ['-e', `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}`]).then(() => true, () => false)
     : existsSync(join(worktreesOf(proj), id))
 
-// allocPort: 3100 + n*10, the first not taken by another live workspace
+// allocPort: 3100 + n*10, the first not taken by another live workspace (F7: n is its slot, shared/isolation.ts)
 export function allocPort() {
   const used = new Set(state.workspaces.filter(w => !w.archived).map(w => w.port))
-  let port = 3100
-  while (used.has(port)) port += 10
+  let port = PORT_BASE
+  while (used.has(port)) port += BLOCK
   return port
 }
 
@@ -1524,6 +1525,7 @@ export function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> =
     LAKI_WORKSPACE: ws.id,
     LAKI_TAB: tab.id,
     PORT: String(ws.port),
+    ...isolationEnv(ws.port, ws.project), // F7: LAKI_SLOT, PORT_1…9, LAKI_DB_SUFFIX, COMPOSE_PROJECT_NAME
     ...(!ws.host && { LAKI_HOME: dir }), // the laki CLI's: there's none on a host
     LAKI_PROJECT_PATH: (p => (p?.host || !ws.host ? p?.path : undefined))(state.projects.find(p => p.id === ws.project)) ?? ws.path, // the repo itself: setup copies .env etc. from it (a codespace's: its own)
     ...(storage && { LAKI_STORAGE_FOLDER: storage }), // its files for the user to keep: every tab's the same

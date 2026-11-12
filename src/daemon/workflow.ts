@@ -25,6 +25,7 @@ import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { copyTree, move, readCapped, readJson, writeAtomic } from '../shared/conn.ts'
 import { chatCost, chatCostBefore } from './meters.ts'
+import { isolationEnv } from '../shared/isolation.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -1089,7 +1090,7 @@ function command(r: FlowRun, b: Block) {
   kill0(r) // never two at once
   const { cmd, env: vals } = shellFill(b.cmd ?? '', varsOf(r)) // every value an env reference: an answer, a PR's title, never shell
   const storage = storageOf(ws)
-  const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), ...vals, CI: '1' } })
+  const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), ...isolationEnv(ws.port, ws.project), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), ...vals, CI: '1' } })
   procs.set(r.id, child)
   let out = ''
   const take = (d: Buffer) => (out = (out + d.toString()).slice(-64000))

@@ -21,7 +21,10 @@ changing it: [AGENTS.md](../AGENTS.md).
 
 - **Workspaces**: one git worktree and branch per task (or the repo or a plain folder itself), with setup and
   teardown scripts (worktrees only: a folder's own workspace never runs them), env, a `$PORT` of its own, and a
-  name you can change. Files git ignores that a worktree needs (`.env`…) are copied in (`.worktreeinclude`).
+  name you can change. Each workspace is kept apart from the others (Settings › a project › *Isolation*): ten ports of
+  its own (`$PORT`, `$PORT_1`…`$PORT_9`), a number (`$LAKI_SLOT`), a database suffix (`$LAKI_DB_SUFFIX`, `_ws<n>`) and
+  a compose project (`$COMPOSE_PROJECT_NAME`, `<project>-ws<n>`) in every tab, setup, run, Done check and teardown, with
+  examples to copy; a server listening on another workspace's port shows ⚠ and the port on both rows. Files git ignores that a worktree needs (`.env`…) are copied in (`.worktreeinclude`).
 - **Agents**: Claude Code, Codex, Gemini, Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
   workspace; notifications and a count on the Dock icon and in the menu bar; pushes to your phone; a follow-up queue; resume after a restart; usage limits wait
   and continue; a model and effort per workspace; turn timers (off by default); ⌘J jumps to the next tab that

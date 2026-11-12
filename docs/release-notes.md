@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Workspaces stay apart: each gets ten ports, a slot number, a database suffix and a compose project name in its environment (Settings › a project › Isolation has examples to copy), and a dev server on another workspace's port is flagged on both.
 - On macOS 26 the app icon follows your icon style: light, dark, tinted and clear, built from layers.
 - Things move on springs: switches, the picked row, a Needs you card and the bubbles' buttons settle with a little bounce, and menus, popovers and dialogs ease in.
 - Pages cross-fade, Ship, New workspace and Rename grow from the button that opened them and shrink back into it, and a workspace you pin slides into Pinned.

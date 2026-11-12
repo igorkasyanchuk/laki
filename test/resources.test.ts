@@ -152,3 +152,25 @@ test('whenDone: once what was going is done, a countdown, then the Mac sleeps an
   await sleep(1000)
   assert.equal(ran(), 'sleepnow')
 })
+
+test('F7 portClashes: a server on a port of another workspace\'s block shows on both; its own block, an archived one and a stray port don\'t', async () => {
+  const { isolationEnv, portClashes, slotOf } = await import('../src/shared/isolation.ts')
+  assert.equal(slotOf(3100), 0)
+  assert.equal(slotOf(3130), 3)
+  assert.equal(slotOf(0), undefined, 'archived')
+  assert.equal(slotOf(3105), undefined)
+  assert.deepEqual(isolationEnv(0, 'shop'), {})
+  const e = isolationEnv(3120, 'My Shop!')
+  assert.deepEqual([e.LAKI_SLOT, e.PORT_1, e.PORT_9, e.LAKI_DB_SUFFIX, e.COMPOSE_PROJECT_NAME, e.PORT_10], ['2', '3121', '3129', '_ws2', 'my-shop-ws2', undefined])
+  const ws = [
+    { id: 'a', port: 3100, ports: [3100, 3101, 3115, 3115] }, // its own two, and one of b's (twice: once)
+    { id: 'b', port: 3110, ports: [3110] },
+    { id: 'c', port: 3120, ports: [8080] }, // nobody's block
+    { id: 'old', port: 0, archived: true, ports: [3105] }, // archived: no block, and its processes are gone
+  ]
+  const m = portClashes(ws)
+  assert.deepEqual(m.get('a'), [{ port: 3115, other: 'b', theirs: true }])
+  assert.deepEqual(m.get('b'), [{ port: 3115, other: 'a', theirs: false }])
+  assert.equal(m.has('c'), false)
+  assert.equal(m.has('old'), false)
+})

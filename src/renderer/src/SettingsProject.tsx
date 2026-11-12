@@ -329,6 +329,47 @@ function AllowRules({ rules, onSave }: { rules: AllowRule[]; onSave: (allow: All
   )
 }
 
+// F7: what keeps two workspaces of the project apart (shared/isolation.ts): the variables every tab, setup, run, Done
+// check and teardown gets, and examples to copy for common stacks; Teardown (Scripts) takes them down on archive
+const ISO_VARS: [string, string][] = [
+  ['LAKI_SLOT', "the workspace's number: 0, 1, 2…"],
+  ['PORT', 'its first port (3100 + 10 × the slot)'],
+  ['PORT_1 … PORT_9', 'the nine after it: a database, a worker, a second server'],
+  ['LAKI_DB_SUFFIX', '_ws<slot>: a database name of its own'],
+  ['COMPOSE_PROJECT_NAME', '<project>-ws<slot>: docker compose reads it, so each workspace has its own containers and volumes'],
+]
+const ISO_EGS = (project: string): [string, string][] => [
+  ['docker-compose.yml', `services:\n  db:\n    image: postgres:16\n    ports: ["\${PORT_1}:5432"]\n  web:\n    build: .\n    ports: ["\${PORT}:3000"]\n# its name: $COMPOSE_PROJECT_NAME (${project}-ws<slot>), set already`],
+  ['.env (DATABASE_URL)', 'DATABASE_URL=postgres://localhost:${PORT_1}/app${LAKI_DB_SUFFIX}'],
+  ['Setup', 'docker compose up -d && createdb -p $PORT_1 app$LAKI_DB_SUFFIX'],
+  ['Teardown', 'docker compose down -v; dropdb --if-exists app$LAKI_DB_SUFFIX'],
+]
+function Isolation({ project }: { project: string }) {
+  const [copied, setCopied] = useState('')
+  const copy = (k: string, v: string) => void navigator.clipboard.writeText(v).then(() => (setCopied(k), setTimeout(() => setCopied(''), 1500)))
+  return (
+    <Group title="Isolation" hint="Every workspace has ten ports of its own and a number: a dev server, a database or a compose stack that uses these never meets another workspace's. A server on another workspace's port shows ⚠ on both rows. Teardown (Scripts) runs on archive, with the same trust as setup">
+      <div className="setting-box iso">
+        {ISO_VARS.map(([k, v]) => (
+          <div key={k} className="iso-var">
+            <code>${k}</code>
+            <span className="muted small">{v}</span>
+          </div>
+        ))}
+        {ISO_EGS(project).map(([k, v]) => (
+          <div key={k} className="iso-eg">
+            <div className="iso-eg-head">
+              <span className="small">{k}</span>
+              <IconButton icon="copy" title={copied === k ? 'Copied' : `Copy the ${k} example`} onClick={() => copy(k, v)} />
+            </div>
+            <pre className="mono small">{v}</pre>
+          </div>
+        ))}
+      </div>
+    </Group>
+  )
+}
+
 export function ProjectSection(p: {
   project: ProjectInfo
   noNotes?: boolean // the project page: its own Notes tab has them
@@ -463,6 +504,7 @@ export function ProjectSection(p: {
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </Group>
+      <Isolation project={p.project.id} />
       {p.global?.flows !== false && (
         <Group title="Workflows">
           <div className="setting-box">
