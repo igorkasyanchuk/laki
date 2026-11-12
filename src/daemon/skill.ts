@@ -76,8 +76,8 @@ From a terminal Laki didn't start (not a tab), \`laki\` may wait up to a minute 
 Laki's window (it says so): wait for it; don't retry in a loop.
 
 Over MCP (\`laki mcp\`) the core tools are listed (state, new workspace, send, screen, wait, diff, alert, progress,
-limits); \`laki_more\` with a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) lists that
-group's too. Any \`laki_*\` tool named below runs by its name whether it's listed or not.
+limits); call \`laki_more\` with a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) first
+to get that group's tools: a \`laki_*\` tool named below that you don't have is in one of them.
 
 ## Start work
 

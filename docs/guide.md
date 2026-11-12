@@ -831,7 +831,7 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   (unset: the agent's default); memory compaction uses it too.
 - **Your endpoint**: any OpenAI-compatible server with tool calls, a local one (Ollama, LM Studio, llama.cpp's server)
   or a provider's: its URL (https, or http on this Mac only, no user or password in it), model and key (none for a
-  local server; kept in `ai-endpoint-key`, 0600, as OpenRouter's is). The same tools and conversation as OpenRouter;
+  local server; kept in `ai-endpoint-key`, 0600, as OpenRouter's is; a redirect is never followed; an empty URL turns it off). The same tools and conversation as OpenRouter;
   not priced. *Test* asks it to say OK. Workflows' AI call blocks and memory compaction go there too; Voice and
   decision blocks stay on OpenRouter. Only you set it (not an agent, not over remote access); a team's policy can lock it.
 
@@ -2746,7 +2746,7 @@ a spot in the picture is where to tap. MCP's `laki_device` does the same.
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. It lists its core
 tools (state, a new workspace, send, screen, wait, diff, ask, alert, progress, limits) and `laki_more`, which adds a group
 to the list (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings): less of an agent's context goes
-to tools it won't use. Any tool runs by its name, listed or not; `laki mcp --all` (or `LAKI_MCP_ALL=1`) lists every one,
+to tools it won't use (an agent calls `laki_more` first for a tool it doesn't have yet); `laki mcp --all` (or `LAKI_MCP_ALL=1`) lists every one,
 as Laki AI's own backends do. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_new_tab` (another agent in a workspace; `beside` a tab: a split in its tab), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and

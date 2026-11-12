@@ -51,7 +51,7 @@ const opened = new Set(['core'])
 let changed = () => {}
 const more: Tool = {
   name: 'laki_more',
-  description: `More of Laki's tools, a group at a time: the group's tools are listed from then on (any tool also runs by its name unlisted). Groups:\n${Object.entries(GROUPS)
+  description: `More of Laki's tools, a group at a time: call it before a laki_* tool you don't have yet, and that group's tools are listed from then on. Groups:\n${Object.entries(GROUPS)
     .filter(([g]) => g !== 'core')
     .map(([g, x]) => `- ${g}: ${x.words}`)
     .join('\n')}`,

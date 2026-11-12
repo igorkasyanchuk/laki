@@ -62,18 +62,18 @@ export function aiEndpointKey(o: { key?: string | null }) {
   return { key: true }
 }
 // where a chat-completions call goes: Your endpoint (backend 'endpoint'), else OpenRouter
-type Target = { url: string; key: string; model: string; or: boolean; name: string }
+type Target = { url: string; key: string; model: string; or: boolean; name: string; redirect: RequestRedirect } // redirect: Your endpoint's never followed (its https-or-this-Mac rule would be gone)
 const target = (backend = state.settings?.ai?.backend): Target => {
-  if (backend !== 'endpoint') return { url: api(), key: readKey(), model: state.settings?.ai?.models?.openrouter || AI_MODEL, or: true, name: 'OpenRouter' }
+  if (backend !== 'endpoint') return { url: api(), key: readKey(), model: state.settings?.ai?.models?.openrouter || AI_MODEL, or: true, name: 'OpenRouter', redirect: 'follow' }
   const e = state.settings?.aiEndpoint
   if (!e?.url || !e.model) throw new Error('no endpoint: Settings › AI › Your endpoint (its URL and model)')
-  return { url: endpointOk(e.url), key: readEndpointKey(), model: e.model, or: false, name: 'Your endpoint' }
+  return { url: endpointOk(e.url), key: readEndpointKey(), model: e.model, or: false, name: 'Your endpoint', redirect: 'error' }
 }
 const headersOf = (t: Target) => ({ ...(t.key && { authorization: `Bearer ${t.key}` }), 'content-type': 'application/json', ...(t.or && { 'x-title': 'Laki' }) })
 // Settings › AI's Test: one short ask to Your endpoint, its answer or why not
 export async function aiEndpointTest() {
   const t = target('endpoint')
-  const res = await fetch(`${t.url}/chat/completions`, { method: 'POST', headers: headersOf(t), body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: 'Say OK.' }], max_tokens: 16 }), signal: AbortSignal.timeout(20000) })
+  const res = await fetch(`${t.url}/chat/completions`, { method: 'POST', headers: headersOf(t), redirect: t.redirect, body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: 'Say OK.' }], max_tokens: 16 }), signal: AbortSignal.timeout(20000) })
   const j: any = await res.json().catch(() => ({}))
   if (!res.ok || j.error) throw new Error(`Your endpoint: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
   const text = j.choices?.[0]?.message?.content
@@ -663,6 +663,7 @@ async function openrouter(o: Opts) {
       const res = await fetch(`${at.url}/chat/completions`, {
         method: 'POST',
         headers: headersOf(at),
+        redirect: at.redirect,
         body: JSON.stringify({ model, messages, tools: fns, stream: true, ...(at.or ? { usage: { include: true } } : { stream_options: { include_usage: true } }) }),
         signal: AbortSignal.any([o.signal, quiet.signal]),
       })
@@ -701,12 +702,13 @@ const waitOf = (signal?: AbortSignal) => AbortSignal.any([...(signal ? [signal] 
 export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string }) {
   const at = target(state.settings?.ai?.backend === 'endpoint' ? 'endpoint' : 'openrouter') // Your endpoint when it's Laki AI's; else OpenRouter (claude and codex: aiOnce)
   if (at.or && !at.key) throw new Error('no OpenRouter API key: Settings › AI')
-  const model = o.model?.trim() || at.model
+  const model = (at.or && o.model?.trim()) || at.model // a block's or compaction's model is an OpenRouter id: Your endpoint has its own
   const call: AiCall = { at: Date.now(), backend: at.or ? 'openrouter' : 'endpoint', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
   try {
     const res = await fetch(`${at.url}/chat/completions`, {
       method: 'POST',
       headers: headersOf(at),
+      redirect: at.redirect,
       // json: an answer that is a JSON object (out:'s), where the model can
       body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], ...(at.or && { usage: { include: true } }), ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
       signal: waitOf(o.signal),

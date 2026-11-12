@@ -433,7 +433,7 @@ one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
   mcp: `Laki as an MCP server over stdio (JSON-RPC, a message per line): its state, a new workspace, a message to an
 agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, archives or ships. It lists its core tools
 and laki_more, which adds a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) to the
-list; any tool runs by its name, listed or not. --all (or LAKI_MCP_ALL=1) lists every one.
+list (a client that keeps its first list can still call any tool by its name). --all (or LAKI_MCP_ALL=1) lists every one.
 
   claude mcp add laki -- laki mcp
   claude mcp add laki -- laki mcp --all`,

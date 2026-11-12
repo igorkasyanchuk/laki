@@ -2272,7 +2272,7 @@ export function settingsSet(o: Settings, own = false) {
   policySettings(o as Record<string, unknown>) // a managed one only as the policy has it
   if (o.ptyHost && !state.settings?.ptyHost) void ptyUp().catch((e: Error) => log(`pty host: ${(e as Error).message}`)) // R6: new terminals go there from now on
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
-  if (o.aiEndpoint) o = { ...o, aiEndpoint: { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } } // https, or http on this Mac; no credentials
+  if (o.aiEndpoint) o = { ...o, aiEndpoint: String(o.aiEndpoint.url ?? '').trim() ? { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } : undefined } // https, or http on this Mac; no credentials. No URL: none
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)

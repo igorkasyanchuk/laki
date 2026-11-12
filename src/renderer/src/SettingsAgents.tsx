@@ -223,6 +223,7 @@ function EndpointFields({ api, endpoint, onEndpoint, has }: { api: AiApi; endpoi
   const [url, setUrl] = useState(endpoint?.url ?? '')
   const [model, setModel] = useState(endpoint?.model ?? '')
   const [said, setSaid] = useState('')
+  useEffect(() => (setUrl(endpoint?.url ?? ''), setModel(endpoint?.model ?? '')), [endpoint?.url, endpoint?.model]) // as saved (the daemon's /-less URL, a policy's)
   const [hasKey, setHasKey] = useState(has)
   useEffect(() => setHasKey(has), [has])
   const save = () => (url.trim() !== (endpoint?.url ?? '') || model.trim() !== (endpoint?.model ?? '')) && onEndpoint?.({ url: url.trim(), model: model.trim() })

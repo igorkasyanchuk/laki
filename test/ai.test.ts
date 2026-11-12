@@ -65,6 +65,14 @@ test("ai: Your endpoint: the same tool loop at its own URL with its own key, non
   const seen = JSON.stringify(await rig.rpc('state')) + JSON.stringify(a) + readFileSync(join(rig.data, 'state.json'), 'utf8')
   assert.ok(!seen.includes('fake-secret-own'), 'the key: its file only')
   assert.deepEqual(await rig.rpc('aiEndpointKey', { key: '' }), { key: false })
+  // a redirect is never followed (its https-or-this-Mac rule would go with it); no URL: no endpoint
+  const moved = createServer((_, r) => r.writeHead(307, { location: 'http://example.com/v1/chat/completions' }).end())
+  await new Promise<void>(r => moved.listen(0, '127.0.0.1', r))
+  t.after(() => moved.close())
+  await rig.rpc('settingsSet', { aiEndpoint: { url: `http://127.0.0.1:${(moved.address() as AddressInfo).port}/v1`, model: 'llama' } })
+  await assert.rejects(rig.rpc('aiEndpointTest'), /fetch failed|redirect/)
+  await rig.rpc('settingsSet', { aiEndpoint: { url: '', model: '' } })
+  assert.equal((await rig.rpc('state')).settings.aiEndpoint, undefined)
 })
 
 test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 0600 file; each ask is logged', async t => {
