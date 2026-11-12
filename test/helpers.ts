@@ -206,7 +206,8 @@ export async function farFetch(url: string, init: { method?: string; headers?: R
   if (!secret || !url.endsWith('/rpc')) return fetch(url, init)
   const salt = randomBytes(16)
   const ch = channel(keyOf(secret, salt), PAGE)
-  const r = await fetch(url, { ...init, headers: { ...init.headers, 'x-laki-e2e': salt.toString('base64') }, body: new Uint8Array(ch.seal(init.body ?? '')) })
+  const body = init.body ? JSON.stringify({ ...JSON.parse(init.body), at: Date.now() }) : '' // when it was sealed: the daemon refuses one over 5 minutes old
+  const r = await fetch(url, { ...init, headers: { ...init.headers, 'x-laki-e2e': salt.toString('base64') }, body: new Uint8Array(ch.seal(body)) })
   const buf = Buffer.from(await r.arrayBuffer())
   const text = r.headers.get('content-type') === 'application/octet-stream' ? String(ch.open(buf)) : String(buf)
   return { status: r.status, ok: r.ok, headers: r.headers, json: async () => JSON.parse(text), text: async () => text }
@@ -226,8 +227,9 @@ export class FarWs extends EventEmitter {
       if (!this.ch) {
         const j = JSON.parse(String(raw))
         if (j.e2e !== 1 || !secret) return
-        this.ch = channel(keyOf(secret, Buffer.from(j.salt, 'base64')), PAGE)
-        this.raw.send(this.ch.seal(JSON.stringify({ auth })))
+        const mine = randomBytes(16) // the page's salt too
+        this.ch = channel(keyOf(secret, Buffer.concat([Buffer.from(j.salt, 'base64'), mine])), PAGE)
+        this.raw.send(Buffer.concat([mine, this.ch.seal(JSON.stringify({ auth }))]))
         this.queued.splice(0).forEach(t => this.raw.send(this.ch!.seal(t)))
         return void this.emit('open')
       }

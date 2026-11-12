@@ -3299,7 +3299,9 @@ function trashTidy(now: number) {
   for (const n of names) if (now - Number(/-(\d{12,})$/.exec(n)?.[1] ?? now) > TRASH_DAYS * DAY) rmSync(join(trashRoot(), n), { recursive: true, force: true })
 }
 const soonList = () => state.workspaces.filter(w => w.archived && w.soon).map(w => ({ id: w.id, name: w.name ?? w.id, what: w.soon!.what }))
-export async function archivedTidy(now = Date.now()) {
+let tidying: Promise<void> | undefined // one run at a time: the hourly tick and the start's (its awaits between the checks and the trash)
+export const archivedTidy = (now = Date.now()) => (tidying ??= tidyNow(now).finally(() => (tidying = undefined)))
+async function tidyNow(now: number) {
   trashTidy(now)
   const days = Number(state.settings?.archivedDays)
   if (!(days > 0)) return
@@ -3308,7 +3310,10 @@ export async function archivedTidy(now = Date.now()) {
   for (const ws of state.workspaces.filter(w => w.archived)) {
     if (!ws.archivedAt) (ws.archivedAt = now), (dated = true)
     const due = ws.archivedAt + days * DAY
-    if (now < due - DAY) continue
+    if (now < due - DAY) {
+      if (ws.soon) delete ws.soon, (dated = true) // not within a day any more (archivedDays raised): its notice comes again then
+      continue
+    }
     const what = await hasSaved(ws)
     if (!ws.soon) {
       ws.soon = { at: now, what }

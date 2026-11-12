@@ -760,7 +760,7 @@ function CliField({ api, onSkill }: { api: CliApi; onSkill?: () => void }) {
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
 // who reads what Laki AI sends (memory compaction's line): its backend's company, OpenRouter's model
-const aiWho = (ai?: AppSettings['ai']) => (b => (b === 'claude' ? 'Anthropic (claude -p, your Claude Code sign-in)' : b === 'codex' ? 'OpenAI (codex exec, your Codex sign-in)' : `OpenRouter${ai?.models?.openrouter ? ` (${ai.models.openrouter})` : ''}`))(ai?.backend ?? 'openrouter')
+const aiWho = (ai?: AppSettings['ai'], endpoint?: AppSettings['aiEndpoint']) => (b => (b === 'claude' ? 'Anthropic (claude -p, your Claude Code sign-in)' : b === 'codex' ? 'OpenAI (codex exec, your Codex sign-in)' : b === 'endpoint' ? `your endpoint${endpoint?.url && URL.canParse(endpoint.url) ? ` (${new URL(endpoint.url).host})` : ''}` : `OpenRouter${ai?.models?.openrouter ? ` (${ai.models.openrouter})` : ''}`))(ai?.backend ?? 'openrouter')
 export function SettingsPage(p: {
   own?: number // its own ⌘± size (App's), over Pages size
   settings: AppSettings
@@ -2511,7 +2511,7 @@ export function SettingsPage(p: {
               <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
                 <div className="setting-box">
                   <Switch className="switch-row" on={s.memoryCompact?.on !== false} onChange={on => set({ memoryCompact: { ...s.memoryCompact, on } })}>
-                    <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to ${aiWho(s.ai)} every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
+                    <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to ${aiWho(s.ai, s.aiEndpoint)} every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
                   </Switch>
                   <label className="row">
                     <Says title="Every" hint="days since the last one (0: only when full)" />

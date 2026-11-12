@@ -1670,7 +1670,7 @@ const SPLASH_TIPS = [...TIPS, ...MORE_TIPS]
 export function SnapSkeleton({ s, railW }: { s: Snap; railW: number }) {
   const groups = s.rows.reduce<[string, SnapRow[]][]>((g, r) => (g.at(-1)?.[0] === r.project ? g.at(-1)![1].push(r) : g.push([r.project, [r]]), g), [])
   return (
-    <div className={`app snap-skel ${s.railOn ? 'rail-on' : ''}`} aria-hidden inert>
+    <div className={`app snap-skel ${s.railOn ? 'rail-on' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''}`} style={s.railOn ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} aria-hidden inert>
       {s.railOn && <nav className="rail" style={{ width: railW }} />}
       <aside className="sidebar" style={{ width: s.sideW }}>
         <div className="side-scroll">

@@ -60,7 +60,7 @@ export function first(secrets: Buffer[], salt: Buffer, frame: Buffer) {
 // a paired device's key at rest: sealed with a key from its cookie's token (state.json has the token's hash only), so
 // the file alone opens nothing
 const wrapKey = (token: string) => keyOf(Buffer.from(token), Buffer.alloc(16), 'laki-device-key-v1')
-export const wrap = (token: string, key: Buffer) => seal(wrapKey(token), 0, 0n, key).toString('base64')
+export const wrap = (token: string, key: Buffer) => seal(wrapKey(token), 0, randomBytes(8).readBigUInt64BE(), key).toString('base64') // a random nonce: a wrap again never reuses one
 export function unwrap(token: string, sealed: string): Buffer | undefined {
   try {
     return open(wrapKey(token), 0, Buffer.from(sealed, 'base64')).plain

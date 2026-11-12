@@ -348,15 +348,17 @@ HKDF-SHA-256, info `laki-remote-e2e-v1`; a frame `seal`/`open`: 12 bytes of nonc
 not higher than the last. The secret: `RemoteRun.e2e` (32 random bytes a start, new when a quick tunnel's address moves;
 kept for a stable address as `state.remote.e2e`, so its pages reconnect after a restart; the same across Add a device),
 in the link as `&k=` (base64url) beside `#t=`; or a paired device's own (`SavedDevice.ek`: `wrap`ped with a key from
-its cookie's token, so state.json alone opens nothing; `deviceKeyNew` makes one the first time a device's socket opens
+its cookie's token with a random nonce, so state.json alone opens nothing; `deviceKeyNew` makes one the first time a device's socket opens
 sealed and main.ts sends it as `{ ev: 'e2e-device', key }` inside it, past a locked page's filter). `e2eSecrets(cookie)`:
 the device's then the link's; `first` opens a connection's first frame with whichever fits.
 
 The socket (main.ts' upgrade, remote origin only): the daemon sends `{ e2e: 1, salt }` in clear, then the first message
-within 5 s must be a sealed `{ auth }` (S11's token, or `device` with its cookie): a clear one closes 4426 (`OLD_PAGE`:
+within 5 s must be the page's own 16 bytes of salt followed by a sealed `{ auth }`, the key from both salts (so a
+provider can't play an old session's frames to either side by sending its salt again) (S11's token, or `device` with its cookie): a clear one closes 4426 (`OLD_PAGE`:
 open a new link), one no secret opens 4401 `bad key`. Then every frame both ways is sealed (`Conn.send` seals, a
 message that doesn't open, or opens out of order, closes 4400). `/rpc` from the remote origin: a salt of the page's own
-in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay), its body a sealed frame, the answer sealed
+in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay), its body a sealed frame with `at` (when it was
+sealed: over 5 minutes from now, `SEALED_AGE`, refused, so one older than the salts kept can't come back), the answer sealed
 (`application/octet-stream`); none: 426 after the token check (so the page's `whyNot` still tells a dead link by 401).
 The page (`api.ts`): `pageToken` takes `k` out of the hash as it does `t`; `sealUp` imports it (not extractable),
 keeps it in IndexedDB (`laki-e2e`, `keys`: `link`, `device`), and seals with this tab's link key, else the device's, else

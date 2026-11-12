@@ -323,7 +323,7 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
           {preset
             ? `Your profile ${preset.name}: ${BACKENDS[backend]} on its account (none: the default) with its env${Object.keys(preset.env ?? {}).length ? ` (${Object.keys(preset.env!).join(', ')})` : ''}. Its model, effort and flags are a tab's, not used here.`
             : AI_HOW.find(x => x[0] === backend)?.[1]}
-          {backend !== 'openrouter' && !preset && ' Another account: a profile on it (Agents & profiles), then pick it here; none: the default account.'}
+          {(backend === 'claude' || backend === 'codex') && !preset && ' Another account: a profile on it (Agents & profiles), then pick it here; none: the default account.'}
         </p>
         {backend === 'endpoint' && <EndpointFields api={api} endpoint={endpoint} onEndpoint={onEndpoint} has={st?.endpointKey} />}
         {backend !== 'endpoint' && <label>

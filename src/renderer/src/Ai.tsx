@@ -138,7 +138,7 @@ export function AiPage({
         setImages(sent.images)
       })
   }
-  const model = settings.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : 'its default model')
+  const model = backend === 'endpoint' ? "your endpoint's model" : settings.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : 'its default model')
   const runs = `${BACKENDS[backend]}${backend !== 'openrouter' && settings.preset ? ` (${settings.preset})` : ''}`
   const cost = !settings.hideCost // Settings › AI's Show costs
   const skill = settings.skill !== false

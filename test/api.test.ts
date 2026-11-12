@@ -657,7 +657,8 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const rpcSealed = (body: Uint8Array, salt: Buffer) => fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url, 'x-laki-e2e': salt.toString('base64') }, body: body as BodyInit })
   assert.equal((await fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: '{"method":"ping"}' })).status, 426, 'a clear call')
   const salt = randomBytes(16)
-  const sealed = new Uint8Array(channel(keyOf(secret, salt), PAGE).seal('{"method":"ping"}'))
+  const ping1 = () => JSON.stringify({ method: 'ping', at: Date.now() })
+  const sealed = new Uint8Array(channel(keyOf(secret, salt), PAGE).seal(ping1()))
   const back = await rpcSealed(sealed, salt)
   assert.equal(back.headers.get('content-type'), 'application/octet-stream')
   const backBuf = Buffer.from(await back.arrayBuffer())
@@ -665,9 +666,13 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual(JSON.parse(String(channel(keyOf(secret, salt), PAGE).open(backBuf))), { result: 'pong' })
   assert.equal((await rpcSealed(sealed, salt)).status, 400, 'its salt again: a replay')
   const salt2 = randomBytes(16)
-  const torn = new Uint8Array(channel(keyOf(secret, salt2), PAGE).seal('{"method":"ping"}'))
+  const torn = new Uint8Array(channel(keyOf(secret, salt2), PAGE).seal(ping1()))
   torn[torn.length - 1] ^= 1
   assert.equal((await rpcSealed(torn, salt2)).status, 400, 'a wrong tag')
+  const salt3 = randomBytes(16)
+  const stale = await rpcSealed(new Uint8Array(channel(keyOf(secret, salt3), PAGE).seal(JSON.stringify({ method: 'ping', at: Date.now() - 6 * 60e3 }))), salt3)
+  assert.equal(stale.status, 400, 'sealed 6 minutes ago: past its salt being kept, refused by its time')
+  assert.match(String(channel(keyOf(secret, salt3), PAGE).open(Buffer.from(await stale.arrayBuffer()))), /more than 5 minutes ago/)
   // the socket: its salt in clear, then sealed both ways; a frame again, a wrong tag, a clear page, another key: closed
   const sock = async (first: (ch: ReturnType<typeof channel>, ws: WebSocket) => void, key = secret) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: url })
@@ -678,8 +683,11 @@ test('remote access: the page, one email for some hours, a token of its own; gon
       if (!binary) {
         const j = JSON.parse(String(m))
         assert.deepEqual([j.e2e, Buffer.from(j.salt, 'base64').length], [1, 16])
-        ch = channel(keyOf(key, Buffer.from(j.salt, 'base64')), PAGE)
-        return first(ch, ws)
+        const mine = randomBytes(16)
+        ch = channel(keyOf(key, Buffer.concat([Buffer.from(j.salt, 'base64'), mine])), PAGE)
+        const raw = ws.send.bind(ws)
+        let firstOne = true
+        return first(ch, Object.assign(Object.create(ws), { send: (d: any) => (firstOne && Buffer.isBuffer(d) ? ((firstOne = false), raw(Buffer.concat([mine, d]))) : raw(d)) }))
       }
       got.push(JSON.parse(String(ch!.open(m as Buffer))))
     })

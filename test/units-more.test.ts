@@ -694,6 +694,7 @@ test('snapshotOf: the last layout, no Private rows, no paths, under its cap; ano
       { id: 'a', name: 'login', color: 'red', project: 'p', path: '/Users/me/web/a' },
       { id: 'b', name: 'hidden', project: 'p', private: true, path: '/x' },
       { id: 'c', name: 'deal', project: 'q', path: '/y' },
+      { id: 'd', name: 'gone-by', project: 'p', archived: true, path: '/z' },
     ],
     tabs: [{ id: 't1', workspace: 'a', name: 'claude', title: 'rm -rf in /Users/me' }, { id: 't2', workspace: 'a', name: 'zsh' }, { id: 't3', workspace: 'c', name: 'codex' }],
   } as never
@@ -704,7 +705,7 @@ test('snapshotOf: the last layout, no Private rows, no paths, under its cap; ano
   assert.equal(s.sel, 1)
   assert.equal(s.theme, 'nord')
   const raw = JSON.stringify(s)
-  for (const no of ['/Users', 'hidden', 'secret-co', 'deal', 'rm -rf']) assert.ok(!raw.includes(no), no)
+  for (const no of ['/Users', 'hidden', 'secret-co', 'deal', 'rm -rf', 'gone-by']) assert.ok(!raw.includes(no), no) // gone-by: archived, not in the sidebar
   assert.equal(snapshotOf(view, { ...ui, ws: 'c' }).tabs.length, 0, "a Private project's open workspace: no tabs")
   assert.deepEqual(snapOf(raw), s)
   const big = { ...(view as object), projects: [{ id: 'p', name: 'p'.repeat(500) }], workspaces: Array.from({ length: 40 }, (_, i) => ({ id: String(i), name: 'n'.repeat(500), project: 'p' })), tabs: Array.from({ length: 40 }, (_, i) => ({ id: 't' + i, workspace: '0', name: 'x'.repeat(500) })) } as never

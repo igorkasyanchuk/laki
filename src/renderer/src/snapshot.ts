@@ -19,7 +19,7 @@ export function snapshotOf(view: Pick<View, 'projects' | 'workspaces' | 'tabs' |
   const rows: SnapRow[] = []
   for (const p of view.projects) {
     if (hidden.has(p.id)) continue
-    for (const w of view.workspaces) if (w.project === p.id && !w.private && rows.length < 30) rows.push({ name: cut(w.name || w.id), ...(w.color && { color: w.color }), project: cut(p.name) })
+    for (const w of view.workspaces) if (w.project === p.id && !w.private && !w.archived && rows.length < 30) rows.push({ name: cut(w.name || w.id), ...(w.color && { color: w.color }), project: cut(p.name) })
   }
   const open = view.workspaces.find(w => w.id === ui.ws)
   const shown = open && !open.private && !hidden.has(open.project) ? view.tabs.filter(t => t.workspace === open.id) : []

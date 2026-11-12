@@ -183,9 +183,10 @@ class Api {
       const up = () => ((this.connected = true), (this.fails = 0), this.emit({ ev: 'open' }))
       ws.onopen = () => !to.remote && up() // S14: remote access's opens once it's sealed (its salt first)
       let inQ: Promise<unknown> = Promise.resolve()
+      let salted = false
       ws.onmessage = e => {
         if (!to.remote) return handle(JSON.parse(e.data))
-        if (typeof e.data === 'string') return void sealUp(e.data) // its salt, in clear: the rest are sealed
+        if (typeof e.data === 'string') return void (!salted && ((salted = true), sealUp(e.data))) // its salt, in clear, once: the rest are sealed (a clear one later: ignored)
         const data = e.data as ArrayBuffer
         inQ = inQ.then(() => this.ch?.open(data).then(t => handle(JSON.parse(t)), () => ws.close(4000, 'a frame that does not open')))
       }
@@ -202,8 +203,18 @@ class Api {
         }
         const base = this.linkKey ?? (await keyGet('device')) ?? (await keyGet('link')) // a stable address's link pairs: its device's key outlives a run's link
         if (!base) return this.emit({ ev: 'problem', text: "This page has no key for Laki on your Mac: open a new link from Laki (Settings › Remote access)." }), ws.close()
-        this.ch = await channel(base, salt)
-        this.out(JSON.stringify({ auth: to.token }))
+        const mine = crypto.getRandomValues(new Uint8Array(16)) // this page's salt too: the key from both
+        const both = new Uint8Array(32)
+        both.set(salt)
+        both.set(mine, 16)
+        const ch = await channel(base, both)
+        const auth = await ch.seal(JSON.stringify({ auth: to.token }))
+        const first = new Uint8Array(16 + auth.length)
+        first.set(mine)
+        first.set(auth, 16)
+        if (ws.readyState !== WebSocket.OPEN) return
+        ws.send(first) // its salt, then its sealed auth
+        this.ch = ch
         up()
       }
       const handle = (m: any) => {

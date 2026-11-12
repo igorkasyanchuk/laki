@@ -1309,6 +1309,8 @@ const server = createServer(async (req, res) => {
     sealedCh = f.ch
     body = String(f.plain)
   }
+  const sealedAt = sealedCh ? Number((() => { try { return JSON.parse(body)?.at } catch { return NaN } })()) : 0
+  if (sealedCh && !(Math.abs(Date.now() - sealedAt) <= SEALED_AGE)) return void (res.writeHead(400, { 'content-type': 'application/octet-stream' }), res.end(sealedCh.seal(JSON.stringify({ error: 'a sealed call from more than 5 minutes ago: a replay, or this Mac\'s clock is off' }))))
   const reply2 = (code: number, o: object) => (sealedCh ? (res.writeHead(code, { 'content-type': 'application/octet-stream' }), res.end(sealedCh.seal(JSON.stringify(o)))) : reply(code, o))
   try {
     const { method, params } = JSON.parse(body)
@@ -1321,14 +1323,18 @@ const server = createServer(async (req, res) => {
     reply2(200, { error: (e as Error).message })
   }
 })
-// S14: a sealed /rpc's salt (16 bytes, base64), once: one seen in the last 10 minutes is a replay
+// S14: a sealed /rpc's salt (16 bytes, base64), once: one seen in the last 10 minutes is a replay; its body's at (when the
+// page sealed it) within 5 minutes of now, so one older than the salts kept is refused too
+const SEALED_AGE = 300e3
 const saltsSeen = new Map<string, number>()
 function saltOf(h: unknown): Buffer | undefined {
   const b = typeof h === 'string' && /^[A-Za-z0-9+/]{22}==$/.test(h) ? Buffer.from(h, 'base64') : undefined
   const now = Date.now()
-  for (const [k, at] of saltsSeen) if (now - at > 600e3) saltsSeen.delete(k)
-  if (!b || saltsSeen.has(h as string) || saltsSeen.size > 10000) return undefined
+  for (const [k, at] of saltsSeen) if (now - at > 2 * SEALED_AGE) saltsSeen.delete(k)
+  else break // oldest first: the rest are newer
+  if (!b || saltsSeen.has(h as string)) return undefined
   saltsSeen.set(h as string, now)
+  if (saltsSeen.size > 20000) saltsSeen.delete(saltsSeen.keys().next().value!) // ponytail: the oldest goes; its call is past SEALED_AGE long before
   return b
 }
 const OLD_PAGE = 'Laki was updated: remote access is end to end now. Open a new link from Laki on your Mac (Settings › Remote access).'
@@ -1418,7 +1424,10 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     ws.once('message', (raw, binary) => {
       clearTimeout(late)
       if (!binary) return ws.close(4426, OLD_PAGE)
-      const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), salt, Buffer.isBuffer(raw) ? raw : Buffer.concat(raw as Buffer[]))
+      // its first frame: the page's own 16 bytes of salt, then the sealed auth; the key from both salts, so neither side's
+      // old session can be played to the other
+      const frame = Buffer.isBuffer(raw) ? raw : Buffer.concat(raw as Buffer[])
+      const f = frame.length > 16 ? e2e.first(remoteMod.e2eSecrets(req.headers.cookie), Buffer.concat([salt, frame.subarray(0, 16)]), frame.subarray(16)) : undefined
       let said: unknown
       try {
         said = f && JSON.parse(String(f.plain))?.auth
@@ -1543,7 +1552,7 @@ core.soonSay.fn = ws => {
     .then(a => (a as { choice?: string }).choice === 'Keep' && core.archivedKeep({ ws: ws.id }))
     .catch(e => log(`${ws.id}: no notice (${(e as Error).message})`))
 }
-await core.termStart().catch(() => {}) // S1: the terminal that started this daemon is yours from the start
+await Promise.race([core.termStart().catch(() => {}), new Promise(r => setTimeout(r, 3000))]) // S1: the terminal that started this daemon is yours from the start (ps slow: not waited past 3 s)
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   port = typeof addr === 'object' && addr ? addr.port : 0
