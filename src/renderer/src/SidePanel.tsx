@@ -33,6 +33,7 @@ export type PanelApi = {
   changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   turnChanges: (n?: number) => Promise<Changes> // an agent's last turn's (turns.ts turnDiff); n: a kept turn's (F1)
+  sinceChanges?: () => Promise<Changes> // R11: from your last review's mark to now (diff since)
   turns?: () => Promise<TurnKept[]> // the workspace's kept turns: This turn's picker
   bases?: () => Promise<{ base: string; gone: boolean; local: string[]; remote: string[] }> // a worktree's: the branches its diff could compare with (Change base)
   setBase?: (base: string) => Promise<unknown> // its new base: the diff and later compares go against it
@@ -242,8 +243,17 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
-function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
+function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewed, stat, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; reviewed?: number; stat?: string; turn?: boolean; onOpen: (url: string) => void }) {
   const [scope, setScope] = useScope('laki.changesScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, turn, empty)
+  // R11: Since I reviewed's count: asked as the mark or the workspace's files move, only while there's a mark
+  const [since, setSince] = useState(0)
+  useEffect(() => {
+    let on = true
+    if (!reviewed || !wsApi.sinceChanges) setSince(0)
+    else void wsApi.sinceChanges().then(d => on && setSince(d.files.length), () => on && setSince(0))
+    return () => void (on = false)
+  }, [ws, reviewed, stat])
+  useEffect(() => void (scope === 'since' && !reviewed && setScope('branch')), [reviewed]) // its mark gone
   useEffect(() => {
     const f = (e: Event) => ((turnNext.on = false), setScope((e as CustomEvent<Scope>).detail)) // the Reader's card's Review: This turn
     window.addEventListener('laki-scope', f)
@@ -265,9 +275,9 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
     if (inTurn) void wsApi.turns?.().then(l => on && setTurns(l), () => {})
     return () => void (on = false)
   }, [ws, inTurn, turnN])
-  const all = scope === 'pr' || inTurn // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
+  const all = scope === 'pr' || inTurn || scope === 'since' // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
   const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
-  const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : ''}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
+  const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : scope === 'since' && api.sinceChanges ? api.sinceChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : ''}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, scope])
@@ -386,7 +396,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
   return (
     <>
       <div className="sp-tools">
-        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} turn={turn} />
+        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} turn={turn} since={since} />
         {inTurn && turns.length > 0 && (
           <select className="sp-turn-pick small" aria-label="Which turn" value={turnN ?? ''} onChange={e => setTurnN(e.target.value ? Number(e.target.value) : undefined)}>
             <option value="">Last turn</option>
@@ -633,7 +643,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
-      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} empty={p.w.stat && !p.w.stat.files} worktree={p.w.kind === 'worktree'} turn={p.turn} onOpen={p.onOpen} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} empty={p.w.stat && !p.w.stat.files} worktree={p.w.kind === 'worktree'} turn={p.turn} reviewed={p.w.reviewed?.at} stat={p.w.stat ? JSON.stringify(p.w.stat) : ''} onOpen={p.onOpen} />}
       {tab === 'commits' && <CommitsTab key={p.w.id} api={p.api} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}

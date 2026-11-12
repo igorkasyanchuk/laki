@@ -39,6 +39,7 @@ export type WsInfo = {
   base: string
   path: string
   storage?: string // $LAKI_STORAGE_FOLDER: made with its first tab
+  reviewed?: { at: number } // R11: Since I reviewed's mark
   links?: { path: string; url: string; title: string }[] // its .url files there: what its agents published
   port: number
   ports?: number[] // listening

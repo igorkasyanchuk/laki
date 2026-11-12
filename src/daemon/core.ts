@@ -36,7 +36,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
+import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -3158,6 +3158,7 @@ export const saidTried = new Map<string, string>() // prFromSaid's: the PR link 
 function dropWs(ws: Workspace) {
   widgetEvent('workspace.removed', {}, ws.id) // its payload now, while it's there
   if (ws.archived) archiveDrop(state.projects.find(p => p.id === ws.project)?.path ?? '', ws.id) // R2: what archiving kept of it
+  if (ws.reviewed && !ws.host) reviewDrop(state.projects.find(p => p.id === ws.project)?.path ?? '', ws.id) // R11
   prSeen.delete(ws.id)
   saidTried.delete(ws.id)
   widgetsGone(ws.id) // its extensions' instances

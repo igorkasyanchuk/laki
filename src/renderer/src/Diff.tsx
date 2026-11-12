@@ -34,24 +34,25 @@ export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
 // yet), only what isn't committed (against HEAD: a worktree's; a folder's own Branch is that already), or the PR's
 // (gh pr diff; a linked PR's first, or one that came to a workspace changing nothing of its own: `empty` as it was when
 // the PR first showed, so a file saved meanwhile doesn't flip it, nor does its own PR, opened after its commits). Branch or Uncommitted is kept per view (store), the PR's for this look only
-export type Scope = 'branch' | 'uncommitted' | 'pr' | 'turn' // turn: an agent's last turn's changes (turns.ts turnDiff)
+export type Scope = 'branch' | 'uncommitted' | 'pr' | 'turn' | 'since' // turn: an agent's last turn's changes (turns.ts turnDiff); since: from your last review (R11, reviewDiff)
 export const turnNext: { on: boolean; n?: number } = { on: false } // the Reader's card's Review: Changes opens on This turn; n: a kept turn's (F1: the strip's Show its changes)
 export function useScope(store: string, pr: boolean, linked: boolean, worktree: boolean, turn = false, empty?: boolean) {
   const was = useRef<boolean | undefined>(undefined)
   if (was.current === undefined && pr && empty !== undefined) was.current = empty // its stat and its PR may come after the view opens
   const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the view opens)
   const [head, setHead] = useState(() => localStore(store) === 'uncommitted')
-  const [inTurn, setInTurn] = useState(() => turn && ((t => ((turnNext.on = false), t))(turnNext.on))) // never kept: the Reader's card's Review picks it (turnNext as it opens, else the laki-scope event)
-  const scope: Scope = turn && inTurn ? 'turn' : pr && (whole ?? (linked || !!was.current)) ? 'pr' : worktree && head ? 'uncommitted' : 'branch'
-  const set = (s: Scope) => (setInTurn(s === 'turn'), s !== 'turn' && (setWhole(s === 'pr'), s !== 'pr' && (setHead(s === 'uncommitted'), localStore(store, s))))
+  const [inTurn, setInTurn] = useState<'' | 'turn' | 'since'>(() => (turn && ((t => ((turnNext.on = false), t))(turnNext.on)) ? 'turn' : '')) // never kept: the Reader's card's Review picks it (turnNext as it opens, else the laki-scope event); since: Since I reviewed, picked here
+  const scope: Scope = turn && inTurn === 'turn' ? 'turn' : inTurn === 'since' ? 'since' : pr && (whole ?? (linked || !!was.current)) ? 'pr' : worktree && head ? 'uncommitted' : 'branch'
+  const set = (s: Scope) => (setInTurn(s === 'turn' || s === 'since' ? s : ''), s !== 'turn' && s !== 'since' && (setWhole(s === 'pr'), s !== 'pr' && (setHead(s === 'uncommitted'), localStore(store, s))))
   return [scope, set] as const
 }
 // the api as Uncommitted reads and reverts: against HEAD
 export const atHead = <T extends PanelApi>(api: T, on: boolean): T =>
   on ? { ...api, changes: () => api.changes(true), read: (p, base) => api.read(p, base, true), undoHunk: (p, h, l, then) => api.undoHunk(p, h, l, then, true), undoFile: (p, then) => api.undoFile(p, then, true) } : api
 // the switch: Branch (its words: branch), Uncommitted (a worktree's), PR #n
-export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn }: { scope: Scope; onScope: (s: Scope) => void; pr?: { number: number; forge?: 'gitlab' }; worktree: boolean; branch?: string; turn?: boolean }) {
-  if (!pr && !worktree && !turn) return null
+// since: how many files changed since your last review (R11; 0 or none: no button)
+export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn, since }: { scope: Scope; onScope: (s: Scope) => void; pr?: { number: number; forge?: 'gitlab' }; worktree: boolean; branch?: string; turn?: boolean; since?: number }) {
+  if (!pr && !worktree && !turn && !since) return null
   return (
     <span className="seg">
       <button type="button" className={scope === 'branch' ? 'on' : ''} data-tip="This workspace's changes: its branch against its base, and what isn't committed" onClick={() => onScope('branch')}>
@@ -70,6 +71,11 @@ export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn
       {turn && (
         <button type="button" className={scope === 'turn' ? 'on' : ''} data-tip="Only what the agent's last turn changed (its card under the Reader's last answer)" onClick={() => onScope('turn')}>
           This turn
+        </button>
+      )}
+      {(!!since || scope === 'since') && (
+        <button type="button" className={scope === 'since' ? 'on' : ''} data-tip="What changed since you last reviewed: sent your comments, posted a review or viewed the last file" onClick={() => onScope('since')}>
+          Since I reviewed{since ? ` · ${since} file${since === 1 ? '' : 's'}` : ''}
         </button>
       )}
     </span>

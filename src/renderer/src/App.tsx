@@ -1941,6 +1941,7 @@ export function App() {
     preview: (path, line) => openFile({ ws: w.id, path, line }),
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
+    sinceChanges: () => api.call<Changes>('diff', { ws: w.id, since: true }),
     turnChanges: n => api.call<Changes>('turnDiff', { ws: w.id, ...(n !== undefined && { n }) }),
     turns: () => api.call<TurnKept[]>('turnList', { ws: w.id }),
     ...(w.kind === 'worktree' && { bases: () => api.call('baseBranches', { ws: w.id }), setBase: (base: string) => api.call('wsBase', { ws: w.id, base }) }),
@@ -2017,6 +2018,7 @@ export function App() {
     blame: (path, side, uncommitted) => api.call<Blame>('blame', { ws: w.id, path, side, uncommitted }),
     notesGet: () => api.call('reviewNotesGet', { ws: w.id }),
     notesSet: notes => api.call('reviewNotesSet', { ws: w.id, notes }),
+    mark: () => api.call('reviewMark', { ws: w.id }),
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the

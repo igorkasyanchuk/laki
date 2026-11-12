@@ -94,3 +94,47 @@ test('kept turns: three survive a restart, each diff its own; rewind, and a rewi
   await rig.rpc('wsRm', { id: ws.id })
   await until(() => refs().length === 0 && !existsSync(join(rig.data, 'turns', `${ws.id}.json`)), 'its refs and list gone')
 })
+
+// R11: Since I reviewed: your review marks the worktree as it was; Changes' diff since then lists only what changed
+// after it, through a restart; no mark, no option; an agent can't set it
+test('R11: Since I reviewed: a mark, a later turn changes two files, the diff since lists exactly those; none without a mark; kept through a restart', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x.status === 'idle' && x)(await rig.tab(ws.id)), 'claude up')
+  const file = (name: string) => join(ws.path, name)
+  const turn = async (prompt: string, edit: () => void) => {
+    await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt } })
+    await sleep(300)
+    edit()
+    await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
+    await until(async () => (await rig.rpc('turnList', { ws: ws.id })).at(-1)?.prompt === prompt, `turn kept: ${prompt}`)
+  }
+  await turn('first', () => (writeFileSync(file('a.txt'), 'one\n'), writeFileSync(file('keep.txt'), 'same\n')))
+  // no mark: no option (nothing in the view, the diff says why)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).reviewed, undefined)
+  await assert.rejects(rig.rpc('diff', { ws: ws.id, since: true }), /no review yet/)
+  // an agent can't mark your review
+  await assert.rejects(rig.rpc('reviewMark', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't mark the user's review/)
+  await rig.rpc('reviewMark', { ws: ws.id })
+  const mark = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).reviewed
+  assert.equal(mark.turn, 1)
+  assert.equal((await rig.rpc('diff', { ws: ws.id, since: true })).files.length, 0, 'nothing since, yet')
+  await turn('second', () => (writeFileSync(file('a.txt'), 'one\ntwo\n'), writeFileSync(file('b.txt'), 'b\n')))
+  const since = async () => (await rig.rpc('diff', { ws: ws.id, since: true }))
+  let d = await since()
+  assert.deepEqual(d.files.map((f: any) => `${f.status} ${f.path}`).sort(), ['A b.txt', 'M a.txt'])
+  assert.match(d.diff, /\+two/)
+  assert.ok(!d.diff.includes('+one') && !d.diff.includes('keep.txt'), 'only what changed after the mark')
+  // a restart: the mark and its tree are still there
+  await rig.stop()
+  await rig.start()
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).reviewed.at, mark.at)
+  d = await since()
+  assert.equal(d.files.length, 2)
+  const git = (...a: string[]) => execFileSync('git', ['-C', rig.repo, ...a], { encoding: 'utf8' })
+  assert.match(git('for-each-ref', '--format=%(refname)', 'refs/laki/reviewed/'), new RegExp(`refs/laki/reviewed/${ws.id}`))
+  // gone with the workspace
+  await rig.rpc('wsRm', { id: ws.id })
+  await until(() => !git('for-each-ref', '--format=%(refname)', 'refs/laki/reviewed/').includes(ws.id), 'its mark gone')
+})

@@ -183,3 +183,4 @@ needs no bump: `settingsSet` keeps any field.
 175: `screenLock` and `remoteLog` (D9: remote access while the Mac is locked, its activity log), `settings.remoteWhen`.
 176: `termAnswer` and the `termAsk`, `termDone` events (S1: a terminal Laki hasn't seen is allowed once in the window before its calls are yours); `termHeld` over `/rpc` (the CLI's hint).
 177: `reviewNotesGet`, `reviewNotesSet` (R10: the Review tab's unsent comments kept by the daemon per workspace).
+178: `reviewMark`, `diff`'s `since` and a workspace's `reviewed` (R11: Changes' Since I reviewed).

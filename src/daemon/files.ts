@@ -818,4 +818,5 @@ export async function archivePatch(repo: string, ws: string) {
   const parent = (await repoGit(repo, ['rev-parse', '-q', '--verify', `${ref}^`]).catch(() => '')).trim() || '4b825dc642cb6eb9a060e54bf8d69288fbee4904' // git's empty tree
   return repoGit(repo, ['-c', 'core.quotePath=false', 'diff', '--binary', '--no-color', '--no-ext-diff', parent, ref])
 }
+export const reviewDrop = (repo: string, ws: string) => void (/^[\w.-]+$/.test(ws) && existsSync(repo) && execFile('git', ['-C', repo, 'update-ref', '-d', `refs/laki/reviewed/${ws}`], () => {})) // R11: Since I reviewed's mark, gone with its workspace
 export const archiveDrop = (repo: string, ws: string) => void (/^[\w.-]+$/.test(ws) && existsSync(repo) && execFile('git', ['-C', repo, 'update-ref', '-d', archivedRef(ws)], () => {}))

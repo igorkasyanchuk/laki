@@ -221,6 +221,7 @@ export type Workspace = {
   setupWait?: boolean // made while its project's .laki.json wasn't trusted: its copy and setup run as you trust it
   noSetup?: boolean // made without its setup script (wsNew noSetup): Run ▾'s Run the setup script (run's setup) clears it
   archivedAt?: number // when (ms), for settings.archivedDays
+  reviewed?: { at: number; tree: string; turn?: number } // R11: Since I reviewed's mark (turns.ts reviewMark): when, the worktree's tree then, the newest kept turn then
   soon?: { at: number; what: string[] } // R8: told it goes within a day (archivedTidy): when, and what it keeps that would go to the trash
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
@@ -1225,7 +1226,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 177
+export const API = 178
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

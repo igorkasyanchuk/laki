@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Changes has *Since I reviewed*: only what changed after you last sent review comments, posted a review or viewed every file in the Review tab.
 - Review tab comments you haven't sent are kept by Laki itself, not just this window: they survive a cleared cache, show on your phone, and go with the workspace when it's deleted.
 - New installs keep terminals running when Laki's background process restarts or crashes (Settings › Git & worktrees › *Terminals outlive the daemon*, now on by default there). If that can't start, Settings says why in one line and tabs run as before.
 - *Delete archived workspaces after* no longer loses work: a day before one goes, Laki says so (Keep / OK), and its uncommitted changes (as a patch) and its storage folder go to the Trash instead of away.

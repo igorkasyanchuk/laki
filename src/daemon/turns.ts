@@ -439,6 +439,33 @@ export function turnsTidy() {
   for (const id of sides.keys()) if (!state.tabs.some(t => t.id === id)) sides.delete(id) // closed tabs' side chats
 }
 
+// R11: Since I reviewed. The worktree's files as they were when you last reviewed (FullReview: comments sent to an agent
+// or posted, its last file ticked Viewed): their tree pinned under refs/laki/reviewed/<ws> (gc keeps it), on the
+// workspace (reviewed, saved: a restart keeps it). Changes diffs from it to now as turn to turn (reviewDiff). The
+// user's alone (AGENT_NO). turn: the newest kept turn then, for what the view says
+const reviewedRef = (ws: string) => `refs/laki/reviewed/${ws}`
+export async function reviewMark(o: { ws?: unknown }) {
+  const ws = findWs(String(o?.ws ?? ''))
+  if (ws.archived || ws.host || !existsSync(ws.path) || state.projects.find(p => p.id === ws.project)?.git === false) throw new Error(`${ws.name ?? ws.id}: no git worktree here to mark`)
+  const tree = await treeOf(ws)
+  const head = await g(ws, ['rev-parse', '-q', '--verify', 'HEAD']).then(s => s.trim(), () => '')
+  await pin(ws, reviewedRef(ws.id), tree, head, `Laki: ${ws.id} as you reviewed it`)
+  const turn = readKept(ws).turns.at(-1)?.n
+  ws.reviewed = { at: Date.now(), tree, ...(turn && { turn }) }
+  save()
+  changed()
+  return { at: ws.reviewed.at }
+}
+export async function reviewDiff(o: { ws?: unknown }) {
+  const ws = findWs(String(o?.ws ?? ''))
+  if (!ws.reviewed) throw new Error('no review yet: Since I reviewed starts at your next one')
+  const before = ws.reviewed.tree
+  const after = await treeOf(ws)
+  const files = before === after ? [] : await filesOf(ws, before, after)
+  const text = files.length ? await g(ws, ['diff', '--no-color', '--no-ext-diff', '--no-renames', '--src-prefix=a/', '--dst-prefix=b/', before, after]) : ''
+  return { base: 'what you reviewed', from: before, files, diff: text.replace(/\n$/, '').slice(0, 4 << 20), at: ws.reviewed.at }
+}
+
 // a workspace that's gone: its kept turns' refs out of its repo, then its list
 function turnsGone(ws: string) {
   const file = keptFile(ws)

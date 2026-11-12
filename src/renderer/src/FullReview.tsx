@@ -35,6 +35,7 @@ export type ReviewApi = PanelApi & {
   blame: (path: string, side: 'old' | 'new', uncommitted?: boolean) => Promise<Blame> // old: at the base, or HEAD (uncommitted)
   notesGet: () => Promise<{ notes: ReviewNote[]; at?: number }> // R10: the daemon's copy of the unsent comments (at: none, never set there)
   notesSet: (notes: ReviewNote[]) => Promise<unknown>
+  mark: () => Promise<unknown> // R11: Since I reviewed starts here (reviewMark)
 }
 
 const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet: a cache of the daemon's (R10: reviewNotesGet), drawn at once
@@ -133,6 +134,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       return n
     })
   const mark = (ps: string[], on: boolean) => {
+    if (on && files.length && files.every(f => ps.includes(f.path) || viewed(f.path))) void wsApi.mark().catch(() => {}) // R11: the last one viewed: a review done
     setFlip(s => new Set([...s].filter(p => !ps.includes(p))))
     gh.mark(ps.filter(p => gh.viewedOf(p) !== undefined && viewed(p) !== on), on)
     const mine = ps.filter(p => gh.viewedOf(p) === undefined)
@@ -347,7 +349,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     const out = notes
     api
       .send(tab, reviewText(out))
-      .then(() => setNotes(n => n.filter(x => !out.includes(x))), e => setSent(String(e?.message ?? e)))
+      .then(() => (setNotes(n => n.filter(x => !out.includes(x))), void api.mark().catch(() => {})), e => setSent(String(e?.message ?? e)))
       .finally(() => setBusy(false))
   }
   const post = () => {
@@ -357,7 +359,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     const out = notes
     api
       .post(out.map(({ path, line, startLine, side, body }) => ({ path, line, startLine, side, body })))
-      .then(() => setNotes(n => n.filter(x => !out.includes(x))), e => setSent(String(e?.message ?? e))) // GitHub's no: all of them stay
+      .then(() => (setNotes(n => n.filter(x => !out.includes(x))), void api.mark().catch(() => {})), e => setSent(String(e?.message ?? e))) // GitHub's no: all of them stay
       .finally(() => setBusy(false))
   }
 
