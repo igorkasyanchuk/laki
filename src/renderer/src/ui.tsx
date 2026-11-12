@@ -54,7 +54,7 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // elsewhere) and ui-smoke (main marks the page data-smoke): fn at once. One whose change hasn't run in 400 ms is skipped
 // (its change runs then)
 let grewFrom: HTMLElement | null = null
-const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches
 const sheetOf = () => [...document.querySelectorAll<HTMLElement>('.overlay .modal, .main > .settings-page')].at(-1) ?? null
 export function morph(fn: () => void, grow?: 'open' | 'close') {
   if (!morphOk()) return fn()

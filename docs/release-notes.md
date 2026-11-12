@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Things move on springs: switches, the picked row, a Needs you card and the bubbles' buttons settle with a little bounce, and menus, popovers and dialogs ease in.
 - Pages cross-fade, Ship, New workspace and Rename grow from the button that opened them and shrink back into it, and a workspace you pin slides into Pinned.
 - Corners are continuous, as macOS draws them: dialogs, menus, cards, buttons and fields round off like a squircle instead of a quarter circle.
 - The tab bar's buttons, the Terminal / Reader switch, the Reader's message box and the status bar's groups float as glass capsules, as in macOS 26; a list scrolled under its header fades into it instead of a line.

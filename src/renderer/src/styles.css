@@ -1343,8 +1343,8 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .toggle.on { color: var(--fg); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: var(--r-m); background: var(--line); transition: background 0.15s; }
 .toggle.on .toggle-track { background: var(--neutral-strong); } /* V1: on is neutral, not the accent */
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: left 0.15s; }
-.toggle.on .toggle-knob { left: 12px; background: var(--bg); }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: translate var(--t-spring) var(--spring); }
+.toggle.on .toggle-knob { translate: 10px 0; background: var(--bg); } /* V14: moved, never laid out again */
 .info .toggle { font-size: var(--fs-2); }
 .info .row { flex-wrap: wrap; }
 
@@ -3346,9 +3346,15 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
    drag); a status that needs you breathes, one that ends ticks once (Glyph.tsx' g-pop). Off under Motion: Off (above) and
    the system's Reduce motion (the media query, and the catch-all further up) */
 :root { --t-fast: 120ms; --t-mid: 200ms; --t-slow: 320ms; --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); --ease: var(--ease-out); }
-@keyframes b-in { from { opacity: 0; translate: 0 4px; } }
+/* V14: springs, as linear() sampled from one (scripts/spring.ts): --spring overshoots and settles (small things that
+   move: a toggle's knob, the picked row's and a segment's fill, the Needs you card, the bubbles' stack), --spring-soft
+   is critically damped (popovers and sheets). Only what moves (scale, translate); opacity keeps a plain ease. Under
+   Reduce motion linear and, by the catch-all, instant */
+:root { --spring: linear(0, 0.026 2.5%, 0.096 5%, 0.194 7.5%, 0.311 10%, 0.559 15%, 0.676 17.5%, 0.782 20%, 0.875 22.5%, 0.953 25%, 1.014 27.5%, 1.061 30%, 1.094 32.5%, 1.115 35%, 1.125 37.5%, 1.126 40%, 1.121 42.5%, 1.111 45%, 1.097 47.5%, 1.082 50%, 1.066 52.5%, 1.036 57.5%, 1.023 60%, 1.012 62.5%, 1.003 65%, 0.996 67.5%, 0.991 70%, 0.987 72.5%, 0.985 75%, 0.984 77.5%, 0.984 80%, 0.985 82.5%, 0.987 85%, 0.988 87.5%, 0.996 97.5%, 1); --t-spring: 600ms; --spring-soft: linear(0, 0.016 2.5%, 0.058 5%, 0.115 7.5%, 0.18 10%, 0.25 12.5%, 0.321 15%, 0.39 17.5%, 0.455 20%, 0.517 22.5%, 0.573 25%, 0.625 27.5%, 0.671 30%, 0.713 32.5%, 0.75 35%, 0.783 37.5%, 0.812 40%, 0.838 42.5%, 0.86 45%, 0.88 47.5%, 0.897 50%, 0.911 52.5%, 0.924 55%, 0.935 57.5%, 0.945 60%, 0.953 62.5%, 0.96 65%, 0.966 67.5%, 0.971 70%, 0.979 75%, 0.985 80%, 0.991 87.5%, 0.995 97.5%, 1); --t-spring-soft: 350ms; }
+@media (prefers-reduced-motion: reduce) { :root { --spring: linear; --spring-soft: linear; } }
+@keyframes v-rise { from { translate: 0 8px; } }
+@keyframes v-sel { from { scale: 0.96; } }
 @keyframes b-lit { from { background-color: color-mix(in srgb, var(--accent) 24%, transparent); } }
-@keyframes v-in { from { opacity: 0; translate: 0 6px; scale: 0.97; } }
 @keyframes v-out { to { opacity: 0; translate: 0 6px; scale: 0.97; } }
 @keyframes v-fade-in { from { opacity: 0; } }
 @keyframes v-fade-out { to { opacity: 0; } }
@@ -3365,10 +3371,16 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   :where(.side-panel) { animation: m-side var(--t-mid) var(--ease-out); }
   :where(.sidebar) { animation: m-row var(--t-mid) var(--ease-out); }
   :where(.overlay) { animation: v-fade-in var(--t-mid) var(--ease-out); }
-  :where(.menu, .modal, .toast) { animation: v-in var(--t-mid) var(--ease-pop); }
+  /* V14: floats come in by @starting-style (no keyframes, no JS): a fade on a plain ease, a scale on the soft spring;
+     a display flip (allow-discrete) goes out the same way. What React removes leaves through motion.ts' exits (a copy:
+     CSS can't animate a node that's gone), which a starting style mustn't catch */
+  :where(.menu, .modal, .toast, .tunnel-pop, .shown-pop, .link-peek, .ws-peek) { transition: opacity var(--t-fast) ease-out, scale var(--t-spring-soft) var(--spring-soft), display var(--t-fast) allow-discrete, overlay var(--t-fast) allow-discrete; }
+  @starting-style { :where(.menu, .modal, .toast, .tunnel-pop, .shown-pop, .link-peek, .ws-peek):not(.leaving) { opacity: 0; scale: 0.96; } }
   :where(.menu) { transform-origin: top left; }
-  :where(.tip) { animation: v-fade-in var(--t-fast) var(--ease-out); }
-  :where(.needs-cards > div, .needs-cards > button) { animation: b-in var(--t-mid) var(--ease-out); }
+  :where(.tip) { transition: opacity var(--t-fast) ease-out, display var(--t-fast) allow-discrete; }
+  @starting-style { :where(.tip):not(.leaving) { opacity: 0; } }
+  :where(.needs-cards > div, .needs-cards > button) { animation: v-rise var(--t-spring) var(--spring), v-fade-in var(--t-mid) ease-out; }
+  :where(.ws.sel:not(.needs), .seg button.on, .reader-switch button.on) { animation: v-sel var(--t-spring) var(--spring); }
   :where(.ws.needs) { animation: b-lit var(--t-slow) var(--ease-out); }
   :where(.ws.v-new) { animation: v-row var(--t-mid) var(--ease-out); transform-origin: top; }
   :where(.tab.v-new) { animation: v-tab var(--t-mid) var(--ease-out); transform-origin: left; }

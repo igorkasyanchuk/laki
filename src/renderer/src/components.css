@@ -47,7 +47,7 @@
 .switch-row { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 4px 0; text-align: left; color: var(--fg); font-size: var(--fs-3); }
 .switch-row .toggle-track { flex: none; width: 34px; height: 20px; border-radius: var(--rs, var(--r-pill)); }
 .switch-row .toggle-knob { top: 3px; left: 3px; width: 14px; height: 14px; }
-.switch-row.on .toggle-knob { left: 17px; }
+.switch-row.on .toggle-knob { translate: 14px 0; }
 .switch-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .switch-text .muted { font-size: var(--fs-2); line-height: 1.4; }
 /* a box of settings, one per line with a rule between */

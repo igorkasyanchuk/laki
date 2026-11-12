@@ -948,6 +948,15 @@ frames would hold the change until one comes: a daemon view, a page opened from 
 and ui-smoke (main's `uiSmoke` sets `data-smoke` on every load). A transition whose change hasn't run in 400 ms is
 skipped (`skipTransition`: its change runs then; measured in a hidden browser page: the sheet at 432 ms).
 
+Springs (V14): styles.css' `--spring` (ζ 0.55, ω 16, 600 ms: an overshoot) and `--spring-soft` (ζ 1, ω 22, 350 ms),
+`linear()` points from `scripts/spring.ts` (run once, pasted; times kept where a point on a straight stretch was
+dropped), `--t-spring` and `--t-spring-soft` beside them; `linear` under Reduce motion (and the catch-all makes every
+duration nil). `--spring`: the toggle's knob (`translate`, not `left` any more), `v-sel` on the picked row and the on
+segment, `v-rise` on a Needs you card, the bubbles' stack (floater.html, its own copy). `--spring-soft`: the floats'
+scale as they come in, by `@starting-style` (opacity 0, scale 0.96; opacity on a plain ease; `display` and `overlay`
+`allow-discrete` for one that's hidden rather than removed), not keyframes; `:not(.leaving)`: motion.ts' exit copies
+(React removes a float; CSS can't animate a node that's gone) keep their `v-out`. `v-in` and `b-in` went.
+
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);
