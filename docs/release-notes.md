@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.50.0 · Nov 12, 2026
 
 - Remote access is end to end: what the phone and the Mac say is sealed between them, so the tunnel's provider can't read or log it. Pages opened before need a new link.
 - Laki AI on your own endpoint (Settings › AI › Runs with: Your endpoint): any OpenAI-compatible server, a local one or a provider, with its own key and a Test button.
