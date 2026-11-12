@@ -154,3 +154,16 @@ title or `md`) gives `NoteItem`s, pinned first, then `at` (a title or text chang
 first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-side`: search, `.notes-dot` color filter,
 `.note-row`s, a right click: pin, color, delete) and `NoteEdit` (title, color, pin, delete; Specs' `SpecEditor`, saved
 600 ms after a change and as it unmounts). Tested in `test/notes.test.ts`.
+
+## Your endpoint
+
+Settings › AI › Runs with: Your endpoint (`ai.backend: 'endpoint'`, `settings.aiEndpoint`: `{ url, model }`). ai.ts
+`target()` picks where a chat-completions call goes: OpenRouter (`api()`, the `ai-key` file, its model) or the endpoint
+(`types.ts` `endpointOk`: https anywhere, http only for localhost, 127.0.0.1 and [::1], no user or password, no ? or #;
+core's settingsSet checks it and drops the trailing /; its key `<data>/ai-endpoint-key`, 0600, `aiEndpointKey`, none for a
+local server: no Authorization header). The same loop (`openrouter()`) and `aiComplete` (workflows' AI call blocks,
+memory's compaction, aiOnce) go there; OpenRouter's own parts stay out: no cache_control marks, no `usage.include` (the
+standard `stream_options.include_usage` instead), no x-title, no cost (the call log's `cost` unset: not priced). Voice
+and the decision blocks stay OpenRouter's. `aiEndpointTest`: one short ask, its answer (Settings' Test). Both methods are
+the user's only (gates.ts AGENT_NO, REMOTE_NO; main.ts FROM, ANSWER_NO), as `aiEndpoint` is (AGENT_KEYS, REMOTE_KEYS); a
+managed policy locks it like any setting. `aiState`'s `endpointKey`: whether a key is kept, never the key.

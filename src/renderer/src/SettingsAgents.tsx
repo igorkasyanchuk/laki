@@ -11,15 +11,16 @@ import { shortPath } from './text'
 
 // Settings › AI: Laki's own AI (daemon/ai.ts, the AI page): on, how it runs, the OpenRouter key (a file only you can
 // read: sent once, never shown again), each backend's model, the steps an ask may take, and what it cost
-export type AiApi = { state: () => Promise<{ key: boolean; totals: AiTotals }>; key: (key: string) => Promise<{ key: boolean }>; open: () => void }
+export type AiApi = { state: () => Promise<{ key: boolean; endpointKey?: boolean; totals: AiTotals }>; key: (key: string) => Promise<{ key: boolean }>; endpointKey?: (key: string) => Promise<{ key: boolean }>; endpointTest?: () => Promise<{ model: string; text: string }>; open: () => void }
 const AI_HOW: [AiBackend, string][] = [
   ['openrouter', 'Any model OpenRouter has, paid per token with your API key'],
   ['claude', 'Claude Code in the background (claude -p), on your Claude plan or its API key'],
   ['codex', 'Codex in the background (codex exec), on your ChatGPT plan'],
+  ['endpoint', 'Your own OpenAI-compatible server (a local one, or a provider): its URL, model and key below; not priced'],
 ]
 // the OpenRouter key's field: Laki AI's and Voice's cloud share one key, in a file only you can read (never shown again)
 const KEY_HINT = "Kept in a file only you can read, in Laki's data folder: never in its settings, never shown again. Laki AI and Voice share it"
-function OpenRouterKey({ has, save }: { has?: boolean; save: (key: string) => Promise<{ key: boolean }> }) {
+function OpenRouterKey({ has, save, label = 'OpenRouter API key', hint = 'sk-or-v1-…' }: { has?: boolean; save: (key: string) => Promise<{ key: boolean }>; label?: string; hint?: string }) {
   const [key, setKey] = useState('')
   const [said, setSaid] = useState('')
   const go = (k: string) => save(k).then(r => (setKey(''), setSaid(r.key ? 'Saved' : 'Removed')), e => setSaid(e.message))
@@ -31,9 +32,9 @@ function OpenRouterKey({ has, save }: { has?: boolean; save: (key: string) => Pr
           type="password"
           autoComplete="off"
           value={key}
-          placeholder={has ? '•••••••• saved: paste another to replace it' : 'sk-or-v1-…'}
+          placeholder={has ? '•••••••• saved: paste another to replace it' : hint}
           spellCheck={false}
-          aria-label="OpenRouter API key"
+          aria-label={label}
           onChange={e => (setKey(e.target.value), setSaid(''))}
           onKeyDown={e => e.key === 'Enter' && key.trim() && go(key)}
         />
@@ -216,8 +217,42 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
 }
 
 // presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
-export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; next: boolean; onNext: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
-  const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
+// Your endpoint: its URL (https, or http on this Mac) and model, saved as you leave each field (a bad URL: the daemon's
+// words); its key a file of its own; Test asks it to say OK
+function EndpointFields({ api, endpoint, onEndpoint, has }: { api: AiApi; endpoint?: { url: string; model: string }; onEndpoint?: (e: { url: string; model: string }) => void; has?: boolean }) {
+  const [url, setUrl] = useState(endpoint?.url ?? '')
+  const [model, setModel] = useState(endpoint?.model ?? '')
+  const [said, setSaid] = useState('')
+  const [hasKey, setHasKey] = useState(has)
+  useEffect(() => setHasKey(has), [has])
+  const save = () => (url.trim() !== (endpoint?.url ?? '') || model.trim() !== (endpoint?.model ?? '')) && onEndpoint?.({ url: url.trim(), model: model.trim() })
+  const test = () => (setSaid('Asking…'), api.endpointTest!().then(r => setSaid(`It answered (${r.model}): ${r.text}`), (e: Error) => setSaid(e.message)))
+  return (
+    <>
+      <div className="grid2">
+        <label>
+          URL
+          <input className="mono" value={url} placeholder="http://localhost:11434/v1" spellCheck={false} onChange={e => setUrl(e.target.value)} onBlur={save} />
+        </label>
+        <label>
+          Model
+          <input className="mono" value={model} placeholder="llama3.1, gpt-4.1…" spellCheck={false} onChange={e => setModel(e.target.value)} onBlur={save} />
+        </label>
+      </div>
+      <p className="muted small">An OpenAI-compatible chat completions server with tool calls: https, or http on this Mac only. A model that can call tools.</p>
+      {api.endpointKey && <OpenRouterKey label="Your endpoint's key" hint="its API key (none for a local server)" has={hasKey} save={k => api.endpointKey!(k).then(r => (setHasKey(r.key), r))} />}
+      <div className="row-buttons">
+        <button type="button" disabled={!endpoint?.url || !endpoint.model || !api.endpointTest} onClick={test}>
+          Test
+        </button>
+        {said && <span className="muted small">{said}</span>}
+      </div>
+    </>
+  )
+}
+
+export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChange, endpoint, onEndpoint, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; next: boolean; onNext: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; endpoint?: { url: string; model: string }; onEndpoint?: (e: { url: string; model: string }) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
+  const [st, setSt] = useState<{ key: boolean; endpointKey?: boolean; totals: AiTotals }>()
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
   // the agents' presets, but the plain ones (claude, codex as they are: the options above them)
@@ -290,7 +325,8 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
             : AI_HOW.find(x => x[0] === backend)?.[1]}
           {backend !== 'openrouter' && !preset && ' Another account: a profile on it (Agents & profiles), then pick it here; none: the default account.'}
         </p>
-        <label>
+        {backend === 'endpoint' && <EndpointFields api={api} endpoint={endpoint} onEndpoint={onEndpoint} has={st?.endpointKey} />}
+        {backend !== 'endpoint' && <label>
           Model
           <input
             className="mono"
@@ -299,7 +335,7 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
             spellCheck={false}
             onChange={e => onChange({ ...ai, models: { ...ai.models, [backend]: e.target.value.trim() || undefined } })}
           />
-        </label>
+        </label>}
         {(backend === 'claude' || backend === 'codex') && (
           <label>
             Effort

@@ -10,11 +10,11 @@ import { connect, fixtureWidgets, fresh, seen, sleep, until } from './helpers.ts
 
 // a fake OpenRouter: each request to `answers`' next, recorded
 async function openrouter(t: { after: (f: () => void) => void }, answers: object[]) {
-  const hits: { auth?: string; body: any }[] = []
+  const hits: { auth?: string; title?: string; url?: string; body: any }[] = []
   const srv = createServer(async (q, r) => {
     let body = ''
     for await (const c of q) body += c
-    hits.push({ auth: q.headers.authorization, body: JSON.parse(body) })
+    hits.push({ auth: q.headers.authorization, title: q.headers['x-title'] as string | undefined, url: q.url, body: JSON.parse(body) })
     const a = answers[hits.length - 1] ?? { error: { message: 'no more answers' } }
     if ('slow' in a) return // never answers: a stop ends it
     if ('sse' in a) {
@@ -30,6 +30,42 @@ async function openrouter(t: { after: (f: () => void) => void }, answers: object
   return { hits, answers, url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } // answers: a test adds to it as it goes
 }
 const reply = (message: object, usage = { prompt_tokens: 100, completion_tokens: 10, cost: 0.002 }) => ({ model: 'anthropic/claude-sonnet-5.5', choices: [{ message }], usage })
+
+test("ai: Your endpoint: the same tool loop at its own URL with its own key, none of OpenRouter's parts, not priced; https or this Mac's http; the key never in the view", async t => {
+  const own = await openrouter(t, [
+    reply({ content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'laki_state', arguments: '{}' } }] }, { prompt_tokens: 5, completion_tokens: 2, cost: 9 }),
+    reply({ content: 'Hi from mine.' }, { prompt_tokens: 5, completion_tokens: 2, cost: 9 }),
+    reply({ content: 'OK' }),
+  ])
+  const or = await openrouter(t, [])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  for (const [url, why] of [['http://example.com/v1', /http on this Mac only/], ['https://me:pw@example.com/v1', /no user or password/], ['ftp://localhost/v1', /http on this Mac only/], ['nope', /a URL/], ['https://x.dev/v1?k=1', /no \? or #/]] as const)
+    await assert.rejects(rig.rpc('settingsSet', { aiEndpoint: { url, model: 'm' } }), why, url)
+  await rig.rpc('settingsSet', { ai: { backend: 'endpoint' } })
+  await assert.rejects(rig.rpc('aiAsk', { text: 'hi' }), /no endpoint: Settings › AI › Your endpoint/)
+  await rig.rpc('settingsSet', { aiEndpoint: { url: `${own.url}/v1/`, model: ' llama ' } })
+  assert.deepEqual((await rig.rpc('state')).settings.aiEndpoint, { url: `${own.url}/v1`, model: 'llama' })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'hi' }), { text: 'Hi from mine.' }, 'no key: a local server needs none')
+  assert.equal(own.hits[0].auth, undefined)
+  assert.deepEqual(await rig.rpc('aiEndpointKey', { key: ' fake-secret-own ' }), { key: true })
+  assert.equal(statSync(join(rig.data, 'ai-endpoint-key')).mode & 0o777, 0o600)
+  const h = own.hits[0]
+  assert.equal(h.url, '/v1/chat/completions')
+  assert.equal(h.title, undefined, "no OpenRouter's x-title")
+  assert.equal(h.body.model, 'llama')
+  assert.equal(h.body.usage, undefined)
+  assert.deepEqual(h.body.stream_options, { include_usage: true })
+  assert.ok(!JSON.stringify(h.body).includes('cache_control'))
+  assert.equal(own.hits[1].body.messages.at(-1).role, 'tool', 'its tools ran')
+  assert.equal(or.hits.length, 0, 'nothing to OpenRouter')
+  const a = await rig.rpc('aiState')
+  assert.deepEqual([a.calls[0].backend, a.calls[0].model, a.calls[0].cost, a.endpointKey], ['endpoint', 'anthropic/claude-sonnet-5.5', undefined, true], 'not priced')
+  assert.deepEqual(await rig.rpc('aiEndpointTest'), { model: 'anthropic/claude-sonnet-5.5', text: 'OK' })
+  assert.equal(own.hits[2].auth, 'Bearer fake-secret-own')
+  const seen = JSON.stringify(await rig.rpc('state')) + JSON.stringify(a) + readFileSync(join(rig.data, 'state.json'), 'utf8')
+  assert.ok(!seen.includes('fake-secret-own'), 'the key: its file only')
+  assert.deepEqual(await rig.rpc('aiEndpointKey', { key: '' }), { key: false })
+})
 
 test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 0600 file; each ask is logged', async t => {
   const or = await openrouter(t, [

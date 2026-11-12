@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { endpointOk, AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, modelCheck, presets, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -41,6 +41,44 @@ const MAX_IMAGE = 8 << 20
 const api = () => {
   const t = process.env.LAKI_AI_API
   return t && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(t) ? t : 'https://openrouter.ai/api/v1'
+}
+// Settings › AI › Your endpoint (backend 'endpoint', settings.aiEndpoint): any OpenAI-compatible chat-completions server,
+// the same tool loop. https anywhere, http only on this Mac; no user or password in its URL; its key a file of its own
+// (0600; none for a local server). OpenRouter's own parts (cache marks, usage.include, x-title, its prices) stay out:
+// its calls aren't priced
+const endpointKeyPath = join(dir, 'ai-endpoint-key')
+const readEndpointKey = () => {
+  try {
+    return readFileSync(endpointKeyPath, 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+export function aiEndpointKey(o: { key?: string | null }) {
+  const key = o.key?.trim()
+  if (!key) return rmSync(endpointKeyPath, { force: true }), { key: false }
+  if (!/^[\x21-\x7e]{1,400}$/.test(key)) throw new Error('that does not look like an API key')
+  writeFileSync(endpointKeyPath, key + '\n', { mode: 0o600 })
+  return { key: true }
+}
+// where a chat-completions call goes: Your endpoint (backend 'endpoint'), else OpenRouter
+type Target = { url: string; key: string; model: string; or: boolean; name: string }
+const target = (backend = state.settings?.ai?.backend): Target => {
+  if (backend !== 'endpoint') return { url: api(), key: readKey(), model: state.settings?.ai?.models?.openrouter || AI_MODEL, or: true, name: 'OpenRouter' }
+  const e = state.settings?.aiEndpoint
+  if (!e?.url || !e.model) throw new Error('no endpoint: Settings › AI › Your endpoint (its URL and model)')
+  return { url: endpointOk(e.url), key: readEndpointKey(), model: e.model, or: false, name: 'Your endpoint' }
+}
+const headersOf = (t: Target) => ({ ...(t.key && { authorization: `Bearer ${t.key}` }), 'content-type': 'application/json', ...(t.or && { 'x-title': 'Laki' }) })
+// Settings › AI's Test: one short ask to Your endpoint, its answer or why not
+export async function aiEndpointTest() {
+  const t = target('endpoint')
+  const res = await fetch(`${t.url}/chat/completions`, { method: 'POST', headers: headersOf(t), body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: 'Say OK.' }], max_tokens: 16 }), signal: AbortSignal.timeout(20000) })
+  const j: any = await res.json().catch(() => ({}))
+  if (!res.ok || j.error) throw new Error(`Your endpoint: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+  const text = j.choices?.[0]?.message?.content
+  if (typeof text !== 'string') throw new Error('Your endpoint: no answer (is it OpenAI-compatible?)')
+  return { model: j.model || t.model, text: text.slice(0, 200) }
 }
 
 const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
@@ -397,7 +435,7 @@ export function aiForget(id: string) {
 export function aiState(p: { chat?: string } = {}) {
   const t = thread(p.chat)
   const calls = readCalls()
-  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t), key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
+  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t), key: hasKey(), endpointKey: !!readEndpointKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
 }
 
 // ---------- asking
@@ -425,6 +463,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   refuseBusy(t)
   const backend: AiBackend = s.backend ?? 'openrouter'
   if (backend === 'openrouter' && !hasKey()) throw new Error('no OpenRouter API key: Settings › AI')
+  if (backend === 'endpoint') target(backend) // its URL and model set, before anything is said
   if (t.ended) fresh(t)
   const ctl = new AbortController()
   let child: ChildProcess | undefined
@@ -439,12 +478,12 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   say(t, 'user', ask, images)
   t.asked = false
   const t0 = Date.now()
-  const r: Run = { text: '', model: s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
+  const r: Run = { text: '', model: backend === 'endpoint' ? state.settings?.aiEndpoint?.model || backend : s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
   const where = typeof p.context === 'string' ? p.context.trim().slice(0, CONTEXT_MAX) : ''
   const o: Opts = { t, ask: where ? `${ask || 'See the image.'}\n\n[Where the user is in Laki as they ask this: ${where}]` : ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
   const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120) }
   try {
-    await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o))
+    await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o)) // openrouter: Your endpoint's too
     call.ok = true
     if (r.text.trim() || !t.asked) say(t, 'ai', r.text || '(no answer)') // a question it asked is the answer
     return { text: r.text }
@@ -523,7 +562,7 @@ const history = (t: Thread) => earlier(t.chat.slice(0, -1)).map(m => ({ role: m.
 // the first message the model sees with the next ask (its at), when older ones are left out: the page marks it.
 // OpenRouter's only: claude and codex keep their own session
 const seenFrom = (t: Thread) => {
-  if ((state.settings?.ai?.backend ?? 'openrouter') !== 'openrouter') return undefined
+  if (['claude', 'codex'].includes(state.settings?.ai?.backend ?? 'openrouter')) return undefined
   const kept = earlier(t.chat)
   return kept.length < t.chat.filter(m => m.role === 'user' || m.role === 'ai').length ? kept[0]?.at : undefined
 }
@@ -541,10 +580,10 @@ const cachedOf = (u: any) => Number(u?.prompt_tokens_details?.cached_tokens) || 
 // in pieces, by index), reasoning kept for the next request, the model and usage from the chunks (usage: the last).
 // onText: the text so far; alive: a chunk came. A JSON answer (an error, a reply that doesn't stream) is read whole
 type Round = { model?: string; usage?: any; message?: any }
-async function roundOf(res: Response, onText: (text: string) => void, alive: () => void): Promise<Round> {
+async function roundOf(res: Response, onText: (text: string) => void, alive: () => void, name = 'OpenRouter'): Promise<Round> {
   if (!res.ok || !/text\/event-stream/.test(res.headers.get('content-type') ?? '')) {
     const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+    if (!res.ok || j.error) throw new Error(`${name}: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
     return { model: j.model, usage: j.usage, message: j.choices?.[0]?.message }
   }
   const m: any = { role: 'assistant', content: '' }
@@ -563,7 +602,7 @@ async function roundOf(res: Response, onText: (text: string) => void, alive: () 
     } catch {
       return
     }
-    if (j.error) throw new Error(`OpenRouter: ${j.error.message ?? j.error}`)
+    if (j.error) throw new Error(`${name}: ${j.error.message ?? j.error}`)
     r.model = j.model || r.model
     r.usage = j.usage ?? r.usage
     const d = j.choices?.[0]?.delta
@@ -599,17 +638,17 @@ async function roundOf(res: Response, onText: (text: string) => void, alive: () 
 const QUIET_MS = Number(process.env.LAKI_AI_QUIET_MS) || 120_000
 
 async function openrouter(o: Opts) {
-  const key = readKey()
   const s = state.settings?.ai ?? {}
-  const model = s.models?.openrouter || AI_MODEL
-  const mark = cachesByMark(model)
+  const at = target() // OpenRouter, or Your endpoint
+  const model = at.model
+  const mark = at.or && cachesByMark(model)
   const list = toolsFor(o.rpc, o.t.id)
   const fns = list.map((t, i) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema }, ...(mark && i === list.length - 1 && { cache_control: EPHEMERAL }) }))
   const pics = o.images.map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))
   const sys = system(o.t)
   const messages: object[] = [{ role: 'system', content: mark ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
-  r.cost = 0
+  r.cost = at.or ? 0 : undefined // Your endpoint's: not priced
   // the text so far to the page (its partial, under the chat until the message comes), 10 a second at most. ponytail:
   // the whole text each time (a 40 KB answer: ~8 MB to each window); deltas with a sequence if long answers drag
   let shown = 0
@@ -617,17 +656,17 @@ async function openrouter(o: Opts) {
   for (let i = 0; ; i++) {
     const quiet = new AbortController()
     let timer: NodeJS.Timeout | undefined
-    const alive = () => (clearTimeout(timer), (timer = setTimeout(() => quiet.abort(new Error(`OpenRouter sent nothing for ${Math.round(QUIET_MS / 1000)} s`)), QUIET_MS)))
+    const alive = () => (clearTimeout(timer), (timer = setTimeout(() => quiet.abort(new Error(`${at.name} sent nothing for ${Math.round(QUIET_MS / 1000)} s`)), QUIET_MS)))
     alive()
     let j: Round
     try {
-      const res = await fetch(`${api()}/chat/completions`, {
+      const res = await fetch(`${at.url}/chat/completions`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
-        body: JSON.stringify({ model, messages, tools: fns, stream: true, usage: { include: true } }),
+        headers: headersOf(at),
+        body: JSON.stringify({ model, messages, tools: fns, stream: true, ...(at.or ? { usage: { include: true } } : { stream_options: { include_usage: true } }) }),
         signal: AbortSignal.any([o.signal, quiet.signal]),
       })
-      j = await roundOf(res, partial, alive)
+      j = await roundOf(res, partial, alive, at.name)
     } finally {
       clearTimeout(timer)
     }
@@ -635,9 +674,9 @@ async function openrouter(o: Opts) {
     r.in += j.usage?.prompt_tokens ?? 0
     r.out += j.usage?.completion_tokens ?? 0
     r.cached = (r.cached ?? 0) + cachedOf(j.usage)
-    r.cost! += j.usage?.cost ?? 0
+    if (at.or) r.cost! += j.usage?.cost ?? 0
     const m = j.message
-    if (!m) throw new Error('OpenRouter: no answer')
+    if (!m) throw new Error(`${at.name}: no answer`)
     if (!m.tool_calls?.length) return void (r.text = m.content ?? '')
     if (i >= (s.steps || AI_STEPS)) throw new Error(`stopped after ${i} rounds of tools (Settings › AI › Steps)`)
     messages.push(m) // as it came: a reasoning model's next request needs its reasoning_details
@@ -660,23 +699,23 @@ async function openrouter(o: Opts) {
 // caller's stop too (LAKI_AI_WAIT_MS: tests' shorter)
 const waitOf = (signal?: AbortSignal) => AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(Number(process.env.LAKI_AI_WAIT_MS) || 5 * 60_000)])
 export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string }) {
-  const key = readKey()
-  if (!key) throw new Error('no OpenRouter API key: Settings › AI')
-  const model = o.model?.trim() || state.settings?.ai?.models?.openrouter || AI_MODEL
-  const call: AiCall = { at: Date.now(), backend: 'openrouter', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  const at = target(state.settings?.ai?.backend === 'endpoint' ? 'endpoint' : 'openrouter') // Your endpoint when it's Laki AI's; else OpenRouter (claude and codex: aiOnce)
+  if (at.or && !at.key) throw new Error('no OpenRouter API key: Settings › AI')
+  const model = o.model?.trim() || at.model
+  const call: AiCall = { at: Date.now(), backend: at.or ? 'openrouter' : 'endpoint', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
   try {
-    const res = await fetch(`${api()}/chat/completions`, {
+    const res = await fetch(`${at.url}/chat/completions`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
+      headers: headersOf(at),
       // json: an answer that is a JSON object (out:'s), where the model can
-      body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], usage: { include: true }, ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
+      body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], ...(at.or && { usage: { include: true } }), ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
       signal: waitOf(o.signal),
     })
     const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
-    Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, ...(cachedOf(j.usage) && { cachedIn: cachedOf(j.usage) }), cost: j.usage?.cost })
+    if (!res.ok || j.error) throw new Error(`${at.name}: ${j.error?.message ?? res.status}`)
+    Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, ...(cachedOf(j.usage) && { cachedIn: cachedOf(j.usage) }), cost: at.or ? j.usage?.cost : undefined })
     const text = j.choices?.[0]?.message?.content
-    if (typeof text !== 'string') throw new Error('OpenRouter: no answer')
+    if (typeof text !== 'string') throw new Error(`${at.name}: no answer`)
     call.ok = true
     return { text, model: call.model, cost: call.cost }
   } catch (e) {
@@ -708,7 +747,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   // nothing of the user's: what it reads (a diff an agent wrote) can't steer a tool
   const userCfg = !!o.perm
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
-  if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text // ponytail: no onCall (an extension's agent is claude or codex)
+  if (backend === 'openrouter' || backend === 'endpoint') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text // ponytail: no onCall (an extension's agent is claude or codex)
   const pre = o.preset ?? presetOf(backend)
   const model = agent ? o.preset!.model : s.models?.[backend]
   const effort = effortArgs(backend, agent ? (o.preset!.effort ?? '') : undefined)
@@ -836,7 +875,7 @@ const sessionKey = (agent: AiBackend) => `${agent}:${presetOf(agent)?.name ?? ''
 function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
   mkdirSync(home, { recursive: true })
   return new Promise<void>((resolve, reject) => {
-    const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, ...(cmd !== 'openrouter' && accountEnv(presetOf(cmd)?.account ?? accountUsed(cmd))), MCP_TOOL_TIMEOUT: '300000' } // its account: the preset's, else the default
+    const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, ...((cmd === 'claude' || cmd === 'codex') && accountEnv(presetOf(cmd)?.account ?? accountUsed(cmd))), MCP_TOOL_TIMEOUT: '300000' } // its account: the preset's, else the default
     const c = spawn(cmd, args, { cwd: home, env, stdio: ['ignore', 'pipe', 'pipe'] })
     o.spawned(c)
     own(c, `Laki AI · ${cmd}`, 'ai')

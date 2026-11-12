@@ -28,6 +28,7 @@ export const BACKENDS = {
   openrouter: 'OpenRouter',
   claude: 'claude -p',
   codex: 'codex exec',
+  endpoint: 'Your endpoint',
 } as const
 // how each one is paid for, the side panel's words
 const PAYS = {
@@ -35,12 +36,14 @@ const PAYS = {
   claude:
     'Runs Claude Code in the background, on your Claude plan (or its API key). The cost is what claude says the tokens would cost; on a plan it counts toward its limits instead.',
   codex: "Runs Codex in the background, on your ChatGPT plan: it counts toward the plan's limits, so no cost is shown.",
+  endpoint: 'Runs on your own OpenAI-compatible server (Settings › AI › Your endpoint): not priced here.',
 } as const
 // how its asks share a conversation, the side panel's words
 const SESSION = {
   openrouter: 'Each ask sends the conversation so far (the last 20 asks and answers); the model looks things up again.',
   claude: 'One claude session for the whole chat: each ask goes on with it (--resume), so it remembers. New chat starts another.',
   codex: 'One codex thread for the whole chat: each ask goes on with it, so it remembers. New chat starts another.',
+  endpoint: 'Each ask sends the conversation so far (the last 20 asks and answers); the model looks things up again.',
 } as const
 const CAN = ['See your workspaces, agents and PRs', 'Start workspaces and agent tabs', 'Send prompts to your agents', 'Attach PRs, schedule tasks', 'Make extensions (off until you turn them on)']
 // what Laki's skill adds (Settings › AI, on unless turned off)

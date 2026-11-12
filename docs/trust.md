@@ -15,7 +15,7 @@ checked against it by `test/trust.test.ts`), how to check the build you run, and
 | Agents' transcripts | Where each agent writes them (`~/.claude/projects/…`, `~/.codex/sessions/…`): Laki reads them for the context and cost meters and the Reader, never copies them elsewhere |
 | Today's and each day's token use and cost | The data folder: `usage-today.json`, `usage-days.json` |
 | Laki AI's chats and its call log | The data folder: `ai-chats/`, `ai-chat.json`, `ai-calls.jsonl` |
-| Secrets you give Laki (the OpenRouter key, `laki secret` answers, extensions' secrets) | 0600 files in the data folder (`ai-key`, `widget-secrets.json`, a secret's own file) |
+| Secrets you give Laki (the OpenRouter key, your endpoint's key, `laki secret` answers, extensions' secrets) | 0600 files in the data folder (`ai-key`, `ai-endpoint-key`, `widget-secrets.json`, a secret's own file) |
 | Logs | The data folder: `daemon.log`, `ptyhost.log`, `script-logs/` |
 | The window's place and the Dock icon | Electron's own folder (`~/Library/Application Support/Laki`) |
 
@@ -42,6 +42,7 @@ providers on their own; Laki starts them and reads their screens, it doesn't rel
 | Host | What is sent | When | How to turn it off |
 |---|---|---|---|
 | `openrouter.ai` | Laki AI's chat, an AI call or decision block's prompt, Voice's recording, a project's agent-learned memories for compaction, the last answer for *Guess my next prompt* | Once you add an OpenRouter key (Settings › AI), as each of those runs | Remove the key; Laki AI off; each feature's own switch (Voice, *On its own* compaction, *Guess my next prompt*) |
+| Your own endpoint (Settings › AI › Your endpoint) | Laki AI's chat, an AI call block's prompt, memories for compaction, *Guess my next prompt*'s last answer: what goes to OpenRouter otherwise (Voice and decision blocks stay OpenRouter's) | Only with *Runs with: Your endpoint*, as each of those runs; https, or http on this Mac only | Pick another backend; Laki AI off; each feature's own switch |
 | `api.anthropic.com` | Claude Code's own sign-in token, asking for your plan's limits (an undocumented endpoint) | At most every 7.5 minutes, only with *Ask api.anthropic.com for Claude Code's plan limits* on (Settings › Appearance) | That switch (off unless you turn it on) |
 | `chatgpt.com` | Codex's own sign-in token, asking for your plan's limits (an undocumented endpoint); `api.openai.com` is only a claim name read from that token, never contacted | At most every 5 minutes, only with *Ask chatgpt.com for Codex's plan limits* on | That switch |
 | `oauth2.googleapis.com`, `cloudcode-pa.googleapis.com` | Gemini CLI's own sign-in (its token renewed, then its quota asked) | At most every 5 minutes, only with *Ask Google for Gemini CLI's plan limits* on | That switch |

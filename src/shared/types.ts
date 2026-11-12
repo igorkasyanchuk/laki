@@ -624,6 +624,7 @@ export type Settings = {
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (off unless true; overlapCheck asks for one)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: on)
+  aiEndpoint?: { url: string; model: string } // Settings › AI › Your endpoint: an OpenAI-compatible server (ai.ts endpointOk; its key: <data>/ai-endpoint-key); the user's only (AGENT_KEYS, REMOTE_KEYS), a policy can lock it
   menuBarClick?: 'menu' | 'inbox' // Settings › General › Menu bar click: the tray's menu, or the Inbox (macOS; unset: menu)
   menus?: 'laki' | 'macos' // Settings › Layout › Menus: a workspace's and a tab's menu drawn by macOS (unset: Laki's)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
@@ -836,7 +837,18 @@ export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false
 // Laki's own AI (daemon/ai.ts): on unless turned off, it works Laki through the MCP server's tools, only when asked. backend:
 // OpenRouter (its key in <data>/ai-key, never here) or a CLI agent in the background (claude -p, codex exec); models:
 // each backend's (unset: AI_MODEL for OpenRouter, the agent's own for the others); steps: tool calls an ask may make
-export type AiBackend = 'openrouter' | 'claude' | 'codex'
+// Settings › AI › Your endpoint's URL, checked (core's settingsSet, ai.ts): https anywhere, http only on this Mac, no user
+// or password, no ? or #; without its trailing /
+export function endpointOk(u: unknown): string {
+  const s = typeof u === 'string' ? u.trim() : ''
+  if (!URL.canParse(s)) throw new Error('Your endpoint: a URL, as https://host/v1')
+  const url = new URL(s)
+  if (url.username || url.password) throw new Error('Your endpoint: no user or password in the URL (its key has a field of its own)')
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw new Error('Your endpoint: https, or http on this Mac only (localhost, 127.0.0.1, [::1])')
+  if (url.search || url.hash) throw new Error('Your endpoint: no ? or # in the URL')
+  return url.href.replace(/\/+$/, '')
+}
+export type AiBackend = 'openrouter' | 'claude' | 'codex' | 'endpoint' // endpoint: Settings › AI › Your endpoint (settings.aiEndpoint)
 // preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
 // skill: Laki's skill for it (unset: on): more tools (PRs, projects' notes and memory, tabs and shells, actions, templates) and
 // asking you with options; hideCost: no $ on the AI page

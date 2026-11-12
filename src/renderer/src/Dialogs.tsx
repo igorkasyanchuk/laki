@@ -201,7 +201,7 @@ export function Pages({ app }: { app: AppCtx }) {
           accounts={layoutsOn ? accountsApi : undefined}
           hooks={hasCap(view, 'hooks.seen') ? () => api.call('hooksSeen') : undefined}
           typeIn={(cmd, project) => void termType(cmd, project)}
-          ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
+          ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), endpointKey: key => api.call('aiEndpointKey', { key }), endpointTest: () => api.call('aiEndpointTest'), open: () => setDialog('ai') }}
           bg={{
             url: bgUrl,
             set: async f => {

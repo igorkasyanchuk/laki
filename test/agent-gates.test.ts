@@ -233,6 +233,9 @@ test("S5: what was never classified: Laki AI's key, the CLI, remote access, a te
   const note = await rig.rpc('noteNew', { title: 'mine' })
   const no: [string, object][] = [
     ['aiKey', { key: 'fake-secret' }],
+    ['aiEndpointKey', { key: 'fake-secret' }],
+    ['aiEndpointTest', {}],
+    ['settingsSet', { aiEndpoint: { url: 'https://example.com/v1', model: 'm' } }],
     ['cliInstall', {}],
     ['cliRemove', {}],
     ['remoteStop', {}],

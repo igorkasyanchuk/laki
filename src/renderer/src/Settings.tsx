@@ -208,6 +208,7 @@ export type AppSettings = Paint & {
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
   ai?: AiSettings // Laki AI (Settings › AI)
+  aiEndpoint?: { url: string; model: string } // AI › Your endpoint: an OpenAI-compatible server (its key apart: aiEndpointKey)
   voice?: VoiceSettings // the mic and hold Fn (Settings › Voice)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   cmdKeys?: Record<string, string> // Settings › Keys: ⌘K commands' keys
@@ -2530,7 +2531,7 @@ export function SettingsPage(p: {
               </div>
             </>
           )}
-          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
+          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} endpoint={s.aiEndpoint} onEndpoint={aiEndpoint => set({ aiEndpoint })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'voice' && bridge?.talkKey && (
             <Group title="Talk key">
