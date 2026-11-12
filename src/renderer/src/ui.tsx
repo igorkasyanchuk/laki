@@ -45,6 +45,22 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // keyId: its Settings › Keys action (data-key: the hold-⌘ overlay's badge beside it)
 // U11: a click target that isn't a <button> (a row, a cell, a picture): a button to the keyboard and a screen reader
 // too: focusable, Enter and Space click it (its own key, not a child's). none: nothing to press, no role
+// V11: a scrolling list's edge: once it's scrolled, its top fades under the header above it (styles.css
+// [data-scrolled]: a mask). A sentinel, its scroller's first child, seen by one IntersectionObserver: no scroll listener.
+// A data attribute, not a class: React leaves it alone as the scroller's className changes
+export function ScrollEdge() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    const root = el?.parentElement
+    if (!el || !root || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => root.toggleAttribute('data-scrolled', !e.isIntersecting), { root })
+    io.observe(el)
+    return () => (io.disconnect(), root.removeAttribute('data-scrolled'))
+  }, [])
+  return <div ref={ref} className="scroll-edge" aria-hidden />
+}
+
 // space: what Space does instead of a click (U14: a file row's Quick Look)
 export const act = <E extends Element>(f: ((e: MouseEvent<E>) => unknown) | false | null | undefined, space?: (() => unknown) | false) =>
   f ? { role: 'button', tabIndex: 0, onClick: f, onKeyDown: (e: KE<E>) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), e.key === ' ' && space ? space() : f(e as unknown as MouseEvent<E>)) } : {}

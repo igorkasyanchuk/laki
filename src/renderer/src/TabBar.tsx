@@ -159,12 +159,12 @@ export function TabBar({ app }: { app: AppCtx }) {
       {onePane && readSwitch(tab?.id) /* U2: a split pane has it in its header */}
       {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
       {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
-        <div className="actions nodrag">
+        <div className="actions capsule nodrag">
           <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(full), 'right')} />
         </div>
       )}
       {ws && ws.browser === undefined && project?.kind !== 'shells' && (
-        <div className="actions nodrag">
+        <div className="actions capsule nodrag">
           {!narrow && ( // a phone: in ⌘K's palette (its search button)
             <>
               <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />

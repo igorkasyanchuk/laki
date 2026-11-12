@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
-import { ask, Icon, type MenuItem, ON, useMenu } from './ui'
+import { ask, Icon, type MenuItem, ON, ScrollEdge, useMenu } from './ui'
 import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
 import { daemonBase, openExternal } from './api'
@@ -246,6 +246,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     <RunCode.Provider value={runCode}>
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
+        <ScrollEdge />
         <div className="reader-col">
           {none && !said?.length && (
             <div className="reader-empty muted">
@@ -310,7 +311,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           </div>
         </div>
       ) : (
-        <form className="rd-box" ref={fabOver} onSubmit={e => (e.preventDefault(), send())}>
+        <form className="rd-box capsule" ref={fabOver} onSubmit={e => (e.preventDefault(), send())}>
           {tab.mode && (
             <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip={tab.modeUnknown ? `Claude's footer isn't on screen (a menu, a transcript view or a narrow pane hides it). Last seen: ${modeLabel(tab.mode)}` : 'Its permission mode: change it without restarting'} onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
               {tab.modeUnknown ? 'Mode unknown' : modeLabel(tab.mode)} ▾

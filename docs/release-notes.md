@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The tab bar's buttons, the Terminal / Reader switch, the Reader's message box and the status bar's groups float as glass capsules, as in macOS 26; a list scrolled under its header fades into it instead of a line.
 - Answer an agent's question from the notification: its Reply field sends your words to that tab. The Dock icon shows a Ship's or a workflow run's progress, and bounces once when a workspace starts waiting on you while Laki is in the background (Settings › Notifications). *Share…* on a PR and on a shared tab's link opens macOS's Share menu.
 - Space on a file shows it in Quick Look, as in Finder: Changes, the Review tab's files, Files and Artifacts (and *Quick Look* in a file's right click).
 

@@ -3624,7 +3624,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 /* U10: Settings' Basic | All, and Basic's view: only its cards (Shown), none of the sections' own heads and notes */
 .settings-view { display: flex; margin: 4px 0 8px; }
 .settings-view button { flex: 1; }
-.settings-main[data-basic] > :not(.set-group, .basic-head) { display: none; }
+.settings-main[data-basic] > :not(.set-group, .basic-head, .scroll-edge) { display: none; }
 .settings-main button.danger { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }
 
 /* U11: the sidebar's tree from the keyboard: the row in focus ringed, its ⋯ and the project's + ⋯ shown as on hover */
@@ -3641,3 +3641,39 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .link-peek.md { width: 360px; }
 .link-peek .lp-md { max-height: 320px; overflow: auto; overscroll-behavior: contain; } /* the card scrolls: the pointer on it keeps it */
 .link-peek .lp-md .md { font-size: var(--fs-2); }
+
+/* V11: macOS 26's glass. A capsule floats over what's under it, apart from the edges: the panel at the floating
+   surface's strength (--surface-a: made to read over a busy background, test/contrast.test.ts), a blur and more
+   saturation of what's behind, a hairline, a lit top edge, the pill's corners (square in the Square look: --rs).
+   Opaque as before under Reduce transparency and in the looks marked opaque; in glass (the window's own blur) nearly
+   opaque, no backdrop-filter (components.css: it flickers there); never a blur over a terminal (its WebGL canvas
+   would repaint the blur every frame it prints). Its own name, not .glass: that's html's, the window's glass mode */
+:root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(20px) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); }
+html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
+html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-blur: none; }
+@media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
+.capsule { background: var(--cap-bg); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-hi), var(--lift-1); }
+.term-wrap .capsule { --cap-blur: none; background: var(--panel); }
+/* the tab bar's buttons and the Terminal / Reader switch: a capsule each, a gap around it */
+.actions.capsule { gap: 0; padding: var(--sp-1); margin: 0 var(--sp-2) 0 var(--sp-3); }
+.actions.capsule .ib { border-radius: var(--r-pill); }
+.reader-switch.capsule { padding: var(--sp-1); gap: var(--sp-1); }
+.reader-switch.capsule button { border-radius: var(--r-pill); }
+.reader-switch.capsule button.on { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+/* the Reader's composer: one capsule, its field borderless in it, its focus ring the capsule's; round as a pill at one
+   line, its corners kept as it grows */
+.rd-box.capsule { width: calc(100% - 40px); max-width: 720px; margin: 0 auto var(--sp-5); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); align-items: center; border-radius: min(var(--r-pill), 23px); }
+.rd-box.capsule textarea { border: none; background: transparent; padding: var(--sp-3) var(--sp-2); }
+.rd-box.capsule textarea:focus-visible { box-shadow: none; }
+.rd-box.capsule:focus-within { border-color: var(--accent); box-shadow: inset 0 1px 0 var(--cap-hi), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.rd-box.capsule button[type='submit'] { border-radius: var(--r-pill); }
+/* the status bar: no strip of its own, its two groups capsules over the window (no outer shadow: the bar clips it) */
+.status { background: transparent; border-top-color: transparent; gap: var(--sp-3); padding: 0 var(--sp-2); }
+.status .sb-group { display: inline-flex; align-items: center; gap: var(--sp-4); flex: 0 1 auto; min-width: 0; height: var(--h-s); padding: 0 var(--sp-4); overflow: hidden; box-shadow: inset 0 1px 0 var(--cap-hi); }
+.status .sb-group:empty { display: none; }
+/* the scroll edge (ui.tsx ScrollEdge): a list scrolled under its header fades into it instead of a line */
+.scroll-edge { display: block; height: 1px; margin-bottom: -1px; flex: none; pointer-events: none; }
+.settings-main > .scroll-edge { margin-bottom: calc(-1px - var(--sp-6)); } /* its column's gap */
+:is(.side-scroll, .reader-scroll, .fr-files, .settings-main)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); }
+.settings-main[data-scrolled]:has(.theme-find) { mask-image: none; } /* the themes' search stays at the top: never faded */
+.settings-head { border-bottom-color: transparent; }

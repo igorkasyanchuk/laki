@@ -4,7 +4,7 @@
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
-import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act } from './ui'
+import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
@@ -623,6 +623,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         </div>
       )}
       <div className="side-scroll" role="tree" aria-label="Workspaces" ref={tree} onKeyDown={treeKey} onFocus={e => (e.target as HTMLElement).getAttribute('role') === 'treeitem' && rove(e.currentTarget, e.target as HTMLElement)}>
+        <ScrollEdge />
         {find && !found && <div className="empty-side muted">No workspace matches.</div>}
         {!find && (!rail || railKind === 'projects') && settings.needsList !== false && (
           <NeedsList items={needsSorted(needing, staleMin).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} next={needNext?.id} staleAfter={staleMin} />

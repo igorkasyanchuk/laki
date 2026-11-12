@@ -75,8 +75,11 @@ test('contrast: every theme is readable', () => {
     const under = [c.bg, over(c.side, c.bg), ...[c.bg, c.side, c.fg].map(x => over(x.slice(0, 7) + '40', c.bg))]
     on('surface: fg', c.fg, under.map(u => over(top, u)), 4.5)
     on('surface: muted', c.muted, under.map(u => over(top, u)), 4.5)
+    // V11's capsules (the tab bar's buttons, the Reader's composer, the status bar's groups) are the same fill: covered above
   }
   assert.deepEqual(bad, [])
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+  assert.match(css, /--cap-bg: color-mix\(in srgb, var\(--panel\) var\(--surface-a\), transparent\)/, "V11: a capsule's fill is the floating surface's, whose text the pairs above check")
 })
 
 test("contrast: readable keeps a color that reads, else darkens it on light (lightens on dark), the hue kept", () => {

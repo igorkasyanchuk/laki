@@ -20,7 +20,7 @@ import { atHead, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffB
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
-import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act } from './ui'
+import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act, ScrollEdge } from './ui'
 import { fileTree, prName, prNo } from './text'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
@@ -483,6 +483,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           </button>
         ) : (
         <div className="fr-files">
+          <ScrollEdge />
           <div className="fr-filter">
             <Icon name="filter" />
             <input

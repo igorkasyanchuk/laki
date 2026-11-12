@@ -2873,7 +2873,7 @@ export function App() {
   // U2: Terminal | Reader, in the pane's header (split panes) or the tab bar (one pane): never over the terminal's lines
   const readSwitch = (id?: string) =>
     id && readerOn && readable(byId(id)) ? (
-      <div className="reader-switch nodrag" role="group" aria-label="Show it as">
+      <div className="reader-switch capsule nodrag" role="group" aria-label="Show it as">
         <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
         <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>
       </div>
@@ -3471,6 +3471,8 @@ export function App() {
   const statusBar = view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
+          {/* V11: two groups, each a capsule over the bar (empty: none drawn) */}
+          <span className="sb-group capsule">
           {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own
             <>
               {ctxOn && tab?.context && (
@@ -3554,7 +3556,9 @@ export function App() {
               Artifacts: {ws.artifacts}
             </button>
           )}
+          </span>
           <span className="spacer" />
+          <span className="sb-group capsule">
           {/* U3: the right end: the ports, then the plan's limits; left of the spacer what the open work is (branch, PR, checks) */}
           {ws && ws.browser === undefined && !pageBar && (
             <>
@@ -3633,6 +3637,7 @@ export function App() {
               AI
             </button>
           )}
+          </span>
           {wideBar && !rail && ( // no rail: its AI and Settings at the end
             <span className="sb-foot">
               {aiOn(settings) && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}

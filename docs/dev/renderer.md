@@ -913,6 +913,21 @@ window, the sidebar or a blurred busy terminal (`test/contrast.test.ts`); `OPAQU
 as do glass (components.css' own near-solid floats: a backdrop-filter over vibrancy flickers) and Reduce transparency.
 The dim behind a dialog (`.overlay`) is 28% black.
 
+Capsules (V11, macOS 26's glass): styles.css' `.capsule` (not `.glass`: that's `<html>`'s, the window's glass mode),
+`--cap-bg` (the floating surface's fill, `--surface-a`: the same contrast holds), `--cap-blur` (`blur(20px)
+saturate(1.7)`), the surface's hairline, `--cap-hi` (a lit top edge), `--r-pill` (square in the Square look). Opaque
+in `html.opaque` and under Reduce transparency; in glass nearly opaque without a blur; inside `.term-wrap` never a
+blur. On: TabBar's two `.actions` groups, App's `reader-switch`, the Reader's `.rd-box` (its field borderless in it,
+its focus ring the capsule's, corners `min(--r-pill, 23px)` as it grows), and the status bar's two `.sb-group`s (left:
+the workspace's; right: ports, limits and the rest; `:empty` draws none), the bar itself transparent. The scroll edge:
+ui.tsx `ScrollEdge`, a 1px sentinel as the scroller's first child, one `IntersectionObserver` (root: the scroller)
+sets `data-scrolled` (not a class: React keeps the scroller's className) once it's out of sight; `:is(.side-scroll,
+.reader-scroll, .fr-files, .settings-main)[data-scrolled]` masks the top 20px; `.settings-head` lost its line. Frame
+cost, measured 12 Nov 2026 in the dev renderer (Chromium 156, `npm run demo`, a shell printing `date; ls -la` in a loop,
+4 s of `requestAnimationFrame` intervals each, capsules as they are against a style forcing them opaque without a blur,
+twice each): mean 16.65 / 16.66 ms with the blur, 16.66 / 16.67 ms without, p95 17.5 ms in all four, no frame over 17.7
+ms. None is over the terminal's canvas, so its repaints don't redraw a blur.
+
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);

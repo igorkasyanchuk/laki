@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
@@ -1188,6 +1188,7 @@ export function SettingsPage(p: {
         <Fresh.Provider value={freshHere}>
         <Shown.Provider value={shown}>
         <div className="settings-main form" data-basic={basic ? '' : undefined}>
+          <ScrollEdge />
           {basic && <h2 className="basic-head">{basic.label}</h2>}
           {p.managed && (
             <div className="setting-box managed-box" role="note">
