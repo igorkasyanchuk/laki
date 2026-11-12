@@ -143,6 +143,7 @@ export function Term({
       allowProposedApi: true,
       allowTransparency: transparent(),
       macOptionIsMeta: true,
+      cursorInactiveStyle: 'outline', // a split's other panes (Dim other panes): their cursor an outline, the focused one's as set
       // ⌥-click and ⌥-drag select even while an app has the mouse (claude's fullscreen TUI picks its own words, the dot
       // in): xterm's selection, trimmed and copied as any. ponytail: ⌥-drag's block selection goes with it
       macOptionClickForcesSelection: true,

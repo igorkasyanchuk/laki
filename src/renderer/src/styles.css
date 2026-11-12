@@ -95,6 +95,7 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
    Reduce transparency, in glass (components.css: the window's blur is native, a backdrop-filter over it flickers) and
    in looks marked opaque (html.opaque: themes.ts OPAQUE_LOOKS). Never on a list's rows: only these float */
 :is(.menu, .modal, .finder, .tip, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
+:root { --pane-dim: 0.88; } /* Dim other panes: how much a split's other panes keep */
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
@@ -2425,7 +2426,8 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 @media (prefers-reduced-motion: reduce) { .ws > .ws-acts { transition: none; } .ws:hover > .ws-acts .icon-svg { animation: none; } }
 /* Settings › Terminal › Dim other panes */
 .pane-body { transition: opacity 0.12s; }
-.dim-panes .pane.multi:not(.active) .pane-body { opacity: 0.5; }
+.dim-panes .pane.multi:not(.active) .pane-body { opacity: var(--pane-dim); } /* Dim other panes: a split's panes but the focused one (Term.tsx: their cursors an outline) */
+html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the window in the background: it's greyed whole already */
 /* the toast's Undo */
 .toast.has-undo { display: flex; align-items: center; gap: var(--sp-5); border-color: var(--line); }
 .toast-undo { flex: none; border: none; background: none; color: var(--accent-ink); font-weight: 600; padding: var(--sp-1) var(--sp-2); }
