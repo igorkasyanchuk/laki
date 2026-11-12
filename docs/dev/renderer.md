@@ -1024,3 +1024,13 @@ each into tokens (words and numbers, one punctuation mark, a run of spaces), tak
 each side `[text, changed]` spans, or none when over 60% changed or a line is over 500 characters. A changed span is a
 `<mark class="wd wd-add|wd-del">`: the page's `--fg` on 15% of `--add`/`--del` (`test/contrast.test.ts` checks it in
 every theme). DiffRows has no syntax highlighting to combine with. Tests: `test/template.test.ts`.
+
+
+## Display P3
+
+themes.ts `p3Sheet`, at the end of `applyTheme`: a `<style id="laki-p3">` with `@media (color-gamut: p3) { body { … } }`
+setting `--accent`, `--running`, `--waiting`, `--done` and `--error` to `oklch()` values of the theme's own (color.ts
+`p3Boost`: chroma up to 15%, as far as Display P3 holds it, lightness and hue kept). On `body`, so `css()` (it reads the
+root: the terminal's theme, canvases) and `test/contrast.test.ts` keep the sRGB hex. Not for `OPAQUE_LOOKS` (flat and
+bitmap looks: the sheet goes), and not the accent when you picked one in Settings (statuses only then). color.ts is pure
+(`hexToOklch`, `oklchToHex`, `inP3`), tested in `test/units-more.test.ts`.

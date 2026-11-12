@@ -21,6 +21,7 @@ import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
 import { hookRunner } from '../src/shared/helper.ts'
+import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
   assert.equal(newReview('t1:1'), true, 'nothing sent yet')
@@ -638,4 +639,22 @@ test('hookRunner: the bundle’s Laki Hook when it’s there; the app binary wit
   assert.equal(hookRunner('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook', 'spaces in the path')
   assert.equal(hookRunner('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
   assert.equal(hookRunner('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
+})
+
+// themes.ts p3Sheet: a theme's accent and status colors a little more vivid on a Display P3 screen
+test('color: a hex round-trips through OKLCH; P3 raises chroma up to 15%, lightness and hue kept, inside the gamut', () => {
+  for (const h of ['#7aa2f7', '#9ece6a', '#f7768e', '#e0af68', '#000000', '#ffffff', '#123456']) assert.equal(oklchToHex(hexToOklch(h)), h)
+  const o = hexToOklch('#7aa2f7')
+  const p = p3Boost('#7aa2f7')
+  assert.ok(Math.abs(p.c / o.c - 1.15) < 1e-6, 'a mid blue: the whole 15%')
+  assert.equal(p.l, o.l)
+  assert.equal(p.h, o.h)
+  assert.match(p.css, /^oklch\(71\.90% 0\.1520 264\.20\)$/)
+  // sRGB's own red is near P3's edge on its hue: raised as far as the gamut holds, never past it
+  const red = p3Boost('#ff0000')
+  const r0 = hexToOklch('#ff0000')
+  assert.ok(red.c > r0.c && red.c <= r0.c * 1.15 + 1e-9)
+  assert.ok(inP3(red) && !inP3({ ...red, c: red.c * 1.2 }))
+  // a grey stays grey
+  assert.ok(p3Boost('#808080').c < 1e-6)
 })

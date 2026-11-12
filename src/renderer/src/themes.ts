@@ -3,6 +3,7 @@
 // and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (looks.css,
 // <html data-look>). Glass makes the window see-through, as much as its sliders say.
 import { lookOf, setIconLook } from '../../shared/icons.ts'
+import { p3Boost } from './color'
 
 type Colors = {
   bg: string
@@ -1411,7 +1412,8 @@ export function applyTheme(p: string | Paint = '', solid = false) {
     st.setProperty('--side-fg', ink?.fg ?? fg)
     st.setProperty('--side-muted', st.getPropertyValue('--muted') || (ink?.muted ?? muted))
   }
-  if (!t.c || !t.ansi) return
+  const ownAccent = !!pick && /^#[\da-f]{6}$/i.test(pick) // yours: kept as you picked it (p3Sheet)
+  if (!t.c || !t.ansi) return void p3Sheet(root.dataset.look, ownAccent)
   const { c, ansi: a } = t
   const ink = (x: string) => readable(x, [...bgs, c.raised]) // a diff's +/− counts as text (the sidebar's too): the terminal's green and red made to read
   const vars: Record<string, string> = {
@@ -1423,6 +1425,17 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   a.forEach((x, i) => (vars[`--ansi-${i}`] = x))
   for (const [k, v] of Object.entries(vars)) if (!st.getPropertyValue(k)) st.setProperty(k, v) // not what glass or the accent set above
   st.colorScheme = t.light ? 'light' : 'dark'
+  p3Sheet(root.dataset.look, ownAccent)
+}
+// where the screen has Display P3, the accent and the status colors a little more vivid (color.ts p3Boost: chroma up
+// to 15%, lightness and hue kept), set on body: what reads them from the root (the terminal's theme, css()) and
+// test/contrast.test.ts keep the sRGB ones. Not for a look drawn flat (OPAQUE_LOOKS), nor an accent you picked
+function p3Sheet(look: string | undefined, ownAccent: boolean) {
+  let el = document.getElementById('laki-p3')
+  if (OPAQUE_LOOKS.has(look ?? '')) return void el?.remove()
+  const rules = ['--running', '--waiting', '--done', '--error', ...(ownAccent ? [] : ['--accent'])].flatMap(k => (v => (/^#[\da-f]{6}$/i.test(v) ? [`${k}: ${p3Boost(v).css};`] : []))(css(k)))
+  if (!el) document.head.append((el = Object.assign(document.createElement('style'), { id: 'laki-p3' })))
+  el.textContent = `@media (color-gamut: p3) { body { ${rules.join(' ')} } }`
 }
 
 const ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white']
