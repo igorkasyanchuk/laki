@@ -54,7 +54,8 @@ function originOf(tab: Tab | undefined, by: unknown) {
   return `message from ${tab.kind === 'agent' ? 'agent' : 'a terminal'} · ${[proj?.name ?? proj?.id, ws?.name ?? ws?.id, tab.name].filter(Boolean).join(' › ')}`
 }
 
-export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert') {
+// own: Laki's own notice (the daemon's, never an RPC's: api passes no third argument), its origin line
+export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert', own?: string) {
   // Laki AI's (aiRpc's by and chat): only when you asked for one, or allowed it
   if (kind === 'alert' && o.by === 'ai' && !aiMayAlert(typeof o.chat === 'string' ? o.chat : undefined)) throw new Error("not sent: Laki AI puts an important alert on the user's screen only when they ask for one (or Settings › AI › Important alerts on its own is on). Say it in the chat instead")
   const text = clean(o.text, 600)
@@ -69,11 +70,11 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
   const now = Date.now()
   for (const [k, at] of sent) if (now - at[at.length - 1] >= 60_000) sent.delete(k) // a minute quiet: forgotten (closed tabs')
   const recent = (sent.get(tab?.id ?? '') ?? []).filter(at => now - at < 60_000)
-  if (recent.length >= RATE) throw new Error(`${RATE} alerts or notices a minute at most: wait a minute, or say it in one`)
+  if (recent.length >= RATE && !own) throw new Error(`${RATE} alerts or notices a minute at most: wait a minute, or say it in one`)
   sent.set(tab?.id ?? '', [...recent, now])
   const id = randomUUID().slice(0, 8)
   const title = clean(String(o.title ?? '').replace(MD_LINK, '$1'), 80) || (tab ? named(tab) : 'Laki') // S10: a link's words only: no link to click in a title
-  const ev = { ev: kind, id, title, text, choices, origin: originOf(tab, o.by), ...(tab && { tab: tab.id }), ...(to && { to: { ws: to.ws, ...(to.tab && { tab: to.tab.id }), name: to.tab ? named(to.tab) : wsName(to.ws) } }) }
+  const ev = { ev: kind, id, title, text, choices, origin: own ? `message from ${own}` : originOf(tab, o.by), ...(tab && { tab: tab.id }), ...(to && { to: { ws: to.ws, ...(to.tab && { tab: to.tab.id }), name: to.tab ? named(to.tab) : wsName(to.ws) } }) }
   if (kind === 'notice') {
     // past NOTICES, the oldest that only tell go: one that waits stays (its caller would hear a close you never
     // made); its wait ends by ALERT_WAIT anyway

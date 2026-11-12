@@ -221,6 +221,7 @@ export type Workspace = {
   setupWait?: boolean // made while its project's .laki.json wasn't trusted: its copy and setup run as you trust it
   noSetup?: boolean // made without its setup script (wsNew noSetup): Run ▾'s Run the setup script (run's setup) clears it
   archivedAt?: number // when (ms), for settings.archivedDays
+  soon?: { at: number; what: string[] } // R8: told it goes within a day (archivedTidy): when, and what it keeps that would go to the trash
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
   term?: boolean // made as a terminal (quickNew's shells): its menus close it, no branch or PR items
@@ -648,6 +649,7 @@ export type Settings = {
   turnsKept?: number // F1: how many turns' snapshots a workspace keeps on disk (unset: 50; 0: none; at most 500), 14 days at most
   turnChanges?: boolean // each claude or codex turn's changes, from a snapshot of the worktree as it starts and ends (turns.ts; unset: on)
   nextPrompt?: boolean // as a claude or codex turn ends, Laki AI's model guesses your next message: the Reader's box shows it greyed out, Tab takes it (turns.ts; a request per turn; unset: off)
+  archivedSoon?: { id: string; name: string; what: string[] }[] // R8: archived workspaces deleted within a day, and what of theirs goes to the trash (Keep: archivedKeep)
   whenDone?: WhenDone // once every agent, workflow run and scheduled task that was going is done: the Mac sleeps, locks or shuts down after WHEN_DONE_WAIT (core's whenDone; then off again; unset: off)
   copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)

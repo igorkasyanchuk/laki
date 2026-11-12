@@ -12,7 +12,7 @@ import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
+import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
@@ -36,7 +36,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { archiveBack, archiveDrop, archiveKeep, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
+import { archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -758,6 +758,7 @@ export function view(): View {
     built: BUILT,
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
+    ...(soonList().length && { archivedSoon: soonList() }),
     ...(updateIdle && { updateIdle }),
     ...(trouble && { trouble }),
     ...(newerData && { newerData }),
@@ -3230,22 +3231,82 @@ export async function unsaved(ws: Workspace) {
 export const unsavedWhy = (r: { dirty?: number; subs?: string[]; ignored?: string[] }) =>
   [(r.dirty ?? 0) > (r.subs?.length ?? 0) + (r.ignored?.length ?? 0) && 'uncommitted changes', r.subs && `uncommitted work in a submodule (${r.subs.join(', ')})`, r.ignored && `ignored files your checkout doesn't have (${r.ignored.slice(0, 3).join(', ')}${r.ignored.length > 3 ? '…' : ''})`].filter(Boolean).join(', ')
 // archived workspaces past settings.archivedDays (hourly, and as the daemon starts) are deleted, their branch kept:
-// their worktree went as they were archived. One archived before archivedAt counts from now
-export function archivedTidy(now = Date.now()) {
+// their worktree went as they were archived. One archived before archivedAt counts from now. R8: nothing that can't be
+// had again goes silently: a day before, it's in the view (archivedSoon) with a notice (Keep / OK: soonSay, main.ts);
+// one with something of its own (hasSaved: its uncommitted files kept at archive, a storage folder with files in it)
+// waits until a day after that notice, then those go to the trash (trashSaved), not away
+export const soonSay: { fn?: (ws: Workspace) => void } = {} // main.ts': the notice
+const DAY = 86400e3
+const TRASH_DAYS = 30 // Linux's trash folder (Laki's own): what's in it this long goes, as workflows' trash
+const trashRoot = () => (process.platform === 'darwin' ? join(homedir(), '.Trash') : join(dir, 'trash'))
+const storageFull = (ws: Workspace) => !!ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id) && (() => { try { return readdirSync(ws.storage!).length > 0 } catch { return false } })()
+const repoOf = (ws: Workspace) => (ws.host ? '' : (state.projects.find(p => p.id === ws.project)?.path ?? ''))
+// what deleting it would lose for good, in words: none, nothing of its own
+export async function hasSaved(ws: Workspace) {
+  return [(await archiveHas(repoOf(ws), ws.id)) && 'its uncommitted changes', storageFull(ws) && 'its storage folder'].filter((x): x is string => !!x)
+}
+// its kept changes as changes.patch (git apply puts them back) and its storage folder, in the trash as <name>-<time>
+async function trashSaved(ws: Workspace, now: number) {
+  const name = `${String(ws.name ?? ws.id).replace(/[^\w.-]+/g, '-').replace(/^[-.]+/, '').slice(0, 60) || ws.id}-${now}`
+  const to = join(trashRoot(), name)
+  mkdirSync(to, { recursive: true, mode: 0o700 })
+  if (await archiveHas(repoOf(ws), ws.id)) writeFileSync(join(to, 'changes.patch'), await archivePatch(repoOf(ws), ws.id), { mode: 0o600 })
+  if (storageFull(ws)) moveFile(ws.storage!, join(to, basename(ws.storage!))) // across volumes too
+  return to
+}
+function trashTidy(now: number) {
+  if (process.platform === 'darwin') return // Finder empties it
+  let names: string[] = []
+  try {
+    names = readdirSync(trashRoot())
+  } catch {}
+  for (const n of names) if (now - Number(/-(\d{12,})$/.exec(n)?.[1] ?? now) > TRASH_DAYS * DAY) rmSync(join(trashRoot(), n), { recursive: true, force: true })
+}
+const soonList = () => state.workspaces.filter(w => w.archived && w.soon).map(w => ({ id: w.id, name: w.name ?? w.id, what: w.soon!.what }))
+export async function archivedTidy(now = Date.now()) {
+  trashTidy(now)
   const days = Number(state.settings?.archivedDays)
   if (!(days > 0)) return
   let n = 0
   let dated = false
   for (const ws of state.workspaces.filter(w => w.archived)) {
     if (!ws.archivedAt) (ws.archivedAt = now), (dated = true)
-    if (now - ws.archivedAt < days * 86400e3) continue
+    const due = ws.archivedAt + days * DAY
+    if (now < due - DAY) continue
+    const what = await hasSaved(ws)
+    if (!ws.soon) {
+      ws.soon = { at: now, what }
+      dated = true
+      soonSay.fn?.(ws)
+      log(`${ws.id}: deleted within a day (archived over ${days} days)${what.length ? `; ${what.join(' and ')} to the trash` : ''}`)
+    }
+    if (now < due || (what.length && now < ws.soon.at + DAY)) continue // its own: a full day's notice first
+    if (!state.workspaces.includes(ws) || !ws.archived) continue // restored or deleted while git ran
+    let trashed = ''
+    if (what.length)
+      try {
+        trashed = await trashSaved(ws, now)
+      } catch (e) {
+        log(`${ws.id}: kept, its files couldn't go to the trash (${(e as Error).message})`)
+        continue // never deleted with them lost
+      }
     dropWs(ws)
-    rmStorage(ws)
+    if (!trashed) rmStorage(ws)
     n++
-    log(`deleted ${ws.id} (${ws.name ?? ws.branch}): archived over ${days} days`)
+    log(`deleted ${ws.id} (${ws.name ?? ws.branch}): archived over ${days} days${trashed ? `; ${what.join(' and ')} in ${trashed}` : ''}`)
   }
   if (dated || n) save()
-  if (n) changed()
+  if (dated || n) changed()
+}
+// R8: Keep on the notice: a full archivedDays again from now
+export function archivedKeep(o: { ws?: unknown }) {
+  const ws = findWs(String(o?.ws ?? ''))
+  if (!ws.archived) throw new Error(`${ws.name ?? ws.id} isn't archived`)
+  ws.archivedAt = Date.now()
+  delete ws.soon
+  save()
+  changed()
+  return { ok: true }
 }
 
 // a deleted workspace's storage folder goes with it (settings.keepStorage: stays); only one Laki named, <…>-<id>
@@ -3300,6 +3361,7 @@ export async function wsRestore(ref: string) {
   await archiveBack(ws).catch(e => wsLog(ws, `restore: its uncommitted files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${ws.id}`))
   ws.archived = false
   ws.archivedAt = undefined
+  delete ws.soon
   ws.touchedAt = Date.now() // archive when idle: a full period from here, so an Undo stays undone
   if (ws.railPin && railTaken() > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()

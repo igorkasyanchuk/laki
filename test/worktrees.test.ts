@@ -1,10 +1,10 @@
 // Worktrees and their files: ignored files copied, .laki.json's trust, setup, diff, the side panel's files, a folder without git.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, sleep, until } from './helpers.ts'
+import { connect, fresh, seen, sleep, until } from './helpers.ts'
 
 test('a new worktree gets the ignored files .worktreeinclude and .laki.json copy name, with their modes, before setup', async t => {
   const rig = await fresh(t, { config: { setup: 'cat .env .env.local secrets/key > seen.txt', copy: ['secrets/'] } })
@@ -926,4 +926,64 @@ test('R1, R2: archive stops on uncommitted work outside the app (the CLI, an age
   assert.match(rm.out + rm.err, /Not deleted: 2 uncommitted paths/)
   assert.equal((await rig.cli('rm', 'work', '--force')).code, 0)
   assert.ok(!(await rig.rpc('state')).workspaces.some((w: any) => w.id === ws.id))
+})
+
+// R8: an archived workspace past archivedDays: told a day before (the view, a notice with Keep); one with its own files
+// (its kept uncommitted changes, a storage folder with something in it) goes a day after that, those to the trash
+// (macOS: ~/.Trash, the rig's own HOME; Linux: <data>/trash); one with none goes as before; Keep postpones it
+test("R8: an archived workspace's saved work goes to the trash, not away; told a day before; Keep postpones it; not an agent's", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const app = await connect(rig)
+  const work = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'work' })
+  const bare = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'bare' })
+  const tab = (await rig.rpc('tabNew', { ws: bare.id, preset: 'claude' })).id
+  writeFileSync(join(work.path, 'README.md'), 'changed\n')
+  writeFileSync(join(work.path, 'new.txt'), 'mine\n')
+  await rig.rpc('tabNew', { ws: work.id, kind: 'shell' }) // its first tab makes its storage folder
+  const store = (await rig.rpc('state')).workspaces.find((w: any) => w.id === work.id).storage
+  mkdirSync(store, { recursive: true })
+  writeFileSync(join(store, 'notes.md'), 'kept\n')
+  await rig.rpc('wsArchive', { id: work.id, force: true })
+  await rig.rpc('wsArchive', { id: bare.id })
+  await rig.rpc('settingsSet', { archivedDays: 7 })
+  const now = Date.now()
+  const has = async (id: string) => (await rig.rpc('state')).workspaces.some((w: any) => w.id === id)
+  await rig.rpc('archivedTidy', { now: now + 5 * 86400e3 })
+  assert.equal((await rig.rpc('state')).archivedSoon, undefined, 'not yet')
+  // a day before: both in the view, a notice each
+  await rig.rpc('archivedTidy', { now: now + 6.5 * 86400e3 })
+  const soon = (await rig.rpc('state')).archivedSoon
+  assert.deepEqual(soon.find((s: any) => s.id === work.id).what, ['its uncommitted changes', 'its storage folder'])
+  assert.deepEqual(soon.find((s: any) => s.id === bare.id).what, [])
+  const notice: any = await seen(app, (e: any) => e.ev === 'notice' && e.to?.ws === work.id, 'its notice')
+  assert.deepEqual([notice.choices, notice.origin], [['Keep', 'OK'], 'message from Laki'])
+  // an agent can't keep one
+  await assert.rejects(rig.rpc('archivedKeep', { ws: work.id, from: { ws: bare.id, tab } }), /an agent can't keep an archived workspace/)
+  // due: the one with nothing of its own goes; the other waits a day after its notice
+  await rig.rpc('archivedTidy', { now: now + 7.2 * 86400e3 })
+  assert.equal(await has(bare.id), false)
+  assert.equal(await has(work.id), true, 'a full day after its notice first')
+  await rig.rpc('archivedTidy', { now: now + 7.6 * 86400e3 })
+  assert.equal(await has(work.id), false)
+  const trash = process.platform === 'darwin' ? join(rig.home, '.Trash') : join(rig.data, 'trash')
+  const [put] = readdirSync(trash).filter(n => n.startsWith('work-'))
+  assert.ok(put, 'in the trash')
+  assert.equal(readFileSync(join(trash, put, basename(store), 'notes.md'), 'utf8'), 'kept\n')
+  // its changes as a patch git apply takes: README.md changed, new.txt added
+  const patch = join(trash, put, 'changes.patch')
+  assert.match(readFileSync(patch, 'utf8'), /README\.md[^]*new\.txt/)
+  execFileSync('git', ['apply', '--check', patch], { cwd: rig.repo })
+  assert.ok(!existsSync(store), 'moved, not copied')
+  assert.throws(() => execFileSync('git', ['rev-parse', '--verify', '-q', `refs/laki/archived/${work.id}`], { cwd: rig.repo }), 'its ref went with it')
+  // Keep: archivedDays again from now
+  const again = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'again' })
+  await rig.rpc('wsArchive', { id: again.id })
+  await rig.rpc('archivedTidy', { now: Date.now() + 6.5 * 86400e3 })
+  assert.ok((await rig.rpc('state')).archivedSoon?.some((s: any) => s.id === again.id))
+  await rig.rpc('archivedKeep', { ws: again.id })
+  assert.equal((await rig.rpc('state')).archivedSoon, undefined)
+  await rig.rpc('archivedTidy', { now: Date.now() + 6.9 * 86400e3 })
+  assert.equal(await has(again.id), true, 'kept: a full archivedDays again')
+  app.close()
 })

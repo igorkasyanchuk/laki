@@ -809,4 +809,13 @@ export async function archiveBack(ws: Workspace) {
   await g(ws, ['update-ref', '-d', ref]).catch(() => {})
   wsLog(ws, 'restored with its uncommitted files as they were')
 }
+// R8: an archived workspace's kept files before it's deleted (archivedTidy): there at all, and as a patch git apply takes
+// (--binary: pictures too), against the commit it was archived on (none: from nothing)
+const repoGit = (repo: string, args: string[]) => new Promise<string>((ok, no) => execFile('git', ['-C', repo, ...args], { maxBuffer: 256 << 20 }, (e, out) => (e ? no(e) : ok(out))))
+export const archiveHas = (repo: string, ws: string) => (/^[\w.-]+$/.test(ws) && existsSync(repo) ? repoGit(repo, ['rev-parse', '-q', '--verify', archivedRef(ws)]).then(s => !!s.trim(), () => false) : Promise.resolve(false))
+export async function archivePatch(repo: string, ws: string) {
+  const ref = archivedRef(ws)
+  const parent = (await repoGit(repo, ['rev-parse', '-q', '--verify', `${ref}^`]).catch(() => '')).trim() || '4b825dc642cb6eb9a060e54bf8d69288fbee4904' // git's empty tree
+  return repoGit(repo, ['-c', 'core.quotePath=false', 'diff', '--binary', '--no-color', '--no-ext-diff', parent, ref])
+}
 export const archiveDrop = (repo: string, ws: string) => void (/^[\w.-]+$/.test(ws) && existsSync(repo) && execFile('git', ['-C', repo, 'update-ref', '-d', archivedRef(ws)], () => {}))

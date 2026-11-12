@@ -389,7 +389,14 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   back; windows; tap, swipe, type, describe through `idb ui … --udid <booted> --` (on PATH: the user's install, as
   cloudflared; Settings › Agent skill says, `doctor`'s `idb`);
 - clean-up: `archivedTidy` (hourly and at start: archived workspaces past `settings.archivedDays` dropped as `wsRm`
-  would, their branch kept; `archivedAt` set by `wsArchive`, one archived before it counts from the first look);
+  would, their branch kept; `archivedAt` set by `wsArchive`, one archived before it counts from the first look). R8:
+  a day before it's due, `ws.soon { at, what }` and the view's `archivedSoon [{ id, name, what }]`, with a notice in the
+  window (main.ts `soonSay`: Keep / OK, origin *message from Laki*; Keep calls `archivedKeep { ws }`, archivedDays again
+  from now, the user's only: `AGENT_NO`, `ANSWER_NO`). `hasSaved(ws)`: its kept uncommitted files (files.ts
+  `archiveHas`, `refs/laki/archived/<ws>`) and a storage folder with files in it; one with either goes a day after its
+  notice at the earliest, those to the trash first (`trashSaved`: `<name>-<ms>/changes.patch`, `git diff --binary`
+  against the commit it was archived on, `git apply` takes it, and the storage folder moved in by conn.ts `move`; macOS
+  `~/.Trash`, Linux `<data>/trash`, swept after 30 days); a trash that fails keeps the workspace);
   `settings.bgRefresh === false`: no `prTick`, `prSoon` or branch-move scans (only `prRefresh`); `settings.copyIgnored` /
   `copyUntracked`: `copyIncludes` takes every ignored (`--exclude-standard`) / untracked file too, copied awaited (a
   relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
