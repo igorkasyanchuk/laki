@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.49.1 · Nov 12, 2026
 
 - Updating from 0.48 no longer leaves the window on its splash: the old daemon, which turned down the new app's restart, is stopped and a new one started. *Quit Laki Completely* stops a daemon another copy of Laki (or the app before an update) started, instead of leaving it running.
 - A new install's *Try it on a sample repo* no longer ends on "Laki hit an error": the New workspace page opened before its first project was there.
