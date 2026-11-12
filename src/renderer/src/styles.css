@@ -3711,8 +3711,7 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 /* the scroll edge (ui.tsx ScrollEdge): a list scrolled under its header fades into it instead of a line */
 .scroll-edge { display: block; height: 1px; margin-bottom: -1px; flex: none; pointer-events: none; }
 .settings-main > .scroll-edge { margin-bottom: calc(-1px - var(--sp-6)); } /* its column's gap */
-:is(.side-scroll, .reader-scroll, .fr-files, .settings-main)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); }
-.settings-main[data-scrolled]:has(.theme-find) { mask-image: none; } /* the themes' search stays at the top: never faded */
+:is(.side-scroll, .reader-scroll, .fr-files)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); } /* Settings' own: the collapsing title instead (below) */
 .settings-head { border-bottom-color: transparent; }
 
 /* V12: continuous corners, as macOS draws them (a superellipse, not a circle's quarter): what takes the window's, a
@@ -3807,3 +3806,21 @@ html[data-motion='none'] .num > .num-in { animation: none; }
 .need { --r-out: var(--r-panel); --pad: var(--sp-4); }
 :is(.modal, .menu, .palette-list, .actions.capsule, .reader-switch.capsule, .status .sb-group, .need) { --r-in: max(var(--r-xs), calc(var(--r-out) - var(--pad))); }
 .status .sb-group > button { border-radius: var(--r-in); }
+
+/* a page's large title collapses as it scrolls (scroll-driven, no script): Settings and every Page (Board, Schedule,
+   Workflows, Notes, To-dos, a project's). The page's scroller is the --page timeline (timeline-scope: its head is a
+   sibling); over its first 60px the title goes from --fs-5 to --fs-3 and the head from see-through to the floating
+   surface (--surface-bg: solid with Reduce transparency and in the flat looks). Motion: None and Reduce motion: the
+   compact glass head, always */
+.settings-page { timeline-scope: --page; }
+.settings-page > .page-body, .settings-body > .settings-main { scroll-timeline: --page block; }
+@keyframes page-head { from { background: transparent; } to { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border-bottom-color: var(--line); } }
+@keyframes page-title { from { font-size: var(--fs-5); } to { font-size: var(--fs-3); } }
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-motion='none']) .settings-page > .settings-head { animation: page-head linear both; animation-timeline: --page; animation-range: 0 60px; }
+    html:not([data-motion='none']) .settings-page > .settings-head > b { animation: page-title linear both; animation-timeline: --page; animation-range: 0 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); } }
+  html[data-motion='none'] .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); }
+}

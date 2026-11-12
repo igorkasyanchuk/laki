@@ -1070,3 +1070,13 @@ styles.css: a container sets `--r-out` (its radius token) and `--pad` (its paddi
 (Ship, ⌘K), `.palette-list` (the modal's padding plus the items' margin), `.menu`, the tab bar's and Terminal / Reader
 capsules, the status bar's groups, a Needs you card. The --r-* tokens go through `--rs`, so Square stays square.
 `test/css.test.ts` checks the inner rules use `var(--r-in)`.
+
+
+## Collapsing page titles
+
+styles.css: `.settings-page` (ui.tsx `Page` and Settings) is `timeline-scope: --page`; its scroller (`> .page-body`, Settings'
+`.settings-body > .settings-main`) is `scroll-timeline: --page block`. Inside `@supports (animation-timeline: scroll())`,
+over `animation-range: 0 60px`: `page-head` (see-through to `--surface-bg` and its blur, the line back) and `page-title`
+(`--fs-5` to `--fs-3`, a plain `<b>` title only). Motion: None and Reduce motion: the compact glass head always. Settings'
+scroll-edge fade (`mask-image`) is off, this replaces it. Only one scroller per page names `--page` (two would make the
+timeline inactive: a project's embedded `.settings-main` doesn't).

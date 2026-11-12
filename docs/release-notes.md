@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Pages (Settings, Board, Schedule, Workflows, Notes, To-dos, a project's) start with a large title that shrinks into a glass header as you scroll.
 - Nested corners line up: buttons in the capsules, menu and ⌘K items, dialog cards and Needs you buttons round to their container less its padding (Square stays square).
 - The glass capsules (tab bar buttons, Terminal / Reader, the Reader's box, the status bar) have depth: a lit top edge, a soft shade below and a light that follows the pointer. Flat looks, Reduce transparency and Motion off keep them flat.
 - Folds open smoothly: a project's workspaces, Needs you and its Earlier, a long message's Show more and a setting's ? card grow to their height, the chevron turning with them (not with Motion off or Reduce motion).
