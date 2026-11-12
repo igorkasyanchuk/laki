@@ -9,9 +9,10 @@ import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
 import { Markdown } from './MarkdownView'
 import { preview, THEMES } from './themes'
+import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, groupNew, laterText, nameOf, type PalKind, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
-import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu, act } from './ui'
+import { AGENT_COLORS, colorVar, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu, act } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -1665,6 +1666,43 @@ const SPLASH_TIPS = [...TIPS, ...MORE_TIPS]
 
 // the splash while the daemon wakes and the first view comes: Laki's mark in a turning ring, where it's at (the daemon,
 // then your workspaces; the seconds once it's slow) and a tip that changes every few seconds
+// the start-up snapshot (snapshot.ts): the last layout, the real one's classes (the theme's look), inert and dimmed
+export function SnapSkeleton({ s, railW }: { s: Snap; railW: number }) {
+  const groups = s.rows.reduce<[string, SnapRow[]][]>((g, r) => (g.at(-1)?.[0] === r.project ? g.at(-1)![1].push(r) : g.push([r.project, [r]]), g), [])
+  return (
+    <div className={`app snap-skel ${s.railOn ? 'rail-on' : ''}`} aria-hidden inert>
+      {s.railOn && <nav className="rail" style={{ width: railW }} />}
+      <aside className="sidebar" style={{ width: s.sideW }}>
+        <div className="side-scroll">
+          {groups.map(([p, rows], i) => (
+            <div key={i} className="project">
+              <div className="project-head">
+                <span className="project-name">{p}</span>
+              </div>
+              {rows.map((r, j) => (
+                <div key={j} className="ws" style={colorVar(r.color)}>
+                  <span className="ws-name">{r.name}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </aside>
+      <div className="main">
+        <div className="tabbar">
+          {s.tabs.map((t, i) => (
+            <div key={i} className={`tab ${i === s.sel ? 'sel' : ''}`}>
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+        <div className="term-wrap" />
+      </div>
+      {s.panelOpen && <div className="side-panel" style={{ width: s.panelW }} />}
+    </div>
+  )
+}
+
 export function Loading({ connected }: { connected: boolean }) {
   const [s, setS] = useState(0)
   useEffect(() => {

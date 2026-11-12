@@ -1092,3 +1092,15 @@ emoji grid or a filter field has no model and stays Laki's. Main's `menu-popup` 
 the list with guards.ts `menuModelOk` (only id, label, sublabel, enabled, checked, separator, sub; strings 200, ids 40,
 depth 4, 300 items: no role, no accelerator, nothing that runs in main), pops it up at the point and answers the picked
 id, or nothing once it closes. A browser (remote access, `npm run dev:web`) has no bridge: Laki's menu.
+
+## Start-up snapshot
+
+`snapshot.ts` `snapshotOf(view, ui)`: the window's last layout as `laki.snap` (version `SNAP_VERSION`, 20 KB at most): the
+sidebar's width, the side panel's width and whether it's open, the rail's choice, up to 30 rows (name, color, project
+name), the open workspace's tab names (Laki's, never a terminal's title) and the picked one, the theme's id. A Private
+project or workspace never goes in (and the view's veiled first), nor a prompt or a path. App keeps it on `pagehide` and
+every minute, the app's main window only (`bridge`: not remote access or `dev:web`; the small windows are NewWindow.tsx,
+not App). As App starts with one of this version (`snapOf`), panels.tsx `SnapSkeleton` draws it with the real classes
+(`.app`, `.sidebar`, `.ws`, `.tabbar`, `.tab`: the theme's look), `aria-hidden` and `inert`, dimmed by `.snap-skel`
+(`--snap-dim`); the first view fades the real one in (`.from-snap`). No view in 5 s, the daemon's problem, a PIN or a
+lock: the splash, as before.

@@ -98,6 +98,7 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
    in looks marked opaque (html.opaque: themes.ts OPAQUE_LOOKS). Never on a list's rows: only these float */
 :is(.menu, .modal, .finder, .tip, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
 :root { --pane-dim: 0.88; } /* Dim other panes: how much a split's other panes keep */
+:root { --snap-dim: 0.6; } /* the start-up snapshot: how much of the last layout shows until the first view */
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
@@ -131,6 +132,11 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .nodrag, .drag button, .drag input { -webkit-app-region: no-drag; }
 
 .splash { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-4); }
+/* the start-up snapshot (panels.tsx SnapSkeleton): the last layout, dimmed, until the first view; the real one fades in */
+.snap-skel { opacity: var(--snap-dim); pointer-events: none; }
+.snap-skel .term-wrap { flex: 1; }
+.app.from-snap { animation: snap-in 0.25s ease-out both; }
+@keyframes snap-in { from { opacity: var(--snap-dim); } }
 .splash-problem { max-width: 420px; margin: 8px 16px 0; padding: var(--sp-4) var(--sp-5); text-align: center; color: var(--fg); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--radius); }
 .splash:not(.pinning) { position: relative; isolation: isolate; } /* the body's background under it: a gradient theme's, glass */
 .splash:not(.pinning)::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 60% 45% at 50% 20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), radial-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1.5px) 0 0 / 22px 22px; mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, #000, transparent 80%); }

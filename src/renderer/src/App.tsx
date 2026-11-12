@@ -13,7 +13,7 @@ import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type Labe
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { notInstalled, tabAgent } from '../../shared/install'
-import { type Artifact, CopyDiagnostics, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
+import { type Artifact, CopyDiagnostics, VIEWED, Loading, SnapSkeleton, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
 import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
@@ -51,6 +51,7 @@ import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
 import { menuModel } from './menuModel'
+import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
 import { Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
@@ -2249,6 +2250,33 @@ export function App() {
   const sideKind: RailKind = rail ? railKind : 'projects' // a phone's drawer, or no rail: one width
   const sideW = sideWs[sideKind] ?? SIDE
   const setSideW = (w: number) => setSideWs(m => ({ ...m, [sideKind]: w }))
+  // the start-up snapshot (snapshot.ts): the app's main window keeps its layout on pagehide and every minute; drawn
+  // dimmed in place of the splash as it starts again (5 s at most, then the splash)
+  const snapUi = useRef<() => void>(() => {})
+  snapUi.current = () => {
+    const v = viewRef.current
+    if (!bridge || !v) return
+    try {
+      localStorage.setItem(SNAP_KEY, JSON.stringify(snapshotOf(veiled(v), { sideW, panelW, panelOpen, rail: railKind, railOn: rail, ws: ws?.id, tab: tab?.id })))
+    } catch {}
+  }
+  useEffect(() => {
+    if (!bridge) return
+    const keep = () => snapUi.current()
+    const i = setInterval(keep, 60_000)
+    addEventListener('pagehide', keep)
+    return () => (clearInterval(i), removeEventListener('pagehide', keep))
+  }, [])
+  const [snap] = useState(() => {
+    try {
+      return bridge ? snapOf(localStorage.getItem(SNAP_KEY)) : undefined
+    } catch {
+      return undefined
+    }
+  })
+  const [snapLate, setSnapLate] = useState(false)
+  useEffect(() => void (snap && !view && setTimeout(() => setSnapLate(true), 5000)), [])
+  const fromSnap = useRef(false)
   const isTerm = (w: WorkspaceView) => !!w.term || rawKind(w) === 'shells' // a terminal: closed, not deleted
   useEffect(() => void (railOf(railKind) !== railKind && setRailKind('projects')), [railKind, settings.railShells, settings.railBrowsers])
   // the full review (settings.fullReview, FullReview.tsx): the tab bar's first tab while a git workspace has changes
@@ -3171,6 +3199,7 @@ export function App() {
   const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => x === 'needs' || view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x)))) // needs: the Needs you list
 
   const pinning = pinAsk && !connected
+  if (!view && snap && !snapLate && !pinning && !locked && !problem) return (fromSnap.current = true), <SnapSkeleton s={snap} railW={railW} />
   if (!view)
     return (
       <div className={`splash ${pinning || locked ? 'pinning' : ''}`}>
@@ -3719,7 +3748,7 @@ export function App() {
   const { wsMenu, tabMenu, fileMenu, applyLayout, peekCard } = app
   keys.current = (e, force, fixed) => onKey(app, e, force, fixed)
   return (
-    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
+    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}

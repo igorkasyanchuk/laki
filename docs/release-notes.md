@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki opens on your last layout (the sidebar's rows, the tabs, the widths), dimmed until your workspaces load, instead of the splash.
 - Menus: macOS (Settings › Layout): a workspace's and a tab's menu drawn by macOS itself, its look, keys and VoiceOver; the colors as a submenu.
 - Pages (Settings, Board, Schedule, Workflows, Notes, To-dos, a project's) start with a large title that shrinks into a glass header as you scroll.
 - Nested corners line up: buttons in the capsules, menu and ⌘K items, dialog cards and Needs you buttons round to their container less its padding (Square stays square).

@@ -22,6 +22,7 @@ import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.
 import { ago, render, spark } from '../src/shared/widget.ts'
 import { hookRunner } from '../src/shared/helper.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
+import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
@@ -683,4 +684,33 @@ test('menuModel: Laki\'s menu as macOS\'s, each item\'s run by its id', () => {
   assert.deepEqual(ran, ['rename', 'finder', 'blue'])
   assert.equal(menuModel([{ filter: 'Find' }] as never), undefined, "a filter: Laki's own")
   assert.equal(menuModel([{ label: 'x', icon: 'x', items: [{ emojis: [], pick: () => {} }] }] as never), undefined, 'an emoji grid in a submenu')
+})
+
+test('snapshotOf: the last layout, no Private rows, no paths, under its cap; another version ignored', () => {
+  const view = {
+    settings: { theme: 'nord' },
+    projects: [{ id: 'p', name: 'web' }, { id: 'q', name: 'secret-co', private: true }],
+    workspaces: [
+      { id: 'a', name: 'login', color: 'red', project: 'p', path: '/Users/me/web/a' },
+      { id: 'b', name: 'hidden', project: 'p', private: true, path: '/x' },
+      { id: 'c', name: 'deal', project: 'q', path: '/y' },
+    ],
+    tabs: [{ id: 't1', workspace: 'a', name: 'claude', title: 'rm -rf in /Users/me' }, { id: 't2', workspace: 'a', name: 'zsh' }, { id: 't3', workspace: 'c', name: 'codex' }],
+  } as never
+  const ui = { sideW: 260, panelW: 380, panelOpen: true, rail: 'projects', railOn: true, ws: 'a', tab: 't2' }
+  const s = snapshotOf(view, ui)
+  assert.deepEqual(s.rows, [{ name: 'login', color: 'red', project: 'web' }])
+  assert.deepEqual(s.tabs, ['claude', 'zsh'])
+  assert.equal(s.sel, 1)
+  assert.equal(s.theme, 'nord')
+  const raw = JSON.stringify(s)
+  for (const no of ['/Users', 'hidden', 'secret-co', 'deal', 'rm -rf']) assert.ok(!raw.includes(no), no)
+  assert.equal(snapshotOf(view, { ...ui, ws: 'c' }).tabs.length, 0, "a Private project's open workspace: no tabs")
+  assert.deepEqual(snapOf(raw), s)
+  const big = { ...(view as object), projects: [{ id: 'p', name: 'p'.repeat(500) }], workspaces: Array.from({ length: 40 }, (_, i) => ({ id: String(i), name: 'n'.repeat(500), project: 'p' })), tabs: Array.from({ length: 40 }, (_, i) => ({ id: 't' + i, workspace: '0', name: 'x'.repeat(500) })) } as never
+  const b = snapshotOf(big, { ...ui, ws: '0' })
+  assert.ok(JSON.stringify(b).length <= SNAP_MAX && b.rows.length <= 30 && b.tabs.length <= 20)
+  assert.equal(snapOf(JSON.stringify({ ...s, v: SNAP_VERSION + 1 })), undefined, 'another version')
+  assert.equal(snapOf('{'), undefined)
+  assert.equal(snapOf(null), undefined)
 })
