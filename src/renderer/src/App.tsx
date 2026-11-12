@@ -33,7 +33,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { needsTab, nextStep, type Step, type StepId } from '../../shared/nextStep'
-import { stateOf } from '../../shared/tray'
+import { bounceOf, dockProgress, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
 import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
@@ -913,8 +913,17 @@ export function App() {
     const t = setTimeout(() => trayTick(n => n + 1), Math.min(resetAt - Date.now() + 500, 2 ** 31 - 1))
     return () => clearTimeout(t)
   }, [resetAt])
-  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked]])
-  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo), [trayKey])
+  const dockBar = view ? dockProgress(view) : -1 // U15: a Ship or a workflow run at work: the Dock's progress bar
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], dockBar])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo, dockBar), [trayKey])
+  // U15: a workspace that starts waiting on you while Laki isn't in front: the Dock bounces once (tray.ts bounceOf)
+  const waitedWs = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (!view || !bridge?.bounce) return
+    const b = bounceOf(waitedWs.current, view, document.hasFocus())
+    waitedWs.current = b.now
+    if (b.bounce) bridge.bounce()
+  }, [view])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
@@ -1306,7 +1315,7 @@ export function App() {
           const always = perm?.rule ? alwaysOf(perm) : undefined
           const cut = !noteWhole(body) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
-            m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
+            m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
           const card = !w?.important ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
@@ -2840,6 +2849,7 @@ export function App() {
           { label: `Open the ${K}`, icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem,
           { label: 'Open its checks', icon: 'link', key: 'c', tip: `Its CI checks on ${F}`, run: () => openExternal(`${w.pr!.url}/${w.pr!.forge === 'gitlab' ? 'pipelines' : 'checks'}`) } as MenuItem,
           { label: `Copy ${K} link`, icon: 'copy', key: 'l', run: () => copy(w.pr!.url) } as MenuItem,
+          ...(bridge?.share ? [{ label: 'Share…', icon: 'share', tip: `macOS's Share menu with its link: Messages, Mail, AirDrop`, run: () => bridge!.share!(w.pr!.url) } as MenuItem] : []), // U15; off macOS: Copy link
           { label: `Copy ${prNo(w.pr)}`, icon: 'copy', key: 'n', run: () => copy(prNo(w.pr!)) } as MenuItem,
         ]
       : []),

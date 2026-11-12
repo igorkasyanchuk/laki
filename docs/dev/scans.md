@@ -315,6 +315,17 @@ character you'd not see (`noteWhole`: types.ts' `HIDDEN`, cmdAsk's rule: macOS d
 read isn't what runs; a no-break space, a line separator, a zero-width one): a Yes
 would approve a command you can't see as it is; an extension agent's tool ask, the same: no *Allow* then.
 
+U15, macOS's own touches: a waiting turn with neither a menu nor "permission" (a free-text question) gets
+`{ reply: true }` instead: main's `Notification` has `hasReply` (no button), its `reply` event sends the text through
+the daemon's `send` (as typed in the window: its rules, the policy; empty: nothing), then drops that tab's card on
+screen. The Dock's progress bar: App's `dockProgress` (shared/tray.ts: a running `ship` tab, its `progress.pct` else
+unknown; a running workflow, `FlowView.steps` and the blocks in `visits`; their mean, `2` unknown, `-1` none) rides the
+`badge` IPC, main's `setProgressBar` only when it changes (`barWas`). *Bounce the Dock icon* (`settings.dockBounce`, on
+unless false; Settings › Notifications): `bounceOf` (a workspace waiting the view before didn't: muted, archived and Do
+not disturb's non-important ones aside; the first view never), then main's `dock-bounce` (`from(e)`, Laki not focused:
+`app.dock.bounce('informational')`, never critical). *Share…* (a PR's ⋯, a shared tab's *Shared live view*): main's
+`share-menu` (`from(e)`, a website's link) pops `ShareMenu` at the pointer; off macOS there's no item, Copy link stays.
+
 Cards on screen: what's marked important notifies as a card instead, its `notify` carrying `card`: a workspace's
 (`important`, wsSet; ⋯ › Workspace) turns (`ask` and the ask's `diff` while waiting; `tone` ok for a finish, bad for a
 limit or a check that's over to you), a timer's end (`Timer.important`, in place of the dialog), a reminder

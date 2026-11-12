@@ -7,7 +7,7 @@ import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
-export type NotifyAction = { text: string; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
+export type NotifyAction = { text: string; reply?: boolean /* U15: a free-text question's Reply field (macOS), not a button */; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   restartDaemon?(): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown)
@@ -24,6 +24,8 @@ type Bridge = {
   pathOf?(f: File): string
   openExternal(url: string): void
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
+  share?(url: string): void // U15: macOS's Share menu for a link, at the pointer (main's share-menu)
+  bounce?(): void // U15: the Dock icon bounces once (informational), when Laki isn't in front
   quickLook?(path: string): void // U14: macOS's Quick Look of a file (main's quick-look; a regular file only, macOS only)
   onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
   copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
@@ -57,7 +59,7 @@ type Bridge = {
   simFloating?(): Promise<string[]> // the devices in windows of their own
   onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
-  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: TrayInfo): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip)
+  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: TrayInfo, progress?: number): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip); progress: U15's Dock bar (tray.ts dockProgress)
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void

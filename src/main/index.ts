@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
 import { type ChildProcess, execFile, spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -872,7 +872,7 @@ ipcMain.handle('conn', async e => {
 // Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
 // closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
 // collected Notification's events never come
-type NoteAction = { text: string; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
+type NoteAction = { text: string; reply?: boolean; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
 const notes = new Set<Notification>()
 // card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
@@ -882,24 +882,37 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
   if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.reply === true || a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
   if (card && typeof card === 'object') {
     if (sound !== 'none') execFile('afplay', [`/System/Library/Sounds/${named ? sound : 'Glass'}.aiff`], () => {})
     const t = typeof tab === 'string' ? tab : ''
     const ask = card.ask === true && !!t
     const alert = typeof card.alert === 'string' && /^[\w-]{1,40}$/.test(card.alert) ? card.alert : ''
-    const actions = alert ? buttons.filter(a => a.alert?.id === alert) : buttons.filter(a => !a.tool && !a.alert)
+    const actions = alert ? buttons.filter(a => a.alert?.id === alert) : buttons.filter(a => !a.tool && !a.alert && !a.reply)
     // S10: a laki alert has a tone of its own, never an ask's (a permission prompt's), and its origin line from the daemon
     const tone = alert ? 'alert' : ask ? 'ask' : ['ok', 'bad'].includes(card.tone as string) ? (card.tone as Card['tone']) : 'info'
     const origin = alert && typeof card.origin === 'string' ? card.origin.slice(0, 200) : undefined
     return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), ...(origin && { origin }), actions })
   }
-  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })
+  // U15: an agent's free-text question (no menu, not Allow/Deny): a Reply field (macOS), its text sent to the tab as one
+  // typed in the window would be (the daemon's send: its rules, Recording mode, the policy), then its card on screen goes
+  const reply = mac && !!tab && typeof tab === 'string' && buttons.some(a => a.reply)
+  const shown = buttons.filter(a => !a.reply)
+  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: shown.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })), ...(reply && { hasReply: true, replyPlaceholder: 'Your answer' }) })
   const done = () => notes.delete(n)
   n.on('click', () => (done(), show(tab)))
+  n.on('reply', (_ev, text) => {
+    done()
+    const t = typeof text === 'string' ? text.trim() : ''
+    if (!reply || !t) return // empty: nothing sent
+    rpc('send', { target: tab, text: t.slice(0, 20000) }).then(
+      () => dropCards(c => c.key !== `tab:${tab}`),
+      () => show(tab), // it moved on, or was refused: look
+    )
+  })
   n.on('action', (_ev, i) => {
     done()
-    const a = buttons[i]
+    const a = shown[i]
     if (a?.tool) rpc('widgetToolAnswer', { req: a.tool.req, allow: a.tool.allow }).catch(() => {})
     else if (a?.stop) rpc('longStop', { tab }).catch(() => show(tab)) // a long turn's Stop: its Esc, if that turn still runs
     else if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
@@ -1144,6 +1157,7 @@ ipcMain.on('dock-icon', (e, png: unknown) => {
 // notification's does), Open (with the global hotkey) and Quit. tray false: Settings › General › Menu bar hid it
 let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
+let barWas = -1 // U15: the Dock's progress bar as last set
 let recording = false // the last badge's: Recording mode is on (settings.recording), its item ticked
 function trayMenu() {
   tray?.setContextMenu(
@@ -1165,11 +1179,14 @@ function trayMenu() {
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
 // st (Q8, Settings › General › Menu bar's Show state): the state its picture shows (stateOf's), its title's ! and its
 // tooltip's words; none (off, or an older page): the filled mark and the count, as before
-ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false, st?: Partial<TrayInfo>) => {
+ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false, st?: Partial<TrayInfo>, progress?: unknown) => {
   if (!from(e)) return
   recording = rec === true
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
+  // U15: a Ship at work or a workflow run going (shared/tray.ts dockProgress): -1 none, 2 unknown, else 0 to 1
+  const p = typeof progress === 'number' && Number.isFinite(progress) && (progress === 2 || (progress >= -1 && progress <= 1)) ? progress : -1
+  if (p !== barWas) win?.setProgressBar((barWas = p) < 0 ? -1 : p, p === 2 ? { mode: 'indeterminate' } : undefined)
   if (!on) return void (tray?.destroy(), (tray = null))
   const num = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : 0)
   const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked) } : undefined
@@ -2301,6 +2318,18 @@ ipcMain.on('quick-look', async (e, path: unknown) => {
   if (!real || !(await stat(real).catch(() => null))?.isFile()) return
   BrowserWindow.fromWebContents(e.sender)?.previewFile(real, basename(path))
 })
+
+// U15: Share… (a PR's link, a shared tab's): macOS's Share menu at the pointer (Messages, Mail, AirDrop…), a website's
+// link only. Kept while it shows (a collected menu closes)
+let shareMenu: ShareMenu | null = null
+ipcMain.on('share-menu', (e, url: unknown) => {
+  if (!mac || !from(e) || !web(url) || url.length > 4096) return
+  shareMenu = new ShareMenu({ urls: [url] })
+  shareMenu.popup({ window: BrowserWindow.fromWebContents(e.sender) ?? undefined, callback: () => (shareMenu = null) })
+})
+// U15: a workspace started waiting on you, Laki not in front (shared/tray.ts bounceOf, Settings' Bounce the Dock icon):
+// one bounce, never 'critical' (that one keeps going until Laki is looked at)
+ipcMain.on('dock-bounce', e => mac && from(e) && !BrowserWindow.getFocusedWindow() && app.dock?.bounce('informational'))
 
 // an HTML artifact as itself, a file:// page in the default browser (its viewer's and right click's Open file): the app
 // window's only, a file inside root (the workspace's storage folder), links followed first. The user's call, asked for

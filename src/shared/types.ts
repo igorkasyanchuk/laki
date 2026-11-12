@@ -540,6 +540,7 @@ export type Settings = {
   simpleRow?: boolean // B4: Appearance › Sidebar rows › Simple row (off unless true): a row is its name and one next-step chip, the other marks on hover
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // a sidebar row's other marks, each on unless false (step: off unless true; conflict, ci: unset, as prIcon)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  dockBounce?: boolean // U15: the Dock icon bounces once as a workspace starts waiting on you, Laki not in front (unset: on)
   usageAt?: number // a plan limit's % that notifies (notifyOn.usage): 75, 90, 95 (unset: USAGE_AT, 90)
   scheduleMaxMinutes?: number // T8: a scheduled run's time limit, its agent's working time, for a task that sets none (unset: 60; 0: none)
   scheduleAtOnce?: number // T8: scheduled runs going at once; a due one past it waits its turn (unset: 2; 0: no cap)

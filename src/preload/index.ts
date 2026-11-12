@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('laki', {
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
-  ...(process.platform === 'darwin' && { quickLook: (path: string) => ipcRenderer.send('quick-look', path) }), // U14: Space on a file row
+  ...(process.platform === 'darwin' && { quickLook: (path: string) => ipcRenderer.send('quick-look', path), share: (url: string) => ipcRenderer.send('share-menu', url), bounce: () => ipcRenderer.send('dock-bounce') }), // U14: Space on a file row; U15: Share…, the Dock's bounce
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard
   openFile: (path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld('laki', {
   onSimFloating: (cb: (devices: string[]) => void) => ipcRenderer.on('sim-floating', (_e, d: string[]) => cb(d)),
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
-  badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: object) => ipcRenderer.send('badge', n, items, tray, recording, state), // state: Q8's (shared/tray.ts stateOf)
+  badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: object, progress?: number) => ipcRenderer.send('badge', n, items, tray, recording, state, progress), // state: Q8's (shared/tray.ts stateOf)
   onDeepLink: (cb: (url: string) => void) => {
     ipcRenderer.on('deep-link', (_e, url: string) => cb(url))
     ipcRenderer.send('deep-link-ready') // then main sends one that came first

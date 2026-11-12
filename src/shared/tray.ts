@@ -21,6 +21,30 @@ export function stateOf(view: Pick<View, 'tabs' | 'workspaces'>, now = Date.now(
   return { state: blocked ? 'blocked' : needs ? 'waiting' : working ? 'working' : 'idle', needs, working, blocked }
 }
 
+// U15: the Dock icon's progress bar (main's setProgressBar, sent with the badge): a Ship at work (its tab: laki
+// progress' pct, else unknown) and each workflow run going (the blocks it has been on of all its blocks: a branch not
+// taken keeps it under 1; an older daemon's run, no steps: unknown). -1: none; 2: unknown (macOS's indeterminate bar);
+// else their mean, 0 to 1
+type Run = { status: string; visits: Record<string, number>; steps?: number }
+export function dockProgress(view: Pick<View, 'tabs'> & { flows?: Run[] }): number {
+  const parts = [
+    ...view.tabs.filter(t => t.kind === 'ship' && t.status === 'running').map(t => (t.progress ? Math.max(0, Math.min(1, t.progress.pct / 100)) : NaN)),
+    ...(view.flows ?? []).filter(f => f.status === 'running').map(f => (f.steps ? Math.min(Object.keys(f.visits).length / f.steps, 0.99) : NaN)),
+  ]
+  if (!parts.length) return -1
+  return parts.some(Number.isNaN) ? 2 : parts.reduce((a, b) => a + b, 0) / parts.length
+}
+
+// U15: the Dock bounces once (informational) as a workspace starts waiting on you (none of its tabs waited the view
+// before) while Laki isn't the front app: Settings › Notifications › Bounce the Dock icon (on unless off). Not a muted or
+// archived workspace or tab, nor in Do not disturb unless it's important (its ask comes as a card then, as notify's).
+// was: the workspaces that waited the view before (null: the first view, nothing bounces); now: this view's
+export function bounceOf(was: ReadonlySet<string> | null, view: Pick<View, 'tabs' | 'workspaces' | 'settings' | 'dnd'>, front: boolean) {
+  const quiet = new Set(view.workspaces.filter(w => w.muted || w.archived || (!!view.dnd && !w.important)).map(w => w.id))
+  const now = new Set(view.tabs.filter(t => t.status === 'waiting' && !t.muted && !quiet.has(t.workspace)).map(t => t.workspace))
+  return { now, bounce: !!was && !front && view.settings.dockBounce !== false && [...now].some(w => !was.has(w)) }
+}
+
 // its tooltip, in words: "Laki: 2 need you, 3 working, 1 blocked"; nothing going on: the name alone
 export function trayTip(i: Pick<TrayInfo, 'needs' | 'working' | 'blocked'>, name = 'Laki') {
   const parts = [i.needs && `${i.needs} need${i.needs === 1 ? 's' : ''} you`, i.working && `${i.working} working`, i.blocked && `${i.blocked} blocked`].filter(Boolean)

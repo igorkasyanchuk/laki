@@ -126,6 +126,7 @@ export function menusOf(app: AppBase) {
             items: [
               { label: 'Link and QR code…', icon: 'globe', run: () => setSharing(ts[0].id) },
               { label: 'Copy share link', icon: 'link', run: () => copy(ts[0].share!.url) },
+              ...(bridge?.share ? [{ label: 'Share…', icon: 'share', tip: "macOS's Share menu with its link: Messages, Mail, AirDrop", run: () => bridge!.share!(ts[0].share!.url) } as MenuItem] : []), // U15; off macOS: Copy share link
               { label: 'Stop sharing', icon: 'x', danger: true, run: () => void call('shareStop', { tab: ts[0].id }).then(() => done(`${ts[0].name} isn't shared any more: its link is dead`)) },
             ],
           }

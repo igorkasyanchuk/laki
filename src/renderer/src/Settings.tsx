@@ -148,6 +148,7 @@ export type AppSettings = Paint & {
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  dockBounce?: boolean // U15: the Dock icon bounces as a workspace starts waiting (unset: on)
   usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
@@ -1421,6 +1422,11 @@ export function SettingsPage(p: {
                       <Says title="Sound" hint="macOS's sounds, as in System Settings › Sound" />
                     </label>
                   </>
+                )}
+                {bridge?.bounce && (
+                  <Switch className="switch-row" on={s.dockBounce !== false} onChange={v => set({ dockBounce: v })}>
+                    <Says title="Bounce the Dock icon" hint="Once, when a workspace starts waiting on you and Laki isn't in front. Not for a muted workspace, nor in Do not disturb unless it's important." />
+                  </Switch>
                 )}
                 <label className="switch-row">
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

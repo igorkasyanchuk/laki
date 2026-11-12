@@ -1010,11 +1010,11 @@ export type Shown = { at: number; block: string; title: string; body: string }
 // each block's visits so far, what each would have been sent (the newest SIM_SENT), its steps (SIM_STEPS at most)
 export type FlowSim = { from?: string; answers?: Record<string, string | string[]>; n: Record<string, number>; sent: { block: string; n: number; what: string }[]; steps?: number }
 export const SHOWN_MAX = 512 << 10 // a Show you's body
-export type FlowView = Omit<FlowRun, 'flow' | 'log' | 'decisions' | 'vars' | 'tabs' | 'resume' | 'shown'> & { name: string; block?: string; decisions: number; last?: Decision } // the view's: the details come from flowGet
+export type FlowView = Omit<FlowRun, 'flow' | 'log' | 'decisions' | 'vars' | 'tabs' | 'resume' | 'shown'> & { name: string; block?: string; decisions: number; last?: Decision; steps?: number } // the view's: the details come from flowGet; steps: its blocks (U15: the Dock's progress)
 export const flowView = ({ flow, log, decisions, vars, tabs, resume, shown, ...r }: FlowRun): FlowView => {
   const b = flow.blocks.find(x => x.id === r.cur)
   const wait = r.wait && 'show' in r.wait ? { ...r.wait, show: undefined } : r.wait // an agent's whole answer: flowGet has it
-  return { ...r, wait, name: flow.name, block: b && blockName(b), decisions: decisions.length, last: decisions.at(-1), ...(r.sim && { sim: { ...r.sim, sent: [] } }) } // a simulation's sent: flowGet's
+  return { ...r, wait, name: flow.name, steps: flow.blocks.length, block: b && blockName(b), decisions: decisions.length, last: decisions.at(-1), ...(r.sim && { sim: { ...r.sim, sent: [] } }) } // a simulation's sent: flowGet's
 }
 
 // the format in words: MCP's laki_workflow_write and Laki AI's guide to writing one

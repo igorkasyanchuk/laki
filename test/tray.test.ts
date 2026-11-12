@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { crc32, deflateSync } from 'node:zlib'
-import { stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
+import { bounceOf, dockProgress, stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
 
 const tab = (o: object) => ({ id: Math.random().toString(36).slice(2), workspace: 'w1', kind: 'agent', status: 'idle', done: false, ...o }) as any
 const view = (tabs: any[], workspaces: any[] = [{ id: 'w1' }]) => ({ tabs, workspaces }) as any
@@ -81,4 +81,36 @@ test('Q8 its four pictures: template images (black, alpha only), each drawn, non
   assert.equal(seen.size, TRAY_STATES.length, 'four different pictures')
   // the outline has less ink than the filled mark; working and blocked each add to theirs
   assert.ok(inks.idle < inks.waiting && inks.idle < inks.working && inks.waiting < inks.blocked)
+})
+
+test('U15 dockProgress: none, a Ship (its pct or unknown), workflow runs by blocks visited, their mean', () => {
+  assert.equal(dockProgress({ tabs: [tab({ status: 'running' })] } as any), -1, 'an agent at work is no progress bar')
+  assert.equal(dockProgress({ tabs: [tab({ kind: 'ship', status: 'running' })] } as any), 2, "a Ship with no pct: macOS's indeterminate")
+  assert.equal(dockProgress({ tabs: [tab({ kind: 'ship', status: 'running', progress: { pct: 40 } })] } as any), 0.4)
+  assert.equal(dockProgress({ tabs: [tab({ kind: 'ship', status: 'exited' })] } as any), -1, 'a Ship done: the bar goes')
+  const run = (visits: string[], steps?: number, status = 'running') => ({ status, steps, visits: Object.fromEntries(visits.map(v => [v, 1])) })
+  assert.equal(dockProgress({ tabs: [], flows: [run(['a'], 4)] } as any), 0.25)
+  assert.equal(dockProgress({ tabs: [], flows: [run(['a', 'b'], 2)] } as any), 0.99, 'never full while it runs')
+  assert.equal(dockProgress({ tabs: [], flows: [run(['a'], 4), run(['a', 'b', 'c'], 4)] } as any), 0.5, 'two runs: their mean')
+  assert.equal(dockProgress({ tabs: [], flows: [run(['a'])] } as any), 2, "an older daemon's run, no steps: unknown")
+  assert.equal(dockProgress({ tabs: [], flows: [run(['a'], 4, 'waiting')] } as any), -1, 'waiting on you is no progress')
+})
+
+test('U15 bounceOf: once as a workspace starts waiting, Laki not in front; muted, Do not disturb and the setting', () => {
+  const v = (tabs: any[], o: any = {}) => ({ tabs, workspaces: o.workspaces ?? [{ id: 'w1' }, { id: 'w2' }], settings: o.settings ?? {}, dnd: o.dnd }) as any
+  const w1 = tab({ status: 'waiting' })
+  assert.equal(bounceOf(null, v([w1]), false).bounce, false, 'the first view: nothing bounces')
+  let r = bounceOf(new Set(), v([w1]), false)
+  assert.equal(r.bounce, true)
+  assert.deepEqual([...r.now], ['w1'])
+  assert.equal(bounceOf(r.now, v([w1, tab({ status: 'waiting' })]), false).bounce, false, 'the same workspace waiting on: once')
+  assert.equal(bounceOf(r.now, v([w1, tab({ workspace: 'w2', status: 'waiting' })]), false).bounce, true, 'another workspace: again')
+  assert.equal(bounceOf(new Set(), v([w1]), true).bounce, false, 'Laki in front: no bounce')
+  assert.equal(bounceOf(new Set(), v([w1], { settings: { dockBounce: false } }), false).bounce, false, 'turned off')
+  assert.equal(bounceOf(new Set(), v([tab({ status: 'waiting', muted: true })]), false).bounce, false, 'a muted tab')
+  assert.equal(bounceOf(new Set(), v([w1], { workspaces: [{ id: 'w1', muted: true }] }), false).bounce, false, 'a muted workspace')
+  assert.equal(bounceOf(new Set(), v([w1], { dnd: { until: 9 } }), false).bounce, false, 'Do not disturb')
+  assert.equal(bounceOf(new Set(), v([w1], { dnd: { until: 9 }, workspaces: [{ id: 'w1', important: true }] }), false).bounce, true, 'Do not disturb lets an important one through')
+  r = bounceOf(new Set(['w1']), v([]), false)
+  assert.equal(bounceOf(r.now, v([w1]), false).bounce, true, 'answered, then waiting again: it bounces again')
 })
