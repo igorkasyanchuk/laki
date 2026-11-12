@@ -635,10 +635,10 @@ test('R7: writeAtomic and readJson', t => {
 // docs/dev/helper.md: laki hook runs on the bundle's Laki Hook when it has one, else the binary that runs the daemon
 test('hookRunner: the bundle’s Laki Hook when it’s there; the app binary without it; node from source as it is', () => {
   const app = '/Applications/Laki.app/Contents/MacOS/Laki'
-  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook'
+  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper'
   assert.equal(hookRunner(app, p => p === helper), helper)
   assert.equal(hookRunner(app, () => false), app, 'an older build: none')
-  assert.equal(hookRunner('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook', 'spaces in the path')
+  assert.equal(hookRunner('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook Helper')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper', 'spaces in the path')
   assert.equal(hookRunner('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
   assert.equal(hookRunner('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
 })

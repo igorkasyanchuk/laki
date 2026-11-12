@@ -9,7 +9,8 @@ nothing of Laki's needs the app binary to run as node. This moves them, one at a
 ## Step 1 (done): `laki hook` on Laki Hook
 
 - `scripts/after-pack.cjs` `hookHelper` (macOS, before signing): `Contents/Frameworks/Laki Hook.app`, a copy of
-  `Laki Helper.app` (Electron's helper: the same framework, so it runs as node too), its executable renamed `Laki Hook`,
+  `Laki Helper.app` (Electron's helper: the same framework, so it runs as node too), its executable renamed `Laki Hook Helper` (Electron takes itself for a helper, its framework four folders up, only
+  by a name ending in ` Helper`; `Laki Hook` alone looked beside itself and trapped as ICU started),
   `CFBundleIdentifier` `<appId>.hook` (`dev.laki.app.hook`), `LSUIElement`, no `NS…UsageDescription` keys.
   electron-builder signs it with the rest (ad hoc, or the Developer ID and hardened runtime in a release).
 - `src/shared/helper.ts` `hookRunner(execPath, exists)` (pure, `test/units-more.test.ts`): the bundle's Laki Hook when

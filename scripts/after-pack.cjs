@@ -20,7 +20,7 @@ function hookHelper(ctx, app) {
   rmSync(to, { recursive: true, force: true })
   cpSync(from, to, { recursive: true, verbatimSymlinks: true })
   const macos = join(to, 'Contents/MacOS')
-  renameSync(join(macos, readdirSync(macos)[0]), join(macos, 'Laki Hook'))
+  renameSync(join(macos, readdirSync(macos)[0]), join(macos, 'Laki Hook Helper')) // " Helper": Electron finds its framework only from a helper so named (src/shared/helper.ts HOOK_EXE)
   const plist = join(to, 'Contents/Info.plist')
   const pb = (cmd, ok = false) => {
     try {
@@ -33,7 +33,7 @@ function hookHelper(ctx, app) {
   set('CFBundleIdentifier', `${ctx.packager.appInfo.id}.hook`)
   set('CFBundleName', 'Laki Hook')
   set('CFBundleDisplayName', 'Laki Hook')
-  set('CFBundleExecutable', 'Laki Hook')
+  set('CFBundleExecutable', 'Laki Hook Helper')
   set('LSUIElement', 'true', 'bool')
   const keys = execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Print', plist], { encoding: 'utf8' }).match(/^\s{4}(NS\w+UsageDescription)\b/gm) ?? []
   for (const k of keys) pb(`Delete :${k.trim()}`, true)

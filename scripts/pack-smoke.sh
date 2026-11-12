@@ -29,9 +29,9 @@ for i in $(seq 100); do laki ls | grep -q "○● claude" && break; sleep 0.1; d
 laki ls
 echo "--- hook command:"; grep -o '"command": "[^"]*hook idle' "$LAKI_HOME/claude-settings.json"
 # docs/dev/helper.md: the hook on Laki Hook (macOS), and how long a hook takes to start on each binary
-HOOKBIN="$APP/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook"
+HOOKBIN="$APP/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper"
 if [ -x "$HOOKBIN" ]; then
-  grep -q 'Laki Hook.app/Contents/MacOS/Laki Hook' "$LAKI_HOME/claude-settings.json" || { echo "the hook doesn't run on Laki Hook"; exit 1; }
+  grep -q 'Laki Hook.app/Contents/MacOS/Laki Hook Helper' "$LAKI_HOME/claude-settings.json" || { echo "the hook doesn't run on Laki Hook"; exit 1; }
   [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Frameworks/Laki Hook.app/Contents/Info.plist")" != "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" ] || { echo 'Laki Hook has the app'"'"'s bundle id'; exit 1; }
   echo "--- hook start, ms (10 runs each, the median):"
   node -e 'const { spawnSync } = require("node:child_process"); const t = b => { const ms = []; for (let i = 0; i < 10; i++) { const s = process.hrtime.bigint(); const r = spawnSync(b, [process.argv[3], "hook", "ping"], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } }); if (r.status !== 0) throw new Error(b + ": exit " + r.status); ms.push(Number(process.hrtime.bigint() - s) / 1e6) } return ms.sort((a, b) => a - b)[5].toFixed(0) }; console.log(`before (Laki): ${t(process.argv[1])}  after (Laki Hook): ${t(process.argv[2])}`)' "$BIN" "$HOOKBIN" "$RES/hook.js"
