@@ -20,3 +20,10 @@ export async function procPeer(port: number, ours: number, proc = '/proc') {
 export const procParent = async (pid: number, proc = '/proc') => Number((await readFile(join(proc, String(pid), 'stat'), 'utf8').catch(() => '')).replace(/^[^]*\) /, '').split(' ')[1]) || 0
 // S1: a process's controlling terminal: /proc/<pid>/stat's tty_nr (the field after the session's), '' for none
 export const procTty = async (pid: number, proc = '/proc') => (n => (n && n !== '0' ? n : ''))((await readFile(join(proc, String(pid), 'stat'), 'utf8').catch(() => '')).replace(/^[^]*\) /, '').split(' ')[4])
+// S1: a process's session: its leader's pid (the session id) and when that one started (stat's starttime, in ticks)
+export async function procSession(pid: number, proc = '/proc') {
+  const f = async (p: number) => (await readFile(join(proc, String(p), 'stat'), 'utf8').catch(() => '')).replace(/^[^]*\) /, '').split(' ')
+  const leader = Number((await f(pid))[3]) || 0
+  const start = leader ? (await f(leader))[19] : ''
+  return leader && start ? { leader, start } : undefined
+}

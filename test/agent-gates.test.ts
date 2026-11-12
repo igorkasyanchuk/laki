@@ -186,14 +186,17 @@ test("S1: a detached process with daemon.json's token is refused what's yours; t
   assert.match(said[6].error, /only Laki's app gets its token/)
   assert.ok(!existsSync(join(ws.path, 'pwned')))
   assert.equal((await rig.rpc('state')).settings.nextPrompt, undefined)
-  // the CLI from a terminal of yours (script gives it one): you
-  execFileSync('script', ['-q', '/dev/null', ...node, cli, 'rename', ws.id, 'by-you'], { env, stdio: 'ignore' })
+  // the CLI from a terminal of yours (script gives it one): you, once you allowed that terminal in the window
+  const app = await connect(rig)
+  const term = spawn('script', ['-q', '/dev/null', ...node, cli, 'rename', ws.id, 'by-you'], { env, stdio: 'ignore' })
+  const ask: any = await seen(app, (e: any) => e.ev === 'termAsk', 'the terminal asked about')
+  await app.call('termAnswer', { req: ask.req, allow: true })
+  await new Promise(ok => term.on('exit', ok))
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name, 'by-you')
   // the same command detached: refused
   const d = await loose(`require('node:child_process').execFile(${JSON.stringify(node[0])}, ${JSON.stringify([...node.slice(1), cli, 'rename', ws.id, 'by-it'])}, (e, o, er) => console.log(er))`)
   assert.match(d, /couldn't tell who's calling/)
   // the app's window (its token, from main's conn): yours, no terminal needed
-  const app = await connect(rig)
   await app.call('settingsSet', { nextPrompt: true })
   await app.call('wsSet', { id: ws.id, name: 'from-the-app' })
   assert.equal((await rig.rpc('state')).settings.nextPrompt, true)

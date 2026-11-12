@@ -549,8 +549,18 @@ you (`if (!tab) return p`). Now only two kinds of caller in no tab are you.
   throws `core.WHO`, and `FROM` and `CALLER` methods (and a hook without its key) are refused. A WebSocket of such a
   process gets the masked view. Methods outside `FROM`/`CALLER` (`ping`, `state`) still answer.
 - **What stops working.** `laki` from a launchd or cron job, an app's MCP server (`laki mcp` in another app) or
-  `ssh -T`: refused what asks who. ponytail: a process that gives itself a terminal (`script`, `expect`, a tmux server
-  it starts) passes as yours; a native addon in Electron run as node could pass `appPeer`.
+  `ssh -T`: refused what asks who. A process with a terminal of its own that isn't a tab's (`script`, `expect`, a tmux
+  server it starts, but your Terminal's too) is asked about once: core.ts `Term` (its tty and its session's leader: pid
+  and start time; macOS: the `s` row of `ps -t`, Linux: `/proc/<pid>/stat`, peer.ts `procSession`), `termOk`/`termAllow`
+  (in memory, an entry gone with its leader), `termStart` (the daemon's own terminal and `LAKI_START_PID`'s, which
+  conn.ts sets as it spawns one: allowed from the start). main.ts `termAsk` (from `callerOf`, so only `FROM`/`CALLER`
+  methods and a keyless hook): no app window, refused at once; else the event `termAsk { req, tty, cmd, chain }` to the
+  app's windows only, the call held up to 60 s (`LAKI_TERM_WAIT`), calls from the same terminal sharing the one ask;
+  `termAnswer { req, allow }` is the app's token's alone (checked in `call` before anyone is looked up; `AGENT_NO`,
+  `REMOTE_NO`, `ANSWER_NO`), then `termDone { req }`. The window's card is the tool ask's (`toolLine`: *Allow this
+  terminal* / *Deny*). The CLI (conn.ts `post`, a tty outside a tab) asks `termHeld` over `/rpc` a second in and prints
+  *Approve this terminal in Laki's window…*, waiting 70 s then. A WebSocket from a terminal not allowed yet gets the
+  masked view. ponytail: you can allow the wrong terminal; a native addon in Electron run as node could pass `appPeer`.
 - **Tests.** `test/agent-gates.test.ts` (S1): a detached child with daemon.json's token is refused `tabNew` with `cmd`,
   `settingsSet`, `answer`, `prAct` merge, `wsSet` and `appPair`; the CLI under `script` (a terminal) and the app's
   WebSocket aren't. The rig's `rpc` and `connect` use the app's token, `rig.cli` passes it as `LAKI_APP_TOKEN`.

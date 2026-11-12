@@ -63,20 +63,30 @@ async function pair(info: DaemonInfo) {
 async function post(method: string, params: any, timeoutMs: number) {
   const info = daemonInfo()
   if (!info) throw new Error('daemon not running')
+  // S1: a terminal Laki hasn't seen before: the daemon holds the call until you allow it in the window; say so here, and
+  // wait as long as it does (a minute)
+  const stop = new AbortController()
+  let limit = setTimeout(() => stop.abort(new Error('The operation was aborted due to timeout')), timeoutMs)
+  const hint = !process.stderr.isTTY || inTab() ? undefined : setTimeout(() => void fetch(`http://127.0.0.1:${info.port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${info.token}` }, body: '{"method":"termHeld"}', signal: AbortSignal.timeout(5000) }).then(r => r.json()).then(r => { if (r.result === true && !stop.signal.aborted) (process.stderr.write("Approve this terminal in Laki's window…\n"), clearTimeout(limit), (limit = setTimeout(() => stop.abort(new Error('The operation was aborted due to timeout')), Math.max(timeoutMs, 70000)))) }, () => {}), 1000)
   const send = (token: string) =>
     fetch(`http://127.0.0.1:${info.port}/rpc`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ method, params }),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: stop.signal,
     })
   // S12: in a Laki tab, with that tab's token (LAKI_TAB_TOKEN, this start's): the daemon knows the caller by it. One
   // of a start that ended (its tab restarted under a process that lives on, another Laki's): the daemon's own, as before
   if (appMode && app?.pid && app.pid !== info.pid) await pair(info).catch(() => {}) // the app's daemon started again
   const mine = process.env.LAKI_TAB_TOKEN || app?.token // a tab's first: a CLI in a tab is that tab's, whatever else it has
-  let res = await send(mine || info.token)
-  if (mine && res.status === 401) (await res.arrayBuffer(), (res = await send(info.token)))
-  const body = await res.json()
+  try {
+    let res = await send(mine || info.token)
+    if (mine && res.status === 401) (await res.arrayBuffer(), (res = await send(info.token)))
+    var body = await res.json()
+  } finally {
+    clearTimeout(limit)
+    clearTimeout(hint)
+  }
   if (body.error) throw new Error(body.error)
   return body.result
 }
@@ -131,7 +141,7 @@ export async function ensureDaemon(env: Record<string, string> = {}, asApp = fal
   rotateLog(logPath) // and each hour as it runs (main.ts' logTick)
   const log = openSync(logPath, 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
-  const child = spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log, ...(asApp ? (['pipe'] as const) : [])], env: { ...process.env, ...env, ...(asApp && { LAKI_APP_PIPE: '3' }) } })
+  const child = spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log, ...(asApp ? (['pipe'] as const) : [])], env: { ...process.env, ...env, LAKI_START_PID: String(process.pid), ...(asApp && { LAKI_APP_PIPE: '3' }) } }) // LAKI_START_PID: S1, this terminal is the daemon's own (core.termStart)
   child.unref()
   let said = ''
   const pipe = asApp ? (child.stdio[3] as import('node:net').Socket) : undefined

@@ -123,7 +123,12 @@ project's test script is, which the agent can edit.
 - Any program running as your user can read daemon.json's token (`ponytail:` in `src/daemon/main.ts`). A process an
   agent starts that leaves its tab's tree and its terminal (`setsid`, `launchctl submit`) is refused what asks who calls;
   one that then gives itself a terminal of its own (`script`, `expect`, a tmux server it starts, `open x.command`)
-  still counts as yours. A double fork keeps the tab's terminal, so it's the tab's. A user per agent would close that.
+  is no longer yours by that alone: a terminal Laki hasn't seen is held until you pick *Allow this terminal* in Laki's
+  window (once per terminal, until its shell exits; the card names the terminal and what started it), and refused when
+  no window is open or you say Deny. The terminal that started the daemon is allowed from the start. What's left: you
+  can allow the wrong one (an agent's pty looks like a terminal you just opened: Deny when you ran nothing there), and
+  with no window open (headless) only the starting terminal works. A double fork keeps the tab's terminal, so it's the
+  tab's. A user per agent would close that.
 - The app's token goes to a daemon's starter on a pipe, or to a running daemon's app after a check that it's Laki's
   own window process on the daemon's binary (LaunchServices says it finished launching): a native addon loaded into
   Electron run as node could pass that check (the runAsNode fuse below).

@@ -1287,8 +1287,8 @@ export function App() {
         if (viewRef.current?.settings.notify !== false && !document.hasFocus()) notify(w?.name ?? m.widget, m.notify, '', open, viewRef.current?.settings.notifySound) // looking at Laki: the toast is enough
         toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
       } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal, close: m.close }, m.ws)
-      else if (m.ev === 'toolAsk') toolAsk.current ? toolAsk.current(m) : earlyAsks.current.push(m)
-      else if (m.ev === 'toolDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
+      else if (m.ev === 'toolAsk' || m.ev === 'termAsk') toolAsk.current ? toolAsk.current(m) : earlyAsks.current.push(m)
+      else if (m.ev === 'toolDone' || m.ev === 'termDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'locked') setLocked({ pin: !!m.pin })
@@ -2469,6 +2469,14 @@ export function App() {
     if (toolLine.has(m.req)) return // sent again as the socket came back (widgetAsks)
     type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
     const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
+    if (m.ev === 'termAsk') {
+      // S1: a laki command from a terminal Laki hasn't seen (main.ts' termAsk): yours once you allow it, once per terminal
+      const title = 'Allow this terminal to act as you?'
+      const picks: Pick[] = [{ label: 'Allow this terminal', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, `${m.cmd} on ${m.tty}`, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
+      toolLine.add({ req: m.req, title, text: `A laki command came from a terminal Laki hasn't seen: ${m.tty}, started by ${m.cmd} (${(m.chain ?? []).join(' ‹ ')}).\n\nAllow it if you just ran laki there. An agent that left its tab looks the same: Deny if you didn't. Asked once per terminal.`, picks, answer: allow => void api.call('termAnswer', { req: m.req, allow: allow === 'once' }).catch(() => {}) })
+      return toolShow()
+    }
     if (typeof m.perm === 'string') {
       // an extension's agent (its AI source or an AI action, claude -p) asking for a tool it may not use unasked: its
       // input as lines, Always: in its runs from now on (its page lists them)

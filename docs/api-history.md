@@ -181,3 +181,4 @@ needs no bump: `settingsSet` keeps any field.
 173: `uiDo` and its `ui` event (Q13: Laki AI's `laki_ui` moves the window), Laki AI's `delete` act and a `run` act's `ids`, `stopAll`'s `tab`.
 174: `remoteCheck` and the view's `remote.check` (D8: remote access reached from outside, its result), `settings.remoteAwake`.
 175: `screenLock` and `remoteLog` (D9: remote access while the Mac is locked, its activity log), `settings.remoteWhen`.
+176: `termAnswer` and the `termAsk`, `termDone` events (S1: a terminal Laki hasn't seen is allowed once in the window before its calls are yours); `termHeld` over `/rpc` (the CLI's hint).

@@ -667,6 +667,7 @@ const api: Record<string, Handler> = {
   flowGet: p => flowGet(p),
   flowForget: p => flowForget(p),
   flowTick: p => flowTick(p.now), // tests move the clock
+  termAnswer: p => termAnswer(p), // S1: Allow this terminal / Deny, from the app's window only (call's check)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
 }
 
@@ -699,13 +700,13 @@ const remoteNo = (method: string, p: any) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'aiKey', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
+const FROM = new Set(['termAnswer', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'aiKey', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 // S5: OPEN: what any caller may call, as it is (reads of the view and of a workspace's own facts, the ticks tests move,
 // a connection's own view and size, the hook: hookWho's). Every method of api is in FROM, CALLER or OPEN, checked as
 // the daemon loads (below api): a new one is classified, never open by default
 const OPEN = new Set(['voiceModels', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss', 'hookList', 'storageInfo', 'apps', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowHistory', 'flowStop', 'flowGet', 'flowForget'])
-const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
+const peers = new WeakMap<Socket, ReturnType<typeof core.peerWho>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
 const own = new WeakMap<core.Conn, () => boolean>() // S3: a connection known to be yours (not an agent's process, not remote access's)
@@ -713,7 +714,7 @@ const apps = new WeakSet<core.Conn>() // S1: a WebSocket with the app's token: t
 const peerOf = (sock: Socket) => {
   let t = peers.get(sock)
   if (!t) {
-    const p = (t = core.tabOfPeer(sock.remotePort ?? 0))
+    const p = (t = core.peerWho(sock.remotePort ?? 0))
     peers.set(sock, p)
     p.catch(() => peers.get(sock) === p && peers.delete(sock)) // not found: asked again at the next call, not refused for good
   }
@@ -723,9 +724,46 @@ const peerOf = (sock: Socket) => {
 // process is in no tab or can't be found (a detached child's, a launchd job's: the point of the token), but a process
 // found in another tab is that one's (a token read out of another tab's environment names its reader, not its owner)
 const callerOf = async (sock: Socket, known?: Tab) => {
-  const peer = await peerOf(sock).catch(() => null)
+  const who = await peerOf(sock).catch(() => null)
+  const peer = who && who.tab
+  if (!known && who?.term) await termAsk(who.term) // S1: a terminal of its own: yours once you allowed it
   return known ? (peer && peer.id !== known.id ? peer : known) : peer
 }
+// S1: a process in no tab with a terminal of its own may be an agent that left its tab and gave itself a pty (script,
+// expect, a tmux server): its first call that asks who waits (60 s at most) for Allow this terminal in Laki's window,
+// once per terminal (core.termOk: its tty and its session's leader). Calls made together share the one ask; the app's
+// windows alone see it and answer (termAnswer, the app's token). No window: refused at once, saying why
+const TERM_WAIT = () => Number(process.env.LAKI_TERM_WAIT) || 60_000
+const termAsks = new Map<string, { msg: { ev: 'termAsk'; req: string }; done: Promise<boolean>; answer: (allow: boolean) => void }>() // by the terminal's key
+const NO_TERM = "this terminal isn't allowed to act as you yet"
+async function termAsk(term: core.Term) {
+  if (core.termOk(term)) return
+  let a = termAsks.get(term.key)
+  if (!a) {
+    const windows = [...core.clients].filter(c => apps.has(c))
+    if (!windows.length) throw new Error(`${NO_TERM}, and Laki's window isn't open to allow it: open Laki, then try again`)
+    const msg = { ev: 'termAsk' as const, req: randomBytes(8).toString('hex'), tty: term.tty, cmd: term.cmd, chain: term.chain }
+    let answer = (_: boolean) => {}
+    const done = new Promise<boolean>(ok => {
+      const timer = setTimeout(() => ok(false), TERM_WAIT())
+      answer = allow => (clearTimeout(timer), ok(allow))
+    }).then(allow => {
+      termAsks.delete(term.key)
+      if (allow) core.termAllow(term)
+      for (const c of core.clients) if (apps.has(c)) c.send({ ev: 'termDone', req: msg.req })
+      return allow
+    })
+    termAsks.set(term.key, (a = { msg, done, answer }))
+    for (const c of windows) c.send(msg)
+    log(`a terminal asks to act as you: ${term.tty} (${term.chain.join(' < ')})`)
+  }
+  if (!(await a.done)) throw new Error(`${NO_TERM}: Allow it in Laki's window (it asked there), then try again`)
+}
+const termAsksTo = (c: core.Conn) => apps.has(c) && termAsks.forEach(a => c.send(a.msg)) // a window that opened meanwhile
+// the app's answer (its token only: call() checks before anyone is looked up)
+const termAnswer = (p: any) => void [...termAsks.values()].find(a => a.msg.req === p?.req)?.answer(p?.allow === true)
+// the CLI's own question while its call waits (not a method of api: it reads the socket, as appPair does)
+const termHeld = async (sock: Socket) => (who => !!who?.term && termAsks.has(who.term.key))(await core.peerWho(sock.remotePort ?? 0).catch(() => undefined))
 // S7: what Recording mode keeps from an agent in another workspace: the state's private rows, a private workspace's
 // kept turns (their prompts, their diffs). ponytail: its diff, files and screen go by their own gates (crossAsk)
 const RECORDED = new Set(['state', 'turnList', 'turnDiff'])
@@ -874,7 +912,7 @@ const ANSWER: Record<string, true | ((p: any) => string)> = {
   tabNew: newOk(true),
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
 }
-const ANSWER_NO = new Set(['diagnostics', 'agentContext', 'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet', 'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen', 'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet', 'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk', 'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook', 'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct', 'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount', 'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart', 'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick', 'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash', 'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetCheck', 'noteNew', 'noteSave', 'noteRm', 'noteUpload', 'todoListSave', 'planNew', 'planSave', 'planUpload', 'planWrite', 'planRm', 'mcpAppCall', 'checkAgain', 'checkStop', 'flowSave', 'flowTrust', 'flowPause', 'flowRm', 'flowRestore', 'flowTrash', 'flowTrashTidy', 'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
+const ANSWER_NO = new Set(['termAnswer', 'diagnostics', 'agentContext', 'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet', 'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen', 'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet', 'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk', 'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook', 'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct', 'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount', 'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart', 'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick', 'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash', 'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetCheck', 'noteNew', 'noteSave', 'noteRm', 'noteUpload', 'todoListSave', 'planNew', 'planSave', 'planUpload', 'planWrite', 'planRm', 'mcpAppCall', 'checkAgain', 'checkStop', 'flowSave', 'flowTrust', 'flowPause', 'flowRm', 'flowRestore', 'flowTrash', 'flowTrashTidy', 'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
 for (const k of Object.keys(api)) if (Object.hasOwn(ANSWER, k) === ANSWER_NO.has(k)) throw new Error(`api's ${k} is ${ANSWER_NO.has(k) ? 'in ANSWER and ANSWER_NO' : 'in neither ANSWER nor ANSWER_NO'}: classify it for remote access's answer level (D7)`)
 for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, k)) throw new Error(`ANSWER's or ANSWER_NO's ${k} isn't a method of api`)
 const answerNo = (method: string, p: any) => {
@@ -1156,6 +1194,7 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (method === 'settingsSet' && params && typeof params === 'object') params = unmasked(params, core.state.settings ?? {}) // S3: the masks a masked view's Settings sends back are the values it has
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   if (remote && remoteMod.levelOf(c?.device) === 'answer') answerNo(method, params) // D7
+  if (method === 'termAnswer' && !app) throw new Error("only Laki's window allows a terminal") // before whoCalls: an unapproved terminal's would ask about itself
   if (sock) params = await whoCalls(sock, method, params, known, app)
   if (sock) agentNo(method, params ?? {})
   if (sock && method === 'hook') await hookWho(sock, params ?? {}, known, app)
@@ -1250,6 +1289,7 @@ const server = createServer(async (req, res) => {
   try {
     const { method, params } = JSON.parse(body)
     // S1: the app's token for the app's own process, with daemon.json's: a daemon it didn't start (appPeer checks it)
+    if (method === 'termHeld') return reply(200, { result: !far && (await termHeld(req.socket)) }) // S1: the CLI's own, while its call waits for Allow this terminal
     if (method === 'appPair') return reply(200, !far && !mine && !app && (await core.appPeer(req.socket.remotePort ?? 0)) ? { result: { token: appToken } } : { error: "only Laki's app gets its token" })
     // remote access's: a Conn of its own (no socket to look up), its device's for D7's level
     reply(200, { result: (await (far ? call(method, params, { id: 0, remote: true, ...(device && { device }), send: () => {} }) : call(method, params, undefined, false, req.socket, mine?.kind === 'agent' ? mine : undefined, app))) ?? null })
@@ -1381,7 +1421,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     }
     // looked up as it opens: the app's first keys don't wait. In Recording mode the first state waits for it (S7)
     if (app) apps.add(c)
-    const who = c.remote ? undefined : (local.set(c, req.socket), app ? undefined : peerOf(req.socket).then(t => void ((agent = !!t && !!core.agentCaller({ ws: t.workspace, tab: t.id })), (mine = !agent)), () => void (agent = true)))
+    const who = c.remote ? undefined : (local.set(c, req.socket), app ? undefined : peerOf(req.socket).then(({ tab: t, term }) => void ((agent = !!t && !!core.agentCaller({ ws: t.workspace, tab: t.id })), (mine = !agent && (!term || core.termOk(term)))), () => void (agent = true))) // S1: a terminal not allowed yet: no secrets
     own.set(c, () => mine)
     core.clients.add(c)
     // the first state once it's known whose it is (S3: yours has the secrets, and it draws it once); remote's at once
@@ -1391,7 +1431,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
       const late = setTimeout(first, 500)
       void who.then(() => (clearTimeout(late), first()))
     } else first()
-    if (!c.locked) widgetAsks(c), noticesTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
+    if (!c.locked) widgetAsks(c), noticesTo(c), termAsksTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
@@ -1450,6 +1490,7 @@ void remoteMod
   .then(() => listening) // tunnelsBack skips the daemon's own port: known once it listens
   .then(() => (remoteMod.remoteBack(), remoteMod.tunnelsBack())) // then the ones state.json kept (remote access first: My domain's on the tunnels' connector): after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
+await core.termStart().catch(() => {}) // S1: the terminal that started this daemon is yours from the start
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   port = typeof addr === 'object' && addr ? addr.port : 0

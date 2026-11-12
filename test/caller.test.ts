@@ -9,7 +9,8 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { procParent, procPeer } from '../src/daemon/peer.ts'
-import { connect, fresh, until } from './helpers.ts'
+import { spawn } from 'node:child_process'
+import { connect, fresh, seen, sleep, until } from './helpers.ts'
 
 test("M5: an agent's call is its tab's with Origin: app://laki too; answers, keys into an ask and remote access aren't an agent's; another workspace's terminal asks; one that can't be found is refused", async t => {
   const rig = await fresh(t)
@@ -420,4 +421,58 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
   // the start ends: its token with it
   await rig.rpc('tabClose', { id: tab })
   await until(async () => (await post(mine, 'ping', {})).code === 401, 'its token refused')
+})
+
+// S1: a process in no tab with a terminal of its own could be an agent that left its tab and gave itself a pty: its
+// terminal is yours only once you said so in Laki's window (main.ts' termAsk, core.ts' termOk)
+test("S1: a terminal Laki hasn't seen is held until you allow it in the window: none open or Deny refuses; allowed once it holds until its shell exits; only the window answers", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  const { port, token } = rig.info()
+  const laki = `${process.execPath} --experimental-strip-types --no-warnings ${fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))}`
+  // sh under script: one terminal, its session's leader sh, for every command in the line; daemon.json's token
+  const term = (line: string) =>
+    new Promise<string>(ok => {
+      const c = spawn('script', ['-q', '/dev/null', 'sh', '-c', line], { env: rig.env, stdio: ['ignore', 'pipe', 'pipe'] })
+      let out = ''
+      c.stdout.on('data', d => (out += d))
+      c.on('exit', () => ok(out))
+    })
+  const name = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name
+  // no window to allow it: refused at once, saying why
+  assert.match(await term(`${laki} rename ${ws.id} nobody`), /isn't allowed to act as you yet, and Laki's window isn't open/)
+  const app = await connect(rig)
+  const asked = (from: number) => until(() => app.events.slice(from).find((e: any) => e.ev === 'termAsk') as any, 'the ask in the window')
+  // Deny: held, then refused
+  let at = app.events.length
+  let run = term(`${laki} rename ${ws.id} denied`)
+  let ask = await asked(at)
+  assert.ok(ask.tty && ask.cmd && ask.chain.includes('script'), JSON.stringify(ask)) // what the card shows: its terminal, its leader, who ran it
+  // not an agent's to answer, nor a CLI's or a tab's with daemon.json's token: the window's alone
+  await assert.rejects(rig.rpc('termAnswer', { req: ask.req, allow: true, from: { ws: ws.id, tab } }), /an agent can't allow a terminal/)
+  const plain = await (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ method: 'termAnswer', params: { req: ask.req, allow: true } }) })).json()
+  assert.match(plain.error, /only Laki's window allows a terminal/)
+  await app.call('termAnswer', { req: ask.req, allow: false })
+  assert.match(await run, /isn't allowed to act as you yet: Allow it in Laki's window/)
+  assert.notEqual(await name(), 'denied')
+  await seen(app, (e: any) => e.ev === 'termDone' && e.req === ask.req, 'its card closed')
+  // Allow: asked once for the terminal, the calls after it pass; the CLI says what it waits for
+  at = app.events.length
+  run = term(`${laki} rename ${ws.id} first && ${laki} rename ${ws.id} second`)
+  ask = await asked(at)
+  await sleep(1500) // the CLI's hint comes a second in
+  await app.call('termAnswer', { req: ask.req, allow: true })
+  assert.match(await run, /Approve this terminal in Laki's window/)
+  assert.equal(await name(), 'second')
+  assert.equal(app.events.slice(at).filter((e: any) => e.ev === 'termAsk').length, 1, 'once per terminal')
+  // its shell exited: the approval went with it; the same line from a new terminal asks again
+  at = app.events.length
+  run = term(`${laki} rename ${ws.id} third`)
+  ask = await asked(at)
+  await app.call('termAnswer', { req: ask.req, allow: false })
+  await run
+  assert.equal(await name(), 'second')
+  app.close()
 })

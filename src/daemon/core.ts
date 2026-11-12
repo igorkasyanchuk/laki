@@ -26,7 +26,7 @@ import { redact, transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
-import { procParent, procPeer, procTty } from './peer.ts'
+import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
 import { ptySock } from '../ptyhost/proto.ts'
@@ -4285,9 +4285,49 @@ const causeEv = (agent: string | undefined, c: Cause) => ({ ...fromAgent(agent),
 // process at all does (it closed, or the port can't be read): main.ts refuses the call, never takes it for yours. The
 // app's own window and calls carry its token instead (main.ts' appToken). ponytail: an lsof and a ps per connection
 // asked about (main.ts' FROM and CALLER methods only); a process that gives itself a new terminal (script, expect, a
-// tmux server it starts) passes as yours; a user per agent is the real fix
+// tmux server it starts) is asked about once in Laki's window before its calls are yours (Term, termOk: main.ts' termAsk);
+// a user per agent is the real fix
 export const WHO = "couldn't tell who's calling: try again"
-type Peer = { pid: number; tab?: Tab; term?: boolean; own?: boolean } // term: a terminal of its own, not a tab's; own: the daemon's child
+// S1: a terminal that isn't a tab's, by its tty and its session's leader (pid and start time): a new pty an agent gives
+// itself (script, expect, tmux) is another one, never the one you allowed. cmd: the leader's; chain: the caller and its parents
+export type Term = { key: string; tty: string; leader: number; cmd: string; chain: string[] }
+type Peer = { pid: number; tab?: Tab; term?: Term; own?: boolean } // term: a terminal of its own, not a tab's; own: the daemon's child
+const base = (c: string) => c.trim().split('/').pop() || '?'
+async function termOf(pid: number, tty: string, up: (p: number) => Promise<number>, proc: string): Promise<Term | undefined> {
+  const pids = [pid]
+  for (let p = await up(pid), n = 0; p > 1 && n < 6; p = await up(p), n++) pids.push(p)
+  if (proc) {
+    const s = await procSession(pid, proc)
+    if (!s) return
+    const name = async (p: number) => base(await readFile(join(proc, String(p), 'comm'), 'utf8').catch(() => '?'))
+    return { key: `${tty}:${s.leader}:${s.start}`, tty, leader: s.leader, cmd: await name(s.leader), chain: await Promise.all(pids.map(name)) }
+  }
+  // macOS's ps has no session id: the leader is the process on that tty whose state says so (s)
+  const rows = (await run('/bin/ps', ['-t', tty, '-o', 'pid=,stat=,lstart=,comm=']).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout.split('\n').map(l => /^\s*(\d+)\s+(\S+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.*)$/.exec(l))
+  const lead = rows.find(m => m && m[2].includes('s'))
+  if (!lead) return // its session's leader is gone: nobody's terminal any more
+  const names = psRows((await run('/bin/ps', ['-o', 'pid=,comm=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout)
+  return { key: `${tty}:${lead[1]}:${lead[3].replace(/\s+/g, ' ')}`, tty, leader: Number(lead[1]), cmd: base(lead[4]), chain: pids.map(p => base(names.get(p) ?? '?')) }
+}
+// the terminals you allowed (and the one the daemon was started from), in memory: gone with the daemon, and each with its leader
+const termsOk = new Map<string, number>()
+const alive = (pid: number) => { try { return process.kill(pid, 0) } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } } // EPERM: root's login
+export const termOk = (t: Term) => {
+  for (const [k, pid] of termsOk) if (!alive(pid)) termsOk.delete(k)
+  return termsOk.has(t.key)
+}
+export const termAllow = (t: Term) => void termsOk.set(t.key, t.leader)
+// the terminal the daemon itself was started from (laki daemon, --headless, the CLI's first call: LAKI_START_PID): yours
+// from the start. ponytail: whoever starts the daemon names it; an agent that can start Laki's daemon is past this gate anyway
+export async function termStart(proc = process.platform === 'linux' ? '/proc' : '') {
+  for (const pid of new Set([process.pid, Number(process.env.LAKI_START_PID) || 0])) {
+    if (pid <= 1) continue
+    const tty = (await ttys([pid], proc)).get(pid)
+    const up = proc ? (p: number) => procParent(p, proc) : async (p: number) => Number((await run('/bin/ps', ['-o', 'ppid=', '-p', String(p)]).catch(() => ({ stdout: '' }))).stdout) || 0
+    const t = tty && (await termOf(pid, tty, up, proc).catch(() => undefined))
+    if (t) termAllow(t)
+  }
+}
 async function peerInfo(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Peer> {
   let pid: number | undefined
   let up: (p: number) => Promise<number>
@@ -4318,7 +4358,7 @@ async function peerInfo(port: number, proc = process.platform === 'linux' ? '/pr
   const mine = tty.get(pid)
   if (!mine) return { pid }
   for (const [p, id] of roots) if (tty.get(p) === mine) return { pid, tab: tabOf(id) }
-  return { pid, term: true }
+  return { pid, term: await termOf(pid, mine, up, proc) }
 }
 // each process's controlling terminal, none left out when it has none: ps's tty (?? for none); Linux: /proc/<pid>/stat's tty_nr
 async function ttys(pids: number[], proc: string) {
@@ -4326,9 +4366,10 @@ async function ttys(pids: number[], proc: string) {
   const rows = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
   return new Map([...rows].filter(([, t]) => t && !/^\?+$/.test(t)))
 }
-export async function tabOfPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Tab | undefined> {
+// who a local connection is: its tab, a terminal of its own (term: asked about once, main.ts' termAsk), or neither (yours: the daemon's own)
+export async function peerWho(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<{ tab?: Tab; term?: Term }> {
   const p = await peerInfo(port, proc)
-  if (p.tab || p.term || p.own) return p.tab
+  if (p.tab || p.term || p.own) return { tab: p.tab, term: p.term }
   throw new Error(WHO) // S1: in no tab, with no terminal of its own, not the daemon's: an agent's that left its tab, as likely as yours
 }
 // S1: the app's own process asking for its token (main.ts' appPair: a daemon the app didn't start, the CLI's or the

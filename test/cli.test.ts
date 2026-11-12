@@ -258,10 +258,15 @@ test('cli: starts the daemon when none runs; stop ends it', async t => {
   assert.deepEqual(JSON.parse(r.out).projects, [])
   const { pid } = rig.info()
   assert.match(readFileSync(join(rig.data, 'daemon.log'), 'utf8'), new RegExp(`laki daemon on 127\\.0\\.0\\.1:\\d+ \\(pid ${pid}`))
-  // S1: from a terminal of yours (script gives it one): a daemon the CLI started gives no app token
-  const term = (...a: string[]) => execFileSync('script', ['-q', '/dev/null', process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url)), ...a], { env: rig.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-  term('stop')
-  await until(() => !running(pid), 'daemon gone')
+  // S1: a daemon the CLI started gives no app token, and no window is open to allow a terminal: the one that started
+  // it is yours from the start (LAKI_START_PID). sh under script: one terminal for both commands
+  process.kill(pid)
+  await until(() => !running(pid), 'the first daemon gone')
+  const laki = `${process.execPath} --experimental-strip-types --no-warnings ${fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))}`
+  const said = execFileSync('script', ['-q', '/dev/null', 'sh', '-c', `${laki} ls --json > /dev/null && ${laki} stop`], { env: rig.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  assert.doesNotMatch(said, /isn't allowed|couldn't tell/)
+  assert.equal(readFileSync(join(rig.data, 'daemon.log'), 'utf8').split('laki daemon on 127.0.0.1').length - 1, 2, 'a second daemon, started from the terminal')
+  await until(() => !existsSync(join(rig.data, 'daemon.json')), 'stopped from the terminal that started it')
   assert.ok(!existsSync(join(rig.data, 'daemon.json')))
   r = await rig.cli('stop') // none running: nothing to do
   assert.equal(r.code, 0)
