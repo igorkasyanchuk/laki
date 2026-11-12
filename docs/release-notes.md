@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Titles, toasts and card questions break into even lines, and longer text no longer leaves one word alone on its last line.
 - On a wide-gamut screen, a theme's accent and status colors are a little more vivid (the same hue and lightness).
 - Diffs mark the words that changed inside a line, in Changes, the Review tab and every other diff.
 - Agents' hooks run on a small helper inside the app (Laki Hook) instead of Laki itself, a first step toward closing the gap where any program could run as Laki with its privacy permissions.

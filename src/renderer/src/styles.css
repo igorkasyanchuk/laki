@@ -3746,3 +3746,9 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 .voice-hist-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-hist-row select { max-width: 160px; }
 @media (prefers-reduced-motion: reduce) { .voice-level > i { transition: none; } }
+
+/* text-wrap: balance for the short lines that are read at a glance (titles, toasts, card questions, an empty page's
+   words: about four lines at most), pretty for paragraphs (no word alone on the last line). Never terminals, code,
+   diffs or table cells */
+:is(.modal-title, .whats-new li > .md > p, .toast, .need-q, .empty > p, .note-empty > p) { text-wrap: balance; }
+:is(.rd-agent .md p, .rd-agent .md li, .note-page .bn-editor p, .switch-text .muted, .help-card) { text-wrap: pretty; }

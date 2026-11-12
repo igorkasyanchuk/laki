@@ -549,3 +549,6 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 
 /* U11: a ring the keyboard can see on the editor's own fields */
 .sd-edge-label input:focus-visible, .sd-edit input:focus-visible, .sd-edit textarea:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* a spec's headings: balanced lines (styles.css' text-wrap rules) */
+.bn-editor [data-content-type='heading'] .bn-inline-content { text-wrap: balance; }

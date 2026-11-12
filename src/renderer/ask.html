@@ -21,6 +21,7 @@
       .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--waiting); animation: pulse 1.4s ease-in-out infinite; }
       @keyframes pulse { 50% { opacity: 0.35; } }
       .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .what > p { text-wrap: pretty; } .what > p:only-child { text-wrap: balance; } /* a card's words: no word alone on a line; one short line, balanced */
       .x { position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0; border: none; border-radius: 6px; background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
       .x:hover { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--fg); }
       .what { margin: 0; padding: 7px 9px; background: color-mix(in srgb, #000 22%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; overflow-wrap: anywhere; max-height: 120px; overflow: auto; user-select: text; }
