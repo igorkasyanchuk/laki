@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Space on a file shows it in Quick Look, as in Finder: Changes, the Review tab's files, Files and Artifacts (and *Quick Look* in a file's right click).
+
 ## 0.49.1 · Nov 12, 2026
 
 - Updating from 0.48 no longer leaves the window on its splash: the old daemon, which turned down the new app's restart, is stopped and a new one started. *Quit Laki Completely* stops a daemon another copy of Laki (or the app before an update) started, instead of leaving it running.

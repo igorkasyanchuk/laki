@@ -57,6 +57,7 @@ export type PanelApi = {
   unfloat?: (device: string) => void // one back from its window
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   fileItems?: (path: string) => MenuItem[] // that menu's items for a file, in another menu (the full review's right click)
+  look?: (path: string, storage?: boolean) => void // U14: Space on a file's row, macOS's Quick Look (storage: an artifact); none: no local file (SSH, cloud) or off a Mac
   web?: (path: string, at: 'base' | 'branch', line?: number) => void // the file's page on origin's site (the daemon's fileWeb), in the browser
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
@@ -123,6 +124,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
     setMade([])
   }, [ws, !!art])
   const preview = (f: string) => (art ? art.preview(f) : api.preview(f))
+  const look = (f: string) => api.look && (() => (setSel(f), api.look!(f, !!art)))
   const menu = (e: MouseEvent, f: string, dir: boolean) => (art ? art.menu(e, f) : api.menu(e, f, dir))
   const kids = useMemo(() => tree([...(d?.files ?? []), ...made.map(m => `${m}/`)]), [d, made])
   const changed = d?.changed ?? {}
@@ -208,7 +210,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
           ? found.map(f => (
-              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} {...act(() => (setSel(f), preview(f)))} onContextMenu={e => (setSel(f), menu(e, f, false))}>
+              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} {...act(() => (setSel(f), preview(f)), look(f))} onContextMenu={e => (setSel(f), menu(e, f, false))}>
                 <Icon name="file" />
                 <span className="sp-name">
                   {f.slice(f.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f)}</span>
@@ -221,7 +223,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
                 key={n.path}
                 className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
-                {...act(e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path)))} // a double-click's second opens the editor
+                {...act(e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path)), !n.dir && look(n.path))} // a double-click's second opens the editor
                 onDoubleClick={() => !n.dir && (art ? art.open(n.path) : api.openFile(n.path))}
                 onContextMenu={e => (setSel(n.path), menu(e, n.path, n.dir))}
               >
@@ -322,7 +324,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
   const fileEl = (f: (typeof files)[number], depth?: number) => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
-            <div className="sp-row" style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => toggle(f.path))} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
+            <div className="sp-row" style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => toggle(f.path), f.status[0] !== 'D' && api.look && (() => api.look!(f.path)))} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
               <span className="sp-chev">
                 <Icon name={open.has(f.path) ? 'chevron' : 'chevronRight'} />
               </span>

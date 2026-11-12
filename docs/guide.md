@@ -2088,6 +2088,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | select, then *Reply* | in a terminal: the pill under the selected text quotes it to that tab's agent (an agent tab, or a shell running one; a plain shell has no Reply, ⌥ still offers a new workspace, tab or Laki AI) with your words; ⏎ puts both in its prompt for you to finish, ⌘⏎ sends them (after its turn if it's working) |
 | select, hold ⌥ | the pill offers more: *New workspace* (the new-workspace page with the text as its prompt), *New tab here* (your default agent, started with it), *Ask Laki AI* |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
+| Space (a file's row focused) | Quick Look (macOS): the file in macOS's preview, from Changes, the Review tab's files, Files and Artifacts; also in a file's right click. Not for a deleted file or a workspace on an SSH host or in the cloud |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |

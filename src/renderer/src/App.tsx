@@ -1961,6 +1961,7 @@ export function App() {
     unfloat: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id, false)),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     fileItems: path => fileMenu(w, path, false),
+    look: bridge?.quickLook && !w.host ? (path, storage) => (storage ? w.storage : w.path) && bridge!.quickLook!(`${storage ? w.storage : w.path}/${path}`) : undefined, // host: SSH or a codespace, no file here
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
     undoHunk: async (path, hunk, lines, then, uncommitted) => {
       if (!(await revertOk(w, path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk', uncommitted))) return false

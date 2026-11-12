@@ -434,7 +434,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   // an expanded line: its numbers (a thread's or a comment's jump), the file's right click; no comment or Revert
   const ctxAttrs = (path: string, l: DiffLine) => ({ 'data-old': l.old, 'data-new': l.new, onContextMenu: (e: MouseEvent) => fileMenu(e, path, l) }) as HTMLAttributes<HTMLDivElement>
   const fileRow = (f: (typeof files)[number], depth?: number) => (
-            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => go(f.path))} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
+            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => go(f.path), f.status[0] !== 'D' && api.look && (() => api.look!(f.path)))} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · Space: Quick Look · right click: more`}>
               <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}

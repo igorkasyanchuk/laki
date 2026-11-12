@@ -558,6 +558,11 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw). Tested in `test/markdown.test.ts`.
+- **Quick Look** (U14): Space on a focused file row (Changes, the full review's list, Files, Artifacts: ui.tsx `act`'s
+  `space`) or a file menu's *Quick Look* (menus.ts `fileMenu`) calls `PanelApi.look`, App's: the workspace's `path` (an
+  artifact: `storage`) joined with the row's path, never typed text, then `bridge.quickLook`, main's `quick-look` (`from(e,
+  'tab')`; a regular file after `realpath`; macOS only: `BrowserWindow.previewFile`). None for a deleted file (`D`) or a
+  workspace with a `host` (SSH, a codespace).
 - **Artifacts in Files** (`SidePanel.tsx` `Files` `root`, App's `filesRoot`): with a storage folder, Files has
   *Workspace* / *Artifacts* (`PanelApi.artifacts`: `artifactList` as the tree, the preview's `storage` (read-only,
   `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's

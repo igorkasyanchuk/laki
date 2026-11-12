@@ -2293,6 +2293,15 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   return 'opened'
 })
 
+// U14: Space on a file's row (Changes, the full review, Files, Artifacts), or its menu's Quick Look: macOS's own preview
+// panel, from the app window or a floated tab's. A regular file only (links followed), off a Mac nothing
+ipcMain.on('quick-look', async (e, path: unknown) => {
+  if (!mac || !from(e, 'tab') || typeof path !== 'string' || !path.startsWith('/')) return
+  const real = await realpath(path).catch(() => '')
+  if (!real || !(await stat(real).catch(() => null))?.isFile()) return
+  BrowserWindow.fromWebContents(e.sender)?.previewFile(real, basename(path))
+})
+
 // an HTML artifact as itself, a file:// page in the default browser (its viewer's and right click's Open file): the app
 // window's only, a file inside root (the workspace's storage folder), links followed first. The user's call, asked for
 // by name: unlike the daemon's /artifact/ page (L11), its scripts run as a local file and may read others

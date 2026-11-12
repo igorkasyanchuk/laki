@@ -27,6 +27,7 @@ export function menusOf(app: AppBase) {
   const fileMenu = (w: WorkspaceView, file: string, dir: boolean): MenuItem[] => [
     { head: 'Open in' },
     ...(dir ? [] : [{ label: 'Default app', icon: 'file', key: 'o', run: () => openIn('default', { ws: w.id, file }) } as MenuItem]),
+    ...(dir || w.host || !bridge?.quickLook ? [] : [{ label: 'Quick Look', icon: 'eye', hint: 'Space', run: () => bridge!.quickLook!(`${w.path}/${file}`) } as MenuItem]),
     ...(!dir && WEB.test(file) ? apps.filter(a => a.browser).map(a => ({ label: a.name, icon: 'globe', run: () => openIn(a.id, { ws: w.id, file }) }) as MenuItem) : []),
     ...openInItems({ ws: w.id, file }),
     null,

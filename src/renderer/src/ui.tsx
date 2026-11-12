@@ -45,8 +45,9 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // keyId: its Settings › Keys action (data-key: the hold-⌘ overlay's badge beside it)
 // U11: a click target that isn't a <button> (a row, a cell, a picture): a button to the keyboard and a screen reader
 // too: focusable, Enter and Space click it (its own key, not a child's). none: nothing to press, no role
-export const act = <E extends Element>(f: ((e: MouseEvent<E>) => unknown) | false | null | undefined) =>
-  f ? { role: 'button', tabIndex: 0, onClick: f, onKeyDown: (e: KE<E>) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), f(e as unknown as MouseEvent<E>)) } : {}
+// space: what Space does instead of a click (U14: a file row's Quick Look)
+export const act = <E extends Element>(f: ((e: MouseEvent<E>) => unknown) | false | null | undefined, space?: (() => unknown) | false) =>
+  f ? { role: 'button', tabIndex: 0, onClick: f, onKeyDown: (e: KE<E>) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), e.key === ' ' && space ? space() : f(e as unknown as MouseEvent<E>)) } : {}
 
 export function IconButton({ icon, title, onClick, on, className = '', label, tip = true, disabled, onContextMenu, keyId }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean; disabled?: boolean; onContextMenu?: (e: MouseEvent<HTMLButtonElement>) => void; keyId?: string }) {
   return (

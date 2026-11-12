@@ -24,6 +24,7 @@ type Bridge = {
   pathOf?(f: File): string
   openExternal(url: string): void
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
+  quickLook?(path: string): void // U14: macOS's Quick Look of a file (main's quick-look; a regular file only, macOS only)
   onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
   copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
   openFile?(path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
