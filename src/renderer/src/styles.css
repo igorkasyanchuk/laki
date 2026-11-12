@@ -3769,3 +3769,20 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 html[data-motion='none'] .num > .num-out { display: none; }
 html[data-motion='none'] .num > .num-in { animation: none; }
 @media (prefers-reduced-motion: reduce) { .num > .num-out { display: none; } .num > .num-in { animation: none; } }
+
+/* folds that open grow to their natural height on the spring (interpolate-size: height 0 to auto), and the chevron
+   turns with them; only for an open you clicked (main.tsx's data-unfold, 400 ms), never as the window first draws.
+   Closing is at once (the folded content isn't drawn: out of the tab order as before). Not with Motion: None or the
+   system's Reduce motion. ponytail: the Board's columns fold by width, not here */
+.fold-chev { display: inline-grid; place-items: center; }
+.fold-chev.shut { rotate: -90deg; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='none']) { interpolate-size: allow-keywords; }
+  html:not([data-motion='none']) .fold-chev { transition: rotate 250ms var(--spring); }
+  html:not([data-motion='none']) .rd-you > div { max-height: max-content; transition: max-height 250ms var(--spring); }
+  html[data-unfold]:not([data-motion='none']) :is(.side-scroll .ws, .needs-cards, .needs-cards > .need, .help-card:popover-open) {
+    transition: height 250ms var(--spring), opacity 200ms ease-out;
+    overflow: clip;
+    @starting-style { height: 0; opacity: 0; }
+  }
+}

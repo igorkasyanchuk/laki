@@ -61,7 +61,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
     <div className="project needs-list" role="group" aria-label="Needs you">
       <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
         <span className="project-chev">
-          <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
+          <span className={`fold-chev${shut ? ' shut' : ''}`}><Icon name="chevron" size={12} /></span>
         </span>
         <span className="project-icon">
           <Icon name="inbox" size={12} />
@@ -85,7 +85,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
           {stale.length > 0 && (
             <div className="need-earlier">
               <button type="button" className="need-earlier-head" aria-expanded={early} onClick={foldEarly} data-tip={`Done more than ${staleAfter} minutes ago · click to ${early ? 'collapse' : 'expand'}`}>
-                <Icon name={early ? 'chevron' : 'chevronRight'} size={12} />
+                <span className={`fold-chev${early ? '' : ' shut'}`}><Icon name="chevron" size={12} /></span>
                 Earlier · {stale.length}
               </button>
               <button type="button" className="need-all" onClick={() => api.seenAll(stale.map(x => x.t))}>

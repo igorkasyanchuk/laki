@@ -485,7 +485,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         onContextMenu={e => openMenu(e, sepMenu(p, s))}
       >
         <span className="project-chev">
-          <Icon name={shut ? 'chevronRight' : 'chevron'} size={11} />
+          <span className={`fold-chev${shut ? ' shut' : ''}`}><Icon name="chevron" size={11} /></span>
         </span>
         <span className="ws-name">{s.name}</span>
         {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}

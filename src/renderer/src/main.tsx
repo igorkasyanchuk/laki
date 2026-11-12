@@ -20,6 +20,10 @@ if (!new URLSearchParams(location.search).get('window')) void pwaStart() // M4: 
 const root = document.documentElement
 addEventListener('keydown', () => root.dataset.typing ?? (root.dataset.typing = ''), true)
 addEventListener('pointermove', () => root.dataset.typing !== undefined && delete root.dataset.typing, true)
+// folds open by a click (a group's head, Earlier, Show more, a ? hint) grow to their height (styles.css html[data-unfold]):
+// only then, never as the window first draws
+let unfold: ReturnType<typeof setTimeout> | undefined
+addEventListener('click', e => (e.target as Element | null)?.closest?.('[aria-expanded], .rd-more, .help-q') && ((root.dataset.unfold = ''), clearTimeout(unfold), (unfold = setTimeout(() => delete root.dataset.unfold, 400))), true)
 const vv = window.visualViewport
 vv?.addEventListener('resize', () => document.documentElement.style.setProperty('--vh', `${vv.height * vv.scale}px`))
 
