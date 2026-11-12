@@ -34,7 +34,7 @@ const RENDERER = fileURLToPath(new URL('../renderer/', import.meta.url))
 const pageURL = (file: string, more = '') => (dev ? `${new URL(file === 'index.html' ? '' : file, `${process.env.ELECTRON_RENDERER_URL}/`).href}${more}` : `${APP_ORIGIN}/${file}${more}`)
 // from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
 // tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
-type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' // quick: the quick bar (Q1)
+type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' | 'inbox' // quick: the quick bar (Q1); inbox: the menu bar's Inbox (ask.html)
 const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: Page[]) =>
   fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : pageIs(e.senderFrame?.url, p))))
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
@@ -935,9 +935,56 @@ const dropCards = (keep: (c: Card) => boolean) => {
   if (still.length !== cards.length) (cards = still), sendCards()
 }
 const cardSender = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => !!cardWin && !cardWin.isDestroyed() && e.sender === cardWin.webContents
-const cardOf = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, key: unknown) => (cardSender(e) && typeof key === 'string' ? cards.find(x => x.key === key) : undefined)
+const cardOf = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, key: unknown) => (typeof key === 'string' ? (cardSender(e) ? cards : inboxSender(e) ? inboxList : []).find(x => x.key === key) : undefined)
+
+// the menu bar's Inbox (Settings › General › Menu bar click: Inbox): a left click on the tray opens a panel under it
+// (ask.html?window=inbox: the cards' page) with what the app window lists (tray.ts inboxOf, sent with the badge: the
+// asks with their choices, then the ones at work), New task… (the quick bar), closed as it loses the focus or on Esc; a
+// right click pops the tray's menu. The popover's material, solid with Reduce transparency
+const INBOX_W = 360
+let inboxWin: BrowserWindow | null = null
+let inboxList: Card[] = []
+let inboxShow = false // opened by a click: shown at its next size (the page's), not on every list update
+let inboxHid = 0 // when the blur hid it: the tray's own click (which blurred it) doesn't open it again
+let barInbox = false
+const inboxSender = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => !!inboxWin && !inboxWin.isDestroyed() && e.sender === inboxWin.webContents && from(e, 'inbox')
+const inboxHide = () => ((inboxShow = false), inboxWin?.isDestroyed() || inboxWin?.hide())
+const sendInbox = () => inboxWin && !inboxWin.isDestroyed() && inboxWin.webContents.send('ask-cards', inboxList, floats.colors)
+const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '')
+function inboxCards(items: unknown): Card[] {
+  return (Array.isArray(items) ? items : []).slice(0, 12).flatMap((i): Card[] => {
+    if (!i || typeof i !== 'object' || typeof i.tab !== 'string') return []
+    const ask = i.kind === 'ask'
+    const actions = ask && Array.isArray(i.options) ? i.options.slice(0, 9).filter((o: { n?: unknown; label?: unknown }) => Number.isInteger(o?.n) && typeof o.label === 'string').map((o: { n: number; label: string }) => ({ text: o.label.slice(0, 80), n: o.n, label: o.label.slice(0, 80) })) : []
+    return [{ key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions }]
+  })
+}
+function inboxOpen() {
+  if (inboxWin?.isVisible() || Date.now() - inboxHid < 300) return inboxHide() // its second click closes it
+  inboxShow = true
+  if (inboxWin && !inboxWin.isDestroyed()) return sendInbox()
+  const solid = nativeTheme.prefersReducedTransparency
+  const w = (inboxWin = new BrowserWindow({ ...floatOpts(INBOX_W, 160), hasShadow: true, roundedCorners: true, ...(solid ? { transparent: false, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f2128' : '#f4f5f7' } : { vibrancy: 'popover', visualEffectState: 'active' }) }))
+  w.setAlwaysOnTop(true, 'pop-up-menu')
+  w.on('blur', () => (inboxHide(), (inboxHid = Date.now())))
+  w.webContents.on('will-navigate', e => e.preventDefault())
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  w.webContents.on('did-finish-load', sendInbox)
+  w.on('closed', () => inboxWin === w && (inboxWin = null))
+  w.loadURL(pageURL('ask.html', `?window=inbox${solid ? '&solid' : ''}`))
+}
+// New task…: the quick bar with what was typed
+ipcMain.on('inbox-new', (e, text: unknown) => inboxSender(e) && (inboxHide(), quickWin(str(text, 20000).trim() || undefined)))
 // its height (the page's, every card in it), kept to the screen; bottom right of the work area
 ipcMain.on('ask-size', (e, h: unknown) => {
+  if (inboxSender(e) && typeof h === 'number' && h > 0 && tray) {
+    const b = tray.getBounds()
+    const wa = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea
+    const height = Math.round(Math.min(h, wa.height - 24))
+    inboxWin!.setBounds({ x: Math.round(Math.max(wa.x + 8, Math.min(b.x + b.width / 2 - INBOX_W / 2, wa.x + wa.width - INBOX_W - 8))), y: Math.max(wa.y, b.y + b.height) + 4, width: INBOX_W, height })
+    if (inboxShow && !inboxWin!.isVisible()) inboxWin!.show(), inboxWin!.focus() // its keys: 1-9, Esc
+    return
+  }
   if (!cardSender(e) || typeof h !== 'number' || !(h > 0) || !cards.length) return
   cardAt ??= screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
   const height = Math.round(Math.min(h, cardAt.height - 24))
@@ -952,19 +999,22 @@ ipcMain.handle('ask-act', async (e, key: unknown, i: unknown) => {
   try {
     if (a.alert) await rpc('alertAnswer', { id: a.alert.id, choice: a.alert.choice })
     else await rpc('answer', { tab: c.tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) })
-    dropCards(x => x !== c)
+    if (inboxSender(e)) (inboxList = inboxList.filter(x => x !== c)), sendInbox()
+    else dropCards(x => x !== c)
   } catch (err) {
     c.error = `${(err as Error).message}: open ${c.tab ? 'its tab' : 'Laki'}`
-    sendCards()
+    if (inboxSender(e)) sendInbox()
+    else sendCards()
   }
 })
 // closed: a laki alert that waits hears it (no choice)
 const closed = (c: Card) => c.key.startsWith('alert:') && void rpc('alertAnswer', { id: c.key.slice(6) }).catch(() => {})
-ipcMain.on('ask-close', (e, key: unknown) => (c => c && (closed(c), dropCards(x => x !== c)))(cardOf(e, key)))
-ipcMain.on('ask-close-all', e => cardSender(e) && (cards.forEach(closed), dropCards(() => false)))
+ipcMain.on('ask-close', (e, key: unknown) => (inboxSender(e) ? inboxHide() : (c => c && (closed(c), dropCards(x => x !== c)))(cardOf(e, key))))
+ipcMain.on('ask-close-all', e => (inboxSender(e) ? inboxHide() : cardSender(e) && (cards.forEach(closed), dropCards(() => false))))
 ipcMain.on('ask-open', (e, key: unknown) => {
   const c = cardOf(e, key)
   if (!c) return
+  if (inboxSender(e)) return void (inboxHide(), app.focus({ steal: true }), show(c.tab || undefined))
   if (!c.actions.length) dropCards(x => x !== c) // one with choices stays: it's answered there
   app.focus({ steal: true })
   show(c.tab || undefined)
@@ -1159,9 +1209,10 @@ let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
 let barWas = -1 // U15: the Dock's progress bar as last set
 let recording = false // the last badge's: Recording mode is on (settings.recording), its item ticked
+let trayBuilt: Menu | null = null // the menu: the tray's own (a click), or a right click's with Inbox
 function trayMenu() {
-  tray?.setContextMenu(
-    Menu.buildFromTemplate([
+  trayBuilt = Menu.buildFromTemplate([
+
       ...trayTabs,
       ...(trayTabs.length ? [{ type: 'separator' as const }] : []),
       { label: 'New Task…', click: () => quickWin() }, // the quick bar (Q1), over the app you're in
@@ -1173,8 +1224,8 @@ function trayMenu() {
       { type: 'separator' },
       { label: `Open ${app.name}`, ...(keys.open && { accelerator: keys.open, registerAccelerator: false }), click: () => show() }, // its global hotkey beside it
       { label: 'Quit', click: () => app.quit() },
-    ]),
-  )
+    ])
+  tray?.setContextMenu(barInbox ? null : trayBuilt)
 }
 // D9: remote access that follows the Mac's lock (Settings › Remote access › Start it): the lock and the unlock to the
 // daemon, as the app (its token); laki serve has no app, so none
@@ -1185,18 +1236,26 @@ app.whenReady().then(() => {
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
 // st (Q8, Settings › General › Menu bar's Show state): the state its picture shows (stateOf's), its title's ! and its
 // tooltip's words; none (off, or an older page): the filled mark and the count, as before
-ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false, st?: Partial<TrayInfo>, progress?: unknown) => {
+ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false, st?: Partial<TrayInfo>, progress?: unknown, inbox?: unknown) => {
   if (!from(e)) return
+  barInbox = mac && Array.isArray(inbox) // Menu bar click: Inbox (macOS: a tray's left and right clicks are its own)
+  inboxList = inboxCards(inbox)
+  if (inboxWin?.isVisible()) sendInbox()
+  else if (!barInbox) inboxHide()
   recording = rec === true
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
   // U15: a Ship at work or a workflow run going (shared/tray.ts dockProgress): -1 none, 2 unknown, else 0 to 1
   const p = typeof progress === 'number' && Number.isFinite(progress) && (progress === 2 || (progress >= -1 && progress <= 1)) ? progress : -1
   if (p !== barWas) win?.setProgressBar((barWas = p) < 0 ? -1 : p, p === 2 ? { mode: 'indeterminate' } : undefined)
-  if (!on) return void (tray?.destroy(), (tray = null))
+  if (!on) return void (tray?.destroy(), (tray = null), inboxHide())
   const num = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : 0)
   const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked) } : undefined
-  tray ??= new Tray(trayIcon(info?.state))
+  if (!tray) {
+    tray = new Tray(trayIcon(info?.state))
+    tray.on('click', () => barInbox && inboxOpen())
+    tray.on('right-click', () => barInbox && trayBuilt && tray?.popUpContextMenu(trayBuilt))
+  }
   tray.setImage(trayIcon(info?.state)) // a state change swaps the picture (the same one: its cached image, nothing redrawn)
   tray.setTitle(info ? trayTitle(info) : count, { fontType: 'monospacedDigit' })
   tray.setToolTip(info ? trayTip(info, app.name) : count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)

@@ -624,6 +624,7 @@ export type Settings = {
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (off unless true; overlapCheck asks for one)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: on)
+  menuBarClick?: 'menu' | 'inbox' // Settings › General › Menu bar click: the tray's menu, or the Inbox (macOS; unset: menu)
   menus?: 'laki' | 'macos' // Settings › Layout › Menus: a workspace's and a tab's menu drawn by macOS (unset: Laki's)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
   paneInset?: boolean // Settings › Terminal › Inset panes: each pane a rounded card with a margin (off unless true)

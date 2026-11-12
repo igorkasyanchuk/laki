@@ -33,7 +33,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { needsTab, nextStep, type Step, type StepId } from '../../shared/nextStep'
-import { bounceOf, dockProgress, stateOf } from '../../shared/tray'
+import { bounceOf, dockProgress, inboxOf, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
 import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
@@ -933,8 +933,9 @@ export function App() {
     return () => clearTimeout(t)
   }, [resetAt])
   const dockBar = view ? dockProgress(view) : -1 // U15: a Ship or a workflow run at work: the Dock's progress bar
-  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], dockBar])
-  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo, dockBar), [trayKey])
+  const inboxItems = view && view.settings.menuBarClick === 'inbox' ? inboxOf(view, id => waits.current.get(id)) : undefined // the menu bar's Inbox (tray.ts)
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], dockBar, inboxItems])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo, dockBar, inboxItems), [trayKey])
   // U15: a workspace that starts waiting on you while Laki isn't in front: the Dock bounces once (tray.ts bounceOf)
   const waitedWs = useRef<Set<string> | null>(null)
   useEffect(() => {

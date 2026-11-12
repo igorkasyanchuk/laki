@@ -1104,3 +1104,16 @@ not App). As App starts with one of this version (`snapOf`), panels.tsx `SnapSke
 (`.app`, `.sidebar`, `.ws`, `.tabbar`, `.tab`: the theme's look), `aria-hidden` and `inert`, dimmed by `.snap-skel`
 (`--snap-dim`); the first view fades the real one in (`.from-snap`). No view in 5 s, the daemon's problem, a PIN or a
 lock: the splash, as before.
+
+## The menu bar's Inbox
+
+Settings › General › Menu bar click (`settings.menuBarClick`: `'inbox'`, unset the menu; macOS): App sends
+`shared/tray.ts` `inboxOf(view, said)` with the badge (the view as drawn: Recording mode's private workspaces already
+out): the agents waiting on you, the oldest first, each with its question (else its last waiting turn's words) and its
+menu's choices (9 at most), then 3 at work; muted and archived workspaces aside. Main (`barInbox`) then sets no context
+menu on the tray: its `click` opens `inboxOpen`, its `right-click` pops the menu (`trayBuilt`). The panel is the cards'
+page, `ask.html?window=inbox` (`&solid` with Reduce transparency: a solid window, else the `popover` vibrancy), a
+non-activating panel under `tray.getBounds()`, hidden on blur and on Esc (a click on the icon that blurred it doesn't open
+it again: `inboxHid`). ask.ts in that mode: no ×, no Close all, "Nothing waits on you", then New task… (`inbox-new`: the
+quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-size`, `ask-close`), each checked by
+`inboxSender` (its window, and `from(e, 'inbox')`: guards.ts `pageIs`); a choice goes through `answer`, as a card's.

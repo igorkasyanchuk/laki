@@ -28,6 +28,8 @@ test('main guards: only the app window’s main frame on the app’s own page is
   assert.equal(pageIs(`${page}?window=newer`, 'new'), false)
   assert.equal(pageIs(`${page}#window=new`, 'new'), false)
   assert.equal(pageIs(undefined, 'new'), false)
+  assert.equal(pageIs('app://laki/ask.html?window=inbox', 'inbox'), true, "the menu bar's Inbox")
+  assert.equal(pageIs('app://laki/ask.html', 'inbox'), false, 'the cards on screen are not the Inbox')
 })
 
 test('S9: the token only to index.html’s pages; app:// requests stay in out/renderer', () => {

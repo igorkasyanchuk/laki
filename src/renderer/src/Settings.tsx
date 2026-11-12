@@ -215,6 +215,7 @@ export type AppSettings = Paint & {
   archiveIdleKeepPR?: boolean // not one with an open PR (unset: on)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
+  menuBarClick?: 'menu' | 'inbox' // General › Menu bar click: its menu, or the Inbox under it (macOS)
   trayState?: boolean // Q8: its picture shows the state (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
   floaterStyle?: FloaterStyle // a working agent's bubble (unset: gradient)
@@ -1385,6 +1386,7 @@ export function SettingsPage(p: {
                     <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
                       <Says title="Menu bar icon" hint="Laki's mark in the menu bar (the tray) with the count of agents that need you, as the Dock's badge; its menu lists them, new workspaces and screenshots, then Screenshot to Laki AI and Open Laki with their hotkeys" />
                     </Switch>
+                    {s.menuBar !== false && /Mac/.test(navigator.userAgent) && seg('Menu bar click', "Inbox: a click opens a panel under the icon with what waits on you (its choices, 1-9) and what's at work, and New task…; a right click, the menu", 'menuBarClick', 'menu', [['menu', 'Menu'], ['inbox', 'Inbox']])}
                     {s.menuBar !== false && (
                       <Switch className="switch-row" on={s.trayState !== false} onChange={v => set({ trayState: v })}>
                         <Says title="Show state" hint="The mark tells how things stand: its outline when nothing runs, a dot under it while an agent works, filled when one needs you, a bar under it when one is blocked (a plan limit, an error; ! beside the count). Its tooltip says it in words" />

@@ -3,6 +3,8 @@
 // per choice, Open, ×; its edge's color by tone (an ask amber, a finish green, a limit red); Close all over two or more.
 // Keys once it's clicked: 1-9 the top card's choices, Esc its ×.
 // A laki alert's words as Markdown (links open in the browser: main's window-open handler), a line break kept as one
+// ?window=inbox: the menu bar's Inbox (main's inboxOpen): the same cards under the tray, no ×, then New task… (the
+// quick bar with what's typed); Esc closes it, nothing waiting says so
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 type Action = { text: string }
 type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string }
@@ -14,11 +16,22 @@ type Bridge = {
     close(key: string): void
     closeAll(): void
     open(key: string): void
+    newTask(text: string): void
   }
 }
 const bridge = (window as unknown as { laki?: Bridge }).laki?.ask
 const el = (tag: string, text = '', cls = '') => Object.assign(document.createElement(tag), { textContent: text, className: cls })
 let shown: Card[] = []
+const params = new URLSearchParams(location.search)
+const inbox = params.get('window') === 'inbox'
+if (inbox) document.documentElement.classList.add('inbox', ...(params.has('solid') ? ['solid'] : []))
+function newTask() {
+  const f = el('form', '', 'new-task') as HTMLFormElement
+  const i = Object.assign(el('input') as HTMLInputElement, { placeholder: 'New task…', ariaLabel: 'New task' })
+  f.append(i)
+  f.onsubmit = e => (e.preventDefault(), bridge?.newTask(i.value))
+  return f
+}
 const seen = new Set<string>() // cards already drawn (key and time): only a new one slides in
 const id = (c: Card) => `${c.key}@${c.at}`
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -37,7 +50,7 @@ function cardEl(c: Card) {
   const head = el('div', '', 'head')
   head.append(el('span', '', 'dot'), el('span', c.title, 'title'))
   head.title = c.title
-  box.append(x)
+  if (!inbox) box.append(x)
   if (c.tone === 'alert') box.append(el('div', c.origin ?? 'message from an agent or a script', 'origin')) // S10: the daemon's words, first: it's a message, not Laki asking
   box.append(head)
   // a laki alert's words as Markdown (markdownHtml escapes every word); any other card's as written: an ask's command
@@ -74,7 +87,7 @@ bridge?.onCards((cards, colors) => {
   const shut = el('button', `Close all ${cards.length}`, 'open')
   shut.onclick = () => bridge.closeAll()
   all.append(shut)
-  document.body.replaceChildren(...(cards.length > 1 ? [all] : []), ...cards.map(cardEl))
+  document.body.replaceChildren(...(cards.length > 1 && !inbox ? [all] : []), ...cards.map(cardEl), ...(inbox ? [...(cards.length ? [] : [el('div', 'Nothing waits on you', 'empty')]), newTask()] : []))
   const now = new Set(cards.map(id))
   for (const c of now) seen.add(c)
   for (const t of seen) if (!now.has(t)) seen.delete(t)
@@ -82,6 +95,8 @@ bridge?.onCards((cards, colors) => {
 })
 
 addEventListener('keydown', e => {
+  if (inbox && e.key === 'Escape') return bridge?.closeAll()
+  if (e.target instanceof HTMLInputElement) return // New task…'s words
   const top = shown[0]
   if (!top || !bridge) return
   if (e.key === 'Escape') return bridge.close(top.key)

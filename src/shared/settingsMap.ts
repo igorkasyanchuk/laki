@@ -191,6 +191,7 @@ export const FIND: [string, string, string?][] = [
   ['git', 'When everything is done', 'sleep lock shut down shutdown power off overnight night finished all done countdown'],
   ['git', 'Done check', 'verify test lint format review checked before done second opinion'],
   ['git', 'Collision radar', 'overlap conflict collide same lines files worktrees merge base moved'],
+  ['general', 'Menu bar click', 'menu bar tray click inbox popover panel asks waiting choices new task'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Show state', 'menu bar tray icon state idle working waiting blocked limit error tooltip'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],

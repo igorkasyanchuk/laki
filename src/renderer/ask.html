@@ -45,6 +45,12 @@
       .foot .err { color: var(--waiting); }
       .open { margin-left: auto; font: inherit; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; }
       .open:hover { text-decoration: underline; }
+      /* the menu bar's Inbox: on the popover's material (or solid), no shadow under the cards */
+      .inbox, .inbox body { background: transparent; } .inbox.solid body { background: var(--bg); }
+      .inbox .card { box-shadow: none; } .inbox .card.new { animation: none; }
+      .empty { padding: 10px 4px; color: var(--muted); text-align: center; }
+      .new-task input { box-sizing: border-box; width: 100%; font: inherit; color: var(--fg); padding: 7px 10px; background: color-mix(in srgb, #000 22%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; outline: none; }
+      .new-task input:focus { border-color: var(--accent); }
     </style>
   </head>
   <body>

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { crc32, deflateSync } from 'node:zlib'
-import { bounceOf, dockProgress, stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
+import { bounceOf, dockProgress, INBOX_ASKS, INBOX_WORKING, inboxOf, stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
 
 const tab = (o: object) => ({ id: Math.random().toString(36).slice(2), workspace: 'w1', kind: 'agent', status: 'idle', done: false, ...o }) as any
 const view = (tabs: any[], workspaces: any[] = [{ id: 'w1' }]) => ({ tabs, workspaces }) as any
@@ -113,4 +113,27 @@ test('U15 bounceOf: once as a workspace starts waiting, Laki not in front; muted
   assert.equal(bounceOf(new Set(), v([w1], { dnd: { until: 9 }, workspaces: [{ id: 'w1', important: true }] }), false).bounce, true, 'Do not disturb lets an important one through')
   r = bounceOf(new Set(['w1']), v([]), false)
   assert.equal(bounceOf(r.now, v([w1]), false).bounce, true, 'answered, then waiting again: it bounces again')
+})
+
+test('inboxOf: the asks first, oldest first, with their choices; then 3 at work; muted, archived and shells aside', () => {
+  const ws = [{ id: 'w1', name: 'login' }, { id: 'w2', muted: true }, { id: 'w3', archived: true }]
+  const opts = Array.from({ length: 12 }, (_, i) => ({ n: i + 1, label: 'opt ' + i }))
+  const tabs = [
+    tab({ id: 'a', name: 'claude', status: 'waiting', needAt: 20, ask: { options: opts, at: 1, question: 'Run  the\ntests?' } }),
+    tab({ id: 'b', name: 'codex', status: 'waiting', needAt: 10 }),
+    ...Array.from({ length: 5 }, (_, i) => tab({ id: 'r' + i, name: 'gemini', status: 'running' })),
+    tab({ id: 'm', status: 'waiting', muted: true }),
+    tab({ id: 'x', status: 'waiting', workspace: 'w2' }),
+    tab({ id: 'y', status: 'waiting', workspace: 'w3' }),
+    tab({ id: 's', kind: 'shell', status: 'waiting' }),
+  ]
+  const l = inboxOf(view(tabs, ws), t => (t === 'b' ? 'Which branch?' : undefined))
+  assert.deepEqual(l.map(i => i.tab), ['b', 'a', 'r0', 'r1', 'r2'])
+  assert.deepEqual(l[0], { tab: 'b', title: 'login · codex', body: 'Which branch?', kind: 'ask' })
+  assert.equal(l[1].body, 'Run the tests?')
+  assert.equal(l[1].options!.length, 9, 'keys 1-9')
+  assert.equal(l.filter(i => i.kind === 'working').length, INBOX_WORKING)
+  const many = inboxOf(view(Array.from({ length: 20 }, (_, i) => tab({ id: 'q' + i, status: 'waiting' }))))
+  assert.equal(many.length, INBOX_ASKS)
+  assert.deepEqual(inboxOf(view([tab({ status: 'idle' })])), [])
 })

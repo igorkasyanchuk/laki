@@ -77,3 +77,26 @@ export function trayBitmap(state: TrayState): Buffer {
     }
   return px
 }
+
+// the menu bar's Inbox (Settings › General › Menu bar click: Inbox; main's inbox window, ask.html?window=inbox): what
+// it lists, from the view as drawn (Recording mode's private workspaces already out). The agents waiting on you first,
+// the oldest first, each with its question and its menu's choices (9 at most: keys 1-9), then the ones at work, 3 at
+// most; muted and archived workspaces aside, as the Dock's count
+export type InboxItem = { tab: string; title: string; body: string; kind: 'ask' | 'working'; options?: { n: number; label: string }[] }
+export const INBOX_ASKS = 9
+export const INBOX_WORKING = 3
+export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: string) => string | undefined = () => undefined): InboxItem[] {
+  const ws = new Map(view.workspaces.map(w => [w.id, w]))
+  const tabs = view.tabs.filter(t => t.kind === 'agent' && !t.muted && ws.has(t.workspace) && !ws.get(t.workspace)!.muted && !ws.get(t.workspace)!.archived)
+  const title = (t: TabView) => (w => `${w.name || w.id} · ${t.name}`.slice(0, 90))(ws.get(t.workspace)!)
+  const asks = tabs
+    .filter(t => t.status === 'waiting')
+    .sort((a, b) => (a.needAt ?? 0) - (b.needAt ?? 0))
+    .slice(0, INBOX_ASKS)
+    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.ask?.question || said(t.id) || 'Waiting for you').replace(/\s+/g, ' ').slice(0, 300), kind: 'ask', ...(t.ask?.options.length && { options: t.ask.options.slice(0, 9).map(o => ({ n: o.n, label: o.label.slice(0, 80) })) }) }))
+  const working = tabs
+    .filter(t => t.status === 'running')
+    .slice(0, INBOX_WORKING)
+    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.progress?.note || 'Working').slice(0, 120), kind: 'working' }))
+  return [...asks, ...working]
+}
