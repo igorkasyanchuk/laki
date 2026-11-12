@@ -2511,6 +2511,35 @@ export function tabDraft(p: { tab?: unknown; text?: unknown }) {
   return {}
 }
 
+// R10: the Review tab's comments not sent yet, per workspace (FullReview.tsx): a file each in <data>/review-notes,
+// kept through an archive, gone with the workspace (dropWs). The user's alone (AGENT_NO); a phone at Answer only may
+// read and set them (ANSWER). at: when they were set here (none: never, the window's own copy moves in once)
+const NOTES_MAX = 200
+const NOTE_MAX = 4096
+const notesFile = (ws: string) => join(dir, 'review-notes', `${ws}.json`)
+const wsSafe = (ref: unknown) => (ws => (/^[\w.-]+$/.test(ws.id) ? ws.id : (() => { throw new Error('a workspace Laki named') })()))(findWs(String(ref ?? '')))
+export function reviewNotesGet(p: { ws?: unknown }) {
+  const kept = readJson<{ notes: unknown[]; at: number }>(notesFile(wsSafe(p?.ws)))
+  return kept ? { notes: kept.notes, at: kept.at } : { notes: [] }
+}
+export function reviewNotesSet(p: { ws?: unknown; notes?: unknown }) {
+  const ws = wsSafe(p?.ws)
+  if (!Array.isArray(p?.notes)) throw new Error('notes: a list')
+  if (p.notes.length > NOTES_MAX) throw new Error(`${NOTES_MAX} comments at most`)
+  const STR = ['id', 'path', 'body', 'quote']
+  const notes = p.notes.map((n, i) => {
+    const o = n && typeof n === 'object' ? (n as Record<string, unknown>) : undefined
+    if (!o || STR.some(k => typeof o[k] !== 'string') || typeof o.line !== 'number' || (o.startLine !== undefined && typeof o.startLine !== 'number') || (o.side !== 'LEFT' && o.side !== 'RIGHT')) throw new Error(`comment ${i + 1}: id, path, line, side, body and quote`)
+    const one = { id: o.id, path: o.path, line: o.line, ...(o.startLine !== undefined && { startLine: o.startLine }), side: o.side, body: o.body, quote: o.quote }
+    if (Buffer.byteLength(JSON.stringify(one)) > NOTE_MAX) throw new Error(`comment ${i + 1}: 4 KB at most`)
+    return one
+  })
+  mkdirSync(join(dir, 'review-notes'), { recursive: true, mode: 0o700 })
+  const at = Date.now()
+  writeAtomic(notesFile(ws), JSON.stringify({ notes, at }), 0o600)
+  return { at }
+}
+
 // ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it
 // was (profile, model, effort, mode, fast, sandbox, account; a shell in its folder). A claude or codex chat that's gone
 // starts a new one (fresh: the app says so); a profile gone: its agent's own; refused (a policy, a gone folder): kept.
@@ -3147,6 +3176,7 @@ function dropWs(ws: Workspace) {
   ports.delete(ws.id)
   prs.delete(ws.id)
   if (ws.codespace !== undefined) csGone(ws)
+  if (/^[\w.-]+$/.test(ws.id)) rmSync(notesFile(ws.id), { force: true }) // R10: its unsent review comments
 }
 
 // wsRm kills its tabs, runs teardown and removes the worktree; the branch stays.

@@ -33,9 +33,11 @@ export type ReviewApi = PanelApi & {
   talk: () => Promise<Talk[]> // prTalk
   say: (body: string) => Promise<unknown> // prSay: a comment on the conversation, as you
   blame: (path: string, side: 'old' | 'new', uncommitted?: boolean) => Promise<Blame> // old: at the base, or HEAD (uncommitted)
+  notesGet: () => Promise<{ notes: ReviewNote[]; at?: number }> // R10: the daemon's copy of the unsent comments (at: none, never set there)
+  notesSet: (notes: ReviewNote[]) => Promise<unknown>
 }
 
-const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet
+const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet: a cache of the daemon's (R10: reviewNotesGet), drawn at once
 const VIEWED = 'laki.reviewed' // each workspace's files viewed here: path → its diff's hash
 const FILES_W = 'laki.reviewFilesW' // the files' column's width
 const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
@@ -246,11 +248,36 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), p => `${all}#${hashOf(p)}`)
 
   // the comments, kept until sent
+  // R10: the daemon keeps them (another window, the phone, a cleared cache see the same); this window's copy draws them at
+  // once, moves in once (a daemon that never had them), and each change goes there 400 ms after the last (and as it closes)
   const [notes, setNotesNow] = useState<ReviewNote[]>(() => readAll<ReviewNote[]>(NOTES)[ws] ?? [])
+  const notesOut = useRef<{ t?: ReturnType<typeof setTimeout>; next?: ReviewNote[]; touched?: boolean }>({})
+  const notesFlush = () => {
+    const o = notesOut.current
+    clearTimeout(o.t)
+    if (o.next) void wsApi.notesSet(o.next).catch(() => {}) // an older daemon: the cache still has them
+    o.next = undefined
+  }
+  useEffect(() => {
+    let on = true
+    wsApi.notesGet().then(
+      r => {
+        if (!on || notesOut.current.touched) return // changed meanwhile: that goes there instead
+        if (r.at !== undefined) return void (setNotesNow(r.notes), keepFor(NOTES, ws, r.notes.length ? r.notes : undefined))
+        const mine = readAll<ReviewNote[]>(NOTES)[ws] ?? []
+        if (mine.length) void wsApi.notesSet(mine).catch(() => {})
+      },
+      () => {},
+    )
+    return () => ((on = false), notesFlush())
+  }, [ws])
   const setNotes = (f: (n: ReviewNote[]) => ReviewNote[]) =>
     setNotesNow(n => {
       const next = f(n)
       keepFor(NOTES, ws, next.length ? next : undefined)
+      const o = notesOut.current
+      clearTimeout(o.t)
+      Object.assign(o, { next, touched: true, t: setTimeout(notesFlush, 400) })
       return next
     })
   const outdated = (n: ReviewNote) => !!d && !(byFile.get(n.path)?.lines ?? []).some(l => numOf(l, n.side) === n.line && l.text === n.quote)

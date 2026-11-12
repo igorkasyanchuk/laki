@@ -2015,6 +2015,8 @@ export function App() {
     talk: () => api.call<Talk[]>('prTalk', { ws: w.id }),
     say: body => api.call<{ url?: string }>('prSay', { ws: w.id, body }).then(r => toast(`Commented on PR #${w.pr?.number}`, r.url ? () => openExternal(r.url!) : undefined, 'Open', true)),
     blame: (path, side, uncommitted) => api.call<Blame>('blame', { ws: w.id, path, side, uncommitted }),
+    notesGet: () => api.call('reviewNotesGet', { ws: w.id }),
+    notesSet: notes => api.call('reviewNotesSet', { ws: w.id, notes }),
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
