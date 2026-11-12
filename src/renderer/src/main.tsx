@@ -15,6 +15,11 @@ import './looks.css'
 new MutationObserver((_, o) => document.querySelector('.sidebar .ws') && (o.disconnect(), requestAnimationFrame(() => performance.mark('laki-sidebar')))).observe(document, { childList: true, subtree: true })
 exits(document.body) // V7: what floats fades out as it closes
 if (!new URLSearchParams(location.search).get('window')) void pwaStart() // M4: remote access's page as an app
+// typing: macOS hides the pointer until it moves, but :hover stays where it rests (a resize handle's accent line
+// alone, between the sidebar and the terminal): hover lines hide from a key until the mouse moves (styles.css data-typing)
+const root = document.documentElement
+addEventListener('keydown', () => root.dataset.typing ?? (root.dataset.typing = ''), true)
+addEventListener('pointermove', () => root.dataset.typing !== undefined && delete root.dataset.typing, true)
 const vv = window.visualViewport
 vv?.addEventListener('resize', () => document.documentElement.style.setProperty('--vh', `${vv.height * vv.scale}px`))
 

@@ -1068,6 +1068,8 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 /* sidebar resize handle */
 .side-handle { position: absolute; top: 0; bottom: 0; width: 7px; transform: translateX(-50%); cursor: col-resize; z-index: var(--z-dialog); }
 .side-handle:hover, .side-handle:active { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; }
+:root[data-typing] :is(.side-handle, .sp-handle, .fr-edge):hover:not(:active) { background: none; }
+:root[data-typing] .bar:hover:not(:active)::after { background: var(--line); } /* the pointer hidden as you type (main.tsx): no lone line where it rests */
 
 /* panes: tabs side by side or stacked */
 .tab.shown { color: var(--fg); }
