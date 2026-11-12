@@ -3,7 +3,7 @@
 // and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (looks.css,
 // <html data-look>). Glass makes the window see-through, as much as its sliders say.
 import { lookOf, setIconLook } from '../../shared/icons.ts'
-import { p3Boost } from './color'
+import { p3Boost } from './color.ts'
 
 type Colors = {
   bg: string
@@ -1431,6 +1431,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
 // to 15%, lightness and hue kept), set on body: what reads them from the root (the terminal's theme, css()) and
 // test/contrast.test.ts keep the sRGB ones. Not for a look drawn flat (OPAQUE_LOOKS), nor an accent you picked
 function p3Sheet(look: string | undefined, ownAccent: boolean) {
+  if (!document.head) return // no page to style (the tests' stand-in document)
   let el = document.getElementById('laki-p3')
   if (OPAQUE_LOOKS.has(look ?? '')) return void el?.remove()
   const rules = ['--running', '--waiting', '--done', '--error', ...(ownAccent ? [] : ['--accent'])].flatMap(k => (v => (/^#[\da-f]{6}$/i.test(v) ? [`${k}: ${p3Boost(v).css};`] : []))(css(k)))
