@@ -1061,3 +1061,12 @@ styles.css `.capsule` (the class is `capsule`, not `glass`: `html.glass` is the 
 the pointer and moves its light once a frame; leaving the window unlights it. All four tokens go transparent in
 `html.opaque` (flat looks), `html.away` (the window behind another app) and Reduce transparency; the light also with
 Motion: None.
+
+
+## Concentric corners
+
+styles.css: a container sets `--r-out` (its radius token) and `--pad` (its padding); one rule declares on each
+`--r-in: max(var(--r-xs), calc(var(--r-out) - var(--pad)))`, which what sits at its edge inside uses. Containers: `.modal`
+(Ship, ⌘K), `.palette-list` (the modal's padding plus the items' margin), `.menu`, the tab bar's and Terminal / Reader
+capsules, the status bar's groups, a Needs you card. The --r-* tokens go through `--rs`, so Square stays square.
+`test/css.test.ts` checks the inner rules use `var(--r-in)`.

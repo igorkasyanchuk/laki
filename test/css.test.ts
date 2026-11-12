@@ -82,3 +82,15 @@ test("V6: no raw border-radius outside looks.css", () => {
   }
   assert.deepEqual(bad, [])
 })
+
+// concentric corners (styles.css --r-out, --pad, --r-in): what sits at a container's edge inside takes --r-in, not a
+// raw radius token, so it follows the container's own and its padding (Square: square through --rs)
+test('concentric corners: the inner pieces of capsules, menus, ⌘K, dialogs and Needs you cards take --r-in', () => {
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+  for (const sel of ['.menu-item', '.palette-item', '.actions.capsule .ib', '.reader-switch.capsule button', '.ship-banner', '.need-opts button, .need-acts button', '.status .sb-group > button']) {
+    const rule = css.split('\n').find(l => l.startsWith(`${sel} {`))
+    assert.ok(rule, `a rule for ${sel}`)
+    assert.match(rule!, /border-radius: var\(--r-in\);/, sel)
+  }
+  assert.match(css, /--r-in: max\(var\(--r-xs\), calc\(var\(--r-out\) - var\(--pad\)\)\)/)
+})
