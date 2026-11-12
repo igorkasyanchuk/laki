@@ -3,6 +3,11 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Updating from 0.48 no longer leaves the window on its splash: the old daemon, which turned down the new app's restart, is stopped and a new one started. *Quit Laki Completely* stops a daemon another copy of Laki (or the app before an update) started, instead of leaving it running.
+- A new install's *Try it on a sample repo* no longer ends on "Laki hit an error": the New workspace page opened before its first project was there.
+
 ## 0.49.0 · Nov 12, 2026
 
 - Laki AI drives the app: "show me the checkout session", "open Settings › Voice", "full screen", "show the changes", "close this", "open it in my editor", "delete dark mode" (it says what would be lost and asks first), "run git status in the last 3 sessions" (one Yes, each one's output in the chat). It finds a session by what you call it and asks which when two fit, and knows every project's groups and actions.

@@ -602,8 +602,9 @@ const start = () =>
   )
 // S9: a daemon from before app://laki (API 167, still running after an update) refuses the window's Origin, so the
 // window never sees it's stale (App.tsx staleDaemon) to restart it: main does, once, as the window would (keep: the pty
-// host's terminals go on). ponytail: one another Laki started refuses this shutdown (who's calling); the window then
-// stays unconnected until Quit Laki Completely
+// host's terminals go on). One the app before the update started refuses that shutdown (who's calling: this app's
+// token isn't the one it was given), so it's stopped as the Restart button does (stopDaemon); without that the window
+// stayed on the splash and Quit Laki Completely left the daemon running (0.49)
 const ORIGIN_API = 167
 let checked = false
 async function daemon() {
@@ -613,8 +614,9 @@ async function daemon() {
   const r = await rpc<{ api?: number } | string>('ping', { caps: true }).catch(() => undefined)
   if (r === undefined || (typeof r === 'object' && (r.api ?? 0) >= ORIGIN_API)) return info
   appLog(`the daemon (pid ${info.pid}) is older than this app's window: restarted`)
-  await rpc('shutdown', { keep: true }).catch(() => {})
-  for (let i = 0; i < 60 && running(info.pid); i++) await new Promise(r => setTimeout(r, 250))
+  const asked = await rpc('shutdown', { keep: true }).then(() => true, () => false)
+  for (let i = 0; asked && i < 60 && running(info.pid); i++) await new Promise(r => setTimeout(r, 250))
+  if (running(info.pid) && !(await stopDaemon(info.pid))) appLog(`the daemon (pid ${info.pid}) didn't stop: kill ${info.pid}, then open Laki again`)
   return start()
 }
 // S9: the built pages (out/renderer) on app://laki/, a file of that folder or a 404; other sessions (the preview,
@@ -843,14 +845,19 @@ const running = (pid: number) => {
     return false
   }
 }
+// a Laki daemon (its command line runs out/main/daemon.js) stopped by SIGTERM, its own whole shutdown; false: not one,
+// or still there 15 s on. The Restart button's, a daemon from before an update, Quit Laki Completely's
+async function stopDaemon(pid: number) {
+  if (!running(pid) || !/\bout\/main\/daemon\.js\b/.test(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
+  logLine(join(dataDir(), 'daemon.log'), `the app stops the daemon (pid ${pid}): it refused this app's shutdown (another Laki, or the one before an update, started it)`)
+  process.kill(pid, 'SIGTERM')
+  for (let i = 0; i < 60 && running(pid); i++) await new Promise(r => setTimeout(r, 250))
+  return !running(pid)
+}
 ipcMain.handle('daemon-restart', async e => {
   if (!from(e) || quitting) return false
   const pid = daemonInfo()?.pid
-  if (!pid || !/\bout\/main\/daemon\.js\b/.test(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
-  logLine(join(dataDir(), 'daemon.log'), `the app restarts the daemon (pid ${pid}): it refused this app's shutdown (another Laki started it)`)
-  process.kill(pid, 'SIGTERM')
-  for (let i = 0; i < 60 && running(pid); i++) await new Promise(r => setTimeout(r, 250))
-  if (running(pid)) return false
+  if (!pid || !(await stopDaemon(pid))) return false
   await daemon()
   return true
 })
@@ -2335,7 +2342,10 @@ async function quitCompletely() {
     if (r.response !== 0) return
   }
   quitting = true
-  await rpc('shutdown', {}, 10000).catch(() => {}) // the daemon first asks who calls (lsof, ps): a busy Mac takes a while, and a call given up is refused
+  const pid = daemonInfo()?.pid
+  const asked = await rpc('shutdown', {}, 10000).then(() => true, () => false) // the daemon first asks who calls (lsof, ps): a busy Mac takes a while, and a call given up is refused
+  for (let i = 0; asked && pid && i < 40 && running(pid); i++) await new Promise(r => setTimeout(r, 250))
+  if (pid && running(pid)) await stopDaemon(pid) // refused (another Laki, or the app before an update, started it): as the Restart button stops it
   app.quit()
 }
 

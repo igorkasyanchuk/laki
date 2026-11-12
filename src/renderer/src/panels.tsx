@@ -863,6 +863,16 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
     }
   }
+  const ag = isAgent(starts) ? starts : undefined // an agent's model and effort flags
+  // the models claude and codex say they have (agentModels: a gateway's and custom ones too, each its efforts), by
+  // agent and profile (its account); not said yet or can't: the fixed list. Above the early return below: a fresh
+  // install opens this page with no project, then the sample's arrives (test/hooks.test.ts)
+  const [told, setTold] = useState<Record<string, AgentModel[]>>({})
+  const toldKey = `${ag}:${p.preset}`
+  useEffect(() => {
+    if ((ag !== 'claude' && ag !== 'codex') || told[toldKey]) return
+    void api.call<AgentModel[]>('agentModels', { agent: ag, preset: p.preset }).then(l => setTold(x => ({ ...x, [toldKey]: l })), () => setTold(x => ({ ...x, [toldKey]: [] })))
+  }, [toldKey])
   if (!view.projects.length)
     return (
       <Page title="New workspace" onClose={onClose}>
@@ -917,15 +927,6 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       ],
       'right',
     )
-  const ag = isAgent(starts) ? starts : undefined // an agent's model and effort flags
-  // the models claude and codex say they have (agentModels: a gateway's and custom ones too, each its efforts), by
-  // agent and profile (its account); not said yet or can't: the fixed list
-  const [told, setTold] = useState<Record<string, AgentModel[]>>({})
-  const toldKey = `${ag}:${p.preset}`
-  useEffect(() => {
-    if ((ag !== 'claude' && ag !== 'codex') || told[toldKey]) return
-    void api.call<AgentModel[]>('agentModels', { agent: ag, preset: p.preset }).then(l => setTold(x => ({ ...x, [toldKey]: l })), () => setTold(x => ({ ...x, [toldKey]: [] })))
-  }, [toldKey])
   const said = told[toldKey]?.length ? told[toldKey] : undefined
   const models = said?.map(m => m.id) ?? (ag && MODELS[ag]) ?? []
   const typed = p.model?.trim()
