@@ -1440,7 +1440,9 @@ Extensions lists each tool and where you allowed it always, with *Revoke*.
 With Laki AI on, *New ▾ › With Laki AI…* (⌘K *New extension…*) opens a **new extension's page**, Laki AI's chat on
 its right: say what it should show, or pick a starter, and Laki AI writes it (it asks only what it can't tell
 from what you said). The page then shows it as every extension's page does: its preview on sample data, its settings, its data,
-runs, logs and files, with the chat still beside them. *Try it live* shows what it runs and runs it once, *Undo* takes
+runs, logs and files, with the chat still beside them. Its settings come first, with Remix, its folder, its log and
+Delete beside its name; *Manage ▾* at the top right has the rest from any tab: Rename…, Edit settings, Edit files, Open
+folder, Logs, Show in, Size, Remix, Delete. *Try it live* shows what it runs and runs it once, *Undo* takes
 a change back, *Turn on* turns it on. *Remix* (a row's, any one's) makes a copy that's yours to change and opens its
 page. Each extension's page keeps its own chat with Laki AI, apart from the AI page's.
 Close the page while Laki AI builds and it goes on: Settings › Extensions › *Where you left off* (and a new

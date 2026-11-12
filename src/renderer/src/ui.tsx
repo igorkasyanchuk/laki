@@ -298,7 +298,7 @@ export function AskHost() {
       window.removeEventListener('keydown', f, true)
     }
   }, [])
-  useEffect(() => box.current?.querySelector<HTMLElement>('.ask-field input, .ask-field textarea, button.primary')?.focus(), [a])
+  useEffect(() => void (el => (el?.focus(), el instanceof HTMLInputElement && el.select()))(box.current?.querySelector<HTMLElement>('.ask-field input, .ask-field textarea, button.primary')), [a]) // a line's value selected: typing replaces it (a rename)
   if (!a) return null
   return (
     <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(-1)}>

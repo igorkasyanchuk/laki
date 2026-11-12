@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- An extension's page is easier to manage: its settings come first, with a red Delete beside its name, and *Manage ▾* at the top has Rename, Edit settings, Edit files, Open folder, Logs, Show in, Size, Remix and Delete from any tab.
 - Video, Meme and Timer moved into a ⋯ menu at the bottom left; a playing video or a running timer still shows its own button. Hover cards in a terminal are half again as big, show JSON (pretty-printed), logs, CSV, YAML and other plain text too, wait longer as you move onto them, and open larger with a click anywhere on them.
 - 👀 is back beside a workspace whose PR you commented on, instead of the line eye.
 - Voice: tap Fn twice to keep the mic on hands free (Fn again types it), a level meter that tells you when it can't hear you and names the input, a countdown before the 5-minute cap, Undo after it types, and your last 10 transcripts on ⌥Fn to type again, copy or send to another agent. The OpenRouter key now sits right under the engine choice.

@@ -32,7 +32,7 @@ export type WidgetsApi = {
   chatRm?: (id: string) => Promise<unknown> // a session let go of (asked first)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
-  folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
+  folder?: (id: string, at: MouseEvent<HTMLButtonElement> | DOMRect) => void // its folder's Open in menu, at a button or where one was
   logs?: (id: string) => void // its page's Logs tab
   allLogs?: boolean // settings.widgetLogs: every extension keeps a log
   log?: { read: (id: string, o: { since?: number; limit?: number; level?: string; src?: string; ws?: string }) => Promise<{ on: boolean; lines: WidgetLogLine[]; next: number }>; clear: (id: string) => Promise<unknown>; reveal: (id: string) => void } // its log: read from a cursor, Clear, Show in Finder
@@ -337,7 +337,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           {api.rm && (
             <>
               <span className="wc-sep" />
-              <IconButton icon="trash" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
+              <IconButton icon="trash" className="danger" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
             </>
           )}
         </div>

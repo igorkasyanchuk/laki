@@ -8,7 +8,7 @@
 // Undo to here) puts a version back. start: the Desk's Build with AI, the first ask, sent as it opens. Closing goes
 // back where it was opened from. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { sendKeyName, sendTip } from '../../shared/keys'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type AiMsg, type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
@@ -22,7 +22,8 @@ import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { PromptInput, useDraft } from './PromptInput'
 import { extAgent, KitHero, SourceField, StudioSessions, WidgetCard, type WidgetsApi } from './Settings'
-import { ask, escapes, Icon, IconButton, ON, Page, Switch, useMenu } from './ui'
+import { ask, askText, escapes, Icon, IconButton, ON, Page, Switch, useMenu } from './ui'
+import { extMenuItems } from './extMenu'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
@@ -113,6 +114,25 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
   // a repo's or an agent's folder's through App's repoSheet (every file it runs); else what it runs first (TrySheet)
   const turnOn = () => (guarded ? void cfg.set(w!.id, { on: true }).catch(e => setOops(String(e?.message ?? e))) : setSheet('on'))
   const name = w?.name ?? (cur || 'New extension')
+  // Manage ▾: everything you'd do to it, in one place (the sidebar's and Settings' menu, less Turn on/off: the head's switch)
+  const [menu, openMenu] = useMenu()
+  const rename = async () => {
+    const t = w && (await askText(`Rename ${w.name}`, { value: w.name, ok: 'Rename', placeholder: w.id }))
+    if (t != null && w) await cfg.set(w.id, { name: t }).catch(e => setOops(String(e?.message ?? e)))
+  }
+  const manage = (e: MouseEvent<HTMLButtonElement>) => {
+    if (!w) return
+    const at = e.currentTarget.getBoundingClientRect() // Open folder's own menu, where this one was
+    openMenu(e, [
+      ...(!w.project && !w.oneFile ? [{ label: 'Rename…', icon: 'pencil' as const, run: () => void rename() }] : []),
+      { label: 'Edit settings', icon: 'settings' as const, sub: 'where it shows, its size, data and options', run: () => (setTab('overview'), setSpot(n => n + 1)) },
+      { label: 'Edit files', icon: 'code' as const, sub: 'its widget.json and scripts, here', run: () => setTab('files') },
+      ...(cfg.folder ? [{ label: 'Open folder', icon: 'folder' as const, sub: 'in Finder, an editor or a terminal', run: () => cfg.folder!(w.id, at) }] : []),
+      { label: 'Logs', icon: 'file' as const, run: () => setTab('logs') },
+      null,
+      ...extMenuItems(w, cfg).slice(1), // [0] is Turn on/off: the head's switch, which shows what it runs first
+    ])
+  }
   return (
     <Page
       title={name}
@@ -168,6 +188,10 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
                 Turn on
               </button>
             )}
+            <button className="sm" aria-haspopup="menu" data-tip="Rename, edit, open its folder, where it shows, Remix, Delete" onClick={manage}>
+              Manage <Icon name="chevron" size={12} />
+            </button>
+            {menu}
           </span>
         )
       }
@@ -561,6 +585,14 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
           {cfg.folder && <button onClick={e => cfg.folder!(w.id, e)}>Its folder</button>}
         </div>
       )}
+      {/* first: its settings and actions (Remix, folder, log, Delete), then how it looks */}
+      <section className="ext-card" ref={form}>
+        <div className="ext-card-head">
+          <b>Settings</b>
+          <span className="muted small">saved as you change them</span>
+        </div>
+        <WidgetCard w={w} api={cfg} />
+      </section>
       <section className="ext-card">
         <div className="ext-card-head">
           <b>Preview</b>
@@ -673,13 +705,6 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
             <DeskTile w={w} api={api} sample={made} note={sample ? 'made-up data' : undefined} />
           </div>
         </div>
-      </section>
-      <section className="ext-card" ref={form}>
-        <div className="ext-card-head">
-          <b>Settings</b>
-          <span className="muted small">saved as you change them</span>
-        </div>
-        <WidgetCard w={w} api={cfg} />
       </section>
     </>
   )
