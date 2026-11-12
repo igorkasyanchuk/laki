@@ -1254,7 +1254,8 @@ on than fit, the least used (To-dos, Calendar, then Flows, Specs, Board) go into
 the pages that are on by default, Flows and Specs. Settings ›
 Appearance › Rail › *Its buttons* picks which show (the others go into ⋯ *More*) and, dragged, their order; a right
 click on a rail button gives its icon a color (a row of swatches; the first takes it off) or puts it into *More*, and *More*'s *Show them all on the rail* brings them back. Board and Schedule are pages
-over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
+over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom, under its ⋯ (a video playing or a
+timer running shows its own button there). The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
 filter looks through every kind. Below a line, up to 5 workspaces, terminals or browsers you pinned there (a
@@ -1287,7 +1288,7 @@ Where each one shows is its own (Settings › Extensions › the extension: *Sid
 bar left of its buttons, the status bar's right end, a tab of the side panel (⌥⌘B), or a mark on each workspace's row
 (a per-workspace one: its count for that workspace, its tip on hover); the
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, at the status bar's start)
-or at the status bar's start (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
+or at the status bar's start (beside the ⋯ of Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
 its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
 half that: ½, a thin line, like a row of links as plain words with a rule between them, wrapping when they don't fit),

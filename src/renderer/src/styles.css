@@ -2381,9 +2381,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ws-pr { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; color: var(--done); }
 .avatar { flex: none; border-radius: 50%; vertical-align: -3px; background: var(--hover); }
 /* a row's marks, the PR's author and GitHub's mark alike: one size (Settings › Appearance › Icon size) */
-/* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, an eye: you commented */
+/* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, 👀 you commented (the emoji, as it began) */
 .ws-yes { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; color: var(--done); }
-.ws-eyes { display: inline-flex; line-height: 1; }
+.ws-eyes { display: inline-flex; line-height: 1; font-size: var(--fs-1); }
 .ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes, .ws-radar) :is(.icon-svg, .avatar) { width: var(--ws-icon, calc(13px * var(--icon-k, 1))); height: var(--ws-icon, calc(13px * var(--icon-k, 1))); } /* --icon-k: Appearance's icon size, unless the sidebar's own is set */
 .pr-by { display: inline-flex; align-items: center; gap: var(--sp-2); }
 /* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
@@ -2916,13 +2916,15 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .reply-pop textarea { width: 100%; box-sizing: border-box; resize: vertical; font: var(--fs-3)/1.4 var(--ui-font); }
 .reply-pop .row { display: flex; align-items: center; gap: var(--sp-4); }
 .reply-pop select { max-width: 170px; }
-/* a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, or a picture */
+/* a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, a picture, Markdown or plain text; the last
+   three half again as big as a PR's (540 wide), a click on them opens them larger */
+.link-peek:not(.gh) { max-width: 540px; cursor: zoom-in; }
 .link-peek { position: fixed; z-index: 9; max-width: 360px; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); font: var(--fs-2)/1.4 var(--ui-font); color: var(--fg); }
 .link-peek .lp-img { display: block; padding: 0; border: none; background: none; cursor: zoom-in; } /* a click on the picture, or its ⤢: Term's modal */
 .link-peek .lp-open { position: absolute; top: 4px; right: 4px; background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: var(--r-m); }
 .modal:has(> .lp-big) { width: min(1100px, calc(100vw - 32px)); height: auto; max-height: 92vh; } /* a hovered picture, larger */
 .lp-big img { max-height: calc(92vh - 70px); }
-.link-peek.img img { display: block; max-width: 336px; max-height: 240px; object-fit: contain; border-radius: var(--r-s); background: repeating-conic-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
+.link-peek.img img { display: block; max-width: 504px; max-height: 360px; object-fit: contain; border-radius: var(--r-s); background: repeating-conic-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
 .lp-gh { all: unset; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 260px; cursor: pointer; }
 .lp-head { display: flex; align-items: center; gap: var(--sp-3); color: var(--muted); }
 .lp-repo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3651,7 +3653,10 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .status * { font-family: inherit; }
 .status :is(.sb-branch, .port-item, .port-item *) { font-family: var(--mono); }
 .link-peek.md { width: 360px; }
-.link-peek .lp-md { max-height: 320px; overflow: auto; overscroll-behavior: contain; } /* the card scrolls: the pointer on it keeps it */
+.link-peek .lp-md { max-height: 480px; overflow: auto; overscroll-behavior: contain; }
+.link-peek .lp-text { margin: 0; max-width: 504px; max-height: 480px; overflow: auto; overscroll-behavior: contain; font: var(--fs-1)/1.45 var(--mono); white-space: pre; tab-size: 2; }
+.lp-big-md { max-height: calc(92vh - 70px); overflow: auto; }
+.lp-big-text { margin: 0; max-height: calc(92vh - 70px); overflow: auto; font: var(--fs-2)/1.45 var(--mono); white-space: pre; tab-size: 2; user-select: text; } /* the card scrolls: the pointer on it keeps it */
 .link-peek .lp-md .md { font-size: var(--fs-2); }
 
 /* V11: macOS 26's glass. A capsule floats over what's under it, apart from the edges: the panel at the floating

@@ -303,7 +303,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   - The rail (`rail`: always, but on a phone, whose sidebar is a drawer; Settings › Appearance › Rail) puts `railBar`
     (`.rail`, `railW` as `--rail-w` on `.app`, `.rail-on`) left of the sidebar: a `railButton` per `RAIL` kind (a project's
     `kind`, none: projects) with `railSays` (`needsYou`'s count, a dot while a tab `spins`), Board and Schedule (`runFailed`: a
-    red dot) right after Projects, and AI (when on) over Settings at its bottom, which leave the list's `.side-foot` (Video, Meme, Timer stay); Schedule's and Board's pages hide the list (`listOff`: the aside `hidden`, `.list-off`); the list is `listed`, that kind's projects, and `inList` its pinned (a filter: all). An
+    red dot) right after Projects, and AI (when on) over Settings at its bottom, which leave the list's `.side-foot` (Video, Meme, Timer stay, under App's `footButtons` ⋯ menu; one in use, a video or a timer, its own button too); Schedule's and Board's pages hide the list (`listOff`: the aside `hidden`, `.list-off`); the list is `listed`, that kind's projects, and `inList` its pinned (a filter: all). An
     effect on the selected workspace sets the kind (`lastIn`: each kind's last, where `railTo` goes back); below `.rail-sep`,
     `railPins` (`pinButton`: `initials` in the workspace's color, a terminal's or browser's icon, `needsYou`'s count; never lit, its kind's button is; a
     right click is `wsMenu`); `moveWs`
@@ -326,13 +326,15 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   with Settings' agent), *Ask Laki AI* (`aiAsk` with `whereNow`), the pill shown with ⌥ alone when no agent can be
   replied to), text.ts `replyText`: *From
   <tab>:* (*your output* from its own), the quote fenced, the words). A link's hover card (`LinkPeek.tsx`, 400 ms on,
-  250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension; a Markdown file, `MD`, a
-  local path only, drawn by MarkdownView's `Markdown` (its first 30,000 characters; App's `peekText`, `peekFile` as
+  500 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension; a Markdown file, `MD`, or
+  a plain text one, `TEXT` (JSON, pretty-printed by `textShown` when it parses; logs, CSV, YAML, TOML, XML, a diff; no
+  `.env`), a local path only, drawn by MarkdownView's `Markdown` or as text in a `<pre>` (never HTML; its first 30,000
+  characters; the card 540 wide, a picture up to 504 × 360; App's `peekText`, `peekFile` as
   `peekImage`'s, but no file outside the workspace and its storage folder: no card), also from the `CODE` provider's
   hover): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
-  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click on the picture or its ⤢ (`.lp-open`) opens it larger: Term's `big`, panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.
+  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click anywhere on an image's, a Markdown's or a text's card (not its own links and buttons), or its ⤢ (`.lp-open`), opens it larger: Term's `big` (`kind`: the picture, the Markdown drawn, the text), panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.
   Any other file's path (`CODE`: one with a folder, or a bare name with `:line`; not a picture's) is a link too: ⌘-click
   (⌃ unless an app has the mouse; a plain click would open it as you select it) is `onCode`, App's `openCode`: a file of the workspace in the preview at its line,
   or `openIn` `editor` (`settings.fileClick`, ⌥ the other; `codeTo` for the hover's words); any other path `openPath`'s. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
@@ -976,7 +978,7 @@ in it (one idiom; a tab's own color over it), a switch's track, a Settings subgr
 picks it; a project's color is its bar). Rows are quiet: done, limit and ended marks muted (Needs you shows what's
 done), a step that isn't waiting on you (`t-go`: Merge, Ship) neutral. Status marks (Glyph.tsx `MARKS`) are the icon
 pack's shapes, not a font's characters: ◆ the pack's square on its corner and ● filled, ○ ✖ ✓ ◷ as lines; the PR's
-*you commented* mark the pack's eye. Other themes take the same rules; their own colors stay theirs.
+*you commented* mark stays the 👀 emoji (asked for back). Other themes take the same rules; their own colors stay theirs.
 
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).
 

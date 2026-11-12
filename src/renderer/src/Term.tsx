@@ -9,7 +9,8 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
-import { type Big, LinkPeek, MD, type Peek, peekOf } from './LinkPeek'
+import { type Big, LinkPeek, MD, type Peek, peekOf, TEXT } from './LinkPeek'
+import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './settingsBase'
 import { wordTrim } from './text'
@@ -85,7 +86,7 @@ export function Term({
   // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both. xterm
   // drops the hovered link as its rows redraw and finds it again at once (a leave, then a hover): a TUI that redraws
   // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
-  // link stays (peekAt) and only a leave that lasts 250 ms ends it
+  // link stays (peekAt) and only a leave that lasts 500 ms ends it (time to move onto the card and click it)
   const [peek, setPeek] = useState<Peek | null>(null)
   const [big, setBig] = useState<Big | null>(null) // a hovered picture opened larger
   const showT = useRef(0)
@@ -98,21 +99,21 @@ export function Term({
     const abs = path && absOf(path)
     const at = abs || uri
     const kind = peekOf(at)
-    const read = kind === 'md' ? props.current.text : props.current.image
-    // a file's picture or Markdown needs a reader; a web picture, https (the daemon's /img)
-    if ((path && !abs) || !kind || (abs ? !read : kind === 'md' || !/^https:/i.test(at))) return false
+    const read = kind === 'md' || kind === 'text' ? props.current.text : props.current.image
+    // a file's picture, Markdown or text needs a reader; a web picture, https (the daemon's /img)
+    if ((path && !abs) || !kind || (abs ? !read : kind === 'md' || kind === 'text' || !/^https:/i.test(at))) return false
     clearTimeout(hideT.current)
     if (peekAt.current === at) return true
     clearTimeout(showT.current)
     peekAt.current = at
     const { clientX: x, clientY: y } = e
     // a Markdown file with no card (not the workspace's): its path and ⌘-click as any file link's
-    const said = (s: string | null | undefined) => (s === null && kind === 'md' && peekAt.current === at && box.current && (box.current.title = `${abs}\n⌘-click to open`), s)
+    const said = (s: string | null | undefined) => (s === null && kind !== 'img' && peekAt.current === at && box.current && (box.current.title = `${abs}\n⌘-click to open`), s)
     showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, read: abs ? () => read!(abs).then(said) : undefined }), 400)
     return true
   }
   const peekGone = () => (clearTimeout(showT.current), clearTimeout(hideT.current), (peekAt.current = ''), setPeek(null))
-  const peekOff = () => (clearTimeout(hideT.current), (hideT.current = window.setTimeout(peekGone, 250)))
+  const peekOff = () => (clearTimeout(hideT.current), (hideT.current = window.setTimeout(peekGone, 500))) // time to reach the card
   // Reply: a pill under the selection as the mouse lets go, to quote it to an agent
   const [pill, setPill] = useState<{ x: number; y: number; text: string } | null>(null)
   const [alt, setAlt] = useState(false) // ⌥ held: the pill's other uses of the selection
@@ -183,7 +184,7 @@ export function Term({
                   range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
                   text: m[0],
                   activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && props.current.onCode?.(absOf(t.replace(/(:\d+)+$/, '')), m[1] ? Number(m[1]) : undefined, e.altKey),
-                  hover: (e: MouseEvent, t: string) => ((over = true), (MD.test(t) && peekOn(e, t)) || (box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`))), // a Markdown file's: its card
+                  hover: (e: MouseEvent, t: string) => ((over = true), ((MD.test(t) || TEXT.test(t)) && peekOn(e, t)) || (box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`))), // a Markdown file's: its card
                   leave: () => ((over = false), peekOff(), box.current && (box.current.title = '')),
                 })),
               ]
@@ -393,7 +394,7 @@ export function Term({
       {big && (
         <Modal title={big.size ? `${big.name} · ${big.size}` : big.name} onClose={() => setBig(null)} loose>
           <div className="art-big lp-big">
-            <img src={big.src} alt={big.name} />
+            {big.kind === 'md' ? <div className="lp-big-md"><Markdown src={big.src.slice(0, 200_000)} /></div> : big.kind === 'text' ? <pre className="lp-big-text">{big.src.slice(0, 500_000)}</pre> : <img src={big.src} alt={big.name} />}
           </div>
         </Modal>
       )}

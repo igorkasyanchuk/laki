@@ -2,7 +2,10 @@
 // GitHub PR's or issue's (the daemon's ghCard: gh, kept a minute; a click opens it on GitHub), an image's (Term's
 // `image`: a file of the workspace or its storage folder, a pasted one; an https one through the daemon's /img; a click on
 // it, or its ⤢, opens it larger: Term's modal, which outlives the card), or a Markdown file's, drawn (Term's `text`: a
-// file of the workspace or its storage folder; the card scrolls, ⌘-click on the link opens it)
+// file of the workspace or its storage folder; the card scrolls, ⌘-click on the link opens it), or a plain text one's
+// (JSON pretty-printed, a log, CSV, YAML…: as text, never run or drawn as HTML). A click anywhere on an image's, a
+// Markdown's or a text's card opens it larger (Term's modal); the card comes 500 ms after the link is left, room to
+// get there
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type GhCard, GH_LINK } from '../../shared/types'
@@ -15,11 +18,21 @@ import { Markdown } from './MarkdownView'
 export const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 // what a hovered link shows: a GitHub card, an image, or nothing
 export const MD = /\.(md|markdown)$/i
-export const peekOf = (uri: string) => (GH_LINK.test(uri) ? 'gh' : IMAGE.test(uri.split(/[?#]/)[0]) ? 'img' : MD.test(uri.split(/[?#]/)[0]) && !/^[a-z]+:/i.test(uri) ? 'md' : undefined) // md: a file's only
+// plain text that reads as it is (no .env: secrets on a hover)
+export const TEXT = /\.(txt|log|json|jsonc|jsonl|ndjson|csv|tsv|ya?ml|toml|ini|cfg|conf|xml|diff|patch)$/i
+export const peekOf = (uri: string) => (u => (GH_LINK.test(uri) ? 'gh' : IMAGE.test(u) ? 'img' : /^[a-z]+:/i.test(uri) ? undefined : MD.test(u) ? 'md' : TEXT.test(u) ? 'text' : undefined))(uri.split(/[?#]/)[0]) // md, text: a file's only
+// a text file as shown: JSON pretty-printed when it parses, else as it is
+export const textShown = (src: string, name: string) => {
+  if (/\.json$/i.test(name))
+    try {
+      return JSON.stringify(JSON.parse(src), null, 2)
+    } catch {}
+  return src
+}
 export type Peek = { uri: string; x: number; y: number; read?: () => Promise<string | undefined | null> } // read: a local picture's data URL, a Markdown file's text; null: nothing to show (no card)
 const MD_SHOWN = 30_000 // a Markdown file's first characters drawn: a card's worth, and quick
 
-export type Big = { src: string; name: string; size: string } // an image opened larger (Term's modal)
+export type Big = { src: string; name: string; size: string; kind?: 'img' | 'md' | 'text' } // a card opened larger (Term's modal)
 export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnter: () => void; onLeave: () => void; onOpen: (b: Big) => void }) {
   const [card, setCard] = useState<GhCard>()
   const [src, setSrc] = useState<string>() // a picture's data URL, a Markdown file's text
@@ -36,19 +49,20 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
     if (kind === 'gh') api.call<GhCard>('ghCard', { url: peek.uri }).then(c => live && setCard(c), fail)
     else if (/^https:/i.test(peek.uri)) (via => (via ? setSrc(via) : fail('Web pictures need the daemon')))(imgVia(peek.uri))
     else
-      (peek.read?.() ?? Promise.reject(new Error('Not a file of this workspace'))).then(s => live && (typeof s === 'string' && (s || kind === 'md') ? setSrc(s) : s === null ? setNone(true) : fail(kind === 'md' ? 'Not shown: not text' : 'Not shown: over 10 MB')), fail)
+      (peek.read?.() ?? Promise.reject(new Error('Not a file of this workspace'))).then(s => live && (typeof s === 'string' && (s || kind !== 'img') ? setSrc(s) : s === null ? setNone(true) : fail(kind !== 'img' ? 'Not shown: not text' : 'Not shown: over 10 MB')), fail)
     return () => void (live = false)
   }, [peek.uri, n])
   // below the pointer, or above it in the screen's lower part; never off the window's right edge
   const low = peek.y > innerHeight * 0.55
-  const style = { left: Math.max(8, Math.min(peek.x - 12, innerWidth - 376)), ...(low ? { bottom: innerHeight - peek.y + 14 } : { top: peek.y + 18 }) }
+  const style = { left: Math.max(8, Math.min(peek.x - 12, innerWidth - (kind === 'gh' ? 376 : 556))), ...(low ? { bottom: innerHeight - peek.y + 10 } : { top: peek.y + 12 }) }
   const [, owner, name, what, num] = GH_LINK.exec(peek.uri) ?? []
   const state = card && (card.draft && card.state === 'open' ? 'draft' : card.state)
   const file = decodeURIComponent(peek.uri.split(/[?#]/)[0].split('/').pop() ?? '')
-  const open = () => src && onOpen({ src, name: file, size })
+  const open = () => src && !err && onOpen({ src: kind === 'text' ? textShown(src, file) : src, name: file, size, kind: kind === 'gh' ? undefined : kind })
   if (none) return null
   return createPortal(
-    <div className={`link-peek ${kind}`} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+    // a click anywhere on it but a link or a button of its own: larger
+    <div className={`link-peek ${kind}`} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave} onClick={e => kind !== 'gh' && !(e.target as HTMLElement).closest('a, button, [role=button]') && open()}>
       {kind === 'gh' ? (
         <button type="button" className="lp-gh" onClick={() => openExternal(card?.url ?? peek.uri)} data-tip="Open on GitHub">
           <span className="lp-head">
@@ -94,7 +108,15 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
           {src !== undefined && !err ? <div className="lp-md">{src.trim() ? <Markdown src={src.slice(0, MD_SHOWN)} /> : <span className="muted">Empty</span>}</div> : <span className={err ? 'lp-err' : 'lp-wait muted'}>{err || 'Loading…'}</span>}
           <span className="lp-meta muted">
             {file}
-            {src && src.length > MD_SHOWN && ' · its start'} · ⌘-click to open
+            {src && src.length > MD_SHOWN && ' · its start'} · click for larger · ⌘-click the link to open
+          </span>
+        </>
+      ) : kind === 'text' ? (
+        <>
+          {src !== undefined && !err ? <pre className="lp-text">{src.trim() ? textShown(src.slice(0, MD_SHOWN), file) : 'Empty'}</pre> : <span className={err ? 'lp-err' : 'lp-wait muted'}>{err || 'Loading…'}</span>}
+          <span className="lp-meta muted">
+            {file}
+            {src && src.length > MD_SHOWN && ' · its start'} · click for larger · ⌘-click the link to open
           </span>
         </>
       ) : (
@@ -110,6 +132,7 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
           <span className="lp-meta muted">
             {file}
             {size && ` · ${size}`}
+            {src && !err && ' · click for larger'}
           </span>
         </>
       )}

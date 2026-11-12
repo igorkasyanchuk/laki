@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Video, Meme and Timer moved into a ⋯ menu at the bottom left; a playing video or a running timer still shows its own button. Hover cards in a terminal are half again as big, show JSON (pretty-printed), logs, CSV, YAML and other plain text too, wait longer as you move onto them, and open larger with a click anywhere on them.
+- 👀 is back beside a workspace whose PR you commented on, instead of the line eye.
 - Voice: tap Fn twice to keep the mic on hands free (Fn again types it), a level meter that tells you when it can't hear you and names the input, a countdown before the 5-minute cap, Undo after it types, and your last 10 transcripts on ⌥Fn to type again, copy or send to another agent. The OpenRouter key now sits right under the engine choice.
 - Remote access can start by itself as you lock your Mac and stop a minute after you're back (Settings › Remote access › Start it), and its Activity list shows what each device did: messages and answers to agents, pairings, wrong PINs. `laki remote log` prints it.
 - Remote access stays reachable: the Mac is kept awake while it runs (on power, or always), Laki checks its address from outside every few minutes (*Check* in Settings for one now), and if it can't be reached the status bar badge turns yellow, you're notified and its tunnel starts again.
