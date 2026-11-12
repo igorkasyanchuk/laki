@@ -8,7 +8,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { appToken, daemonInfo, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
+import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, rpc, stopDaemon } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
@@ -612,16 +612,9 @@ const start = () =>
 const ORIGIN_API = 167
 let checked = false
 async function daemon() {
-  const info = await start()
-  if (checked) return info
+  if (checked) return start()
   checked = true
-  const r = await rpc<{ api?: number } | string>('ping', { caps: true }).catch(() => undefined)
-  if (r === undefined || (typeof r === 'object' && (r.api ?? 0) >= ORIGIN_API)) return info
-  appLog(`the daemon (pid ${info.pid}) is older than this app's window: restarted`)
-  const asked = await rpc('shutdown', { keep: true }).then(() => true, () => false)
-  for (let i = 0; asked && i < 60 && running(info.pid); i++) await new Promise(r => setTimeout(r, 250))
-  if (running(info.pid) && !(await stopDaemon(info.pid))) appLog(`the daemon (pid ${info.pid}) didn't stop: kill ${info.pid}, then open Laki again`)
-  return start()
+  return freshDaemon(start, ORIGIN_API, appLog) // conn.ts: the decision and the stop, tested without the app
 }
 // S9: the built pages (out/renderer) on app://laki/, a file of that folder or a 404; other sessions (the preview,
 // Browsers, the agent browser) have no app: scheme at all
@@ -842,22 +835,7 @@ ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.
 // bundle's path: appPair gives the app's token to its own binary only, S1), so it can't tell this app is the user's.
 // This app asks it to stop as any of the user's processes can (SIGTERM: its own shutdown), then starts one from this
 // bundle. Only daemon.json's pid, and only while that pid is a Laki daemon
-const running = (pid: number) => {
-  try {
-    return process.kill(pid, 0), true
-  } catch {
-    return false
-  }
-}
-// a Laki daemon (its command line runs out/main/daemon.js) stopped by SIGTERM, its own whole shutdown; false: not one,
-// or still there 15 s on. The Restart button's, a daemon from before an update, Quit Laki Completely's
-async function stopDaemon(pid: number) {
-  if (!running(pid) || !/\bout\/main\/daemon\.js\b/.test(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
-  logLine(join(dataDir(), 'daemon.log'), `the app stops the daemon (pid ${pid}): it refused this app's shutdown (another Laki, or the one before an update, started it)`)
-  process.kill(pid, 'SIGTERM')
-  for (let i = 0; i < 60 && running(pid); i++) await new Promise(r => setTimeout(r, 250))
-  return !running(pid)
-}
+const running = pidRunning // conn.ts' stopDaemon: a Laki daemon stopped by SIGTERM (the Restart button's, a daemon from before an update, Quit Laki Completely's)
 ipcMain.handle('daemon-restart', async e => {
   if (!from(e) || quitting) return false
   const pid = daemonInfo()?.pid

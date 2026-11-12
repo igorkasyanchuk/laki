@@ -411,6 +411,8 @@ link (App's `setLink`), *All changes* opens Settings › Release notes (for ever
 changes sets `seenVersion`. A version with no section (a build between releases) shows nothing. ui-smoke's
 `whats-new` steps: shown for an old `seenVersion`, closed, gone after a reload.
 
+
+**After an update** (S9, conn.ts `freshDaemon`, main's `daemon()` once per app start): a daemon whose `ping { caps }` says an API under 167 (`daemonStale`: no app://laki), or a plain `pong`, is asked for `shutdown { keep: true }`; one that refuses (the app before the update started it: this app's token isn't the one it gave) is stopped by SIGTERM (`stopDaemon`, only a pid whose command line runs `out/main/daemon.js`: `isDaemonCmd`), then a current one starts. `test/upgrade.test.ts`: a fake old daemon that refuses, and one another copy started that stops by its shutdown.
 ### Usage
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when

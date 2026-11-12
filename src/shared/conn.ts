@@ -1,5 +1,5 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { randomBytes } from 'node:crypto'
@@ -158,6 +158,40 @@ export async function ensureDaemon(env: Record<string, string> = {}, asApp = fal
   }
   pipe?.destroy()
   throw new Error(`daemon didn't start; see ${logPath}`)
+}
+
+// S9: the app's start (main's daemon()): a daemon from before app://laki (an API under minApi, still running after an
+// update) refuses the window's Origin, so the window never sees it's stale; it's restarted once, as the window would
+// (keep: the pty host's terminals go on). One the app before the update started refuses that shutdown (who's calling:
+// this app's token isn't the one it was given), so it's stopped as the Restart button does (stopDaemon). Without that
+// the window stayed on the splash (0.48 to 0.49). test/upgrade.test.ts, with a fake old daemon
+export const daemonStale = (ping: unknown, minApi: number) => ping !== undefined && !(typeof ping === 'object' && ping !== null && Number((ping as { api?: unknown }).api ?? 0) >= minApi) // pure: none (no answer) isn't stale, it's gone
+export const isDaemonCmd = (command: string) => /\bout\/main\/daemon\.js\b/.test(command) // a Laki daemon's command line (built), never another process on a reused pid
+export const pidRunning = (pid: number) => {
+  try {
+    return process.kill(pid, 0), true
+  } catch {
+    return false
+  }
+}
+// a Laki daemon (its command line runs out/main/daemon.js) stopped by SIGTERM, its own whole shutdown; false: not one,
+// or still there 15 s on. The Restart button's, a daemon from before an update, Quit Laki Completely's
+export async function stopDaemon(pid: number) {
+  if (!pidRunning(pid) || !isDaemonCmd(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
+  logLine(join(dataDir(), 'daemon.log'), `the app stops the daemon (pid ${pid}): it refused this app's shutdown (another Laki, or the one before an update, started it)`)
+  process.kill(pid, 'SIGTERM')
+  for (let i = 0; i < 60 && pidRunning(pid); i++) await new Promise(r => setTimeout(r, 250))
+  return !pidRunning(pid)
+}
+export async function freshDaemon(start: () => Promise<DaemonInfo>, minApi: number, log: (line: string) => void = () => {}) {
+  const info = await start()
+  const r = await rpc<unknown>('ping', { caps: true }).catch(() => undefined)
+  if (!daemonStale(r, minApi)) return info
+  log(`the daemon (pid ${info.pid}) is older than this app's window: restarted`)
+  const asked = await rpc('shutdown', { keep: true }).then(() => true, () => false)
+  for (let i = 0; asked && i < 60 && pidRunning(info.pid); i++) await new Promise(r => setTimeout(r, 250))
+  if (pidRunning(info.pid) && !(await stopDaemon(info.pid))) log(`the daemon (pid ${info.pid}) didn't stop: kill ${info.pid}, then open Laki again`)
+  return start()
 }
 
 // a response's text (and bytes), at most max bytes read: past it the rest is let go (body.cancel()), the connection
