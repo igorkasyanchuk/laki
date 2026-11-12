@@ -949,11 +949,11 @@ export type Remote = { check?: RemoteCheck; mail: string; level?: 'answer' | 'fu
 // meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
 // state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
 // its last address; what remoteBack starts again. Never a token or the PIN
-export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string }
+export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string; e2e?: string } // e2e: S14's link secret (base64), a stable address's only
 // locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
 // a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
 export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean; passkey?: boolean; level?: 'answer' | 'full' } // notify: it takes Web Push notifications (M4); passkey: it unlocks with one (D6); level: D7, answer only or full (unset: full, paired before D7)
-export type SavedDevice = Omit<RemoteDevice, 'notify' | 'passkey'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string }; pk?: { id: string; jwk: Record<string, unknown>; count: number }; regUntil?: number } // push: its Web Push subscription (push.ts WebSub); pk: its passkey (D6: the credential's id, its public key as a JWK, the signature counter); regUntil: a just-paired device may set one up until then
+export type SavedDevice = Omit<RemoteDevice, 'notify' | 'passkey'> & { hash: string; push?: { endpoint: string; p256dh: string; auth: string }; pk?: { id: string; jwk: Record<string, unknown>; count: number }; regUntil?: number; ek?: string } // push: its Web Push subscription (push.ts WebSub); pk: its passkey (D6: the credential's id, its public key as a JWK, the signature counter); regUntil: a just-paired device may set one up until then
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)

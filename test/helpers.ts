@@ -7,6 +7,9 @@ import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import WebSocket from 'ws'
+import { randomBytes } from 'node:crypto'
+import { EventEmitter } from 'node:events'
+import { type Channel, channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const fakes = join(root, 'test/fakes')
@@ -187,11 +190,73 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   return rig
 }
 
+// S14: remote access's links: the page's token (#t=) and the end-to-end secret (#k=), kept by its origin for farFetch
+// and farWs (a test reads the token off the link: tokenOf)
+const farKeys = new Map<string, Buffer>()
+export function tokenOf(link: string): string {
+  const h = new URLSearchParams(link.split('#')[1] ?? '')
+  const k = h.get('k')
+  if (k) farKeys.set(new URL(link).origin, Buffer.from(k, 'base64url'))
+  return h.get('t') ?? ''
+}
+export const farKey = (origin: string) => farKeys.get(origin)
+// a /rpc as remote access's page would send it: sealed when its origin's secret is known (a salt of its own in
+// x-laki-e2e), its answer opened; else as it is
+export async function farFetch(url: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}, secret = init.headers?.origin ? farKeys.get(init.headers.origin) : undefined) {
+  if (!secret || !url.endsWith('/rpc')) return fetch(url, init)
+  const salt = randomBytes(16)
+  const ch = channel(keyOf(secret, salt), PAGE)
+  const r = await fetch(url, { ...init, headers: { ...init.headers, 'x-laki-e2e': salt.toString('base64') }, body: new Uint8Array(ch.seal(init.body ?? '')) })
+  const buf = Buffer.from(await r.arrayBuffer())
+  const text = r.headers.get('content-type') === 'application/octet-stream' ? String(ch.open(buf)) : String(buf)
+  return { status: r.status, ok: r.ok, headers: r.headers, json: async () => JSON.parse(text), text: async () => text }
+}
+// a WebSocket as remote access's page opens one (S14): the daemon's salt, then its auth and every frame sealed; 'open'
+// once it's sent its auth, 'message' each opened frame (a Buffer, as ws gives), 'close' with the code and reason
+export class FarWs extends EventEmitter {
+  raw: WebSocket
+  ch?: Channel
+  private queued: string[] = []
+  constructor(port: number, origin: string, headers: Record<string, string>, auth: string, secret = farKeys.get(origin)) {
+    super()
+    this.raw = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin, headers })
+    this.raw.on('error', e => this.emit('error', e))
+    this.raw.on('close', (code, reason) => this.emit('close', code, reason))
+    this.raw.on('message', (raw, binary) => {
+      if (!this.ch) {
+        const j = JSON.parse(String(raw))
+        if (j.e2e !== 1 || !secret) return
+        this.ch = channel(keyOf(secret, Buffer.from(j.salt, 'base64')), PAGE)
+        this.raw.send(this.ch.seal(JSON.stringify({ auth })))
+        this.queued.splice(0).forEach(t => this.raw.send(this.ch!.seal(t)))
+        return void this.emit('open')
+      }
+      if (binary) this.emit('message', this.ch.open(raw as Buffer))
+    })
+  }
+  get readyState() {
+    return this.raw.readyState
+  }
+  get OPEN() {
+    return WebSocket.OPEN
+  }
+  send(text: string) {
+    if (this.ch) this.raw.send(this.ch.seal(text))
+    else this.queued.push(text)
+  }
+  close(code?: number) {
+    this.raw.close(code)
+  }
+  terminate() {
+    this.raw.terminate()
+  }
+}
+
 // A WebSocket client like the renderer's: requests by id, events collected.
-// auth: as remote access's page (S11): the token in its first message, none in the URL
+// auth: as remote access's page (S11): the token in its first message, none in the URL; S14: sealed (FarWs)
 export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string, auth = false) {
   const { port, token: tk } = rig.info()
-  const ws = new WebSocket(auth ? `ws://127.0.0.1:${port}/ws` : `ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
+  const ws = auth && origin ? new FarWs(port, origin, {}, token ?? '') : new WebSocket(auth ? `ws://127.0.0.1:${port}/ws` : `ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
   let seq = 0
   const waiting = new Map<number, (m: any) => void>()
   const events: any[] = []
@@ -205,7 +270,7 @@ export async function connect(rig: { info(): { port: number; token: string }; ap
     ws.once('open', res)
     ws.once('error', rej)
   })
-  if (auth) ws.send(JSON.stringify({ auth: token }))
+  if (auth && !(ws instanceof FarWs)) ws.send(JSON.stringify({ auth: token }))
   return {
     ws,
     events,

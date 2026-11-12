@@ -1,5 +1,6 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
@@ -7,7 +8,8 @@ import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
 import { REMOTE_NO, REMOTE_OK } from '../src/daemon/gates.ts'
-import { connect, fresh, sleep, until } from './helpers.ts'
+import { connect, farKey, fresh, sleep, until, tokenOf, farFetch } from './helpers.ts'
+import { channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
   const rig = await fresh(t)
@@ -623,16 +625,16 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const on = await rig.rpc('remoteStart', { hours: 2 })
   const url = `https://fake-${port}.trycloudflare.com`
   assert.deepEqual([on.mail, on.url], ['me@x.dev', url])
-  assert.match(on.link, new RegExp(`^${url}/#t=[0-9a-f]{64}$`)) // S11: in the hash
+  assert.match(on.link, new RegExp(`^${url}/#t=[0-9a-f]{64}&k=[\\w-]{43}$`)) // S11: in the hash; S14: its end-to-end secret too
   assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
   assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
   assert.deepEqual((await rig.rpc('stateOwn')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
   // the link's key, once, from its page's origin: the page's own token for it, then the link is dead (L3)
-  const key = on.link.split('#t=')[1]
+  const key = tokenOf(on.link)
   const ping = (token: string, origin?: string) =>
-    fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
+    farFetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   const pinAt = (body: object, origin = url) => fetch(`${at}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
   assert.equal(await ping(key, url), 401) // the link's key isn't a token
   assert.equal((await fetch(`${at}/pin`, { method: 'POST', headers: { origin: 'https://evil.example' }, body: JSON.stringify({ token: key }) })).status, 403)
@@ -650,9 +652,55 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await assert.rejects(connect(rig, undefined, tok))
   const c = await connect(rig, url, tok, true) // S11: its token in its first message
   assert.equal(await c.call('ping'), 'pong')
+  // S14: end to end: a sealed /rpc and its sealed answer; a clear one, a salt again and a wrong tag refused
+  const secret = farKey(url)!
+  const rpcSealed = (body: Uint8Array, salt: Buffer) => fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url, 'x-laki-e2e': salt.toString('base64') }, body: body as BodyInit })
+  assert.equal((await fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: '{"method":"ping"}' })).status, 426, 'a clear call')
+  const salt = randomBytes(16)
+  const sealed = new Uint8Array(channel(keyOf(secret, salt), PAGE).seal('{"method":"ping"}'))
+  const back = await rpcSealed(sealed, salt)
+  assert.equal(back.headers.get('content-type'), 'application/octet-stream')
+  const backBuf = Buffer.from(await back.arrayBuffer())
+  assert.ok(!backBuf.includes('pong'), 'the answer sealed')
+  assert.deepEqual(JSON.parse(String(channel(keyOf(secret, salt), PAGE).open(backBuf))), { result: 'pong' })
+  assert.equal((await rpcSealed(sealed, salt)).status, 400, 'its salt again: a replay')
+  const salt2 = randomBytes(16)
+  const torn = new Uint8Array(channel(keyOf(secret, salt2), PAGE).seal('{"method":"ping"}'))
+  torn[torn.length - 1] ^= 1
+  assert.equal((await rpcSealed(torn, salt2)).status, 400, 'a wrong tag')
+  // the socket: its salt in clear, then sealed both ways; a frame again, a wrong tag, a clear page, another key: closed
+  const sock = async (first: (ch: ReturnType<typeof channel>, ws: WebSocket) => void, key = secret) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: url })
+    const got: any[] = []
+    const shut = new Promise<[number, string]>(r => ws.once('close', (code, why) => r([code, String(why)])))
+    let ch: ReturnType<typeof channel> | undefined
+    ws.on('message', (m, binary) => {
+      if (!binary) {
+        const j = JSON.parse(String(m))
+        assert.deepEqual([j.e2e, Buffer.from(j.salt, 'base64').length], [1, 16])
+        ch = channel(keyOf(key, Buffer.from(j.salt, 'base64')), PAGE)
+        return first(ch, ws)
+      }
+      got.push(JSON.parse(String(ch!.open(m as Buffer))))
+    })
+    return { ws, got, shut }
+  }
+  const one = await sock((ch, ws) => (ws.send(ch.seal(JSON.stringify({ auth: tok }))), ws.send(ch.seal('{"id":1,"method":"ping"}'))))
+  await until(() => one.got.some(m => m.id === 1 && m.result === 'pong'), 'a sealed answer')
+  assert.ok(one.got.some(m => m.ev === 'state'), 'its state, sealed')
+  const elsewhere = channel(keyOf(secret, randomBytes(16)), PAGE) // a frame sealed under another connection's salt: no tag fits
+  one.ws.send(elsewhere.seal('{"id":2,"method":"ping"}'))
+  assert.equal((await one.shut)[0], 4400)
+  let kept: Buffer | undefined
+  const two = await sock((ch, ws) => (ws.send(ch.seal(JSON.stringify({ auth: tok }))), (kept = ch.seal('{"id":1,"method":"ping"}')), ws.send(kept), setTimeout(() => ws.send(kept!), 200)))
+  assert.deepEqual(await two.shut, [4400, 'a replayed frame'])
+  const old = await sock((_, ws) => ws.send(JSON.stringify({ auth: tok })))
+  assert.equal((await old.shut)[0], 4426, 'a page from before S14')
+  const other = await sock((ch, ws) => ws.send(ch.seal(JSON.stringify({ auth: tok }))), randomBytes(32))
+  assert.deepEqual(await other.shut, [4401, 'bad key'])
   // a phone has what it needs, not what outlives its session or opens Laki wider (M4)
   const far = (method: string, params = {}) =>
-    fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+    farFetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
   for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['hookAdd', { name: 'far' }], ['hookRm', { name: 'far' }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['aiEndpointKey', { key: 'k' }], ['aiEndpointTest', {}], ['settingsSet', { aiEndpoint: { url: 'https://evil.example/v1', model: 'm' } }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }], ['settingsSet', { editorCmd: 'sh -c evil' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
@@ -668,7 +716,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal((await far('projectSet', { id: pr.id, notes: 'from the phone', config: {} })).error, undefined, 'its notes, and a config with no script changed')
   assert.equal((await far('tabNew', { ws: pws.id, kind: 'shell' })).error, undefined, 'a shell tab: yes')
   // S11: the socket: its token in its first message within 5 s, else closed; ?token= in the URL counts for nothing
-  const shut = (sock: WebSocket) => new Promise<number>(r => sock.once('close', code => r(code)))
+  const shut = (sock: { once(e: 'close', f: (code: number) => void): unknown }) => new Promise<number>(r => sock.once('close', code => r(code)))
   const bad = await connect(rig, url, 'f'.repeat(64), true)
   assert.equal(await shut(bad.ws), 4401)
   const quiet = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${tok}`, { origin: url })
@@ -713,7 +761,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual([pub.mail, pub.open], ['', true])
   assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port}\n`))
   assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
-  assert.equal(await ping((await pinAt({ token: pub.link.split('#t=')[1] })).token, url), 200)
+  assert.equal(await ping((await pinAt({ token: tokenOf(pub.link) })).token, url), 200)
   assert.equal(await ping('nope', url), 401)
   await rig.rpc('remoteStop')
   await until(() => stops() >= 4, 'cloudflared stopped', 30000)
@@ -730,7 +778,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual([pinned.mail, pinned.open, pinned.tries], ['', undefined, 3])
   assert.match(pinned.pin, /^\d{6}$/)
   assert.equal(log().split(`cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
-  const link = pinned.link.split('#t=')[1]
+  const link = tokenOf(pinned.link)
   assert.equal(await ping(link, url), 401) // the link's key alone isn't in
   assert.deepEqual(await pinAt({ token: link }), { need: true, left: 3 })
   assert.deepEqual(await pinAt({ token: 'nope', pin: pinned.pin }), { need: false })
@@ -754,7 +802,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal(await ping(got.token, url), 403)
   // the last wrong PIN stops it
   const again2 = await rig.rpc('remoteStart', { hours: 1, pin: true })
-  const link2 = again2.link.split('#t=')[1]
+  const link2 = tokenOf(again2.link)
   const wrong2 = again2.pin === '000000' ? '111111' : '000000'
   const app = await connect(rig)
   assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 2 more tries, then remote access stops' })
@@ -810,8 +858,8 @@ test('D7: answer only: what a phone may do at each level, set on the Mac only, i
   await rig.rpc('settingsSet', { remoteMail: 'me@x.dev', remoteLevel: 'answer' })
   const on = await rig.rpc('remoteStart', { hours: 1 })
   const url = `https://fake-${port}.trycloudflare.com`
-  const tok = (await fetch(`${at}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: on.link.split('#t=')[1] }) }).then(r => r.json())).token
-  const far = (method: string, params = {}) => fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  const tok = (await fetch(`${at}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: tokenOf(on.link) }) }).then(r => r.json())).token
+  const far = (method: string, params = {}) => farFetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
   const c = await connect(rig, url, tok, true)
   t.after(() => c.close())
   await until(() => c.events.some(e => e.ev === 'state'), 'its view')
@@ -865,9 +913,9 @@ test('D7: a paired device keeps its own level (the session\'s as it paired), cha
   await rig.rpc('settingsSet', { tunnel: { name: 'laki', domain: 'example.dev' }, remoteLevel: 'answer', remotePasskey: false })
   const origin = 'https://laki.example.dev'
   const on = await rig.rpc('remoteStart', { hours: 0, host: 'laki' })
-  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify({ token: on.link.split('#t=')[1], pin: on.pin }) })
+  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify({ token: tokenOf(on.link), pin: on.pin }) })
   const cookie = r.headers.get('set-cookie')!.split(';')[0]
-  const far = (method: string, params = {}) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin, cookie }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  const far = (method: string, params = {}) => farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin, cookie }, body: JSON.stringify({ method, params }) }).then(r => r.json())
   const [d] = (await rig.rpc('state')).remoteDevices
   assert.equal(d.level, 'answer', 'the session\'s as it paired')
   await rig.rpc('settingsSet', { remoteLevel: 'full' })

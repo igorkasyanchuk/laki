@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Remote access is end to end: what the phone and the Mac say is sealed between them, so the tunnel's provider can't read or log it. Pages opened before need a new link.
 - Laki AI on your own endpoint (Settings › AI › Runs with: Your endpoint): any OpenAI-compatible server, a local one or a provider, with its own key and a Test button.
 - Tab completion for the CLI: `laki completion zsh|bash|fish`, with your workspaces', projects' and profiles' names.
 - `laki mcp` lists its core tools and `laki_more`, which adds a group (sessions, PRs, schedule, widgets…): far less in an agent's context. `laki mcp --all` lists every one.

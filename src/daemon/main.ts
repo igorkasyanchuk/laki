@@ -25,6 +25,7 @@ import * as hostsMod from './hosts.ts'
 import * as prMod from './pr.ts'
 import * as filesMod from './files.ts'
 import * as remoteMod from './remote.ts'
+import * as e2e from './e2e.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
@@ -1290,22 +1291,47 @@ const server = createServer(async (req, res) => {
   if (device && remoteMod.deviceLocks(device)) return reply(423, { error: 'this device unlocks on its page first (a passkey)' }) // D6: no call outside an unlocked page's socket
   if (!mine && !device && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
   const app = isApp(bearer, req.headers.origin)
-  let body = ''
+  // S14: remote access's /rpc is sealed: a salt of the page's own in x-laki-e2e (never one seen in the last 10 minutes),
+  // its body a frame (e2e.ts), the answer one too. A clear call: refused (426)
+  const sealedSalt = far ? saltOf(req.headers['x-laki-e2e']) : undefined
+  if (far && !sealedSalt) return req.headers['x-laki-e2e'] ? reply(400, { error: 'a salt seen before: a replay' }) : reply(426, { error: OLD_PAGE })
+  const chunks: Buffer[] = []
+  let size = 0
   for await (const chunk of req) {
-    body += chunk
-    if (body.length > 16 << 20) return reply(413, { error: 'too big' })
+    chunks.push(chunk)
+    if ((size += chunk.length) > 16 << 20) return reply(413, { error: 'too big' })
   }
+  let body = Buffer.concat(chunks).toString()
+  let sealedCh: e2e.Channel | undefined
+  if (sealedSalt) {
+    const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), sealedSalt, Buffer.concat(chunks))
+    if (!f) return reply(400, { error: 'not sealed with its key' })
+    sealedCh = f.ch
+    body = String(f.plain)
+  }
+  const reply2 = (code: number, o: object) => (sealedCh ? (res.writeHead(code, { 'content-type': 'application/octet-stream' }), res.end(sealedCh.seal(JSON.stringify(o)))) : reply(code, o))
   try {
     const { method, params } = JSON.parse(body)
     // S1: the app's token for the app's own process, with daemon.json's: a daemon it didn't start (appPeer checks it)
     if (method === 'termHeld') return reply(200, { result: !far && (await termHeld(req.socket)) }) // S1: the CLI's own, while its call waits for Allow this terminal
     if (method === 'appPair') return reply(200, !far && !mine && !app && (await core.appPeer(req.socket.remotePort ?? 0)) ? { result: { token: appToken } } : { error: "only Laki's app gets its token" })
     // remote access's: a Conn of its own (no socket to look up), its device's for D7's level
-    reply(200, { result: (await (far ? call(method, params, { id: 0, remote: true, ...(device && { device }), send: () => {} }) : call(method, params, undefined, false, req.socket, mine?.kind === 'agent' ? mine : undefined, app))) ?? null })
+    reply2(200, { result: (await (far ? call(method, params, { id: 0, remote: true, ...(device && { device }), send: () => {} }) : call(method, params, undefined, false, req.socket, mine?.kind === 'agent' ? mine : undefined, app))) ?? null })
   } catch (e) {
-    reply(200, { error: (e as Error).message })
+    reply2(200, { error: (e as Error).message })
   }
 })
+// S14: a sealed /rpc's salt (16 bytes, base64), once: one seen in the last 10 minutes is a replay
+const saltsSeen = new Map<string, number>()
+function saltOf(h: unknown): Buffer | undefined {
+  const b = typeof h === 'string' && /^[A-Za-z0-9+/]{22}==$/.test(h) ? Buffer.from(h, 'base64') : undefined
+  const now = Date.now()
+  for (const [k, at] of saltsSeen) if (now - at > 600e3) saltsSeen.delete(k)
+  if (!b || saltsSeen.has(h as string) || saltsSeen.size > 10000) return undefined
+  saltsSeen.set(h as string, now)
+  return b
+}
+const OLD_PAGE = 'Laki was updated: remote access is end to end now. Open a new link from Laki on your Mac (Settings › Remote access).'
 
 // L15: a refused WebSocket logged once per address and Origin, then how many more once a minute: a page that retries
 // for good doesn't fill daemon.log. ponytail: daemon.log still rotates only as a daemon starts (conn.ts)
@@ -1384,22 +1410,27 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   }
   wss.handleUpgrade(req, socket, head, ws => {
     if (!far) return opened(ws)
-    // its first message within 5 s: { auth: <its token> }; anything else closes it, nothing sent before
+    // S14: its salt in clear, then its first message within 5 s, sealed (e2e.ts): { auth: <its token> }; a clear one
+    // (a page from before S14) or one no secret opens closes it, nothing else sent
+    const salt = e2e.salt()
+    ws.send(JSON.stringify({ e2e: 1, salt: salt.toString('base64') }))
     const late = setTimeout(() => ws.close(4401, 'no auth'), 5000)
-    ws.once('message', raw => {
+    ws.once('message', (raw, binary) => {
       clearTimeout(late)
+      if (!binary) return ws.close(4426, OLD_PAGE)
+      const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), salt, Buffer.isBuffer(raw) ? raw : Buffer.concat(raw as Buffer[]))
       let said: unknown
       try {
-        said = JSON.parse(String(raw))?.auth
+        said = f && JSON.parse(String(f.plain))?.auth
       } catch {}
-      if (typeof said === 'string' && tokenOk(said, req.headers.origin)) return opened(ws)
-      const device = remoteMod.deviceOf(req.headers.cookie) // D3: a paired device: its cookie, with the Origin checked above
-      if (device) return opened(ws, device)
-      refusedWs(`${req.socket.remoteAddress ?? '?'} ${req.headers.origin} (a bad auth message)`)
-      ws.close(4401, 'bad token')
+      if (f && typeof said === 'string' && tokenOk(said, req.headers.origin)) return opened(ws, undefined, f.ch)
+      const device = f && remoteMod.deviceOf(req.headers.cookie) // D3: a paired device: its cookie, with the Origin checked above
+      if (device) return opened(ws, device, f.ch)
+      refusedWs(`${req.socket.remoteAddress ?? '?'} ${req.headers.origin} (${f ? 'a bad auth message' : 'not sealed with its key'})`)
+      ws.close(4401, f ? 'bad token' : 'bad key')
     })
   })
-  function opened(ws: import('ws').WebSocket, device?: string) {
+  function opened(ws: import('ws').WebSocket, device?: string, ch?: e2e.Channel) {
     if (device) devSocks.set(ws, device), ws.once('close', () => devSocks.delete(ws))
     if (far) farSocks.add(ws), ws.once('close', () => farSocks.delete(ws))
     const locked = !!device && remoteMod.deviceLocks(device) // D6: its page unlocks first (a passkey, or the PIN)
@@ -1425,7 +1456,8 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         if (isState && !known) return
         if (isState && (!mine || (agent && core.state.settings?.recording)))
           msg = (m => ({ ...m, view: (v => (far && v.remote ? { ...v, remote: { ...v.remote, level: remoteMod.levelOf(c.device) } } : v))((v => (mine ? v : masked(v)))(agent ? recorded(m.view) : m.view)) }))(typeof msg === 'string' ? JSON.parse(msg) : msg) // D7: a remote page's own access
-        ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg)) // a string: JSON already (core's state, made once for all)
+        const text = typeof msg === 'string' ? msg : JSON.stringify(msg) // a string: JSON already (core's state, made once for all)
+        ws.send(ch ? ch.seal(text) : text) // S14: remote access's, sealed
       },
     }
     // looked up as it opens: the app's first keys don't wait. In Recording mode the first state waits for it (S7)
@@ -1440,13 +1472,16 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
       const late = setTimeout(first, 500)
       void who.then(() => (clearTimeout(late), first()))
     } else first()
+    const dk = device && ch ? remoteMod.deviceKeyNew(req.headers.cookie) : undefined // S14: a paired device's own key, given inside its sealed socket (its next visits have no link)
+    if (dk) ws.send(ch!.seal(JSON.stringify({ ev: 'e2e-device', key: dk.toString('base64') }))) // past a locked page's filter: it can't come in again without it
     if (!c.locked) widgetAsks(c), noticesTo(c), termAsksTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
-    ws.on('message', async raw => {
+    ws.on('message', async (raw, binary) => {
       let m: { id?: number; method: string; params?: any }
       try {
-        m = JSON.parse(String(raw))
-      } catch {
+        m = JSON.parse(ch ? String(ch.open(binary ? (raw as Buffer) : Buffer.alloc(0))) : String(raw)) // S14: a frame that isn't sealed, a wrong tag or a counter seen: the socket closes
+      } catch (e) {
+        if (ch) ws.close(4400, (e as Error).message.slice(0, 100))
         return
       }
       // D6: a paired device's page: its last call kept; a passkey one's locked again after its idle minutes, and while

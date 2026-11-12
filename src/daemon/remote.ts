@@ -3,6 +3,7 @@
 
 import { spawn } from 'node:child_process'
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
+import { secret as e2eSecret, unwrap, wrap } from './e2e.ts'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
@@ -593,7 +594,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
 // left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
 // again (remoteAgain), its address before, why it's down
-type RemoteRun = { byLock?: boolean; graceUntil?: number; check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
+type RemoteRun = { e2e: Buffer; byLock?: boolean; graceUntil?: number; check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
@@ -602,7 +603,7 @@ const hashOf = (t: string) => createHash('sha256').update(t).digest('hex')
 export const accessOk = (t: unknown) => !!remote?.used && !!remote.access && typeof t === 'string' && !!t && same(hashOf(t), remote.access)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { ...(remote.check && { check: remote.check }), mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
+  remote && { ...(remote.check && { check: remote.check }), mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}&k=${remote.e2e.toString('base64url')}` } // S14: k, its end-to-end secret: never sent either // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 const newPin = () => String(randomInt(0, 1e6)).padStart(6, '0')
 const hex = () => randomBytes(32).toString('hex')
@@ -612,7 +613,7 @@ const hex = () => randomBytes(32).toString('hex')
 function keepRemote() {
   const r = remote
   if (!r) return
-  state.remote = { mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }) }
+  state.remote = { mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }), ...(stable(r) && { e2e: r.e2e.toString('base64') }) } // S14: a stable address's page reconnects after a restart with the secret it has
   save()
 }
 const forget = () => state.remote && (delete state.remote, save())
@@ -647,7 +648,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   const { bin, peers } = ts ? await tsReady() : (await cfReady(!!mail), { bin: '', peers: 0 })
   if (host) await routeDns(n!.name, host) // its DNS record: made once, this tunnel's (never over another's)
   if (remote) return remoteView() // started meanwhile
-  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: hex(), access: '', tries: 0, ...(open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel, peers }), ...(host && { host, named: n!.name }) }
+  const r: RemoteRun = { e2e: e2eSecret(), mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: hex(), access: '', tries: 0, ...(open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel, peers }), ...(host && { host, named: n!.name }) }
   if (pin) Object.assign(r, { pin: newPin(), left: triesOf() })
   if (o.lock === true) r.byLock = true // D9: the Mac's lock started it: its unlock stops it
   remote = r
@@ -716,7 +717,7 @@ function remoteAt(r: RemoteRun, u: string | undefined) {
   const was = r.was
   Object.assign(r, { url: u, down: undefined, tries: 0, moved: !!was && was !== u })
   if (r.moved) {
-    Object.assign(r, { token: hex(), access: '', used: false, ...(r.pin && { pin: newPin(), left: triesOf() }) })
+    Object.assign(r, { e2e: e2eSecret(), token: hex(), access: '', used: false, ...(r.pin && { pin: newPin(), left: triesOf() }) })
     log(`remote access: back at ${u} (was ${was}): a new link`)
     phoneRemote(`Laki: remote access moved to a new address${r.pin ? ' with a new PIN (on your Mac)' : ''}: tap to open it`, { url: remoteView()?.link, open: r.open })
     broadcast({ ev: 'remote', text: 'Remote access is back at a new address: open its new link from Settings › Remote access (the old one has ended).' })
@@ -740,7 +741,7 @@ export function remoteBack(now = Date.now()) {
   const ts = s.via === 'tailscale'
   const mail = typeof s.mail === 'string' ? s.mail : ''
   if ((s.until && s.until <= now) || (!ts && !s.pin && !s.open && !s.host && !ONE_MAIL.test(mail)) || (s.host !== undefined && (typeof s.host !== 'string' || typeof s.named !== 'string'))) return forget()
-  const r: RemoteRun = { mail: ts || s.pin || s.open ? '' : mail, until: typeof s.until === 'number' ? s.until : undefined, token: hex(), access: typeof s.access === 'string' ? s.access : '', used: typeof s.access === 'string', tries: 0, was: typeof s.url === 'string' ? s.url : undefined, down: 'starting again after a restart', ...(s.open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel: !!s.funnel }), ...(s.host && { host: s.host, named: s.named }) }
+  const r: RemoteRun = { e2e: typeof s.e2e === 'string' && Buffer.from(s.e2e, 'base64').length === 32 ? Buffer.from(s.e2e, 'base64') : e2eSecret(), mail: ts || s.pin || s.open ? '' : mail, until: typeof s.until === 'number' ? s.until : undefined, token: hex(), access: typeof s.access === 'string' ? s.access : '', used: typeof s.access === 'string', tries: 0, was: typeof s.url === 'string' ? s.url : undefined, down: 'starting again after a restart', ...(s.open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel: !!s.funnel }), ...(s.host && { host: s.host, named: s.named }) }
   if (s.pin || s.host) Object.assign(r, { pin: newPin(), left: triesOf() })
   remote = r
   log('remote access: starting again after a restart')
@@ -794,7 +795,7 @@ const DEVICE_COOKIE = '__Host-laki-device'
 const PAIR_MS = 10 * 60e3
 const stable = (r: RemoteRun) => !!(r.host || r.via)
 const deviceDays = () => (n => (Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30))(Number(state.settings?.remoteDeviceDays))
-export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, pk, regUntil: __, ...d }) => ({ ...d, ...(push && { notify: true }), ...(pk && { passkey: true }) })) : undefined) // never its hash, its push keys or its passkey
+export const remoteDevices = (): RemoteDevice[] | undefined => (state.remoteDevices?.length ? state.remoteDevices.map(({ hash: _, push, pk, regUntil: __, ek: ___, ...d }) => ({ ...d, ...(push && { notify: true }), ...(pk && { passkey: true }) })) : undefined) // never its hash, its push keys or its passkey
 let gone: (ids: string[]) => void = () => {}
 export const onGone = (f: (ids: string[]) => void) => void (gone = f) // main.ts: a revoked or expired device's sockets closed
 let stopped = () => {}
@@ -822,6 +823,29 @@ export function deviceOf(cookie: string | undefined, now = Date.now()): string |
   if (!d || d.until <= now) return undefined
   if (now - d.seenAt > 60000) (d.seenAt = now), save(), changed()
   return d.id
+}
+// S14: the secrets a remote connection's first frame may be sealed with: the link's, and its device's key (by its
+// cookie, unwrapped with the cookie's token: e2e.ts wrap)
+export function e2eSecrets(cookie: string | undefined): Buffer[] {
+  const r = remote
+  if (!r) return []
+  const t = cookieOf(cookie)
+  const id = deviceOf(cookie)
+  const d = id ? deviceById(id) : undefined
+  const k = d?.ek && t ? unwrap(t, d.ek) : undefined
+  return [...(k ? [k] : []), r.e2e]
+}
+// a paired device with no key of its own yet (just paired, or paired before S14): one made and kept, wrapped, given to
+// its page inside its sealed connection (main.ts); one it has: none
+export function deviceKeyNew(cookie: string | undefined): Buffer | undefined {
+  const t = cookieOf(cookie)
+  const id = deviceOf(cookie)
+  const d = id ? deviceById(id) : undefined
+  if (!d || !t || (d.ek && unwrap(t, d.ek))) return undefined
+  const k = e2eSecret()
+  d.ek = wrap(t, k)
+  save()
+  return k
 }
 // M4: the page as an app (main.ts' manifest and service worker) only at a stable address: an installed app keeps its
 // origin, and its device's cookie is its way back in after each start (a quick tunnel's address is new each time)

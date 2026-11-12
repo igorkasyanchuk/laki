@@ -339,3 +339,27 @@ the daemon when remote access ends (a service's `Restart=always` starts it again
 Chromium touches a display) makes `Laki.AppImage --headless …` work with no X server and no `--no-sandbox` (tried in
 Docker: `scripts/linux.sh`'s image without Xvfb). It passes `LAKI_HEADLESS_PARENT`: `serve` stops when its parent goes
 (a kill of that pid alone), remote access with it.
+
+### End to end (S14)
+
+`e2e.ts` (node:crypto) and the page's `renderer/src/e2e.ts` (WebCrypto): a connection's key `keyOf(secret, salt)`,
+HKDF-SHA-256, info `laki-remote-e2e-v1`; a frame `seal`/`open`: 12 bytes of nonce (4 of direction, `PAGE` 0 and
+`DAEMON` 1, then an 8-byte counter), the ciphertext, the 16-byte tag; `channel` keeps each side's counter, refusing one
+not higher than the last. The secret: `RemoteRun.e2e` (32 random bytes a start, new when a quick tunnel's address moves;
+kept for a stable address as `state.remote.e2e`, so its pages reconnect after a restart; the same across Add a device),
+in the link as `&k=` (base64url) beside `#t=`; or a paired device's own (`SavedDevice.ek`: `wrap`ped with a key from
+its cookie's token, so state.json alone opens nothing; `deviceKeyNew` makes one the first time a device's socket opens
+sealed and main.ts sends it as `{ ev: 'e2e-device', key }` inside it, past a locked page's filter). `e2eSecrets(cookie)`:
+the device's then the link's; `first` opens a connection's first frame with whichever fits.
+
+The socket (main.ts' upgrade, remote origin only): the daemon sends `{ e2e: 1, salt }` in clear, then the first message
+within 5 s must be a sealed `{ auth }` (S11's token, or `device` with its cookie): a clear one closes 4426 (`OLD_PAGE`:
+open a new link), one no secret opens 4401 `bad key`. Then every frame both ways is sealed (`Conn.send` seals, a
+message that doesn't open, or opens out of order, closes 4400). `/rpc` from the remote origin: a salt of the page's own
+in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay), its body a sealed frame, the answer sealed
+(`application/octet-stream`); none: 426 after the token check (so the page's `whyNot` still tells a dead link by 401).
+The page (`api.ts`): `pageToken` takes `k` out of the hash as it does `t`; `sealUp` imports it (not extractable),
+keeps it in IndexedDB (`laki-e2e`, `keys`: `link`, `device`), and seals with this tab's link key, else the device's, else
+a kept link one; sends go through `out` one after another (their counters in order), frames are opened in the order
+they came. A 4426 or a `bad key` close says so on the splash. The rig's `tokenOf` keeps a link's secret by origin for
+`farFetch` and `FarWs` (test/helpers.ts).

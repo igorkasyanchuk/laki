@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, until, tokenOf, farFetch, FarWs } from './helpers.ts'
 
 const kids = (data: string) => (f => (existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as { pid: number }[]) : []))(join(data, 'children.json'))
 const saved = (data: string) => JSON.parse(readFileSync(join(data, 'state.json'), 'utf8')).remote
@@ -23,7 +23,7 @@ async function named(rig: Awaited<ReturnType<typeof fresh>>) {
   await rig.rpc('settingsSet', { tunnel: { name: 'laki', domain: 'example.dev' } })
 }
 const pinAt = (port: number, origin: string, body: object) => fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
-const ping = (port: number, token: string, origin?: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: '{"method":"ping"}' }).then(r => r.status)
+const ping = (port: number, token: string, origin?: string) => farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: '{"method":"ping"}' }).then(r => r.status)
 
 test('D1: My domain, a stable address on your named tunnel: the same origin each start, a PIN always, the connector shared; refusals', async t => {
   const rig = await fresh(t)
@@ -39,11 +39,11 @@ test('D1: My domain, a stable address on your named tunnel: the same origin each
   const url = 'https://laki.example.dev'
   assert.deepEqual([on.url, on.host, on.mail], [url, 'laki.example.dev', ''])
   assert.match(on.pin, /^\d{6}$/)
-  assert.match(on.link, new RegExp(`^${url}/#t=[0-9a-f]{64}$`))
+  assert.match(on.link, new RegExp(`^${url}/#t=[0-9a-f]{64}&k=[\\w-]{43}$`))
   assert.match(log(), /cloudflared tunnel route dns laki laki\.example\.dev\n/)
   assert.match(ingress(), new RegExp(`- hostname: laki\\.example\\.dev\\n {4}service: http://127\\.0\\.0\\.1:${port}\\n`))
   // its page: the PIN, then it's paired (D3: a cookie of its own), from that origin only
-  const key = on.link.split('#t=')[1]
+  const key = tokenOf(on.link)
   assert.deepEqual(await pinAt(port, url, { token: key }), { need: true, left: 2 })
   const jar = (await pinRaw(port, url, { token: key, pin: on.pin })).cookie!.split(';')[0]
   assert.equal(await rpcAt(port, url, jar), 200)
@@ -70,6 +70,7 @@ test('D1: My domain, a stable address on your named tunnel: the same origin each
   const again = await rig.rpc('remoteStart', { hours: 2, host: 'laki' })
   assert.equal(again.url, url)
   assert.notEqual(again.link, on.link)
+  tokenOf(again.link) // S14: a new secret with the new start (a paired page's own key works too: D2, D3's test)
   assert.equal(await rpcAt(port, url, jar), 200) // the same device, paired still: a bookmark works
   assert.equal(await ping(port, 'f'.repeat(64), url), 401)
   assert.equal(await rpcAt(port, 'https://fake.trycloudflare.com', jar), 403)
@@ -135,10 +136,10 @@ async function pinRaw(port: number, origin: string, body: object, headers: Recor
 }
 const UA = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }
 // a paired device's socket: its cookie, its origin, any word as its auth; closed: its code
-function devSock(port: number, origin: string, cookie: string) {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin, headers: { cookie } })
+function devSock(port: number, origin: string, cookie: string, secret?: Buffer) {
+  const ws = new FarWs(port, origin, { cookie }, 'device', secret)
   const shut = new Promise<number>(r => ws.once('close', code => r(code)))
-  const open = new Promise<void>((res, rej) => (ws.once('open', () => (ws.send(JSON.stringify({ auth: 'device' })), res())), ws.once('error', rej)))
+  const open = new Promise<void>((res, rej) => (ws.once('open', () => res()), ws.once('error', rej)))
   let seq = 0
   const call = (method: string, params: object = {}) =>
     new Promise<any>((res, rej) => {
@@ -148,20 +149,43 @@ function devSock(port: number, origin: string, cookie: string) {
     })
   return { ws, shut, open, call }
 }
-const rpcAt = (port: number, origin: string | undefined, cookie?: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', ...(origin && { origin }), ...(cookie && { cookie }) }, body: '{"method":"ping"}' }).then(r => r.status)
+// S14: a paired device's own key, as its page's first sealed socket gets it (the link's secret seals that one)
+async function keyOfDevice(port: number, origin: string, cookie: string) {
+  const d = devSock(port, origin, cookie)
+  const given = new Promise<string>(r => d.ws.on('message', raw => (m => m.ev === 'e2e-device' && r(m.key))(JSON.parse(String(raw)))))
+  await d.open
+  const k = Buffer.from(await given, 'base64')
+  d.ws.close()
+  return k
+}
+const rpcAt = (port: number, origin: string | undefined, cookie?: string) => farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', ...(origin && { origin }), ...(cookie && { cookie }) }, body: '{"method":"ping"}' }).then(r => r.status)
 
 test('D2, D3: a stable address (My domain) comes back as it was after a restart: the paired page gets in again by its cookie', async t => {
   const rig = await fresh(t)
   await named(rig)
   const url = 'https://laki.example.dev'
   const on = await rig.rpc('remoteStart', { hours: 4, host: '' })
-  const { json, cookie } = await pinRaw(rig.info().port, url, { token: on.link.split('#t=')[1], pin: on.pin }, UA)
+  const { json, cookie } = await pinRaw(rig.info().port, url, { token: tokenOf(on.link), pin: on.pin }, UA)
   assert.deepEqual(json, { need: false, device: true })
   const jar = cookie!.split(';')[0]
+  // S14: its first sealed socket (with the link's secret) gets the device's own key; at rest only wrapped
+  const pre = devSock(rig.info().port, url, jar)
+  const given = new Promise<string>(r => pre.ws.on('message', raw => (m => m.ev === 'e2e-device' && r(m.key))(JSON.parse(String(raw)))))
+  await pre.open
+  const devKey = await given
+  pre.ws.close()
+  assert.equal(Buffer.from(devKey, 'base64').length, 32)
+  assert.ok(!readFileSync(join(rig.data, 'state.json'), 'utf8').includes(devKey), 'kept wrapped')
   await rig.stop()
   await rig.start()
   const { port } = rig.info()
   await until(async () => (r => r?.url === url && !r.down)((await rig.rpc('stateOwn')).remote), 'back at its address')
+  const mine = devSock(port, url, jar, Buffer.from(devKey, 'base64')) // S14: no link this time: the device's own key
+  await mine.open
+  assert.equal(await mine.call('ping'), 'pong')
+  mine.ws.close()
+  const stranger = devSock(port, url, jar, Buffer.alloc(32, 7))
+  assert.equal(await stranger.shut, 4401, 'another key')
   const r = (await rig.rpc('stateOwn')).remote
   assert.deepEqual([r.until, r.was], [on.until, undefined])
   assert.equal(await rpcAt(port, url, jar), 200) // the same page, reconnected
@@ -180,7 +204,7 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   const on = await rig.rpc('remoteStart', { hours: 0, host: 'laki' })
   const { port } = rig.info()
   // paired: an HttpOnly, Secure, SameSite=Strict cookie on its origin; its token only there, the daemon keeps its hash
-  const first = await pinRaw(port, url, { token: on.link.split('#t=')[1], pin: on.pin }, UA)
+  const first = await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin }, UA)
   assert.deepEqual(first.json, { need: false, device: true })
   assert.match(first.cookie!, /^__Host-laki-device=[0-9a-f]{64}; Path=\/; Max-Age=\d+; HttpOnly; Secure; SameSite=Strict$/)
   const jar = first.cookie!.split(';')[0]
@@ -193,7 +217,7 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   assert.ok(!disk.includes(token) && !rig.out.includes(token), 'never its token, only its hash')
   assert.match((await until(async () => app.events.find(e => e.ev === 'remote' && /new device/.test(e.text)), 'the Mac told')).text, /A new device joined remote access: iPhone · Safari/)
   // the link is used: nothing more from it; the cookie alone gets the page in (a closed tab, a new one)
-  assert.deepEqual((await pinRaw(port, url, { token: on.link.split('#t=')[1], pin: on.pin })).json, { need: false })
+  assert.deepEqual((await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin })).json, { need: false })
   assert.deepEqual((await pinRaw(port, url, {}, { cookie: jar })).json, { need: false, device: true })
   assert.equal(await rpcAt(port, url, jar), 200)
   assert.equal(await rpcAt(port, 'https://evil.example', jar), 403) // CSRF: its origin only
@@ -202,14 +226,14 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   await a.open
   assert.equal(await a.call('ping'), 'pong')
   // not from the phone, nor an agent: pairing or revoking
-  const far = (method: string, params = {}) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin: url, cookie: jar }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  const far = (method: string, params = {}) => farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin: url, cookie: jar }, body: JSON.stringify({ method, params }) }).then(r => r.json())
   for (const m of ['remotePair', 'remoteDeviceRm']) assert.match((await far(m, { all: true })).error ?? '', /not over remote access/, m)
 
   // a second device: Add a device's link (10 minutes, once), its own cookie; both in at once
   const more = await rig.rpc('remotePair')
   assert.notEqual(more.link, on.link)
   assert.ok(more.pairUntil > Date.now() + 9 * 60e3 && more.pairUntil <= Date.now() + 10 * 60e3)
-  const second = await pinRaw(port, url, { token: more.link.split('#t=')[1], pin: more.pin }, { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36' })
+  const second = await pinRaw(port, url, { token: tokenOf(more.link), pin: more.pin }, { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36' })
   const jar2 = second.cookie!.split(';')[0]
   assert.notEqual(jar2, jar)
   assert.deepEqual((await devices()).map((d: any) => d.name), ['iPhone · Safari', 'Mac · Chrome'])
@@ -233,7 +257,7 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   // a stop keeps the devices, but nothing connects; Forget devices clears them
   await rig.rpc('settingsSet', { remoteDeviceDays: 1 })
   const p3 = await rig.rpc('remotePair')
-  const third = await pinRaw(port, url, { token: p3.link.split('#t=')[1], pin: p3.pin })
+  const third = await pinRaw(port, url, { token: tokenOf(p3.link), pin: p3.pin })
   assert.ok(Math.abs(Number(/Max-Age=(\d+)/.exec(third.cookie!)![1]) - 86400) < 10)
   const jar3 = third.cookie!.split(';')[0]
   await rig.rpc('remoteStop')
@@ -245,7 +269,7 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   await assert.rejects(rig.rpc('remotePair'), /isn't running/)
   const quick = await rig.rpc('remoteStart', { hours: 1, pin: true })
   await assert.rejects(rig.rpc('remotePair'), /devices need a stable address/)
-  const q = await pinRaw(port, quick.url, { token: quick.link.split('#t=')[1], pin: quick.pin })
+  const q = await pinRaw(port, quick.url, { token: tokenOf(quick.link), pin: quick.pin })
   assert.equal(q.cookie, undefined)
   assert.match(q.json.token, /^[0-9a-f]{64}$/)
   app.close()
@@ -258,9 +282,9 @@ test('D5: wrong PINs wait 1, 5, then 30 minutes instead of stopping; a right one
   const app = await connect(rig)
   const on = await rig.rpc('remoteStart', { hours: 0, host: '' })
   const { port } = rig.info()
-  const paired = (await pinRaw(port, url, { token: on.link.split('#t=')[1], pin: on.pin })).cookie!.split(';')[0]
+  const paired = (await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin })).cookie!.split(';')[0]
   const link = await rig.rpc('remotePair')
-  const key = link.link.split('#t=')[1]
+  const key = tokenOf(link.link)
   const wrongOf = (pin: string) => (pin === '000000' ? '111111' : '000000')
   const ip = { 'cf-connecting-ip': '203.0.113.9' }
   const view = async () => (await rig.rpc('stateOwn')).remote
@@ -288,7 +312,7 @@ test('D5: wrong PINs wait 1, 5, then 30 minutes instead of stopping; a right one
   // the waits grow, 1, 5, 30, 30 minutes, and 20 wrong in a day stop it
   await rig.rpc('settingsSet', { remoteTries: 3 })
   const l2 = await rig.rpc('remotePair')
-  const k2 = l2.link.split('#t=')[1]
+  const k2 = tokenOf(l2.link)
   const w2 = wrongOf(l2.pin)
   const waits: string[] = []
   let last = ''
@@ -326,7 +350,7 @@ test('M4: at a stable address the page is an app: its manifest and service worke
   assert.match(js, /fetch\('\/tap'/)
   assert.ok(!/\/rpc|\/pin|token/.test(js.replace(/OFFLINE = .*/, '')), 'it caches no API and holds no token')
   // a paired device: the key to subscribe with, its subscription (a browser vendor's service only)
-  const { cookie } = await pinRaw(port, url, { token: on.link.split('#t=')[1], pin: on.pin }, UA)
+  const { cookie } = await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin }, UA)
   const jar = cookie!.split(';')[0]
   const push = (body: object, c = jar) => fetch(`${at}/push`, { method: 'POST', headers: { origin: url, cookie: c }, body: JSON.stringify(body) }).then(async r => [r.status, await r.json()])
   const [code, { key }] = await push({})
@@ -399,7 +423,8 @@ test('D9: remote access while the Mac is locked: started by the lock (My domain,
   const remote = async () => (await rig.rpc('stateOwn')).remote
   // a device paired once, by hand
   const first = await rig.rpc('remoteStart', { hours: 1, host: '' })
-  const jar = (await pinRaw(rig.info().port, url, { token: first.link.split('#t=')[1], pin: first.pin }, UA)).cookie!.split(';')[0]
+  const jar = (await pinRaw(rig.info().port, url, { token: tokenOf(first.link), pin: first.pin }, UA)).cookie!.split(';')[0]
+  const devKey = await keyOfDevice(rig.info().port, url, jar) // S14: its page's first socket gets its own key: the lock's start has a new link
   await rig.rpc('remoteStop')
   await rig.rpc('screenLock', { locked: true })
   assert.equal(await remote(), undefined, 'not asked for: a lock starts nothing')
@@ -408,7 +433,7 @@ test('D9: remote access while the Mac is locked: started by the lock (My domain,
   await rig.rpc('screenLock', { locked: true })
   await until(async () => (await remote())?.url === url, 'started by the lock')
   const { port } = rig.info()
-  const dev = devSock(port, url, jar)
+  const dev = devSock(port, url, jar, devKey)
   await dev.open
   t.after(() => dev.ws.close())
   // from the phone: a read, a message, an answer

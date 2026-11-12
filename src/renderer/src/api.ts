@@ -5,6 +5,7 @@
 import type { InboxItem, TrayInfo } from '../../shared/tray'
 import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
+import { baseKey, type Channel, channel, fromB64, keyGet, keyPut } from './e2e'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
 export type NotifyAction = { text: string; reply?: boolean /* U15: a free-text question's Reply field (macOS), not a button */; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
@@ -91,9 +92,12 @@ const keep = (t: string) => {
   } catch {}
 }
 // S11: the link's key comes in the hash (#t=…): a browser never sends it, so no proxy or log has it
+let linkK = '' // S14: the link's end-to-end secret (#k=), until it's kept in IndexedDB as a key the page can't read back
 function pageToken() {
   const h = new URLSearchParams(location.hash.slice(1))
   const t = h.get('t')
+  const k = h.get('k')
+  if (k) (linkK = k), h.delete('k')
   if (t) {
     keep(t)
     h.delete('t')
@@ -174,14 +178,36 @@ class Api {
       }
       const ws = new WebSocket(to.url)
       this.ws = ws
-      ws.onopen = () => {
-        if (to.remote) ws.send(JSON.stringify({ auth: to.token })) // S11: first, before any call
-        this.connected = true
-        this.fails = 0
-        this.emit({ ev: 'open' })
-      }
+      this.ch = undefined
+      ws.binaryType = 'arraybuffer'
+      const up = () => ((this.connected = true), (this.fails = 0), this.emit({ ev: 'open' }))
+      ws.onopen = () => !to.remote && up() // S14: remote access's opens once it's sealed (its salt first)
+      let inQ: Promise<unknown> = Promise.resolve()
       ws.onmessage = e => {
-        const m = JSON.parse(e.data)
+        if (!to.remote) return handle(JSON.parse(e.data))
+        if (typeof e.data === 'string') return void sealUp(e.data) // its salt, in clear: the rest are sealed
+        const data = e.data as ArrayBuffer
+        inQ = inQ.then(() => this.ch?.open(data).then(t => handle(JSON.parse(t)), () => ws.close(4000, 'a frame that does not open')))
+      }
+      // S14: the daemon's salt; the secret: the link's (just opened, or this tab's), else this device's own; the first
+      // frame, sealed, says who it is (S11's auth)
+      const sealUp = async (said: string) => {
+        const salt = (j => (j?.e2e === 1 && typeof j.salt === 'string' ? fromB64(j.salt) : null))(JSON.parse(said))
+        if (!salt) return ws.close()
+        if (linkK) {
+          const k = await baseKey(fromB64(linkK))
+          linkK = ''
+          await keyPut('link', k)
+          this.linkKey = k
+        }
+        const base = this.linkKey ?? (await keyGet('device')) ?? (await keyGet('link')) // a stable address's link pairs: its device's key outlives a run's link
+        if (!base) return this.emit({ ev: 'problem', text: "This page has no key for Laki on your Mac: open a new link from Laki (Settings › Remote access)." }), ws.close()
+        this.ch = await channel(base, salt)
+        this.out(JSON.stringify({ auth: to.token }))
+        up()
+      }
+      const handle = (m: any) => {
+        if (m.ev === 'e2e-device' && typeof m.key === 'string') return void baseKey(fromB64(m.key)).then(k => keyPut('device', k)) // D3: its next visits (no link) seal with it
         if (m.ev === 'locked') this.locked = true // D6: a passkey device's page, until its state comes
         if (m.ev === undefined && m.id !== undefined) { // a reply; an event may carry an id of its own (a workflow run's)
           const w = this.waiting.get(m.id)
@@ -197,7 +223,8 @@ class Api {
           if (opens) this.emit({ ev: 'open' }) // D6: unlocked: as a socket that just opened (what it sent while locked was refused): its terminals attach, its view is told, its lists come
         }
       }
-      ws.onclose = () => {
+      ws.onclose = e => {
+        if (e.code === 4426 || (e.code === 4401 && e.reason === 'bad key')) this.emit({ ev: 'problem', text: e.code === 4426 ? e.reason : 'This page\'s key has ended: open a new link from Laki on your Mac (Settings › Remote access).' }) // S14
         const opened = this.connected
         this.connected = false
         this.locked = false
@@ -229,15 +256,25 @@ class Api {
     method = sendAs(method, this.caps) // an older daemon (or no view yet): note.list as noteList
     const id = ++this.seq
     return new Promise((res, rej) => {
-      if (this.ws?.readyState !== WebSocket.OPEN) return rej(new Error('not connected'))
+      if (this.ws?.readyState !== WebSocket.OPEN || !this.connected) return rej(new Error('not connected'))
       this.waiting.set(id, { res: r => (res(r), this.calls.forEach(f => f(method, params, r))), rej })
-      this.ws.send(JSON.stringify({ id, method, params }))
+      this.out(JSON.stringify({ id, method, params }))
     })
   }
 
   // fire and forget (keystrokes, resizes)
   send(method: string, params: object) {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ method: sendAs(method, this.caps), params }))
+    if (this.ws?.readyState === WebSocket.OPEN && this.connected) this.out(JSON.stringify({ method: sendAs(method, this.caps), params }))
+  }
+  // S14: remote access's frames sealed, one after another (their counters in order); the app's as they are
+  private ch: Channel | undefined
+  private linkKey: CryptoKey | undefined
+  private outQ: Promise<unknown> = Promise.resolve()
+  private out(text: string) {
+    const ws = this.ws
+    const ch = this.ch
+    if (!ch) return ws?.send(text)
+    this.outQ = this.outQ.then(() => ch.seal(text).then(f => ws?.readyState === WebSocket.OPEN && ws.send(f)))
   }
 
   on(f: (m: Msg) => void) {

@@ -7,7 +7,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync
 import { join } from 'node:path'
 import { test } from 'node:test'
 import type { SimCheck, SimDev } from '../src/shared/types.ts'
-import { fresh, type Rig, until } from './helpers.ts'
+import { fresh, type Rig, until, tokenOf, farFetch } from './helpers.ts'
 
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
 // a 1×1 PNG: what the fake simulator's screenshot writes
@@ -41,13 +41,13 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   const on = await rig.rpc('remoteStart', { hours: 0, via: 'tailscale' })
   const url = 'https://box.tail1234.ts.net'
   assert.deepEqual([on.url, on.via, on.mail, on.open, on.until, on.peers, on.funnel], [url, 'tailscale', '', undefined, undefined, 1, false]) // no email, never "open"; the other device online
-  assert.match(on.link, /^https:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64}$/)
+  assert.match(on.link, /^https:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64}&k=[\w-]{43}$/)
   assert.match(readFileSync(join(rig.home, 'ts.log'), 'utf8'), new RegExp(`serve --https=443 http://127\\.0\\.0\\.1:${port}\n`))
-  const key = on.link.split('#t=')[1] // good once: a stable address, so it pairs the page (D3: a cookie of its own)
+  const key = tokenOf(on.link) // good once: a stable address, so it pairs the page (D3: a cookie of its own)
   const paired = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: key }) })
   assert.deepEqual(await paired.json(), { need: false, device: true })
   const jar = paired.headers.get('set-cookie')!.split(';')[0]
-  const ping = (origin: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', cookie: jar, origin }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
+  const ping = (origin: string) => farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', cookie: jar, origin }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   assert.equal(await ping(url), 200)
   assert.equal(await ping('https://evil.ts.net'), 403)
 
@@ -56,7 +56,7 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   assert.match(r.out, /box\.tail1234\.ts\.net\/#t=.*\nyour tailnet's devices only\nuntil stopped/)
   const s = await rig.cli('serve', '--tailscale')
   assert.equal(s.code, 0, s.err)
-  assert.match(s.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64} \(opened already: that device is paired[^\n]*\n[^]*in the daemon already running here/)
+  assert.match(s.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64}&k=[\w-]{43} \(opened already: that device is paired[^\n]*\n[^]*in the daemon already running here/)
   assert.match((await rig.cli('serve')).err, /how do you get in\? laki serve --tailscale/)
   assert.match((await rig.cli('serve', '--cloudflare', '--open')).err, /--open lets in anyone with the link: give it --hours \(24 at most\)/)
 
@@ -89,7 +89,7 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   const alone = await rig.cli('serve', '--tailscale')
   delete rig.env.LAKI_HEADLESS_PARENT
   assert.equal(alone.code, 0, alone.err)
-  assert.match(alone.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64} \(it pairs one device\)\n[^]*laki: Laki --headless ended: stopping/)
+  assert.match(alone.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/#t=[0-9a-f]{64}&k=[\w-]{43} \(it pairs one device\)\n[^]*laki: Laki --headless ended: stopping/)
   await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').match(/stopped/g)?.length === 4, 'its tailscale serve went with it')
 })
 

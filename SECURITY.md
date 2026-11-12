@@ -93,6 +93,19 @@ only a device that just paired (with the link and PIN) can register one, on Laki
 unless you turn off *Allow the PIN instead*; a wrong one counts as on the link's page. The passkey is the device's;
 Laki keeps only its public key, never in the view.
 
+### Remote access: end to end
+
+The tunnel's provider (Cloudflare, Tailscale) ends TLS, so without more it could read and log everything the phone and
+the Mac say. Remote access's socket and its `/rpc` are sealed between the page and the daemon (S14, `src/daemon/e2e.ts`,
+`src/renderer/src/e2e.ts`): each connection's key is HKDF-SHA-256 of a secret with a salt the daemon sends as it opens;
+each frame is AES-256-GCM with its own counter (a repeated or lower one closes the socket; a `/rpc` salt seen in the last
+10 minutes is refused). The secret is the link's `#k=` (a browser never sends the hash), or for a paired device a key
+of its own the daemon gives it inside its first sealed socket, which the page keeps in IndexedDB as a key it can't read
+back, and the daemon keeps wrapped with the device's cookie (state.json has neither the cookie nor the key in clear). A
+page from before this, or a call in clear, is refused with *open a new link*. The passkey unlock and Answer only apply
+to what's opened, as before. Still in clear through the tunnel: the page's files, `/pin` (the link's token and the PIN:
+neither seals anything) and `/push`.
+
 ### Remote access: answer only
 
 *Answer only* (Settings › Remote access, for a link's page and each device as it pairs; Devices › *Answer only* for
@@ -120,6 +133,9 @@ project's test script is, which the agent can edit.
 
 ## Known limits
 
+- Remote access end to end stops a tunnel's provider from reading and logging what's said, not from changing it: the
+  page's own code is still served through the tunnel, so a provider that rewrites that script could read what the page
+  sees. A paired device's page that came from a link before S14 has no key of its own: Add a device again.
 - Any program running as your user can read daemon.json's token (`ponytail:` in `src/daemon/main.ts`). A process an
   agent starts that leaves its tab's tree and its terminal (`setsid`, `launchctl submit`) is refused what asks who calls;
   one that then gives itself a terminal of its own (`script`, `expect`, a tmux server it starts, `open x.command`)

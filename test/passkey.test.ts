@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
 import { AT, authData, register, UP, UV, verifyGet } from '../src/daemon/passkey.ts'
-import { fresh, sleep, until } from './helpers.ts'
+import { fresh, sleep, until, tokenOf, farFetch, FarWs } from './helpers.ts'
 
 const b64u = (b: Buffer | string) => Buffer.from(b).toString('base64url')
 const sha = (b: Buffer | string) => createHash('sha256').update(b).digest()
@@ -87,11 +87,11 @@ async function named(rig: Awaited<ReturnType<typeof fresh>>) {
 }
 // a paired device's page: its socket by its cookie, its events, its calls
 async function page(port: number, origin: string, cookie: string) {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin, headers: { cookie } })
+  const ws = new FarWs(port, origin, { cookie }, 'device')
   const events: any[] = []
   const waiting = new Map<number, (m: any) => void>()
   ws.on('message', raw => (m => (m.id !== undefined && !m.ev ? waiting.get(m.id)?.(m) : events.push(m)))(JSON.parse(String(raw))))
-  await new Promise<void>((res, rej) => (ws.once('open', () => (ws.send(JSON.stringify({ auth: 'device' })), res())), ws.once('error', rej)))
+  await new Promise<void>((res, rej) => (ws.once('open', () => res()), ws.once('error', rej)))
   let seq = 0
   const call = (method: string, params: object = {}) =>
     new Promise<any>((res, rej) => {
@@ -109,7 +109,7 @@ test('D6: a paired device sets a passkey up, then each page is locked until its 
   const rpId = 'laki.example.dev'
   const on = await rig.rpc('remoteStart', { hours: 0, host: 'laki' })
   const { port } = rig.info()
-  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify({ token: on.link.split('#t=')[1], pin: on.pin }) })
+  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify({ token: tokenOf(on.link), pin: on.pin }) })
   const cookie = r.headers.get('set-cookie')!.split(';')[0]
 
   // just paired: its page is open (the state), offered a passkey
@@ -138,7 +138,7 @@ test('D6: a paired device sets a passkey up, then each page is locked until its 
   await rig.rpc('settingsSet', { remoteMail: 'x@y.dev' }) // a change: broadcast to every client
   await sleep(200)
   assert.ok(!p.events.some(e => e.ev === 'state'), 'no state while locked')
-  const http = await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin, cookie }, body: '{"method":"state"}' })
+  const http = await farFetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin, cookie }, body: '{"method":"state"}' })
   assert.equal(http.status, 423)
 
   // its signature: unlocked, the state comes
