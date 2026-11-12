@@ -144,7 +144,7 @@
   A gh failure but *no pull requests found* (a rate limit, the network, a timeout) keeps the last PR; the timer's scans
   (`scanPRs(true)`) skip a branch gh found none for within `NONE_EVERY` (5 minutes), all of them for `LIMITED` (5
   minutes) after gh says rate limit, a quiet PR (`quietAt`: the last scan found it as it was, with no pending check and
-  its mergeability known, or not open) within `QUIET` (10 minutes; merged or closed: `SHUT`, 30), and all of them while
+  its mergeability known, or not open) within `settings.prQuiet` minutes (`quietMs`, `PR_QUIET`: 10; Settings › Pull requests › *Check a quiet PR every*, Info's tips with it, never under `prScan`'s; merged or closed: `SHUT`, 30), and all of them while
   GitHub's GraphQL quota is under `FLOOR` (1000 points: `quotaLow`, `gh api rate_limit`, free, asked at most every 5
   minutes; until its reset, logged with Laki's own gh calls); a turn's end, a branch move and `prRefresh` ask at once.
   Every gh of Laki's is counted by kind (core.ts `ghCount`: `exec`'s, codespace.ts', `ghCard`'s; `ghSaid`), its log

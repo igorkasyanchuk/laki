@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
+import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { fenced } from '../shared/fence.ts'
@@ -193,17 +193,17 @@ let prAgain: Set<string> | true | undefined // asked mid-scan: those workspaces 
 // the timer's scans (bg) spare GitHub's GraphQL quota (5000 points an hour, shared with every other gh of yours, your
 // extensions' too): a branch gh found no PR for is asked again after NONE_EVERY, and none at all for LIMITED after gh
 // said rate limit. A quiet PR (the last scan found it as it was, nothing running: no pending check, its mergeability
-// known) is asked again after QUIET, a merged or closed one's after SHUT; and none while the quota is under FLOOR. A
+// known) is asked again after settings.prQuiet minutes (PR_QUIET), a merged or closed one's after SHUT; and none while the quota is under FLOOR. A
 // turn's end, a branch move, a push and Refresh PR ask at once
 const NONE_EVERY = 5 * 60000
 const LIMITED = 5 * 60000
-const QUIET = 10 * 60000
+const quietMs = () => (state.settings?.prQuiet || PR_QUIET) * 60000
 const SHUT = 30 * 60000
 const FLOOR = 1000
 const noneAt = new Map<string, number>()
 const quietAt = new Map<string, number>()
 let limitedAt = 0
-const quiet = (ws: Workspace, now: number) => (t => t !== undefined && now - t < (/^(MERGED|CLOSED)$/.test(prs.get(ws.id)?.state ?? '') ? SHUT : QUIET))(quietAt.get(ws.id))
+const quiet = (ws: Workspace, now: number) => (t => t !== undefined && now - t < (/^(MERGED|CLOSED)$/.test(prs.get(ws.id)?.state ?? '') ? SHUT : quietMs()))(quietAt.get(ws.id))
 // GitHub's GraphQL quota left: gh api rate_limit (it costs none), asked at most every QUOTA_EVERY; under FLOOR, the
 // timer's scans wait for its reset. ponytail: this Mac's gh only, an SSH host's own sign-in isn't asked
 const QUOTA_EVERY = 5 * 60000

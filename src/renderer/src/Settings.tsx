@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -178,6 +178,7 @@ export type AppSettings = Paint & {
   remoteFunnel?: boolean // Tailscale: Funnel, the internet (a PIN always)
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
+  prQuiet?: number // minutes between a quiet PR's checks (unset: PR_QUIET)
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   turnChanges?: boolean // each turn's changes: the Reader's card, This turn, Undo (unset: on)
@@ -2574,8 +2575,10 @@ export function SettingsPage(p: {
               <Group title="Checks">
               <div className="grid2">
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
+                {pick('Check a quiet PR every', 'prQuiet', PR_QUIET, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
                 {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
               </div>
+              <p className="muted small">A quiet PR is open with nothing running (no check pending): this is how soon the sidebar sees it merged, closed or reviewed. Sooner uses more of GitHub's hourly quota, shared with your other gh calls. A turn's end and Refresh PR status check at once.</p>
               </Group>
               <Group title="Review bots" hint="The review switch sends people's comments (the repo's owners, members, collaborators) and these bots' only: any app can be a bot. Others are skipped.">
                 <ChipsInput value={(s.prBots ?? PR_BOTS).join(',')} onChange={v => set({ prBots: v.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="A bot's login, then Enter" />

@@ -28,7 +28,11 @@ test("the timer's scans spare GitHub's quota: a quiet PR waits, a low quota wait
   const m = views()
   await rig.rpc('prRefresh')
   assert.equal(views(), m + 1)
-  // ponytail: QUIET's 10 minutes aren't waited out here; the quota under FLOOR is
+  // its pace is yours (Settings › Pull requests › Check a quiet PR every, prQuiet minutes): a short one asks it again
+  await rig.rpc('settingsSet', { prQuiet: 0.03 })
+  const q = views()
+  await until(() => views() > q, 'a quiet PR asked again after prQuiet', 6000)
+  // ponytail: the default 10 minutes (PR_QUIET) aren't waited out here; the quota under FLOOR is
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api rate_limit --jq \.resources\.graphql/)
 })
 

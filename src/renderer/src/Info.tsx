@@ -56,6 +56,7 @@ export type WsInfo = {
   fixTries?: number // failing CI sent this many times in a row for the current PR
   mergeTries?: number // and its merge conflicts
   prScan: number // minutes between PR checks (Settings › Pull requests)
+  prQuiet: number // a quiet PR's (open, nothing running): no sooner than prScan
   prTries: number // failing CI or conflicts go to the agent this many times in a row
   checking?: boolean // its Merge's gates run: Checking… on the button
   tunnels?: Tunnel[] // ports exposed to the world
@@ -158,7 +159,8 @@ export function AutoToggles({ w, onToggle, names = ['fix CI', 'review', 'fix con
         linked PR
       </span>
     )
-  const when = `Checked every ${w.prScan === 1 ? 'minute' : `${w.prScan} minutes`} and after each turn; the prompt and pace: Settings › Pull requests.`
+  const mins = (n: number) => (n === 1 ? 'minute' : `${n} minutes`)
+  const when = `Checked every ${mins(w.prScan)} (with nothing running, every ${mins(w.prQuiet)}) and after each turn; the prompt and pace: Settings › Pull requests.`
   const tips: Record<AutoKey, string> = {
     autoFix: `Failing CI on a new commit goes to the agent, with the failed logs: it fixes and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`,
     autoReview: `New review comments on the PR go to the agent: it addresses them and pushes. ${when}`,

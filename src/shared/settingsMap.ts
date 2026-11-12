@@ -140,6 +140,7 @@ export const FIND: [string, string, string?][] = [
   ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
+  ['pr', 'Check a quiet PR every', 'pr status refresh merged closed sidebar quiet idle how often minutes'],
   ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
   ['git', 'Archive workspaces untouched for', 'idle old stale inactive auto archive cleanup days disk sidebar'],
   ['git', 'Keep ones with an open PR', 'idle archive pull request open'],

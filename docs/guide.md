@@ -1058,7 +1058,8 @@ it again.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
 1 to 30 minutes), and a couple of seconds after an agent's turn ends (its workspace's, at most every 20 seconds), so a
-PR the agent just opened shows up at once. A branch with no PR yet is asked every 5 minutes. When GitHub turns `gh`
+PR the agent just opened shows up at once. A quiet PR (open, no check running) is asked every 10 minutes (*Check a
+quiet PR every*: 1 to 30): how soon the sidebar sees it merged, closed or reviewed. A branch with no PR yet is asked every 5 minutes. When GitHub turns `gh`
 away (its hourly rate limit, the network), each row keeps the PR it had, and Laki pauses its checks for 5 minutes. If an
 agent switches the workspace to another branch, Laki follows it (the status bar and the
 PR are that branch's). Hover a switch for what it does, how often it checks and how many tries it gets.
@@ -2430,7 +2431,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   question waits (a day at most), and a tap counts only while the same menu is still on screen. A workflow's questions
   come too (its *Ask you*, a confirm before a PR or a merge, a stuck block, a decision it isn't sure of), with a button
   per choice the same way, counted only while the run still asks the same; a typed answer needs Laki.
-- *Pull requests* (after *Git & worktrees*): the *Review tab* (on by default; off: no Review tab), how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
+- *Pull requests* (after *Git & worktrees*): the *Review tab* (on by default; off: no Review tab), how often Laki checks PRs (every minute by default; a quiet one, open with nothing running, every 10), how many tries in a row *fix CI* and *fix
   conflicts* get (3), the review bots whose comments *review* sends (any app can be a bot: others are skipped), and the
   prompts the PR switches send (above, in
   *PRs*).

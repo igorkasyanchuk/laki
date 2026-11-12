@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Settings › Pull requests › *Check a quiet PR every*: how soon the sidebar sees an open PR with nothing running merged, closed or reviewed (10 minutes by default, now down to 1).
 - Voice: Fn stops a recording the mic or a screenshot started (it did nothing there before), and holding Fn works in the AI and new-workspace windows when they open over another app. The bar says which ends it: *let go of Fn*, *Fn or the mic*, or *Locked*.
 - An extension's page is easier to manage: its settings come first, with a red Delete beside its name, and *Manage ▾* at the top has Rename, Edit settings, Edit files, Open folder, Logs, Show in, Size, Remix and Delete from any tab.
 - Video, Meme and Timer moved into a ⋯ menu at the bottom left; a playing video or a running timer still shows its own button. Hover cards in a terminal are half again as big, show JSON (pretty-printed), logs, CSV, YAML and other plain text too, wait longer as you move onto them, and open larger with a click anywhere on them.

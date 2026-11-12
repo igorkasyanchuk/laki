@@ -393,6 +393,7 @@ export function answerOk(w: Webhook) {
 export const ANSWER_WHY = "ntfy.sh's topics are public: anyone who reads yours could tap. Add an access token (?auth=…) to the URL, or use your own ntfy server"
 
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
+export const PR_QUIET = 10 // minutes a quiet PR (open, nothing running) waits between the timer's checks (settings.prQuiet)
 export const PR_BOTS = ['github-actions', 'copilot-pull-request-reviewer', 'coderabbitai'] // the review bots whose threads go to the agent (settings.prBots); other bots' are skipped
 export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
 
@@ -641,6 +642,7 @@ export type Settings = {
   vertText?: 'down' | 'up' // Appearance's Vertical text (themes.ts' Paint, --vt): every sideways label read top to bottom or bottom to top (unset: each its own)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
+  prQuiet?: number // minutes between a quiet PR's checks: merged yet, a review, a new check (unset: PR_QUIET; never under prScan's)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
   keepAwake?: boolean // the Mac doesn't sleep while an agent works or waits for you (core's keepAwake: caffeinate -i; unset: off)
   turnsKept?: number // F1: how many turns' snapshots a workspace keeps on disk (unset: 50; 0: none; at most 500), 14 days at most
