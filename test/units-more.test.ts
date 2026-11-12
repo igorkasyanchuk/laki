@@ -21,6 +21,7 @@ import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
 import { hookRunner } from '../src/shared/helper.ts'
+import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
@@ -657,4 +658,29 @@ test('color: a hex round-trips through OKLCH; P3 raises chroma up to 15%, lightn
   assert.ok(inP3(red) && !inP3({ ...red, c: red.c * 1.2 }))
   // a grey stays grey
   assert.ok(p3Boost('#808080').c < 1e-6)
+})
+
+test('menuModel: Laki\'s menu as macOS\'s, each item\'s run by its id', () => {
+  const ran: string[] = []
+  const m = menuModel([
+    { head: 'web' }, null, null,
+    { label: 'Rename', icon: 'edit', hint: 'R', run: () => ran.push('rename') },
+    { label: 'Pinned', icon: 'pin', hint: '✓', run: () => ran.push('pin') },
+    { label: 'Merge', icon: 'merge', off: true, sub: 'no PR', run: () => ran.push('merge') },
+    { label: 'Open in', icon: 'open', items: [{ label: 'Finder', icon: 'folder', run: () => ran.push('finder') }] },
+    { colors: ['red', 'blue'], value: 'blue', pick: (c: string) => ran.push(c) },
+    null,
+  ] as never)!
+  assert.deepEqual(m.model, [
+    { label: 'web', enabled: false }, { separator: true },
+    { label: 'Rename', sublabel: 'R', id: '1' },
+    { label: 'Pinned', checked: true, id: '2' },
+    { label: 'Merge', sublabel: 'no PR', enabled: false, id: '3' },
+    { label: 'Open in', sub: [{ label: 'Finder', id: '4' }] },
+    { label: 'Color', sub: [{ id: '5', label: 'Red' }, { id: '6', label: 'Blue', checked: true }] },
+  ])
+  for (const id of ['1', '4', '6']) m.runs.get(id)!()
+  assert.deepEqual(ran, ['rename', 'finder', 'blue'])
+  assert.equal(menuModel([{ filter: 'Find' }] as never), undefined, "a filter: Laki's own")
+  assert.equal(menuModel([{ label: 'x', icon: 'x', items: [{ emojis: [], pick: () => {} }] }] as never), undefined, 'an emoji grid in a submenu')
 })

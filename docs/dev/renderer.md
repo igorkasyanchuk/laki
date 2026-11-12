@@ -1080,3 +1080,15 @@ over `animation-range: 0 60px`: `page-head` (see-through to `--surface-bg` and i
 (`--fs-5` to `--fs-3`, a plain `<b>` title only). Motion: None and Reduce motion: the compact glass head always. Settings'
 scroll-edge fade (`mask-image`) is off, this replaces it. Only one scroller per page names `--page` (two would make the
 timeline inactive: a project's embedded `.settings-main` doesn't).
+
+## Native menus
+
+Settings › Layout › Menus (`settings.menus`: `'macos'`, unset Laki's; shown only in the app on a Mac): App's `wsTabMenu`
+opens a workspace's menu (a row's right click and ⋯, the rail's pins, the Terminals and Browsers strip) and a tab's (the
+tab bar's right click, a pane's) through macOS. `menuModel.ts` turns Laki's `MenuItem`s into a plain list: a head is a
+disabled item, `null` a separator (no doubles, none last), `hint` the sublabel (`ON` a check), `off` disabled, `items` a
+submenu, a color grid a Color submenu (the picked one checked); each run gets an id, kept in the renderer. A menu with an
+emoji grid or a filter field has no model and stays Laki's. Main's `menu-popup` (from(e): the app window only) checks
+the list with guards.ts `menuModelOk` (only id, label, sublabel, enabled, checked, separator, sub; strings 200, ids 40,
+depth 4, 300 items: no role, no accelerator, nothing that runs in main), pops it up at the point and answers the picked
+id, or nothing once it closes. A browser (remote access, `npm run dev:web`) has no bridge: Laki's menu.

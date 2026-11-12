@@ -60,6 +60,7 @@ export const FIND: [string, string, string?][] = [
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Follow the system', 'theme auto light dark mode macos system appearance match switch sunset'],
   ['layout', 'Design', 'layout frame window cards sections tiles inset soft frosted glass macos mac floating translucent rounded corners padding gaps style variation'],
+  ['layout', 'Menus', 'menus context right click native macos system menu look voiceover workspace tab'],
   ['layout', 'Empty projects', 'hide projects without workspaces empty archived pinned sidebar short list'],
   ['layout', 'Simple row', 'sidebar row simple minimal name one chip next step fewer marks clean hover'],
   ['layout', 'Sidebar rows', 'marks row sidebar show hide next step chip merge archive pr github icon author avatar approved approval check double eyes commented review conflicts failing checks ci overlaps radar plan diff size lines'],

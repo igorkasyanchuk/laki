@@ -14,7 +14,7 @@ import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -1078,6 +1078,24 @@ async function browseOp(entry: AgentWin, r: Browse) {
   }
   return { ...now, ...(now.url !== page.url && { nav: now }), ...caused(), changed } satisfies BrowseDid
 }
+// Settings › Layout's Menus: macOS: a workspace's or a tab's menu drawn by macOS (the renderer's menuModel, checked by
+// guards.ts menuModelOk), popped up at the point; the picked item's id back, or nothing (closed). The app window only
+ipcMain.handle('menu-popup', (e, model: unknown, x: unknown, y: unknown) => {
+  if (!from(e)) return undefined
+  const m = menuModelOk(model)
+  const w = BrowserWindow.fromWebContents(e.sender)
+  if (!m || !w || typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return undefined
+  return new Promise<string | undefined>(done => {
+    let picked: string | undefined
+    const build = (items: NativeItem[]): MenuItemConstructorOptions[] =>
+      items.map(it =>
+        it.separator
+          ? { type: 'separator' }
+          : { label: it.label, sublabel: it.sublabel, enabled: it.enabled !== false, ...(it.sub ? { submenu: build(it.sub) } : { type: it.checked ? 'checkbox' : 'normal', checked: !!it.checked, click: () => ((picked = it.id), done(picked)) }) },
+      )
+    Menu.buildFromTemplate(build(m)).popup({ window: w, x: Math.round(x), y: Math.round(y), callback: () => setTimeout(() => done(picked), 50) }) // a click comes before or after the close: whichever is first answers
+  })
+})
 ipcMain.handle('pick-folder', async e => {
   if (!from(e)) return null
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender) ?? win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button

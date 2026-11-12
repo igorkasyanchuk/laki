@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Menus: macOS (Settings › Layout): a workspace's and a tab's menu drawn by macOS itself, its look, keys and VoiceOver; the colors as a submenu.
 - Pages (Settings, Board, Schedule, Workflows, Notes, To-dos, a project's) start with a large title that shrinks into a glass header as you scroll.
 - Nested corners line up: buttons in the capsules, menu and ⌘K items, dialog cards and Needs you buttons round to their container less its padding (Square stays square).
 - The glass capsules (tab bar buttons, Terminal / Reader, the Reader's box, the status bar) have depth: a lit top edge, a soft shade below and a light that follows the pointer. Flat looks, Reduce transparency and Motion off keep them flat.

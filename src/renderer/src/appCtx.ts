@@ -238,6 +238,7 @@ export type AppBase = {
   openIn: (app: string, where?: Where) => void
   openInItems: (where?: Where) => MenuItem[]
   openMenu: (e: DOMRect | React.MouseEvent<Element, MouseEvent>, items: MenuItem[], align?: "left" | "right" | undefined) => void
+  wsTabMenu: AppBase['openMenu'] // a workspace's or a tab's: macOS's with Menus: macOS
   openPort: (port: number) => void | Window | null
   openProject: () => Promise<void>
   openReview: () => void | null

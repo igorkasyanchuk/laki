@@ -1,7 +1,7 @@
 // E3: Electron main's checks (src/main/guards.ts), on plain node: who may send IPC, which URLs get through
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { appFile, appPage, BROWSER, externalOf, fromApp, fromTokenPage, local, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { appFile, appPage, BROWSER, externalOf, fromApp, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -84,4 +84,28 @@ test('main guards: webviews by partition; open-external sites and laki: links on
   assert.equal(externalOf('laki://ws/x'), 'laki')
   for (const u of ['file:///Applications/Calculator.app', 'javascript:alert(1)', 'vscode://x', 'smb://host/share', 'HTTPS://example.com', 42, undefined])
     assert.equal(externalOf(u), undefined, String(u))
+})
+
+test('main guards: menu-popup takes a plain menu only', () => {
+  const ok = [{ id: '1', label: 'Rename', sublabel: 'R' }, { separator: true }, { label: 'Color', sub: [{ id: '2', label: 'Red', checked: true }] }, { label: 'Head', enabled: false }]
+  assert.deepEqual(menuModelOk(ok), ok)
+  const deep = (n: number): unknown => (n ? [{ label: 'x', sub: deep(n - 1) }] : [{ id: '1', label: 'y' }])
+  assert.ok(menuModelOk(deep(MENU_DEPTH - 1)))
+  for (const [m, why] of [
+    ['x', 'not a list'],
+    [[{ label: 'a', click: 'rm -rf' }], 'a key of its own'],
+    [[{ label: 'a', role: 'quit' }], 'a role'],
+    [[{ id: '1' }], 'no label'],
+    [[{ label: 7 }], 'a label not a string'],
+    [[{ label: 'x'.repeat(201) }], 'a long label'],
+    [[{ id: 'x'.repeat(41), label: 'a' }], 'a long id'],
+    [[{ label: 'a', enabled: 'yes' }], 'enabled not a boolean'],
+    [[{ separator: 1 }], 'a separator not true'],
+    [[{ label: 'a', sub: 'b' }], 'a submenu not a list'],
+    [[null], 'a null'],
+    [[[{ label: 'a' }]], 'a list in a list'],
+    [deep(MENU_DEPTH), 'too deep'],
+    [Array.from({ length: MENU_ITEMS + 1 }, (_, i) => ({ id: String(i), label: 'a' })), 'too many'],
+  ] as [unknown, string][])
+    assert.equal(menuModelOk(m), undefined, why)
 })

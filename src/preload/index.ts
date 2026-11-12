@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('laki', {
   onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
   onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // a Browsers page's ⌘T or ⌘W (Settings › Keys': a shared/keys.ts id), or a menu bar item's id or key
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
+  menuPopup: (model: unknown, x: number, y: number): Promise<string | undefined> => ipcRenderer.invoke('menu-popup', model, x, y), // Menus: macOS
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),

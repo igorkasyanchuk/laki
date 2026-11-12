@@ -71,7 +71,7 @@ export function layoutOf(app: AppBase) {
 
 // the tabs: a tab per group of panes (its split's sessions), a drag moves them (Panes.tsx useTabDrag)
 export function TabList({ app }: { app: AppCtx }) {
-  const { accountsOf, byId, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
+  const { accountsOf, byId, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
   return (
@@ -93,7 +93,7 @@ export function TabList({ app }: { app: AppCtx }) {
             style={colorVar(colorOf(ts[0]))}
             {...act(() => selectGroup(g))}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
-            onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
+            onContextMenu={e => wsTabMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
             data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}

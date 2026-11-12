@@ -30,7 +30,7 @@ const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Pl
 const markOf = (p: Project): IconName => (p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork')
 
 export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
-  const { anchor, busyWith, call, done, doStep, dropAgent, dropOn, dropProps, find, flowsOn, fold, folded, going, kh, kindOf, live, making, mark, markUnread, narrow, needAfter, needsYou, newWs, openMenu, openProject, order, peek, peekBox, peekStat, peekTimer, picked, pinned, projOf, quickNew, radarOf, rail, railKind, railOf, rawKind, restart, restore, ring, rows, selectTab, setDialog, setOverlapsAt, setPeek, setPicked, setSideOpen, setTimer, settings, setWsId, showPanel, sortedRows, sortItems, stepOf, stepsOn, termIn, termsOk, termWhere, timers, tint, toast, view, waits, widgetApi, ws, wsAt, wsMenu } = app
+  const { anchor, busyWith, call, done, doStep, dropAgent, dropOn, dropProps, find, flowsOn, fold, folded, going, kh, kindOf, live, making, mark, markUnread, narrow, needAfter, needsYou, newWs, openMenu, wsTabMenu, openProject, order, peek, peekBox, peekStat, peekTimer, picked, pinned, projOf, quickNew, radarOf, rail, railKind, railOf, rawKind, restart, restore, ring, rows, selectTab, setDialog, setOverlapsAt, setPeek, setPicked, setSideOpen, setTimer, settings, setWsId, showPanel, sortedRows, sortItems, stepOf, stepsOn, termIn, termsOk, termWhere, timers, tint, toast, view, waits, widgetApi, ws, wsAt, wsMenu } = app
   const peekAt = (id?: string, el?: HTMLElement) => {
     clearTimeout(peekTimer.current)
     peekTimer.current = window.setTimeout(() => {
@@ -222,7 +222,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         onPointerLeave={() => peekAt()}
         onClick={e => ((e.metaKey || e.shiftKey) && !narrow && pickable(w) ? pickRow(w, e) : (setWsId(w.id), (!pin && !find && rows.dragged()) || (setPicked([]), setDialog(null)), narrow && setSideOpen(false))) /* ⌘ and ⇧: picked; a page over the main area (Settings, the new-workspace page…) gives way to it, and the picks go, not at a drag's end */}
         onDoubleClick={e => !(e.metaKey || e.shiftKey) && setDialog({ renameWs: w.id })}
-        onContextMenu={e => openMenu(e, wsMenu(w))}
+        onContextMenu={e => wsTabMenu(e, wsMenu(w))}
         {...dropProps(w)}
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : w.pending && !wt.length ? 'idle' /* its agent comes later: not ended */ : rollup(wt)} />}
@@ -336,7 +336,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         )}
         {/* on hover, after the marks (they slide left): its menu */}
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-          <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
+          <IconButton icon="more" title="Workspace" onClick={e => wsTabMenu(e, wsMenu(w))} />
         </span>
         {more && (
           <div className="ws-sub">
@@ -442,7 +442,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           <button onClick={() => (setPeek(null), setWsId(w.id), setDialog(null))}>Open</button>
           {pr && <button onClick={() => openExternal(pr.url)}>{prName(pr)} on {forgeName(pr)}</button>}
           <span className="spacer" />
-          <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
+          <IconButton icon="more" title="Workspace" onClick={e => wsTabMenu(e, wsMenu(w))} />
         </div>
       </div>
     )

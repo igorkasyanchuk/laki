@@ -46,3 +46,36 @@ export const AGENT_BROWSER = 'agent-browser' // S12: the agent browser's hidden 
 export const webviewOk = (partition: string | undefined, src: string) => (partition === BROWSER ? web(src) || src === 'about:blank' : partition === PREVIEW && local(src))
 // open-external's: a website to the default browser, a laki: link to the app window, nothing else
 export const externalOf = (u: unknown) => (web(u) ? 'web' : typeof u === 'string' && u.startsWith('laki:') ? 'laki' : undefined)
+
+// A menu as macOS draws it (Settings › Layout's Menus: macOS; the renderer's menuModel): what main's menu-popup takes
+// from the window, checked: an array of items, strings and booleans only, 4 deep and 300 items at most. A copy of
+// what passed, or undefined (then nothing pops up)
+export type NativeItem = { id?: string; label?: string; sublabel?: string; enabled?: boolean; checked?: boolean; separator?: true; sub?: NativeItem[] }
+export const MENU_DEPTH = 4
+export const MENU_ITEMS = 300
+export function menuModelOk(m: unknown): NativeItem[] | undefined {
+  let n = 0
+  const str = (v: unknown, max: number) => (v === undefined ? undefined : typeof v === 'string' && v.length <= max ? v : null)
+  const bool = (v: unknown) => (v === undefined ? undefined : typeof v === 'boolean' ? v : null)
+  const list = (a: unknown, depth: number): NativeItem[] | undefined => {
+    if (!Array.isArray(a) || depth > MENU_DEPTH) return
+    const out: NativeItem[] = []
+    for (const x of a) {
+      if (++n > MENU_ITEMS || !x || typeof x !== 'object' || Array.isArray(x)) return
+      const o = x as Record<string, unknown>
+      if (Object.keys(o).some(k => !['id', 'label', 'sublabel', 'enabled', 'checked', 'separator', 'sub'].includes(k))) return
+      if (o.separator !== undefined) {
+        if (o.separator !== true) return
+        out.push({ separator: true })
+        continue
+      }
+      const it = { id: str(o.id, 40), label: str(o.label, 200), sublabel: str(o.sublabel, 200), enabled: bool(o.enabled), checked: bool(o.checked) }
+      if (Object.values(it).includes(null) || !it.label) return
+      const sub = o.sub === undefined ? undefined : list(o.sub, depth + 1)
+      if (o.sub !== undefined && !sub) return
+      out.push(Object.fromEntries(Object.entries({ ...it, sub }).filter(([, v]) => v !== undefined)) as NativeItem)
+    }
+    return out
+  }
+  return list(m, 1)
+}

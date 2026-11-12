@@ -50,6 +50,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
+import { menuModel } from './menuModel'
 import { Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
@@ -575,6 +576,17 @@ export function App() {
   const peekBox = useRef<HTMLDivElement>(null)
   // a menu (a row's ⋯, a right click, any other) closes the card first
   const openMenu: typeof showMenu = (e, items, align) => (clearTimeout(peekTimer.current), setPeek(null), showMenu(e, items, align))
+  // Settings › Layout's Menus: macOS: a workspace's and a tab's menu drawn by macOS (main's menu-popup), else Laki's (a
+  // browser, remote access, or a menu with an emoji grid or a filter)
+  const wsTabMenu: typeof showMenu = (e, items, align) => {
+    const m = viewRef.current?.settings.menus === 'macos' && bridge?.menuPopup ? menuModel(items) : undefined
+    if (!m) return openMenu(e, items, align)
+    if (!(e instanceof DOMRect)) (e.preventDefault(), e.stopPropagation())
+    const at = e instanceof DOMRect ? e : e.type === 'contextmenu' ? new DOMRect(e.clientX, e.clientY, 0, 0) : (e.currentTarget as HTMLElement).getBoundingClientRect()
+    clearTimeout(peekTimer.current)
+    setPeek(null)
+    void bridge!.menuPopup!(m.model, at.left, at.bottom).then(id => id && m.runs.get(id)?.())
+  }
   useEffect(() => {
     if (!peek) return
     const hide = (e: Event) => !(e.type === 'wheel' && peekBox.current?.contains(e.target as Node)) && (clearTimeout(peekTimer.current), setPeek(null))
@@ -3294,7 +3306,7 @@ export function App() {
     // never lit as the open one: its kind's button above is, and the list shows the row; a mouse click lets go of the
     // focus (a key pressed later would ring it, :focus-visible), Enter or Space keeps a keyboard user's place
     return (
-      <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${dropOn === w.id ? 'drop-on' : ''}`} {...dropProps(w)} aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
+      <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${dropOn === w.id ? 'drop-on' : ''}`} {...dropProps(w)} aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), wsTabMenu(e, wsMenu(w)))}>
         <span className="rail-icon" style={colorVar(tint(w))}>
           {w.icon ? isIconName(w.icon) ? <Icon name={w.icon} size={18} /> : <span className="rail-emoji">{w.icon}</span> : k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
           {k === 'projects' && <ProjectMark p={projOf(w)} size={11} /> /* its project's, at the corner */}
@@ -3375,7 +3387,7 @@ export function App() {
       {order
         .filter(w => kindOf(w) === railKind)
         .map(w => (
-          <button key={w.id} type="button" className={`strip-ws ${w.id === ws?.id && !onPage ? 'sel' : ''}`} style={colorVar(tint(w))} data-tip={wsName(w)} onClick={() => (setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), e.stopPropagation(), openMenu(e, wsMenu(w)))}>
+          <button key={w.id} type="button" className={`strip-ws ${w.id === ws?.id && !onPage ? 'sel' : ''}`} style={colorVar(tint(w))} data-tip={wsName(w)} onClick={() => (setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), e.stopPropagation(), wsTabMenu(e, wsMenu(w)))}>
             <span className="fr-vert">{wsName(w)}</span>
             {stripNeeds && stripNeeds.has(w.id) && <i role="img" aria-label="needs you" />}
           </button>
@@ -3687,7 +3699,7 @@ export function App() {
     inViewer, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutsOn, layoutWait,
     listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
-    openInItems, openMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
+    openInItems, openMenu, wsTabMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
     pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail,
     railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
@@ -3797,7 +3809,7 @@ export function App() {
                 drag={drag}
                 label={label}
                 color={id => colorOf(byId(id))}
-                onMenu={(e, id) => openMenu(e, tabMenu([id]))}
+                onMenu={(e, id) => wsTabMenu(e, tabMenu([id]))}
                 ghost={drag && (() => { // a pill: the tab's glyph and names, as in the tab bar
                   const ts = (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null) : [drag.tab]).map(byId).filter((t): t is TabView => !!t)
                   return ts.length > 1 ? <><Glyph s={rollup(ts)} /><span>{ts.map(t => t.name).join(' · ')}</span></> : label(drag.tab)

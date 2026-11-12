@@ -135,6 +135,7 @@ export type AppSettings = Paint & {
   statusBridge?: boolean // Claude Code's status line read for its context and plan limits (unset: on)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: on)
+  menus?: 'laki' | 'macos' // Layout › Menus: a workspace's and a tab's menu drawn by macOS (unset: Laki's)
   paneInset?: boolean // Terminal › Inset panes: each pane a rounded card with room around it (off unless true; not on a phone)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
   splitNew?: boolean // a new tab opens beside the pane you're on (the daemon's layoutPlace)
@@ -1845,6 +1846,11 @@ export function SettingsPage(p: {
                   <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
                 </Switch>
               </Group>
+              {bridge && /Mac/.test(navigator.userAgent) && (
+                <Group title="Menus" hint="A workspace's and a tab's menu: Laki's, or macOS's own (its look, its keys, VoiceOver). Laki's keeps the color grid; macOS's lists the colors">
+                  {seg('Menus', "macOS: a right click or ⋯ on a workspace or a tab opens macOS's menu. Other menus stay Laki's", 'menus', 'laki', [['laki', "Laki's"], ['macos', 'macOS']])}
+                </Group>
+              )}
               <Group title="Sidebar" hint="How the sidebar's rows and project names look; each choice is over the theme's. The preview changes as you do">
               <SidePreview sl={s.sideLook} pl={s.projectLook} style={s.sideStyle} />
               <div className="field">
