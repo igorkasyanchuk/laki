@@ -330,7 +330,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   a plain text one, `TEXT` (JSON, pretty-printed by `textShown` when it parses; logs, CSV, YAML, TOML, XML, a diff; no
   `.env`), a local path only, drawn by MarkdownView's `Markdown` or as text in a `<pre>` (never HTML; its first 30,000
   characters; the card 540 wide, a picture up to 504 × 360; App's `peekText`, `peekFile` as
-  `peekImage`'s, but no file outside the workspace and its storage folder: no card), also from the `CODE` provider's
+  `peekImage`'s, but no file outside the workspace and its storage folder, nor one over `PEEK_TEXT`, 50 KB by
+  `fileRead`'s `size`: no card), also from the `CODE` provider's
   hover): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted

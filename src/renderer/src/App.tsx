@@ -1878,9 +1878,11 @@ export function App() {
   }
   // a hovered file of the tab's workspace or its storage folder (one not there: the workspace's file of that name),
   // fileRead's answer's `what` (a picture's data URL, a text's); null: no card; undefined: not one of the workspace's
+  const PEEK_TEXT = 50 * 1024 // a Markdown or text file's hover card: 50 KB at most
   const peekFile = (id: string, path: string, what: 'image' | 'text') => {
     const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
-    const read = (storage: boolean, p = path) => api.call<{ image?: string; text?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r[what])
+    // a text file over PEEK_TEXT: no card (null: its path's tooltip), however much the daemon read of it
+    const read = (storage: boolean, p = path) => api.call<{ image?: string; text?: string; size?: number }>('fileRead', { ws: w!.id, path: p, storage }).then(r => (what === 'text' && (r.size ?? 0) > PEEK_TEXT ? null : r[what]))
     if (w && path.startsWith(`${w.path}/`))
       return read(false).catch(async e => {
         if (!/ENOENT|no such file/i.test(String(e?.message ?? e))) throw e // a real failure is said, not hidden
