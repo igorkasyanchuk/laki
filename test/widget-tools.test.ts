@@ -181,7 +181,7 @@ test('tools: laki mcp lists ext_ tools only with a daemon running, and routes ca
   const mcp = async (...m: object[]) => (await rig.cliIn(msgs(...m), 'mcp')).out.trim().split('\n').map(l => JSON.parse(l)).sort((a, b) => a.id - b.id) // tool calls answer as they end
   let got = await mcp({ method: 'tools/list' }, { method: 'tools/call', params: { name: 'ext_g_echo', arguments: { text: 'yo' } } }, { method: 'tools/call', params: { name: 'laki_extension_call', arguments: { tool: 'g.echo', input: { text: 'there' } } } }, { method: 'tools/call', params: { name: 'laki_extension_tools', arguments: {} } })
   const names = got[0].result.tools.map((x: any) => x.name)
-  assert.ok(names.includes('ext_g_echo') && names.includes('ext_g_hi') && names.includes('laki_extension_call'), names.join())
+  assert.ok(names.includes('ext_g_echo') && names.includes('ext_g_hi') && !names.includes('laki_extension_call'), names.join()) // laki_extension_call: the widgets group's (laki_more), called by its name below
   assert.deepEqual(got[0].result.tools.find((x: any) => x.name === 'ext_g_echo').inputSchema, { type: 'object', properties: { text: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: [] })
   assert.equal(got[1].result.content[0].text.trim(), 'echo yo')
   assert.equal(got[2].result.content[0].text.trim(), 'echo there')

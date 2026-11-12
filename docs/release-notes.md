@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- `laki mcp` lists its core tools and `laki_more`, which adds a group (sessions, PRs, schedule, widgets…): far less in an agent's context. `laki mcp --all` lists every one.
 - Menu bar click: Inbox (Settings › General › Menu bar): a click on Laki's menu bar icon opens what waits on you with its choices (1–9), what's at work, and New task…; a right click, the menu.
 - Laki opens on your last layout (the sidebar's rows, the tabs, the widths), dimmed until your workspaces load, instead of the splash.
 - Menus: macOS (Settings › Layout): a workspace's and a tab's menu drawn by macOS itself, its look, keys and VoiceOver; the colors as a submenu.

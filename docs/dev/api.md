@@ -607,3 +607,14 @@ agent could write a state.json in a folder of its own and have the CLI start a s
 launcher on PATH (`cliText`) pins `LAKI_HOME` to its daemon's anyway; one set by hand is still read, and with no daemon
 there the call fails. The rig sets `LAKI_HOME` without `LAKI_TAB`, so its own CLI calls start one as before. Tested in
 `test/cli-agents.test.ts` (S4).
+
+## MCP tool groups
+
+`shared/tools.ts` `GROUPS`: every tool's group (`toolGroup`; cli-more's test fails on one without): core (what the laki
+skill tells agents to use first: state, new workspace, send, screen, wait, diff, ask, alert, progress, secret, limits),
+sessions, prs, schedule, widgets, specs, flows, memory, browser, settings. `laki mcp` (`cli/mcp.ts`) lists the core
+group and `laki_more({ group })`, whose description has a line per group; a call opens that group for the connection
+(answered at once, no daemon: open before the next line is read) and sends `notifications/tools/list_changed`
+(`capabilities.tools.listChanged`). `tools/call` takes every tool, listed or not, for a client that never lists again.
+`laki mcp --all`, `LAKI_MCP_ALL=1`, Laki AI's own backends (`LAKI_AI=1`: claude -p, codex exec) and an extension's
+permission server list everything, as before. `ext_*` tools (the user's extensions') stay listed.

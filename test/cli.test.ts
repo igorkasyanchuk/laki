@@ -358,7 +358,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'laki_screen', arguments: { target: 'nope' } } },
     { jsonrpc: '2.0', id: 5, method: 'resources/list' },
   ]
-  const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp')
+  const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp', '--all') // every tool listed (laki_more's groups: cli-more)
   assert.equal(r.code, 0, r.err)
   const got = Object.fromEntries(r.out.trim().split('\n').map(l => JSON.parse(l)).map(m => [m.id, m]))
   assert.deepEqual(Object.keys(got).sort(), ['1', '2', '3', '4', '5']) // the notification gets no answer

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
-import { aiRpc, extCall, obj, skillTools, str, type Tool, tools } from '../shared/tools.ts'
+import { aiRpc, extCall, GROUPS, obj, skillTools, str, toolGroup, type Tool, tools } from '../shared/tools.ts'
 import { API } from '../shared/types.ts'
 
 // MCP's ext_<id>_<action>: each tool as one of its own, while a daemon runs (tools/list never starts one: stdout is the
@@ -43,7 +43,32 @@ const permission: Tool = {
   },
 }
 const TOOLS = process.env.LAKI_PERM_EXT ? [permission] : [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : []), ...(process.env.LAKI_AI_PERM === '1' ? [permission] : [])]
+// what tools/list shows: every tool with --all, LAKI_MCP_ALL=1, Laki AI's backends and an extension's permission server;
+// else the core group and laki_more, which adds a group for this connection (tools/list_changed). Any tool still runs by
+// its name, listed or not: a client that never lists again
+let all = process.env.LAKI_MCP_ALL === '1' || process.env.LAKI_AI === '1' || !!process.env.LAKI_PERM_EXT
+const opened = new Set(['core'])
+let changed = () => {}
+const more: Tool = {
+  name: 'laki_more',
+  description: `More of Laki's tools, a group at a time: the group's tools are listed from then on (any tool also runs by its name unlisted). Groups:\n${Object.entries(GROUPS)
+    .filter(([g]) => g !== 'core')
+    .map(([g, x]) => `- ${g}: ${x.words}`)
+    .join('\n')}`,
+  inputSchema: obj({ group: { type: 'string', enum: Object.keys(GROUPS).filter(g => g !== 'core'), description: 'the group' } }, ['group']),
+  run: async a => {
+    const g = GROUPS[a.group as string]
+    if (!g || a.group === 'core') throw new Error(`no group ${a.group}: ${Object.keys(GROUPS).join(', ')}`)
+    const was = opened.size
+    opened.add(a.group)
+    if (opened.size > was) changed()
+    return `${a.group}: ${TOOLS.filter(t => toolGroup(t.name) === a.group).map(t => t.name).join(', ') || 'none here'}`
+  },
+}
+const listed = () => (all ? TOOLS : [...TOOLS.filter(t => opened.has(toolGroup(t.name) ?? 'core')), more])
+
 async function call(name: string, args: unknown) {
+  if (name === 'laki_more' && !all) return String(await more.run(args ?? {})) // no daemon; its group's open before the next line is read
   const tool = TOOLS.find(t => t.name === name)
   if (!tool && name.startsWith('ext_')) {
     const t = extNames(await extTools()).get(name)
@@ -61,14 +86,14 @@ async function answer(m: any): Promise<object | undefined> {
     case 'initialize':
       return {
         protocolVersion: typeof m.params?.protocolVersion === 'string' ? m.params.protocolVersion : '2025-06-18',
-        capabilities: { tools: {} },
+        capabilities: { tools: all ? {} : { listChanged: true } },
         serverInfo: { name: 'laki', version: `api ${API}` },
         instructions: 'Laki runs coding agents side by side, each task in its own git worktree. Ask the user before scheduling tasks.',
       }
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: [...TOOLS.map(({ run, max, ...t }) => t), ...[...extNames(await extTools())].map(([name, t]) => ({ name, description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
+      return { tools: [...listed().map(({ run, max, ...t }) => t), ...[...extNames(await extTools())].map(([name, t]) => ({ name, description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
     case 'tools/call':
       try {
         return { content: [{ type: 'text', text: await call(m.params?.name, m.params?.arguments) }] }
@@ -78,8 +103,10 @@ async function answer(m: any): Promise<object | undefined> {
   }
 }
 
-export function mcp() {
+export function mcp(every = false) {
+  all ||= every
   const send = (o: object) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...o }) + '\n')
+  changed = () => send({ method: 'notifications/tools/list_changed' })
   const busy = new Set<Promise<unknown>>()
   const lines = createInterface({ input: process.stdin })
   lines.on('line', line => {

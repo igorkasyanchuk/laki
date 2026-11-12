@@ -114,7 +114,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
                                               and cost; laki ai alone: the conversation
-  laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
+  laki mcp [--all]                            Laki as an MCP server (stdio): claude mcp add laki -- laki mcp; its core
+                                              tools listed, laki_more adds a group (--all, LAKI_MCP_ALL=1: every one)
   laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
   laki serve --tailscale [--pin | --funnel] | --domain [name] | --cloudflare --mail <you@x.com> | --cloudflare --pin | --cloudflare --open --hours <n ≤ 24>  [--hours n]
                                               headless: the daemon and remote access, until stopped (docs/headless.md);
@@ -418,9 +419,12 @@ one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
 
   laki ai "what are my agents doing?"`,
   mcp: `Laki as an MCP server over stdio (JSON-RPC, a message per line): its state, a new workspace, a message to an
-agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, archives or ships.
+agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, archives or ships. It lists its core tools
+and laki_more, which adds a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) to the
+list; any tool runs by its name, listed or not. --all (or LAKI_MCP_ALL=1) lists every one.
 
-  claude mcp add laki -- laki mcp`,
+  claude mcp add laki -- laki mcp
+  claude mcp add laki -- laki mcp --all`,
 }
 
 // laki help <command> [sub]: that command's lines of USAGE (with the lines under each) and its HELP; null: no such

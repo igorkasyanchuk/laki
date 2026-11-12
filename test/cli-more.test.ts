@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fixtureWidgets, fresh, type Rig, until } from './helpers.ts'
+import { GROUPS, skillTools, toolGroup, tools } from '../src/shared/tools.ts'
 
 const cliPath = fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))
 
@@ -25,8 +26,8 @@ function cliAt(rig: Rig, cwd: string, ...args: string[]): Promise<{ code: number
 }
 
 // `laki mcp` fed these lines; its answers by id (a parse error's id is null)
-async function mcp(rig: Rig, lines: (string | object)[]) {
-  const r = await rig.cliIn(lines.map(l => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n') + '\n', 'mcp')
+async function mcp(rig: Rig, lines: (string | object)[], ...args: string[]) {
+  const r = await rig.cliIn(lines.map(l => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n') + '\n', 'mcp', ...args)
   assert.equal(r.code, 0, r.err)
   const all = r.out.trim().split('\n').map(l => JSON.parse(l))
   for (const m of all) assert.equal(m.jsonrpc, '2.0')
@@ -340,6 +341,31 @@ test('laki mcp: blank lines, bad JSON, ping, an unknown tool, a string answer, t
   assert.deepEqual([by[7].result.isError, by[7].result.content[0].text], [true, 'a race needs two agents or more'])
   assert.ok(!by[8].result.isError, by[8].result.content[0].text)
   assert.equal(JSON.parse(by[8].result.content[0].text).id, 'plain', 'no presets: one workspace')
+})
+
+test('laki mcp: the core tools and laki_more; a group on ask, with list_changed; any tool by its name; --all and LAKI_MCP_ALL list them all', async t => {
+  const rig = await fresh(t)
+  const names = (m: any) => m.result.tools.map((x: any) => x.name).filter((n: string) => !n.startsWith('ext_')) as string[]
+  const list = (id: number) => ({ jsonrpc: '2.0', id, method: 'tools/list' })
+  const { all, by } = await mcp(rig, [{ jsonrpc: '2.0', id: 1, method: 'initialize' }, list(2), tool(3, 'laki_schedules'), tool(4, 'laki_more', { group: 'prs' }), list(5), tool(6, 'laki_more', { group: 'nope' })])
+  assert.deepEqual(by[1].result.capabilities.tools, { listChanged: true })
+  const any = (async () => ({})) as never
+  const plain = tools(any).map(x => x.name) // laki mcp's (Laki AI's skill tools aside)
+  assert.deepEqual(names(by[2]).sort(), [...GROUPS.core.tools.filter(n => plain.includes(n)), 'laki_more'].sort(), 'the core group and laki_more')
+  assert.ok(!by[3].result.isError, `an unlisted tool runs: ${by[3].result.content[0].text}`)
+  assert.equal(by[4].result.content[0].text, 'prs: laki_attach_pr, laki_pr_draft')
+  assert.equal(all.filter(m => m.method === 'notifications/tools/list_changed').length, 1)
+  assert.ok(names(by[5]).includes('laki_pr_draft') && !names(by[5]).includes('laki_schedules'), 'the group asked for, no other')
+  assert.equal(by[6].result.isError, true)
+  const every = (m: any) => assert.ok(names(m).includes('laki_workflow_run') && !names(m).includes('laki_more'))
+  every((await mcp(rig, [list(1)], '--all')).by[1])
+  rig.env.LAKI_MCP_ALL = '1'
+  const e = await mcp(rig, [{ jsonrpc: '2.0', id: 1, method: 'initialize' }, list(2)])
+  every(e.by[2])
+  assert.deepEqual(e.by[1].result.capabilities.tools, {})
+  delete rig.env.LAKI_MCP_ALL
+  // every tool has a group
+  for (const x of [...tools(any), ...skillTools(any)]) assert.ok(toolGroup(x.name), `${x.name} has no group`)
 })
 
 test('daemon HTTP and WebSocket: only POST /rpc, a body over 16 MB, a bad body, a page file of an unknown type, a client that stops reading', async t => {

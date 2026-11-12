@@ -13,6 +13,22 @@ import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
 
 export type Tool = { name: string; description: string; inputSchema: object; max?: number; run: (a: any) => Promise<unknown> } // max: what Laki AI's model may read of its result (TOOL_TEXT)
+// laki mcp's groups: what tools/list shows at first (core: what the laki skill tells agents to use first), the rest
+// a laki_more({ group }) away (mcp.ts); every tool runs by its name, listed or not. --all, LAKI_MCP_ALL=1 and Laki AI's
+// own backends list them all. Every tool has one (test/cli-more.test.ts)
+export const GROUPS: Record<string, { words: string; tools: string[] }> = {
+  core: { words: 'state, a new workspace, a message, a screen, wait, a diff, ask the user, alerts, progress, plan limits', tools: ['laki_state', 'laki_new_workspace', 'laki_send', 'laki_screen', 'laki_wait', 'laki_diff', 'laki_ask', 'laki_ask_agent', 'laki_alert', 'laki_progress', 'laki_secret', 'laki_limits'] },
+  sessions: { words: 'tabs, panes, shells and run scripts, names, stop, archive, open in, projects, profiles, notices', tools: ['laki_name', 'laki_new_tab', 'laki_update_when_idle', 'laki_stop', 'laki_remove', 'laki_archive', 'laki_delete', 'laki_open_in', 'laki_rename', 'laki_shell', 'laki_run', 'laki_panes', 'laki_actions', 'laki_run_action', 'laki_templates', 'laki_profiles', 'laki_find', 'laki_project', 'laki_notice', 'laki_ui'] },
+  prs: { words: "pull requests: a workspace's PR, its draft, the PR list", tools: ['laki_attach_pr', 'laki_pr_draft', 'laki_prs'] },
+  schedule: { words: 'scheduled tasks, reminders, timers, to-dos', tools: ['laki_schedules', 'laki_schedule_add', 'laki_schedule_set', 'laki_reminder', 'laki_timer', 'laki_todo_add'] },
+  widgets: { words: 'extensions (widgets): list, read, write, check, logs, events, their tools', tools: ['laki_extensions', 'laki_extension_set', 'laki_extension_guide', 'laki_extension_read', 'laki_extension_write', 'laki_extension_check', 'laki_extension_logs', 'laki_extension_emit', 'laki_extension_tools', 'laki_extension_call', 'laki_extension_on'] },
+  specs: { words: 'specs and brainstorms', tools: ['laki_plans', 'laki_plan_read', 'laki_plan_new', 'laki_plan_write'] },
+  flows: { words: 'workflows: list, write, run', tools: ['laki_workflows', 'laki_workflow_write', 'laki_workflow_run'] },
+  memory: { words: "Laki's memory and a project's notes", tools: ['laki_memory', 'laki_remember', 'laki_memory_write', 'laki_notes_write'] },
+  browser: { words: 'the agent browser and the iOS Simulator', tools: ['laki_browser', 'laki_device'] },
+  settings: { words: "Laki's settings, found by words", tools: ['laki_settings_find'] },
+}
+export const toolGroup = (name: string) => Object.keys(GROUPS).find(g => GROUPS[g].tools.includes(name))
 export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T>
 export const str = (description: string) => ({ type: 'string', description })
 export const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })

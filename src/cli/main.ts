@@ -267,7 +267,7 @@ async function main() {
       return out(r ?? null, remoteText(r))
     }
     case 'mcp':
-      return mcp() // starts the daemon at its first tool call: stdout is the protocol's
+      return mcp(rest.includes('--all')) // starts the daemon at its first tool call: stdout is the protocol's; --all: every tool listed
     case 'version': {
       // A9: this CLI's (no daemon started); a running daemon's too, and a note when it isn't this one
       const d = (await alive()) ? await rpc<{ version?: string; api?: number }>('ping', { caps: true }).catch(() => undefined) : undefined

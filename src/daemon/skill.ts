@@ -73,6 +73,10 @@ For example \`"${cli}" ls --json\`. Below, \`laki\` stands for it.
 Inside a Laki tab, \`$LAKI_APP\` is \`true\`, \`$LAKI_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
 \`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset.
 
+Over MCP (\`laki mcp\`) the core tools are listed (state, new workspace, send, screen, wait, diff, alert, progress,
+limits); \`laki_more\` with a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) lists that
+group's too. Any \`laki_*\` tool named below runs by its name whether it's listed or not.
+
 ## Start work
 
 1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path; \`tabs\`: how its tabs are split, \`a | b\` side by
