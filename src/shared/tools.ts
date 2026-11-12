@@ -577,7 +577,11 @@ async function runMany(rpc: Rpc, v: View, refs: string[], text: string) {
   let made = false
   for (const ref of [...new Set(refs)].slice(0, 12)) {
     const w = v.workspaces.find(x => x.id === ref && !x.archived)
-    if (w && !w.host) {
+    if (w?.host) {
+      out.push({ ws: ref, error: 'on an SSH host: laki_run a tab there alone' })
+      continue
+    }
+    if (w) {
       // a session: its shell at its prompt, else a new one (its prompt waited for once, below)
       const sh = v.tabs.find(x => x.workspace === w.id && atPrompt(x)) ?? (await rpc<{ id: string }>('tabNew', { ws: w.id, preset: 'shell' }).then(x => ((made = true), x), () => undefined))
       if (sh) shells.push(sh.id)
@@ -611,7 +615,7 @@ export function findSessions(s: Found, o: { query?: string; project?: string; gr
     if (o.project && w.project !== (proj ? proj.id : o.project)) return []
     if (o.group && n(w.group) !== n(o.group)) return []
     if (o.agent && !tabs.some(t => n(t.agent) === n(o.agent))) return []
-    if (o.status && !tabs.some(t => (o.status === 'done' ? t.done : t.status === o.status))) return []
+    if (o.status && !tabs.some(t => t.kind === 'agent' && (o.status === 'done' ? t.done : t.status === o.status))) return [] // its agent's: a shell at its prompt is idle too
     const fields: [string, number][] = [[n(w.name), 5], [n(w.branch), 3], [n(w.group), 2], [n(p?.name), 2], [n(tabs.map(t => `${t.name} ${t.alias ?? ''}`).join(' ')), 2], [n(w.pr?.title), 2], [n(tabs.map(t => t.last).join(' ')), 1]]
     const score = words.reduce((sum, wd) => sum + Math.max(0, ...fields.map(([x, k]) => near(wd, x) * k)), 0)
     if (words.length && !score) return []
@@ -691,8 +695,11 @@ export const skillTools = (rpc: Rpc): Tool[] => [
     description: "Ask the user to delete a workspace for good: its worktree, its branch and its uncommitted work go (Laki says what it would lose). They see Yes / No and Laki deletes it on Yes; you never do. Only when they ask to delete; to close one they may want back, laki_archive. End your turn after it.",
     inputSchema: obj({ id: str('the workspace id, from laki_state') }, ['id']),
     run: async a => {
-      const p = await rpc<{ dirty?: number; ahead?: number; unpushed?: number }>('wsPeek', { id: a.id }).catch(() => ({}) as { dirty?: number; ahead?: number; unpushed?: number })
-      const lose = [p.dirty && `${p.dirty} uncommitted file${p.dirty > 1 ? 's' : ''}`, p.unpushed && `${p.unpushed} commit${p.unpushed > 1 ? 's' : ''} not pushed`].filter(Boolean).join(' and ')
+      type Peek = { dirty?: number; unpushed?: number; subs?: string[]; ignored?: string[] }
+      const p = await rpc<Peek>('wsPeek', { id: a.id }).catch(() => ({}) as Peek)
+      const archived = (await rpc<View>('state')).workspaces.find(w => w.id === a.id)?.archived // wsPeek has nothing on one: what Archive kept for Restore goes
+      const n = (k: number, one: string) => `${k} ${one}${k > 1 ? 's' : ''}`
+      const lose = [p.dirty && n(p.dirty, 'uncommitted file'), p.unpushed && `${n(p.unpushed, 'commit')} not pushed`, p.subs?.length && 'submodule changes', p.ignored?.length && n(p.ignored.length, 'ignored file'), archived && 'what Archive kept for Restore'].filter(Boolean).join(', ')
       return rpc('aiQuestion', { act: { kind: 'delete', id: a.id, text: lose } })
     },
   },

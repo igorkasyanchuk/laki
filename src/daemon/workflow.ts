@@ -1577,9 +1577,10 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   delete r.hold // a pause asked for: nothing left to pause
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
   say(r, `${status}: ${why}`)
-  // ended ones past FLOWS_KEPT go, the oldest first
-  const ended = runs().filter(x => !live(x))
-  if (ended.length > FLOWS_KEPT) state.flows = runs().filter(x => live(x) || ended.indexOf(x) >= ended.length - FLOWS_KEPT)
+  // ended ones past FLOWS_KEPT go, the oldest first; simulations (W7) counted apart: they never push a real run out
+  const same = (x: FlowRun) => !x.sim === !r.sim
+  const ended = runs().filter(x => !live(x) && same(x))
+  if (ended.length > FLOWS_KEPT) state.flows = runs().filter(x => live(x) || !same(x) || ended.indexOf(x) >= ended.length - FLOWS_KEPT)
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   tally(r)
   touch()

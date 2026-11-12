@@ -81,7 +81,7 @@ test('Q10: Tab goes on to Laki AI while it is on; screen words in a few language
   assert.equal(talkNext(list, '', false, false), 'a', 'off: never Laki AI')
   for (const s of ['take a screenshot of this', 'what is on my screen?', 'Look at the screen shot', 'зроби скріншот', 'що на екрані', 'сделай скриншот', 'was ist auf dem Bildschirm', 'zrób zrzut ekranu'])
     assert.equal(talkShot(s), true, s)
-  for (const s of ['make the button blue', 'start a task in shop', 'скажи привіт', 'fix the fullscreen button', 'add a screening step', 'додай екранування лапок', 'the screens folder'])
+  for (const s of ['make the button blue', 'start a task in shop', 'скажи привіт', 'fix the fullscreen button', 'add a screening step', 'додай екранування лапок', 'the screens folder', 'turn on the screen reader', 'check the screen recording permission', 'add a скрининг step'])
     assert.equal(talkShot(s), false, s)
   for (const said of ['Laki AI, start a task', 'Lucky AI, start a task', 'Lucky, start a task', 'Лакі, start a task', 'Laki A.I., start a task', 'Lackey AI: start a task'])
     assert.deepEqual(route(said), { target: { kind: 'ai' }, rest: 'start a task', how: 'Laki AI' }, said)

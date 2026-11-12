@@ -34,8 +34,8 @@ export const talkName = (list: TalkTo[], tab: string) => (tab === AI_TO ? 'Laki 
 // the screen under the pill goes to Laki AI's model with it, so only when it's asked for in so many words: never
 // "fullscreen", "screening", "екранування" (escaping). ponytail: a few languages' words
 const SHOT = [
-  /\bscreen ?shots?\b|\b(?:my|the|this|on|at) screen\b|\bscreen grab\b/i,
-  /скр[іи]н/iu, // скрін, скріншот, скрин, скриншот
+  /\bscreen ?shots?\b|\b(?:my|the|this|on|at) screen\b(?! ?(?:reader|saver|size|time|record|shar|lock))|\bscreen grab\b/i, // never the screen reader, saver, recording…
+  /скр[іи]н(?![иі]нг)/iu, // скрін, скріншот, скрин, скриншот; not скрининг, скринінг (screening)
   /(?<!\p{L})[еэ]кран[іиеуа]?(?!\p{L})/iu, // екран, на екрані, экран, на экране
   /\bbildschirm(?:foto)?\b|\bpantalla\b|écran(?!\p{L})|\bzrzut ekranu\b|\bekran(?:ie|u)?\b/iu,
 ]
