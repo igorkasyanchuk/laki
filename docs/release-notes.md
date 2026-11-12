@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- New installs keep terminals running when Laki's background process restarts or crashes (Settings › Git & worktrees › *Terminals outlive the daemon*, now on by default there). If that can't start, Settings says why in one line and tabs run as before.
 - *Delete archived workspaces after* no longer loses work: a day before one goes, Laki says so (Keep / OK), and its uncommitted changes (as a patch) and its storage folder go to the Trash instead of away.
 - The first `laki` command from a terminal outside Laki now asks once in Laki's window: *Allow this terminal*. It closes a way for an agent to pass as you by giving itself a terminal. The terminal that started Laki is allowed from the start.
 - Safer by default: every daemon call is now marked as an agent's or not, and as a phone's or not. An agent can no longer add or rename your accounts, turn skills off, put a tab to sleep or run Laki's tidies early; a phone at Full can't change accounts, reset settings or change an extension's files.

@@ -28,8 +28,8 @@ import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
-import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
-import { ptySock } from '../ptyhost/proto.ts'
+import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
+import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
@@ -223,6 +223,8 @@ export function load() {
   if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
   // U13: What's new shows once a version (App's WhatsNew): a new install has seen its own, one from before U13 none
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
+  // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
+  if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
     state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
@@ -759,6 +761,7 @@ export function view(): View {
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
     ...(soonList().length && { archivedSoon: soonList() }),
+    ...(state.settings?.ptyHost && ptyWhy() && { ptyHostOff: ptyWhy() }), // R9: why new terminals run in the daemon
     ...(updateIdle && { updateIdle }),
     ...(trouble && { trouble }),
     ...(newerData && { newerData }),
@@ -1726,7 +1729,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const viaHost = !!state.settings?.ptyHost && ptyOn() // R6: its terminal in the pty host, where it outlives this daemon
+  const viaHost = !!state.settings?.ptyHost && ptyTakes() // R6: its terminal in the pty host, where it outlives this daemon
   const ptyId = `${tab.id}.${randomBytes(6).toString('hex')}`
   const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
   // R6: in the pty host, its start's keys are kept (pty.json, 0600) for the daemon that finds it there after this one
@@ -4739,9 +4742,19 @@ export async function diagnostics(): Promise<string> {
     '',
     '## Doctor',
     doctorText(doctorRows(d)),
+    '',
+    '## Pty host',
+    await ptyState(),
     ...(['daemon.log', 'app.log'] as const).flatMap(f => ['', `## ${f} (the last 200 lines)`, tailOf(join(dir, f), 200)]),
   ].join('\n')
   return `${diagRedact(text)}\n`
+}
+// R9: the pty host as the diagnostics say it: the setting, running or why not, its pid, protocol and the terminals it keeps
+async function ptyState() {
+  const on = !!state.settings?.ptyHost
+  if (!ptyOn()) return `${on ? 'on' : 'off'}; not running${ptyWhy() ? `: ${ptyWhy()}` : ''}`
+  const kept = await ptyList().then(l => l.filter(p => p.exit === undefined).length, () => '?')
+  return `${on ? 'on' : 'off'}; running, pid ${ptyPid()}, protocol ${ptyVersion()} (this Laki's ${PTY_PROTO}), ${kept} terminals kept${ptyWhy() ? `; ${ptyWhy()}` : ''}`
 }
 // a file's last n lines (of its last 512 KB: a log rotates at 10 MB)
 function tailOf(path: string, n: number) {

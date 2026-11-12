@@ -769,6 +769,7 @@ export function SettingsPage(p: {
   onUnarchive?: (id: string) => void
   updateIdle?: boolean // Update when idle asked (view.updateIdle)
   managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } // a managed policy's locks (view.managed)
+  ptyHostOff?: string // R9: why new terminals run in the daemon (view.ptyHostOff)
   onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
@@ -1289,8 +1290,9 @@ export function SettingsPage(p: {
                   <Says title="Collision radar" hint="Marks rows whose worktrees change the same lines; off: Check overlaps looks once" />
                 </Switch>
                 <Switch className="switch-row" on={!!s.ptyHost} onChange={v => set({ ptyHost: v })}>
-                  <Says title="Terminals outlive the daemon (experimental)" hint="New tabs' terminals keep running when the daemon crashes or restarts" />
+                  <Says title="Terminals outlive the daemon" hint="New tabs' terminals keep running when the daemon crashes or restarts" />
                 </Switch>
+                {s.ptyHost && p.ptyHostOff && <p className="hint">Off for now: {p.ptyHostOff}. New tabs run inside Laki.</p>}
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />
                 </Switch>

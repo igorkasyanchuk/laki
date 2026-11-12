@@ -32,6 +32,14 @@ const ask = <T>(m: object) =>
   })
 
 export const ptyOn = () => !!sock
+// R9: new terminals go to the host only when it speaks this daemon's protocol; another's keeps serving the terminals it
+// has (an update never ends a turn), the new ones run in the daemon. why: what keeps them out (it didn't start, another
+// protocol), for the view's ptyHostOff and the diagnostics
+let hostVersion = 0
+let why: string | undefined
+export const ptyTakes = () => !!sock && hostVersion === PTY_PROTO
+export const ptyWhy = () => why
+export const ptyVersion = () => hostVersion
 export const ptyList = async () => (await ask<{ ptys: PtyInfo[] }>({ op: 'list' })).ptys
 export const ptyForget = (id: string) => (open.delete(id), post({ op: 'forget', id }))
 export const ptyQuit = () => ((wanted = false), post({ op: 'quit' }))
@@ -143,11 +151,16 @@ function script() {
   for (const p of [join(here, 'ptyhost.js'), join(here, '../ptyhost.js'), join(here, '../ptyhost/main.ts')]) if (existsSync(p)) return p
   throw new Error('pty host script not found')
 }
-async function up(): Promise<void> {
+async function up(again = true): Promise<void> {
   if (sock) return
   let s = await dial().catch(() => undefined)
   if (!s) {
-    const out = openSync(join(dir, 'ptyhost.log'), 'a')
+    let out: number
+    try {
+      out = openSync(join(dir, 'ptyhost.log'), 'a')
+    } catch (e) {
+      throw new Error(`the pty host didn't start (${(e as Error).message})`)
+    }
     spawn(process.execPath, [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), script()], { detached: true, stdio: ['ignore', out, out] }).unref()
     for (let i = 0; i < 50 && !s; i++) (await sleep(100), (s = await dial().catch(() => undefined)))
   }
@@ -156,24 +169,35 @@ async function up(): Promise<void> {
   const h = await ask<{ version?: number; pid?: number }>({ op: 'hello', version: PTY_PROTO })
   if (h.version === undefined) throw new Error('the pty host turned this daemon away (another one is connected)')
   hostPid = h.pid ?? 0
+  hostVersion = h.version
   wanted = true
   if (h.version === PTY_PROTO) return
   // another version's: started again only when it holds no live terminal (an update never ends a turn); until then it
   // serves this daemon as it is (the protocol's ops are only ever added to)
-  if ((await ptyList()).some(p => p.exit === undefined)) return log(`protocol ${h.version}, this daemon's is ${PTY_PROTO}: kept until its terminals end`)
+  if (!again || (await ptyList()).some(p => p.exit === undefined)) return log(`protocol ${h.version}, this daemon's is ${PTY_PROTO}: kept for the terminals it has, new ones run in Laki`) // !again: one started anew speaks it too (it never will: in-daemon terminals)
   log(`protocol ${h.version}, this daemon's is ${PTY_PROTO}: starting it again`)
   const closed = new Promise(r => s.once('close', r))
   ptyQuit()
   wanted = true
   await closed
   await sleep(300)
-  return up()
+  return up(false)
 }
 // the setting off: a host left from when it was on is ended, its terminals with it (their tabs start again as any)
 export async function ptyGone() {
+  why = undefined
   if (sock) return ptyQuit()
   const s = existsSync(ptySock()) ? await dial().catch(() => undefined) : undefined
   s?.end(frame({ op: 'quit' }))
 }
 let upping: Promise<void> | undefined
-export const ptyUp = () => (upping ??= up().finally(() => (upping = undefined)))
+export const ptyUp = () =>
+  (upping ??= up()
+    .then(
+      () => void (why = hostVersion === PTY_PROTO ? undefined : `it speaks protocol ${hostVersion}, this Laki ${PTY_PROTO}: new terminals run in Laki`),
+      e => {
+        why = (e as Error).message
+        throw e
+      },
+    )
+    .finally(() => (upping = undefined)))

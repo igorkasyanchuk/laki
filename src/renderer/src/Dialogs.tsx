@@ -188,6 +188,7 @@ export function Pages({ app }: { app: AppCtx }) {
           archived={view.archivedProjects}
           updateIdle={!!view.updateIdle}
           managed={view.managed}
+          ptyHostOff={view.ptyHostOff}
           onUpdateIdle={on => void call('updateIdle', { on })}
           onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
           projectFile={id => api.call<ProjectConfig>('projectFile', { id })}

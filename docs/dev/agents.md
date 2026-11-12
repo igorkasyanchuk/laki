@@ -437,7 +437,7 @@ A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the s
 words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:
 the code, the seconds it ran, its last lines.
 
-### Terminals that outlive the daemon (R6, `settings.ptyHost`, off)
+### Terminals that outlive the daemon (R6, `settings.ptyHost`; on for a new install, R9)
 
 node-pty's children belong to the daemon (session.ts), so a crash or a restart ends every turn. With
 *Terminals outlive the daemon* on (Settings › Git & worktrees › In the background), new tabs' terminals live in a pty host.
@@ -467,7 +467,14 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   after an update) leave the host's terminals running. A plain `laki stop`, *Quit Laki Completely* and SIGTERM end them
   and the host, as before.
 - **Versions.** `PTY_PROTO` changes only when an older host can't serve a newer daemon (ops are added, never changed).
-  A host of another version is quit and started again only when it holds no live terminal; until then it serves.
+  A host of another version is quit and started again only when it holds no live terminal; until then it keeps the
+  terminals it has, and new ones run in the daemon (R9: `ptyTakes`, the host's own protocol only). One started anew
+  that still speaks another (once: `up(false)`, no loop) is kept the same way.
+- **R9: the default and its fallback.** `load()` sets `ptyHost: true` for a new install (no state.json or backup:
+  test worlds too); one from before keeps what it had. A host that can't start (its log can't be opened, no socket in
+  5 s, turned away) or speaks another protocol: `ptyWhy()` says why, the view's `ptyHostOff` (only with the setting
+  on), one line under the switch in Settings, and `## Pty host` in the diagnostics (on/off, running, pid, protocol,
+  terminals kept; `ptyState`). New tabs then run in the daemon as before.
 - **Security.** The socket and pty.json are the user's alone, and a sandboxed claude can't read either (its settings'
   deny rules, with daemon.json). ponytail: with no daemon connected, the first process of the user to connect is taken
   for it, as any of them can read daemon.json.

@@ -2,7 +2,7 @@
 // holds no live terminal, and a daemon killed mid-command that finds its terminals still running when it starts again
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { connect, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -169,8 +169,8 @@ test('the pty host: with no terminal and no daemon it ends by itself; one of ano
 })
 
 test("a daemon killed mid-command starts again: the terminal still runs, its output whole, its start's token and keys still its own; laki stop ends them, --keep doesn't", async t => {
-  const rig = await fresh(t)
-  await rig.rpc('settingsSet', { ptyHost: true })
+  const rig = await fresh(t) // R9: a new install's default, on
+  assert.equal((await rig.rpc('state')).settings.ptyHost, true)
   await until(() => existsSync(join(rig.data, 'pty.sock')), 'the pty host')
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
@@ -231,4 +231,46 @@ test("a daemon killed mid-command starts again: the terminal still runs, its out
   assert.ok(running(pid2))
   await rig.start()
   await until(() => !running(pid2) && !existsSync(join(rig.data, 'pty.sock')), 'the host and its shell ended')
+})
+
+// R9: on by default for a new install; a host that can't start or speaks another protocol leaves new terminals in the
+// daemon, said in the view (ptyHostOff) and the diagnostics; the switch works both ways
+test('R9: a fresh world has the pty host on; one that fails to start or speaks another protocol falls back, says why; off and on again', async t => {
+  const rig = await fresh(t)
+  assert.equal((await rig.rpc('state')).settings.ptyHost, true)
+  await until(() => existsSync(join(rig.data, 'pty.sock')), 'the pty host')
+  assert.match(await rig.rpc('diagnostics'), new RegExp(`## Pty host\non; running, pid \\d+, protocol ${PTY_PROTO}`))
+  assert.equal((await rig.rpc('state')).ptyHostOff, undefined)
+  // off: the host goes as the next daemon starts, new tabs in the daemon; on again: the host back
+  await rig.rpc('settingsSet', { ptyHost: false })
+  await rig.stop()
+  await rig.start()
+  await until(() => !existsSync(join(rig.data, 'pty.sock')), 'no host')
+  assert.match(await rig.rpc('diagnostics'), /## Pty host\noff; not running/)
+  await rig.rpc('settingsSet', { ptyHost: true })
+  await until(() => existsSync(join(rig.data, 'pty.sock')), 'the host again')
+  // one that can't start (its log can't be opened): new terminals in the daemon, the reason in the view
+  await rig.stop()
+  await until(() => !existsSync(join(rig.data, 'pty.sock')), 'the host gone with laki stop')
+  rmSync(join(rig.data, 'ptyhost.log'), { force: true })
+  mkdirSync(join(rig.data, 'ptyhost.log'))
+  await rig.start()
+  const off = await until(async () => (await rig.rpc('state')).ptyHostOff, 'the reason')
+  assert.match(off, /the pty host didn't start \(EISDIR/)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
+  const tab = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === w.id), 'its shell')
+  await rig.rpc('input', { tab: tab.id, data: 'echo in-daemon-ok\r' })
+  await until(async () => (await rig.screen(`${w.id}/${tab.id}`)).includes('in-daemon-ok'), 'a terminal all the same')
+  assert.match(await rig.rpc('diagnostics'), /## Pty host\non; not running: the pty host didn't start/)
+  await rig.stop()
+  rmSync(join(rig.data, 'ptyhost.log'), { recursive: true, force: true })
+  // another protocol, again after a start anew (its env says so): kept, new terminals in the daemon, said
+  rig.env.LAKI_PTY_VERSION = String(PTY_PROTO + 50)
+  await rig.start()
+  assert.match(await until(async () => (await rig.rpc('state')).ptyHostOff, 'the reason'), new RegExp(`it speaks protocol ${PTY_PROTO + 50}, this Laki ${PTY_PROTO}`))
+  const w2 = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh2' })
+  const tab2 = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === w2.id), 'its shell')
+  await rig.rpc('input', { tab: tab2.id, data: 'echo still-ok\r' })
+  await until(async () => (await rig.screen(`${w2.id}/${tab2.id}`)).includes('still-ok'), 'a terminal all the same')
 })
