@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { dataDir } from '../src/shared/conn.ts'
+import { completionWords } from '../src/shared/usage.ts'
 import { fresh, running, until } from './helpers.ts'
 
 // a dev server on two ports
@@ -496,4 +497,33 @@ test('A9: laki --version and laki doctor', async t => {
   await rig.stop()
   r = await rig.cli('--version')
   assert.match(r.out, /\nno daemon running\n$/)
+})
+
+test('laki completion: words from USAGE, a script per shell; laki _complete names a running daemon\'s workspaces, never starts one', async t => {
+  const w = completionWords()
+  assert.ok(w.commands.includes('send') && w.options.send.includes('--when-idle'), 'send and --when-idle')
+  assert.ok(w.subs.widget.includes('on') && w.names.send === 'ws' && w.names.new === 'project')
+  assert.deepEqual(completionWords('  laki zap <ws> [--hard]   x\n  laki zap undo   y').subs.zap, ['undo'], 'a new command, no edit')
+  const rig = await fresh(t)
+  const zsh = await rig.cli('completion', 'zsh')
+  assert.equal(zsh.code, 0, zsh.err)
+  assert.match(zsh.out, /compdef _laki laki/)
+  assert.match(zsh.out, /--when-idle/)
+  assert.match((await rig.cli('completion', 'bash')).out, /complete -F _laki laki/)
+  assert.match((await rig.cli('completion', 'fish')).out, /laki _complete ws/)
+  assert.equal((await rig.cli('completion', 'tcsh')).code, 1)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'fix-login' })
+  delete rig.env.LAKI_TAB
+  delete rig.env.LAKI_TAB_TOKEN
+  const got = await rig.cli('_complete', 'ws', 'fix')
+  assert.deepEqual([got.code, got.out], [0, 'fix-login\n'])
+  assert.match((await rig.cli('_complete', 'profile', 'cl')).out, /^claude$/m)
+  rig.env.LAKI_TAB = 'x'
+  assert.deepEqual((await rig.cli('_complete', 'ws', 'fix')).out, '', "an agent's tab: nothing")
+  delete rig.env.LAKI_TAB
+  await rig.stop()
+  const none = await rig.cli('_complete', 'ws', 'fix')
+  assert.deepEqual([none.code, none.out], [0, ''], 'no daemon: nothing')
+  assert.equal(JSON.parse((await rig.cli('version', '--json')).out).daemon, undefined, 'and none started')
 })

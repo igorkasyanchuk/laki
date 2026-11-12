@@ -114,6 +114,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
                                               and cost; laki ai alone: the conversation
+  laki completion zsh|bash|fish               a completion script for your shell: eval it from your rc file (docs/guide.md)
   laki mcp [--all]                            Laki as an MCP server (stdio): claude mcp add laki -- laki mcp; its core
                                               tools listed, laki_more adds a group (--all, LAKI_MCP_ALL=1: every one)
   laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
@@ -128,10 +129,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
 
 // A4: each command's options, read off its lines of USAGE (a line that names more, \`rm <ws> … | archive <ws>\`, gives
 // each its own), --json and --help everywhere: the CLI refuses any other --word before a command's text
-export const FLAGS: Record<string, Set<string>> = (() => {
+const flagsIn = (usage: string) => {
   const m: Record<string, Set<string>> = {}
   let cur: string[] = []
-  for (const line of USAGE.split('\n')) {
+  for (const line of usage.split('\n')) {
     const c = /^  laki ([a-z]+)/.exec(line)
     if (c) cur = [c[1], ...[...line.matchAll(/\| ([a-z]+) [<[]/g)].map(x => x[1])]
     else if (!/^\s{6,}/.test(line)) cur = []
@@ -141,7 +142,8 @@ export const FLAGS: Record<string, Set<string>> = (() => {
     }
   }
   return m
-})()
+}
+export const FLAGS: Record<string, Set<string>> = flagsIn(USAGE)
 // edit distance, two letters swapped one edit (sned: send)
 const dist = (a: string, b: string) => {
   const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i ? (j ? 0 : i) : j)))
@@ -164,12 +166,22 @@ export const nearest = (typed: string, known: Iterable<string>, n = 1) =>
 // the closest of a command's options to a mistyped one, for the error's hint
 export const nearFlag = (cmd: string, typed: string): string | undefined => nearest(typed, FLAGS[cmd] ?? [])[0]
 // A6: a command's own subcommands, read off its lines of USAGE (laki widget on|off|run <id> | logs <id>: on, off, run, logs)
-export const subsOf = (cmd: string) =>
-  USAGE.split('\n')
+export const subsOf = (cmd: string, usage = USAGE) =>
+  usage.split('\n')
     .filter(l => l.startsWith(`  laki ${cmd} `) || l === `  laki ${cmd}`)
     .flatMap(l => l.split(/(?<=\S) {2,}/)[0].slice(`  laki ${cmd}`.length).split(' | '))
     .flatMap(part => (part.trim().split(' ')[0] ?? '').replace(/^\[|\]$/g, '').split('|'))
     .filter(w => /^[a-z]+$/.test(w))
+
+// laki completion's words, read off USAGE as it runs (a new command needs no edit): the commands, each one's
+// subcommands and options, and what its first argument names (a workspace, a project: laki _complete asks the daemon)
+export function completionWords(usage = USAGE) {
+  const commands = [...new Set([...usage.matchAll(/^ {2}laki ([a-z]+)/gm)].map(m => m[1]))]
+  const flags = flagsIn(usage)
+  const names: Record<string, 'ws' | 'project'> = {}
+  for (const [, c, arg] of usage.matchAll(/^ {2}laki ([a-z]+) (?:[a-z]+ )?<([a-z]+)/gm)) if (!names[c]) { if (/^(ws|workspace|target)$/.test(arg)) names[c] = 'ws'; else if (arg === 'project') names[c] = 'project' }
+  return { commands, subs: Object.fromEntries(commands.map(c => [c, [...new Set(subsOf(c, usage))]])), options: Object.fromEntries(commands.map(c => [c, [...(flags[c] ?? [])]])), names }
+}
 
 // each command's details and examples, after its lines of USAGE: laki help <command>, laki <command> --help. Written
 // for agents (the skill points here): what it prints, what to pass, what to run next

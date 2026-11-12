@@ -9,6 +9,7 @@ import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, crea
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
+import { completion } from './completion.ts'
 import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
@@ -232,6 +233,21 @@ async function main() {
   const [cmd, ...rest] = args
   if (cmd !== 'hook' && help(cmd, rest)) return
   switch (cmd) {
+    case 'completion':
+      return void process.stdout.write(completion(rest[0]))
+    case '_complete': {
+      // the completion scripts' names: a running daemon's (never one started), none from an agent's tab; any error: none
+      if (inTab() || !(await alive())) return
+      try {
+        const v: View = await rpc('state', {}, 2000)
+        const at = (rest[1] ?? '').toLowerCase()
+        const kind = rest[0]
+        const names = kind === 'ws' ? v.workspaces.filter(w => !w.archived).flatMap(w => [w.id, ...(w.name && w.name !== w.id && !/\s/.test(w.name) ? [w.name] : [])]) : kind === 'project' ? v.projects.map(p => p.id) : kind === 'profile' ? [...AGENTS.map(a => a), 'shell', 'none', ...(v.settings.presets ?? []).map(p => p.name)] : []
+        const shown = [...new Set(names)].filter(n => n.toLowerCase().startsWith(at))
+        if (shown.length) process.stdout.write(shown.join('\n') + '\n')
+      } catch {}
+      return
+    }
     case 'hook':
       return import('./hook.ts') // runs as it loads (agents' hooks run it directly: hookArgv)
     case 'daemon':

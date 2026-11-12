@@ -2617,6 +2617,16 @@ Laki doesn't have is two lines, the nearest ones and where to look (*unknown com
 a subcommand it doesn't have (`laki widget reloda`) says the nearest and prints that command's own lines only. Neither
 starts the daemon.
 
+Tab completion: `laki completion zsh|bash|fish` prints a script with every command, subcommand and option (read off
+`laki help` as it runs: a new command needs nothing more), and a running Laki's workspace, project and profile names
+(`laki _complete`: it never starts the daemon, and says nothing in an agent's tab). Add the line for your shell:
+
+```bash
+eval "$(laki completion zsh)"          # ~/.zshrc, after compinit
+eval "$(laki completion bash)"         # ~/.bashrc
+laki completion fish | source          # ~/.config/fish/config.fish
+```
+
 ```bash
 laki project add ~/code/app
 laki project add devbox:~/code/app                      # a folder over SSH (below: Projects over SSH)
