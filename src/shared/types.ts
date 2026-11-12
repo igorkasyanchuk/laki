@@ -393,7 +393,7 @@ export function answerOk(w: Webhook) {
 export const ANSWER_WHY = "ntfy.sh's topics are public: anyone who reads yours could tap. Add an access token (?auth=…) to the URL, or use your own ntfy server"
 
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
-export const PR_QUIET = 10 // minutes a quiet PR (open, nothing running) waits between the timer's checks (settings.prQuiet)
+export const PR_QUIET = 5 // minutes a quiet PR (open, nothing running) waits between the timer's checks (settings.prQuiet)
 export const PR_BOTS = ['github-actions', 'copilot-pull-request-reviewer', 'coderabbitai'] // the review bots whose threads go to the agent (settings.prBots); other bots' are skipped
 export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
 
