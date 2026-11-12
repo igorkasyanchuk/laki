@@ -98,7 +98,13 @@ npm run dev                       # Electron + renderer dev server on :5199
   to 11 (GHSA-g3hv-75wg-m249); the older 3.x and 5.x copies stay (their API went in 11). Drop it once electron-builder
   takes minimatch 11 itself; a pack's file list was the same with it.
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
-  browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
+  browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it. macOS 26's own (V15): `build/Laki.icon`, an Icon Composer document (`icon.json`: the tile's gradient as its
+  fill and a darker one for dark; `Assets/` the caret and the sun, copies of `build/icon/mark.svg` and `highlight.svg`;
+  `build/icon/background.svg` the tile, on the 1024 canvas), compiled by `scripts/after-pack.cjs` (electron-builder's
+  `afterPack`) with Xcode 26's `actool` into `Contents/Resources/Assets.car` and `CFBundleIconName`; the `.icns` stays
+  `CFBundleIconFile` (macOS 15 and earlier). No Xcode 26: the `.icns` alone, said in one line. Look at one appearance:
+  Icon Composer's `ictool build/Laki.icon --export-image --platform macOS --rendition Dark …` (Default, Dark,
+  TintedLight, TintedDark, ClearLight, ClearDark).
 - Licenses: each build writes `out/renderer/THIRD_PARTY_NOTICES.txt` (electron.vite.config.ts' `notices`: every npm
   package in a bundle, the daemon's `dependencies` and Electron, each with its own license files, then the fonts'
   `NOTICE.md`, `OFL.txt`, `HACK-LICENSE.md`); About's *Open-source licenses* opens it. `THIRD_PARTY_LICENSES.md` is

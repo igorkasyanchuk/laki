@@ -108,6 +108,7 @@
       "owner": "igorkasyanchuk",
       "repo": "laki-releases"
     },
+    "afterPack": "scripts/after-pack.cjs",
     "mac": {
       "target": "dir",
       "category": "public.app-category.developer-tools",
