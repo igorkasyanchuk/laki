@@ -12,7 +12,7 @@ import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
-import { AI_TO, type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { AI_TO, type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
@@ -784,13 +784,18 @@ function talkPage() {
     const an = ctx?.createAnalyser()
     if (an && ctx && stream) (an.fftSize = 512), ctx.createMediaStreamSource(stream).connect(an)
     const buf = new Uint8Array(512)
+    const device = stream?.getAudioTracks()[0]?.label
+    let loud = Date.now()
+    let deaf = false // Q6: flat for QUIET_MS: "I can't hear you", the input named, until it hears something
     const tick = setInterval(() => {
       timeEl.textContent = talkTime(Date.now() - at)
       if (!an) return void (level.style.width = `${30 + 20 * Math.sin(Date.now() / 200)}%`)
       an.getByteTimeDomainData(buf)
-      let sum = 0
-      for (const v of buf) sum += (v - 128) ** 2
-      level.style.width = `${Math.min(100, Math.sqrt(sum / buf.length) * 3)}%`
+      const l = levelOf(buf)
+      level.style.width = `${l * 100}%`
+      if (l >= FLAT) loud = Date.now()
+      const q = phase === 'rec' && Date.now() - loud >= QUIET_MS
+      if (q !== deaf) (deaf = q), say(q ? quietSay(device) : HINT, q)
     }, 60)
     const r = stream && new MediaRecorder(stream)
     const chunks: Blob[] = []

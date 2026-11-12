@@ -331,11 +331,18 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   or Fn + a key never opens it; another key while held or Esc drops it, Esc while it's written down too; under
   `SHORT_MS`: *Too short*; on macOS Chromium drops Fn's own key events, a flagsChanged of keyCode 63, so main's `fnWatch`
   polls NSEvent's modifier flags through osascript's JXA every `FN_MS` while Laki is the front app and a page asked
-  (`fn-watch`), and sends the focused one `fn` down or up: voice.ts' `fnDown`, never with another key held (`down`)),
+  (`fn-watch`), and sends the focused one `fn` down or up: voice.ts' `fnDown`, never with another key held (`down`);
+  Q6: Fn's rules are `talk.ts` `fnStep`, pure (`test/talk.test.ts`): hold, a double tap's lock (`TAP2_MS`, each press
+  under `HOLD_MS`; `settings.voice.lock`), the next press's stop, a key, a blur, a recording ended elsewhere (`end`);
+  ⌥Fn (`alt`) opens the history),
   then types the text where the focus was (`execCommand('insertText')`: a field, a
   contenteditable, xterm's textarea; a terminal or an input gets one line, no control characters), else copies it, as
   it does for a terminal whose agent shows a menu (`ask`: its keys would pick an option); `VoiceBar` (PromptInput.tsx)
-  says what it's doing in the app and the new-workspace and AI windows (`html.away` doesn't pause it). Settings › Voice's
+  says what it's doing in the app and the new-workspace and AI windows (`html.away` doesn't pause it); Q6: its level
+  (`meter`: an AnalyserNode, `levelOf`, every 80 ms; under `FLAT` for `QUIET_MS`: `quietSay` with the track's label;
+  the talk pill's the same), `locked`, `ends` (`WARN_MS` before the cap: a countdown), `undo` after a field's insert
+  (`execCommand('undo')`), and the history (`hist`: 10 transcripts in the window's memory, `settings.voice.history`,
+  emptied by Recording mode; `VoiceHistory`: Insert, Copy, Send to… an agent's tab). Settings › Voice's
   Hold Fn group shows on a Mac only. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
   `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused, it began asking meanwhile: copied, never typed there), a box
   with `data-voice-send` (PromptInput with `onSubmit`, Send later's) a synthetic ⌘⏎ keydown 50 ms after the

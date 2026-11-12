@@ -3722,3 +3722,15 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 .iso-eg pre { margin: var(--sp-1) 0 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-m); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .remote-log { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 360px; overflow-y: auto; padding: var(--sp-4) var(--sp-5); } /* D9: Settings › Remote access › Activity */
 .remote-log-row { display: flex; gap: var(--sp-4); align-items: baseline; } .remote-log-row > :last-child { min-width: 0; overflow-wrap: anywhere; }
+/* Q6: the voice bar's level meter, its buttons, nothing heard; the last transcripts over it */
+.voice-level { flex: none; width: 36px; height: 4px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 14%, transparent); overflow: hidden; }
+.voice-level > i { display: block; height: 100%; background: var(--error); transform-origin: left; transition: transform 80ms linear; }
+.voice-bar.quiet { border-color: var(--waiting); }
+.voice-bar button.link { flex: none; padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; box-shadow: none; }
+.voice-hist { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: var(--z-page); display: flex; flex-direction: column; gap: var(--sp-2); width: min(560px, calc(100vw - 32px)); max-height: 50vh; overflow: auto; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); color: var(--fg); font-size: var(--fs-2); box-shadow: var(--lift-3); }
+.voice-hist-head { display: flex; align-items: center; gap: var(--sp-3); }
+.voice-hist-head .ib { margin-left: auto; }
+.voice-hist-row { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) 0; border-top: 1px solid var(--line); }
+.voice-hist-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-hist-row select { max-width: 160px; }
+@media (prefers-reduced-motion: reduce) { .voice-level > i { transition: none; } }

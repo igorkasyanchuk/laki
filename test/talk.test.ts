@@ -103,3 +103,55 @@ test("Q11: prices: per second as an hour's, Microsoft's per hour as it is, by th
   assert.equal(voicePrice({ prompt: '0', completion: '0' }), 'free')
   for (const p of [undefined, {}, { prompt: '' }, { prompt: 'x' }, { prompt: '-1' }, { prompt: '0.1', completion: 'NaN' }]) assert.equal(voicePrice(p), undefined, JSON.stringify(p))
 })
+
+test('Q6: Fn: held opens and its release inserts; two quick taps lock, the next press stops; a slow second tap, another key, a blur', async () => {
+  const { fnStep, FN0, HOLD_MS, TAP2_MS } = await import('../src/shared/talk.ts')
+  type Ev = Parameters<typeof fnStep>[1]
+  // events at fake times; each step's action, '' left out
+  const run = (evs: [Ev, number][], lock = true) => {
+    let s = FN0
+    const out: string[] = []
+    for (const [e, t] of evs) {
+      const [n, d] = fnStep(s, e, t, lock)
+      s = n
+      if (d) out.push(`${d}@${t}`)
+    }
+    return { out, s }
+  }
+  // hold: down, the timer, up
+  assert.deepEqual(run([['down', 0], ['held', HOLD_MS], ['up', 900]]).out, ['open@200', 'insert@900'])
+  // a single tap: nothing
+  assert.deepEqual(run([['down', 0], ['up', 80]]).out, [])
+  // double tap: locked (the second press within TAP2_MS of the first's release), recording on after the release
+  const two = run([['down', 0], ['up', 80], ['down', 80 + TAP2_MS], ['up', 80 + TAP2_MS + 60]])
+  assert.deepEqual(two.out, [`lock@${80 + TAP2_MS + 60}`])
+  assert.equal(two.s.locked, true)
+  // locked: another key and a blur keep it; the next press stops it, its release does nothing more
+  const stop = run([['down', 0], ['up', 80], ['down', 200], ['up', 260], ['key', 1000], ['blur', 2000], ['down', 5000], ['held', 5200], ['up', 5600]])
+  assert.deepEqual(stop.out, ['lock@260', 'insert@5000'])
+  assert.equal(stop.s.locked, false)
+  // too slow a second tap: no lock
+  assert.deepEqual(run([['down', 0], ['up', 80], ['down', 80 + TAP2_MS + 1], ['up', 80 + TAP2_MS + 50]]).out, [])
+  // a second press held long: a hold, not a lock
+  assert.deepEqual(run([['down', 0], ['up', 80], ['down', 200], ['held', 400], ['up', 1500]]).out, ['open@400', 'insert@1500'])
+  // a tap then a hold-length press whose timer is late: nothing
+  assert.deepEqual(run([['down', 0], ['up', 80], ['down', 200], ['up', 200 + HOLD_MS]]).out, [])
+  // Lock by double tap off: two taps are two taps
+  assert.deepEqual(run([['down', 0], ['up', 80], ['down', 200], ['up', 260]], false).out, [])
+  // another key while held drops it; a blur while held inserts
+  assert.deepEqual(run([['down', 0], ['held', 200], ['key', 300], ['up', 400]]).out, ['open@200', 'drop@300'])
+  assert.deepEqual(run([['down', 0], ['held', 200], ['blur', 300]]).out, ['open@200', 'insert@300'])
+  // a locked one ended by itself (Esc, the cap): Fn after starts afresh, a tap after doesn't stop anything
+  assert.deepEqual(run([['down', 0], ['up', 80], ['down', 200], ['up', 260], ['end', 3000], ['down', 4000], ['up', 4050]]).out, ['lock@260'])
+  // the recording ended while Fn is held (the mic button): its release does nothing
+  assert.deepEqual(run([['down', 0], ['held', 200], ['end', 300], ['up', 400]]).out, ['open@200'])
+})
+
+test('Q6: the level meter: silence 0, a tone in between, clipped at 1; the line when it hears nothing', async () => {
+  const { levelOf, FLAT, quietSay } = await import('../src/shared/talk.ts')
+  assert.equal(levelOf(new Uint8Array(512).fill(128)), 0)
+  const tone = Uint8Array.from({ length: 512 }, (_, i) => 128 + Math.round(10 * Math.sin(i / 4)))
+  assert.ok(levelOf(tone) > FLAT && levelOf(tone) < 1)
+  assert.equal(levelOf(Uint8Array.from({ length: 512 }, (_, i) => (i % 2 ? 0 : 255))), 1)
+  assert.equal(quietSay('MacBook Pro Microphone'), "I can't hear you: check the input (MacBook Pro Microphone)")
+})

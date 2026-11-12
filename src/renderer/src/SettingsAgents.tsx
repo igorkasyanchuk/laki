@@ -104,6 +104,9 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
       </Group>
       {cloud && (
         <>
+          <Group title="OpenRouter API key" hint={KEY_HINT}>
+            <OpenRouterKey has={has} save={k => keyApi.key(k).then(r => (setHas(r.key), r))} />
+          </Group>
           <Group title="Model" hint="A speech-to-text model on OpenRouter (openrouter.ai/models, Speech to text); the language is found by itself">
             <label>
               Model
@@ -153,6 +156,13 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
                 <Says title="Hold Fn to talk" hint="Anywhere in Laki: hold Fn, talk, let go, and it's typed where your cursor is: a prompt, a field, a terminal. Another key while you hold it, or Esc, drops it" />
               </Switch>
             </div>
+            {v.fn !== false && (
+              <div className="setting-box">
+                <Switch className="switch-row" on={v.lock !== false} onChange={lock => onChange({ ...v, lock })}>
+                  <Says title="Lock by double tap" hint="Tap Fn twice to keep the mic on without holding it: the bar says Locked. Fn again stops it and types what you said; Esc drops it" />
+                </Switch>
+              </div>
+            )}
             <p className="muted small">
               So that macOS doesn't open its emoji picker or dictation as well, set System Settings › Keyboard › Press 🌐 key to: Do Nothing.
             </p>
@@ -180,9 +190,11 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
                 <Says title="Send as you stop talking" hint="Letting go of Fn sends what you said to the prompt box or the idle agent" />
               </Switch>
             </div>
-          </Group>
-          <Group title="OpenRouter API key" hint={KEY_HINT}>
-            <OpenRouterKey has={has} save={k => keyApi.key(k).then(r => (setHas(r.key), r))} />
+            <div className="setting-box">
+              <Switch className="switch-row" on={v.history !== false} onChange={history => onChange({ ...v, history })}>
+                <Says title="Keep the last transcripts" hint="Your last 10, in memory only: gone when Laki quits or Recording mode is on. ⌥Fn, or Earlier on the bar, lists them to type again, copy or send to another agent" />
+              </Switch>
+            </div>
           </Group>
         </>
       )}

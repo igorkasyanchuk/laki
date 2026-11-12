@@ -4,14 +4,16 @@
 // in Laki to talk, let go to insert; the mic button starts and stops it the same way.
 // ponytail: the bubbles' Say it (floater.ts, its own window without this module) keeps macOS dictation in the cloud too
 import { useSyncExternalStore } from 'react'
-import type { TabView, VoiceSettings } from '../../shared/types'
+import type { TabView, VoiceSettings, WorkspaceView } from '../../shared/types'
 import { api, bridge } from './api'
-import { base64, wavOf } from './text'
-import { VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { base64, wavOf, wsShown } from './text'
+import { FLAT, FN0, type FnDo, type FnState, fnStep, HOLD_MS, levelOf, QUIET_MS, quietSay, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 
 let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
-api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []), fnAsk())))
+let wss: WorkspaceView[] = [] // the history's Send to…: its agents by workspace
+// Recording mode, or Keep the last transcripts turned off: the history goes
+api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []), (wss = m.view?.workspaces ?? []), (m.view?.settings?.recording || settings.history === false) && forget(), fnAsk())))
 export const cloudVoice = () => settings.on !== false && settings.engine === 'cloud' // off: the mic is macOS dictation
 // Send as you stop talking (settings' send): where the text goes, it's sent too (insert, below)
 // ponytail: cloud only; macOS dictation's stop is macOS's, so its text is only typed
@@ -20,21 +22,48 @@ export const voiceSends = () => cloudVoice() && settings.send === true
 const RATE = 16000 // what speech models take; a minute is about 2 MB of WAV
 const MAX_MS = VOICE_MAX_MS // a recording stops by itself after this
 const SHORT_MS = VOICE_SHORT_MS // shorter: nothing to write down (Fn's taps never open the mic: HOLD_MS)
+const WARN_MS = 20000 // Q6: the bar counts down this long before the cap
 
-// what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went)
-export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string }
+// what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went).
+// Q6: locked (a double tap: Fn again stops it), ends (the cap is near: when), quiet (nothing heard: why), undo (what
+// it typed taken back)
+export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; ends?: number; quiet?: string; undo?: () => void }
 let now: VoicePhase = { phase: 'idle' }
 const subs = new Set<() => void>()
 const set = (v: VoicePhase) => ((now = v), subs.forEach(f => f()))
 export const useVoice = () => useSyncExternalStore(f => (subs.add(f), () => void subs.delete(f)), () => now)
+// Q6: a value a component follows: the level meter's, the history's
+function store<T>(v: T) {
+  const subs = new Set<() => void>()
+  return { get: () => v, set: (n: T) => ((v = n), subs.forEach(f => f())), use: () => useSyncExternalStore(f => (subs.add(f), () => void subs.delete(f)), () => v) }
+}
+const level = store(0)
+export const useLevel = level.use
+// Q6: the last 10 transcripts, newest first, in this window's memory only (gone as Laki quits, in Recording mode, or
+// with Keep the last transcripts off); open: its list shows (⌥Fn, the bar's Earlier, the mic's menu)
+const hist = store<{ list: string[]; open: boolean }>({ list: [], open: false })
+export const useHistory = hist.use
+export const historyOpen = (open: boolean) => hist.get().open !== open && hist.set({ ...hist.get(), open: open && hist.get().list.length > 0 })
+const remember = (t: string) => settings.history !== false && hist.set({ ...hist.get(), list: [t, ...hist.get().list.filter(x => x !== t)].slice(0, 10) })
+const forget = () => hist.get().list.length > 0 && hist.set({ list: [], open: false })
+// the list's buttons: typed again where the cursor is (never sent), copied, or sent to an agent (the agents, by workspace)
+export const voiceAgain = (t: string) => (historyOpen(false), void insert(t, document.activeElement as HTMLElement | null, false))
+export const voiceCopy = (t: string) => (historyOpen(false), void navigator.clipboard?.writeText(t).then(() => say('Copied'), () => say('Not copied')))
+export const voiceAgents = () => tabs.filter(t => t.kind === 'agent').map(t => ({ id: t.id, name: `${(w => (w ? wsShown(w) : '?'))(wss.find(w => w.id === t.workspace))} · ${t.name}` }))
+export async function voiceSendTo(tab: string, t: string) {
+  historyOpen(false)
+  const why = await api.call('send', { target: tab, text: t, agent: true }).then(() => '', e => (e as Error).message)
+  say(why ? `Not sent: ${why}` : `Sent to ${voiceAgents().find(a => a.id === tab)?.name ?? 'the agent'}`)
+}
 
 let rec: { stop: (send: boolean, only?: boolean) => void } | null = null
 let saidT: ReturnType<typeof setTimeout> | undefined
 
-export async function voiceStart() {
+export async function voiceStart(locked = false) {
   if (now.phase !== 'idle') return
   const target = document.activeElement as HTMLElement | null
-  set({ phase: 'listening' })
+  historyOpen(false)
+  set({ phase: 'listening', locked })
   // a stop before the mic opens (a permission prompt, a device that never answers): nothing heard, so idle at once, and
   // the stream, if it comes, closed; a start meanwhile is a recording of its own
   let dropped = false
@@ -47,8 +76,10 @@ export async function voiceStart() {
     rec = null
     return say(`Microphone: ${(e as Error).message}`)
   }
-  const off = () => stream.getTracks().forEach(t => t.stop())
+  let meterOff = () => {}
+  const off = () => (meterOff(), stream.getTracks().forEach(t => t.stop()))
   if (dropped) return off()
+  meterOff = meter(stream)
   try {
     const r = new MediaRecorder(stream)
     const chunks: Blob[] = []
@@ -57,9 +88,11 @@ export async function voiceStart() {
     let only = false // typed, never sent (Send as you stop talking): the cap, the window's blur
     const stop = (s: boolean, o = false) => ((send = s), (only = o), r.state !== 'inactive' && r.stop())
     const limit = setTimeout(() => stop(true, true), MAX_MS)
+    const warn = setTimeout(() => now.phase === 'listening' && set({ ...now, ends: at + MAX_MS }), MAX_MS - WARN_MS)
     r.ondataavailable = e => chunks.push(e.data)
     r.onstop = () => {
       clearTimeout(limit)
+      clearTimeout(warn)
       off()
       rec = null
       if (!send) return set({ phase: 'idle' })
@@ -78,6 +111,31 @@ export async function voiceStart() {
 // send: write it down and insert it; else drop it (Esc). only: insert it, never send it (Send as you stop talking)
 export const voiceStop = (send = true, only = false) => rec?.stop(send, only)
 
+// Q6: the level meter while it listens (the bar's), and "I can't hear you" with the input's name after QUIET_MS of
+// nothing (gone as soon as it hears something); its stop. No AudioContext: it records all the same, no meter
+function meter(stream: MediaStream) {
+  try {
+    const ctx = new AudioContext()
+    const an = ctx.createAnalyser()
+    an.fftSize = 512
+    ctx.createMediaStreamSource(stream).connect(an)
+    const buf = new Uint8Array(an.fftSize)
+    const device = stream.getAudioTracks()[0]?.label
+    let loud = Date.now()
+    const t = setInterval(() => {
+      an.getByteTimeDomainData(buf)
+      const l = levelOf(buf)
+      level.set(l)
+      if (l >= FLAT) loud = Date.now()
+      const quiet = Date.now() - loud >= QUIET_MS ? quietSay(device) : undefined
+      if (now.phase === 'listening' && quiet !== now.quiet) set({ ...now, quiet })
+    }, 80)
+    return () => (clearInterval(t), level.set(0), void ctx.close().catch(() => {}))
+  } catch {
+    return () => {}
+  }
+}
+
 // the write under way; Esc while it works makes it another's, so its text goes nowhere
 let writing = 0
 async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
@@ -88,15 +146,17 @@ async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
     const { text, fixed, fillers } = await api.call<{ text: string; fixed?: string[]; fillers?: number }>('voiceText', { audio: base64(wavOf(buf.getChannelData(0), RATE)) })
     if (mine !== writing) return
     set({ phase: 'idle' })
-    if (text) await insert(text, target, may)
-    if (text && (fixed?.length || fillers) && now.phase === 'idle') say([now.said, fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · ')) // ⌘Z in the field takes the text back
+    if (text) remember(text)
+    const typed = !!text && (await insert(text, target, may))
+    // Q6: typed into a field: Undo takes it back (as ⌘Z there would)
+    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => undoIn(target!) : undefined)
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }
 }
 
-function say(said: string) {
-  set({ phase: 'idle', said })
+function say(said: string, undo?: () => void) {
+  set({ phase: 'idle', said, undo })
   clearTimeout(saidT)
   saidT = setTimeout(() => now.said === said && set({ phase: 'idle' }), 6000)
 }
@@ -109,14 +169,16 @@ function say(said: string) {
 // Send as you stop talking (may: not the cap's or a blur's): an idle agent tab's terminal gets it as send gives it
 // (typed, then Enter; refused, it began asking meanwhile: copied, never typed there, its keys would pick); a box that sends (data-voice-send: a PromptInput with onSubmit, Send later's) its ⌘⏎ once its
 // state has the text. Never a shell, nor any other field
-async function insert(text: string, el: HTMLElement | null, may: boolean) {
+const undoIn = (el: HTMLElement) => (set({ phase: 'idle' }), el.isConnected && (el.focus(), document.execCommand('undo')))
+// true: typed into a field (not a terminal, not sent), so Undo can take it back
+async function insert(text: string, el: HTMLElement | null, may: boolean): Promise<boolean> {
   const term = !!el?.classList.contains('xterm-helper-textarea')
   const tab = term ? tabs.find(t => t.id === el!.closest<HTMLElement>('[data-pane]')?.dataset.pane) : undefined
   const menu = tab?.ask
   if (menu || !el?.isConnected || !(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el.isContentEditable)) {
     const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
     const shown = text.length > 300 ? `${text.slice(0, 298)}…` : text
-    return say(`${menu ? 'The agent is asking something, so not typed there. ' : ''}${copied ? `Copied, paste it: "${shown}"` : `Nowhere to type it: "${shown}"`}`)
+    return say(`${menu ? 'The agent is asking something, so not typed there. ' : ''}${copied ? `Copied, paste it: "${shown}"` : `Nowhere to type it: "${shown}"`}`), false
   }
   el.focus()
   const line = term || el instanceof HTMLInputElement
@@ -126,29 +188,31 @@ async function insert(text: string, el: HTMLElement | null, may: boolean) {
   const sends = may && !!t && voiceSends()
   if (sends && tab?.kind === 'agent' && tab.status === 'idle') {
     const why = await api.call('send', { target: tab.id, text: t, agent: true }).then(() => '', e => (e as Error).message)
-    if (!why) return say(`Sent to ${tab.name}`)
+    if (!why) return say(`Sent to ${tab.name}`), false
     const copied = await navigator.clipboard?.writeText(t).then(() => true, () => false)
-    return say(`Not sent: ${why}${copied ? '. Copied, paste it' : ''}`)
+    return say(`Not sent: ${why}${copied ? '. Copied, paste it' : ''}`), false
   }
   if (t) document.execCommand('insertText', false, (before && !/\s$/.test(before) ? ' ' : '') + t)
   if (sends && el.dataset.voiceSend !== undefined) {
     await new Promise(ok => setTimeout(ok, 50)) // its box's state takes the text first
-    if (!el.isConnected) return
+    if (!el.isConnected) return false
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', metaKey: true, bubbles: true, cancelable: true }))
-    say('Sent')
+    return say('Sent'), false
   }
+  return !!t && !term
 }
 
 // hold Fn to talk (cloud, settings' fn unset or on): held HOLD_MS, the mic opens; its keyup inserts. A tap, or another
 // key while it's held (Fn ← for Home, Fn ⌫…: that key works as ever), never opens it, or drops what it heard; the
-// window's blur ends it as a keyup would. Esc drops any recording, the mic button's too, or what's being written down
+// window's blur ends it as a keyup would. Q6: two quick taps lock it on (settings' lock unset or on; the bar: Locked),
+// the next Fn stops it and inserts; ⌥Fn opens the last transcripts. The keys' rules are talk.ts' fnStep (pure, tested).
+// Esc drops any recording, the mic button's too, or what's being written down
 // (ponytail: a keyup lost without a blur, Fn let go over a native menu, records on until the next Fn or MAX_MS). Neither Fn nor that Esc gets
 // to xterm or the app's keys: listening from the module's load, before App's own capture-phase keys, in every window
 // that has a prompt (the app, the new-workspace and AI windows)
-const HOLD_MS = 200
-let held = false
+let fn: FnState = FN0
 let soon: ReturnType<typeof setTimeout> | undefined // Fn is down, the mic not open yet
-const release = (send: boolean, only = false) => ((held = false), clearTimeout(soon), voiceStop(send, only))
+let alt = false // ⌥ is down: ⌥Fn is the history's
 const isFn = (e: KeyboardEvent) => e.key === 'Fn' || e.code === 'Fn'
 const fnOn = () => cloudVoice() && settings.fn !== false
 // the keys held now, by when each went down (or repeated): Fn with one of them (Fn ←, Fn ⌫) is that key's, never the mic.
@@ -156,14 +220,32 @@ const fnOn = () => cloudVoice() && settings.fn !== false
 const DOWN_MS = 2500
 const down = new Map<string, number>()
 const keyHeld = () => [...down.values()].some(t => Date.now() - t < DOWN_MS)
-const fnDown = () => !held && !keyHeld() && ((held = true), (soon = setTimeout(() => held && void voiceStart(), HOLD_MS)))
+const fnDo = (d: FnDo, only = false) => {
+  if (d === 'open' || d === 'lock') now.phase === 'idle' ? void voiceStart(d === 'lock') : (fn = FN0) // still writing the last one down
+  else if (d === 'insert') voiceStop(true, only)
+  else if (d === 'drop') voiceStop(false)
+}
+const fnEv = (ev: Parameters<typeof fnStep>[1], only = false) => {
+  const [s, d] = fnStep(fn, ev, Date.now(), settings.lock !== false)
+  fn = s
+  if (!s.held) clearTimeout(soon)
+  fnDo(d, only)
+}
+// a recording that ended some other way (Esc, the mic button, the cap): Fn's next press starts afresh
+subs.add(() => now.phase !== 'listening' && (fn.locked || fn.open) && (fn = fnStep(fn, 'end', Date.now())[0]))
+function fnDown() {
+  if (alt) return historyOpen(!hist.get().open)
+  if (fn.held || (!fn.locked && keyHeld())) return
+  fnEv('down')
+  if (fn.held && !fn.skip) soon = setTimeout(() => fnEv('held'), HOLD_MS)
+}
 // macOS: Fn from main (preload's onFn), its own key events never reach a page; elsewhere, or a build without it, keydown's
 let fnAsked: boolean | undefined
 const fnAsk = () => fnOn() !== fnAsked && bridge?.fnWatch && bridge.fnWatch((fnAsked = fnOn()))
-bridge?.onFn?.(on => (on ? fnOn() && fnDown() : held && release(true)))
+bridge?.onFn?.(on => (on ? fnOn() && fnDown() : fn.held && fnEv('up')))
 // immediate: the app's other window listeners (Settings' Esc, popovers') come after this one, on the same target
 const eat = (e: KeyboardEvent) => (e.preventDefault(), e.stopImmediatePropagation())
-window.addEventListener('keyup', e => void down.delete(e.code), true)
+window.addEventListener('keyup', e => void (down.delete(e.code), e.key === 'Alt' && (alt = false)), true)
 window.addEventListener(
   'keydown',
   e => {
@@ -173,20 +255,22 @@ window.addEventListener(
       if (!e.repeat) fnDown()
       return
     }
+    if (e.key === 'Alt') alt = true
     if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) down.set(e.code, Date.now())
-    if (held) release(false)
+    if (fn.held) fnEv('key')
     else if (e.key === 'Escape' && rec) eat(e), voiceStop(false)
     else if (e.key === 'Escape' && now.phase === 'writing') eat(e), writing++, set({ phase: 'idle' })
+    else if (e.key === 'Escape' && hist.get().open) eat(e), historyOpen(false)
   },
   true,
 )
 window.addEventListener(
   'keyup',
   e => {
-    if (!isFn(e) || !held) return
+    if (!isFn(e) || !fn.held) return
     eat(e)
-    release(true)
+    fnEv('up')
   },
   true,
 )
-window.addEventListener('blur', () => (down.clear(), held && release(true, true))) // typed, not sent: Fn wasn't let go
+window.addEventListener('blur', () => (down.clear(), (alt = false), fn.held && fnEv('blur', true))) // typed, not sent: Fn wasn't let go

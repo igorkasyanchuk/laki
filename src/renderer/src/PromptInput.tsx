@@ -10,7 +10,7 @@ import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, type MenuItem, useMenu } from './ui'
-import { cloudVoice, useVoice, voiceSends, voiceStart, voiceStop } from './voice'
+import { cloudVoice, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
@@ -258,6 +258,7 @@ export function PromptInput(p: {
   const voice = useVoice()
   const cloud = cloudVoice()
   const talk = () => (voice.phase === 'listening' ? voiceStop() : (box.current?.focus(), void voiceStart()))
+  const said = useHistory().list.length > 0
   const [histMenu, history] = usePromptHistory(box, t => p.onChange(t))
   // an extension's text at the cursor (over what's selected), the box focused after it
   const insertText = (t: string) => {
@@ -349,6 +350,7 @@ export function PromptInput(p: {
                 ? [
                     { head: 'Voice · cloud' },
                     { label: voice.phase === 'listening' ? 'Stop and insert' : 'Start dictating', icon: 'mic', hint: 'hold Fn', run: talk },
+                    ...(said ? [{ label: 'Last transcripts…', icon: 'history' as const, hint: '⌥Fn', run: () => (box.current?.focus(), historyOpen(true)) }] : []),
                     { label: 'Voice settings…', icon: 'settings', hint: 'Settings › Voice', run: () => openExternal('laki://settings/voice') },
                   ]
                 : [
@@ -432,12 +434,77 @@ export function PromptInput(p: {
 
 // what Voice's cloud is doing, wherever it started (the mic, hold Fn): listening, writing it down, then a line to say
 // (it failed, or the text went to the clipboard). App's and the new-workspace and AI windows'
+// the voice bar over every window's bottom: listening (its level, locked, the cap's countdown, nothing heard), writing
+// it down, what came of it (Undo, Earlier: the last transcripts). Its buttons keep the focus where the text goes
+const keepFocus = (e: React.MouseEvent) => (e.target as HTMLElement).tagName !== 'SELECT' && e.preventDefault()
 export function VoiceBar() {
   const v = useVoice()
-  if (v.phase === 'idle' && !v.said) return null
+  const h = useHistory()
+  const list = h.open && h.list.length > 0
+  const how = voiceSends() ? 'send' : 'insert'
   return (
-    <div className={`voice-bar ${v.phase}`} role="status">
-      {v.phase === 'idle' ? v.said : <><Icon name="mic" /> {v.phase === 'listening' ? `Listening… let go of Fn, or click the mic, to ${voiceSends() ? 'send' : 'insert'}; Esc drops it` : 'Writing it down… Esc drops it'}</>}
+    <>
+      {list && <VoiceHistory list={h.list} />}
+      {(v.phase !== 'idle' || v.said) && (
+        <div className={`voice-bar ${v.phase}${v.quiet ? ' quiet' : ''}`} role="status" onMouseDown={keepFocus}>
+          {v.phase === 'idle' ? (
+            <>
+              <span>{v.said}</span>
+              {v.undo && <button type="button" className="link" onClick={v.undo}>Undo</button>}
+              {h.list.length > 0 && <button type="button" className="link" data-tip="The last transcripts (⌥Fn)" onClick={() => historyOpen(!h.open)}>Earlier</button>}
+            </>
+          ) : (
+            <>
+              <Icon name="mic" />
+              {v.phase === 'listening' && <VoiceLevel />}
+              <span>
+                {v.phase !== 'listening' ? 'Writing it down… Esc drops it' : v.quiet ?? (v.locked ? `Locked: Fn to ${how} · Esc drops it` : `Listening… let go of Fn, or click the mic, to ${how}; Esc drops it`)}
+                {v.phase === 'listening' && v.ends && <VoiceLeft ends={v.ends} />}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+function VoiceLevel() {
+  const l = useLevel()
+  return <span className="voice-level" aria-hidden><i style={{ transform: `scaleX(${l})` }} /></span>
+}
+// the cap's countdown (Q6: its last 20 s)
+function VoiceLeft({ ends }: { ends: number }) {
+  const [, tick] = useState(0)
+  useEffect(() => ((t => () => clearInterval(t))(setInterval(() => tick(n => n + 1), 1000))), [])
+  return <b> · stops by itself in {Math.max(0, Math.ceil((ends - Date.now()) / 1000))} s</b>
+}
+// Q6: the last transcripts, newest first: typed again where the cursor is, copied, or sent to an agent
+function VoiceHistory({ list }: { list: string[] }) {
+  const agents = voiceAgents()
+  return (
+    <div className="voice-hist" role="dialog" aria-label="Last transcripts" onMouseDown={keepFocus}>
+      <div className="voice-hist-head">
+        <b>Last transcripts</b>
+        <span className="muted small">in memory only: gone when Laki quits</span>
+        <button type="button" className="ib" aria-label="Close" data-tip="Close (Esc)" onClick={() => historyOpen(false)}>
+          <Icon name="x" />
+        </button>
+      </div>
+      {list.map(t => (
+        <div key={t} className="voice-hist-row">
+          <span className="voice-hist-text" title={t}>{t}</span>
+          <button type="button" data-tip="Type it again where the cursor is" onClick={() => voiceAgain(t)}>Insert</button>
+          <button type="button" onClick={() => voiceCopy(t)}>Copy</button>
+          {agents.length > 0 && (
+            <select aria-label="Send to an agent" value="" onChange={e => e.target.value && void voiceSendTo(e.target.value, t)}>
+              <option value="">Send to…</option>
+              {agents.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

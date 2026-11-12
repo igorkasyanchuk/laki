@@ -2112,6 +2112,8 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
 | hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it; *Send as you stop talking* sends it too) |
+| Fn Fn | (Cloud) the mic locked on: talk hands free, Fn again types it, Esc drops it |
+| ⌥Fn | (Cloud) the last transcripts: type one again, copy it, send it to another agent |
 | the talk key (⌃⌥⌘M, off until set) | from any app: a pill records you; the key again or ⏎ sends it to the agent that asked last (Tab: another), Esc drops it (Settings › Voice on *Cloud*) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
@@ -2456,7 +2458,13 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Transcribe and others, or *Another model…* for any id), each with its price: OpenRouter's now when its list loads
   (its other speech-to-text models under *More on OpenRouter*), else as Laki last knew it, with the date. Neither the audio nor the text is kept. *Hold Fn to talk*
   (on): hold Fn anywhere in Laki (the app's window, the new-workspace and AI windows), talk, let go, and the text is typed where your cursor is; another key while you
-  hold it, or Esc, drops it. Set System Settings › Keyboard › *Press 🌐 key to* to *Do Nothing*, so macOS doesn't
+  hold it, or Esc, drops it. *Lock by double tap* (on): tap Fn twice and the mic stays on without holding it (the bar
+  says *Locked*); Fn again stops it and types what you said, Esc drops it. The bar shows how loud it hears you, says
+  *I can't hear you: check the input* (with the microphone's name) after 3 seconds of nothing, and counts down the last
+  20 seconds before a recording stops by itself at 5 minutes. After it types into a field, the bar's *Undo* takes it
+  back. *Keep the last transcripts* (on): your last 10, in memory only (gone when Laki quits or Recording mode is on);
+  ⌥Fn, *Earlier* on the bar or the mic's menu lists them, to type one again where your cursor is, copy it or send it to
+  another agent. Set System Settings › Keyboard › *Press 🌐 key to* to *Do Nothing*, so macOS doesn't
   open its emoji picker or dictation as well (*Open Keyboard settings*). *Send as you stop talking* (off): letting go
   of Fn, or the mic's stop, sends it too: a prompt box's message (the new-workspace page, Laki AI, Send later, the
   Board's to-do), or an idle agent's prompt in its terminal; a shell, any other field, or an agent asking something

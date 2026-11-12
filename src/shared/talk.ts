@@ -107,3 +107,38 @@ export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: str
   if (all.length !== 1) return none // none, or two it could be: not a guess
   return { target: { kind: 'tab', tab: all[0].tab }, rest, how: all[0].name }
 }
+
+// Q6: Fn's keys (voice.ts), pure with the clock passed in (test/talk.test.ts). Held HOLD_MS, the mic opens and the
+// release inserts; tapped twice (each press shorter than HOLD_MS, the second pressed within TAP2_MS of the first's
+// release) it locks on, and the next press stops it and inserts. down: Fn pressed with no other key held; held:
+// HOLD_MS after a down, Fn still down; key: another key (Fn ← is Home, never the mic; a locked mic keeps on);
+// blur: the window lost the keyboard; end: the recording ended some other way (Esc, the mic button, the cap)
+export const HOLD_MS = 200
+export const TAP2_MS = 350
+export type FnState = { held: boolean; at: number; tap: number; open: boolean; locked: boolean; skip?: boolean } // skip: this press's release does nothing
+export const FN0: FnState = { held: false, at: 0, tap: -Infinity, open: false, locked: false }
+export type FnDo = '' | 'open' | 'insert' | 'drop' | 'lock'
+export function fnStep(s: FnState, ev: 'down' | 'held' | 'up' | 'key' | 'blur' | 'end', t: number, lock = true): [FnState, FnDo] {
+  if (ev === 'down') return s.locked ? [{ ...FN0, held: true, at: t, skip: true }, 'insert'] : s.held ? [s, ''] : [{ ...s, held: true, at: t, open: false, skip: false }, '']
+  if (ev === 'held') return s.held && !s.open && !s.skip ? [{ ...s, open: true }, 'open'] : [s, '']
+  if (ev === 'up') {
+    if (!s.held) return [s, '']
+    if (s.open) return [FN0, 'insert']
+    if (s.skip || t - s.at >= HOLD_MS) return [FN0, '']
+    return lock && s.at - s.tap <= TAP2_MS ? [{ ...FN0, locked: true }, 'lock'] : [{ ...FN0, tap: t }, '']
+  }
+  if (ev === 'key') return s.locked ? [s, ''] : [FN0, s.open ? 'drop' : '']
+  if (ev === 'blur') return s.locked ? [s, ''] : [FN0, s.open ? 'insert' : '']
+  return [s.held ? { ...FN0, held: true, at: s.at, skip: true } : FN0, ''] // end
+}
+
+// Q6: a level meter's 0…1 from an AnalyserNode's time-domain bytes (128 is silence); under FLAT for QUIET_MS while
+// listening: "I can't hear you" (a muted or wrong input reads 0, a quiet room a little over)
+export const QUIET_MS = 3000
+export const FLAT = 0.01
+export function levelOf(buf: ArrayLike<number>) {
+  let sum = 0
+  for (let i = 0; i < buf.length; i++) sum += (buf[i] - 128) ** 2
+  return Math.min(1, (Math.sqrt(sum / (buf.length || 1)) * 3) / 100)
+}
+export const quietSay = (device?: string) => `I can't hear you: check the input${device ? ` (${device})` : ''}`
