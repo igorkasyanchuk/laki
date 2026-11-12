@@ -3,6 +3,7 @@
 import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
+import { flushSync } from 'react-dom'
 import { menuKeys } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 
@@ -45,6 +46,50 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // keyId: its Settings › Keys action (data-key: the hold-⌘ overlay's badge beside it)
 // U11: a click target that isn't a <button> (a row, a cell, a picture): a button to the keyboard and a screen reader
 // too: focusable, Enter and Space click it (its own key, not a child's). none: nothing to press, no role
+// V13: what's on screen changes in a view transition, the place kept: a page cross-fades in the main area (styles.css'
+// view-transition-name on .main's page; the root has none, so the sidebar and the terminals aren't snapshotted and a
+// printing terminal never freezes); grow 'open': the sheet grows from the button (or menu item) that has the focus,
+// 'close': it shrinks back there. Off without startViewTransition, under Reduce motion, Motion: Off, a window without the
+// focus (one that draws no frames would hold the change until a frame comes: a daemon's view, a page opened from
+// elsewhere) and ui-smoke (main marks the page data-smoke): fn at once. One whose change hasn't run in 400 ms is skipped
+// (its change runs then)
+let grewFrom: HTMLElement | null = null
+const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+const sheetOf = () => [...document.querySelectorAll<HTMLElement>('.overlay .modal, .main > .settings-page')].at(-1) ?? null
+export function morph(fn: () => void, grow?: 'open' | 'close') {
+  if (!morphOk()) return fn()
+  const named: HTMLElement[] = []
+  const name = (el: HTMLElement | null | undefined) => void (el && ((el.style.viewTransitionName = 'morph'), named.push(el)))
+  const clear = () => named.splice(0).forEach(el => (el.style.viewTransitionName = ''))
+  const at = document.activeElement
+  const from = grow === 'open' && at instanceof HTMLElement && at.matches('button, [role=menuitem], .menu-item') ? at : null
+  const back = grow === 'close' && grewFrom?.isConnected ? grewFrom : null
+  if (grow === 'open') (grewFrom = from), name(from)
+  if (back) name(sheetOf())
+  let ran = false
+  const t = document.startViewTransition(() => {
+    ran = true
+    clear()
+    flushSync(fn)
+    name(from ? sheetOf() : back)
+  })
+  void t.finished.finally(clear)
+  t.ready.catch(() => {}) // skipped: its ready rejects
+  setTimeout(() => ran || t.skipTransition(), 400)
+}
+// a workspace's row that moved to another group (Pinned and back): a name each (only those), so it slides there
+export function rowsMorph(ids: string[], fn: () => void) {
+  if (!ids.length || !morphOk()) return fn()
+  const rows = () => ids.map(id => document.querySelector<HTMLElement>(`.sidebar [data-row="ws:${CSS.escape(id)}"]`))
+  const name = (on: boolean) => rows().forEach((el, i) => el && (el.style.viewTransitionName = on ? `row-${i}` : ''))
+  name(true)
+  let ran = false
+  const t = document.startViewTransition(() => ((ran = true), name(false), flushSync(fn), name(true)))
+  void t.finished.finally(() => name(false))
+  t.ready.catch(() => {})
+  setTimeout(() => ran || t.skipTransition(), 400)
+}
+
 // V11: a scrolling list's edge: once it's scrolled, its top fades under the header above it (styles.css
 // [data-scrolled]: a mask). A sentinel, its scroller's first child, seen by one IntersectionObserver: no scroll listener.
 // A data attribute, not a class: React leaves it alone as the scroller's className changes

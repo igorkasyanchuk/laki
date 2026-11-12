@@ -935,6 +935,19 @@ picked row, menu and ⌘K items, the frame's tab and main card). A list: a pill 
 told by its value, and those stay round, as does a capsule and what's in it. The Square look's `--rs: 0` makes every
 token 0. floater.html (its own sheet): the bubbles' menu, voice window, card and reply box.
 
+View transitions (V13): ui.tsx `morph(fn, grow?)` runs fn in `document.startViewTransition(() => flushSync(fn))`, App's
+`setDialog` (a wrapper over the state's setter: every page and dialog goes through it) with `grow` for Ship, New
+workspace and a rename: 'open' names the focused button or menu item `morph` before and the newest sheet (`.overlay
+.modal`, `.main > .settings-page`) after, so one grows into the other; 'close' the other way, while that button is still
+there (`grewFrom`); names cleared once it's `finished`. styles.css: `:root { view-transition-name: none }` (nothing
+else is snapshotted: the sidebar and a printing terminal stay live), `.main > .settings-page` named `page` (a page
+cross-fades), `--t-mid` and `--ease-out`, `::view-transition` takes no clicks. `rowsMorph` (App's `state` event): a row
+whose `pinned` changed gets `row-<n>` before and after, so it slides into Pinned or back (Needs you's are cards, not the
+rows). Off (fn at once): no `startViewTransition`, a hidden window or one without the focus (a window that draws no
+frames would hold the change until one comes: a daemon view, a page opened from elsewhere), Reduce motion, Motion: Off,
+and ui-smoke (main's `uiSmoke` sets `data-smoke` on every load). A transition whose change hasn't run in 400 ms is
+skipped (`skipTransition`: its change runs then; measured in a hidden browser page: the sheet at 432 ms).
+
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);

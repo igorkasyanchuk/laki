@@ -1,5 +1,5 @@
 import { unloadStep } from '../../shared/browserBudget'
-import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
@@ -50,7 +50,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
-import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -457,7 +457,13 @@ export function App() {
     window.addEventListener('blur', f)
     return () => (window.removeEventListener('focus', f), window.removeEventListener('blur', f))
   }, [])
-  const [dialog, setDialog] = useState<Dialog>(null)
+  const [dialog, setDialogNow] = useState<Dialog>(null)
+  // V13: pages and dialogs change in a view transition (ui.tsx morph): Ship, New workspace and a rename grow from the
+  // button that opened them and shrink back as they close
+  const grows = (d: Dialog) => d === 'ship' || d === 'new' || (!!d && typeof d === 'object' && ('renameWs' in d || 'rename' in d))
+  const dialogNow = useRef<Dialog>(null)
+  dialogNow.current = dialog
+  const setDialog = useCallback<Dispatch<SetStateAction<Dialog>>>(d => morph(() => setDialogNow(d), typeof d === 'function' ? undefined : grows(d) ? 'open' : grows(dialogNow.current) && !d ? 'close' : undefined), [])
   // the new-workspace page gone any way (Esc, a row's or the rail's click, another page over it): what it was making
   // comes as a toast, never a jump back to it from where you went
   useEffect(() => void (dialog !== 'new' && made.current.page++), [dialog])
@@ -1270,7 +1276,9 @@ export function App() {
         const v = veiled(m.view) // Recording mode: private workspaces out of everything drawn
         hid.current = v === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !v.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
         settle([...m.view.workspaces.map((w: WorkspaceView) => w.id), ...m.view.tabs.map((t: TabView) => t.id)]) // V7: what's here as the window opens doesn't grow in
-        setView(v)
+        // V13: a row pinned or unpinned slides to its new group. ponytail: Pinned only; Needs you's are cards of their own
+        const was = viewRef.current
+        rowsMorph(was ? v.workspaces.filter((w: WorkspaceView) => (o => !!o && !!o.pinned !== !!w.pinned)(was.workspaces.find(x => x.id === w.id))).map((w: WorkspaceView) => w.id) : [], () => setView(v))
       } else if (QUIET.has(m.ev) && hid.current.has(m.ws)) return // and their notifications and toasts
       else if (m.ev === 'widget-say' && typeof m.notify === 'string') {
         // an extension's notify: its new words, a notification (its click: its full view, else its page) and a toast

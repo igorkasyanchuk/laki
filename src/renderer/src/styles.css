@@ -3691,3 +3691,13 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
   :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { corner-shape: squircle; }
   .capsule, .capsule :is(button, textarea) { corner-shape: round; }
 }
+
+/* V13: view transitions that keep the place (ui.tsx morph, rowsMorph). The root has no name: only what's named is
+   snapshotted, so the sidebar and a printing terminal stay live under it. A page over the main area cross-fades; a sheet
+   that grows from its button is named 'morph' (inline, for the transition only); a row moving to Pinned, row-<n>. The
+   overlay takes no clicks. Off under Reduce motion and Motion: Off (morph doesn't start one) */
+:root { view-transition-name: none; }
+.main > .settings-page { view-transition-name: page; }
+::view-transition { pointer-events: none; }
+::view-transition-group(*) { animation-duration: var(--t-mid); animation-timing-function: var(--ease-out); }
+::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--t-mid); }

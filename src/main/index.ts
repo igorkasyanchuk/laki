@@ -49,6 +49,10 @@ const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smo
 async function uiSmoke(w: BrowserWindow, dir: string) {
   mkdirSync(dir, { recursive: true })
   const errors: string[] = []
+  // V13: no view transitions in a smoke run (ui.tsx morph): its waits see each page as it lands; marked on every load
+  const mark = () => void w.webContents.executeJavaScript("document.documentElement.dataset.smoke = ''").catch(() => {})
+  w.webContents.on('dom-ready', mark)
+  mark()
   w.webContents.on('console-message', (_e, level, message) => void (level >= 3 && errors.push(message)))
   const js = <T>(code: string) => w.webContents.executeJavaScript(code, true) as Promise<T>
   const has = (sel: string) => js<boolean>(`!!document.querySelector(${JSON.stringify(sel)})`)
