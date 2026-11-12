@@ -90,7 +90,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   inside Laki's signed binary (`ELECTRON_RUN_AS_NODE=1 Laki x.js`, `open --env`) and inherit Laki's privacy grants
   (Screen Recording, Accessibility, the microphone, Keychain items allowed to Laki): the fuses don't stop that. The
   planned fix: the daemon, CLI and hooks on a helper binary of their own, the app's with the fuse off (SECURITY.md's
-  known limits). The asar ones stay off (asar is off). Cookie encryption
+  known limits; the steps and what's moved: docs/dev/helper.md, hooks first: `Laki Hook.app`). The asar ones stay off (asar is off). Cookie encryption
   stays off: Chromium's cookie store then waits on the Keychain's *Laki Safe Storage*, the window never reaches the daemon
   until it's answered (pack-smoke's temp home: never), and an ad-hoc signature asks again after each update.
   `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
@@ -149,6 +149,8 @@ for the part you change, and keep it up to date with the change.
   asks, agents' turns, retries, budgets, the queue, resume, trust, stats, events), the page.
 - [docs/dev/ai-and-notes.md](docs/dev/ai-and-notes.md): Laki AI (its backends, chats, key, call log), Specs &
   Brainstorms, Notes and To-dos.
+- [docs/dev/helper.md](docs/dev/helper.md): off the app's binary: Laki Hook (`laki hook`'s), what still runs through
+  `ELECTRON_RUN_AS_NODE`, the order to move it before the runAsNode fuse goes off.
 - [docs/dev/remote.md](docs/dev/remote.md): SSH hosts and cloud workspaces, tunnels (cloudflared, tailscale), shared
   tabs, remote access and headless.
 

@@ -20,6 +20,7 @@ import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
+import { hookRunner } from '../src/shared/helper.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
   assert.equal(newReview('t1:1'), true, 'nothing sent yet')
@@ -626,4 +627,15 @@ test('R7: writeAtomic and readJson', t => {
   writeFileSync(join(d, 'data', 'empty.json'), '')
   assert.equal(readJson(join(d, 'data', 'empty.json')), undefined)
   assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
+})
+
+// docs/dev/helper.md: laki hook runs on the bundle's Laki Hook when it has one, else the binary that runs the daemon
+test('hookRunner: the bundle’s Laki Hook when it’s there; the app binary without it; node from source as it is', () => {
+  const app = '/Applications/Laki.app/Contents/MacOS/Laki'
+  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook'
+  assert.equal(hookRunner(app, p => p === helper), helper)
+  assert.equal(hookRunner(app, () => false), app, 'an older build: none')
+  assert.equal(hookRunner('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook', 'spaces in the path')
+  assert.equal(hookRunner('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
+  assert.equal(hookRunner('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
 })

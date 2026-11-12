@@ -5,12 +5,44 @@
 // Not mac.icon = the .icon: electron-builder then makes the .icns from it too and fails without Xcode 26. No Xcode 26
 // (or not a Mac build): the .icns alone, said in one line. A custom Dock icon (Settings, dock.ts) still overrides both
 const { execFileSync } = require('node:child_process')
-const { copyFileSync, mkdtempSync, rmSync } = require('node:fs')
+const { copyFileSync, cpSync, existsSync, mkdtempSync, readdirSync, renameSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 
+// Laki Hook (docs/dev/helper.md): a copy of Electron's helper app as Contents/Frameworks/Laki Hook.app, its own bundle
+// id (<appId>.hook), no privacy usage strings, no Dock icon: what `laki hook` runs on (src/shared/helper.ts), so a
+// hook isn't Laki's binary with Laki's privacy grants. Before signing: electron-builder signs it with the rest
+function hookHelper(ctx, app) {
+  const fw = join(app, 'Contents/Frameworks')
+  const from = join(fw, `${ctx.packager.appInfo.productFilename} Helper.app`)
+  if (!existsSync(from)) return console.log('  • Laki Hook skipped: no helper app to copy')
+  const to = join(fw, 'Laki Hook.app')
+  rmSync(to, { recursive: true, force: true })
+  cpSync(from, to, { recursive: true, verbatimSymlinks: true })
+  const macos = join(to, 'Contents/MacOS')
+  renameSync(join(macos, readdirSync(macos)[0]), join(macos, 'Laki Hook'))
+  const plist = join(to, 'Contents/Info.plist')
+  const pb = (cmd, ok = false) => {
+    try {
+      execFileSync('/usr/libexec/PlistBuddy', ['-c', cmd, plist], { stdio: 'ignore' })
+    } catch (e) {
+      if (!ok) throw e
+    }
+  }
+  const set = (k, v, type = 'string') => (pb(`Delete :${k}`, true), pb(`Add :${k} ${type} ${v}`))
+  set('CFBundleIdentifier', `${ctx.packager.appInfo.id}.hook`)
+  set('CFBundleName', 'Laki Hook')
+  set('CFBundleDisplayName', 'Laki Hook')
+  set('CFBundleExecutable', 'Laki Hook')
+  set('LSUIElement', 'true', 'bool')
+  const keys = execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Print', plist], { encoding: 'utf8' }).match(/^\s{4}(NS\w+UsageDescription)\b/gm) ?? []
+  for (const k of keys) pb(`Delete :${k.trim()}`, true)
+  console.log('  • Laki Hook: Contents/Frameworks/Laki Hook.app')
+}
+
 exports.default = async function afterPack(ctx) {
   if (ctx.electronPlatformName !== 'darwin') return
+  hookHelper(ctx, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`))
   let v = ''
   try {
     v = execFileSync('xcrun', ['actool', '--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
