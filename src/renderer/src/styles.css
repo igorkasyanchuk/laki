@@ -3754,3 +3754,18 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
    diffs or table cells */
 :is(.modal-title, .whats-new li > .md > p, .toast, .need-q, .empty > p, .note-empty > p) { text-wrap: balance; }
 :is(.rd-agent .md p, .rd-agent .md li, .note-page .bn-editor p, .switch-text .muted, .help-card) { text-wrap: pretty; }
+
+/* ui.tsx Num: a number sliding to its new value, old and new in one cell; none with Motion: None or Reduce motion */
+.num { display: inline-grid; height: 1lh; overflow: clip; vertical-align: bottom; font-variant-numeric: tabular-nums; }
+.num > * { grid-area: 1 / 1; }
+.num-up > .num-in { animation: num-in-up 250ms var(--spring) both; }
+.num-up > .num-out { animation: num-out-up 250ms var(--spring) both; }
+.num-down > .num-in { animation: num-in-down 250ms var(--spring) both; }
+.num-down > .num-out { animation: num-out-down 250ms var(--spring) both; }
+@keyframes num-in-up { from { transform: translateY(100%); opacity: 0; } }
+@keyframes num-out-up { to { transform: translateY(-100%); opacity: 0; } }
+@keyframes num-in-down { from { transform: translateY(-100%); opacity: 0; } }
+@keyframes num-out-down { to { transform: translateY(100%); opacity: 0; } }
+html[data-motion='none'] .num > .num-out { display: none; }
+html[data-motion='none'] .num > .num-in { animation: none; }
+@media (prefers-reduced-motion: reduce) { .num > .num-out { display: none; } .num > .num-in { animation: none; } }

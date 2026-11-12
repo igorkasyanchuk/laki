@@ -4,7 +4,7 @@
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
-import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge } from './ui'
+import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
@@ -239,8 +239,8 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {(settings.timers || simple) && (simple ? <span className="ws-keep"><TurnTime tabs={wt} /></span> : <TurnTime tabs={wt} />)}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
           <span className="ws-stat">
-            <span className="add">+{short(w.stat.add)}</span>
-            <span className="del">−{short(w.stat.del)}</span>
+            <span className="add">+<Num value={short(w.stat.add)} /></span>
+            <span className="del">−<Num value={short(w.stat.del)} /></span>
           </span>
         )}
         {w.ticket && mark('ticket') && (
@@ -249,7 +249,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
-        {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
+        {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}><Num value={planCount(t.plan)} /></span>)(wt.find(t => t.plan))}
         {(cs => cs && (
           <span className="ws-clash" data-tip={clashTip(cs)}>
             <Icon name="triangle" size={11} />:{cs[0].port}

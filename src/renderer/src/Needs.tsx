@@ -12,7 +12,7 @@ import { bulkOk } from '../../shared/ask'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
-import { Elapsed, Icon } from './ui'
+import { Elapsed, Icon, Num } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
@@ -67,7 +67,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
           <Icon name="inbox" size={12} />
         </span>
         <span className="project-name">Needs you</span>
-        <span className="project-count">{items.length}</span>
+        <span className="project-count"><Num value={items.length} /></span>
         {many.length > 1 && api.bulk && (
           <span className="needs-bulk" onClick={e => e.stopPropagation()}>
             <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} onClick={() => api.bulk!(many, true)}>

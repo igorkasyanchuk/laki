@@ -1034,3 +1034,11 @@ setting `--accent`, `--running`, `--waiting`, `--done` and `--error` to `oklch()
 root: the terminal's theme, canvases) and `test/contrast.test.ts` keep the sRGB hex. Not for `OPAQUE_LOOKS` (flat and
 bitmap looks: the sheet goes), and not the accent when you picked one in Settings (statuses only then). color.ts is pure
 (`hexToOklch`, `oklchToHex`, `inP3`), tested in `test/units-more.test.ts`.
+
+
+## Numbers that slide
+
+ui.tsx `Num`: the old value slides out (up as it grows, down as it shrinks) and the new one in, 250 ms on `--spring`
+(styles.css `.num`, one grid cell, `1lh` tall, tabular figures). None as it first draws, past 3 changes a second, with
+Motion: None or the system's Reduce motion (CSS). The leaving copy is `aria-hidden`. Used for the rail's counts, Needs
+you's count, a row's plan n/m and +/−, and the status bar's context %.

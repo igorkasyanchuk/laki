@@ -953,3 +953,32 @@ const tipText = (text: string) =>
       part.split(/(\+\d[\d.,k]* −\d[\d.,k]*)/).map((s, i) => (i % 2 ? (([add, del]) => <span key={`${j}-${i}`} className="ws-stat"><span className="add">{add}</span> <span className="del">{del}</span></span>)(s.split(' ')) : s))
     ),
   )
+
+// a number that slides to its new value: the old one out (up as it grows, down as it shrinks), the new one in, 250 ms
+// on --spring (styles.css .num). None as it first draws, more than 3 changes in a second (it just swaps), Motion: None
+// or the system's Reduce motion (styles.css). A string's first number tells which way ("3/7"); the moving copy is
+// aria-hidden, so a screen reader reads the value once
+const NUM_RATE = 3
+export function Num({ value }: { value: number | string }) {
+  const was = useRef(value)
+  const times = useRef<number[]>([])
+  const [out, setOut] = useState<{ text: number | string; dir: 'up' | 'down'; k: number } | null>(null)
+  useEffect(() => {
+    const old = was.current
+    if (old === value) return
+    was.current = value
+    const now = Date.now()
+    times.current = [...times.current.filter(t => now - t < 1000), now]
+    if (times.current.length > NUM_RATE) return setOut(null)
+    const n = (v: number | string) => Number(String(v).match(/-?\d+(\.\d+)?/)?.[0] ?? NaN)
+    setOut({ text: old, dir: n(value) < n(old) ? 'down' : 'up', k: now })
+    const t = setTimeout(() => setOut(null), 300)
+    return () => clearTimeout(t)
+  }, [value])
+  return (
+    <span className={`num${out ? ` num-${out.dir}` : ''}`}>
+      {out && <span key={`o${out.k}`} className="num-out" aria-hidden>{out.text}</span>}
+      <span key={`i${out?.k ?? 0}`} className="num-in">{value}</span>
+    </span>
+  )
+}

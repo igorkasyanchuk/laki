@@ -50,7 +50,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
-import { morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -3281,7 +3281,7 @@ export function App() {
   const kindButton = ([k, label, icon]: (typeof RAIL)[number]) => {
     const { n, busy } = railSays(k)
     const says = `${label}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : busy ? ' · at work' : ''}`
-    return railButton(k, icon, label, railKind === k && !onPage, says, () => railTo(k), n > 0 ? <span className="rail-count">{n > 99 ? '99+' : n}</span> : busy && <span className="rail-dot" />)
+    return railButton(k, icon, label, railKind === k && !onPage, says, () => railTo(k), n > 0 ? <span className="rail-count"><Num value={n > 99 ? '99+' : n} /></span> : busy && <span className="rail-dot" />)
   }
   // the rail's quick access: workspaces, terminals and browsers pinned there (Pin to the rail), oldest pin first
   const railPins = rail ? live.filter(w => w.railPin).sort((a, b) => a.railPin! - b.railPin!).slice(0, RAIL_PINS) : []
@@ -3298,7 +3298,7 @@ export function App() {
         <span className="rail-icon" style={colorVar(tint(w))}>
           {w.icon ? isIconName(w.icon) ? <Icon name={w.icon} size={18} /> : <span className="rail-emoji">{w.icon}</span> : k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
           {k === 'projects' && <ProjectMark p={projOf(w)} size={11} /> /* its project's, at the corner */}
-          {n > 0 ? <span className="rail-count">{n}</span> : mine.some(t => spins(t)) && <span className="rail-dot" />}
+          {n > 0 ? <span className="rail-count"><Num value={n} /></span> : mine.some(t => spins(t)) && <span className="rail-dot" />}
         </span>
         {railWords && <span className="rail-label">{wsName(w)}</span>}
       </button>
@@ -3439,9 +3439,9 @@ export function App() {
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }} onContextMenu={e => !e.defaultPrevented && railMenu(e)}>
       {histNav}
       {kindButton(RAIL[0])}
-      {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count">{x.n}</span> : x.mark)))}
+      {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count"><Num value={x.n} /></span> : x.mark)))}
       {railMore.length > 0 &&
-        railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count">{n}</span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
+        railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count"><Num value={n} /></span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
           openMenu(e, [
             ...railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) })),
             ...(railHide.length ? [{ label: 'Show them all on the rail', icon: 'eye' as const, foot: true, run: () => void call('settingsSet', { railHide: [] }).catch(() => {}) }] : []),
@@ -3509,7 +3509,7 @@ export function App() {
                   <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
                     <i style={{ width: `${ctxPct(tab.context)}%` }} />
                   </span>
-                  {ctxPct(tab.context)}%
+                  <Num value={ctxPct(tab.context)} />%
                 </span>
               )}
               {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton key={tab.id} tab={tab} api={turnApi(ws.id)} onMenu={openMenu} /> /* F1: the focused agent's kept turns */}
