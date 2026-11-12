@@ -3509,7 +3509,7 @@ export function App() {
                   <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
                     <i style={{ width: `${ctxPct(tab.context)}%` }} />
                   </span>
-                  <Num value={ctxPct(tab.context)} />%
+                  <Num value={`${ctxPct(tab.context)}%`} />
                 </span>
               )}
               {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton key={tab.id} tab={tab} api={turnApi(ws.id)} onMenu={openMenu} /> /* F1: the focused agent's kept turns */}
