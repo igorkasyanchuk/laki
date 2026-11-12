@@ -1414,6 +1414,11 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .sp-diff .dl { white-space: pre; padding: 0 var(--sp-4); min-width: max-content; }
 .sp-diff .dl-add { color: var(--add); background: var(--add-bg); }
 .sp-diff .dl-del { color: var(--del); background: var(--del-bg); }
+/* word marks (Diff.tsx wordMarks): what changed in a line, a stronger tint of its own color; the text the page's own, to
+   read on it in every theme (test/contrast.test.ts) */
+mark.wd { color: var(--fg); border-radius: var(--r-xs); }
+mark.wd-add { background: color-mix(in srgb, var(--add) 15%, transparent); }
+mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .sp-diff .dl-hunk { color: var(--hunk); }
 .sp-diff .dl-hunk { display: flex; align-items: center; gap: var(--sp-4); }
 /* Revert at a hunk header's end, in sight however wide the lines are; on hover (always on a touch screen) */

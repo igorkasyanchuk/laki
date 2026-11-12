@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Diffs mark the words that changed inside a line, in Changes, the Review tab and every other diff.
 - Agents' hooks run on a small helper inside the app (Laki Hook) instead of Laki itself, a first step toward closing the gap where any program could run as Laki with its privacy permissions.
 - No stray colored line between the sidebar and the terminal while you type.
 - Changes has *Since I reviewed*: only what changed after you last sent review comments, posted a review or viewed every file in the Review tab.

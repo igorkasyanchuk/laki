@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, mentionsOf, rmVerdict, withMentions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, mentionsOf, rmVerdict, withMentions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed , wordDiff } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -534,4 +534,21 @@ test('rmVerdict: Delete and Archive sum up what goes, worst first', () => {
   assert.equal(rmVerdict({ ...base, worktree: false, dirty: 0 }), undefined) // a folder: nothing of its own goes
   assert.equal(rmVerdict({ ...base, pr: { number: 7, state: 'MERGED' } }), undefined) // merged, but its uncommitted files not counted: no Safe
   assert.equal(rmVerdict({ ...base, dirty: 0, ahead: 2, pr: { number: 7, state: 'CLOSED' } }), undefined) // closed unmerged, its commits pushed: nothing to say
+})
+
+// word marks in diffs (Diff.tsx wordMarks): what changed between a deleted line and the added one after it
+test('wordDiff: identical lines, one word changed, an inserted word, a different line and a long one get none', () => {
+  const on = (s: [string, boolean][]) => s.filter(x => x[1]).map(x => x[0])
+  const same = wordDiff('const a = 1;', 'const a = 1;')!
+  assert.deepEqual([on(same.old), on(same.new)], [[], []])
+  assert.deepEqual(same.new, [['const a = 1;', false]], 'one span, unchanged')
+  const one = wordDiff('let total = count + 1', 'let total = amount + 1')!
+  assert.deepEqual([on(one.old), on(one.new)], [['count'], ['amount']])
+  assert.equal(one.old.map(s => s[0]).join(''), 'let total = count + 1', 'the spans are the line')
+  const ins = wordDiff('return a(b)', 'return await a(b)')!
+  assert.deepEqual([on(ins.old), on(ins.new)], [[], ['await ']])
+  assert.deepEqual(on(wordDiff('x = 10', 'x = 12')!.new), ['12'], 'a number is a token')
+  assert.equal(wordDiff('import { a } from "b"', 'export default function render() {}'), undefined, 'over 60% changed')
+  assert.equal(wordDiff('a'.repeat(501), 'a'.repeat(500) + 'b'), undefined, 'over 500 characters')
+  assert.deepEqual(wordDiff('', ''), { old: [], new: [] })
 })

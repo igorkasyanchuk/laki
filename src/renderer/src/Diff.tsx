@@ -1,10 +1,10 @@
 // A diff's pieces that the side panel's Changes and Review and the full review (FullReview.tsx) share: the diff read
 // into each file's lines, a file's lines drawn in one column or two, a line's comment box, an image's before and
 // after, Revert's picked lines, GitHub's Viewed boxes, and review threads with their suggestions.
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
-import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
+import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff } from './text'
 import { escapes, Icon, IconButton, type MenuItem, useMenu, act } from './ui'
 import { diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
@@ -144,10 +144,34 @@ export const lineClass = (l: DiffLine, picked = false) => `dl ${l.text.startsWit
 // under a line (its comment box, a review's threads); gutter: before a line's text (the full review's blame), side: the
 // column it's in (both: one column)
 export type Side = 'old' | 'new' | 'both'
+// word marks (text.ts wordDiff): in each hunk, a run of deleted lines and the run of added lines right after it, paired
+// by index up to the shorter, WORD_PAIRS a file at most; a pair too different (or too long) gets none
+const WORD_PAIRS = 200
+export function wordMarks(lines: DiffLine[]) {
+  const m = new Map<DiffLine, WordSpans>()
+  let pairs = 0
+  for (let i = 0; i < lines.length && pairs < WORD_PAIRS; ) {
+    const del: DiffLine[] = []
+    const add: DiffLine[] = []
+    while (i < lines.length && lines[i].new === undefined && lines[i].old !== undefined && !lines[i].ctx) del.push(lines[i++])
+    while (i < lines.length && lines[i].old === undefined && lines[i].new !== undefined && !lines[i].ctx && lines[i].hunk === del[0]?.hunk) add.push(lines[i++])
+    if (!del.length || !add.length) {
+      if (!del.length && !add.length) i++
+      continue
+    }
+    for (let k = 0; k < Math.min(del.length, add.length) && pairs < WORD_PAIRS; k++, pairs++) {
+      const w = wordDiff(del[k].text.slice(1), add[k].text.slice(1))
+      if (w && [...w.old, ...w.new].some(s => s[1])) m.set(del[k], w.old).set(add[k], w.new) // identical: nothing to mark
+    }
+  }
+  return m
+}
+const marked = (spans: WordSpans, add: boolean) => spans.map(([t, on], i) => (on ? <mark key={i} className={add ? 'wd wd-add' : 'wd wd-del'}>{t}</mark> : t))
 export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode; gutter?: (l: DiffLine, side: Side) => ReactNode; nums?: boolean }) {
   // the line numbers, as GitHub's (one column: old and new; two: each side's), as wide as the file's biggest; then the
   // + a commentable line (.dl-line) shows on hover: a click anywhere on it opens the box
   const w = nums ? `${String(fd.lines.reduce((m, l) => Math.max(m, l.old ?? 0, l.new ?? 0), 0)).length}ch` : ''
+  const words = useMemo(() => wordMarks(fd.lines), [fd])
   const num = (n?: number) => <span className="dl-n" style={{ width: w }}>{n ?? ''}</span>
   const numbers = (l: DiffLine, side: Side) =>
     nums && (
@@ -163,7 +187,7 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
         <>
           {gutter?.(l, side)}
           {numbers(l, side)}
-          {more ? l.text.slice(1) || ' ' : l.text || ' '}
+          {(s => (s ? <>{more ? '' : l.text[0]}{marked(s, l.old === undefined)}</> : more ? l.text.slice(1) || ' ' : l.text || ' '))(words.get(l))}
         </>
       )}
     </div>

@@ -148,6 +148,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
       go); Settings and Help zoom with `pageZoom` instead.
     - `laki.diffSplit`: Changes in two columns (`split`, `text.ts` `splitRows`) or one (`unified`, the default).
     - `laki.changesScope`, `laki.reviewScope`: Changes' and the Review tab's *Branch* or *Uncommitted* (Diff.tsx `useScope`).
+    - `since` (R11): Changes' *Since I reviewed · n files*, never kept; only while the workspace has a `reviewed` mark.
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`, `left`: paused, its ms left, kept as it is;
       `note`: its message, Go out: on its bar, the end dialog's title, the notification's); ones that ended while the
@@ -1013,3 +1014,13 @@ shot; not granted after one that brought no picture): `privacySay`, a notificati
 (`privacy-pane`). Never tried again by itself. Tests: `test/tell.test.ts` (`handOff`, and a path and words reaching an
 agent tab and a new workspace through the daemon); ui-smoke's `show-and-tell` step skips screencapture (the app's icon as
 the picture) and checks the bar has it.
+
+
+## Word marks in diffs
+
+Diff.tsx `DiffRows` marks what changed inside a line (`wordMarks`): in each hunk, a run of deleted lines and the run of
+added lines right after it, paired by index up to the shorter, 200 pairs a file at most; text.ts `wordDiff` splits
+each into tokens (words and numbers, one punctuation mark, a run of spaces), takes their longest common run, and gives
+each side `[text, changed]` spans, or none when over 60% changed or a line is over 500 characters. A changed span is a
+`<mark class="wd wd-add|wd-del">`: the page's `--fg` on 15% of `--add`/`--del` (`test/contrast.test.ts` checks it in
+every theme). DiffRows has no syntax highlighting to combine with. Tests: `test/template.test.ts`.

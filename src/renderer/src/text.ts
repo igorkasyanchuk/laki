@@ -925,3 +925,31 @@ export const pickPrompt = (said: string, p: Picked, shot?: string, files: string
     .join('\n') + '\n'
 // the words to look for in the worktree: its id, its classes that look hand-written, its text's start
 export const pickWords = (p: Picked) => [p.id, ...(p.classes ?? []).filter(c => c.length >= 4 && !/\d{2}|^(css|sc|jsx|svelte|emotion|chakra|tw)-/.test(c)), p.text.slice(0, 40).replace(/…$/, '')].filter((w): w is string => !!w && w.length >= 3)
+
+// a deleted line and the added line that replaced it, word by word (Diff.tsx DiffRows' marks): each side as spans of
+// [text, changed], by the longest common run of tokens (words and numbers, a punctuation mark, a run of spaces). None when
+// over 60% of the tokens changed (a different line: marks would be noise) or a line is over 500 characters
+export type WordSpans = [string, boolean][]
+const TOKENS = /\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu
+export function wordDiff(oldLine: string, newLine: string): { old: WordSpans; new: WordSpans } | undefined {
+  if (oldLine.length > 500 || newLine.length > 500) return
+  const a = oldLine.match(TOKENS) ?? []
+  const b = newLine.match(TOKENS) ?? []
+  // lcs[i][j]: the common run of a[i..] and b[j..] (500 characters: 500 tokens a side at most, a 251k-cell table)
+  const lcs = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1))
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+  const same = lcs[0][0]
+  if (a.length + b.length && (a.length + b.length - 2 * same) / (a.length + b.length) > 0.6) return
+  const keepA = new Array<boolean>(a.length).fill(false)
+  const keepB = new Array<boolean>(b.length).fill(false)
+  for (let i = 0, j = 0; i < a.length && j < b.length; )
+    if (a[i] === b[j]) (keepA[i++] = true), (keepB[j++] = true)
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++
+    else j++
+  const spans = (t: string[], keep: boolean[]): WordSpans => {
+    const out: WordSpans = []
+    t.forEach((x, i) => (out.length && out[out.length - 1][1] === !keep[i] ? (out[out.length - 1][0] += x) : out.push([x, !keep[i]])))
+    return out
+  }
+  return { old: spans(a, keepA), new: spans(b, keepB) }
+}

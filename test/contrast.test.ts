@@ -59,6 +59,12 @@ test('contrast: every theme is readable', () => {
     for (const i of [9, 10, 11, 12, 13, 14]) on(`ansi ${i}`, ansi[i], bg, 3)
     for (const i of [1, 2, 3, 4, 5, 6]) on(`ansi ${i}`, ansi[i], [...bg, ...side, c.panel], 3)
     on('ansi 8', ansi[8], bg, 2.5)
+    // a diff's word marks (styles.css mark.wd): the page's text on its line's tint and the mark's (15% of --add or --del)
+    for (const [k, i] of [['add', 2], ['del', 1]] as const) {
+      const ink = t.c ? readable(ansi[i], [...bg, c.panel, c.raised]) : v(k)
+      const line = over(ansi[i].slice(0, 7) + '1f', c.panel)
+      need(`word mark (${k})`, c.fg, over(ink.slice(0, 7) + '26', line), 4.5)
+    }
     // the accent as text: applyTheme's --accent-ink
     for (const b of [...bg, c.panel, ...side]) need('accent text', readable(c.accent, [...bg, c.panel, ...side]), b, 4.5)
     // V5's translucent sidebar: its tint of the sidebar's color over the brightest and the darkest wallpaper, the worst
