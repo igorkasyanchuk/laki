@@ -2095,15 +2095,17 @@ const setFront = (on: boolean) => on !== front && ((front = on), placeFloater(),
 // front app and a page with a prompt asked (fn-watch: the app, the new-workspace and AI windows): osascript's JXA reads
 // NSEvent's modifier flags every FN_MS and says each change of Fn's (NSEventModifierFlagFunction); the focused page that
 // asked gets 'fn' true or false. Off-Mac Fn never reaches an app. ponytail: a poll (about 2% of a core while Laki is in
-// front), a native NSEvent monitor later
+// front), a native NSEvent monitor later. In front: the app window's `front`, or a page that asked has the focus (the AI
+// or new-workspace window over another app: `own` leaves them out, so `front` stays false there)
+const fnFocus = () => (wc => !!wc && fnWant.has(wc))(BrowserWindow.getFocusedWindow()?.webContents)
 const FN_MS = 40
 const FN_JXA = `ObjC.import('Cocoa'); let was = 0; for (;;) { const f = Number($.NSEvent.modifierFlags) & 0x800000 ? 1 : 0; if (f !== was) { was = f; console.log(f) } delay(${FN_MS / 1000}) }`
 const fnWant = new Set<Electron.WebContents>()
 let fnProc: ChildProcess | null = null
 let fnFails = 0 // quick exits in a row: at 3 it waits until Laki is in front again (osascript refused, say)
 function fnWatch() {
-  const on = mac && front && fnWant.size > 0
-  if (!on) return void (fnProc?.kill(), (fnProc = null), front || (fnFails = 0))
+  const on = mac && (front || fnFocus()) && fnWant.size > 0
+  if (!on) return void (fnProc?.kill(), (fnProc = null), front || fnFocus() || (fnFails = 0))
   if (fnProc || fnFails >= 3) return
   const at = Date.now()
   const p = (fnProc = spawn('/usr/bin/osascript', ['-l', 'JavaScript', '-e', FN_JXA], { stdio: ['ignore', 'ignore', 'pipe'] }))
@@ -2125,7 +2127,8 @@ ipcMain.on('fn-watch', (e, on: unknown) => {
   else if (on !== true) fnWant.delete(wc)
   fnWatch()
 })
-app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
+app.on('browser-window-focus', (_e, w) => (own(w) ? setFront(true) : fnWatch())) // the AI or new-workspace window: Fn's watch
+app.on('browser-window-blur', () => setTimeout(fnWatch, 100)) // after the next window's focus: off once none that asked has it
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
 app.on('did-resign-active', () => setFront(false))
 if (!mac) app.on('browser-window-blur', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // no did-resign-active there: none of Laki's windows has the focus

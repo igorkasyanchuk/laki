@@ -10,7 +10,7 @@ import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, type MenuItem, useMenu } from './ui'
-import { cloudVoice, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceSends, voiceStart, voiceStop } from './voice'
+import { cloudVoice, fnOn, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
@@ -458,7 +458,7 @@ export function VoiceBar() {
               <Icon name="mic" />
               {v.phase === 'listening' && <VoiceLevel />}
               <span>
-                {v.phase !== 'listening' ? 'Writing it down… Esc drops it' : v.quiet ?? (v.locked ? `Locked: Fn to ${how} · Esc drops it` : `Listening… let go of Fn, or click the mic, to ${how}; Esc drops it`)}
+                {v.phase !== 'listening' ? 'Writing it down… Esc drops it' : v.quiet ?? (v.locked ? `Locked: Fn to ${how} · Esc drops it` : v.held ? `Listening… let go of Fn to ${how} · Esc drops it` : `Listening… ${fnOn() ? 'Fn or the mic' : 'the mic'} to ${how} · Esc drops it`)}
                 {v.phase === 'listening' && v.ends && <VoiceLeft ends={v.ends} />}
               </span>
             </>

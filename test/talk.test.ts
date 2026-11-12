@@ -108,11 +108,11 @@ test('Q6: Fn: held opens and its release inserts; two quick taps lock, the next 
   const { fnStep, FN0, HOLD_MS, TAP2_MS } = await import('../src/shared/talk.ts')
   type Ev = Parameters<typeof fnStep>[1]
   // events at fake times; each step's action, '' left out
-  const run = (evs: [Ev, number][], lock = true) => {
+  const run = (evs: [Ev, number][], lock = true, other = false) => {
     let s = FN0
     const out: string[] = []
     for (const [e, t] of evs) {
-      const [n, d] = fnStep(s, e, t, lock)
+      const [n, d] = fnStep(s, e, t, lock, other)
       s = n
       if (d) out.push(`${d}@${t}`)
     }
@@ -145,6 +145,9 @@ test('Q6: Fn: held opens and its release inserts; two quick taps lock, the next 
   assert.deepEqual(run([['down', 0], ['up', 80], ['down', 200], ['up', 260], ['end', 3000], ['down', 4000], ['up', 4050]]).out, ['lock@260'])
   // the recording ended while Fn is held (the mic button): its release does nothing
   assert.deepEqual(run([['down', 0], ['held', 200], ['end', 300], ['up', 400]]).out, ['open@200'])
+  // a recording the mic button or a screenshot started: a Fn press stops it and inserts, its hold and release nothing more
+  assert.deepEqual(run([['down', 1000], ['held', 1200], ['up', 1600]], true, true).out, ['insert@1000'])
+  assert.deepEqual(run([['down', 1000], ['up', 1050]], false, true).out, ['insert@1000'])
 })
 
 test('Q6: the level meter: silence 0, a tone in between, clipped at 1; the line when it hears nothing', async () => {

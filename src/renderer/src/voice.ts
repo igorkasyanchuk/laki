@@ -27,7 +27,7 @@ const WARN_MS = 20000 // Q6: the bar counts down this long before the cap
 // what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went).
 // Q6: locked (a double tap: Fn again stops it), ends (the cap is near: when), quiet (nothing heard: why), undo (what
 // it typed taken back)
-export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; ends?: number; quiet?: string; undo?: () => void }
+export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; held?: boolean; ends?: number; quiet?: string; undo?: () => void }
 let now: VoicePhase = { phase: 'idle' }
 const subs = new Set<() => void>()
 const set = (v: VoicePhase) => ((now = v), subs.forEach(f => f()))
@@ -59,11 +59,12 @@ export async function voiceSendTo(tab: string, t: string) {
 let rec: { stop: (send: boolean, only?: boolean) => void } | null = null
 let saidT: ReturnType<typeof setTimeout> | undefined
 
-export async function voiceStart(locked = false) {
+// how: 'hold' Fn held (its release ends it), 'lock' Fn's double tap, 'free' the mic button or a screenshot's (Fn or the mic ends it)
+export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
   if (now.phase !== 'idle') return
   const target = document.activeElement as HTMLElement | null
   historyOpen(false)
-  set({ phase: 'listening', locked })
+  set({ phase: 'listening', locked: how === 'lock', held: how === 'hold' })
   // a stop before the mic opens (a permission prompt, a device that never answers): nothing heard, so idle at once, and
   // the stream, if it comes, closed; a start meanwhile is a recording of its own
   let dropped = false
@@ -214,19 +215,19 @@ let fn: FnState = FN0
 let soon: ReturnType<typeof setTimeout> | undefined // Fn is down, the mic not open yet
 let alt = false // ⌥ is down: ⌥Fn is the history's
 const isFn = (e: KeyboardEvent) => e.key === 'Fn' || e.code === 'Fn'
-const fnOn = () => cloudVoice() && settings.fn !== false
+export const fnOn = () => cloudVoice() && settings.fn !== false
 // the keys held now, by when each went down (or repeated): Fn with one of them (Fn ←, Fn ⌫) is that key's, never the mic.
 // A keyup that went elsewhere (a webview took the focus) stops counting after DOWN_MS (macOS's longest repeat delay)
 const DOWN_MS = 2500
 const down = new Map<string, number>()
 const keyHeld = () => [...down.values()].some(t => Date.now() - t < DOWN_MS)
 const fnDo = (d: FnDo, only = false) => {
-  if (d === 'open' || d === 'lock') now.phase === 'idle' ? void voiceStart(d === 'lock') : (fn = FN0) // still writing the last one down
+  if (d === 'open' || d === 'lock') now.phase === 'idle' ? void voiceStart(d === 'lock' ? 'lock' : 'hold') : (fn = FN0) // still writing the last one down
   else if (d === 'insert') voiceStop(true, only)
   else if (d === 'drop') voiceStop(false)
 }
 const fnEv = (ev: Parameters<typeof fnStep>[1], only = false) => {
-  const [s, d] = fnStep(fn, ev, Date.now(), settings.lock !== false)
+  const [s, d] = fnStep(fn, ev, Date.now(), settings.lock !== false, now.phase === 'listening')
   fn = s
   if (!s.held) clearTimeout(soon)
   fnDo(d, only)

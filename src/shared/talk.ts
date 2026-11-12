@@ -112,14 +112,15 @@ export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: str
 // release inserts; tapped twice (each press shorter than HOLD_MS, the second pressed within TAP2_MS of the first's
 // release) it locks on, and the next press stops it and inserts. down: Fn pressed with no other key held; held:
 // HOLD_MS after a down, Fn still down; key: another key (Fn ← is Home, never the mic; a locked mic keeps on);
-// blur: the window lost the keyboard; end: the recording ended some other way (Esc, the mic button, the cap)
+// blur: the window lost the keyboard; end: the recording ended some other way (Esc, the mic button, the cap).
+// other: a recording Fn didn't open is on (the mic button, a screenshot's): Fn stops it and inserts, as a locked one
 export const HOLD_MS = 200
 export const TAP2_MS = 350
 export type FnState = { held: boolean; at: number; tap: number; open: boolean; locked: boolean; skip?: boolean } // skip: this press's release does nothing
 export const FN0: FnState = { held: false, at: 0, tap: -Infinity, open: false, locked: false }
 export type FnDo = '' | 'open' | 'insert' | 'drop' | 'lock'
-export function fnStep(s: FnState, ev: 'down' | 'held' | 'up' | 'key' | 'blur' | 'end', t: number, lock = true): [FnState, FnDo] {
-  if (ev === 'down') return s.locked ? [{ ...FN0, held: true, at: t, skip: true }, 'insert'] : s.held ? [s, ''] : [{ ...s, held: true, at: t, open: false, skip: false }, '']
+export function fnStep(s: FnState, ev: 'down' | 'held' | 'up' | 'key' | 'blur' | 'end', t: number, lock = true, other = false): [FnState, FnDo] {
+  if (ev === 'down') return s.locked || (other && !s.held) ? [{ ...FN0, held: true, at: t, skip: true }, 'insert'] : s.held ? [s, ''] : [{ ...s, held: true, at: t, open: false, skip: false }, '']
   if (ev === 'held') return s.held && !s.open && !s.skip ? [{ ...s, open: true }, 'open'] : [s, '']
   if (ev === 'up') {
     if (!s.held) return [s, '']

@@ -330,10 +330,12 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   listeners from the module's load, before App's keys, `stopImmediatePropagation`; the mic opens after `HOLD_MS`, so a tap
   or Fn + a key never opens it; another key while held or Esc drops it, Esc while it's written down too; under
   `SHORT_MS`: *Too short*; on macOS Chromium drops Fn's own key events, a flagsChanged of keyCode 63, so main's `fnWatch`
-  polls NSEvent's modifier flags through osascript's JXA every `FN_MS` while Laki is the front app and a page asked
+  polls NSEvent's modifier flags through osascript's JXA every `FN_MS` while Laki is the front app (`front`, or `fnFocus`:
+  a page that asked has the focus, the AI or new-workspace window over another app) and a page asked
   (`fn-watch`), and sends the focused one `fn` down or up: voice.ts' `fnDown`, never with another key held (`down`);
   Q6: Fn's rules are `talk.ts` `fnStep`, pure (`test/talk.test.ts`): hold, a double tap's lock (`TAP2_MS`, each press
-  under `HOLD_MS`; `settings.voice.lock`), the next press's stop, a key, a blur, a recording ended elsewhere (`end`);
+  under `HOLD_MS`; `settings.voice.lock`), the next press's stop, a key, a blur, a recording ended elsewhere (`end`), and `other`: a recording
+  the mic button or a screenshot started (`voiceStart` `'free'`; the bar: *Fn or the mic*) stops at a press, as a locked one;
   ⌥Fn (`alt`) opens the history),
   then types the text where the focus was (`execCommand('insertText')`: a field, a
   contenteditable, xterm's textarea; a terminal or an input gets one line, no control characters), else copies it, as

@@ -2462,7 +2462,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   (its other speech-to-text models under *More on OpenRouter*), else as Laki last knew it, with the date. Neither the audio nor the text is kept. *Hold Fn to talk*
   (on): hold Fn anywhere in Laki (the app's window, the new-workspace and AI windows), talk, let go, and the text is typed where your cursor is; another key while you
   hold it, or Esc, drops it. *Lock by double tap* (on): tap Fn twice and the mic stays on without holding it (the bar
-  says *Locked*); Fn again stops it and types what you said, Esc drops it. The bar shows how loud it hears you, says
+  says *Locked*); Fn again stops it and types what you said, Esc drops it. A recording the mic button or a screenshot
+  started stops at a press of Fn too. The bar shows how loud it hears you, says
   *I can't hear you: check the input* (with the microphone's name) after 3 seconds of nothing, and counts down the last
   20 seconds before a recording stops by itself at 5 minutes. After it types into a field, the bar's *Undo* takes it
   back. *Keep the last transcripts* (on): your last 10, in memory only (gone when Laki quits or Recording mode is on);
