@@ -714,3 +714,26 @@ test('snapshotOf: the last layout, no Private rows, no paths, under its cap; ano
   assert.equal(snapOf('{'), undefined)
   assert.equal(snapOf(null), undefined)
 })
+
+test("S14: the page's WebCrypto half and the daemon's node:crypto half seal and open each other's frames; a replay refused", async () => {
+  const { baseKey, channel: pageCh } = await import('../src/renderer/src/e2e.ts')
+  const d = await import('../src/daemon/e2e.ts')
+  const secret = d.secret()
+  const salt = d.salt()
+  const page = await pageCh(await baseKey(new Uint8Array(secret)), new Uint8Array(salt))
+  const daemon = d.channel(d.keyOf(secret, salt), d.DAEMON)
+  const f1 = await page.seal('{"auth":"x"}')
+  assert.equal(String(daemon.open(Buffer.from(f1))), '{"auth":"x"}')
+  assert.throws(() => daemon.open(Buffer.from(f1)), /replayed/)
+  const back = daemon.seal('{"ev":"state"}')
+  assert.equal(await page.open(new Uint8Array(back).buffer), '{"ev":"state"}')
+  await assert.rejects(page.open(new Uint8Array(back).buffer), /replayed/)
+  const torn = Buffer.from(daemon.seal('x'))
+  torn[20] ^= 1
+  await assert.rejects(page.open(new Uint8Array(torn).buffer))
+  // a device key, wrapped by its cookie's token: only that token opens it
+  const k = d.secret()
+  const w = d.wrap('a'.repeat(64), k)
+  assert.deepEqual(d.unwrap('a'.repeat(64), w), k)
+  assert.equal(d.unwrap('b'.repeat(64), w), undefined)
+})
