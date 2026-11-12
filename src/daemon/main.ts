@@ -13,7 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { agentChat, aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, rotateLog } from '../shared/conn.ts'
-import { HostPty, ptyOn, ptyQuit } from './ptyHost.ts'
+import { HostPty, ptyGone, ptyOn } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, recorded, type Settings, type Tab, unmasked } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
@@ -1592,7 +1592,7 @@ function shutdown(keep: unknown = false) {
     log('keeping shells', e) // the stop goes on
   }
   for (const s of core.sessions.values()) if (!kept || !(s.pty instanceof HostPty)) s.kill()
-  if (!kept) ptyQuit() // a stop ends the terminals, the host's too
+  if (!kept) void ptyGone().catch(() => {}) // a stop ends the terminals, the host's too: one still being connected to as well (dialed, told to quit)
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })
   rmSync(lockPath, { force: true })

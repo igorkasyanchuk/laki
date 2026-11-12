@@ -249,6 +249,7 @@ test('R9: a fresh world has the pty host on; one that fails to start or speaks a
   assert.match(await rig.rpc('diagnostics'), /## Pty host\noff; not running/)
   await rig.rpc('settingsSet', { ptyHost: true })
   await until(() => existsSync(join(rig.data, 'pty.sock')), 'the host again')
+  await until(async () => /## Pty host\non; running/.test(await rig.rpc('diagnostics')), 'the daemon connected to it')
   // one that can't start (its log can't be opened): new terminals in the daemon, the reason in the view
   await rig.stop()
   await until(() => !existsSync(join(rig.data, 'pty.sock')), 'the host gone with laki stop')
