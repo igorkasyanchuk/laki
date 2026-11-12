@@ -71,6 +71,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   card stays until you close it.
 - **Follow the system**: Settings › Theme & type › Theme › *Follow the system* paints a light theme while macOS is light
   and a dark one while it's dark (pick each); it turns with the system, terminals too.
+- **Menus**: Settings › Layout › *Menus* (macOS): *Laki's* or *macOS*: a workspace's and a tab's menu (a right click,
+  ⋯) drawn by macOS itself, with its look, keys and VoiceOver; a color is a *Color* submenu. Other menus stay Laki's.
 - **Simple row**: Settings › Layout › Sidebar rows › *Simple row* (off by default) makes a workspace's row its name
   and one next-step chip, or the turn's time while its agent works; the other marks show on hover and in its card.
 - **Behind the base**: *↓n* beside the branch in the status bar counts the commits its base has that it hasn't (as
@@ -663,6 +665,10 @@ the daemon stops it too, and the link is dead after (a new share is a new link).
 **Remote access** (Settings › *Remote access*): Laki in a browser on another computer or your phone, with
 its terminals and agents, as if you sat at this Mac. Whoever gets in has a shell here as you, so it lets in one
 email address only, unless you leave the email out on purpose (below).
+- End to end: the tunnel's provider (Cloudflare, Tailscale) can't read or log what the page and the Mac say. Each
+  connection is sealed with a key from the link's secret (the part after `&k=`, which a browser never sends) or, on a
+  paired device, a key of its own the page keeps where its scripts can't read it back. A page opened before this asks
+  for a new link. What it doesn't stop: a provider that changes the page's code as it passes (SECURITY.md).
 - Set the email (kept in the app's settings for next time), pick how long (1, 2, 4, 8, 12, 24, 48 or 72 hours, or Forever: until you stop it or the daemon) and click
   *Start remote access*. It needs `cloudflared` 2026.9.3 or newer (`brew install cloudflared`), like *Expose
   to the world*.
@@ -823,6 +829,11 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   yours: a claude or codex profile with its env and account (none: the agent's default account), each with a session
   of its own. *Effort* (beside the model) sets how hard it thinks: low to max for claude, minimal to xhigh for codex
   (unset: the agent's default); memory compaction uses it too.
+- **Your endpoint**: any OpenAI-compatible server with tool calls, a local one (Ollama, LM Studio, llama.cpp's server)
+  or a provider's: its URL (https, or http on this Mac only, no user or password in it), model and key (none for a
+  local server; kept in `ai-endpoint-key`, 0600, as OpenRouter's is). The same tools and conversation as OpenRouter;
+  not priced. *Test* asks it to say OK. Workflows' AI call blocks and memory compaction go there too; Voice and
+  decision blocks stay on OpenRouter. Only you set it (not an agent, not over remote access); a team's policy can lock it.
 
 *Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Keep pasted images* (Settings › AI › *Pasted
 images*: 30 days unless changed) is how long Laki keeps what you paste into its chats and new workspaces' prompts, files you attach too. *Show costs ($)* (Settings › AI › Spending, on by
@@ -1219,6 +1230,10 @@ for you or finished while you looked away (muted ones aside); so does Laki's mar
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
 small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
 and *Screenshot to Laki AI* (on by default) has its item there with its keys.
+Settings › General › *Menu bar click* (macOS): *Menu* (the menu above) or *Inbox*: a click opens a panel under the icon
+with every agent waiting on you, oldest first, its question and its choices (1–9 picks one, *Open tab* goes there),
+then what's at work, and a *New task…* box (the quick bar with what you typed); it closes as you click elsewhere or
+press Esc. A right click still opens the menu. Private workspaces stay out of it in Recording mode.
 Settings › General › *Menu bar icon* hides the mark. Its *Show state* (on) shapes the mark by how things stand: its outline when nothing runs, a dot under it while an agent works, filled when one needs you, a bar under it (and ! beside the count) when one is blocked by a plan limit or an error; hover it for the same in words. With *Turn timers* on (Settings › Layout), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes
@@ -2711,7 +2726,8 @@ laki ai "what are my agents doing?"                     # ask Laki AI (Settings 
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over
 laki open                                               # the app
-laki mcp                                                # an MCP server on stdio (below)
+laki mcp                                                # an MCP server on stdio (below); --all: every tool listed
+laki completion zsh                                     # tab completion: eval "$(laki completion zsh)" in ~/.zshrc
 laki stop [--keep]                                      # stop the daemon (agents resume when it starts again); --keep: terminals in the pty host go on
 laki daemon                                             # run the daemon in the foreground
 laki serve --tailscale                                  # headless: the daemon and remote access (headless.md)
@@ -2727,7 +2743,11 @@ a spot in the picture is where to tap. MCP's `laki_device` does the same.
 
 ### MCP
 
-`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
+`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. It lists its core
+tools (state, a new workspace, send, screen, wait, diff, ask, alert, progress, limits) and `laki_more`, which adds a group
+to the list (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings): less of an agent's context goes
+to tools it won't use. Any tool runs by its name, listed or not; `laki mcp --all` (or `LAKI_MCP_ALL=1`) lists every one,
+as Laki AI's own backends do. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_new_tab` (another agent in a workspace; `beside` a tab: a split in its tab), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`, with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`, and with Workflows on `laki_workflows`, `laki_workflow_write` (saved for you to read: until you save it in the app, only *Start* in its editor runs one an agent wrote; not a schedule, an event, Run again, the CLI or an agent) and `laki_workflow_run`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an

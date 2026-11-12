@@ -7,7 +7,7 @@ short version.
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR (a fork's: from origin's or upstream's), with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass), fast mode and sandbox picked under the prompt (a model the installed Claude Code is too old for leaves the menus, with a warning on one you typed). Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it), A turn running longer than you set (off by default) tells you once, with *Stop*.
-  a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
+  a Dock and menu bar count (a click on the menu bar icon can open an Inbox: what waits on you with its choices, what's at work, New task…), floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card, the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
@@ -117,7 +117,8 @@ time and AI money per run (`budget: 60 min, $5`).
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
   anyone with the link, if you type *confirm* (a red warning says what that risks; 24 hours at most); or through Tailscale, for your
   tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet. Its link opens once, in one tab;
-  copy the link and the PIN apart, or *Copy all* for both in one message.
+  copy the link and the PIN apart, or *Copy all* for both in one message. End to end: what the phone and the Mac say is
+  sealed between them, so the tunnel's provider can't read or log it.
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([headless.md](headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
@@ -147,5 +148,5 @@ time and AI money per run (`budget: 60 min, $5`).
   the talk key can go to it from any app, your screen with it when you say so; it moves the window (a session, a page, full screen, a panel),
   opens a workspace in your editor, finds sessions by name or the last few and runs one command in several at one Yes;
   it tells you where a setting is, with a link that opens it;
-  on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
-- **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
+  on OpenRouter, claude -p / codex exec or your own OpenAI-compatible endpoint (a local server too), every ask's cost logged (shown or hidden).
+- **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server: its core tools, more a group at a time) drives it all, agents included, with tab completion (`laki completion zsh|bash|fish`). Menus can be macOS's own (Settings › Layout).

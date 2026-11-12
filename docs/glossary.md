@@ -21,3 +21,6 @@ out of Help and Settings.
 | **Side panel** | the panel right of the panes (⌥⌘B): Info, Files, Changes, PR comments… | right panel, info panel |
 | **My Desk** | the page of extension tiles | the Desk |
 | **Collision radar** | where two worktrees (or the base) change the same lines; *Check overlaps* opens it | Overlaps (as a title) |
+| **Inbox** | the panel the menu bar icon's click opens (Menu bar click: Inbox) | popover, tray panel |
+| **Your endpoint** | Laki AI's own OpenAI-compatible server (Settings › AI) | custom provider, BYO endpoint |
+| **End to end** | remote access sealed between the page and the Mac (S14) | E2E, encrypted tunnel |

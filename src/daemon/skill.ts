@@ -72,6 +72,8 @@ For example \`"${cli}" ls --json\`. Below, \`laki\` stands for it.
 
 Inside a Laki tab, \`$LAKI_APP\` is \`true\`, \`$LAKI_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
 \`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset.
+From a terminal Laki didn't start (not a tab), \`laki\` may wait up to a minute for the user's *Allow this terminal* in
+Laki's window (it says so): wait for it; don't retry in a loop.
 
 Over MCP (\`laki mcp\`) the core tools are listed (state, new workspace, send, screen, wait, diff, alert, progress,
 limits); \`laki_more\` with a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) lists that
