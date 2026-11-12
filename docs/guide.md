@@ -704,6 +704,12 @@ email address only, unless you leave the email out on purpose (below).
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
+- It stays reachable (D8): *Keep the Mac awake* holds the Mac awake while remote access runs: *On power* (the usual,
+  plugged in only), *Always* (on battery too) or *Never*; a closed lid still sleeps a MacBook without an external
+  display. Laki checks its address from outside as it starts, after the Mac wakes and every 5 minutes (through
+  Tailscale, which can't reach its own name from this Mac: `tailscale status`), and Settings says what it reached and
+  how fast, with *Check* for one now. A failed check turns the status bar's badge yellow with why; two in a row notify
+  you and start its tunnel again.
 - It won't start, or Cloudflare's sign-in won't let you in: run `cloudflared tunnel login` once in a terminal (a
   browser page opens to pick your Cloudflare account). Settings › *Remote access* and Help say so too.
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the

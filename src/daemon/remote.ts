@@ -8,9 +8,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
-import { type Agent, AGENT_NAMES, type Remote, type RemoteDevice, REMOTE_TRIES, type SavedDevice, type Tunnel } from '../shared/types.ts'
+import { type Agent, AGENT_NAMES, type Remote, type RemoteCheck, type RemoteDevice, REMOTE_TRIES, type SavedDevice, type Tunnel } from '../shared/types.ts'
 import { broadcast, changed, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
-import { dir } from './dir.ts'
+import { dir, inRig } from './dir.ts'
 import { policyRemote } from './policy.ts'
 import { type Tail, tailOf } from './meters.ts'
 import { b64u, type Passkey, register, verifyGet } from './passkey.ts'
@@ -592,7 +592,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
 // left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
 // again (remoteAgain), its address before, why it's down
-type RemoteRun = { mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
+type RemoteRun = { check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
@@ -601,7 +601,7 @@ const hashOf = (t: string) => createHash('sha256').update(t).digest('hex')
 export const accessOk = (t: unknown) => !!remote?.used && !!remote.access && typeof t === 'string' && !!t && same(hashOf(t), remote.access)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
+  remote && { ...(remote.check && { check: remote.check }), mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}` } // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 const newPin = () => String(randomInt(0, 1e6)).padStart(6, '0')
 const hex = () => randomBytes(32).toString('hex')
@@ -658,6 +658,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   }
   if (remote !== r) return undefined // stopped meanwhile
   keepRemote()
+  void selfCheck(r) // D8: reachable from outside?
   phoneRemote(`Laki: remote access is on${r.pin ? ' (its PIN is on your Mac)' : ''}: tap to open it`, { url: remoteView()?.link, open: r.open })
   log(`remote access at ${r.url} for ${ts ? `${funnel ? 'the internet (Tailscale Funnel)' : `the tailnet's devices (${peers} more online)`} with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
@@ -719,6 +720,7 @@ function remoteAt(r: RemoteRun, u: string | undefined) {
   } else log(`remote access: back at ${u}`)
   keepRemote()
   changed()
+  void selfCheck(r) // D8: reachable from outside?
 }
 
 // as the daemon starts (main.ts, before tunnelsBack): remote access state.json kept, started again unless its time has
@@ -1053,10 +1055,10 @@ function wrongPin(r: RemoteRun, o: Asker, now: number): never {
 }
 
 // remote access past its time ends (main.ts asks every 15 s; tests move the clock). The timer's own ask (no now) also
-// sees a Mac that slept (a minute or more since the last): a cloudflared address is fetched, and started again if it
-// doesn't answer (Cloudflare's 5xx for a tunnel that's gone). Not Tailscale's: this Mac can't reach its own tailnet
-// address, and its process ending says so already
+// sees a Mac that slept (a minute or more since the last): a self-check then, its tunnel started again at once if it
+// fails; else one every CHECK_EVERY. And the Mac's power, for remoteAwake
 let lastTick = 0
+const CHECK_EVERY = 5 * 60_000
 export function remoteTick(now?: number) {
   const at = now ?? Date.now()
   const woke = now === undefined && lastTick > 0 && at - lastTick > 60000
@@ -1065,7 +1067,8 @@ export function remoteTick(now?: number) {
   const r = remote
   if (r?.lockUntil && at >= r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }), changed() // D5: the wait is over
   devicesTidy(at)
-  if (woke && r?.url && !r.via) void awake(r)
+  if (r?.url && (woke || at - (r.check?.at ?? 0) >= CHECK_EVERY)) void selfCheck(r, woke ? 1 : 2, at)
+  if (r) void power()
   // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note
   if (r?.via === 'tailscale' && !r.funnel)
     tsReady().then(
@@ -1073,13 +1076,50 @@ export function remoteTick(now?: number) {
       () => {},
     )
 }
-async function awake(r: RemoteRun) {
-  const up = await fetch(r.url!, { redirect: 'manual', signal: AbortSignal.timeout(15000) }).then(
-    x => x.status < 500,
-    () => false,
-  )
-  if (up || remote !== r || !r.url) return
-  const why = 'not reachable after the Mac slept'
+
+// D8: is it reachable from outside? Its public address's root fetched, no token (a quick tunnel's, My domain's: under
+// 500 is up; Cloudflare's sign-in redirect counts), CHECK_MS at most. Through Tailscale this Mac can't reach its own
+// tailnet name: tailscale status instead (connected, the other devices online), and the check says so. Two in a row
+// failing (one after the Mac slept): a notification and its tunnel started again. In the test rig only
+// LAKI_CHECK_URL's address is fetched (no network); none set, no check
+const CHECK_MS = 10_000
+export function selfCheck(r: RemoteRun | undefined = remote, restartAfter = 2, now = Date.now()): Promise<RemoteCheck | undefined> {
+  if (!r || remote !== r || !r.url) return Promise.resolve(undefined)
+  r.checking ??= (async () => {
+    const t0 = Date.now()
+    let c: RemoteCheck
+    if (r.via === 'tailscale') {
+      c = await tsReady().then(
+        ({ peers }) => ({ ok: true, ms: Date.now() - t0, at: now, what: `tailscale status: connected, ${peers} other device${peers === 1 ? '' : 's'} online (this Mac can't open its own tailnet address)` }),
+        e => ({ ok: false, ms: Date.now() - t0, at: now, what: 'tailscale status', why: firstLine(e) }),
+      )
+    } else {
+      const url = inRig() ? process.env.LAKI_CHECK_URL : r.url
+      if (!url) return undefined
+      c = await fetch(`${url.replace(/\/+$/, '')}/`, { redirect: 'manual', signal: AbortSignal.timeout(Number(process.env.LAKI_CHECK_MS) || CHECK_MS) }).then(
+        x => ({ ok: x.status < 500, ms: Date.now() - t0, at: now, what: 'its public address', ...(x.status >= 500 && { why: `it answered ${x.status}` }) }),
+        e => ({ ok: false, ms: Date.now() - t0, at: now, what: 'its public address', why: (e as Error).name === 'TimeoutError' ? `no answer in ${(Number(process.env.LAKI_CHECK_MS) || CHECK_MS) / 1000} s` : firstLine(e) }),
+      )
+    }
+    if (remote !== r) return undefined
+    r.check = c
+    r.fails = c.ok ? 0 : (r.fails ?? 0) + 1
+    changed()
+    if (!c.ok && r.fails === restartAfter) {
+      const why = `not reachable: ${c.why}`
+      log(`remote access: ${why}; starting its tunnel again`)
+      broadcast({ ev: 'remote', text: `Remote access isn't reachable (${c.why}): starting its tunnel again.` })
+      restartTunnel(r, why)
+    }
+    return c
+  })().finally(() => (r.checking = undefined))
+  return r.checking
+}
+// the Check button (remoteCheck): one now, its result
+export const remoteCheck = () => selfCheck(remote)
+
+function restartTunnel(r: RemoteRun, why: string) {
+  if (remote !== r || r.via === 'tailscale') return // tailscale serve's own end starts it again (remoteAgain)
   if (r.host) {
     const c = conn
     if (c) c.cf.stop(), connDown(c, why)
@@ -1088,4 +1128,15 @@ async function awake(r: RemoteRun) {
   const cf = r.cf
   remoteAgain(r, why) // before the stop: its close then isn't an end of its own
   cf?.stop()
+}
+
+// D8: the Mac awake while remote access runs (core's keepAwake, its reason remote): settings.remoteAwake 'ac' (unset):
+// while on AC power (pmset -g batt; none: a desktop, or not a Mac), 'always', 'off'. ponytail: a closed lid still
+// sleeps a MacBook without an external display (Settings says so)
+let onAc = true
+export const remoteAwake = () => !!remote && (m => m === 'always' || (m !== 'off' && onAc))(state.settings?.remoteAwake)
+async function power() {
+  const r = await run('pmset', ['-g', 'batt'], { timeout: 5000 }).catch(() => null)
+  const ac = !r || !/'Battery Power'/.test(r.stdout)
+  if (ac !== onAc) (onAc = ac), changed()
 }

@@ -405,17 +405,17 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
+export type Remote = { check?: import('../../shared/types').RemoteCheck; mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
 export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; level?: 'answer' | 'full' }
 // devices, pair, revoke (D3): the paired ones, Add a device, Revoke (one; none: all)
-export type RemoteApi = { state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type RemoteApi = { check?: () => Promise<unknown>; state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+type RemoteOpts = { awake: 'ac' | 'always' | 'off'; level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
 // D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
 export function hookOf(w?: Webhook) {
   if (w?.format === 'webpush') return 'your paired phones'
@@ -432,6 +432,7 @@ type Address = 'tailscale' | 'domain' | 'quick'
 const ADDRESSES: [Address, string][] = [['tailscale', 'Tailscale'], ['domain', 'My domain'], ['quick', 'Quick tunnel']]
 // other: Settings › Tunnels (none where that isn't shown)
 export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void; other?: () => void }) {
+  const [checking, setChecking] = useState(false) // D8: the Check button's
   const { mail, auth, tries, funnel, host, domain } = opts
   const ts = auth === 'tailscale'
   const dom = auth === 'domain'
@@ -540,6 +541,15 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
                 Only <b>{r.mail}</b> gets in. Scan it with a phone, or send the link to yourself. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
               </p>
             )}
+            {/* D8: reached from outside: the daemon's self-check (its address, or tailscale status), at start, after sleep, every 5 minutes */}
+            <p className={r.check && !r.check.ok ? 'warn-soft small' : 'muted small'}>
+              {r.check ? (r.check.ok ? `Reachable: ${r.check.what}, ${r.check.ms} ms, checked ${new Date(r.check.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : `Not reachable (${r.check.what}): ${r.check.why}. Two in a row start its tunnel again.`) : 'Not checked from outside yet.'}{' '}
+              {api.check && (
+                <button type="button" className="link small" disabled={checking} onClick={() => (setChecking(true), api.check!().catch(fail).finally(() => setChecking(false)))}>
+                  {checking ? 'Checking…' : 'Check'}
+                </button>
+              )}
+            </p>
             <div className="row">
               {(r.host || r.via) && (
                 <button onClick={() => (setErr(''), api.pair().catch(fail))} title="A new link (and PIN) that pairs one more device, good for 10 minutes">
@@ -704,6 +714,17 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
           <span className="muted">The phone reads, answers and messages agents; the rest stays on this Mac</span>
         </span>
       </Switch>
+      <label className="switch-row">
+        <select value={opts.awake} onChange={e => set({ awake: e.target.value as RemoteOpts['awake'] })}>
+          <option value="ac">On power</option>
+          <option value="always">Always</option>
+          <option value="off">Never</option>
+        </select>
+        <span className="switch-text">
+          <span>Keep the Mac awake</span>
+          <span className="muted">While remote access runs, so it stays reachable: plugged in (the usual), on battery too, or not at all. A closed lid still sleeps a MacBook without an external display.</span>
+        </span>
+      </label>
       {opts.hook && !(r ? r.open : open) && (
         // D4: never with anyone-with-the-link: whoever reads the push could open it
         <Switch on={opts.push} onChange={v => set({ push: v })} className="switch-row" tip="Phone pushes (Settings › Phone pushes) get the link as it starts or moves, and a word when it stops on its own or a new device joins. Never the PIN">

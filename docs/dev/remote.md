@@ -129,6 +129,18 @@ ponytail: funnel takes port 443's root, as remote access over tailscale does.
 
 ### Remote access
 
+D8, kept reachable: `remoteAwake` (the view's changed() asks it) holds core's `keepAwake` with the reason `remote` (one
+caffeinate for `agents` and `remote`: `awakeFor`) while remote access runs, per `settings.remoteAwake` (`ac` unset: on
+AC power, `pmset -g batt` read each `remoteTick`, none found counts as AC; `always`; `off`). `selfCheck`: the public
+address's root (no token, `redirect: manual`, under 500 is up: Cloudflare's sign-in redirect counts; `CHECK_MS` 10 s),
+or through Tailscale `tailscale status` (`tsReady`: connected, peers online; this Mac can't open its own tailnet
+name), into `remote.check` (`ok`, `ms`, `at`, `what`, `why`); at start (`remoteStart`, `remoteAt`), after a wake (one
+failure then restarts), every `CHECK_EVERY` 5 minutes (`remoteTick`, the test clock's `now`), and `remoteCheck`
+(Settings' *Check*; one at a time: `checking`). `fails` in a row reaching 2: a log line, a `remote` event (App's
+notification) and `restartTunnel` (a quick one's `remoteAgain` and a stop; My domain's connector down; Tailscale's own
+end does it). The rig fetches only `LAKI_CHECK_URL` (`LAKI_CHECK_MS`), never the internet. App's status bar badge is
+`unreachable` (yellow) with the why in its tip.
+
 `remote.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*

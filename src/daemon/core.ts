@@ -34,7 +34,7 @@ import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widge
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
-import { daemonPort, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
+import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { archiveBack, archiveDrop, archiveKeep, collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
@@ -782,7 +782,8 @@ export function changed() {
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
     for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
     const agents = agentsBusy(v)
-    keepAwake(agents)
+    keepAwake('agents', agents)
+    keepAwake('remote', remoteAwake()) // D8
     whenDone(agents)
     if (!clients.size) return void (sent = '') // nobody to send it to
     const json = JSON.stringify({ ev: 'state', view: v }) // once for every client
@@ -795,12 +796,17 @@ export function changed() {
 export const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
 
 // settings.keepAwake: the Mac doesn't sleep while an agent works or waits for you (caffeinate -i: the screen may still
-// sleep and lock, the lid still sleeps it; -w: it ends with the daemon, a crash too). Set at each view (changed()).
+// sleep and lock, the lid still sleeps it; -w: it ends with the daemon, a crash too); D8: while remote access runs
+// (remote.ts remoteAwake). One process for every reason held. Set at each view (changed()).
 // ponytail: macOS's caffeinate only; elsewhere none is found, said once
 let awake: ChildProcess | undefined
 let noCaffeinate = false
-function keepAwake(on: boolean) {
-  on &&= state.settings?.keepAwake === true && !noCaffeinate
+const awakeFor = new Set<'agents' | 'remote'>()
+function keepAwake(why: 'agents' | 'remote', want: boolean) {
+  if (why === 'agents') want &&= state.settings?.keepAwake === true
+  if (want) awakeFor.add(why)
+  else awakeFor.delete(why)
+  const on = awakeFor.size > 0 && !noCaffeinate
   if (on === !!awake) return
   if (!on) return void (awake?.kill(), (awake = undefined))
   const p = spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' })

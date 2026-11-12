@@ -2,7 +2,9 @@
 // restarts (D2). remote.ts; api.test.ts has the rest of remote access
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
@@ -342,4 +344,50 @@ test('M4: at a stable address the page is an app: its manifest and service worke
   assert.equal(await tap('0123456789abcdef:1:0123456789abcdef'), 400, 'a signature this Mac never made')
   assert.deepEqual(await push({ off: true }), [200, { ok: true }])
   assert.equal((await rig.rpc('state')).remoteDevices[0].notify, undefined)
+})
+
+test('D8: a self-check of its address at start, every 5 minutes (test clock) and on Check; two failures in a row: the why in the view, the app told, its tunnel started again; caffeinate held with no agent, on power unless always', async t => {
+  let status = 200 // its public address's stand-in: a local server (LAKI_CHECK_URL: the rig never reaches the internet)
+  const srv = createServer((_q, r) => (r.writeHead(status), r.end())).listen(0, '127.0.0.1')
+  await new Promise(r => srv.once('listening', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_CHECK_URL: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_CHECK_MS: '1500' } })
+  const pm = join(rig.home, 'bin/pmset') // the Mac's power: AC unless $HOME/power says otherwise
+  writeFileSync(pm, `#!/bin/sh\ncat "$HOME/power" 2>/dev/null || echo "Now drawing from 'AC Power'"\n`)
+  chmodSync(pm, 0o755)
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  const caf = () => (existsSync(rig.env.FAKE_LOG) ? readFileSync(rig.env.FAKE_LOG, 'utf8') : '').split('\n').filter(l => l.startsWith('caffeinate'))
+  const remote = async () => (await rig.rpc('stateOwn')).remote
+  const on = await rig.rpc('remoteStart', { hours: 2, mail: 'me@x.dev' })
+  const { port } = rig.info()
+  const first = await until(async () => (await remote())?.check, 'checked as it started')
+  assert.deepEqual([first.ok, first.what, typeof first.ms], [true, 'its public address', 'number'])
+  await until(() => caf().length === 1, 'caffeinate held for remote access: no agent works')
+  assert.match(caf()[0], /^caffeinate -i -w \d+$/)
+  // on battery: let go, unless Always
+  writeFileSync(join(rig.home, 'power'), "Now drawing from 'Battery Power'\n")
+  await rig.rpc('remoteTick', { now: Date.now() })
+  await until(() => caf().at(-1) === 'caffeinate stopped', 'let go on battery')
+  await rig.rpc('settingsSet', { remoteAwake: 'always' })
+  await until(() => caf().filter(l => l.startsWith('caffeinate -i')).length === 2, 'held again: Always')
+  // failing: once is said in the view only; twice, the app is told and its tunnel starts again
+  status = 502
+  const app = await connect(rig)
+  t.after(() => app.close())
+  const t0 = Date.now()
+  await rig.rpc('remoteTick', { now: t0 + 6 * 60_000 })
+  const bad = await until(async () => (c => c?.ok === false && c)((await remote()).check), 'the first failure')
+  assert.equal(bad.why, 'it answered 502')
+  assert.ok(!app.events.some(e => e.ev === 'remote'), 'one failure: not told yet')
+  writeFileSync(join(rig.home, 'cf-gen'), '-2')
+  await rig.rpc('remoteTick', { now: t0 + 12 * 60_000 })
+  assert.match((await until(async () => app.events.find(e => e.ev === 'remote'), 'the app told')).text, /isn't reachable \(it answered 502\): starting its tunnel again/)
+  status = 200
+  await until(async () => (await remote())?.url === `https://fake-${port}-2.trycloudflare.com`, 'its tunnel started again')
+  assert.match(rig.out, /remote access: not reachable: it answered 502; starting its tunnel again/)
+  assert.equal((await rig.rpc('remoteCheck')).ok, true, 'Check: reachable again')
+  assert.equal((await remote()).check.ok, true)
+  assert.equal(on.mail, 'me@x.dev')
+  await rig.rpc('remoteStop')
+  await until(() => caf().at(-1) === 'caffeinate stopped', 'let go as it stops')
 })

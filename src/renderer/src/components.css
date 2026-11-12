@@ -122,3 +122,4 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 .sees-list > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .sees-list > li > button { margin-left: auto; }
 .sees-cmd { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }
+.status .remote-badge.unreachable { color: var(--waiting); } /* D8: its self-check failed: the why in its tip */

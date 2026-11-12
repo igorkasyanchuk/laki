@@ -3611,8 +3611,8 @@ export function App() {
           )}
           {view.remote && ws?.browser === undefined && (
             <button
-              className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''}`}
-              data-tip={view.remote.open ? 'Remote access for anyone with the link (no email): Settings › Remote access' : `Remote access for ${view.remote.mail}: Settings › Remote access`}
+              className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''} ${view.remote.check?.ok === false ? 'unreachable' : ''}`}
+              data-tip={`${view.remote.check?.ok === false ? `Not reachable from outside (${view.remote.check.what}): ${view.remote.check.why} · ` : ''}${view.remote.open ? 'Remote access for anyone with the link (no email): Settings › Remote access' : `Remote access for ${view.remote.mail}: Settings › Remote access`}`}
               onClick={() => setDialog({ section: 'remote' })}
             >
               {!view.remote.url ? 'Remote starting…' : view.remote.open ? 'Remote: open to anyone with the link' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}

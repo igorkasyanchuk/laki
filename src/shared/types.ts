@@ -592,6 +592,7 @@ export type Settings = {
   aiGlow?: boolean // Settings › AI: a glow over what Laki AI looks at (a tab's pane, else the window), on unless false
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
+  remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs (core's caffeinate, reason remote): on AC power (unset), also on battery, or never
   remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); both at a quick tunnel's address; tailscale, your tailnet (tailscale serve); domain, My domain (D1: settings.tunnel's named tunnel, a PIN always)
   remoteHost?: string // domain: the word under the named tunnel's domain (unset: laki)
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
@@ -923,7 +924,8 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; level?: 'answer' | 'full'; /* D7: a remote page's own (its view only) */ open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+export type RemoteCheck = { ok: boolean; ms: number; at: number; what: string; why?: string } // D8: the self-check's last: what it reached (its public address; through Tailscale, tailscale status) and how long it took
+export type Remote = { check?: RemoteCheck; mail: string; level?: 'answer' | 'full'; /* D7: a remote page's own (its view only) */ open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 // host: My domain's (D1: a hostname of your named tunnel, a PIN always); down: why it's starting again (D2: no url
 // meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
 // state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
@@ -1219,7 +1221,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 173
+export const API = 174
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

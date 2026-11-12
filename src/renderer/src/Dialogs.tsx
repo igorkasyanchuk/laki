@@ -232,7 +232,7 @@ export function Pages({ app }: { app: AppCtx }) {
             stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
           }}
-          remote={{ state: view.remote, devices: view.remoteDevices, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+          remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
           widgets={extCfg}
           logs={(key, title) => setDialog({ logs: key, title })}
           scriptLogs={() => setDialog('scriptLogs')}
