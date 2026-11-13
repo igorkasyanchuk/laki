@@ -574,7 +574,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
   })
   const { addMenu, busiest, dialog, find, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
   return (
-    <aside className="sidebar" hidden={!sideOpen || listOff || !!strip} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
+    <aside className="sidebar" hidden={!sideOpen} data-away={listOff || strip ? '' : undefined /* a rail page, a strip: styles.css keeps it drawn, so it comes back as it was */} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
       <div className="side-head drag">
         <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} keyId="sidebar" onClick={() => setSideOpen(false)} />
         {!railBar && histNav}

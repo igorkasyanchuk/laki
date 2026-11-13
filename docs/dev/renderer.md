@@ -1075,6 +1075,13 @@ capsules, the status bar's groups, a Needs you card. The --r-* tokens go through
 `test/css.test.ts` checks the inner rules use `var(--r-in)`.
 
 
+## The sidebar behind a rail page
+
+Sidebar.tsx' `<aside>` is `hidden` only when the sidebar is shut (`!sideOpen`: opening it plays its slide-in). Behind a
+rail page (`listOff`: Board, Schedule, AI…) or a strip it's `data-away`: styles.css takes it out of the flow and makes it
+`visibility: hidden`, not `display: none`, which restarted every CSS animation in it on the way back (`.sidebar`'s
+`m-row`, Needs you's `v-rise`, a waiting row's `b-lit`, the picked row's `v-sel`) and dropped its scroll.
+
 ## A page's head turns to glass
 
 styles.css: `.settings-page` (ui.tsx `Page` and Settings) is `timeline-scope: --page`; its scroller (`> .page-body`, Settings'

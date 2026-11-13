@@ -218,6 +218,10 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .app { display: flex; height: 100%; position: relative; }
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .sidebar[hidden] { display: none !important; } /* hidden, not unmounted: its video plays on */
+/* a rail page (Board, Schedule…) or a strip in its place: out of the way but still laid out, not display: none, which
+   played every entrance in it again on the way back (the sidebar's own fade, Needs you's cards rising, a waiting row's
+   flash, the picked row's spring) and dropped its scroll: a flicker under the page's cross-fade */
+.sidebar[data-away] { position: absolute !important; visibility: hidden !important; pointer-events: none; } /* !important: over a design's own position (as [hidden]'s) */
 :is(.notes-side, .ai-chats)[hidden] { display: none; } /* a page's own list, its head's button (ui.tsx usePageSide) */
 /* V2: 40px, on the 4px grid: the traffic lights (trafficLightPosition y 13) sit in its middle; 76px clears them (the app only: .electron) */
 .side-head { height: 40px; flex: none; display: flex; align-items: center; gap: 1px; padding: 0 var(--sp-3); }
