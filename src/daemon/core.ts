@@ -30,7 +30,7 @@ import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
-import { helperBin } from '../shared/helper.ts'
+import { appBinOk, helperBin } from '../shared/helper.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
@@ -4493,7 +4493,8 @@ export async function peerWho(port: number, proc = process.platform === 'linux' 
 }
 // S1: the app's own process asking for its token (main.ts' appPair: a daemon the app didn't start, the CLI's or the
 // one an earlier app left running): a GUI app on this daemon's own binary that LaunchServices knows has finished
-// launching (Electron run as node, open --env ELECTRON_RUN_AS_NODE=1 too, never signals it), in no tab. Linux: its
+// launching (Electron run as node, open --env ELECTRON_RUN_AS_NODE=1 too, never signals it), in no tab; this daemon on
+// the helper inside the bundle: the outer app's binary (helper.ts appBinOk). Linux: its
 // binary, and no ELECTRON_RUN_AS_NODE in the environment it started with. ponytail: a native addon loaded into Electron
 // run as node could signal it too; the app's binary without the runAsNode fuse (SECURITY.md) is the real fix
 export async function appPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<boolean> {
@@ -4503,13 +4504,13 @@ export async function appPeer(port: number, proc = process.platform === 'linux' 
   if (proc) {
     const exe = await readlink(join(proc, String(p.pid), 'exe')).catch(() => '')
     const env = await readFile(join(proc, String(p.pid), 'environ'), 'utf8').catch(() => 'ELECTRON_RUN_AS_NODE=')
-    return exe === bin && !env.split('\0').some(l => l.startsWith('ELECTRON_RUN_AS_NODE='))
+    return appBinOk(exe, bin) && !env.split('\0').some(l => l.startsWith('ELECTRON_RUN_AS_NODE='))
   }
   const asn = (await run('/usr/bin/lsappinfo', ['find', `pid=${p.pid}`]).catch(() => ({ stdout: '' }))).stdout.trim()
   if (!asn) return false
   const info = (await run('/usr/bin/lsappinfo', ['info', '-only', 'pid,CFBundleExecutablePath,LSApplicationHasSignalledItIsReady', asn]).catch(() => ({ stdout: '' }))).stdout
   const at = /"CFBundleExecutablePath"="([^"]*)"/.exec(info)?.[1] ?? ''
-  return new RegExp(`^"pid"=${p.pid}$`, 'm').test(info) && /^"LSApplicationHasSignalledItIsReady"=true$/m.test(info) && !!at && (() => { try { return realpathSync(at) === bin } catch { return false } })()
+  return new RegExp(`^"pid"=${p.pid}$`, 'm').test(info) && /^"LSApplicationHasSignalledItIsReady"=true$/m.test(info) && !!at && (() => { try { return appBinOk(realpathSync(at), bin) } catch { return false } })()
 }
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {

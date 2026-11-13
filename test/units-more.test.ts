@@ -20,7 +20,7 @@ import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
-import { appOf, helperBin } from '../src/shared/helper.ts'
+import { appBinOk, appOf, helperBin } from '../src/shared/helper.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
@@ -654,6 +654,20 @@ test('helperBin: the bundle’s helper when it’s there, from the app or the he
   assert.equal(appOf(helper), '/Applications/Laki.app', 'laki open: the outer app, not the helper')
   assert.equal(appOf(app), '/Applications/Laki.app')
   assert.equal(appOf('/usr/local/bin/node'), undefined)
+})
+
+// S1 appPeer: the app's token only to the app's own window process, the daemon on the app's binary or on the helper
+test('appBinOk: the outer app’s binary, from the daemon on the helper or the app; nothing else in the bundle', () => {
+  const app = '/Applications/Laki.app/Contents/MacOS/Laki'
+  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper'
+  assert.ok(appBinOk(app, helper), 'the daemon on the helper: the window is the app')
+  assert.ok(appBinOk(app, app), 'the daemon on the app binary (an older build)')
+  assert.ok(!appBinOk(helper, helper), 'the helper itself is no window')
+  assert.ok(!appBinOk('/Applications/Laki.app/Contents/Frameworks/Laki Helper (Renderer).app/Contents/MacOS/Laki Helper (Renderer)', helper))
+  assert.ok(!appBinOk('/Applications/Other.app/Contents/MacOS/Laki', helper), 'another app')
+  assert.ok(!appBinOk('/Applications/Laki.app/Contents/MacOS/sub/x', helper), 'not right in Contents/MacOS')
+  assert.ok(appBinOk('/opt/Laki/laki', '/opt/Laki/laki'), 'Linux: the daemon’s own binary')
+  assert.ok(!appBinOk('/usr/bin/node', '/opt/Laki/laki'))
 })
 
 // themes.ts p3Sheet: a theme's accent and status colors a little more vivid on a Display P3 screen

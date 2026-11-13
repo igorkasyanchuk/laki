@@ -23,15 +23,20 @@ nothing of Laki's needs the app binary to run as node. This moves them, one at a
 What it gains now: a hook process is Laki Hook to macOS (its own bundle id: the privacy grants given to Laki aren't its
 by bundle). It doesn't close the hole yet: Laki's own binary still runs as node for anyone.
 
-## What still runs through `ELECTRON_RUN_AS_NODE` on the app's binary
+## What runs as node, and where it starts
 
-| what | started by | where |
+Each one sets `ELECTRON_RUN_AS_NODE=1` (core.ts `cliEnv`, or the env given) on `helperBin`'s binary, or inherits the
+daemon's `process.execPath`, which is that binary.
+
+| what | spawned at | runs |
 |---|---|---|
-| the daemon | the app (`conn.ts` `ensureDaemon`, env from main's `start`) | `out/main/daemon.js` |
-| the pty host | the daemon (`ptyHost.ts` `up`: `process.execPath`) | `out/main/ptyhost.js` |
-| widget scripts | the daemon (`widgets.ts` runs, `cliArgv`) | an extension's `.js` |
-| `--headless` | you (`Laki --headless`: main runs `serve` through it) | `out/main/cli.js serve` |
-| Laki AI's tools | `laki mcp` above | |
+| the daemon | `src/shared/conn.ts:146` `ensureDaemon` (the app's main: `src/main/index.ts:637` `start`'s env; the CLI's autostart) | `out/main/daemon.js` |
+| the pty host | `src/daemon/ptyHost.ts:164` `up`, the daemon's `process.execPath` | `out/main/ptyhost.js` |
+| the CLI | `src/daemon/core.ts:285` `cliArgv`: the launcher on PATH (`cliText`, `LAKI_CLI` :425), the skills' (`skill.ts:47`), an extension's `$LAKI_CLI` (`widgets.ts:1012`) | `out/main/cli.js` |
+| `laki mcp` | `cliArgv` too: the skills' MCP command (`skill.ts:36`), Laki AI's (`ai.ts:870` `mcpWith`) | `out/main/cli.js mcp` |
+| hooks | `core.ts:291` `hookArgv` | `out/main/hook.js` |
+| widget scripts | `widgets.ts:1204` runs, `widgetEvents.ts:341` streams: the daemon's `process.execPath` | an extension's `.js` |
+| `--headless` | `src/main/index.ts:406`: main spawns `serve` | `out/main/cli.js serve` |
 
 ## The order to move them
 
@@ -41,11 +46,13 @@ by bundle). It doesn't close the hole yet: Laki's own binary still runs as node 
    and an extension's `$LAKI_CLI` run on the helper; `hookArgv` is `cliArgv`'s binary. `laki open` finds the outer app
    (`appOf`), not the helper it runs in. Launchers written before update on their own (`refreshSkills`; Settings ›
    General's launcher says it's outdated).
-3. **Widget scripts and the pty host**: spawned by the daemon with `process.execPath`; once the daemon itself runs on
-   the helper, they follow by inheriting it.
-4. **The daemon**: `ensureDaemon`'s spawn from the app names the helper; the daemon's Screen Recording use (laki screen's
-   simulator shots, `device.ts`) moves to the app (an IPC) or asks for its own grant.
-5. **`--headless`**: main spawns the helper with `serve` instead of re-running itself as node.
+3. **The daemon, the pty host and widget scripts** (done): `ensureDaemon` (conn.ts) spawns `helperBin`'s binary, the
+   app's main and the CLI alike; the daemon spawns the pty host and extensions' scripts with `process.execPath`, so
+   they follow it. The app's token (S1, core.ts `appPeer`) still goes only to the app's own window process: `appBinOk`
+   takes the outer bundle's `Contents/MacOS` binary whether the daemon runs on it or on the helper. Privacy grants the
+   daemon uses (laki screen's simulator shots, `device.ts`) stay the app's: macOS asks the responsible process, the
+   app that started it, not the binary.
+4. **`--headless`** (done): main spawns `helperBin`'s binary with `serve` instead of re-running itself as node.
 6. **The fuse off** (`runAsNode: false`), the helper built with it on (the helper's own Electron framework copy, or a
    plain node binary in the bundle: its size against a framework copy decides), `pack-smoke.sh` checking that
    `ELECTRON_RUN_AS_NODE=1 Laki.app/Contents/MacOS/Laki -e 1` no longer runs.

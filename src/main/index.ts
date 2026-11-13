@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, rpc, stopDaemon } from '../shared/conn.ts'
+import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
@@ -395,13 +396,14 @@ let shotReady = false // the renderer listens for screenshots
 let folders: string[] = [] // folders dropped on the Dock icon before the renderer listened (a cold launch: before ready)
 let foldersReady = false // the renderer listens for them
 
-// Laki.AppImage --headless … (Laki.app/Contents/MacOS/Laki too): laki serve through Electron's own node, before any
+// Laki.AppImage --headless … (Laki.app/Contents/MacOS/Laki too): laki serve on the bundle's helper (Electron's node,
+// docs/dev/helper.md), before any
 // window or display: a server's daemon and remote access, no app (docs/headless.md)
 const headless = process.argv.indexOf('--headless')
 if (headless > 0) {
   const cli = fileURLToPath(new URL('./cli.js', import.meta.url))
   const chromium = /^--(no-sandbox|disable-gpu[\w-]*|in-process-gpu|ozone-platform(-hint)?(=.*)?|enable-features=.*|disable-features=.*|user-data-dir=.*)$/ // a window's switches (the AppImage's --no-sandbox): none here, so not laki serve's
-  const r = spawnSync(process.execPath, [cli, 'serve', ...process.argv.slice(headless + 1).filter(a => !chromium.test(a))], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', LAKI_HEADLESS_PARENT: String(process.pid) } })
+  const r = spawnSync(helperBin(process.execPath, existsSync), [cli, 'serve', ...process.argv.slice(headless + 1).filter(a => !chromium.test(a))], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', LAKI_HEADLESS_PARENT: String(process.pid) } })
   process.exit(r.status ?? 1)
 }
 

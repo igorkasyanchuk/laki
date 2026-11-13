@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { oldName } from './caps.ts'
+import { helperBin } from './helper.ts'
 
 // ~/.laki; a Mac that ran Laki as "Laki Electron" keeps its ~/.laki-electron: workspaces' worktrees are in it, and
 // agents find their conversations by those paths
@@ -130,7 +131,8 @@ export function logLine(path: string, ...a: unknown[]) {
   } catch {}
 }
 
-// ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already. app (the app's main, the
+// ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already, on the bundle's helper
+// when it has one (the app's binary doesn't run as node: docs/dev/helper.md). app (the app's main, the
 // demo world): the app's token too (S1), on fd 3 from the one it starts, else asked for
 export async function ensureDaemon(env: Record<string, string> = {}, asApp = false): Promise<DaemonInfo> {
   const paired = async (info: DaemonInfo) => (asApp && (await pair(info).catch(e => console.error(`laki: no app token: ${(e as Error).message}`))), info)
@@ -141,7 +143,7 @@ export async function ensureDaemon(env: Record<string, string> = {}, asApp = fal
   rotateLog(logPath) // and each hour as it runs (main.ts' logTick)
   const log = openSync(logPath, 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
-  const child = spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log, ...(asApp ? (['pipe'] as const) : [])], env: { ...process.env, ...env, LAKI_START_PID: String(process.pid), ...(asApp && { LAKI_APP_PIPE: '3' }) } }) // LAKI_START_PID: S1, this terminal is the daemon's own (core.termStart)
+  const child = spawn(helperBin(process.execPath, existsSync), args, { detached: true, stdio: ['ignore', log, log, ...(asApp ? (['pipe'] as const) : [])], env: { ...process.env, ...env, LAKI_START_PID: String(process.pid), ...(asApp && { LAKI_APP_PIPE: '3' }) } }) // LAKI_START_PID: S1, this terminal is the daemon's own (core.termStart)
   child.unref()
   let said = ''
   const pipe = asApp ? (child.stdio[3] as import('node:net').Socket) : undefined
