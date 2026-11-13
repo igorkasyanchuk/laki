@@ -1,7 +1,9 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
 import { type Account, type AccountAgent, type AccountView, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { heardText, micTest, TEST_MS, useLevel } from './voice'
+import { SILENCES } from '../../shared/talk'
 import { api, bridge } from './api'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
@@ -68,6 +70,81 @@ const VOICE_MODELS: [string, string, string][] = [
   ['google/gemini-3.5-transcribe', 'Gemini 3.5 Transcribe · Google', '$2 / $12 per M tokens'],
   ['mistralai/voxtral-mini-transcribe', 'Voxtral Mini Transcribe · Mistral', '$0.18/h'],
 ]
+// Settings › Voice's Test: talk for up to 10 seconds with the level moving, hear it back, and (the cloud's) see what
+// the speech model wrote; a silent recording says so, with the input's name. On this Mac: the level and the playback
+// only (macOS writes what you dictate, Laki never sees it)
+type Tested = { url: string; heard: boolean; device?: string; text?: string; err?: string }
+function MicTest({ cloud }: { cloud: boolean }) {
+  const [rec, setRec] = useState(0) // recording since (ms), 0: not
+  const [got, setGot] = useState<Tested | { fail: string } | null>(null)
+  const test = useRef<ReturnType<typeof micTest> | null>(null)
+  const [, tick] = useState(0)
+  const level = useLevel()
+  useEffect(() => {
+    if (!rec) return
+    const t = setInterval(() => tick(n => n + 1), 250)
+    return () => clearInterval(t)
+  }, [rec])
+  useEffect(() => () => test.current?.stop(), []) // the page left mid-test: the mic closed
+  const url = got && 'url' in got ? got.url : ''
+  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url])
+  const start = async () => {
+    const t = (test.current = micTest())
+    setGot(null)
+    setRec(Date.now())
+    try {
+      const r = await t.done
+      const u = URL.createObjectURL(r.audio)
+      const mine = (s: typeof got, more: Partial<Tested>) => (s && 'url' in s && s.url === u ? { ...s, ...more } : s) // a newer test's stays
+      setGot({ url: u, heard: r.heard, device: r.device })
+      if (cloud && r.heard) heardText(r.audio).then(text => setGot(s => mine(s, { text })), (e: Error) => setGot(s => mine(s, { err: e.message })))
+    } catch (e) {
+      setGot({ fail: `Microphone: ${(e as Error).message}` })
+    } finally {
+      setRec(0)
+    }
+  }
+  const sec = (ms: number) => `0:${String(Math.min(TEST_MS, Math.max(0, ms)) / 1000 | 0).padStart(2, '0')}`
+  return (
+    <div className="mic-test">
+      <div className="row-buttons">
+        {rec ? (
+          <>
+            <span className="mic-test-rec" role="status">
+              ● Recording {sec(Date.now() - rec)} of {sec(TEST_MS)}
+            </span>
+            <span className="voice-level mic-test-level" aria-hidden>
+              <i style={{ transform: `scaleX(${level})` }} />
+            </span>
+            <button type="button" onClick={() => test.current?.stop()}>
+              Stop
+            </button>
+          </>
+        ) : (
+          <button type="button" data-tip="Talk for up to 10 seconds, then hear it back" onClick={start}>
+            {got ? 'Try again' : 'Test the microphone'}
+          </button>
+        )}
+      </div>
+      {got && 'fail' in got && <p className="warn small">{got.fail}</p>}
+      {got && 'url' in got && (
+        <>
+          <audio className="mic-test-audio" src={got.url} controls autoPlay aria-label="What it recorded" />
+          {!got.heard ? (
+            <p className="warn small">Nothing heard: check the input device{got.device ? ` (${got.device})` : ''}</p>
+          ) : cloud ? (
+            <p className="small">{got.err ? <span className="warn">{got.err}</span> : got.text === undefined ? <span className="muted">Writing it down…</span> : got.text ? <>Heard: “{got.text}”</> : <span className="warn">The model wrote nothing: try again, closer to the microphone</span>}</p>
+          ) : (
+            <p className="muted small">
+              The microphone works{got.device ? ` (${got.device})` : ''}. macOS writes what you dictate: its languages and microphone are in System Settings › Keyboard › Dictation.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
   const [has, setHas] = useState<boolean>()
   useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])
@@ -102,6 +179,7 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
             ? 'Your recording goes to OpenRouter and the model you pick below, then is gone: Laki keeps neither the audio nor the text. Paid per minute of audio with your OpenRouter key, about $0.10 an hour with MAI-Transcribe 2.'
             : 'Free, and on this Mac where macOS can (System Settings › Keyboard › Dictation: its languages and microphone). Press Fn twice anywhere to start it. Cloud adds a choice of model and hold Fn to talk.'}
         </p>
+        <MicTest cloud={cloud} />
       </Group>
       {cloud && (
         <>
@@ -186,6 +264,18 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
             </div>
           </Group>
           <Group title="When you stop talking">
+            <label>
+              Stop after silence
+              <select value={SILENCES.some(s => s[0] === v.silence) ? v.silence : 0} onChange={e => onChange({ ...v, silence: Number(e.target.value) || undefined })}>
+                <option value={0}>Off</option>
+                {SILENCES.map(([s, says]) => (
+                  <option key={s} value={s}>
+                    {says}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted small">A recording with nothing heard that long ends by itself: what you said is typed, never sent. Off: it runs until you stop it, 5 minutes at most.</p>
             <div className="setting-box">
               <Switch className="switch-row" on={v.send === true} onChange={send => onChange({ ...v, send })}>
                 <Says title="Send as you stop talking" hint="Letting go of Fn sends what you said to the prompt box or the idle agent" />

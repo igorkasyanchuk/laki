@@ -2492,7 +2492,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   says *Locked*); Fn again stops it and types what you said, Esc drops it. A recording the mic button or a screenshot
   started stops at a press of Fn too. The bar shows how loud it hears you, says
   *I can't hear you: check the input* (with the microphone's name) after 3 seconds of nothing, and counts down the last
-  20 seconds before a recording stops by itself at 5 minutes. After it types into a field, the bar's *Undo* takes it
+  20 seconds before a recording stops by itself at 5 minutes. *Stop after silence* (off; 30 seconds, 1 minute or
+  2 minutes): a recording with nothing heard that long ends by itself, and what you said is typed, never sent (nothing
+  heard at all: dropped, and the bar says to check the input). *Test the microphone* (both engines): talk for up to
+  10 seconds with the level moving, then hear it played back; in the cloud *Heard: "…"* is what the speech model wrote,
+  and a silent recording says *Nothing heard: check the input device* with its name. After it types into a field, the bar's *Undo* takes it
   back. *Keep the last transcripts* (on): your last 10, in memory only (gone when Laki quits or Recording mode is on);
   ⌥Fn, *Earlier* on the bar or the mic's menu lists them, to type one again where your cursor is, copy it or send it to
   another agent. Set System Settings › Keyboard › *Press 🌐 key to* to *Do Nothing*, so macOS doesn't

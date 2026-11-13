@@ -345,7 +345,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   the talk pill's the same), `locked`, `ends` (`WARN_MS` before the cap: a countdown), `undo` after a field's insert
   (`execCommand('undo')`), and the history (`hist`: 10 transcripts in the window's memory, `settings.voice.history`,
   emptied by Recording mode; `VoiceHistory`: Insert, Copy, Send to… an agent's tab). Settings › Voice's
-  Hold Fn group shows on a Mac only. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
+  Hold Fn group shows on a Mac only. `voice.silence` (*Stop after silence*, seconds: talk.ts `SILENCES`, `silenceEnd` in
+  `meter`: the recording stopped as the cap does, typed and never sent, or dropped when nothing was heard). Settings'
+  *Test the microphone* (`MicTest`): voice.ts `micTest` (up to `TEST_MS`, the same meter), an `<audio>` of the blob,
+  `heardText` (`voiceText`) for the cloud. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
   `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused, it began asking meanwhile: copied, never typed there), a box
   with `data-voice-send` (PromptInput with `onSubmit`, Send later's) a synthetic ⌘⏎ keydown 50 ms after the
   `insertText` (its React state has the text by then); never a shell, another field, under `SHORT_MS`, or a stop of the `MAX_MS` cap's or the window's blur (`voiceStop`'s `only`: typed, not sent);

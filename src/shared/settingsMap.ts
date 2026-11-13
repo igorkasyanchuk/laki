@@ -168,6 +168,8 @@ export const FIND: [string, string, string?][] = [
   ['ai', 'Show its work', 'laki ai window open talk key say it command output tab shown result'],
   ['voice', 'Talk key', 'global hotkey talk agent voice mic microphone from any app pill press record send push to talk laki ai screenshot screen it goes to'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
+  ['voice', 'Test the microphone', 'mic test check input device level playback hear record speech model heard voice dictation'],
+  ['voice', 'Stop after silence', 'silence quiet auto stop end recording timeout 30 seconds minute voice dictation'],
   ['voice', 'Lock by double tap', 'double tap fn twice lock hands free keep listening toggle voice dictation'],
   ['voice', 'Keep the last transcripts', 'history earlier transcript again copy send undo recent voice dictation memory'],
   ['voice', 'Send as you stop talking', 'auto send submit enter release let go stop talking voice dictation agent prompt'],

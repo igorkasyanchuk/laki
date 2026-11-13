@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react'
 import type { TabView, VoiceSettings, WorkspaceView } from '../../shared/types'
 import { api, bridge } from './api'
 import { base64, wavOf, wsShown } from './text'
-import { FLAT, FN0, type FnDo, type FnState, fnStep, HOLD_MS, levelOf, QUIET_MS, quietSay, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
+import { FLAT, FN0, type FnDo, type FnState, fnStep, HOLD_MS, levelOf, QUIET_MS, quietSay, silenceEnd, VOICE_MAX_MS, VOICE_SHORT_MS } from '../../shared/talk'
 
 let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
@@ -71,7 +71,7 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
   rec = { stop: () => ((dropped = true), (rec = null), set({ phase: 'idle' })) }
   let stream: MediaStream
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    stream = await navigator.mediaDevices.getUserMedia(MIC)
   } catch (e) {
     if (dropped) return
     rec = null
@@ -114,7 +114,7 @@ export const voiceStop = (send = true, only = false) => rec?.stop(send, only)
 
 // Q6: the level meter while it listens (the bar's), and "I can't hear you" with the input's name after QUIET_MS of
 // nothing (gone as soon as it hears something); its stop. No AudioContext: it records all the same, no meter
-function meter(stream: MediaStream) {
+function meter(stream: MediaStream, onLevel?: (l: number) => void) {
   try {
     const ctx = new AudioContext()
     const an = ctx.createAnalyser()
@@ -123,13 +123,19 @@ function meter(stream: MediaStream) {
     const buf = new Uint8Array(an.fftSize)
     const device = stream.getAudioTracks()[0]?.label
     let loud = Date.now()
+    let heard = false
     const t = setInterval(() => {
       an.getByteTimeDomainData(buf)
       const l = levelOf(buf)
       level.set(l)
-      if (l >= FLAT) loud = Date.now()
+      onLevel?.(l)
+      if (l >= FLAT) (loud = Date.now()), (heard = true)
+      if (now.phase !== 'listening') return
+      // Stop after silence: typed, never sent (as the cap); nothing heard at all: dropped, and why
+      const end = silenceEnd(Date.now() - loud, settings.silence, heard)
+      if (end) return voiceStop(end === 'type', true), void (end === 'drop' && say(quietSay(device)))
       const quiet = Date.now() - loud >= QUIET_MS ? quietSay(device) : undefined
-      if (now.phase === 'listening' && quiet !== now.quiet) set({ ...now, quiet })
+      if (quiet !== now.quiet) set({ ...now, quiet })
     }, 80)
     return () => (clearInterval(t), level.set(0), void ctx.close().catch(() => {}))
   } catch {
@@ -137,14 +143,47 @@ function meter(stream: MediaStream) {
   }
 }
 
+// Settings › Voice's Test: the microphone for TEST_MS at most (stop ends it sooner), the level meter moving as it
+// records; then what it recorded, to play back, whether anything was heard and the input's name. heardText: what the
+// speech model writes of it (the cloud's)
+export const TEST_MS = 10000
+const MIC = { audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }
+export function micTest() {
+  let stop = () => {}
+  let stopped = false
+  const done = (async () => {
+    const stream = await navigator.mediaDevices.getUserMedia(MIC)
+    let peak = 0
+    const meterOff = meter(stream, l => (peak = Math.max(peak, l)))
+    try {
+      const r = new MediaRecorder(stream)
+      const chunks: Blob[] = []
+      r.ondataavailable = e => chunks.push(e.data)
+      const ended = new Promise<void>(ok => (r.onstop = () => ok()))
+      stop = () => void (r.state !== 'inactive' && r.stop())
+      const cap = setTimeout(stop, TEST_MS)
+      r.start()
+      if (stopped) stop() // Stop before the mic opened
+      await ended
+      clearTimeout(cap)
+      return { audio: new Blob(chunks, { type: r.mimeType }), heard: peak >= FLAT, device: stream.getAudioTracks()[0]?.label }
+    } finally {
+      meterOff()
+      stream.getTracks().forEach(t => t.stop())
+    }
+  })()
+  return { stop: () => ((stopped = true), stop()), done }
+}
+// a recording as the speech model takes it: decoding resamples to the context's rate, 16 kHz, its first channel
+const wavB64 = async (audio: Blob) => base64(wavOf((await new OfflineAudioContext(1, 1, RATE).decodeAudioData(await audio.arrayBuffer())).getChannelData(0), RATE))
+export const heardText = async (audio: Blob) => (await api.call<{ text: string }>('voiceText', { audio: await wavB64(audio) })).text
+
 // the write under way; Esc while it works makes it another's, so its text goes nowhere
 let writing = 0
 async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
   const mine = ++writing
   try {
-    // decoding resamples to the context's rate: 16 kHz, its first channel
-    const buf = await new OfflineAudioContext(1, 1, RATE).decodeAudioData(await audio.arrayBuffer())
-    const { text, fixed, fillers } = await api.call<{ text: string; fixed?: string[]; fillers?: number }>('voiceText', { audio: base64(wavOf(buf.getChannelData(0), RATE)) })
+    const { text, fixed, fillers } = await api.call<{ text: string; fixed?: string[]; fillers?: number }>('voiceText', { audio: await wavB64(audio) })
     if (mine !== writing) return
     set({ phase: 'idle' })
     if (text) remember(text)

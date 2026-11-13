@@ -142,4 +142,8 @@ export function levelOf(buf: ArrayLike<number>) {
   for (let i = 0; i < buf.length; i++) sum += (buf[i] - 128) ** 2
   return Math.min(1, (Math.sqrt(sum / (buf.length || 1)) * 3) / 100)
 }
+// Stop after silence (settings.voice.silence: seconds, one of SILENCES; unset: off): a recording with nothing heard that
+// long ends by itself: what was said before typed (never sent: nobody let go of a key), or dropped when it heard nothing
+export const SILENCES: [number, string][] = [[30, '30 seconds'], [60, '1 minute'], [120, '2 minutes']]
+export const silenceEnd = (quietMs: number, after: number | undefined, heard: boolean): 'type' | 'drop' | undefined => (after && SILENCES.some(s => s[0] === after) && quietMs >= after * 1000 ? (heard ? 'type' : 'drop') : undefined)
 export const quietSay = (device?: string) => `I can't hear you: check the input${device ? ` (${device})` : ''}`

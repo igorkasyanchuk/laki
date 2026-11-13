@@ -2893,7 +2893,9 @@ export function App() {
       if (!(await ask(`Revert ${prName(pr)}?`, { text: `${pr.title ?? ''}\nOpens a new ${pr.forge === 'gitlab' ? 'merge request' : 'pull request'} on ${forgeName(pr)} that undoes it. Nothing is merged until you merge that one.`.trim(), facts: prFacts(w), ok: 'Open the revert' }))) return
       const r = await call<{ pr: { number: number; url: string; title: string } }>('prAct', { ws: w.id, act }).catch(() => null)
       if (!r) return
-      if ((await choose(`Opened ${prNo({ ...pr, number: r.pr.number })}: ${r.pr.title}`, 'Open it as a workspace, to merge it or have an agent fix forward from there?', [{ label: 'Not now' }, { label: 'On the forge' }, { label: 'New workspace', primary: true }])) === 2) void call('wsNew', { project: w.project, pr: r.pr.url, preset: settings.agent ?? 'claude' }).catch(() => {})
+      const how = await choose(`Opened ${prNo({ ...pr, number: r.pr.number })}: ${r.pr.title}`, 'Open it as a workspace, to merge it or have an agent fix forward from there?', [{ label: 'Not now' }, { label: `Open on ${forgeName(pr)}` }, { label: 'New workspace', primary: true }])
+      if (how === 1) openExternal(r.pr.url)
+      else if (how === 2) void call('wsNew', { project: w.project, pr: r.pr.url, preset: settings.agent ?? 'claude' }).catch(() => {})
       return
     }
     if (act === 'merge') {

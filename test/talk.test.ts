@@ -152,6 +152,13 @@ test('Q6: Fn: held opens and its release inserts; two quick taps lock, the next 
 
 test('Q6: the level meter: silence 0, a tone in between, clipped at 1; the line when it hears nothing', async () => {
   const { levelOf, FLAT, quietSay } = await import('../src/shared/talk.ts')
+  // Stop after silence: only a time Settings offers, only once that long has been quiet; heard before: typed, else dropped
+  const { silenceEnd } = await import('../src/shared/talk.ts')
+  assert.equal(silenceEnd(29_999, 30, true), undefined)
+  assert.equal(silenceEnd(30_000, 30, true), 'type')
+  assert.equal(silenceEnd(120_000, 120, false), 'drop')
+  assert.equal(silenceEnd(600_000, undefined, true), undefined)
+  assert.equal(silenceEnd(600_000, 1, true), undefined, 'a time Settings never offered')
   assert.equal(levelOf(new Uint8Array(512).fill(128)), 0)
   const tone = Uint8Array.from({ length: 512 }, (_, i) => 128 + Math.round(10 * Math.sin(i / 4)))
   assert.ok(levelOf(tone) > FLAT && levelOf(tone) < 1)

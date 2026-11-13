@@ -3754,6 +3754,10 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 .remote-log-row { display: flex; gap: var(--sp-4); align-items: baseline; } .remote-log-row > :last-child { min-width: 0; overflow-wrap: anywhere; }
 /* Q6: the voice bar's level meter, its buttons, nothing heard; the last transcripts over it */
 .voice-level { flex: none; width: 36px; height: 4px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 14%, transparent); overflow: hidden; }
+.mic-test { display: flex; flex-direction: column; gap: var(--sp-3); }
+.mic-test-rec { color: var(--error); font-variant-numeric: tabular-nums; }
+.mic-test-level { width: 120px; }
+.mic-test-audio { width: 100%; max-width: 420px; height: 32px; }
 .voice-level > i { display: block; height: 100%; background: var(--error); transform-origin: left; transition: transform 80ms linear; }
 .voice-bar.quiet { border-color: var(--waiting); }
 .voice-bar button.link { flex: none; padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; box-shadow: none; }
