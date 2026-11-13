@@ -1082,6 +1082,12 @@ rail page (`listOff`: Board, Schedule, AI…) or a strip it's `data-away`: style
 `visibility: hidden`, not `display: none`, which restarted every CSS animation in it on the way back (`.sidebar`'s
 `m-row`, Needs you's `v-rise`, a waiting row's `b-lit`, the picked row's `v-sel`) and dropped its scroll.
 
+The page going is a view transition (ui.tsx `morph`): its picture, `::view-transition-old(page)`, is as wide as the page
+was, so a rail page's faded out over the sidebar's rows, already live under it. `morph` measures `.main`'s left edge
+before and after its change and sets `--vt-cut` on the root for the transition; styles.css clips the old picture by it,
+so it fades only over the main area. Seen frame by frame only in a focused Electron window (a preview pane draws none,
+and the UI walk turns `morph` off).
+
 ## A page's head turns to glass
 
 styles.css: `.settings-page` (ui.tsx `Page` and Settings) is `timeline-scope: --page`; its scroller (`> .page-body`, Settings'

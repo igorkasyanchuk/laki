@@ -3761,6 +3761,7 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 ::view-transition { pointer-events: none; }
 ::view-transition-group(*) { animation-duration: var(--t-mid); animation-timing-function: var(--ease-out); }
 ::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--t-mid); }
+::view-transition-old(page) { clip-path: inset(0 0 0 var(--vt-cut, 0px)); } /* a rail page going, the sidebar back: not over it (ui.tsx morph) */
 
 /* F7: a workspace's server on another's port block (shared/isolation.ts portClashes): a chip on both rows */
 .ws-clash { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; color: var(--waiting); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }

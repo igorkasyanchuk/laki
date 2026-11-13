@@ -67,13 +67,19 @@ export function morph(fn: () => void, grow?: 'open' | 'close') {
   if (grow === 'open') (grewFrom = from), name(from)
   if (back) name(sheetOf())
   let ran = false
+  // a page that covered the sidebar (Board, Schedule) going: its fading picture is cut to where the main area is after
+  // (styles.css --vt-cut), else its text and card faded out over the sidebar's rows, already back under it
+  const root = document.documentElement
+  const left = () => document.querySelector('.main')?.getBoundingClientRect().left ?? 0
+  const was = left()
   const t = document.startViewTransition(() => {
     ran = true
     clear()
     flushSync(fn)
     name(from ? sheetOf() : back)
+    root.style.setProperty('--vt-cut', `${Math.max(0, left() - was)}px`)
   })
-  void t.finished.finally(clear)
+  void t.finished.finally(() => (clear(), root.style.removeProperty('--vt-cut')))
   t.ready.catch(() => {}) // skipped: its ready rejects
   setTimeout(() => ran || t.skipTransition(), 400)
 }
