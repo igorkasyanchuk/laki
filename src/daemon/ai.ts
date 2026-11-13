@@ -505,14 +505,17 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     try {
       logCall(call)
     } catch {}
-    const next = t.queue?.splice(0) ?? []
-    changed(t)
-    if (next.length) {
-      // what was sent meanwhile, all of it as one ask; refused before it asked (Laki AI off, too many chats at work): said, not lost
-      const text = next.map(q => q.text).filter(Boolean).join('\n\n')
-      setImmediate(() => aiAsk({ chat: p.chat, text, images: next.flatMap(q => q.images), context: next.findLast(q => q.context)?.context }, rpc).catch(e => t.chat.findLast(m => m.role === 'user')?.text === text || say(t, 'error', `Not sent (${(e as Error).message}): ${text}`)))
-    }
+    drain(t, rpc)
   }
+}
+// what was sent while it worked (an ask, a Yes to several), all of it as one ask; refused before it asked (Laki AI off,
+// too many chats at work): said, not lost
+function drain(t: Thread, rpc: Rpc) {
+  const next = t.queue?.splice(0) ?? []
+  changed(t)
+  if (!next.length) return
+  const text = next.map(q => q.text).filter(Boolean).join('\n\n')
+  setImmediate(() => aiAsk({ chat: t.id, text, images: next.flatMap(q => q.images), context: next.findLast(q => q.context)?.context }, rpc).catch(e => t.chat.findLast(m => m.role === 'user')?.text === text || say(t, 'error', `Not sent (${(e as Error).message}): ${text}`)))
 }
 // a message waiting for the answer to end, taken back (the composer's ✕)
 export function aiUnqueue(p: { chat?: string; i: number; text?: string }) {
@@ -659,6 +662,7 @@ async function openrouter(o: Opts) {
   // the whole text each time (a 40 KB answer: ~8 MB to each window); deltas with a sequence if long answers drag
   let shown = 0
   const partial = (text: string) => Date.now() - shown >= 100 && ((shown = Date.now()), broadcast({ ev: 'ai', of: o.t.id, partial: text }))
+  let shot: object | undefined // the message with laki_screenshot's pictures, until a round has taken it
   for (let i = 0; ; i++) {
     const quiet = new AbortController()
     let timer: NodeJS.Timeout | undefined
@@ -674,9 +678,16 @@ async function openrouter(o: Opts) {
         signal: AbortSignal.any([o.signal, quiet.signal]),
       })
       j = await roundOf(res, partial, alive, at.name)
+    } catch (e) {
+      // a model that takes no pictures refuses the round laki_screenshot's came with: once more without them
+      if (!shot || o.signal.aborted) throw e
+      messages[messages.indexOf(shot)] = { role: 'user', content: `The screenshot didn't reach you (${at.name}: ${(e as Error).message.slice(0, 200)}): this model may take no pictures. The user sees it in the chat; tell them you can't see it with this model (Settings › AI has others).` }
+      shot = undefined
+      continue
     } finally {
       clearTimeout(timer)
     }
+    shot = undefined
     r.model = j.model || model
     r.in += j.usage?.prompt_tokens ?? 0
     r.out += j.usage?.completion_tokens ?? 0
@@ -706,7 +717,7 @@ async function openrouter(o: Opts) {
         return [] // gone, or over MAX_IMAGE: the chat has it, the model its path
       }
     })
-    if (pics.length) messages.push({ role: 'user', content: [{ type: 'text', text: 'The screenshot you took (the user sees it in the chat too):' }, ...pics] })
+    if (pics.length) messages.push((shot = { role: 'user', content: [{ type: 'text', text: 'The screenshot you took (the user sees it in the chat too):' }, ...pics] }))
   }
 }
 // one OpenRouter call with Settings › AI's key, no tools and no chat (a workflow's AI call block): its answer, logged
@@ -1065,6 +1076,8 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unkn
     const have = was.items ?? [{ id: was.id, label: itemOf(was, was.id)?.label ?? was.label, ...(was.text !== undefined && { text: was.text }) }]
     const more = (act!.items ?? [itemOf(act!, act!.id, act!.text)!]).filter(x => !have.some(h => h.id === x.id))
     const items = [...have, ...more].slice(0, AI_ITEMS)
+    const over = have.length + more.length - items.length
+    if (over) out.push(`${over} more than the ${AI_ITEMS} one question holds: ask about them once the user has answered`)
     if (items.length > 1) (was.items = items), delete was.text
     open.text = askText(was)
     open.ask.options = askOptions(was)
@@ -1139,18 +1152,31 @@ async function answerMany(t: Thread, m: AiMsg, n: number, only: unknown, rpc: Rp
   say(t, 'user', n === 0 && ticked.length < items.length ? `Yes, ${VERB(act)} ${ticked.length} of ${items.length}` : m.ask!.options[n])
   if (n !== 0) return say(t, 'ai', `Kept all ${items.length}.`), { kept: true }
   const done = DONE(act)
-  const v = act.kind === 'delete' ? await rpc<View>('state').catch(() => undefined) : undefined
-  for (const i of ticked) {
-    i.said = '…'
-    changed(t)
-    i.said = await doOne(act, i.id, i.text, rpc, v).then(() => done, e => `not ${done}: ${(e as Error).message}`)
+  // at work until the last one (50 may take minutes): the page's Stop ends it between two, the rest stay; no ask or new
+  // chat comes in between, and what's sent meanwhile waits as it would for an answer
+  let stopped = false
+  busy.set(t.id, () => (stopped = true))
+  try {
+    const v = act.kind === 'delete' ? await rpc<View>('state').catch(() => undefined) : undefined
+    for (const i of ticked) {
+      if (stopped) {
+        i.said = `not ${done}: stopped`
+        continue
+      }
+      i.said = '…'
+      changed(t)
+      i.said = await doOne(act, i.id, i.text, rpc, v).then(() => done, e => `not ${done}: ${(e as Error).message}`)
+    }
+    const ok = ticked.filter(i => i.said === done)
+    const no = ticked.filter(i => i.said !== done)
+    const kept = items.length - ticked.length
+    const Done = done[0].toUpperCase() + done.slice(1)
+    say(t, 'ai', [ok.length && `${Done} ${ok.length}: ${ok.map(i => i.label).join(', ')}.${act.kind === 'archive' ? ' Archived in the sidebar brings them back.' : ''}`, no.length && `${no.length} ${no.length === 1 ? 'is' : 'are'} still there:\n${no.map(i => `- ${i.label}: ${i.said}`).join('\n')}`, kept && `Kept ${kept}.`].filter(Boolean).join('\n\n'))
+    return { done: ok.length, failed: no.length, kept }
+  } finally {
+    busy.delete(t.id)
+    drain(t, rpc)
   }
-  const ok = ticked.filter(i => i.said === done)
-  const no = ticked.filter(i => i.said !== done)
-  const kept = items.length - ticked.length
-  const Done = done[0].toUpperCase() + done.slice(1)
-  say(t, 'ai', [ok.length && `${Done} ${ok.length}: ${ok.map(i => i.label).join(', ')}.${act.kind === 'archive' ? ' Archived in the sidebar brings them back.' : ''}`, no.length && `${no.length} ${no.length === 1 ? 'is' : 'are'} still there:\n${no.map(i => `- ${i.label}: ${i.said}`).join('\n')}`, kept && `Kept ${kept}.`].filter(Boolean).join('\n\n'))
-  return { done: ok.length, failed: no.length, kept }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -1386,20 +1412,27 @@ async function remove(a: AiAct, rpc: Rpc) {
 // a screenshot Laki AI takes while it works on an ask: the screen, an app's frontmost window by the app's name, or the
 // iOS Simulator; kept in images/, shown in the chat, and (OpenRouter, your endpoint) given to the model as a picture; a
 // CLI backend reads its path. The whole screen only when the user's last message asks to see it (or Your instructions
-// name the screen): never for something a tab's screen or a PR told it, never in an agent's chat
+// name the screen), an app's window when they name the app or ask to look: never for something a tab's screen or a PR
+// told it, never in an agent's chat. The simulator any time (laki_device has it)
 const SHOT_SAID = /screen|display|desktop|monitor|capture/
+const LOOK_SAID = /look|window|show me/
 // what the user asked for, in their own words: their last message in this chat and Your instructions. An agent's chat
 // has none (its "user" is that agent)
 const userSaid = (t: Thread) => (AGENT_CHAT.test(t.id) ? '' : `${t.chat.findLast(m => m.role === 'user')?.text ?? ''}\n${state.settings?.ai?.context ?? ''}`.toLowerCase())
 export async function aiShot(p: { of?: string; chat?: string }) {
   const t = asking(p.chat)
   const of = String(p.of ?? '').trim().slice(0, 80) || 'screen'
-  const whole = of.toLowerCase() === 'screen'
-  if (whole && !SHOT_SAID.test(userSaid(t))) throw new Error("not taken: Laki AI looks at the whole screen only when the user asks it to; an app's window by its name, or the simulator, any time")
+  const whole = /^(the |my |whole |entire |full |main )*(screen|display|desktop)$/i.test(of)
+  const sim = of.toLowerCase() === 'simulator'
+  const said = userSaid(t)
+  if (whole && !SHOT_SAID.test(said)) throw new Error('not taken: Laki AI looks at the whole screen only when the user asks it to. Ask them first (laki_ask, an option like "Look at my screen")')
+  if (!whole && !sim && !said.includes(of.toLowerCase()) && !SHOT_SAID.test(said) && !LOOK_SAID.test(said)) throw new Error(`not taken: the user didn't ask to look at ${of}. Ask them first (laki_ask, an option like "Look at ${of}")`)
   if (process.platform !== 'darwin') throw new Error('a screenshot: macOS only')
-  const r = whole ? { ...(await screenShot()), what: 'the screen' } : await device({ op: 'shot', ...(of.toLowerCase() !== 'simulator' && { app: of }) }).then(d => ({ path: (d as { path: string }).path, what: 'app' in (d as object) ? `${(d as { app: string }).app}${(d as { title?: string }).title ? `: ${(d as { title: string }).title}` : ''}` : `the simulator (${(d as { simulator?: string }).simulator ?? 'iOS'})` }))
+  // name: for the chat (Laki AI's own words there, and the next ask's history); a window's title is the page's or the
+  // file's own words, so only the tool's result has it
+  const r = whole ? { ...(await screenShot()), name: 'the screen', what: 'the screen' } : await device({ op: 'shot', ...(!sim && { app: of }) }).then(d => (name => ({ path: (d as { path: string }).path, name, what: `${name}${(d as { title?: string }).title ? `: ${(d as { title: string }).title}` : ''}` }))('app' in (d as object) ? (d as { app: string }).app : `the simulator (${(d as { simulator?: string }).simulator ?? 'iOS'})`))
   ;(t.shots ??= []).push(r.path)
-  say(t, 'ai', `Screenshot of ${r.what}.`, [r.path])
+  say(t, 'ai', `Screenshot of ${r.name}.`, [r.path])
   return { path: r.path, of: r.what, note: 'The user sees it in the chat. You get it as a picture after this result (a CLI agent: Read the path).' }
 }
 // an app on the Mac opened by its name, a web address in the browser (or in that app): only while Laki AI works on an
@@ -1411,13 +1444,17 @@ export async function aiOpenApp(p: { app?: string; url?: string; chat?: string }
   if (!app && !url) throw new Error('an app, a url, or both')
   if (app && !/^[\w][\w .&+'-]{0,59}$/.test(app)) throw new Error('an app by its name, as Applications has it (Safari, Xcode, Simulator)')
   if (url && !/^https?:\/\/[^\s"'<>]+$/i.test(url)) throw new Error('a web address: http or https')
-  // only a site the user named (or this Mac's own): text Laki AI read in a tab or a PR can't send it anywhere else
-  const host = url ? (URL.parse(url)?.hostname ?? '').toLowerCase().replace(/^www\./, '') : ''
-  if (url && !host) throw new Error('a web address: http or https')
-  if (host && !/^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/.test(host) && !userSaid(t).includes(host)) throw new Error(`not opened: the user didn't name ${host}. Give them the link to click, or ask them first (laki_ask)`)
+  // only a site the user named (or this Mac's own): text Laki AI read in a tab or a PR can't send it anywhere else. The
+  // address as node reads it is the one opened (href: macOS reads a \ or a user@ its own way), no user in it; the host
+  // whole among the hosts they wrote (t.co isn't in reddit.com)
+  const u = url ? URL.parse(url) : null
+  if (url && (!u?.hostname || u.username || u.password)) throw new Error('a web address: http or https, no user in it')
+  const host = (u?.hostname ?? '').toLowerCase().replace(/^www\./, '')
+  const named = (userSaid(t).match(/[a-z0-9-]+(?:\.[a-z0-9-]+)+/g) ?? []).map(h => h.replace(/^www\./, ''))
+  if (host && !/^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/.test(host) && !named.includes(host)) throw new Error(`not opened: the user didn't name ${host}. Give them the link to click, or ask them first (laki_ask)`)
   if (process.platform !== 'darwin') throw new Error('opening an app: macOS only')
-  await new Promise<void>((ok, no) => execFile('open', [...(app ? ['-a', app] : []), ...(url ? [url] : [])], { timeout: 15000 }, (e, _out, err) => (e ? no(new Error(`couldn't open ${app || url}: ${String(err || e.message).trim().split('\n').at(-1)}`)) : ok())))
-  return { opened: app || url, ...(app && url && { with: url }) }
+  await new Promise<void>((ok, no) => execFile('open', [...(app ? ['-a', app] : []), ...(u ? [u.href] : [])], { timeout: 15000 }, (e, _out, err) => (e ? no(new Error(`couldn't open ${app || url}: ${String(err || e.message).trim().split('\n').at(-1)}`)) : ok())))
+  return { opened: app || u!.href, ...(app && u && { with: u.href }) }
 }
 // Laki's own guide (docs/guide.md and features.md, in the app), the parts a question is about: how Laki works and where
 // things are, in its own words

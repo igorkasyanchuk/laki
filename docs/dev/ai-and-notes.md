@@ -43,24 +43,33 @@ Q14: several in one question, and more of the Mac.
   (`doOne`: a delete looks at `wsLose` again and refuses one with more of any kind to lose than shown, `loseParts`; less
   goes; archive is `archiveAct`), each item's `said` as it comes (`…` meanwhile; a daemon that ended in the middle:
   `thread` says *not done: Laki quit meanwhile* on the rest), then one answer (*Deleted 2: …*, the ones still there with why, *Kept n*).
+  The chat is at work (`busy`) until the last one: Stop (`aiStop`) ends it between two (*not deleted: stopped* on the
+  rest), no ask or new chat comes in between, and what's sent meanwhile waits and goes after (`drain`, aiAsk's too). A
+  merged question past `AI_ITEMS` says how many didn't fit.
 - A question with an `act` no longer closes at your next ask (`aiAnswer`'s "a newer ask came since" is for a pick that
   goes back to the model; Ai.tsx `openAsks`, the three chats'): each is checked against what's there at its Yes.
 - `laki_find`: `pr` (merged, open, closed, none, any); a filter and no words lists every match (`FIND_MAX` 50), a line
-  each past 12 (`agents` in words, no tabs) within its `max` 12000; `more` says what isn't listed exists.
+  each past 12 (`agents` in words, no tabs) within its `max` 12000; `more` says what isn't listed exists (and, past
+  `FIND_MAX`, that a narrower filter reaches it: no `last` does).
 - `laki_screenshot` (`aiShot`, only while an ask works, macOS): an app's window or the simulator through device.ts
   `device`, the whole main display (`screenShot`, `screencapture -x -m`) only when the user's last message asks to see
-  it (`SHOT_SAID` in `userSaid`: screen, display, desktop, monitor, capture) or Your instructions name it, never in an
-  agent's chat (its "user" is the agent); an agent's own call is its own chat's (main.ts, `FROM`); kept in `images/`, said in the chat with the picture (`Message`
-  draws an answer's `images`), and `openrouter` adds a user message with it after the round's tool results (`t.shots`).
+  it (`SHOT_SAID` in `userSaid`: screen, display, desktop, monitor, capture) or Your instructions name it (`of`: screen,
+  my screen, desktop…), an app's window only when they name that app or ask to look (`LOOK_SAID`: look, window, show
+  me; else the model asks first, `laki_ask`), the simulator any time; never in an
+  agent's chat (its "user" is the agent); an agent's own call is its own chat's (main.ts, `FROM`); `REMOTE_NO`, as `device` is (apps' windows; `aiOpenApp` too). Kept in `images/`, said in the chat with the picture (`Message`
+  draws an answer's `images`) by the app's name alone (its window's title, a page's own words, is only in the tool's
+  result), and `openrouter` adds a user message with it after the round's tool results (`t.shots`); a round refused
+  with it (a model that takes no pictures) goes once more with a line saying so in its place (`shot`).
   ponytail: a CLI backend gets the path (claude's Read asks for it outside its folder).
 - `laki_open_app` (`aiOpenApp`, only while an ask works, macOS): `open [-a <name>] [<http(s) url>]`, the name a plain
-  one, the address only of a site the user named (its host in `userSaid`) or localhost: what Laki AI read in a tab or a
-  PR can't send it elsewhere. `laki_script`: `run` (`runDev`: the dev tab, or test, lint, format, setup; never deploy,
+  one, the address only of a site the user named (its host whole among the hosts in `userSaid`: t.co isn't in
+  reddit.com) or localhost, no user in it, and opened as node read it (`href`): what Laki AI read in a tab or a
+  PR can't send it elsewhere. ponytail: a named site's own path and query are the model's. `laki_script`: `run` (`runDev`: the dev tab, or test, lint, format, setup; never deploy,
   which the app asks about first). `laki_restore`: the archived
   ones, or `wsRestore`.
 - `laki_help` (`aiHelp`): shared/help.ts `helpParts` cuts `docs/guide.md` and `docs/features.md` (in the app:
   package.json's `files`) into paragraphs and list items under their headings; `helpFind` ranks them by the question's
-  words (an item's bold lead most, then how thick), a long one cut to its sentences (`snip`), 7 KB at most. `SKILL`
+  words (two letters and up, a short one like PR or ⌘K matched whole; an item's bold lead most, then how thick), a long one cut to its sentences (`snip`), 7 KB at most. `SKILL`
   opens with how Laki is laid out (projects, workspaces, tabs, the path to a PR) and tells it to look there first.
   Tested in `test/help.test.ts` and `test/ai.test.ts`.
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions

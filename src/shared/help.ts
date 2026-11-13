@@ -1,10 +1,13 @@
 // Laki's own guide for Laki AI (laki_help): the guide cut into its paragraphs and list items (most of it is long lists
 // under few headings), each under its path of headings; the ones a question's words are in, best first. A word in an
 // item's bold lead (- **Groups**: …) counts most. Pure: test/help.test.ts.
-// ponytail: words only (a plural's s off, no synonyms); embeddings if "how do I undo" must find Rewind
+// ponytail: words only (a plural's s off, no synonyms; two letters and up, a short one whole); embeddings if "how do I undo" must find Rewind
 
-const SKIP = new Set(['the', 'and', 'for', 'how', 'can', 'what', 'where', 'does', 'with', 'you', 'your', 'from', 'that', 'this', 'are', 'its', 'not', 'laki', 'when', 'why', 'which', 'use', 'get', 'set', 'there', 'have', 'has', 'any', 'one', 'into', 'about', 'work', 'works', 'back', 'bring', 'make', 'want'])
-const wordsOf = (q: string) => [...new Set(q.toLowerCase().match(/[a-z0-9⌘⇧⌥⌃]+/g) ?? [])].map(w => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w)).filter(w => w.length > 2 && !SKIP.has(w))
+const SKIP = new Set(['the', 'and', 'for', 'how', 'can', 'what', 'where', 'does', 'with', 'you', 'your', 'from', 'that', 'this', 'are', 'its', 'not', 'laki', 'when', 'why', 'which', 'use', 'get', 'set', 'there', 'have', 'has', 'any', 'one', 'into', 'about', 'work', 'works', 'back', 'bring', 'make', 'want', 'is', 'to', 'of', 'in', 'on', 'it', 'do', 'my', 'an', 'or', 'as', 'at', 'be', 'by', 'if', 'me', 'no', 'so', 'up', 'we', 'us', 'am', 'go'])
+const wordsOf = (q: string) => [...new Set(q.toLowerCase().match(/[a-z0-9⌘⇧⌥⌃]+/g) ?? [])].map(w => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w)).filter(w => w.length > 1 && !SKIP.has(w))
+// a word where it's looked for: a short one (pr, ci, ai, ⌘k) whole, a longer one anywhere (a plural's, a compound's)
+const reOf = (w: string) => new RegExp(w.length > 2 ? w : `(?<![a-z0-9])${w}(?![a-z0-9])`, 'g')
+const hits = (s: string, re: RegExp) => s.match(re)?.length ?? 0
 
 export type HelpPart = { at: string; lead: string; text: string }
 // name: what the file is called in a part's path (Guide › Using it)
@@ -34,10 +37,10 @@ export function helpParts(md: string, name: string): HelpPart[] {
 const PART = 1400 // of one part
 // a long part (the guide has paragraphs of several thousand characters): the sentences with the words, each with the one
 // before it, in their order
-function snip(text: string, words: string[], size: number) {
+function snip(text: string, words: RegExp[], size: number) {
   if (text.length <= size) return text
   const ss = text.split(/(?<=[.;:])\s+/)
-  const has = ss.map(x => words.some(w => x.toLowerCase().includes(w)))
+  const has = ss.map(x => words.some(w => hits(x.toLowerCase(), w)))
   const out: string[] = []
   let n = 0
   let gap = false
@@ -48,14 +51,13 @@ function snip(text: string, words: string[], size: number) {
   return `${out.join(' ').slice(0, size)}${gap || n >= size ? ' …' : ''}`
 }
 export function helpFind(parts: HelpPart[], question: string, max = 7000) {
-  const words = wordsOf(question)
-  const hits = (s: string, w: string) => s.split(w).length - 1
+  const words = wordsOf(question).map(reOf)
   const scored = parts
     .map(p => {
       const [lead, head, body] = [p.lead, p.at, p.text].map(s => s.toLowerCase())
-      const found = words.filter(w => body.includes(w) || head.includes(w))
+      const found = words.filter(w => hits(body, w) || hits(head, w))
       // how many of the words, then where (its lead, its headings) and how thick in it: a long paragraph has every word once
-      return { p, n: found.length, score: words.reduce((n, w) => n + (lead.includes(w) ? 6 : 0) + (head.includes(w) ? 2 : 0), 0) + words.reduce((n, w) => n + Math.min(hits(body, w), 3), 0) / (1 + body.length / 1200) }
+      return { p, n: found.length, score: words.reduce((n, w) => n + (hits(lead, w) ? 6 : 0) + (hits(head, w) ? 2 : 0), 0) + words.reduce((n, w) => n + Math.min(hits(body, w), 3), 0) / (1 + body.length / 1200) }
     })
     .filter(x => x.n > 0)
     .sort((a, b) => b.n - a.n || b.score - a.score)

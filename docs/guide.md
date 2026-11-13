@@ -800,11 +800,11 @@ is left to its menu in the sidebar, which names them). *Delete it* asks the same
 (uncommitted files, commits not pushed). Several at once (*archive every workspace whose PR is merged*, *delete
 these three*) is one question: a list with a box for each (its PR and what a delete would lose beside it), *All* and
 *None*, and one *Yes, archive 4* for the ticked ones; each line then says what became of it (*archived*, *kept*, or why
-not: one with more to lose than the question said stays). Questions it acts on itself stay open until you answer them,
+not: one with more to lose than the question said stays); Stop ends a long one between two. Questions it acts on itself stay open until you answer them,
 in any order, also after you asked something else. *Bring back the login workspace* restores an archived one. It
 looks at what's on screen when you ask (*take a screenshot of the Simulator: does it look right?*, *look at my
-screen*): an app's window, the iOS Simulator or the whole screen, shown in the chat and read by the model (Laki needs
-Screen Recording for it). *Open Xcode*, *open github.com in Safari* opens an app or a web address (a site you named, or localhost; any
+screen*): the iOS Simulator, an app's window when you name the app or ask it to look, or the whole screen when you say
+screen, shown in the chat and read by the model (Laki needs Screen Recording for it; not from remote access). *Open Xcode*, *open github.com in Safari* opens an app or a web address (a site you named, or localhost; any
 other it gives you as a link, or asks first); *start the app in
 checkout* runs the project's run script there (test, lint, format and setup too; deploy stays yours: *Run ▾ › Deploy…*). And it answers how Laki
 works from this guide (*how do I get an archived workspace back?*, *what does Merge when green do?*). It moves the window when you ask: *show me the checkout session*, *open

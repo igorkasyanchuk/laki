@@ -19,7 +19,7 @@ test("help: the guide's paragraphs and list items under their headings; a word i
 
 test("help: Laki's real guide answers what people ask, within what a tool's result may be", () => {
   const parts = [...helpParts(readFileSync('docs/guide.md', 'utf8'), 'Guide'), ...helpParts(readFileSync('docs/features.md', 'utf8'), 'Features')]
-  for (const [q, has] of [['get an archived workspace back restore', /restore/i], ['merge when green', /merge when green/i], ['scheduled tasks every weekday', /schedul/i], ['remote access phone', /remote access/i]] as const) {
+  for (const [q, has] of [['get an archived workspace back restore', /restore/i], ['merge when green', /merge when green/i], ['scheduled tasks every weekday', /schedul/i], ['remote access phone', /remote access/i], ['what can I do with a PR', /\bPRs?\b/], ['what is ⌘K', /⌘K/]] as const) {
     const r = helpFind(parts, q)
     assert.ok(r.parts!.length >= 2 && r.parts!.some(p => has.test(p.text)), q)
     assert.ok(JSON.stringify(r).length < 9000, `${q}: ${JSON.stringify(r).length}`)
