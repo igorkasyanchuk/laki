@@ -1346,6 +1346,11 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal((await fetch(`http://127.0.0.1:${port}/worktree/${widgetKey}/${w.id}/docs/mail.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${wv.wtKey}/${w.id}/site/index.html`)).status, 401)
   rmSync(join(wv.path, 'docs'), { recursive: true })
+  // a Terminals workspace's folder is your home: no key for it, no page of it
+  const term = await rig.rpc('quickNew', { kind: 'shells' })
+  assert.equal((await rig.rpc('state')).workspaces.find((x: any) => x.id === term.id).wtKey, undefined)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/worktree/${wv.wtKey}/${term.id}/x.html`)).status, 401)
+  await rig.rpc('wsRm', { id: term.id }).catch(() => {})
   rmSync(join(dir, 'site'), { recursive: true })
   // a link an agent kept (a .url file): moved into the links file, in the view for the info panel, first in the
   // gallery (the app's: not a file); only http(s); one that isn't a link stays a file

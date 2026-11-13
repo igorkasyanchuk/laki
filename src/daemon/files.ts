@@ -643,10 +643,14 @@ export function artifactFile(id: string, rel: string) {
 }
 
 // a file of a workspace's worktree, for View as page (main.ts' GET /worktree/…: a changed HTML file and what it loads
-// beside it): its path, inside the worktree (links followed, none out of it), nothing of .git; never on a host
+// beside it): its path, inside the worktree (links followed, none out of it), nothing of .git; never on a host, and
+// never a Terminals or Browsers workspace's (pageable: its folder is your home, not a project's)
+export function pageable(ws: Workspace) {
+  return !ws.host && !state.projects.find(p => p.id === ws.project)?.kind
+}
 export function worktreeFile(id: string, rel: string) {
   const ws = findWs(id)
-  if (ws.host || rel.toLowerCase().split('/').includes('.git')) throw new Error('not a file of the worktree') // any case: macOS's volumes don't tell .GIT from .git
+  if (!pageable(ws) || rel.toLowerCase().split('/').includes('.git')) throw new Error('not a file of the worktree') // any case: macOS's volumes don't tell .GIT from .git
   return inside(ws, rel)
 }
 

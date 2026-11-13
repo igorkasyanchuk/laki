@@ -370,7 +370,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     const items: MenuItem[] = [
       ...(!all && !gone ? ([{ label: 'Show the file', icon: 'file', run: () => api.preview(p, l?.new) }, { label: 'Open in the editor', icon: 'code', run: () => api.openFile(p) }] as MenuItem[]) : []),
       ...(!all && !IMAGE.test(p) ? ([{ label: blamed.has(p) ? 'Hide blame' : 'Blame', icon: 'history', key: 'b', sub: "who last changed each line: the base's for lines taken out, the branch's for the rest", run: () => blame(p) }] as MenuItem[]) : []),
-      ...webItems(api, p, baseName, branch, l),
+      ...webItems(all ? { ...api, page: undefined } : api, p, baseName, branch, l), // a PR's file may not be this worktree's: no View as page
       null,
       { label: viewed(p) ? 'Not viewed' : 'Viewed', icon: 'eye', key: 'v', run: () => mark([p], !viewed(p)) },
       { label: pins.includes(p) ? 'Unpin' : 'Pin to the top', icon: 'pin', key: 'p', sub: pins.includes(p) ? undefined : 'first in both lists, kept on this Mac', run: () => pinGo(p) },

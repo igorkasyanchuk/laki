@@ -1051,10 +1051,11 @@ line, after the tab restarts.
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
 in its header and remembered; *Outline* (⌘⇧O while the preview has the keyboard) lists the rendered page's headings by
-level under *Go to heading…*: type to filter, ↑↓ and ⏎ to go there (a Markdown artifact's big view has it too). An HTML
+level under *Go to heading…*: type to filter, ↑↓ and ⏎ to go there (a Markdown artifact has it too, in its viewer and its big view). An HTML
 file's right click (Files, Changes, the Review tab) and the 🌐 on its row have *View as page*: the file as it is in the
 worktree now, in a sandboxed frame, with the CSS, scripts and pictures beside it (its scripts run and fetch nothing;
-*Source* shows its text, *Back* closes it). A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
+*Source* shows its text, *Reload* loads it again after a change to its CSS or script, *Back* closes it; a project's
+workspace only, not a Terminals one). A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
 row the head) or *Raw*: with the pencil, a click on a cell edits it (Enter: the cell below, Tab: the next, Esc: as it
 was), *+ Row*, *+ Column*, × on a row's number deletes it, ⌘S saves. Only the cells you change change in the file:
 its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest.
@@ -1800,7 +1801,7 @@ tab shows *Draft*); agents can't read it. A
 marked *Proposal*: what it suggests, not applied.
 
 A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh`, `shell`, `console`) *▷ Run*: a new
-shell tab opens in the workspace with the command typed, several lines as one paste, a `$ ` or `> ` prompt at a line's
+shell tab opens in the workspace with the command typed, several lines as one paste, a `$ ` prompt at a line's
 start left out (and, in a block with `$ ` lines, what the commands printed); nothing runs until you press ⏎ there.
 ⌥-click types it into the workspace's last shell tab at its prompt instead. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
 

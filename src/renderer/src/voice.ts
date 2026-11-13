@@ -131,7 +131,7 @@ function meter(stream: MediaStream, onLevel?: (l: number) => void) {
       level.set(l)
       onLevel?.(l)
       if (l >= FLAT) (loud = Date.now()), (heard = true)
-      if (now.phase !== 'listening') return
+      if (onLevel || now.phase !== 'listening') return // Settings' test: its own level only, a recording's state isn't its to set
       // Stop after silence: typed, never sent (as the cap); nothing heard at all: dropped, and why
       const end = silenceEnd(Date.now() - loud, settings.silence, heard)
       if (end) return void voiceStop(end === 'type', true, end === 'drop' ? quietSay(device) : undefined)

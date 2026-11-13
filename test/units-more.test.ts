@@ -573,8 +573,10 @@ test('F6: the Reader’s times (a message’s, a finished turn’s end, length a
   assert.equal(canRun('console', 'ok 12\n$ '), false, 'a prompt and no command')
   // what Run types: no prompts, a session's output left out, several lines kept
   assert.equal(runText('npm i\nnpm test\n\n'), 'npm i\nnpm test')
-  assert.equal(runText('$ npm i\n> --force\nadded 3 packages\n  $ npm test'), 'npm i\n--force\nnpm test')
-  assert.equal(runText('> echo a\necho $HOME'), 'echo a\necho $HOME')
+  assert.equal(runText('$ npm i \\\n> --force\nadded 3 packages\n  $ npm test'), 'npm i \\\n--force\nnpm test', "the shell's > before a continued line")
+  assert.equal(runText('$ npm run build\n> laki@1.0.0 build\n> tsc\n$ ls'), 'npm run build\nls', "npm's > lines are what it printed")
+  assert.equal(runText('> echo a\n\n> echo b'), 'echo a\n\necho b', 'a > prompt on every line')
+  assert.equal(runText('echo a\n> out.log\necho $HOME'), 'echo a\n> out.log\necho $HOME', 'a redirect, as written')
   assert.equal(runText('$ docker run \\\n    -p 80:80 img\nstarted\n$ ls'), 'docker run \\\n    -p 80:80 img\nls', 'a command over two lines, whole')
   for (const [lang, text] of [['ts', 'npm test'], [undefined, 'npm test'], ['sh', '  \n'], ['sh', 'echo a‮b'], ['zsh', 'rm ​-rf x'], ['shell', 'a\r\nb'], ['bash', 'x\x1b[201~y']] as const) assert.equal(canRun(lang, text), false, JSON.stringify([lang, text]))
   // the transcript's times on the lines; an answer's usage counted once per message id, onto the message that began the turn

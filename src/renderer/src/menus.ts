@@ -24,8 +24,8 @@ export function menusOf(app: AppBase) {
 
   // right click in Files: a file in its default app, a browser (for what they show), or any app (Finder reveals it,
   // a terminal opens its folder)
-  const fileMenu = (w: WorkspaceView, file: string, dir: boolean): MenuItem[] => [
-    ...(!dir && isPage(file) && artPage(w, file, true) ? [{ label: 'View as page', icon: 'globe', sub: 'as it is in the worktree now', run: () => setArtView({ ws: w.id, path: file, wt: true }) } as MenuItem] : []),
+  const fileMenu = (w: WorkspaceView, file: string, dir: boolean, page = true): MenuItem[] => [
+    ...(page && !dir && isPage(file) && artPage(w, file, true) ? [{ label: 'View as page', icon: 'globe', sub: 'as it is in the worktree now', run: () => setArtView({ ws: w.id, path: file, wt: true }) } as MenuItem] : []),
     { head: 'Open in' },
     ...(dir ? [] : [{ label: 'Default app', icon: 'file', key: 'o', run: () => openIn('default', { ws: w.id, file }) } as MenuItem]),
     ...(dir || w.host || !bridge?.quickLook ? [] : [{ label: 'Quick Look', icon: 'eye', hint: 'Space', run: () => bridge!.quickLook!(`${w.path}/${file}`) } as MenuItem]),
@@ -216,5 +216,5 @@ export function menusOf(app: AppBase) {
     // a head or a line with nothing of its own left under it goes too
     return kept.filter((i, n) => (i === null ? n > 0 && kept[n - 1] !== null && n < kept.length - 1 : 'head' in i ? !!kept[n + 1] && !('head' in kept[n + 1]!) : true))
   }
-  return { wsMenu: (w: WorkspaceView) => only(wsMenu(w), true), tabMenu: (ids: string[]) => only(tabMenu(ids)), fileMenu: (w: WorkspaceView, file: string, dir: boolean) => only(fileMenu(w, file, dir)), projectActions: (p: Project) => only(projectActions(p)), showItems: () => only(showItems()), canOverlap, checkOverlaps }
+  return { wsMenu: (w: WorkspaceView) => only(wsMenu(w), true), tabMenu: (ids: string[]) => only(tabMenu(ids)), fileMenu: (w: WorkspaceView, file: string, dir: boolean, page?: boolean) => only(fileMenu(w, file, dir, page)), projectActions: (p: Project) => only(projectActions(p)), showItems: () => only(showItems()), canOverlap, checkOverlaps }
 }

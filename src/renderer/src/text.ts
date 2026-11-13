@@ -882,16 +882,18 @@ export const turnFacts = (t: TurnLine, now = Date.now()) =>
 // zero-width ones, controls: what runs wouldn't be what's read; then Copy only)
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell', 'console'])
 export const canRun = (lang: string | undefined, text: string) => SHELLS.has((lang ?? '').toLowerCase()) && !!runText(text).trim() && !HIDDEN.test(text)
-// what Run types of a block: no `$ ` or `> ` prompt at a line's start (as GitHub's Copy leaves them out), no blank end;
-// a session's block (a `$ ` line and lines without one): the commands only, what they printed left out
-// (a command goes on while its line ends in a backslash). ponytail: a heredoc's body in a session's block reads as output
+// what Run types of a block: no prompt at a line's start (as GitHub's Copy leaves them out), no blank end. A session's
+// block (a `$ ` line and lines without one): its `$ ` lines only, what they printed left out, npm's `> name@1 build`
+// lines too; a command goes on while its line ends in a backslash (the shell's `> ` before the next one taken off).
+// No `$ ` line: as written (a line may start with a redirect, `> out.log`), unless every line has a `> ` prompt.
+// ponytail: a heredoc's body, or a line continued by a quote or a pipe, reads as output in a session's block
 export function runText(text: string) {
   const lines = text.replace(/\n+$/, '').split('\n')
-  const prompt = /^\s*[$>] /
-  const session = lines.some(l => /^\s*\$ /.test(l))
+  const cmd = /^\s*\$ /
+  const quoted = /^\s*> /
+  if (!lines.some(l => cmd.test(l))) return lines.every(l => !l.trim() || quoted.test(l)) ? lines.map(l => l.replace(quoted, '')).join('\n') : lines.join('\n')
   let more = false // the line before was a command ending in a backslash
-  const kept = lines.filter(l => ((keep => ((more = keep && l.endsWith('\\')), keep))(!session || more || prompt.test(l))))
-  return kept.map(l => l.replace(prompt, '')).join('\n')
+  return lines.flatMap(l => ((keep, cont) => ((more = keep && l.endsWith('\\')), keep ? [cont ? l.replace(/^> /, '') : l.replace(cmd, '')] : []))(more || cmd.test(l), more)).join('\n')
 }
 export const isPage = (path: string) => /\.html?$/i.test(path) // View as page: an HTML file
 export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {

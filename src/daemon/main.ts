@@ -472,7 +472,7 @@ const api: Record<string, Handler> = {
   hook: ({ key: _, ...p }) => core.hook(p), // hookWho's first
   worktreeList: p => core.worktreeList(p.project),
   worktreeImport: p => core.worktreeImport(p),
-  diff: p => (p.since === true ? reviewDiff(p) : filesMod.diff(p.ws, p.uncommitted === true, typeof p.since === 'string' ? p.since : undefined)), // since a sha: only what changed after that commit of the branch (Changes' Since) // uncommitted: against HEAD (Changes' and Review's Uncommitted); since: from your last review's mark (R11)
+  diff: p => (p.since === true ? reviewDiff(p) : filesMod.diff(p.ws, p.uncommitted === true, typeof p.since === 'string' ? p.since : undefined)), // uncommitted: against HEAD (Changes' and Review's Uncommitted); since true: from your last review's mark (R11), a sha: only what changed after that commit of the branch (Changes' Since)
   reviewMark: p => reviewMark(p), // R11: Since I reviewed's mark, the user's
   baseBranches: p => filesMod.baseBranches(p.ws), // Changes' base menu
   wsBase: p => filesMod.wsBase(p),

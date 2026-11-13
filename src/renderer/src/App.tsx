@@ -1996,7 +1996,7 @@ export function App() {
     floated: simFloated,
     unfloat: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id, false)),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
-    fileItems: path => fileMenu(w, path, false),
+    fileItems: path => fileMenu(w, path, false, false), // its menu has View as page already (webItems)
     look: bridge?.quickLook && !w.host ? (path, storage) => (storage ? w.storage : w.path) && bridge!.quickLook!(`${storage ? w.storage : w.path}/${path}`) : undefined, // host: SSH or a codespace, no file here
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
     page: artPage(w, 'x.html', true) ? path => setArtView({ ws: w.id, path, wt: true }) : undefined, // View as page: a changed HTML file

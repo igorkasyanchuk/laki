@@ -1975,15 +1975,18 @@ function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undef
 
 // stamp: its size and time, looked at every 1.5 s while it's open: a change (an agent writes it again) reads it again, a
 // page loads again
-// wt: View as page, a worktree's HTML file: said so, and Back instead of Close
+// wt: View as page, a worktree's HTML file: said so, Back instead of Close, and Reload (stamp is the HTML file's: a
+// change to its CSS or script alone loads nothing again). A Markdown one: Outline, its headings
 export function ArtifactView({ path, page, read, stamp, wt, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
   useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path, n])
   useChanged(stamp, path, 1500, () => setN(x => x + 1))
+  const [menu, openMenu] = useMenu()
   return (
     <Modal title={path} onClose={onClose} wide loose>
+      {menu}
       <div className="art-big">
         {html ? (
           page ? <iframe key={n} className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>
@@ -1999,6 +2002,8 @@ export function ArtifactView({ path, page, read, stamp, wt, onExternal, onFile, 
       </div>
       <div className="buttons">
         <span className="muted small grow">{wt ? 'The file as it is in the worktree now: a commit’s or the PR’s may differ. Sandboxed: its scripts run; it can’t read Laki or your files' : html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
+        {wt && <button onClick={() => setN(x => x + 1)} data-tip="Loads the page again: after a change to its CSS or script">Reload</button>}
+        {!html && typeof md === 'string' && <button data-tip="Go to heading…" onClick={e => openMenu(e, outlineItems(e.currentTarget.closest('.modal')))}>Outline</button>}
         {onSource && <button onClick={onSource} data-tip="Its text in the side panel's preview">Source</button>}
         {onReveal && <button onClick={onReveal}>Show in Finder</button>}
         {onExternal && <button onClick={onExternal}>Open in the browser</button>}

@@ -57,7 +57,7 @@
 - Reader view (F6: a line's `at`/`end` are its transcript lines' times, a `you`'s `cost` its turn's claude usage at API
   prices, counted once per message id (`chatOf`'s `spent`); text.ts `readerTimes` makes the small lines
   (`settings.readerTimes`, on unless false), `canRun` says which fenced block gets *▷ Run* (MarkdownView's `RunCode`,
-  `runText` what it types (no prompts); App's `readerApi.run`: `send` with `enter: false` into a new shell tab, ⌥ the last idle one; several lines wait in `typeInto` for the shell's bracketed paste, 2 s, once per terminal)). Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
+  `runText` what it types (a session's `$ ` lines without the prompt, what they printed left out, npm's `> ` lines too; no `$ ` line: as written, a `> ` taken off only when every line has one); App's `readerApi.run`: `send` with `enter: false` into a new shell tab, ⌥ the last idle one; several lines wait in `typeInto` for the shell's bracketed paste, 2 s, once per terminal)). Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
   `chatOf` as shares read, `v` moving with it, the newest 400; `{ none }` without a transcript): Reader.tsx over the
   pane's `Term` (still attached; its `active` off meanwhile), `readable` (claude, codex), asked every 1.5 s while shown;
   App's `readMode` (`laki.reader`: `reader` or `term` per tab, unset: `narrow`'s Reader), `.reader-switch`, the tab
