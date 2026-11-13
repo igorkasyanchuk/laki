@@ -20,6 +20,7 @@ type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; seenFrom?: numbe
 // what it can do, as you'd say it: a click puts it in the box
 const EXAMPLES = [
   'What are my agents doing? Anything waiting for me?',
+  'Archive every workspace whose PR is merged',
   'Review each PR in this screenshot in its own workspace with codex',
   'Start a code review of the PR with the login form',
   'Take the PR from workspace ABC and start a new codex session to review it',
@@ -143,10 +144,8 @@ export function AiPage({
   const cost = !settings.hideCost // Settings › AI's Show costs
   const skill = settings.skill !== false
   // a question's button: its pick goes on as the next ask (a removal: done on Yes, by Laki)
-  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { id, n }).catch(e => setErr(e.message)))
-  // the questions still open: none of yours after them (an older one's moment has passed)
-  const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
-  const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
+  const pick = (id: string, n: number, only?: string[]) => (setErr(''), api.call('aiAnswer', { id, n, only }).catch(e => setErr(e.message)))
+  const open = openAsks(d?.chat)
   const t = d?.totals
   const settingsLink = (label: string) =>
     onSettings ? (
@@ -288,7 +287,7 @@ export function AiPage({
                   ) : (
                     `${runs} · ${model}`
                   )}{' '}
-                  · {skill ? 'it removes only what you confirm; never archives, ships or merges' : 'it never archives, deletes, ships or merges'}
+                  · {skill ? 'it removes, archives or deletes only what you confirm; never ships or merges' : 'it never archives, deletes, ships or merges'}
                 </div>
               )}
             </div>
@@ -583,8 +582,19 @@ export function Thumbs({ paths }: { paths: string[] }) {
   )
 }
 
-export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number) => void }) {
-  const src = useMemo(() => link(m.text), [m.text, link])
+// the questions still open: none of yours after them (an older one's moment has passed), but one Laki acts on itself (a
+// removal, a run: ask.act) stays open until it's answered, so several are answered in any order
+export const openAsks = (chat?: AiMsg[]) => (last => new Set(chat?.flatMap((m, i) => (m.ask && (i > last || (m.ask.act && !m.ask.perm)) ? [m.ask.id] : []))))(chat ? chat.map(m => m.role).lastIndexOf('user') : -1)
+
+export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number, only?: string[]) => void }) {
+  // several in one question (ask.act.items): a box each, all ticked; the text's first paragraph is the question (its
+  // list, there for the model and the CLI, is drawn here as the boxes)
+  const items = m.ask?.act?.items
+  const src = useMemo(() => link(items ? m.text.split('\n\n')[0] : m.text), [m.text, link, !items])
+  const [off, setOff] = useState<Set<string>>(new Set()) // the ones unticked
+  const ticked = items?.filter(i => !off.has(i.id)) ?? []
+  const answered = m.ask?.picked !== undefined
+  const tick = (id: string, on: boolean) => setOff(s => (x => (on ? x.delete(id) : x.add(id), x))(new Set(s)))
   if (m.role === 'error') return <div className="ai-msg ai-error">{m.text}</div>
   if (m.role === 'user')
     return (
@@ -600,6 +610,37 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
       </span>
       <div className="ai-body">
         <Markdown src={src} chat />
+        {items && (
+          <>
+            {!answered && items.length > 3 && (
+              <div className="ai-items-head small muted">
+                {ticked.length} of {items.length} ticked
+                <button type="button" className="link small" disabled={busy || !off.size} onClick={() => setOff(new Set())}>
+                  All
+                </button>
+                <button type="button" className="link small" disabled={busy || !ticked.length} onClick={() => setOff(new Set(items.map(i => i.id)))}>
+                  None
+                </button>
+              </div>
+            )}
+            <div className="ai-items" role="group" aria-label="Which ones">
+              {items.map(i => (
+                <label key={i.id} className={`ai-item ${answered ? 'done' : ''}`}>
+                  <input type="checkbox" checked={answered ? i.said !== 'kept' : !off.has(i.id)} disabled={busy || answered} onChange={e => tick(i.id, e.target.checked)} />
+                  <span className="ai-item-name">
+                    {i.label}
+                    {(i.note || i.text) && <span className="muted small"> {[i.note, i.text && `loses ${i.text}`].filter(Boolean).join(' · ')}</span>}
+                  </span>
+                  {i.said && (
+                    <span className={`ai-item-said small ${i.said.startsWith('not ') ? 'warn' : i.said === 'kept' || i.said === '…' ? 'muted' : 'ok'}`} role={i.said.startsWith('not ') ? 'alert' : undefined}>
+                      {i.said === '…' ? 'working…' : i.said}
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
         {m.ask && (
           // its options: one pick, then they stay as they were picked
           <div className={`ai-options ${m.ask.looks ? 'looks' : ''}`} role="group" aria-label="Answer">
@@ -607,9 +648,9 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
               <button
                 key={o}
                 className={m.ask!.picked === o ? 'picked' : m.ask!.act && m.ask!.act.kind !== 'widget' && m.ask!.act.kind !== 'run' && m.ask!.act.kind !== 'profile' && n === 0 ? 'danger' : m.ask!.perm && n === 0 && m.ask!.picked === undefined ? 'primary' : ''}
-                disabled={(busy && !m.ask!.perm) || m.ask!.picked !== undefined} /* a tool its agent asks for: while it works */
+                disabled={(busy && !m.ask!.perm) || m.ask!.picked !== undefined || (!!items && n === 0 && !ticked.length)} /* a tool its agent asks for: while it works */
                 aria-pressed={m.ask!.picked === o}
-                onClick={() => onPick(m.ask!.id, n)}
+                onClick={() => onPick(m.ask!.id, n, items && n === 0 && off.size ? ticked.map(i => i.id) : undefined)}
               >
                 {(l =>
                   l && (
@@ -619,7 +660,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
                     </span>
                   ))(m.ask!.looks?.[n])}
                 <span className="ai-opt">
-                  {m.ask!.picked === o && <Icon name="check" size={11} />} {o}
+                  {m.ask!.picked === o && <Icon name="check" size={11} />} {items && n === 0 && !answered ? o.replace(/\d+$/, String(ticked.length)) : o}
                 </span>
               </button>
             ))}

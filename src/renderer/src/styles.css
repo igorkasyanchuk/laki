@@ -2143,6 +2143,18 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .ai-body > .md { padding: 0; } /* beside the mark: no inset of its own */
 .ai-body > .md > :first-child { margin-top: 0; }
 .ai-body > .md > :last-child { margin-bottom: 0; }
+/* several in one question (Q14): a box each, what became of each on its line after the Yes */
+.ai-items-head { display: flex; align-items: center; gap: var(--sp-4); margin-top: var(--sp-4); }
+.ai-items-head button.link { padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; box-shadow: none; }
+.ai-items-head button.link:disabled { color: var(--muted); cursor: default; }
+.ai-items { display: flex; flex-direction: column; margin-top: var(--sp-3); max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--sp-2); }
+.ai-item { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-s); cursor: pointer; }
+.ai-item:hover:not(.done) { background: var(--hover); }
+.ai-item.done { cursor: default; }
+.ai-item input { flex: none; align-self: center; width: auto; margin: 0; accent-color: var(--accent); }
+.ai-item-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ai-item-said { flex: none; max-width: 50%; text-align: right; }
+.ai-item-said.ok { color: var(--add); }
 /* a question's options (laki_ask, a removal's Yes / No): one pick, then the picked one stays lit */
 .ai-options { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: 10px; }
 .ai-options button { display: inline-flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-5); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel); color: var(--fg); font-size: var(--fs-3); }

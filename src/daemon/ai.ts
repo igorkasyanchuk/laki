@@ -10,10 +10,10 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
-import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { endpointOk, AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
+import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, modelCheck, presets, sessions, state } from './core.ts'
+import { broadcast, cliArgv, modelCheck, presets, prs, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
 import { execGroup, own } from './resources.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -1013,29 +1013,118 @@ function lookOf(v: unknown): AiLook | null {
 export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unknown[]; act?: AiAct; chat?: string }) {
   const t = asking(p.chat) // the chat whose ask is at work
   const ids = p.act?.kind === 'run' && Array.isArray(p.act.ids) ? [...new Set(p.act.ids.filter((x): x is string => typeof x === 'string' && !!x))].slice(0, 12) : [] // Q13: one command in several shells
-  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(ids.length > 1 && { ids }), ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }), ...(p.act.kind === 'delete' && { text: String(p.act.text ?? '').replace(/[^\w ,]/g, '').slice(0, 120) }) } : undefined
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(ids.length > 1 && { ids }), ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }), ...(p.act.kind === 'delete' && { text: loseText(p.act.text) }) } : undefined
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
+  const none = (a: { kind: AiAct['kind']; id: string }) => new Error(`no ${a.kind === 'widget' ? 'extension' : a.kind === 'archive' ? 'workspace (not archived)' : a.kind === 'delete' ? 'workspace' : a.kind} ${a.id}${a.kind === 'memory' ? ' in that project' : ''}`)
+  // several of one kind in one question (Q14): each named from Laki's own state, the same one once
+  if (act && MANY.includes(act.kind)) {
+    const given = (Array.isArray(p.act!.items) ? (p.act!.items as unknown[]) : []).filter((x): x is { id: string; text?: unknown } => !!x && typeof (x as { id?: unknown }).id === 'string' && !!(x as { id: string }).id)
+    const items = given.filter((x, i) => given.findIndex(y => y.id === x.id) === i).slice(0, AI_ITEMS).map(x => itemOf(act, x.id, x.text) ?? fail(none({ kind: act.kind, id: x.id })))
+    if (items.length > 1) (act.items = items), delete act.text
+    else if (items.length) (act.id = items[0].id), items[0].text !== undefined && (act.text = items[0].text)
+  }
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
-  if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind === 'archive' ? 'workspace (not archived)' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
+  if (act && !act.label) throw none(act)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
-  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : act.kind === 'archive' ? `Archive ${act.label}? Its agents and shells stop and its worktree goes; its branch and uncommitted changes are kept, and Archived in the sidebar brings it back.` : act.kind === 'delete' ? `Delete ${act.label} for good? Its agents and shells stop, and its worktree and branch are deleted${act.text ? `, with ${act.text}` : ''}: nothing brings it back. Archive keeps it instead.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  // a second ask of the same kind in this turn (a model that calls once per workspace): one question, its list longer
+  const at = t.chat.map(m => m.role).lastIndexOf('user')
+  const open = act && MANY.includes(act.kind) ? t.chat.find((m, i) => i > at && m.ask?.picked === undefined && m.ask?.act?.kind === act.kind && m.ask.act.project === act.project) : undefined
+  if (open?.ask?.act) {
+    const was = open.ask.act
+    const have = was.items ?? [{ id: was.id, label: itemOf(was, was.id)?.label ?? was.label, ...(was.text !== undefined && { text: was.text }) }]
+    const more = (act!.items ?? [itemOf(act!, act!.id, act!.text)!]).filter(x => !have.some(h => h.id === x.id))
+    const items = [...have, ...more].slice(0, AI_ITEMS)
+    if (items.length > 1) (was.items = items), delete was.text
+    open.text = askText(was)
+    open.ask.options = askOptions(was)
+    t.chat.splice(t.chat.indexOf(open), 1) // last again, under the tool calls that came since
+    t.chat.push(open)
+    open.at = t.at = Date.now()
+    t.asked = true
+    changed(t)
+    return { asked: open.ask.id, note: `Added to the question the user already has: one list of ${items.length}, a box each, one Yes. Next time give them all at once (ids). End your turn now, without more words.` }
+  }
+  const text = act ? (on ? turnOn(act, on.text) : askText(act)) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   // each option with its look (an extension's chat: how it would show), the same option once
   const given = (Array.isArray(p.options) ? p.options : []).map((o, i) => [String(o).trim().slice(0, 200), lookOf(Array.isArray(p.looks) ? p.looks[i] : undefined)] as const).filter(([o], i, all) => o && all.findIndex(x => x[0] === o) === i).slice(0, 6)
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : act.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : act.kind === 'delete' ? ['Yes, delete it', 'No, keep it'] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : askOptions(act)) : given.map(([o]) => o)
   if (options.length < 2) throw new Error('2 to 6 options')
   const looks = act || !given.some(([, l]) => l) ? undefined : given.map(([, l]) => l)
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? 'archives it, Laki does' : act.kind === 'delete' ? 'deletes it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees ${act.items ? `the ${act.items.length} listed, a box each, and ` : ''}Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? `archives ${act.items ? 'the ticked ones' : 'it'}, Laki does` : act.kind === 'delete' ? `deletes ${act.items ? 'the ticked ones' : 'it'}, Laki does` : `removes ${act.items ? 'the ticked ones' : 'it'}`} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+}
+// Q14: the kinds a question may list several of, a box each on the AI page (act.items)
+const MANY: AiAct['kind'][] = ['memory', 'schedule', 'tab', 'todo', 'archive', 'delete']
+const fail = (e: Error): never => {
+  throw e
+}
+// what a delete would lose, as the question says it: Laki's words only (digits, letters, commas)
+const loseText = (s: unknown) => String(s ?? '').replace(/[^\w ,]/g, '').slice(0, 120)
+// one of several: its name alone (whatOf's, out of its quotes), what a delete of it would lose
+function itemOf(a: AiAct, id: string, text?: unknown): AiItem | undefined {
+  const label = whatOf({ kind: a.kind, id, project: a.project, label: '' })
+  const pr = a.kind === 'archive' || a.kind === 'delete' ? prs.get(id) : undefined
+  return label ? { id, label: /“(.*)”$/s.exec(label)?.[1] ?? label, ...(pr && { note: `${pr.forge === 'gitlab' ? `MR !${pr.number}` : `PR #${pr.number}`} ${pr.state.toLowerCase()}` }), ...(a.kind === 'delete' && { text: loseText(text) }) } : undefined
+}
+const NOUN: Partial<Record<AiAct['kind'], string>> = { archive: 'workspaces', delete: 'workspaces', tab: 'tabs', todo: 'to-dos', schedule: 'scheduled tasks', memory: 'memories' }
+const VERB = (a: AiAct) => (a.kind === 'archive' ? 'archive' : a.kind === 'delete' ? 'delete' : 'remove')
+const DONE = (a: AiAct) => (a.kind === 'archive' ? 'archived' : a.kind === 'delete' ? 'deleted' : 'removed')
+// a removal's question and its buttons, for one or for several (the list in the text too: the model's history and the
+// CLI read it there; the AI page draws the boxes from act.items and shows the text's first paragraph)
+function askText(a: AiAct) {
+  if (a.kind === 'run') return runIn(a)
+  if (a.kind === 'profile') return profilesAsk(a)
+  if (!a.items) return a.kind === 'archive' ? `Archive ${a.label}? Its agents and shells stop and its worktree goes; its branch and uncommitted changes are kept, and Archived in the sidebar brings it back.` : a.kind === 'delete' ? `Delete ${a.label} for good? Its agents and shells stop, and its worktree and branch are deleted${a.text ? `, with ${a.text}` : ''}: nothing brings it back. Archive keeps it instead.` : `Remove ${a.label}?`
+  const n = `these ${a.items.length} ${NOUN[a.kind]}`
+  const head = a.kind === 'archive' ? `Archive ${n}? Their agents and shells stop and their worktrees go; their branches and uncommitted changes are kept, and Archived in the sidebar brings them back.` : a.kind === 'delete' ? `Delete ${n} for good? Their agents and shells stop, and their worktrees and branches are deleted: nothing brings them back. Archive keeps them instead.` : `Remove ${n}?`
+  return `${head}\n\n${a.items.map(i => `- ${i.label.replace(/\s+/g, ' ')}${i.note ? ` (${i.note})` : ''}${i.text ? `: loses ${i.text}` : ''}`).join('\n')}`
+}
+const askOptions = (a: AiAct) => (a.kind === 'run' ? ['Yes, run it', "No, don't"] : a.kind === 'profile' ? ['Yes, save them', "No, don't"] : a.items ? [`Yes, ${VERB(a)} ${a.items.length}`, 'No, keep them'] : a.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : a.kind === 'delete' ? ['Yes, delete it', 'No, keep it'] : [`Yes, remove ${a.label}`, 'No, keep it'])
+// one of them done at the user's Yes. A delete: what it would lose looked at again, and one with more to lose now than
+// the question said stays (an agent wrote since)
+async function doOne(a: AiAct, id: string, shown: string | undefined, rpc: Rpc) {
+  if (a.kind === 'delete') {
+    const now = loseText(await wsLose(rpc, id))
+    if (now && now !== (shown ?? '')) throw new Error(`it has ${now} now, not what you were shown: ask again`)
+    return rpc('wsRm', { id })
+  }
+  if (a.kind === 'archive') return archiveAct({ ...a, id }, rpc)
+  return remove({ ...a, id }, rpc)
+}
+// the Yes to several: the ticked ones (only: their ids; none given: all), one after another, each one's outcome on its
+// line as it comes, then one answer saying what became of them
+async function answerMany(t: Thread, m: AiMsg, n: number, only: unknown, rpc: Rpc) {
+  const act = m.ask!.act!
+  const items = act.items!
+  const ticked = n !== 0 ? [] : Array.isArray(only) ? items.filter(i => only.includes(i.id)) : items
+  if (n === 0 && !ticked.length) throw new Error('none ticked: tick the ones you mean, or pick No')
+  if (n === 0) m.ask!.options[0] = `Yes, ${VERB(act)} ${ticked.length}` // as picked: the ticked ones
+  m.ask!.picked = m.ask!.options[n]
+  for (const i of items) if (!ticked.includes(i)) i.said = 'kept'
+  say(t, 'user', n === 0 && ticked.length < items.length ? `Yes, ${VERB(act)} ${ticked.length} of ${items.length}` : m.ask!.options[n])
+  if (n !== 0) return say(t, 'ai', `Kept all ${items.length}.`), { kept: true }
+  const done = DONE(act)
+  for (const i of ticked) {
+    i.said = '…'
+    changed(t)
+    i.said = await doOne(act, i.id, i.text, rpc).then(() => done, e => `not ${done}: ${(e as Error).message}`)
+  }
+  const ok = ticked.filter(i => i.said === done)
+  const no = ticked.filter(i => i.said !== done)
+  const kept = items.length - ticked.length
+  const Done = done[0].toUpperCase() + done.slice(1)
+  say(t, 'ai', [ok.length && `${Done} ${ok.length}: ${ok.map(i => i.label).join(', ')}.${act.kind === 'archive' ? ' Archived in the sidebar brings them back.' : ''}`, no.length && `${no.length} ${no.length === 1 ? 'is' : 'are'} still there:\n${no.map(i => `- ${i.label}: ${i.said}`).join('\n')}`, kept && `Kept ${kept}.`].filter(Boolean).join('\n\n'))
+  return { done: ok.length, failed: no.length, kept }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
-export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc: Rpc) {
+export async function aiAnswer(p: { id: string; n: number; chat?: string; only?: string[] }, rpc: Rpc) {
   const t = thread(p.chat)
   const chat = t.chat
   const m = chat.find(m => m.ask?.id === p.id)
@@ -1048,7 +1137,10 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
     return { allowed: Number(p.n) < 2 }
   }
   if (t.ended) throw new Error('this chat ended: Continue it, or ask again') // a pick would start a new chat without the question
-  if (chat.slice(chat.indexOf(m) + 1).some(x => x.role === 'user')) throw new Error('a newer ask came since: ask again') // its context is gone
+  // a question whose pick goes back to the model: its context is gone once you asked something else. One Laki acts on
+  // itself (a removal, a run, an extension turned on) stays open: several of them are answered in any order, each
+  // checked against what's there now
+  if (!m.ask.act && chat.slice(chat.indexOf(m) + 1).some(x => x.role === 'user')) throw new Error('a newer ask came since: ask again')
   refuseBusy(t)
   const pick = m.ask.options[Number(p.n)]
   if (pick === undefined) throw new Error('no such option')
@@ -1058,6 +1150,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
     if (busy.has(t.id)) (m.ask.picked = pick), changed(t) // refused: the buttons stay, for another try
     return r
   }
+  if (act.items) return answerMany(t, m, Number(p.n), p.only, rpc)
   m.ask.picked = pick
   say(t, 'user', pick)
   const on = act.kind === 'widget'
@@ -1083,7 +1176,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
       return { ran: true }
     }
     if (act.kind === 'delete') {
-      await rpc('wsRm', { id: act.id })
+      await doOne(act, act.id, act.text, rpc)
       say(t, 'ai', `Deleted ${act.label}.`)
       return { deleted: true }
     }

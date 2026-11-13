@@ -622,6 +622,63 @@ test('ai: laki_ui moves the window; laki_find; laki_run in several shells; laki_
   await assert.rejects(tool('laki_open_in')({ app: 'finder' }), /a workspace or a project/)
 })
 
+// Q14: several in one question: laki_delete's and laki_archive's ids, a box each, one Yes for the ticked ones; a model
+// that asks once per workspace gets one question all the same; a question Laki acts on stays open after a later ask
+test('ai: several deleted or archived at one Yes: the ticked ones, each one’s outcome; one question for a call per workspace; answered in any order', async t => {
+  const calls = (...c: [string, object][]) => reply({ content: '', tool_calls: c.map(([name, args], i) => ({ id: `c${i}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })) })
+  const or = await openrouter(t, [])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const [a, b, c, d, e] = await Promise.all(['one', 'two', 'three', 'four', 'five'].map(name => rig.rpc('wsNew', { project: p.id, preset: 'shell', name })))
+  const has = async (id: string) => (w => !!w && !w.archived)((await rig.rpc('state')).workspaces.find((w: any) => w.id === id))
+  const last = async () => (await rig.rpc('aiState')).chat.at(-1)
+
+  // one call with ids: one question, each named by Laki with what it would lose; only the ticked ones go
+  writeFileSync(join(b.path, 'wip.txt'), 'x')
+  or.answers.push(calls(['laki_delete', { ids: [a.id, b.id, c.id, a.id] }]))
+  await rig.rpc('aiAsk', { text: 'delete one, two and three' })
+  const q = await last()
+  assert.match(q.text, /^Delete these 3 workspaces for good\? .+nothing brings them back\. Archive keeps them instead\.\n\n- one( \(PR #\d+ \w+\))?\n- two( \(PR #\d+ \w+\))?: loses 1 uncommitted file\n- three( \(PR #\d+ \w+\))?$/s) // its PR, once a scan has one
+  assert.deepEqual(q.ask.options, ['Yes, delete 3', 'No, keep them'])
+  assert.deepEqual(q.ask.act.items.map(({ note: _, ...i }: any) => i), [{ id: a.id, label: 'one', text: '' }, { id: b.id, label: 'two', text: '1 uncommitted file' }, { id: c.id, label: 'three', text: '' }])
+  await assert.rejects(rig.rpc('aiAnswer', { id: q.ask.id, n: 0, only: [] }), /none ticked/)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0, only: [a.id, b.id] }), { done: 2, failed: 0, kept: 1 })
+  assert.deepEqual([await has(a.id), await has(b.id), await has(c.id)], [false, false, true])
+  const chat = (await rig.rpc('aiState')).chat
+  assert.deepEqual(chat.at(-2).text, 'Yes, delete 2 of 3')
+  assert.equal(chat.at(-1).text, 'Deleted 2: one, two.\n\nKept 1.')
+  assert.deepEqual(chat.find((m: any) => m.ask?.id === q.ask.id).ask.act.items.map((i: any) => i.said), ['deleted', 'deleted', 'kept'])
+  await assert.rejects(rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), /answered already/)
+
+  // a call per workspace in one turn: still one question, its list longer; No keeps them all
+  or.answers.push(calls(['laki_archive', { id: c.id }], ['laki_archive', { id: d.id }], ['laki_archive', { id: c.id }]))
+  await rig.rpc('aiAsk', { text: 'archive three and four' })
+  const m = await last()
+  assert.match(m.text, /^Archive these 2 workspaces\? .+\n\n- three( \(PR #\d+ \w+\))?\n- four( \(PR #\d+ \w+\))?$/s)
+  assert.deepEqual(m.ask.options, ['Yes, archive 2', 'No, keep them'])
+  assert.equal((await rig.rpc('aiState')).chat.filter((x: any) => x.ask?.picked === undefined && x.ask?.act).length, 1, 'one question, not three')
+
+  // another ask meanwhile, a question of its own: the earlier one is still answered, each in any order
+  or.answers.push(calls(['laki_delete', { ids: [d.id, e.id] }]))
+  await rig.rpc('aiAsk', { text: 'no wait: delete four and five' })
+  const del = await last()
+  writeFileSync(join(e.path, 'late.txt'), 'x') // written after the question: more to lose than it said
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: del.ask.id, n: 0 }), { done: 1, failed: 1, kept: 0 })
+  assert.deepEqual([await has(d.id), await has(e.id)], [false, true])
+  assert.match((await last()).text, /^Deleted 1: four\.\n\n1 is still there:\n- five: not deleted: it has 1 uncommitted file now, not what you were shown: ask again$/)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: m.ask.id, n: 0 }), { done: 1, failed: 1, kept: 0 }, 'the archive asked before it: three archived, four is gone')
+  assert.equal(await has(c.id), false)
+  assert.match((await last()).text, /^Archived 1: three\. Archived in the sidebar brings them back\.\n\n1 is still there:\n- four: not archived: /)
+  // a question whose pick goes back to the model still closes with the next ask
+  or.answers.push(calls(['laki_ask', { question: 'Which?', options: ['A', 'B'] }]), reply({ content: 'ok' }))
+  await rig.rpc('aiAsk', { text: 'pick one' })
+  const which = await last()
+  await rig.rpc('aiAsk', { text: 'never mind' })
+  await assert.rejects(rig.rpc('aiAnswer', { id: which.ask.id, n: 0 }), /a newer ask came since/)
+})
+
 test('ai: findSessions ranks by name, then branch and the rest; filters; says when two fit about as well', () => {
   const s: any = {
     projects: [{ id: 'p1', name: 'Shop' }, { id: 'p2', name: 'Site' }],
@@ -640,6 +697,16 @@ test('ai: findSessions ranks by name, then branch and the rest; filters; says wh
   assert.deepEqual(findSessions(s, { agent: 'codex' }).sessions.map((x: any) => x.id), ['w2'])
   assert.deepEqual(findSessions(s, { query: 'headr' }).sessions.map((x: any) => x.id), ['w3', 'w2'], 'a letter off; its last answer counts least')
   assert.match(findSessions(s, { query: 'laki' }).unsure ?? '', /ask the user which/)
+  // Q14: by its PR's state; a filter and no words lists every one that fits (a line each past 12), and what isn't
+  // listed is said to exist
+  const many: any = { projects: s.projects, tabs: [{ id: 'ta', workspace: 'm1', name: 'claude', kind: 'agent', agent: 'claude', status: 'idle' }], workspaces: Array.from({ length: 60 }, (_, i) => ({ id: `m${i}`, name: `ws ${i}`, project: 'p1', created: '2026-11-10 09:00', pr: i < 55 ? { number: i, title: `PR ${i}`, state: i % 2 ? 'MERGED' : 'OPEN' } : undefined })) }
+  const merged = findSessions(many, { pr: 'merged' })
+  assert.deepEqual([merged.found, merged.sessions.length, merged.more], [27, 27, undefined], 'all 27, not the first 10')
+  assert.deepEqual(merged.sessions.find((x: any) => x.id === 'm1'), { id: 'm1', name: 'ws 1', project: 'Shop', group: undefined, branch: undefined, created: '2026-11-10 09:00', active: undefined, pr: { number: 1, title: 'PR 1', state: 'MERGED' }, agents: 'claude idle' })
+  assert.deepEqual([findSessions(many, { pr: 'none' }).found, findSessions(many, { pr: 'any' }).found, findSessions(many, { pr: 'open' }).found], [5, 55, 28])
+  assert.match(findSessions(many, { pr: 'any' }).more ?? '', /^5 more fit and are not listed here \(they exist\): last: 50 lists them$/)
+  assert.match(findSessions(many, {}).more ?? '', /^50 more fit/)
+  assert.ok(JSON.stringify(findSessions(many, { pr: 'any' })).length < 12000, 'what the model may read of it')
 })
 
 test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {

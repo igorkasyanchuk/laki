@@ -867,7 +867,12 @@ export type AiAsk = { id: string; options: string[]; looks?: (AiLook | null)[]; 
 export type AiLook = { ui: Record<string, unknown>; data?: unknown; size?: [number, number] }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
 export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile', 'archive', 'delete'] as const // widget: turning an extension on; run: a command in a shell (id: its tab; ids: more shells, Q13); profile: agent profiles saved (text: them as JSON); archive, delete: a workspace archived (Q12) or deleted for good (Q13; text: what it would lose, Laki's words), id: its id; the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; ids?: string[]; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
+// several in one question (a removal, an archive, a delete of each): a box each on the AI page, the Yes takes the ticked
+// ones; note: a workspace's PR and its state; text: what a delete would lose; said: what became of it after the pick
+// (done, kept, or why not; … while it's being done)
+export type AiItem = { id: string; label: string; note?: string; text?: string; said?: string }
+export const AI_ITEMS = 50
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; ids?: string[]; items?: AiItem[]; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string } // cachedIn: of in, the tokens read from the provider's prompt cache (A3)

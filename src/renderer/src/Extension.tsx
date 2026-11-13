@@ -14,7 +14,7 @@ import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
 import type { UiProblem } from '../../shared/widgetUi'
-import { BACKENDS, Message, Tools, turns } from './Ai'
+import { BACKENDS, Message, openAsks, Tools, turns } from './Ai'
 import { api as daemon, bridge } from './api'
 import type { DeskAsk } from './Desk'
 import { highlight } from './highlight'
@@ -289,9 +289,8 @@ function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: strin
     setImages([])
     void go(sent.text, sent.images.map(i => i.path)).then(ok => ok || (setText(sent.text), setImages(sent.images)))
   }
-  const pick = (id: string, n: number) => daemon.call('aiAnswer', { id, n, chat }).catch(() => {})
-  const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
-  const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
+  const pick = (id: string, n: number, only?: string[]) => daemon.call('aiAnswer', { id, n, chat, only }).catch(() => {})
+  const open = openAsks(d?.chat)
   const groups = d ? turns(d.chat) : []
   const backend = ai.backend ?? 'openrouter'
   const hello = !w

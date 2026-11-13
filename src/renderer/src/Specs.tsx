@@ -10,7 +10,7 @@ import { memo, type MouseEvent, useEffect, useMemo, useRef, useState } from 'rea
 import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planRef } from '../../shared/plans'
 import { type AiMsg, PLAN_KINDS, type Plan, type PlanFile, type PlanKind, type PlanTemplate, type Project } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { Message, Tools, turns } from './Ai'
+import { Message, openAsks, Tools, turns } from './Ai'
 import { api as daemon, bridge, daemonBase } from './api'
 import { DiagramView } from './diagram'
 import { Markdown } from './MarkdownView'
@@ -480,9 +480,8 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
     setImages([])
     void ask(sent.text, sent.images.map(i => i.path)).then(ok => ok || (setText(sent.text), setImages(sent.images)))
   }
-  const pick = (id: string, n: number) => api.call('aiAnswer', { id, n, chat }).catch(e => setOops(e.message))
-  const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
-  const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
+  const pick = (id: string, n: number, only?: string[]) => api.call('aiAnswer', { id, n, chat, only }).catch(e => setOops(e.message))
+  const open = openAsks(d?.chat)
   const say = err || oops
   // the thread drawn again only as it changes, not at each key typed in the box (every message's Markdown parsed)
   const shown = useMemo(
