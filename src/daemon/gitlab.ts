@@ -90,7 +90,8 @@ export function glabAct(ws: Workspace, pr: PR, act: 'approve' | 'close' | 'merge
   return glab(ws, args, 60000).catch(e => Promise.reject(new Error(glabSays(e, `MR !${iid}`))))
 }
 // a merged MR undone: its merge (or squash) commit reverted onto a new branch off the target (the commits API: GitLab
-// makes the revert commit), then an MR from it; a revert GitLab can't make (it conflicts) takes the branch off again
+// makes the revert commit), then an MR from it; a revert GitLab can't make (it conflicts), or an MR that didn't open,
+// takes the branch off again
 export async function glabRevert(ws: Workspace, pr: PR, title: string) {
   const says = (e: unknown) => Promise.reject(new Error(glabSays(e, `MR !${pr.number}`)))
   const j = JSON.parse(await glab(ws, ['mr', 'view', String(pr.number), '--output', 'json'], 20000).catch(says))
@@ -98,11 +99,9 @@ export async function glabRevert(ws: Workspace, pr: PR, title: string) {
   if (!/^[0-9a-f]{7,64}$/.test(sha)) throw new Error(`MR !${pr.number} has no merge commit to revert (a fast-forward merge of several commits: revert them by hand)`)
   const branch = `revert-${sha.slice(0, 8)}`
   await glab(ws, ['api', '-X', 'POST', 'projects/:id/repository/branches', '-f', `branch=${branch}`, '-f', `ref=${j.target_branch}`]).catch(says)
-  await glab(ws, ['api', '-X', 'POST', `projects/:id/repository/commits/${sha}/revert`, '-f', `branch=${branch}`], 60000).catch(async e => {
-    await glab(ws, ['api', '-X', 'DELETE', `projects/:id/repository/branches/${branch}`]).catch(() => {})
-    return says(e)
-  })
-  const out = await glab(ws, ['mr', 'create', '--source-branch', branch, '--target-branch', String(j.target_branch), '--title', title, '--description', `Reverts !${pr.number}`, '--yes'], 60000).catch(says)
+  const undo = async (e: unknown) => (await glab(ws, ['api', '-X', 'DELETE', `projects/:id/repository/branches/${branch}`]).catch(() => {}), says(e)) // a retry starts clean
+  await glab(ws, ['api', '-X', 'POST', `projects/:id/repository/commits/${sha}/revert`, '-f', `branch=${branch}`], 60000).catch(undo)
+  const out = await glab(ws, ['mr', 'create', '--source-branch', branch, '--target-branch', String(j.target_branch), '--title', title, '--description', `Reverts !${pr.number}`, '--yes'], 60000).catch(undo)
   const url = /https?:\/\/\S+\/merge_requests\/(\d+)/.exec(out)
   if (!url) throw new Error(`MR !${pr.number}: glab opened no merge request for ${branch}`)
   return { number: Number(url[1]), url: url[0], title }

@@ -934,7 +934,8 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge' 
 
 // a merged PR undone: a new PR that reverts it, opened on the forge, nothing changed here. GitHub: its own Revert
 // (revertPullRequest: a merge commit, a squash or a rebase alike, onto a branch of GitHub's naming), by gh as you; when
-// GitHub can't (the revert conflicts), its words. GitLab: gitlab.ts' glabRevert. The answer: the new PR, for a
+// GitHub can't (the revert conflicts), its words (ponytail: no workspace opened on the conflict for an agent to
+// resolve; a rebase merge of several commits is GitHub's to revert or refuse). GitLab: gitlab.ts' glabRevert. The answer: the new PR, for a
 // workspace of its own (wsNew's pr)
 const REVERT = 'mutation($id: ID!, $title: String!) { revertPullRequest(input: { pullRequestId: $id, title: $title }) { revertPullRequest { number url title } } }'
 async function prRevert(ws: Workspace, pr: PR): Promise<{ pr: { number: number; url: string; title: string } }> {

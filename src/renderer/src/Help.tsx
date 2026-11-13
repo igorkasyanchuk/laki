@@ -42,6 +42,7 @@ const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
     [k('files'), 'find a file in the workspace'],
     [k('find'), 'find in the terminal or a diff (here: the filter)'],
     ['⌘S', "save the file you're editing in the preview"],
+    ['⌘⇧O', "a Markdown file's outline in the preview (Go to heading…)"],
     ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
     ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes: a GitHub PR or issue shows its card, a picture's path or link the picture"],
     ['select · Reply', "in a terminal: the pill under the selected text quotes it to that tab's agent (not in a plain shell) with your words; ⏎ puts both in its prompt, ⌘⏎ sends them"],

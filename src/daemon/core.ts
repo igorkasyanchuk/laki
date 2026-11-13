@@ -3859,12 +3859,17 @@ const typing = new WeakMap<Session, Promise<void>>()
 // no escapes (a \x1b[201~ in it would end the paste and type the rest as keys), nor other controls (a CI log's
 // ⌃C or ⌃D would be keys to the agent): only tab and newline stay
 export const noKeys = (t: string) => t.replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
+const noPaste = new WeakSet<Session>()
 export function typeInto(s: Session, text: string | Promise<string>, enter = true) {
   const next = (typing.get(s) ?? Promise.resolve()).then(async () => {
     const t = noKeys(await text)
     // several lines left at a prompt (the Reader's Run): a shell that just started turns bracketed paste on with its
     // first prompt, so they wait for it (2 s at most), else they'd land as one line
-    if (!enter && /[\r\n]/.test(t)) for (let i = 0; i < 40 && !s.term.modes.bracketedPasteMode && !s.exited; i++) await new Promise(r => setTimeout(r, 50))
+    // (once per terminal: one that never turned it on, bash 3.2 or sh, isn't waited for again)
+    if (!enter && /[\r\n]/.test(t) && !noPaste.has(s)) {
+      for (let i = 0; i < 40 && !s.term.modes.bracketedPasteMode && !s.exited; i++) await new Promise(r => setTimeout(r, 50))
+      if (!s.term.modes.bracketedPasteMode) noPaste.add(s)
+    }
     await new Promise<void>(done => {
       s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
       if (!enter) return done()

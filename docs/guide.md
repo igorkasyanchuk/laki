@@ -1122,8 +1122,8 @@ notifies you. The workspace stays (*Archive workspace when its PR merges* still 
 
 A merged PR's menus (the status bar PR's right click, ⋯ in the panel, ⌘K) have *Revert…*: after you confirm, a new PR
 *Revert "<title>"* is opened that undoes it (GitHub's own revert, by `gh`; GitLab: the merge commit reverted onto a
-`revert-<sha>` branch, then an MR), and Laki offers it as a new workspace, to merge it or have an agent fix forward. A
-revert that conflicts is refused with the forge's words.
+`revert-<sha>` branch, then an MR), and Laki offers it as a new workspace (a GitHub PR), to merge it or have an agent fix forward. A
+revert that conflicts is refused, in GitHub's or GitLab's own words.
 
 Each project says which of these Laki may do (its settings › *Pull requests*): *Merge*, *Approve*, *Close* and *Revert* are on
 until you turn them off; *Merge when green* is off until you turn it on. What's off isn't shown, and the daemon

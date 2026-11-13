@@ -274,12 +274,15 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
 
 // GET /worktree/<key>/<ws>/<path>: the same for a file of the workspace's worktree (View as page: a changed HTML file,
 // its relative CSS, scripts and pictures), under a key of its own. No connect-src at all: a page at the worktree's root
-// would have the whole of it as "its own folder", so its scripts fetch nothing (what it loads by a tag still loads)
+// would have the whole of it as "its own folder", so its scripts fetch nothing (what it loads by a tag still loads), and
+// no CORS for its JSON (a JSON module would read any of the worktree's). Only at this Mac's own address: never through
+// remote access's tunnel, where the key in the path is all that would guard the source
 const ART_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:"
 function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/(?:artifact|worktree)\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
   const wt = path.startsWith('/worktree/')
+  if (wt && host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return no(404, 'not there')
   if (!m || !urlKeyOk(m[1], `${wt ? 'worktree' : 'artifact'}:${m[2]}`)) return no(401, 'bad key') // that workspace's key only
   let body: Buffer
   let file: string
@@ -298,7 +301,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
     'cache-control': 'no-store',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
-    ...(origin === 'null' && !/^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': 'null' }), // its page's module scripts and fonts: CORS loads, from its opaque origin (sandboxed: Origin null)
+    ...(origin === 'null' && !(wt ? /^(text\/html|application\/json)/ : /^text\/html/).test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': 'null' }), // its page's module scripts and fonts: CORS loads, from its opaque origin (sandboxed: Origin null)
   })
   res.end(body)
 }

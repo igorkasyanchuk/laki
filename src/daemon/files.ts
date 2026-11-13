@@ -113,7 +113,7 @@ export async function diff(ref: string, uncommitted?: boolean, since?: string) {
     files.push({ path: f, add: d.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).length, del: 0, status: 'A' })
   }
   const MAX = 4 << 20
-  return { base: since ? since.slice(0, 7) : ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
+  return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
 }
 const CUT = '\n… (cut)'
 
@@ -646,7 +646,7 @@ export function artifactFile(id: string, rel: string) {
 // beside it): its path, inside the worktree (links followed, none out of it), nothing of .git; never on a host
 export function worktreeFile(id: string, rel: string) {
   const ws = findWs(id)
-  if (ws.host || rel.split('/').includes('.git')) throw new Error('not a file of the worktree')
+  if (ws.host || rel.toLowerCase().split('/').includes('.git')) throw new Error('not a file of the worktree') // any case: macOS's volumes don't tell .GIT from .git
   return inside(ws, rel)
 }
 

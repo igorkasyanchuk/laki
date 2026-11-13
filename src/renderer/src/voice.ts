@@ -56,7 +56,7 @@ export async function voiceSendTo(tab: string, t: string) {
   say(why ? `Not sent: ${why}` : `Sent to ${voiceAgents().find(a => a.id === tab)?.name ?? 'the agent'}`)
 }
 
-let rec: { stop: (send: boolean, only?: boolean) => void } | null = null
+let rec: { stop: (send: boolean, only?: boolean, why?: string) => void } | null = null // why: said as a dropped recording ends (Stop after silence heard nothing)
 let saidT: ReturnType<typeof setTimeout> | undefined
 
 // how: 'hold' Fn held (its release ends it), 'lock' Fn's double tap, 'free' the mic button or a screenshot's (Fn or the mic ends it)
@@ -87,7 +87,8 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
     const at = Date.now()
     let send = false
     let only = false // typed, never sent (Send as you stop talking): the cap, the window's blur
-    const stop = (s: boolean, o = false) => ((send = s), (only = o), r.state !== 'inactive' && r.stop())
+    let why: string | undefined
+    const stop = (s: boolean, o = false, w?: string) => ((send = s), (only = o), (why = w), r.state !== 'inactive' && r.stop())
     const limit = setTimeout(() => stop(true, true), MAX_MS)
     const warn = setTimeout(() => now.phase === 'listening' && set({ ...now, ends: at + MAX_MS }), MAX_MS - WARN_MS)
     r.ondataavailable = e => chunks.push(e.data)
@@ -96,7 +97,7 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
       clearTimeout(warn)
       off()
       rec = null
-      if (!send) return set({ phase: 'idle' })
+      if (!send) return why ? say(why) : set({ phase: 'idle' })
       if (Date.now() - at < SHORT_MS) return say('Too short: hold Fn, or the mic, while you talk')
       set({ phase: 'writing' })
       void write(new Blob(chunks, { type: r.mimeType }), target, !only)
@@ -110,7 +111,7 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
   }
 }
 // send: write it down and insert it; else drop it (Esc). only: insert it, never send it (Send as you stop talking)
-export const voiceStop = (send = true, only = false) => rec?.stop(send, only)
+export const voiceStop = (send = true, only = false, why?: string) => rec?.stop(send, only, why)
 
 // Q6: the level meter while it listens (the bar's), and "I can't hear you" with the input's name after QUIET_MS of
 // nothing (gone as soon as it hears something); its stop. No AudioContext: it records all the same, no meter
@@ -133,7 +134,7 @@ function meter(stream: MediaStream, onLevel?: (l: number) => void) {
       if (now.phase !== 'listening') return
       // Stop after silence: typed, never sent (as the cap); nothing heard at all: dropped, and why
       const end = silenceEnd(Date.now() - loud, settings.silence, heard)
-      if (end) return voiceStop(end === 'type', true), void (end === 'drop' && say(quietSay(device)))
+      if (end) return void voiceStop(end === 'type', true, end === 'drop' ? quietSay(device) : undefined)
       const quiet = Date.now() - loud >= QUIET_MS ? quietSay(device) : undefined
       if (quiet !== now.quiet) set({ ...now, quiet })
     }, 80)

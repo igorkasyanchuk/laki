@@ -279,12 +279,13 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
     return () => void (on = false)
   }, [ws, inTurn, turnN])
   // Since: Branch narrowed to what changed after one of its commits (picked from the branch's own, newest first); never
-  // kept, and another workspace or scope drops it
+  // kept, and another workspace or scope drops it. ponytail: read only as Since I reviewed is (a Revert would be to that
+  // commit), and Changes only: the Review tab keeps Branch, Uncommitted and the PR
   const [from, setFrom] = useState<{ sha: string; short: string } | null>(null)
   useEffect(() => setFrom(null), [ws, scope])
   const after = scope === 'branch' && wsApi.commitChanges ? from : null
   const all = scope === 'pr' || inTurn || scope === 'since' || !!after // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
-  const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
+  const api = scope === 'pr' ? { ...wsApi, page: undefined } : atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD; a PR's files may not be this worktree's: no View as page
   const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : after ? () => api.commitChanges!(after.sha) : scope === 'since' && api.sinceChanges ? api.sinceChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : (after?.sha ?? '')}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
@@ -303,7 +304,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
           { label: `${c.base ?? 'Base'} (all changes)`, icon: 'gitBranch', hint: after ? undefined : ON, run: () => setFrom(null) },
           ...c.commits.map(x => ({ label: x.subject || x.short, icon: 'gitCommit', sub: [x.short, ago(x.at), (n => n && `Head of ${n}`)(wsApi.prHeadOf?.(x.sha))].filter(Boolean).join(' · '), hint: after?.sha === x.sha ? ON : undefined, run: () => setFrom({ sha: x.sha, short: x.short }) }) as MenuItem),
         ]),
-      () => {},
+      e => setBaseErr((e as Error).message), // git's failure (its base gone), as the Commits tab says it
     )
   }
   // Change base: another branch to compare with (its own deleted, or the wrong one), local or origin's; a PR keeps its own

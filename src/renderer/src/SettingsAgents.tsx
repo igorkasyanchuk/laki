@@ -85,7 +85,8 @@ function MicTest({ cloud }: { cloud: boolean }) {
     const t = setInterval(() => tick(n => n + 1), 250)
     return () => clearInterval(t)
   }, [rec])
-  useEffect(() => () => test.current?.stop(), []) // the page left mid-test: the mic closed
+  const left = useRef(false)
+  useEffect(() => () => ((left.current = true), void test.current?.stop()), []) // the page left mid-test: the mic closed, nothing kept or written
   const url = got && 'url' in got ? got.url : ''
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url])
   const start = async () => {
@@ -94,6 +95,7 @@ function MicTest({ cloud }: { cloud: boolean }) {
     setRec(Date.now())
     try {
       const r = await t.done
+      if (left.current) return
       const u = URL.createObjectURL(r.audio)
       const mine = (s: typeof got, more: Partial<Tested>) => (s && 'url' in s && s.url === u ? { ...s, ...more } : s) // a newer test's stays
       setGot({ url: u, heard: r.heard, device: r.device })

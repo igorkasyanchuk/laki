@@ -4,7 +4,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
-import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff } from './text'
+import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
 import { escapes, Icon, IconButton, type MenuItem, useMenu, act } from './ui'
 import { diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
@@ -571,7 +571,8 @@ export const webItems = (api: PanelApi, path: string, base: string, branch?: str
   ...(api.web ? [{ label: 'Open on remote', icon: 'externalLink', items: webSub(api, path, base, branch, line) } as MenuItem] : []),
 ]
 // View as page: an HTML file there is a local worktree for
-export const canPage = (api: PanelApi, path: string) => !!api.page && /\.html?$/i.test(path)
+// ponytail: Open in the browser there is your default one; a ⌘-click into Laki's own Browser if its devtools are wanted
+export const canPage = (api: PanelApi, path: string) => !!api.page && isPage(path)
 
 // a thread's key across refreshes: where it is and when it began (the daemon gives no id)
 export const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`

@@ -884,11 +884,16 @@ const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell', 'console'])
 export const canRun = (lang: string | undefined, text: string) => SHELLS.has((lang ?? '').toLowerCase()) && !!runText(text).trim() && !HIDDEN.test(text)
 // what Run types of a block: no `$ ` or `> ` prompt at a line's start (as GitHub's Copy leaves them out), no blank end;
 // a session's block (a `$ ` line and lines without one): the commands only, what they printed left out
+// (a command goes on while its line ends in a backslash). ponytail: a heredoc's body in a session's block reads as output
 export function runText(text: string) {
   const lines = text.replace(/\n+$/, '').split('\n')
-  const cmd = (l: string) => /^\s*[$>] /.test(l)
-  return (lines.some(l => /^\s*\$ /.test(l)) ? lines.filter(cmd) : lines).map(l => l.replace(/^\s*[$>] /, '')).join('\n')
+  const prompt = /^\s*[$>] /
+  const session = lines.some(l => /^\s*\$ /.test(l))
+  let more = false // the line before was a command ending in a backslash
+  const kept = lines.filter(l => ((keep => ((more = keep && l.endsWith('\\')), keep))(!session || more || prompt.test(l))))
+  return kept.map(l => l.replace(prompt, '')).join('\n')
 }
+export const isPage = (path: string) => /\.html?$/i.test(path) // View as page: an HTML file
 export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {
   return said.map((x, i) => {
     if (!tools || x.who === 'you' || x.who === 'new' || x.who === 'screen' || (running && i === said.length - 1)) return true
