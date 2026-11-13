@@ -880,8 +880,15 @@ export const turnFacts = (t: TurnLine, now = Date.now()) =>
   [`${t.count} file${t.count === 1 ? '' : 's'} +${t.add} −${t.del}`, saidTime(t.ended, now), t.started ? tookText(t.ended - t.started) : '', usd(t.cost)].filter(Boolean).join(' · ')
 // F6: a fenced block the Reader offers Run on: a shell's, with something in it and no hidden character (bidi marks,
 // zero-width ones, controls: what runs wouldn't be what's read; then Copy only)
-const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell'])
-export const canRun = (lang: string | undefined, text: string) => SHELLS.has((lang ?? '').toLowerCase()) && !!text.trim() && !HIDDEN.test(text)
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'shell', 'console'])
+export const canRun = (lang: string | undefined, text: string) => SHELLS.has((lang ?? '').toLowerCase()) && !!runText(text).trim() && !HIDDEN.test(text)
+// what Run types of a block: no `$ ` or `> ` prompt at a line's start (as GitHub's Copy leaves them out), no blank end;
+// a session's block (a `$ ` line and lines without one): the commands only, what they printed left out
+export function runText(text: string) {
+  const lines = text.replace(/\n+$/, '').split('\n')
+  const cmd = (l: string) => /^\s*[$>] /.test(l)
+  return (lines.some(l => /^\s*\$ /.test(l)) ? lines.filter(cmd) : lines).map(l => l.replace(/^\s*[$>] /, '')).join('\n')
+}
 export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {
   return said.map((x, i) => {
     if (!tools || x.who === 'you' || x.who === 'new' || x.who === 'screen' || (running && i === said.length - 1)) return true

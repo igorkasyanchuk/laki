@@ -544,7 +544,7 @@ test('B3: Follow the system picks the theme by the system: your two, else the pi
 })
 
 test('F6: the Reader’s times (a message’s, a finished turn’s end, length and cost), Run only on a shell block with no hidden character, a transcript’s times and a turn’s cost', async () => {
-  const { saidTime, readerTimes, canRun } = await import('../src/renderer/src/text.ts')
+  const { saidTime, readerTimes, canRun, runText } = await import('../src/renderer/src/text.ts')
   const { chatOf } = await import('../src/daemon/share.ts')
   const at = (h: number, m: number, s = 0, d = 10) => new Date(2026, 10, d, h, m, s).getTime()
   const now = at(15, 0)
@@ -569,6 +569,12 @@ test('F6: the Reader’s times (a message’s, a finished turn’s end, length a
   // Run: a shell's block, as read
   assert.equal(canRun('bash', 'npm test'), true)
   assert.equal(canRun('SH', 'a\nb'), true)
+  assert.equal(canRun('console', '$ npm test\nok 12'), true)
+  assert.equal(canRun('console', 'ok 12\n$ '), false, 'a prompt and no command')
+  // what Run types: no prompts, a session's output left out, several lines kept
+  assert.equal(runText('npm i\nnpm test\n\n'), 'npm i\nnpm test')
+  assert.equal(runText('$ npm i\n> --force\nadded 3 packages\n  $ npm test'), 'npm i\n--force\nnpm test')
+  assert.equal(runText('> echo a\necho $HOME'), 'echo a\necho $HOME')
   for (const [lang, text] of [['ts', 'npm test'], [undefined, 'npm test'], ['sh', '  \n'], ['sh', 'echo a‮b'], ['zsh', 'rm ​-rf x'], ['shell', 'a\r\nb'], ['bash', 'x\x1b[201~y']] as const) assert.equal(canRun(lang, text), false, JSON.stringify([lang, text]))
   // the transcript's times on the lines; an answer's usage counted once per message id, onto the message that began the turn
   const line = (o: object) => JSON.stringify(o)

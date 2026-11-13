@@ -3862,6 +3862,9 @@ export const noKeys = (t: string) => t.replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, ''
 export function typeInto(s: Session, text: string | Promise<string>, enter = true) {
   const next = (typing.get(s) ?? Promise.resolve()).then(async () => {
     const t = noKeys(await text)
+    // several lines left at a prompt (the Reader's Run): a shell that just started turns bracketed paste on with its
+    // first prompt, so they wait for it (2 s at most), else they'd land as one line
+    if (!enter && /[\r\n]/.test(t)) for (let i = 0; i < 40 && !s.term.modes.bracketedPasteMode && !s.exited; i++) await new Promise(r => setTimeout(r, 50))
     await new Promise<void>(done => {
       s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
       if (!enter) return done()

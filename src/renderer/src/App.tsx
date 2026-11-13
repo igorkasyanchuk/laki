@@ -2952,14 +2952,13 @@ export function App() {
     bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),
     appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
-    // F6: a shell block's command into the workspace's terminal (its first shell tab at its prompt: one running a
-    // program would take it as that program's keys; else a new one), typed and not
-    // run: the tab shows, ⏎ there runs it. ponytail: a shell that just started has no bracketed paste yet, so a block
-    // of several lines lands as one
-    run: async (t, text) => {
-      const sh = viewRef.current?.tabs.find(x => x.workspace === t.workspace && x.kind === 'shell' && x.status === 'idle' && !x.runs) ?? (await call<TabView>('tabNew', { ws: t.workspace, preset: 'shell' }).catch(() => null))
+    // F6: a shell block's command into a new shell tab of the workspace, typed and not run: the tab shows, ⏎ there
+    // runs it (several lines: one paste, typeInto waits for the new shell's bracketed paste). same (⌥-click): into its
+    // last shell tab at its prompt (one running a program would take it as that program's keys), a new one when none
+    run: async (t, text, same) => {
+      const sh = (same && viewRef.current?.tabs.findLast(x => x.workspace === t.workspace && x.kind === 'shell' && x.status === 'idle' && !x.runs)) || (await call<TabView>('tabNew', { ws: t.workspace, preset: 'shell' }).catch(() => null))
       if (!sh) return
-      await call('send', { target: sh.id, text: text.replace(/\n+$/, ''), enter: false }).catch(() => {})
+      await call('send', { target: sh.id, text, enter: false }).catch(() => {})
       selectTab(sh)
     },
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects

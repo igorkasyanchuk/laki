@@ -4,7 +4,7 @@
 import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
-import { canRun, proposalOf } from './text'
+import { canRun, proposalOf, runText } from './text'
 import { useNear } from './ui'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
@@ -29,7 +29,8 @@ const UiFence = ({ text }: { text: string }) => {
 }
 
 // F6: a chat's shell block run in a terminal of the workspace: whoever provides it (the Reader) types it there, no Enter
-export const RunCode = createContext<((text: string) => void) | undefined>(undefined)
+// (same: ⌥-click, into a shell tab that's there instead of a new one)
+export const RunCode = createContext<((text: string, same?: boolean) => void) | undefined>(undefined)
 function Code({ text, lang }: { text: string; lang?: string }) {
   const chat = useContext(InChat)
   const run = useContext(RunCode)
@@ -55,7 +56,7 @@ function Code({ text, lang }: { text: string; lang?: string }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
         {run && canRun(lang, text) && (
-          <button type="button" className="link small" data-tip="Types it into this workspace's terminal: press ⏎ there to run it" onClick={() => run(text)}>
+          <button type="button" className="link small" data-tip="A new shell tab with it typed: press ⏎ there to run it. ⌥-click: into the last shell tab" onClick={e => run(runText(text), e.altKey)}>
             ▷ Run
           </button>
         )}

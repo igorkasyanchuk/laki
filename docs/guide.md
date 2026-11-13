@@ -1787,9 +1787,10 @@ tab shows *Draft*); agents can't read it. A
 ```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,
 marked *Proposal*: what it suggests, not applied.
 
-A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh`, `shell`) *▷ Run*: the command is typed
-into the workspace's terminal (its first shell tab, a new one when there's none) and that tab shows; nothing runs until
-you press ⏎ there. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
+A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh`, `shell`, `console`) *▷ Run*: a new
+shell tab opens in the workspace with the command typed, several lines as one paste, a `$ ` or `> ` prompt at a line's
+start left out (and, in a block with `$ ` lines, what the commands printed); nothing runs until you press ⏎ there.
+⌥-click types it into the workspace's last shell tab at its prompt instead. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
 
 Settings › Layout › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds
 into *n steps hidden · Show*; one with a failed call stays, *1 failed* in red) or *Final answer only* (your messages and

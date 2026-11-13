@@ -217,3 +217,18 @@ test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a
   await rig.rpc('wsArchive', { id: xw.id })
   assert.equal((await wsOf(xw.id)).closed, undefined)
 })
+
+test("several lines typed and not run (the Reader's Run) wait for a new terminal's bracketed paste: one paste, its lines kept", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
+  // a program that turns bracketed paste on half a second in, as a shell does with its first prompt
+  const tab = await rig.rpc('tabNew', { ws: w.id, preset: 'custom', cmd: `sh -c "sleep 0.5; printf '\\033[?2004h'; exec cat -v"` })
+  await rig.rpc('send', { target: tab.id, text: 'npm i\nnpm test', enter: false })
+  const out = (await until(async () => ((s: string) => (s.includes('201~') ? s : null))(await rig.screen(tab.id)), 'the paste')) as string
+  assert.match(out, /\^\[\[200~npm i\n[\s\S]*npm test\^\[\[201~/)
+  // one line goes at once: nothing to keep apart
+  const one = await rig.rpc('tabNew', { ws: w.id, preset: 'custom', cmd: 'cat' })
+  await rig.rpc('send', { target: one.id, text: 'echo hi', enter: false })
+  await until(async () => (await rig.screen(one.id)).includes('echo hi'), 'typed', 1500)
+})

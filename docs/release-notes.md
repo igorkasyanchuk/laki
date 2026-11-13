@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- ▷ Run on a shell block in the Reader opens a new shell tab with the command typed (⌥-click: the last shell tab), several lines as one paste, `$ ` prompts left out; `console` blocks have it too.
+
 ## 0.50.0 · Nov 12, 2026
 
 - Remote access is end to end: what the phone and the Mac say is sealed between them, so the tunnel's provider can't read or log it. Pages opened before need a new link.
