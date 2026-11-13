@@ -679,6 +679,76 @@ test('ai: several deleted or archived at one Yes: the ticked ones, each one’s 
   await assert.rejects(rig.rpc('aiAnswer', { id: which.ask.id, n: 0 }), /a newer ask came since/)
 })
 
+// Q14: Laki AI's eyes and hands: a screenshot it sees and shows, an app opened, a project's scripts started, an
+// archived workspace back, Laki's guide to answer from
+test('ai: laki_screenshot shows the picture and gives it to the model, the whole screen only when asked; laki_open_app; laki_script; laki_restore; laki_help', async t => {
+  const calls = (...c: [string, object][]) => reply({ content: '', tool_calls: c.map(([name, args], i) => ({ id: `c${i}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })) })
+  const or = await openrouter(t, [])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, config: { run: 'echo dev-up-$((40+2)); sleep 30', test: 'echo tests-ok' } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const tool = (name: string): ((a: object) => Promise<any>) => skillTools(rig.rpc).find(x => x.name === name)!.run
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'checkout' })
+  const said = (n: number) => or.hits[n].body.messages.at(-1) // what a round got back
+
+  // Laki's guide, the parts a question is about; nothing on it: its topics
+  const h = await tool('laki_help')({ question: 'get an archived workspace back' })
+  assert.ok(h.found > 3 && h.parts.some((x: any) => /restore/i.test(x.text)), JSON.stringify(h).slice(0, 300))
+  assert.equal((await tool('laki_help')({ question: 'zzzqq' })).found, 0)
+
+  // a project's scripts, as Run does: its dev tab, a script's own
+  const dev = await tool('laki_script')({ ws: ws.id })
+  assert.deepEqual([dev.started, dev.ws, typeof dev.tab], ['run', ws.id, 'string'])
+  await until(async () => (await rig.screen(dev.tab)).includes('dev-up-42'), 'its run script in its dev tab')
+  assert.equal((await tool('laki_script')({ ws: ws.id, script: 'test' })).started, 'test')
+  await assert.rejects(tool('laki_script')({ ws: ws.id, script: 'lint' }), /no "lint" command/)
+
+  // an archived workspace: listed, brought back
+  await rig.rpc('wsArchive', { id: ws.id })
+  assert.deepEqual((await tool('laki_restore')({})).map((x: any) => [x.id, x.branch]), [[ws.id, ws.branch]])
+  await assert.rejects(tool('laki_restore')({ id: 'nope' }), /no archived workspace nope/)
+  assert.equal((await tool('laki_restore')({ id: ws.id })).restored, ws.id)
+  assert.ok(!(await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived)
+
+  // only while Laki AI works on an ask: never a call of an agent's or a script's own
+  await assert.rejects(rig.rpc('aiShot', { of: 'Safari' }), /only while Laki AI works/)
+  await assert.rejects(rig.rpc('aiOpenApp', { app: 'Safari' }), /only while Laki AI works/)
+  if (process.platform !== 'darwin') return // open and screencapture: macOS's
+
+  // an app and a web address opened (the fake open records it); a name that isn't one, a file: refused
+  or.answers.push(calls(['laki_open_app', { app: 'Safari', url: 'https://example.com/docs' }], ['laki_open_app', { app: '-x' }], ['laki_open_app', { url: 'file:///etc/passwd' }]), reply({ content: 'Opened.' }))
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'open the docs in Safari' }), { text: 'Opened.' })
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^open -a Safari https:\/\/example\.com\/docs$/m)
+  assert.deepEqual(or.hits[1].body.messages.slice(-3).map((m: any) => m.content), ['{"opened":"Safari","with":"https://example.com/docs"}', 'failed: an app by its name, as Applications has it (Safari, Xcode, Simulator)', 'failed: a web address: http or https'])
+
+  // a screenshot: stand-ins for osascript (the windows, Screen Recording on), screencapture (a PNG) and sips
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
+  writeFileSync(join(rig.home, 'one.png'), png)
+  const bin = (name: string, body: string) => writeFileSync(join(rig.home, 'bin', name), `#!/bin/sh\n${body}\n`, { mode: 0o755 })
+  bin('osascript', `echo '{"rec":true,"wins":[{"id":7,"app":"Safari","title":"Docs","width":800,"height":600}]}'`)
+  bin('screencapture', 'echo "screencapture $*" >> "$FAKE_LOG"; for a; do last=$a; done; cp "$HOME/one.png" "$last"')
+  bin('sips', 'exit 0')
+  const n = or.hits.length
+  or.answers[n] = calls(['laki_screenshot', { of: 'screen' }], ['laki_screenshot', { of: 'safari' }])
+  or.answers[n + 1] = reply({ content: 'It shows the docs.' })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'is the page in Safari right?' }), { text: 'It shows the docs.' })
+  const round = or.hits[n + 1].body.messages
+  assert.match(round.at(-3).content, /^failed: not taken: Laki AI looks at the whole screen only when the user asks it to/, 'nobody asked to see the screen')
+  assert.match(round.at(-2).content, /^\{"path":".+\/images\/[^"]+\.png","of":"Safari: Docs"/)
+  assert.deepEqual([round.at(-1).role, round.at(-1).content.map((c: any) => c.type), round.at(-1).content[1].image_url.url.slice(0, 22)], ['user', ['text', 'image_url'], 'data:image/png;base64,'], 'the model sees it')
+  const shown = (await rig.rpc('aiState')).chat.find((m: any) => m.role === 'ai' && m.images)
+  assert.deepEqual([shown.text, shown.images.length], ['Screenshot of Safari: Docs.', 1], 'and the user, in the chat')
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^screencapture -x -o -l 7 /m)
+  // asked to look at the screen: the main display whole
+  or.answers[or.hits.length] = calls(['laki_screenshot', {}])
+  or.answers[or.hits.length + 1] = reply({ content: 'I see it.' })
+  await rig.rpc('aiAsk', { text: 'look at my screen: what is wrong?' })
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^screencapture -x -m /m)
+  assert.equal(said(or.hits.length - 1).role, 'user')
+})
+
 test('ai: findSessions ranks by name, then branch and the rest; filters; says when two fit about as well', () => {
   const s: any = {
     projects: [{ id: 'p1', name: 'Shop' }, { id: 'p2', name: 'Site' }],

@@ -5,6 +5,10 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki AI does several at once: *archive every workspace whose PR is merged* is one list with a box for each and one Yes, and each line says what became of it. Its questions stay open until you answer them, in any order. [Try it](laki://ai)
+- Laki AI looks at your screen when you ask: a screenshot of an app's window, the iOS Simulator or the whole screen, shown in the chat. It opens apps and web addresses, starts a project's scripts and restores archived workspaces.
+- Laki AI answers how Laki works from its own guide: *how do I get an archived workspace back?*
+- Voice: ⏎ ends a recording the mic button started, and in Laki AI's box (or any prompt) ⏎ or Send sends what you said. Text no longer ends on the clipboard when its box closed meanwhile: it goes to the field you're in.
 - Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
 - Settings › Voice: *Test the microphone* (talk for 10 seconds, hear it back, see what the speech model wrote) and *Stop after silence* (30 seconds, 1 or 2 minutes).
 - Changes › *Since ▾*: only what changed after a commit of the branch, to review what an agent did since you last looked or your layer of a stack.

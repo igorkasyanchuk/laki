@@ -3,4 +3,6 @@
 echo "open $*" >> "${FAKE_LOG:-/dev/null}"
 for a; do last=$a; done
 [ -z "$FAKE_OPEN_MISSING" ] || { echo "Unable to find application named '$FAKE_OPEN_MISSING'" >&2; exit 1; }
+case "$last" in http://*|https://*) exit 0 ;; esac # a web address: the browser's, or the app's (-a)
+[ "$1" = -a ] && [ $# = 2 ] && exit 0 # an app alone, by its name
 [ "$1" = -b ] || [ -e "$last" ] || { echo "The file $last does not exist." >&2; exit 1; }

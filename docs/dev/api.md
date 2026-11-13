@@ -309,7 +309,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   what it runs, `widgetTrust.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
   Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
   now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
-  `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
+  `busy`; a chat message with `ask`), `aiShot` (`of`: an app's name, `simulator` or `screen`), `aiOpenApp` (`app`, `url`) and `aiHelp` (`question`) are the skill's `laki_screenshot`, `laki_open_app` and `laki_help` (the first two only while Laki AI works on an ask), `aiAnswer` (`id`, `n`, `only`: the ticked ids of an `act` with `items`; the AI page's buttons; a pick is the next `aiAsk`, an
   `act`'s Yes is `remove` here, `runAct`, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
 - specs and brainstorms (`settings.specs`, `specsOn`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
@@ -348,7 +348,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   Hold Fn group shows on a Mac only. `voice.silence` (*Stop after silence*, seconds: talk.ts `SILENCES`, `silenceEnd` in
   `meter`: the recording stopped as the cap does, typed and never sent, or dropped when nothing was heard). Settings'
   *Test the microphone* (`MicTest`): voice.ts `micTest` (up to `TEST_MS`, the same meter), an `<audio>` of the blob,
-  `heardText` (`voiceText`) for the cloud. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
+  `heardText` (`voiceText`) for the cloud. ⏎ ends a `free` or locked recording in the field it listens for (`now.enter`: not a
+  terminal; `'send'` for a `data-voice-send` box: `voiceStop`'s `force` sends it there whatever `voice.send` says, and
+  PromptInput draws *Stop and send* in place of its Send, `voiceIn`); `insert` falls back to `fieldNow` (the focused field,
+  no terminal, else a prompt box on screen; typed, never sent) when its target is gone. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
   `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused, it began asking meanwhile: copied, never typed there), a box
   with `data-voice-send` (PromptInput with `onSubmit`, Send later's) a synthetic ⌘⏎ keydown 50 ms after the
   `insertText` (its React state has the text by then); never a shell, another field, under `SHORT_MS`, or a stop of the `MAX_MS` cap's or the window's blur (`voiceStop`'s `only`: typed, not sent);

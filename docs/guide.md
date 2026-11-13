@@ -797,7 +797,16 @@ through such a question: *Yes, remove…* is yours to press, and Laki does it. Y
 agent* stops its turn as your Stop does (its chat stays), and *close that worktree* asks *Archive the workspace…?*:
 *Yes, archive it* archives it, its uncommitted changes kept for Restore (one with ignored files archiving would lose
 is left to its menu in the sidebar, which names them). *Delete it* asks the same way, saying what would be lost
-(uncommitted files, commits not pushed). It moves the window when you ask: *show me the checkout session*, *open
+(uncommitted files, commits not pushed). Several at once (*archive every workspace whose PR is merged*, *delete
+these three*) is one question: a list with a box for each (its PR and what a delete would lose beside it), *All* and
+*None*, and one *Yes, archive 4* for the ticked ones; each line then says what became of it (*archived*, *kept*, or why
+not: one with more to lose than the question said stays). Questions it acts on itself stay open until you answer them,
+in any order, also after you asked something else. *Bring back the login workspace* restores an archived one. It
+looks at what's on screen when you ask (*take a screenshot of the Simulator: does it look right?*, *look at my
+screen*): an app's window, the iOS Simulator or the whole screen, shown in the chat and read by the model (Laki needs
+Screen Recording for it). *Open Xcode*, *open the docs in Safari* opens an app or a web address; *start the app in
+checkout* runs the project's run script there (test, lint, format, deploy and setup too). And it answers how Laki
+works from this guide (*how do I get an archived workspace back?*, *what does Merge when green do?*). It moves the window when you ask: *show me the checkout session*, *open
 Settings › Voice*, *full screen*, *exit full screen*, *show the changes*, *close this page*; opens a workspace in your
 editor, Finder or terminal; finds a session by what you call it (a letter off is fine; when two fit it asks which), or
 the last few (*run git status in the last 3 sessions*: one Yes for their shells, what each printed in the chat); knows
@@ -2494,7 +2503,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   (on): hold Fn anywhere in Laki (the app's window, the new-workspace and AI windows), talk, let go, and the text is typed where your cursor is; another key while you
   hold it, or Esc, drops it. *Lock by double tap* (on): tap Fn twice and the mic stays on without holding it (the bar
   says *Locked*); Fn again stops it and types what you said, Esc drops it. A recording the mic button or a screenshot
-  started stops at a press of Fn too. The bar shows how loud it hears you, says
+  started stops at a press of Fn too, and at ⏎ in the field it types into: in a box that sends (Laki AI's, a prompt's)
+  ⏎ or its Send button sends what you said. A field that's gone meanwhile (its panel closed): the text goes to the
+  field you're in (not a terminal), else a prompt box on screen, typed and not sent, before the clipboard. The bar shows how loud it hears you, says
   *I can't hear you: check the input* (with the microphone's name) after 3 seconds of nothing, and counts down the last
   20 seconds before a recording stops by itself at 5 minutes. *Stop after silence* (off; 30 seconds, 1 minute or
   2 minutes): a recording with nothing heard that long ends by itself, and what you said is typed, never sent (nothing

@@ -9,7 +9,7 @@ with `settings.ai.skill` unset or true, Laki's skill: `shared/tools.ts` `skillTo
 `archive`, a worktree workspace only; its Yes, `archiveAct`: `wsArchive` `ifClean` first, refused when ignored files or a
 submodule's work would go (the sidebar's ask names them), else archived with its uncommitted files kept, R2; a gate's
 hold said), `laki_delete` (Q13: an `aiQuestion` act `delete`, `wsPeek`'s uncommitted and unpushed counts as its `text`,
-Laki's words only; Yes: `wsRm`), `laki_open_in` (`openIn`: editor, finder, terminal, default), `laki_ui` (`uiDo`),
+Laki's words only; Yes: `wsRm`), `laki_open_in` (`openIn`: editor, finder, terminal, default), Q14's (below), `laki_ui` (`uiDo`),
 `laki_find` (`findSessions`, pure: the user's words scored over name 5, branch 3, group, project, tabs and the PR's
 title 2, the last answer 1, a word a letter or two off half; no words: the last at work first; `unsure` when the top
 two are within a point: the skill has it ask), `laki_run`'s `tabs` (`runMany`: agents get it as a message each, the
@@ -31,6 +31,32 @@ a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make ext
 made or one the user let it (the Extension page's chat: `widgetSet` `ai`, then `aiAsk` `chat` `widget:<id>`, whose brief is `aboutWidget`'s);
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask per chat, `AI_AT_ONCE` (4) chats at once (`busy`: each chat's stop; `refuseBusy`, set before the first await); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
+Q14: several in one question, and more of the Mac.
+- `aiQuestion`'s `act.items` (`AiItem`: `id`, `label`, `note` a workspace's PR and state from `prs`, `text` a delete's
+  loss, `said`; `MANY`'s kinds, `AI_ITEMS` 50): `laki_archive`, `laki_delete` and `laki_remove` take `ids` (tools.ts
+  `several`; a delete's `wsLose` per id). A second ask of the same kind in the same turn (a model that calls once per
+  workspace) is added to the open question, which moves last. `askText` keeps the list in the message too (the model's
+  history, the CLI); Ai.tsx `Message` draws the text's first paragraph and a box per item (`.ai-items`; All, None past 3),
+  the Yes relabelled by the ticked count, and sends `aiAnswer`'s `only`. `answerMany`: the ticked ones one after another
+  (`doOne`: a delete looks at `wsLose` again and refuses one with more to lose than shown; archive is `archiveAct`), each
+  item's `said` as it comes (`…` meanwhile), then one answer (*Deleted 2: …*, the ones still there with why, *Kept n*).
+- A question with an `act` no longer closes at your next ask (`aiAnswer`'s "a newer ask came since" is for a pick that
+  goes back to the model; Ai.tsx `openAsks`, the three chats'): each is checked against what's there at its Yes.
+- `laki_find`: `pr` (merged, open, closed, none, any); a filter and no words lists every match (`FIND_MAX` 50), a line
+  each past 12 (`agents` in words, no tabs) within its `max` 12000; `more` says what isn't listed exists.
+- `laki_screenshot` (`aiShot`, only while an ask works, macOS): an app's window or the simulator through device.ts
+  `device`, the whole main display (`screenShot`, `screencapture -x -m`) only when the user's last message asks to see
+  it (`SHOT_SAID`) or Your instructions name the screen; kept in `images/`, said in the chat with the picture (`Message`
+  draws an answer's `images`), and `openrouter` adds a user message with it after the round's tool results (`t.shots`).
+  ponytail: a CLI backend gets the path (claude's Read asks for it outside its folder).
+- `laki_open_app` (`aiOpenApp`, only while an ask works, macOS): `open [-a <name>] [<http(s) url>]`, the name a plain
+  one. `laki_script`: `run` (`runDev`: the dev tab, or test, lint, format, deploy, setup). `laki_restore`: the archived
+  ones, or `wsRestore`.
+- `laki_help` (`aiHelp`): shared/help.ts `helpParts` cuts `docs/guide.md` and `docs/features.md` (in the app:
+  package.json's `files`) into paragraphs and list items under their headings; `helpFind` ranks them by the question's
+  words (an item's bold lead most, then how thick), a long one cut to its sentences (`snip`), 7 KB at most. `SKILL`
+  opens with how Laki is laid out (projects, workspaces, tabs, the path to a PR) and tells it to look there first.
+  Tested in `test/help.test.ts` and `test/ai.test.ts`.
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
   and `usage: { include: true }` (its `cost`), looping over `tool_calls` up to `steps` rounds (`AI_STEPS`, 20). Each
   round streams (A7, `stream: true`; `roundOf`): its SSE lines (keep-alive comments skipped) build the message as it

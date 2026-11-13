@@ -21,6 +21,8 @@ type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; seenFrom?: numbe
 const EXAMPLES = [
   'What are my agents doing? Anything waiting for me?',
   'Archive every workspace whose PR is merged',
+  'Start the app in checkout-flow and take a screenshot of the Simulator',
+  'How do I get an archived workspace back?',
   'Review each PR in this screenshot in its own workspace with codex',
   'Start a code review of the PR with the login form',
   'Take the PR from workspace ABC and start a new codex session to review it',
@@ -48,7 +50,7 @@ const SESSION = {
 } as const
 const CAN = ['See your workspaces, agents and PRs', 'Start workspaces and agent tabs', 'Send prompts to your agents', 'Attach PRs, schedule tasks', 'Make extensions (off until you turn them on)']
 // what Laki's skill adds (Settings › AI, on unless turned off)
-const SKILL_CAN = ["List your open PRs and others' in your repos", "Read and write a project's notes and memory", 'Rename and pin workspaces and tabs, open shells', 'Run your actions, start workspaces from templates', 'Ask you with options when unsure', 'Remove a memory item, task, tab or to-do once you say Yes']
+const SKILL_CAN = ["List your open PRs and others' in your repos", "Read and write a project's notes and memory", 'Rename and pin workspaces and tabs, open shells', 'Run your actions, start workspaces from templates', 'Ask you with options when unsure', 'Remove a memory item, task, tab or to-do once you say Yes', 'Archive or delete workspaces, several at once, once you say Yes', 'Take a screenshot of an app, the simulator or the screen and look at it', 'Open an app or a web address, start a project’s scripts', 'Answer how Laki works from its own guide']
 
 export const money = (n?: number) => (n === undefined ? '—' : n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`)
 export const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
@@ -610,6 +612,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
       </span>
       <div className="ai-body">
         <Markdown src={src} chat />
+        {!!m.images?.length && <Thumbs paths={m.images} /> /* a screenshot it took (laki_screenshot) */}
         {items && (
           <>
             {!answered && items.length > 3 && (

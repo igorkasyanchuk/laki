@@ -10,7 +10,7 @@ import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, type MenuItem, useMenu } from './ui'
-import { cloudVoice, fnOn, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceSends, voiceStart, voiceStop } from './voice'
+import { cloudVoice, fnOn, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceIn, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
@@ -328,7 +328,7 @@ export function PromptInput(p: {
         type="button"
         className={`ib${cloud && voice.phase !== 'idle' ? ` voice-${voice.phase}` : ''}`}
         aria-label={cloud && voice.phase === 'listening' ? 'Stop and insert' : 'Dictate'}
-        data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert (or let go of Fn); Esc drops it' : 'Dictate: click, talk, click again; or hold Fn') : 'Dictate (macOS dictation; or press Fn twice)'}
+        data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert (or let go of Fn); Esc drops it' : 'Dictate: click, talk, then ⏎ or click again; or hold Fn') : 'Dictate (macOS dictation; or press Fn twice)'}
         disabled={cloud && voice.phase === 'writing'}
         onMouseDown={e => e.preventDefault() /* the text box keeps the focus */}
         onClick={cloud ? talk : dictate}
@@ -423,7 +423,14 @@ export function PromptInput(p: {
           <span className="prompt-tools-end">
             {p.tools}
             {p.lead && mic}
-            {p.send}
+            {cloud && voice.phase === 'listening' && voice.enter === 'send' && voiceIn(box.current) ? (
+              // its own Send is off while the box is empty: this one ends the recording and sends what was said
+              <button type="button" className="primary ai-send" aria-label="Stop and send" data-tip="Stop and send what you said (⏎)" onMouseDown={e => e.preventDefault()} onClick={() => voiceStop(true, false, undefined, true)}>
+                <Icon name="arrowRight" size={14} />
+              </button>
+            ) : (
+              p.send
+            )}
           </span>
         )}
       </div>
@@ -458,7 +465,7 @@ export function VoiceBar() {
               <Icon name="mic" />
               {v.phase === 'listening' && <VoiceLevel />}
               <span>
-                {v.phase !== 'listening' ? 'Writing it down… Esc drops it' : v.quiet ?? (v.locked ? `Locked: Fn to ${how} · Esc drops it` : v.held ? `Listening… let go of Fn to ${how} · Esc drops it` : `Listening… ${fnOn() ? 'Fn or the mic' : 'the mic'} to ${how} · Esc drops it`)}
+                {v.phase !== 'listening' ? 'Writing it down… Esc drops it' : v.quiet ?? (v.locked ? `Locked: Fn to ${how} · Esc drops it` : v.held ? `Listening… let go of Fn to ${how} · Esc drops it` : v.enter === 'send' ? `Listening… ⏎ sends${how === 'send' ? '' : ', the mic inserts'} · Esc drops it` : v.enter ? `Listening… ⏎ or the mic to ${how} · Esc drops it` : `Listening… ${fnOn() ? 'Fn or the mic' : 'the mic'} to ${how} · Esc drops it`)}
                 {v.phase === 'listening' && v.ends && <VoiceLeft ends={v.ends} />}
               </span>
             </>

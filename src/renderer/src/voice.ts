@@ -27,7 +27,7 @@ const WARN_MS = 20000 // Q6: the bar counts down this long before the cap
 // what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went).
 // Q6: locked (a double tap: Fn again stops it), ends (the cap is near: when), quiet (nothing heard: why), undo (what
 // it typed taken back)
-export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; held?: boolean; ends?: number; quiet?: string; undo?: () => void }
+export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; held?: boolean; enter?: 'send' | 'insert'; ends?: number; quiet?: string; undo?: () => void }
 let now: VoicePhase = { phase: 'idle' }
 const subs = new Set<() => void>()
 const set = (v: VoicePhase) => ((now = v), subs.forEach(f => f()))
@@ -56,7 +56,7 @@ export async function voiceSendTo(tab: string, t: string) {
   say(why ? `Not sent: ${why}` : `Sent to ${voiceAgents().find(a => a.id === tab)?.name ?? 'the agent'}`)
 }
 
-let rec: { stop: (send: boolean, only?: boolean, why?: string) => void } | null = null // why: said as a dropped recording ends (Stop after silence heard nothing)
+let rec: { stop: (send: boolean, only?: boolean, why?: string, force?: boolean) => void; at?: HTMLElement | null } | null = null // at: where its text goes; why: said as a dropped recording ends (Stop after silence heard nothing)
 let saidT: ReturnType<typeof setTimeout> | undefined
 
 // how: 'hold' Fn held (its release ends it), 'lock' Fn's double tap, 'free' the mic button or a screenshot's (Fn or the mic ends it)
@@ -64,11 +64,13 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
   if (now.phase !== 'idle') return
   const target = document.activeElement as HTMLElement | null
   historyOpen(false)
-  set({ phase: 'listening', locked: how === 'lock', held: how === 'hold' })
+  // ⏎ in the field it listens for ends it (not a terminal: its ⏎ is the agent's or the shell's): a box that sends, sent
+  const enter = how === 'hold' || !isField(target) || isTerm(target) ? undefined : target!.dataset.voiceSend !== undefined ? 'send' : 'insert'
+  set({ phase: 'listening', locked: how === 'lock', held: how === 'hold', enter })
   // a stop before the mic opens (a permission prompt, a device that never answers): nothing heard, so idle at once, and
   // the stream, if it comes, closed; a start meanwhile is a recording of its own
   let dropped = false
-  rec = { stop: () => ((dropped = true), (rec = null), set({ phase: 'idle' })) }
+  rec = { stop: () => ((dropped = true), (rec = null), set({ phase: 'idle' })), at: target }
   let stream: MediaStream
   try {
     stream = await navigator.mediaDevices.getUserMedia(MIC)
@@ -88,7 +90,8 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
     let send = false
     let only = false // typed, never sent (Send as you stop talking): the cap, the window's blur
     let why: string | undefined
-    const stop = (s: boolean, o = false, w?: string) => ((send = s), (only = o), (why = w), r.state !== 'inactive' && r.stop())
+    let force = false // ⏎ or Send ended it: sent whatever Send as you stop talking says
+    const stop = (s: boolean, o = false, w?: string, f = false) => ((send = s), (only = o), (why = w), (force = f), r.state !== 'inactive' && r.stop())
     const limit = setTimeout(() => stop(true, true), MAX_MS)
     const warn = setTimeout(() => now.phase === 'listening' && set({ ...now, ends: at + MAX_MS }), MAX_MS - WARN_MS)
     r.ondataavailable = e => chunks.push(e.data)
@@ -100,9 +103,9 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
       if (!send) return why ? say(why) : set({ phase: 'idle' })
       if (Date.now() - at < SHORT_MS) return say('Too short: hold Fn, or the mic, while you talk')
       set({ phase: 'writing' })
-      void write(new Blob(chunks, { type: r.mimeType }), target, !only)
+      void write(new Blob(chunks, { type: r.mimeType }), target, !only, force)
     }
-    rec = { stop }
+    rec = { stop, at: target }
     r.start()
   } catch (e) {
     off()
@@ -110,8 +113,11 @@ export async function voiceStart(how: 'hold' | 'lock' | 'free' = 'free') {
     say(`Microphone: ${(e as Error).message}`)
   }
 }
-// send: write it down and insert it; else drop it (Esc). only: insert it, never send it (Send as you stop talking)
-export const voiceStop = (send = true, only = false, why?: string) => rec?.stop(send, only, why)
+// send: write it down and insert it; else drop it (Esc). only: insert it, never send it (Send as you stop talking).
+// force: send it where it goes (a box that sends), the setting or not: ⏎ there, its Send button
+export const voiceStop = (send = true, only = false, why?: string, force = false) => rec?.stop(send, only, why, force)
+// is the recording under way this box's (its Send then ends it)
+export const voiceIn = (el: HTMLElement | null) => !!el && rec?.at === el
 
 // Q6: the level meter while it listens (the bar's), and "I can't hear you" with the input's name after QUIET_MS of
 // nothing (gone as soon as it hears something); its stop. No AudioContext: it records all the same, no meter
@@ -181,16 +187,16 @@ export const heardText = async (audio: Blob) => (await api.call<{ text: string }
 
 // the write under way; Esc while it works makes it another's, so its text goes nowhere
 let writing = 0
-async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
+async function write(audio: Blob, target: HTMLElement | null, may: boolean, force = false) {
   const mine = ++writing
   try {
     const { text, fixed, fillers } = await api.call<{ text: string; fixed?: string[]; fillers?: number }>('voiceText', { audio: await wavB64(audio) })
     if (mine !== writing) return
     set({ phase: 'idle' })
     if (text) remember(text)
-    const typed = !!text && (await insert(text, target, may))
+    const typed = !!text && (await insert(text, target, may, force))
     // Q6: typed into a field: Undo takes it back (as ⌘Z there would)
-    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => undoIn(target!) : undefined)
+    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => (el => el && undoIn(el))(isField(target) ? target : fieldNow()) : undefined)
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }
@@ -210,13 +216,19 @@ function say(said: string, undo?: () => void) {
 // Send as you stop talking (may: not the cap's or a blur's): an idle agent tab's terminal gets it as send gives it
 // (typed, then Enter; refused, it began asking meanwhile: copied, never typed there, its keys would pick); a box that sends (data-voice-send: a PromptInput with onSubmit, Send later's) its ⌘⏎ once its
 // state has the text. Never a shell, nor any other field
+const isTerm = (el: HTMLElement | null) => !!el?.classList.contains('xterm-helper-textarea')
+const isField = (el: Element | null): el is HTMLElement => !!el?.isConnected && (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || (el as HTMLElement).isContentEditable)
+// where it started is gone (its panel closed, its box drawn again): the field with the focus now, else a prompt box on
+// screen; typed there, never sent, and never a terminal (not where you meant it: its agent or shell would get it)
+const fieldNow = () => (isField(document.activeElement) && !isTerm(document.activeElement) ? document.activeElement : [...document.querySelectorAll<HTMLElement>('textarea[data-voice-send]')].find(e => e.offsetParent) ?? null)
 const undoIn = (el: HTMLElement) => (set({ phase: 'idle' }), el.isConnected && (el.focus(), document.execCommand('undo')))
 // true: typed into a field (not a terminal, not sent), so Undo can take it back
-async function insert(text: string, el: HTMLElement | null, may: boolean): Promise<boolean> {
-  const term = !!el?.classList.contains('xterm-helper-textarea')
+async function insert(text: string, el: HTMLElement | null, may: boolean, force = false): Promise<boolean> {
+  if (!isField(el)) (el = fieldNow()), (may = false)
+  const term = isTerm(el)
   const tab = term ? tabs.find(t => t.id === el!.closest<HTMLElement>('[data-pane]')?.dataset.pane) : undefined
   const menu = tab?.ask
-  if (menu || !el?.isConnected || !(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el.isContentEditable)) {
+  if (menu || !isField(el)) {
     const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
     const shown = text.length > 300 ? `${text.slice(0, 298)}…` : text
     return say(`${menu ? 'The agent is asking something, so not typed there. ' : ''}${copied ? `Copied, paste it: "${shown}"` : `Nowhere to type it: "${shown}"`}`), false
@@ -226,7 +238,7 @@ async function insert(text: string, el: HTMLElement | null, may: boolean): Promi
   const t = line ? text.replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').replace(/ {2,}/g, ' ').trim() : text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
   const field = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el : null
   const before = field && !term ? field.value.slice(0, field.selectionStart ?? 0) : ''
-  const sends = may && !!t && voiceSends()
+  const sends = may && !!t && (voiceSends() || (force && el.dataset.voiceSend !== undefined))
   if (sends && tab?.kind === 'agent' && tab.status === 'idle') {
     const why = await api.call('send', { target: tab.id, text: t, agent: true }).then(() => '', e => (e as Error).message)
     if (!why) return say(`Sent to ${tab.name}`), false
@@ -300,6 +312,9 @@ window.addEventListener(
     if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) down.set(e.code, Date.now())
     if (fn.held) fnEv('key')
     else if (e.key === 'Escape' && rec) eat(e), voiceStop(false)
+    // ⏎ in the field it listens for (or, that one gone, the one with the focus): done talking; a box that sends, sent.
+    // Shift's is a new line as ever
+    else if (e.key === 'Enter' && rec && now.enter && !e.shiftKey && !e.altKey && !e.isComposing && isField(document.activeElement) && !isTerm(document.activeElement) && (document.activeElement === rec.at || !isField(rec.at ?? null))) eat(e), voiceStop(true, false, undefined, true)
     else if (e.key === 'Escape' && now.phase === 'writing') eat(e), writing++, set({ phase: 'idle' })
     else if (e.key === 'Escape' && hist.get().open) eat(e), historyOpen(false)
   },

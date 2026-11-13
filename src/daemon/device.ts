@@ -51,6 +51,12 @@ async function shot(cmd: string, args: (file: string) => string[], fail: (e: unk
   }
 }
 
+// the main display whole (Laki AI's laki_screenshot): without Screen Recording it's the desktop's picture alone, so said
+export async function screenShot() {
+  if (!(await windows()).rec) throw new Error("Laki can't see the screen: System Settings › Privacy & Security › Screen & System Audio Recording, turn Laki on, then quit and open Laki again")
+  return shot('screencapture', f => ['-x', '-m', f], e => `screencapture: ${said(e)}`)
+}
+
 const simctl = (args: string[]) => run('xcrun', ['simctl', ...args], { timeout: 30000 })
 // a simulator's screen in points: its own env, its pixels over its scale (idb's describe-all names no app on iOS 27's
 // home screen, and needs idb); kept per device, whose screen never changes

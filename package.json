@@ -80,6 +80,8 @@
     "files": [
       "out/**/*",
       "workflows/**/*",
+      "docs/guide.md",
+      "docs/features.md",
       "package.json",
       "LICENSE",
       "THIRD_PARTY_LICENSES.md",

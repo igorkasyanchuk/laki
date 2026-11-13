@@ -5,11 +5,14 @@
 // has a chat of its own (the Specs page's side panel), kept in its folder (.chat.json), which ends after PLAN_CHAT_IDLE
 // unused: the next ask starts a new one, unless aiContinue takes it up again. One ask at a time, in any chat. Its `ai`
 // event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
-import { extname, join, sep } from 'node:path'
+import { dirname, extname, join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { helpFind, helpParts, type HelpPart } from '../shared/help.ts'
+import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
 import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
@@ -84,7 +87,7 @@ export async function aiEndpointTest() {
 const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
 Do what the user asks with the laki tools, at once, without asking first: look things up with laki_state (workspaces, their PRs with titles, each tab's status and last answer), laki_screen and laki_diff; start work with laki_new_workspace (a PR to review: its pr field and a prompt saying what to do), laki_new_tab (another agent in a workspace that exists), laki_send (a message to a running agent), laki_attach_pr; laki_schedules and laki_schedule_add when asked to schedule work.
 ${groupRule("laki_state's groups; laki_new_workspace's group")} Look at the project's groups before laki_new_workspace. A group with a prompt template (laki_state's groupTemplates) starts its workspaces with it on its own; otherwise, when one of the user's prompt templates (laki_templates) plainly fits the task, give it as laki_new_workspace's template; none fits, none.
-Find workspaces by name, branch, PR number or PR title. You cannot archive or delete workspaces, ship or merge: say so if asked.
+Find workspaces by name, branch, PR number or PR title. You never archive or delete a workspace yourself (with Laki's skill you ask the user, and Laki does it at their Yes), and never ship or merge: say so if asked.
 The user's extensions may give you tools: laki_extension_tools lists them (with their notes on when to use them), laki_extension_call runs one; Laki may ask the user first, and a denial is final.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
@@ -252,7 +255,7 @@ export function aiMayAlert(chat?: string) {
 
 // resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
-type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean; queue?: Queued[] } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
+type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean; shots?: string[]; queue?: Queued[] } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
 const threads = new Map<string, Thread>()
 // what you send while it answers (aiAsk queue): kept in memory, all of it the next ask as the answer ends (any end, Stop
 // too); aiUnqueue drops one first. ponytail: a restart forgets them
@@ -477,6 +480,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   }
   say(t, 'user', ask, images)
   t.asked = false
+  t.shots = undefined
   const t0 = Date.now()
   const r: Run = { text: '', model: backend === 'endpoint' ? state.settings?.aiEndpoint?.model || backend : s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
   const where = typeof p.context === 'string' ? p.context.trim().slice(0, CONTEXT_MAX) : ''
@@ -692,6 +696,8 @@ async function openrouter(o: Opts) {
       messages.push({ role: 'tool', tool_call_id: c.id, content: await runTool(o.t, list, c.function?.name, args) })
     }
     if (o.t.asked) return void (r.text = '') // it asked the user: their pick goes on from here, as the next ask
+    // laki_screenshot's pictures: a tool's result is text, so they follow as a message the model sees
+    if (o.t.shots?.length) messages.push({ role: 'user', content: [{ type: 'text', text: 'The screenshot you took (the user sees it in the chat too):' }, ...o.t.shots.splice(0).map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))] })
   }
 }
 // one OpenRouter call with Settings › AI's key, no tools and no chat (a workflow's AI call block): its answer, logged
@@ -1349,6 +1355,50 @@ async function remove(a: AiAct, rpc: Rpc) {
   const p = (await rpc<View>('state')).projects.find(x => x.id === a.project)
   if (!p?.memory?.some(m => m.id === a.id)) throw new Error('not in that project’s memory any more')
   return rpc('projectSet', { id: p.id, memory: p.memory.filter(m => m.id !== a.id) })
+}
+
+// ---------- its eyes and hands on the Mac, and Laki's own guide (the skill's laki_screenshot, laki_open_app, laki_help)
+
+// a screenshot Laki AI takes while it works on an ask: the screen, an app's frontmost window by the app's name, or the
+// iOS Simulator; kept in images/, shown in the chat, and (OpenRouter, your endpoint) given to the model as a picture; a
+// CLI backend reads its path. The whole screen only when the user's last message asks to see it (or Your instructions
+// name screenshots): never for something a tab's screen or a PR told it
+const SHOT_SAID = /screen|capture|look|\bsee\b|show|what.?s on/i
+export async function aiShot(p: { of?: string; chat?: string }) {
+  const t = asking(p.chat)
+  const of = String(p.of ?? '').trim().slice(0, 80) || 'screen'
+  const whole = of.toLowerCase() === 'screen'
+  if (whole && !SHOT_SAID.test(t.chat.findLast(m => m.role === 'user')?.text ?? '') && !/screen/i.test(state.settings?.ai?.context ?? '')) throw new Error("not taken: Laki AI looks at the whole screen only when the user asks it to; an app's window by its name, or the simulator, any time")
+  if (process.platform !== 'darwin') throw new Error('a screenshot: macOS only')
+  const r = whole ? { ...(await screenShot()), what: 'the screen' } : await device({ op: 'shot', ...(of.toLowerCase() !== 'simulator' && { app: of }) }).then(d => ({ path: (d as { path: string }).path, what: 'app' in (d as object) ? `${(d as { app: string }).app}${(d as { title?: string }).title ? `: ${(d as { title: string }).title}` : ''}` : `the simulator (${(d as { simulator?: string }).simulator ?? 'iOS'})` }))
+  ;(t.shots ??= []).push(r.path)
+  say(t, 'ai', `Screenshot of ${r.what}.`, [r.path])
+  return { path: r.path, of: r.what, note: 'The user sees it in the chat. You get it as a picture after this result (a CLI agent: Read the path).' }
+}
+// an app on the Mac opened by its name, a web address in the browser (or in that app): only while Laki AI works on an
+// ask, as the user's own `open` would
+export async function aiOpenApp(p: { app?: string; url?: string; chat?: string }) {
+  asking(p.chat)
+  const app = String(p.app ?? '').trim()
+  const url = String(p.url ?? '').trim()
+  if (!app && !url) throw new Error('an app, a url, or both')
+  if (app && !/^[\w][\w .&+'-]{0,59}$/.test(app)) throw new Error('an app by its name, as Applications has it (Safari, Xcode, Simulator)')
+  if (url && !/^https?:\/\/[^\s"'<>]+$/i.test(url)) throw new Error('a web address: http or https')
+  if (process.platform !== 'darwin') throw new Error('opening an app: macOS only')
+  await new Promise<void>((ok, no) => execFile('open', [...(app ? ['-a', app] : []), ...(url ? [url] : [])], { timeout: 15000 }, (e, _out, err) => (e ? no(new Error(`couldn't open ${app || url}: ${String(err || e.message).trim().split('\n').at(-1)}`)) : ok())))
+  return { opened: app || url, ...(app && url && { with: url }) }
+}
+// Laki's own guide (docs/guide.md and features.md, in the app), the parts a question is about: how Laki works and where
+// things are, in its own words
+let guide: HelpPart[] | undefined
+export function aiHelp(p: { question?: string }) {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs')
+  try {
+    guide ??= [...helpParts(readFileSync(join(root, 'guide.md'), 'utf8'), 'Guide'), ...helpParts(readFileSync(join(root, 'features.md'), 'utf8'), 'Features')]
+  } catch {
+    throw new Error("this build has no guide in it: it's at https://github.com/igorkasyanchuk/laki/blob/main/docs/guide.md")
+  }
+  return helpFind(guide, String(p.question ?? '').slice(0, 400))
 }
 
 // ---------- its agent asking to use a tool (claude -p's --permission-prompt-tool: laki mcp's laki_permission)
