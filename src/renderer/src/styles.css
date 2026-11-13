@@ -3831,19 +3831,17 @@ html[data-motion='none'] .num > .num-in { animation: none; }
 :is(.modal, .menu, .palette-list, .actions.capsule, .reader-switch.capsule, .status .sb-group, .need) { --r-in: max(var(--r-xs), calc(var(--r-out) - var(--pad))); }
 .status .sb-group > button { border-radius: var(--r-in); }
 
-/* a page's large title collapses as it scrolls (scroll-driven, no script): Settings and every Page (Board, Schedule,
+/* a page's head turns to glass as it scrolls (scroll-driven, no script): Settings and every Page (Board, Schedule,
    Workflows, Notes, To-dos, a project's). The page's scroller is the --page timeline (timeline-scope: its head is a
-   sibling); over its first 60px the title goes from --fs-5 to --fs-3 and the head from see-through to the floating
-   surface (--surface-bg: solid with Reduce transparency and in the flat looks). Motion: None and Reduce motion: the
-   compact glass head, always */
+   sibling); over its first 60px the head goes from see-through to the floating surface (--surface-bg: solid with
+   Reduce transparency and in the flat looks). Motion: None and Reduce motion: the glass head, always. Its title is one
+   size on every page: a large one that shrank showed only where the page scrolls (Schedule, Settings; not Board) */
 .settings-page { timeline-scope: --page; }
 .settings-page > .page-body, .settings-body > .settings-main { scroll-timeline: --page block; }
 @keyframes page-head { from { background: transparent; } to { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border-bottom-color: var(--line); } }
-@keyframes page-title { from { font-size: var(--fs-5); } to { font-size: var(--fs-3); } }
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
     html:not([data-motion='none']) .settings-page > .settings-head { animation: page-head linear both; animation-timeline: --page; animation-range: 0 60px; }
-    html:not([data-motion='none']) .settings-page > .settings-head > b { animation: page-title linear both; animation-timeline: --page; animation-range: 0 60px; }
   }
   @media (prefers-reduced-motion: reduce) { .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); } }
   html[data-motion='none'] .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); }

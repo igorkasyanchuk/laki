@@ -464,7 +464,9 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
           <span className="sched-hero-icon">
             <Icon name="clock" size={20} />
           </span>
-          <p className="muted">A prompt for an agent, a workflow, or an extension to fetch, at the times you write or on an event (CI failing, a PR, an issue, a push). Laki's daemon runs it, window or not; a run the Mac slept through runs as it wakes.</p>
+          <p className="muted" data-tip="Laki's daemon runs them, window or not; a run the Mac slept through runs as it wakes">
+            A prompt, a workflow or an extension's fetch, run at set times or on an event (CI failing, a PR, an issue, a push).
+          </p>
           <span className="sched-hero-acts">
             {view.projects.length > 1 && (
               <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose tasks and runs show" onClick={filterMenu}>

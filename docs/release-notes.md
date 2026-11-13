@@ -10,6 +10,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Laki AI answers how Laki works from its own guide: *how do I get an archived workspace back?*
 - Voice: ⏎ ends a recording the mic button started, and in Laki AI's box (or any prompt) ⏎ or Send sends what you said. Text no longer ends on the clipboard when its box closed meanwhile: it goes to the field you're in.
 - Settings › Layout has the window's glass, see-through sliders (with *Reset*) and background picture, right under *Design*; they were in Extras. A new install on a Mac starts in the Frosted design. [Try it](laki://settings/layout?spot=Design)
+- A page's title is the same size on every page (Schedule's and Settings' were larger than Board's), and Schedule's header says what it is in one line.
 - Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
 - Settings › Voice: *Test the microphone* (talk for 10 seconds, hear it back, see what the speech model wrote) and *Stop after silence* (30 seconds, 1 or 2 minutes).
 - Changes › *Since ▾*: only what changed after a commit of the branch, to review what an agent did since you last looked or your layer of a stack.

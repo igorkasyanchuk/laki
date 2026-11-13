@@ -46,6 +46,7 @@ const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smo
 // R8 --laki-smoke=<dir> (npm run test:ui): the real window walked page by page. Each step opens a page (its laki://
 // link, a click, a key), waits for something only that page draws, and fails on ui.tsx' Boundary (.boom) or an error
 // in the console; a screenshot each, result.json at the end, then the app quits (1: a step failed)
+let smoked = false
 async function uiSmoke(w: BrowserWindow, dir: string) {
   mkdirSync(dir, { recursive: true })
   const errors: string[] = []
@@ -787,7 +788,7 @@ function create() {
     pendingTab = null
     // --laki-capture=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
     if (capture) setTimeout(async () => win && writeFileSync(capture, (await win.webContents.capturePage()).toPNG()), 3000)
-    if (smoke) setTimeout(() => win && void uiSmoke(win, smoke), 1500)
+    if (smoke && !smoked) (smoked = true), setTimeout(() => win && void uiSmoke(win, smoke), 1500) // once: the walk reloads the window itself (whats-new-once), and a second walk beside the first wrote over its result
   })
   win.loadURL(pageURL('index.html'))
 }
