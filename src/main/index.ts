@@ -95,6 +95,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     // All's list is taller than the window: it scrolls, no row squeezed under its text
     ['settings-rows', null, () => js<boolean>(`[...document.querySelectorAll('.settings-nav > button')].every(b => b.scrollHeight <= b.clientHeight + 1)`)],
     ['board', link('laki://board'), '.board'],
+    // behind a rail page the sidebar is hidden but keeps its box (its scroll with it), the main area over it
+    ['board-sidebar', null, () => js<boolean>(`(([s, m]) => getComputedStyle(s).visibility === 'hidden' && s.getBoundingClientRect().width > 0 && Math.abs(s.getBoundingClientRect().height - m.getBoundingClientRect().height) < 2 && m.getBoundingClientRect().left < s.getBoundingClientRect().right)([document.querySelector('.sidebar'), document.querySelector('.main')])`)],
     ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],

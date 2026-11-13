@@ -1078,15 +1078,24 @@ capsules, the status bar's groups, a Needs you card. The --r-* tokens go through
 ## The sidebar behind a rail page
 
 Sidebar.tsx' `<aside>` is `hidden` only when the sidebar is shut (`!sideOpen`: opening it plays its slide-in). Behind a
-rail page (`listOff`: Board, Schedule, AI…) or a strip it's `data-away`: styles.css takes it out of the flow and makes it
-`visibility: hidden`, not `display: none`, which restarted every CSS animation in it on the way back (`.sidebar`'s
-`m-row`, Needs you's `v-rise`, a waiting row's `b-lit`, the picked row's `v-sel`) and dropped its scroll.
+rail page (`listOff`: Board, Schedule, AI…) or a strip it's `data-away`: `visibility: hidden` (styles.css) and a right
+margin of minus its width (inline), so it keeps its own box and the main area lies over it. Not `display: none`, which
+restarted every CSS animation in it on the way back (`.sidebar`'s `m-row`, Needs you's `v-rise`, a waiting row's
+`b-lit`, the picked row's `v-sel`); not `position: absolute` either: out of the flow it's as tall as its rows, so
+`.side-scroll` had nothing to scroll and came back at the top. Its endless animations (a running row's line, the spinner, the
+waiting glyph) are paused there. The UI walk's `board-sidebar` step checks the box.
 
 The page going is a view transition (ui.tsx `morph`): its picture, `::view-transition-old(page)`, is as wide as the page
 was, so a rail page's faded out over the sidebar's rows, already live under it. `morph` measures `.main`'s left edge
 before and after its change and sets `--vt-cut` on the root for the transition; styles.css clips the old picture by it,
-so it fades only over the main area. Seen frame by frame only in a focused Electron window (a preview pane draws none,
-and the UI walk turns `morph` off).
+so it fades only over the main area.
+
+A transition's pictures belong to the root: while one runs the pointer is over `<html>`, and as it ends a `pointerover`
+comes for the button under it again. Tips' `over` (ui.tsx) skips the root as a target, else a rail button just pressed
+showed its tip again 350 ms later, over the sidebar's corner.
+
+Seen frame by frame only in a focused Electron window (a preview pane draws none, and the UI walk turns `morph` off):
+`webContents.beginFrameSubscription` in main, the sidebar's area of each frame compared with the one before.
 
 ## A page's head turns to glass
 

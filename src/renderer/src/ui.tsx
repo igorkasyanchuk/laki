@@ -910,6 +910,9 @@ export function Tips() {
       setTip(null)
     }
     const over = (e: PointerEvent) => {
+      // a view transition's picture is the root's: the pointer "leaves" a button under it and comes back as it ends, and
+      // a rail button just pressed got its tip again, over the sidebar
+      if (e.target === document.documentElement && document.documentElement.matches(':active-view-transition')) return
       const el = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]') ?? null
       if (el === cur) return
       hide()
