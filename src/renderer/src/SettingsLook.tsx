@@ -213,6 +213,7 @@ const WHERE: [string, string][] = [
   ['.sidebar', 'the sidebar'],
   ['.project-name', "a project's name"],
   ['.ws', "a workspace's row (.ws.sel: the selected one)"],
+  ['.ws-sep, .group-count', "a group's row, its count"],
   ['.tabbar, .tab', 'the tab bar, a tab (.tab.sel)'],
   ['.status', 'the status bar'],
   ['.side-panel', 'the side panel'],

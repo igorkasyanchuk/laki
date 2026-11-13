@@ -489,7 +489,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         </span>
         <span className="ws-name">{s.name}</span>
         {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}
-        <span className="project-count">{n}</span>
+        {settings.groupCount !== false && <span className="project-count group-count">{n}</span> /* Show › Group counts; its own class for Custom CSS */}
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
           <IconButton icon="plus" title={termsOk ? `New workspace or terminal in ${s.name || 'this group'}` : `New workspace in ${s.name || 'this group'}`} onClick={e => (termsOk ? openMenu(e, plusMenu(p, s.id)) : newWs(p.id, { place: s.id }))} />
           <IconButton icon="more" title="Group" onClick={e => openMenu(e, sepMenu(p, s))} />

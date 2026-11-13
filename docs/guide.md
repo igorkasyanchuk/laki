@@ -277,6 +277,8 @@ an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its ba
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
   else's PR. Settings › Layout › *Sidebar rows* (or a right click › *Show ›*) turns each off; it also puts them by the status circle or after the name instead.
+- *Group counts* (the same places, on by default): off hides the number of workspaces after a group's name. Custom CSS
+  styles it as `.group-count`.
 - *Empty projects* (the same places, on by default): off leaves out a project with no workspace to show (none, all
   archived, or all in Pinned); the selected workspace's project and a filter's hits still show.
 

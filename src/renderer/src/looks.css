@@ -2274,15 +2274,15 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 [data-look='frosted'] .main { background: var(--app-bg, var(--bg)); }
 [data-look='frosted'] .narrow .sidebar { background: var(--panel); } /* a phone's drawer over the main area: solid */
 
-/* the frame: one rounded panel for the rail and the list, a card for the rest */
+/* the frame: one rounded panel for the rail and the list (a hairline between them), a card for the rest */
 [data-look='frosted'] .app[data-dz] { box-sizing: border-box; padding: var(--f-gap); background: none; }
 [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .main) { border: 1px solid var(--f-edge); }
 [data-look='frosted'] .app[data-dz] .sidebar { position: relative; z-index: 1; border-radius: var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), 14px 10px 44px -14px var(--f-drop); }
 [data-look='frosted'] .app[data-dz] .rail { border-right: none; border-radius: var(--f-r) 0 0 var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), -14px 10px 44px -14px var(--f-drop); }
-[data-look='frosted'] .app[data-dz].rail-on .sidebar { border-left: none; border-radius: 0 var(--f-r) var(--f-r) 0; }
+[data-look='frosted'] .app[data-dz].rail-on .sidebar { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept: a hairline between the rail and the list, one panel still */
 [data-look='frosted'] .app[data-dz]:is(.list-off, .strip-right) .rail { border-right: 1px solid var(--f-edge); border-radius: var(--f-r); }
 [data-look='frosted'] .app[data-dz] .side-strip { border: 1px solid var(--f-edge); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi); } /* Terminals' and Browsers' strip: the rail's panel goes on (left), or a panel of its own (right) */
-[data-look='frosted'] .app[data-dz].strip-left .side-strip { border-left: none; border-radius: 0 var(--f-r) var(--f-r) 0; }
+[data-look='frosted'] .app[data-dz].strip-left .side-strip { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept, as the sidebar's */
 [data-look='frosted'] .app[data-dz].strip-right .side-strip { margin-left: var(--f-gap); border-radius: var(--f-r); }
 [data-look='frosted'] .app[data-dz] .main { margin-left: var(--f-gap); overflow: hidden; border-radius: var(--f-r); box-shadow: inset 0 1px 0 var(--f-hi), 0 14px 44px -12px var(--f-drop); }
 [data-look='frosted'] .app[data-dz].side-closed .main { margin-left: 0; }

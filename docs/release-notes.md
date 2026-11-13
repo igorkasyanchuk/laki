@@ -12,6 +12,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Settings › Layout has the window's glass, see-through sliders (with *Reset*) and background picture, right under *Design*; they were in Extras. A new install on a Mac starts in the Frosted design. [Try it](laki://settings/layout?spot=Design)
 - A page's title is the same size on every page (Schedule's and Settings' were larger than Board's), and Schedule's header says what it is in one line.
 - Back from Board, Schedule or another rail page, the sidebar is there at once, as you left it: no fade, no page fading out over it, its scroll kept.
+- *Group counts* (Settings › Layout › Sidebar rows, or a right click › Show): off hides the number after a group's name; Custom CSS styles it as `.group-count`.
+- Frosted: a hairline between the rail and the sidebar.
 - With Frosted or Glass on a Mac, pages change at once: their cross-fade made the see-through sidebar and rail flash.
 - Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
 - Settings › Voice: *Test the microphone* (talk for 10 seconds, hear it back, see what the speech model wrote) and *Stop after silence* (30 seconds, 1 or 2 minutes).
