@@ -295,7 +295,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('iframe.art-frame[src*="/worktree/"]'), 'the frame')
     }, async () => {
       const f = w.webContents.mainFrame.framesInSubtree.find(f => f.url.includes('/worktree/'))
-      return !!f && (await f.executeJavaScript('document.title === "ran" && getComputedStyle(document.querySelector("h1")).color === "rgb(1, 2, 3)"').then(Boolean, () => false))
+      return !!f && (await hasText('.modal button', 'Reload')) && (await f.executeJavaScript('document.title === "ran" && getComputedStyle(document.querySelector("h1")).color === "rgb(1, 2, 3)"').then(Boolean, () => false))
     }],
     ['view-as-page-back', () => clickText('.modal button', 'Back'), async () => !(await has('iframe.art-frame'))],
     // Outline: a Markdown file in Files, its headings under Go to heading…, a raw <h2> among them
