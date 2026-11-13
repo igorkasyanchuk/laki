@@ -1094,12 +1094,14 @@ A transition's pictures belong to the root: while one runs the pointer is over `
 comes for the button under it again. Tips' `over` (ui.tsx) skips the root as a target, else a rail button just pressed
 showed its tip again 350 ms later, over the sidebar's corner.
 
-No view transitions in a see-through window (`html.vibrant`: macOS's glass behind the page, Frosted's or Glass's;
-`morphOk`): while a transition's picture fades (its own opacity or its group's), the desktop behind every see-through
-part of the window (the sidebar, the rail) fades to flat grey with it and snaps back as the transition ends, so the
-whole panel flashed on every page change. Pages there change at once; Motion: High's own entrances still play. A
-transition with no fade (the old picture not shown, the new one at once) didn't flash: the ones that only move (a sheet
-growing, a row sliding) could come back that way.
+The main window is `transparent: true` on a Mac (main's `create`), for the see-through looks (Glass, Frosted, the
+translucent sidebar, Sidebar see-through: `blurred`). Made opaque and given its blur and a clear background later (the
+`glass` IPC), it never cleared what it had drawn where the page is see-through: the sidebar kept copies of its earlier
+rows and of a rail page that had been over it (plain at Sidebar see-through near 100%), a translucent tint redrawn
+piled up to solid, and while a view transition's picture faded, the desktop behind the sidebar and the rail faded to
+flat grey with it and snapped back as it ended, the whole panel flashing on every page change. None of it is in
+Chromium's own frames (`capturePage`, a frame subscription): look at the real screen (`screencapture`, `-v` for a
+recording of a page change), the page's capture beside it.
 
 How these were seen: `webContents.beginFrameSubscription` in main for every frame Chromium draws (the sidebar's area
 of each compared with the one before; a preview pane draws none, and the UI walk turns `morph` off). The glass flash

@@ -47,6 +47,7 @@ const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smo
 // link, a click, a key), waits for something only that page draws, and fails on ui.tsx' Boundary (.boom) or an error
 // in the console; a screenshot each, result.json at the end, then the app quits (1: a step failed)
 let smoked = false
+
 async function uiSmoke(w: BrowserWindow, dir: string) {
   mkdirSync(dir, { recursive: true })
   const errors: string[] = []
@@ -723,6 +724,11 @@ function create() {
     minHeight: 400,
     backgroundColor: '#0e1014',
     visualEffectState: 'active', // glass keeps its blur when the window isn't focused
+    // a see-through window from the start (macOS: the `glass` IPC's blur comes later, with a clear background): an opaque
+    // one never clears what it drew where the page is see-through, so the sidebar kept copies of its earlier rows and of
+    // the page that was over it, a translucent tint redrawn piled up to solid, and a view transition's fade took the
+    // desktop behind the sidebar and the rail with it (seen only on the real screen: Chromium's own frames are right)
+    ...(mac && { transparent: true }),
     ...(mac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: lights() } : { autoHideMenuBar: true }), // Alt shows the menu
     show: false, // shown once ready: where it was left (winAt), else maximized
     webPreferences: {

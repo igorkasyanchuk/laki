@@ -14,7 +14,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Back from Board, Schedule or another rail page, the sidebar is there at once, as you left it: no fade, no page fading out over it, its scroll kept.
 - *Group counts* (Settings › Layout › Sidebar rows, or a right click › Show): off hides the number after a group's name; Custom CSS styles it as `.group-count`.
 - Frosted: a hairline between the rail and the sidebar.
-- With Frosted or Glass on a Mac, pages change at once: their cross-fade made the see-through sidebar and rail flash.
+- A see-through sidebar on a Mac (Frosted, Glass, the translucent sidebar, *Sidebar see-through*) no longer flashes as a page changes or keeps traces of what was drawn there before.
+- Sections, Tiles and Soft: a project's box keeps its round corners when *Corners* is set.
 - Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
 - Settings › Voice: *Test the microphone* (talk for 10 seconds, hear it back, see what the speech model wrote) and *Stop after silence* (30 seconds, 1 or 2 minutes).
 - Changes › *Since ▾*: only what changed after a commit of the branch, to review what an agent did since you last looked or your layer of a stack.

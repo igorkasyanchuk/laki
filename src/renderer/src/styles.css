@@ -3498,12 +3498,12 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .app[data-dz~='side-card'] .sidebar { position: relative; z-index: 1; isolation: isolate; padding: 0 0 var(--d-gap) var(--d-gap); } /* z-index: what it opens past its edge stays over the main area */
 .app[data-dz~='side-card'] .sidebar::before { content: ''; position: absolute; z-index: -1; inset: 40px 0 var(--d-gap) var(--d-gap); border: 1px solid var(--line); border-radius: var(--d-r); background: var(--side); box-shadow: var(--d-lift); pointer-events: none; }
 .app[data-dz~='boxed'] .side-scroll { padding-top: var(--d-gap, 8px); } /* the design's gap all round: the card's top, its sides, between projects */
-.app[data-dz~='boxed'] .side-scroll > .project { margin: 0 var(--d-gap, 8px) var(--d-gap, 8px); padding: var(--sp-1) 0 var(--sp-3); border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--r-s))); background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.app[data-dz~='boxed'] .side-scroll > .project { margin: 0 var(--d-gap, 8px) var(--d-gap, 8px); padding: var(--sp-1) 0 var(--sp-3); border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--sp-2))); background: color-mix(in srgb, var(--fg) 3%, transparent); } /* a step under the card's corner, a space token: Corners makes every corner token one size, and a difference of two was 0 */
 /* the terminals and the side panel: one card, cards inside it, or each a card */
 .app[data-dz~='body'] .body { border: 1px solid var(--line); border-radius: var(--d-r); overflow: hidden; background: var(--app-bg, var(--bg)); box-shadow: var(--d-lift); }
 .app[data-dz~='inner'] .body { padding: var(--d-gap); gap: var(--d-gap); background: var(--side); }
 .app[data-dz~='parts'] .body { gap: var(--d-gap); }
-.app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--r-s))); }
+.app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border: 1px solid var(--line); border-radius: max(0px, calc(var(--d-r) - var(--sp-2))); }
 .app:is([data-dz~='inner'], [data-dz~='parts']) .body > :is(.term-wrap, .side-panel, .pv-wrap) { overflow: hidden; } /* a side tab strip scrolls, which clips it already */
 .app[data-dz] .body > :is(.side-panel, .pv-wrap) .sp-handle { left: 0; } /* inside its card, which clips: all of it to grab */
 .app[data-dz~='parts'] .body > :is(.term-wrap, .side-panel, .pv-wrap, .tabstrip.left, .tabstrip.right) { border-radius: var(--d-r); box-shadow: var(--d-lift); }
@@ -3757,8 +3757,7 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 /* V13: view transitions that keep the place (ui.tsx morph, rowsMorph). The root has no name: only what's named is
    snapshotted, so the sidebar and a printing terminal stay live under it. A page over the main area cross-fades; a sheet
    that grows from its button is named 'morph' (inline, for the transition only); a row moving to Pinned, row-<n>. The
-   overlay takes no clicks. Off under Reduce motion, Motion: Off and in a see-through window, html.vibrant (morph doesn't
-   start one: ui.tsx morphOk says why) */
+   overlay takes no clicks. Off under Reduce motion and Motion: Off (morph doesn't start one: ui.tsx morphOk) */
 :root { view-transition-name: none; }
 .main > .settings-page { view-transition-name: page; }
 ::view-transition { pointer-events: none; }
