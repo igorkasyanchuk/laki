@@ -804,8 +804,9 @@ not: one with more to lose than the question said stays). Questions it acts on i
 in any order, also after you asked something else. *Bring back the login workspace* restores an archived one. It
 looks at what's on screen when you ask (*take a screenshot of the Simulator: does it look right?*, *look at my
 screen*): an app's window, the iOS Simulator or the whole screen, shown in the chat and read by the model (Laki needs
-Screen Recording for it). *Open Xcode*, *open the docs in Safari* opens an app or a web address; *start the app in
-checkout* runs the project's run script there (test, lint, format, deploy and setup too). And it answers how Laki
+Screen Recording for it). *Open Xcode*, *open github.com in Safari* opens an app or a web address (a site you named, or localhost; any
+other it gives you as a link, or asks first); *start the app in
+checkout* runs the project's run script there (test, lint, format and setup too; deploy stays yours: *Run ▾ › Deploy…*). And it answers how Laki
 works from this guide (*how do I get an archived workspace back?*, *what does Merge when green do?*). It moves the window when you ask: *show me the checkout session*, *open
 Settings › Voice*, *full screen*, *exit full screen*, *show the changes*, *close this page*; opens a workspace in your
 editor, Finder or terminal; finds a session by what you call it (a letter off is fine; when two fit it asks which), or

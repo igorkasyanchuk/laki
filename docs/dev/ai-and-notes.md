@@ -34,23 +34,29 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
 Q14: several in one question, and more of the Mac.
 - `aiQuestion`'s `act.items` (`AiItem`: `id`, `label`, `note` a workspace's PR and state from `prs`, `text` a delete's
   loss, `said`; `MANY`'s kinds, `AI_ITEMS` 50): `laki_archive`, `laki_delete` and `laki_remove` take `ids` (tools.ts
-  `several`; a delete's `wsLose` per id). A second ask of the same kind in the same turn (a model that calls once per
+  `several`; a delete's `wsLose` per id, one after another, the state read once; more than `AI_ITEMS`: the first, and
+  the note says how many are left; one that can't be asked about, gone, archived, a project's own folder, is left out
+  and named in the note). A second ask of the same kind in the same turn (a model that calls once per
   workspace) is added to the open question, which moves last. `askText` keeps the list in the message too (the model's
   history, the CLI); Ai.tsx `Message` draws the text's first paragraph and a box per item (`.ai-items`; All, None past 3),
   the Yes relabelled by the ticked count, and sends `aiAnswer`'s `only`. `answerMany`: the ticked ones one after another
-  (`doOne`: a delete looks at `wsLose` again and refuses one with more to lose than shown; archive is `archiveAct`), each
-  item's `said` as it comes (`…` meanwhile), then one answer (*Deleted 2: …*, the ones still there with why, *Kept n*).
+  (`doOne`: a delete looks at `wsLose` again and refuses one with more of any kind to lose than shown, `loseParts`; less
+  goes; archive is `archiveAct`), each item's `said` as it comes (`…` meanwhile; a daemon that ended in the middle:
+  `thread` says *not done: Laki quit meanwhile* on the rest), then one answer (*Deleted 2: …*, the ones still there with why, *Kept n*).
 - A question with an `act` no longer closes at your next ask (`aiAnswer`'s "a newer ask came since" is for a pick that
   goes back to the model; Ai.tsx `openAsks`, the three chats'): each is checked against what's there at its Yes.
 - `laki_find`: `pr` (merged, open, closed, none, any); a filter and no words lists every match (`FIND_MAX` 50), a line
   each past 12 (`agents` in words, no tabs) within its `max` 12000; `more` says what isn't listed exists.
 - `laki_screenshot` (`aiShot`, only while an ask works, macOS): an app's window or the simulator through device.ts
   `device`, the whole main display (`screenShot`, `screencapture -x -m`) only when the user's last message asks to see
-  it (`SHOT_SAID`) or Your instructions name the screen; kept in `images/`, said in the chat with the picture (`Message`
+  it (`SHOT_SAID` in `userSaid`: screen, display, desktop, monitor, capture) or Your instructions name it, never in an
+  agent's chat (its "user" is the agent); an agent's own call is its own chat's (main.ts, `FROM`); kept in `images/`, said in the chat with the picture (`Message`
   draws an answer's `images`), and `openrouter` adds a user message with it after the round's tool results (`t.shots`).
   ponytail: a CLI backend gets the path (claude's Read asks for it outside its folder).
 - `laki_open_app` (`aiOpenApp`, only while an ask works, macOS): `open [-a <name>] [<http(s) url>]`, the name a plain
-  one. `laki_script`: `run` (`runDev`: the dev tab, or test, lint, format, deploy, setup). `laki_restore`: the archived
+  one, the address only of a site the user named (its host in `userSaid`) or localhost: what Laki AI read in a tab or a
+  PR can't send it elsewhere. `laki_script`: `run` (`runDev`: the dev tab, or test, lint, format, setup; never deploy,
+  which the app asks about first). `laki_restore`: the archived
   ones, or `wsRestore`.
 - `laki_help` (`aiHelp`): shared/help.ts `helpParts` cuts `docs/guide.md` and `docs/features.md` (in the app:
   package.json's `files`) into paragraphs and list items under their headings; `helpFind` ranks them by the question's

@@ -7,7 +7,7 @@ import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { dist, norm } from './talk.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, isBasic, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
+import { AI_ACTS, AI_ITEMS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -653,7 +653,7 @@ export function findSessions(s: Found, o: { query?: string; project?: string; gr
 }
 // Laki's skill for Laki AI (Settings › AI, on unless turned off): what these tools are for, in its instructions
 export const SKILL = `How Laki is laid out, so you can find your way: a project is a git repository (or a plain folder) the user added; its workspaces are its tasks, each a git worktree on a branch of its own cut from a base branch (kind worktree), or the project's own folder (kind local); the sidebar lists them under the project, in named groups when it has some. A workspace has tabs: agent sessions (claude, codex…), shells, and the tabs its scripts run in (run: its dev server). An agent's tab is running, waiting (it asks the user something), idle, or done (it finished and the user hasn't looked). Work ends up as changes against the base (laki_diff), then a pull request (the user ships it; its state, checks and reviews are on the workspace), and once merged the workspace is archived (worktree gone, branch and uncommitted changes kept, restorable: laki_restore) or deleted (gone for good). Terminals and Browsers are workspaces of their own in the home folder. Anything else about how Laki works, where a thing is or what a word means: laki_help reads Laki's own guide; use it rather than guessing, and before saying Laki can't do something.
-What's on screen: laki_screenshot takes a picture you can see (an app's window by its name, the iOS Simulator, or the whole screen when the user asks you to look at it); laki_browser drives a workspace's dev server page; laki_open_app opens a Mac app or a web address when they ask ("open Simulator", "start Docker"); laki_script starts a project's own scripts in a workspace ("start the app", "run the tests": run, test, lint, format, deploy, setup), then laki_screen shows what it printed.
+What's on screen: laki_screenshot takes a picture you can see (an app's window by its name, the iOS Simulator, or the whole screen when the user asks you to look at it); laki_browser drives a workspace's dev server page; laki_open_app opens a Mac app or a web address when they ask ("open Simulator", "start Docker"); laki_script starts a project's own scripts in a workspace ("start the app", "run the tests": run, test, lint, format, setup; never deploy, the user starts that), then laki_screen shows what it printed.
 With Laki's skill you also: list a project's open PRs (laki_prs: yours, or others' to review), read a project's notes, memory, templates, actions and scheduled tasks (laki_project), write its notes and memory, rename or pin workspaces and tabs, run a command or send a message in a tab that's open (laki_run: a shell's command runs at the user's Yes, an agent gets it), open a new shell (its command typed for the user to run, or run at their Yes when they ask for that), see and arrange the panes split inside a workspace's tabs (laki_panes: list, split one beside another, move one to a tab of its own, show one; a new pane beside one: laki_new_tab or laki_shell with beside; closing one: laki_remove), run the user's own actions (laki_run_action: a terminal's command is typed for them to run), start a workspace through a prompt template or an agent action (laki_new_workspace's template and action: e.g. a review action on each PR of a screenshot, a workspace each), add to-dos, change scheduled tasks, add or change the user's agent profiles (laki_profiles: "add me claude yolo and claude haiku"; they confirm with a button).
 Asked where a setting is, or how something is set ("where do I turn off sounds?", "is copy on select on?"): laki_settings_find, then answer with its place (Settings › … › …) as a link and its value when it has one; you don't change settings.
 Not sure what the user means, or which of a few they want? Ask with laki_ask (2-6 short options) instead of guessing, then stop: their pick comes as the next message.
@@ -668,17 +668,21 @@ Laki's own tools for the user, which you can explain and some of which you run: 
 // a setting's current value said to Laki AI: plain ones only, never what's private or a secret's (env, keys, mails…)
 const SAID_NOT = /env|webhook|mail|key|token|secret|pass|remote|tunnel|account|preset|memory|context|template|action|flowVars/i
 const said = (k: string, v: unknown) => !SAID_NOT.test(k) && (typeof v === 'boolean' || typeof v === 'number' || (typeof v === 'string' && v.length <= 80))
-// one id or several (ids): the first as the act's id, the lot as its items when there's more than one
-function several(a: { id?: unknown; ids?: unknown }): { id: string; ids?: string[]; items?: { id: string }[] } {
-  const ids = [...new Set([...(Array.isArray(a.ids) ? a.ids : []), a.id].filter((x): x is string => typeof x === 'string' && !!x))]
-  if (!ids.length) throw new Error('an id, or ids')
-  return ids.length > 1 ? { id: ids[0], ids, items: ids.map(id => ({ id })) } : { id: ids[0] }
+// one id or several (ids): the first as the act's id, the lot as its items when there's more than one; AI_ITEMS at
+// most in one question (left: how many more were given)
+function several(a: { id?: unknown; ids?: unknown }): { id: string; ids?: string[]; items?: { id: string }[]; left: number } {
+  const all = [...new Set([...(Array.isArray(a.ids) ? a.ids : []), a.id].filter((x): x is string => typeof x === 'string' && !!x))]
+  if (!all.length) throw new Error('an id, or ids')
+  const ids = all.slice(0, AI_ITEMS)
+  return { id: ids[0], left: all.length - ids.length, ...(ids.length > 1 && { ids, items: ids.map(id => ({ id })) }) }
 }
+// the question asked, and that it has only the first AI_ITEMS when more were given
+const askedOf = async (asked: Promise<{ note?: string }>, left: number) => (r => (left ? { ...r, note: `Only the first ${AI_ITEMS} are in this question: ask about the other ${left} once the user has answered. ${r.note ?? ''}` } : r))(await asked)
 // what deleting a workspace would lose, in Laki's words: the question's, and looked at again at the user's Yes (ai.ts)
-export async function wsLose(rpc: Rpc, id: string) {
+export async function wsLose(rpc: Rpc, id: string, v?: View) { // v: the state, when the caller has it (several: read once)
   type Peek = { dirty?: number; unpushed?: number; subs?: string[]; ignored?: string[] }
   const p = await rpc<Peek>('wsPeek', { id }).catch(() => ({}) as Peek)
-  const archived = (await rpc<View>('state')).workspaces.find(w => w.id === id)?.archived // wsPeek has nothing on one: what Archive kept for Restore goes
+  const archived = (v ?? (await rpc<View>('state'))).workspaces.find(w => w.id === id)?.archived // wsPeek has nothing on one: what Archive kept for Restore goes
   const n = (k: number, one: string) => `${k} ${one}${k > 1 ? 's' : ''}`
   return [p.dirty && n(p.dirty, 'uncommitted file'), p.unpushed && `${n(p.unpushed, 'commit')} not pushed`, p.subs?.length && 'submodule changes', p.ignored?.length && n(p.ignored.length, 'ignored file'), archived && 'what Archive kept for Restore'].filter(Boolean).join(', ')
 }
@@ -706,7 +710,8 @@ export const skillTools = (rpc: Rpc): Tool[] => [
       if (a.kind === 'profile') throw new Error('to add agent profiles: laki_profiles')
       if (a.kind === 'archive') throw new Error('to archive a workspace: laki_archive')
       if (a.kind === 'delete') throw new Error('to delete a workspace: laki_delete')
-      return rpc('aiQuestion', { act: { kind: a.kind, ...several(a), project: a.project } }) // Laki names it, from its own state
+      const { left, ...s } = several(a)
+      return askedOf(rpc('aiQuestion', { act: { kind: a.kind, ...s, project: a.project } }), left) // Laki names it, from its own state
     },
   },
   // Q12: the user's sessions from Laki AI: a turn stopped (as their Stop), a workspace archived (on their Yes)
@@ -730,7 +735,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
     name: 'laki_archive',
     description: "Ask the user to archive a workspace (when they want it closed or done with): its agents and shells stop and its worktree is removed; its branch and uncommitted changes are kept, and Archived in the sidebar restores it. They see Yes / No buttons and Laki archives it on Yes; you never do. Several at once (ids): ONE question listing them, a box each, one Yes for the ticked ones; never a call per workspace. A worktree workspace only (a project's own folder can't be). End your turn after it.",
     inputSchema: obj({ id: str('the workspace id, from laki_state'), ids: { type: 'array', items: { type: 'string' }, description: 'several workspace ids at once, instead of id' } }),
-    run: async a => rpc('aiQuestion', { act: { kind: 'archive', ...several(a) } }),
+    run: async a => (({ left, ...s }) => askedOf(rpc('aiQuestion', { act: { kind: 'archive', ...s } }), left))(several(a)),
   },
   // Q13: more of the app from Laki AI: delete, open in an app, the window itself, finding a session
   {
@@ -738,8 +743,12 @@ export const skillTools = (rpc: Rpc): Tool[] => [
     description: "Ask the user to delete a workspace for good: its worktree, its branch and its uncommitted work go (Laki says what it would lose). They see Yes / No and Laki deletes it on Yes; you never do. Several at once (ids): ONE question listing them with what each would lose, a box each, one Yes for the ticked ones; never a call per workspace. Only when they ask to delete; to close one they may want back, laki_archive. End your turn after it.",
     inputSchema: obj({ id: str('the workspace id, from laki_state'), ids: { type: 'array', items: { type: 'string' }, description: 'several workspace ids at once, instead of id' } }),
     run: async a => {
-      const { id, ids } = several(a)
-      return rpc('aiQuestion', { act: { kind: 'delete', id, ...(ids ? { items: await Promise.all(ids.map(async x => ({ id: x, text: await wsLose(rpc, x) }))) } : { text: await wsLose(rpc, id) }) } })
+      const { id, ids, left } = several(a)
+      if (!ids) return rpc('aiQuestion', { act: { kind: 'delete', id, text: await wsLose(rpc, id) } })
+      const v = await rpc<View>('state')
+      const items: { id: string; text: string }[] = []
+      for (const x of ids) items.push({ id: x, text: await wsLose(rpc, x, v) }) // one after another: each is a git status and log
+      return askedOf(rpc('aiQuestion', { act: { kind: 'delete', id, items } }), left)
     },
   },
   {
@@ -761,7 +770,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_open_app',
-    description: 'Open an app on the Mac by its name as Applications has it (Safari, Xcode, Simulator, Docker, Slack…), a web address in the browser, or a web address in that app. Only when the user asks you to open or start it. A workspace in their editor, Finder or terminal is laki_open_in; a project\'s own app (its dev server) is laki_script.',
+    description: 'Open an app on the Mac by its name as Applications has it (Safari, Xcode, Simulator, Docker, Slack…), a web address in the browser, or a web address in that app. Only when the user asks you to open or start it, and only a site they named (or localhost): another one, give them the link to click, or ask first with laki_ask. A workspace in their editor, Finder or terminal is laki_open_in; a project\'s own app (its dev server) is laki_script.',
     inputSchema: obj({ app: str("the app's name"), url: str('a web address (http or https)') }),
     run: a => rpc('aiOpenApp', { app: a.app, url: a.url }, 20000),
   },
@@ -774,9 +783,10 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_script',
-    description: "Start one of a project's scripts in a workspace, as the status bar's Run does: run (its dev server, in the workspace's dev tab: \"start the app\"), or test, lint, format, deploy, setup, each in a tab of its own. Only the commands the user set for the project (laki_state's workspace has run: true when there is one); deploy only when they ask for it by name. Its output: laki_screen on the tab a moment later; its page: laki_browser.",
-    inputSchema: obj({ ws: str('the workspace id'), script: { type: 'string', enum: ['run', 'test', 'lint', 'format', 'deploy', 'setup'] } }, ['ws']),
+    description: "Start one of a project's scripts in a workspace, as the status bar's Run does: run (its dev server, in the workspace's dev tab: \"start the app\"), or test, lint, format, setup, each in a tab of its own. Only the commands the user set for the project (laki_state's workspace has run: true when there is one). Deploy is the user's own to start (the status bar's Run ▾ › Deploy… asks them first). Its output: laki_screen on the tab a moment later; its page: laki_browser.",
+    inputSchema: obj({ ws: str('the workspace id'), script: { type: 'string', enum: ['run', 'test', 'lint', 'format', 'setup'] } }, ['ws']),
     run: async a => {
+      if (a.script === 'deploy') throw new Error("deploy is the user's own to start: Run ▾ › Deploy… in the status bar, which asks them first")
       const t = await rpc<{ id: string; name: string } | undefined>('run', { ws: a.ws, ...(a.script && a.script !== 'run' && { script: a.script }) })
       return { started: a.script || 'run', ws: a.ws, ...(t?.id && { tab: t.id, name: t.name }) }
     },

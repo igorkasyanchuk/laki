@@ -284,6 +284,8 @@ function thread(id = ''): Thread {
   const j: any = readJson(file) ?? {}
   const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
   for (const m of t.chat) if (m.ask?.perm && m.ask.picked === undefined) m.ask.picked = 'Not answered' // its agent ended with the daemon
+  // a Yes to several the daemon ended in the middle of: the one under way, and the ones it never got to, say so
+  for (const m of t.chat) if (m.ask?.picked !== undefined) for (const i of m.ask.act?.items ?? []) if (!i.said || i.said === '…') i.said = i.said ? 'not known: Laki quit meanwhile' : 'not done: Laki quit meanwhile'
   if (id && !t.ended && t.chat.length && Date.now() - t.at > PLAN_CHAT_IDLE) t.ended = t.at + PLAN_CHAT_IDLE // ran out while the daemon wasn't looking
   threads.set(id, t)
   return t
@@ -697,7 +699,14 @@ async function openrouter(o: Opts) {
     }
     if (o.t.asked) return void (r.text = '') // it asked the user: their pick goes on from here, as the next ask
     // laki_screenshot's pictures: a tool's result is text, so they follow as a message the model sees
-    if (o.t.shots?.length) messages.push({ role: 'user', content: [{ type: 'text', text: 'The screenshot you took (the user sees it in the chat too):' }, ...o.t.shots.splice(0).map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))] })
+    const pics = (o.t.shots?.splice(0) ?? []).flatMap(p => {
+      try {
+        return [{ type: 'image_url', image_url: { url: dataUrl(p) } }]
+      } catch {
+        return [] // gone, or over MAX_IMAGE: the chat has it, the model its path
+      }
+    })
+    if (pics.length) messages.push({ role: 'user', content: [{ type: 'text', text: 'The screenshot you took (the user sees it in the chat too):' }, ...pics] })
   }
 }
 // one OpenRouter call with Settings › AI's key, no tools and no chat (a workflow's AI call block): its answer, logged
@@ -1023,11 +1032,25 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unkn
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
   const none = (a: { kind: AiAct['kind']; id: string }) => new Error(`no ${a.kind === 'widget' ? 'extension' : a.kind === 'archive' ? 'workspace (not archived)' : a.kind === 'delete' ? 'workspace' : a.kind} ${a.id}${a.kind === 'memory' ? ' in that project' : ''}`)
   // several of one kind in one question (Q14): each named from Laki's own state, the same one once
+  const out: string[] = []
+  const left = () => (out.length ? ` Left out, tell the user: ${out.join('; ')}.` : '')
   if (act && MANY.includes(act.kind)) {
     const given = (Array.isArray(p.act!.items) ? (p.act!.items as unknown[]) : []).filter((x): x is { id: string; text?: unknown } => !!x && typeof (x as { id?: unknown }).id === 'string' && !!(x as { id: string }).id)
-    const items = given.filter((x, i) => given.findIndex(y => y.id === x.id) === i).slice(0, AI_ITEMS).map(x => itemOf(act, x.id, x.text) ?? fail(none({ kind: act.kind, id: x.id })))
+    // one that can't be (gone, archived already, a project's own folder) is left out and said, not the whole question
+    const items = given.filter((x, i) => given.findIndex(y => y.id === x.id) === i).slice(0, AI_ITEMS).flatMap(x => {
+      try {
+        const i = itemOf(act, x.id, x.text)
+        if (i) return [i]
+        out.push(none({ kind: act.kind, id: x.id }).message)
+      } catch (e) {
+        out.push((e as Error).message)
+      }
+      return []
+    })
+    if (given.length && !items.length) throw new Error(out.join('; '))
+    if (items.length) act.id = items[0].id
     if (items.length > 1) (act.items = items), delete act.text
-    else if (items.length) (act.id = items[0].id), items[0].text !== undefined && (act.text = items[0].text)
+    else if (items.length && items[0].text !== undefined) act.text = items[0].text
   }
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw none(act)
@@ -1050,7 +1073,7 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unkn
     open.at = t.at = Date.now()
     t.asked = true
     changed(t)
-    return { asked: open.ask.id, note: `Added to the question the user already has: one list of ${items.length}, a box each, one Yes. Next time give them all at once (ids). End your turn now, without more words.` }
+    return { asked: open.ask.id, note: `Added to the question the user already has: one list of ${items.length}, a box each, one Yes. Next time give them all at once (ids).${left()} End your turn now, without more words.` }
   }
   const text = act ? (on ? turnOn(act, on.text) : askText(act)) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
@@ -1063,13 +1086,10 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unkn
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees ${act.items ? `the ${act.items.length} listed, a box each, and ` : ''}Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? `archives ${act.items ? 'the ticked ones' : 'it'}, Laki does` : act.kind === 'delete' ? `deletes ${act.items ? 'the ticked ones' : 'it'}, Laki does` : `removes ${act.items ? 'the ticked ones' : 'it'}`} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees ${act.items ? `the ${act.items.length} listed, a box each, and ` : ''}Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : act.kind === 'archive' ? `archives ${act.items ? 'the ticked ones' : 'it'}, Laki does` : act.kind === 'delete' ? `deletes ${act.items ? 'the ticked ones' : 'it'}, Laki does` : `removes ${act.items ? 'the ticked ones' : 'it'}`} (you do not).${left()} End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 // Q14: the kinds a question may list several of, a box each on the AI page (act.items)
 const MANY: AiAct['kind'][] = ['memory', 'schedule', 'tab', 'todo', 'archive', 'delete']
-const fail = (e: Error): never => {
-  throw e
-}
 // what a delete would lose, as the question says it: Laki's words only (digits, letters, commas)
 const loseText = (s: unknown) => String(s ?? '').replace(/[^\w ,]/g, '').slice(0, 120)
 // one of several: its name alone (whatOf's, out of its quotes), what a delete of it would lose
@@ -1092,12 +1112,15 @@ function askText(a: AiAct) {
   return `${head}\n\n${a.items.map(i => `- ${i.label.replace(/\s+/g, ' ')}${i.note ? ` (${i.note})` : ''}${i.text ? `: loses ${i.text}` : ''}`).join('\n')}`
 }
 const askOptions = (a: AiAct) => (a.kind === 'run' ? ['Yes, run it', "No, don't"] : a.kind === 'profile' ? ['Yes, save them', "No, don't"] : a.items ? [`Yes, ${VERB(a)} ${a.items.length}`, 'No, keep them'] : a.kind === 'archive' ? ['Yes, archive it', 'No, keep it'] : a.kind === 'delete' ? ['Yes, delete it', 'No, keep it'] : [`Yes, remove ${a.label}`, 'No, keep it'])
+// what a delete would lose, by its kind: "2 uncommitted files, 1 commit not pushed" as uncommitted file 2, commit not pushed 1
+const loseParts = (s: string) => new Map(s.split(', ').filter(Boolean).map(x => [x.replace(/^\d+ /, '').replace(/s\b/, ''), Number(/^\d+/.exec(x)?.[0] ?? 1)] as const))
 // one of them done at the user's Yes. A delete: what it would lose looked at again, and one with more to lose now than
-// the question said stays (an agent wrote since)
-async function doOne(a: AiAct, id: string, shown: string | undefined, rpc: Rpc) {
+// the question said stays (an agent wrote since); less (it pushed, it committed) goes. v: the state, read once for several
+async function doOne(a: AiAct, id: string, shown: string | undefined, rpc: Rpc, v?: View) {
   if (a.kind === 'delete') {
-    const now = loseText(await wsLose(rpc, id))
-    if (now && now !== (shown ?? '')) throw new Error(`it has ${now} now, not what you were shown: ask again`)
+    const now = loseText(await wsLose(rpc, id, v))
+    const was = loseParts(shown ?? '')
+    if ([...loseParts(now)].some(([k, n]) => n > (was.get(k) ?? 0))) throw new Error(`it has ${now} now, more than you were shown: ask again`)
     return rpc('wsRm', { id })
   }
   if (a.kind === 'archive') return archiveAct({ ...a, id }, rpc)
@@ -1116,10 +1139,11 @@ async function answerMany(t: Thread, m: AiMsg, n: number, only: unknown, rpc: Rp
   say(t, 'user', n === 0 && ticked.length < items.length ? `Yes, ${VERB(act)} ${ticked.length} of ${items.length}` : m.ask!.options[n])
   if (n !== 0) return say(t, 'ai', `Kept all ${items.length}.`), { kept: true }
   const done = DONE(act)
+  const v = act.kind === 'delete' ? await rpc<View>('state').catch(() => undefined) : undefined
   for (const i of ticked) {
     i.said = '…'
     changed(t)
-    i.said = await doOne(act, i.id, i.text, rpc).then(() => done, e => `not ${done}: ${(e as Error).message}`)
+    i.said = await doOne(act, i.id, i.text, rpc, v).then(() => done, e => `not ${done}: ${(e as Error).message}`)
   }
   const ok = ticked.filter(i => i.said === done)
   const no = ticked.filter(i => i.said !== done)
@@ -1362,13 +1386,16 @@ async function remove(a: AiAct, rpc: Rpc) {
 // a screenshot Laki AI takes while it works on an ask: the screen, an app's frontmost window by the app's name, or the
 // iOS Simulator; kept in images/, shown in the chat, and (OpenRouter, your endpoint) given to the model as a picture; a
 // CLI backend reads its path. The whole screen only when the user's last message asks to see it (or Your instructions
-// name screenshots): never for something a tab's screen or a PR told it
-const SHOT_SAID = /screen|capture|look|\bsee\b|show|what.?s on/i
+// name the screen): never for something a tab's screen or a PR told it, never in an agent's chat
+const SHOT_SAID = /screen|display|desktop|monitor|capture/
+// what the user asked for, in their own words: their last message in this chat and Your instructions. An agent's chat
+// has none (its "user" is that agent)
+const userSaid = (t: Thread) => (AGENT_CHAT.test(t.id) ? '' : `${t.chat.findLast(m => m.role === 'user')?.text ?? ''}\n${state.settings?.ai?.context ?? ''}`.toLowerCase())
 export async function aiShot(p: { of?: string; chat?: string }) {
   const t = asking(p.chat)
   const of = String(p.of ?? '').trim().slice(0, 80) || 'screen'
   const whole = of.toLowerCase() === 'screen'
-  if (whole && !SHOT_SAID.test(t.chat.findLast(m => m.role === 'user')?.text ?? '') && !/screen/i.test(state.settings?.ai?.context ?? '')) throw new Error("not taken: Laki AI looks at the whole screen only when the user asks it to; an app's window by its name, or the simulator, any time")
+  if (whole && !SHOT_SAID.test(userSaid(t))) throw new Error("not taken: Laki AI looks at the whole screen only when the user asks it to; an app's window by its name, or the simulator, any time")
   if (process.platform !== 'darwin') throw new Error('a screenshot: macOS only')
   const r = whole ? { ...(await screenShot()), what: 'the screen' } : await device({ op: 'shot', ...(of.toLowerCase() !== 'simulator' && { app: of }) }).then(d => ({ path: (d as { path: string }).path, what: 'app' in (d as object) ? `${(d as { app: string }).app}${(d as { title?: string }).title ? `: ${(d as { title: string }).title}` : ''}` : `the simulator (${(d as { simulator?: string }).simulator ?? 'iOS'})` }))
   ;(t.shots ??= []).push(r.path)
@@ -1378,12 +1405,16 @@ export async function aiShot(p: { of?: string; chat?: string }) {
 // an app on the Mac opened by its name, a web address in the browser (or in that app): only while Laki AI works on an
 // ask, as the user's own `open` would
 export async function aiOpenApp(p: { app?: string; url?: string; chat?: string }) {
-  asking(p.chat)
+  const t = asking(p.chat)
   const app = String(p.app ?? '').trim()
   const url = String(p.url ?? '').trim()
   if (!app && !url) throw new Error('an app, a url, or both')
   if (app && !/^[\w][\w .&+'-]{0,59}$/.test(app)) throw new Error('an app by its name, as Applications has it (Safari, Xcode, Simulator)')
   if (url && !/^https?:\/\/[^\s"'<>]+$/i.test(url)) throw new Error('a web address: http or https')
+  // only a site the user named (or this Mac's own): text Laki AI read in a tab or a PR can't send it anywhere else
+  const host = url ? (URL.parse(url)?.hostname ?? '').toLowerCase().replace(/^www\./, '') : ''
+  if (url && !host) throw new Error('a web address: http or https')
+  if (host && !/^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/.test(host) && !userSaid(t).includes(host)) throw new Error(`not opened: the user didn't name ${host}. Give them the link to click, or ask them first (laki_ask)`)
   if (process.platform !== 'darwin') throw new Error('opening an app: macOS only')
   await new Promise<void>((ok, no) => execFile('open', [...(app ? ['-a', app] : []), ...(url ? [url] : [])], { timeout: 15000 }, (e, _out, err) => (e ? no(new Error(`couldn't open ${app || url}: ${String(err || e.message).trim().split('\n').at(-1)}`)) : ok())))
   return { opened: app || url, ...(app && url && { with: url }) }

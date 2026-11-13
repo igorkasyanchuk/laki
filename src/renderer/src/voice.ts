@@ -196,7 +196,7 @@ async function write(audio: Blob, target: HTMLElement | null, may: boolean, forc
     if (text) remember(text)
     const typed = !!text && (await insert(text, target, may, force))
     // Q6: typed into a field: Undo takes it back (as ⌘Z there would)
-    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => (el => el && undoIn(el))(isField(target) ? target : fieldNow()) : undefined)
+    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => typedIn && undoIn(typedIn) : undefined)
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }
@@ -221,6 +221,7 @@ const isField = (el: Element | null): el is HTMLElement => !!el?.isConnected && 
 // where it started is gone (its panel closed, its box drawn again): the field with the focus now, else a prompt box on
 // screen; typed there, never sent, and never a terminal (not where you meant it: its agent or shell would get it)
 const fieldNow = () => (isField(document.activeElement) && !isTerm(document.activeElement) ? document.activeElement : [...document.querySelectorAll<HTMLElement>('textarea[data-voice-send]')].find(e => e.offsetParent) ?? null)
+let typedIn: HTMLElement | null = null // the field the last text went into (its target, or fieldNow's): Undo's
 const undoIn = (el: HTMLElement) => (set({ phase: 'idle' }), el.isConnected && (el.focus(), document.execCommand('undo')))
 // true: typed into a field (not a terminal, not sent), so Undo can take it back
 async function insert(text: string, el: HTMLElement | null, may: boolean, force = false): Promise<boolean> {
@@ -245,6 +246,7 @@ async function insert(text: string, el: HTMLElement | null, may: boolean, force 
     const copied = await navigator.clipboard?.writeText(t).then(() => true, () => false)
     return say(`Not sent: ${why}${copied ? '. Copied, paste it' : ''}`), false
   }
+  typedIn = el
   if (t) document.execCommand('insertText', false, (before && !/\s$/.test(before) ? ' ' : '') + t)
   if (sends && el.dataset.voiceSend !== undefined) {
     await new Promise(ok => setTimeout(ok, 50)) // its box's state takes the text first

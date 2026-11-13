@@ -184,4 +184,4 @@ needs no bump: `settingsSet` keeps any field.
 176: `termAnswer` and the `termAsk`, `termDone` events (S1: a terminal Laki hasn't seen is allowed once in the window before its calls are yours); `termHeld` over `/rpc` (the CLI's hint).
 177: `reviewNotesGet`, `reviewNotesSet` (R10: the Review tab's unsent comments kept by the daemon per workspace).
 178: `reviewMark`, `diff`'s `since` and a workspace's `reviewed` (R11: Changes' Since I reviewed).
-179: `prAct`'s `revert` (a merged PR undone by a new one; the `pr.revert` cap), `diff`'s `since` as a commit's sha (Changes' Since; the `diff.since` cap), a workspace's `wtKey` and `GET /worktree/<wtKey>/<ws>/<path>` (View as page).
+179: `prAct`'s `revert` (a merged PR undone by a new one; the `pr.revert` cap), `diff`'s `since` as a commit's sha (Changes' Since; the `diff.since` cap), a workspace's `wtKey` and `GET /worktree/<wtKey>/<ws>/<path>` (View as page). Laki AI: a question's `act.items` (several at one Yes) and `aiAnswer`'s `only`, a question with an `act` answerable after a newer ask, `aiShot`, `aiOpenApp`, `aiHelp`.
