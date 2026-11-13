@@ -31,7 +31,7 @@ test("U10: Basic's four heads name real sections and cards; its settings are FIN
   assert.deepEqual([r.settings[0].where, r.settings[0].basic], ['Settings › Git & worktrees › Sync the base branch', true])
   // Appearance in three: Theme & type keeps its id (old links), Layout and Extras are new
   assert.deepEqual(SECTIONS.filter(s => ['appearance', 'layout', 'extras'].includes(s.id)).map(s => s.label), ['Theme & type', 'Layout', 'Extras'])
-  assert.deepEqual(['Rail', 'Glass', 'Theme'].map(t => FIND.find(f => f[1] === t)?.[0]), ['layout', 'extras', undefined])
+  assert.deepEqual(['Rail', 'Glass', 'Background image', 'Custom CSS', 'Theme'].map(t => FIND.find(f => f[1] === t)?.[0]), ['layout', 'layout', 'layout', 'extras', undefined]) // the window's glass: under Layout's Design
   // hints: one line; the 20 longest moved their words into a ? card
   const hint = (t: string) => src.match(new RegExp(`<Says title="${t.replace(/[()+]/g, '\\$&')}" hint="([^"]+)"`))?.[1] ?? ''
   for (const t of ['Cloud workspaces (GitHub Codespaces)', 'Review tab', 'Reader view', 'Turns kept', 'Development mode', '+ button']) {

@@ -1073,6 +1073,15 @@ export function SettingsPage(p: {
         ...(p.projects ?? []).filter(x => hits(`${x.name} project`)).map(x => ({ sec: `project:${x.id}`, title: x.name, where: 'Project' })),
       ].slice(0, 12)
   const go = (r: { sec: string; title: string }) => (setView('all'), setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() })) // in All: Basic hides most
+  // Theme's hint: where the window's frame and glass are (Layout, under Design)
+  const themeHint = (
+    <>
+      Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type. The window's frame, glass and background picture:{' '}
+      <button type="button" className="link" onClick={() => go({ sec: 'layout', title: 'Design' })}>
+        Layout › Design
+      </button>
+    </>
+  )
   const nextKey = keyShow(keyMap(s.keys).next) // Needs you's words: ⌘J, or what Settings › Keys made it ('': none)
   // the global hotkeys (main's globalShortcut): General's, and the Keys page's too, with the keys in use now
   const globalKeys = bridge?.hotkey && (
@@ -1601,7 +1610,7 @@ export function SettingsPage(p: {
           {on('appearance') && (
             <>
               <h2>Theme & type</h2>
-              <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
+              <Group title="Theme" hint={themeHint}>
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.themeAuto} onChange={v => paint({ themeAuto: v })}>
                   <Says title="Follow the system" hint="A light theme while macOS is light, a dark one while it's dark: it turns with the system, terminals and all. Off, the theme picked below stays" />
@@ -1830,6 +1839,130 @@ export function SettingsPage(p: {
                     </button>
                   )))(designTraits(s.design) ? s.design : 'classic') /* one it no longer has: Classic, as the window */}
                 </div>
+              </Group>
+              <Group title="Window" hint="What shows through it: macOS's glass and how see-through each part is, or a picture behind them">
+              <div className="setting-box">
+                <Switch className="switch-row" on={glassy} disabled={s.design === 'frosted'} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
+                  <Says title="Glass" hint={s.design === 'frosted' ? 'Always on in the Frosted design' : 'A see-through window: the desktop shows through, blurred'} />
+                </Switch>
+                {(glassy || (s.sideClear ?? 0) > 0 || (s.translucent !== false && /Mac/.test(navigator.userAgent))) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
+                  <div className="muted small">macOS's Reduce transparency is on, so the window stays solid: turn it off in System Settings › Accessibility › Display.</div>
+                )}
+                {glassy && (
+                  <>
+                    <div className="sliders">
+                      <span className="muted small">
+                        How see-through{' '}
+                        {(['glassWindow', 'glassSide', 'glassTerm'] as const).some(k => (s[k] ?? GLASS[k]) !== GLASS[k]) && (
+                          <button type="button" className="link" onClick={() => paint({ ...GLASS })}>
+                            Reset
+                          </button>
+                        )}
+                      </span>
+                      {(
+                        [
+                          ['glassWindow', 'Window'],
+                          ['glassSide', 'Sidebar'],
+                          ['glassTerm', 'Terminals'],
+                        ] as const
+                      ).map(([k, label]) => {
+                        const v = s[k] ?? GLASS[k]
+                        return (
+                          <label key={k} className="slider-row">
+                            <span>{label}</span>
+                            <input
+                              type="range"
+                              className="range"
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={v}
+                              style={{ '--p': v } as CSSProperties /* the filled part of the track */}
+                              onChange={e => paint({ [k]: Number(e.target.value) })}
+                            />
+                            <span className="slider-val">{v}%</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <Switch className="switch-row" on={s.glassGlow !== false} onChange={v => paint({ glassGlow: v })}>
+                      <Says title="Glow" hint="The theme's colors, lit from two corners behind the glass" />
+                    </Switch>
+                  </>
+                )}
+                {!glassy && /Mac/.test(navigator.userAgent) && bridge && (
+                  // V5: the sidebar over macOS's sidebar material, the main area a card on it (themes.ts material)
+                  <Switch className="switch-row" on={s.translucent !== false} disabled={!!s.design && s.design !== 'classic'} onChange={v => paint({ translucent: v })}>
+                    <Says title="Translucent sidebar" hint={s.design && s.design !== 'classic' ? 'With the Classic design (Layout › Design)' : "The sidebar and the rail over macOS's sidebar material, the terminals a card on it"} />
+                  </Switch>
+                )}
+                {!glassy && (!/Mac/.test(navigator.userAgent) || !bridge || s.translucent !== false) && (
+                  <div className="sliders">
+                    <Says title="Sidebar see-through" hint={/Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'How much of the desktop shows through. Auto: as much as keeps its words readable over any wallpaper' : "The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off"} />
+                    <label className="slider-row">
+                      <span>Sidebar</span>
+                      <input
+                        type="range"
+                        className="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={s.sideClear ?? 0}
+                        style={{ '--p': s.sideClear ?? 0 } as CSSProperties}
+                        onChange={e => paint({ sideClear: Number(e.target.value) })}
+                      />
+                      <span className="slider-val">{!s.sideClear && /Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'Auto' : `${s.sideClear ?? 0}%`}</span>
+                    </label>
+                  </div>
+                )}
+                {p.bg && (
+                  <div className="sliders">
+                    <Says title="Background image" hint={s.design === 'frosted' ? 'Frosted shows the desktop instead: pick another design to see the picture' : glassy ? 'Glass shows the desktop instead: turn it off to see the picture' : 'A picture behind the sidebar and terminals, softly, in any theme'} />
+                    <div className="row bg-pick">
+                      {s.background?.file && p.bg.url && <img className="bg-thumb" src={p.bg.url} alt="" />}
+                      <button type="button" onClick={() => bgInput.current?.click()}>
+                        {s.background?.file ? 'Another picture…' : 'Pick a picture…'}
+                      </button>
+                      {s.background?.file && (
+                        <button type="button" onClick={() => void p.bg!.set(null).catch((e: Error) => setBgErr(e.message))}>
+                          Remove
+                        </button>
+                      )}
+                      <input
+                        ref={bgInput}
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                        hidden
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          e.target.value = '' // the same file again is a change too
+                          if (f) setBgErr(''), void p.bg!.set(f).catch((err: Error) => setBgErr(err.message))
+                        }}
+                      />
+                    </div>
+                    {bgErr && <p className="field-err">{bgErr}</p>}
+                    {s.background?.file &&
+                      (
+                        [
+                          ['dim', 'Dim', BG.dim, 95, '%'],
+                          ['blur', 'Blur', BG.blur, 40, 'px'],
+                        ] as const
+                      ).map(([k, label, d, max, unit]) => {
+                        const v = s.background?.[k] ?? d
+                        return (
+                          <label key={k} className="slider-row">
+                            <span>{label}</span>
+                            <input type="range" className="range" min={0} max={max} step={k === 'dim' ? 5 : 1} value={v} style={{ '--p': (v / max) * 100 } as CSSProperties} onChange={e => paint({ background: { ...s.background, [k]: Number(e.target.value) } })} />
+                            <span className="slider-val">
+                              {v}
+                              {unit}
+                            </span>
+                          </label>
+                        )
+                      })}
+                  </div>
+                )}
+              </div>
               </Group>
               <Group title="Rail" hint="A column of buttons on the left: Projects, then the pages below in your order, each with what needs you there; the list beside it shows the one you pick">
                 <div className="setting-row rail-buttons">
@@ -2124,123 +2257,6 @@ export function SettingsPage(p: {
                   </div>
                 </Group>
               )}
-              <Group title="Window">
-              <div className="setting-box">
-                <Switch className="switch-row" on={glassy} disabled={s.design === 'frosted'} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
-                  <Says title="Glass" hint={s.design === 'frosted' ? 'Always on in the Frosted design' : 'A see-through window: the desktop shows through, blurred'} />
-                </Switch>
-                {(glassy || (s.sideClear ?? 0) > 0 || (s.translucent !== false && /Mac/.test(navigator.userAgent))) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
-                  <div className="muted small">macOS's Reduce transparency is on, so the window stays solid: turn it off in System Settings › Accessibility › Display.</div>
-                )}
-                {glassy && (
-                  <>
-                    <div className="sliders">
-                      <span className="muted small">How see-through</span>
-                      {(
-                        [
-                          ['glassWindow', 'Window'],
-                          ['glassSide', 'Sidebar'],
-                          ['glassTerm', 'Terminals'],
-                        ] as const
-                      ).map(([k, label]) => {
-                        const v = s[k] ?? GLASS[k]
-                        return (
-                          <label key={k} className="slider-row">
-                            <span>{label}</span>
-                            <input
-                              type="range"
-                              className="range"
-                              min={0}
-                              max={100}
-                              step={5}
-                              value={v}
-                              style={{ '--p': v } as CSSProperties /* the filled part of the track */}
-                              onChange={e => paint({ [k]: Number(e.target.value) })}
-                            />
-                            <span className="slider-val">{v}%</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                    <Switch className="switch-row" on={s.glassGlow !== false} onChange={v => paint({ glassGlow: v })}>
-                      <Says title="Glow" hint="The theme's colors, lit from two corners behind the glass" />
-                    </Switch>
-                  </>
-                )}
-                {!glassy && /Mac/.test(navigator.userAgent) && bridge && (
-                  // V5: the sidebar over macOS's sidebar material, the main area a card on it (themes.ts material)
-                  <Switch className="switch-row" on={s.translucent !== false} disabled={!!s.design && s.design !== 'classic'} onChange={v => paint({ translucent: v })}>
-                    <Says title="Translucent sidebar" hint={s.design && s.design !== 'classic' ? 'With the Classic design (Layout › Design)' : "The sidebar and the rail over macOS's sidebar material, the terminals a card on it"} />
-                  </Switch>
-                )}
-                {!glassy && (!/Mac/.test(navigator.userAgent) || !bridge || s.translucent !== false) && (
-                  <div className="sliders">
-                    <Says title="Sidebar see-through" hint={/Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'How much of the desktop shows through. Auto: as much as keeps its words readable over any wallpaper' : "The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off"} />
-                    <label className="slider-row">
-                      <span>Sidebar</span>
-                      <input
-                        type="range"
-                        className="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={s.sideClear ?? 0}
-                        style={{ '--p': s.sideClear ?? 0 } as CSSProperties}
-                        onChange={e => paint({ sideClear: Number(e.target.value) })}
-                      />
-                      <span className="slider-val">{!s.sideClear && /Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'Auto' : `${s.sideClear ?? 0}%`}</span>
-                    </label>
-                  </div>
-                )}
-                {p.bg && (
-                  <div className="sliders">
-                    <Says title="Background image" hint={glassy ? 'Glass shows the desktop instead: turn it off to see the picture' : 'A picture behind the sidebar and terminals, softly, in any theme'} />
-                    <div className="row bg-pick">
-                      {s.background?.file && p.bg.url && <img className="bg-thumb" src={p.bg.url} alt="" />}
-                      <button type="button" onClick={() => bgInput.current?.click()}>
-                        {s.background?.file ? 'Another picture…' : 'Pick a picture…'}
-                      </button>
-                      {s.background?.file && (
-                        <button type="button" onClick={() => void p.bg!.set(null).catch((e: Error) => setBgErr(e.message))}>
-                          Remove
-                        </button>
-                      )}
-                      <input
-                        ref={bgInput}
-                        type="file"
-                        accept="image/png,image/jpeg,image/gif,image/webp"
-                        hidden
-                        onChange={e => {
-                          const f = e.target.files?.[0]
-                          e.target.value = '' // the same file again is a change too
-                          if (f) setBgErr(''), void p.bg!.set(f).catch((err: Error) => setBgErr(err.message))
-                        }}
-                      />
-                    </div>
-                    {bgErr && <p className="field-err">{bgErr}</p>}
-                    {s.background?.file &&
-                      (
-                        [
-                          ['dim', 'Dim', BG.dim, 95, '%'],
-                          ['blur', 'Blur', BG.blur, 40, 'px'],
-                        ] as const
-                      ).map(([k, label, d, max, unit]) => {
-                        const v = s.background?.[k] ?? d
-                        return (
-                          <label key={k} className="slider-row">
-                            <span>{label}</span>
-                            <input type="range" className="range" min={0} max={max} step={k === 'dim' ? 5 : 1} value={v} style={{ '--p': (v / max) * 100 } as CSSProperties} onChange={e => paint({ background: { ...s.background, [k]: Number(e.target.value) } })} />
-                            <span className="slider-val">
-                              {v}
-                              {unit}
-                            </span>
-                          </label>
-                        )
-                      })}
-                  </div>
-                )}
-              </div>
-              </Group>
               <Group title="Custom CSS" hint="Anything the pickers above don't reach: your own rules over the app's, in every window, as you type. Pictures and fonts from the web stay blocked">
                 <textarea className="mono custom-css" rows={6} spellCheck={false} value={s.customCss ?? ''} placeholder={'.sidebar .ws { font-size: 15px; }\n.project-name { color: var(--accent); }'} onChange={e => set({ customCss: e.target.value })} />
                 <CssGuide open={!s.customCss?.trim()} onAdd={css => set({ customCss: `${(s.customCss ?? '').trimEnd()}${s.customCss?.trim() ? '\n' : ''}${css}\n` })} />

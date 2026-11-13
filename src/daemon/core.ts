@@ -123,7 +123,8 @@ const readState = (p: string): State => {
 
 // U10: a new install's defaults (an install from before keeps what it had): the base fetched from origin before a
 // worktree, the row's next-step chip, memory compaction off until you turn it on (it sends text to Laki AI's model),
-// and no macOS notification as a turn finishes (asks still notify; finishes are in Needs you)
+// and no macOS notification as a turn finishes (asks still notify; finishes are in Needs you). On a Mac its window is
+// the Frosted design (Settings › Layout › Design: macOS's glass), set where the theme pair is
 const NEW_DEFAULTS = { syncBase: 'origin', rowMarks: { step: true }, memoryCompact: { on: false }, notifyOn: { done: false } } as const
 // R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
 // state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
@@ -227,7 +228,7 @@ export function load() {
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
-    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
+    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted' }), ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
 }
 
