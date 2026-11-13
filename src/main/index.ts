@@ -276,6 +276,36 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await nap(1500)
       await waitFor(() => has('.sidebar, .welcome'), 'the window again')
     }, async () => !(await has('.whats-new'))],
+    // View as page: a changed HTML file of the worktree by its 🌐 in Changes: the sandboxed frame from GET /worktree,
+    // its CSS and script beside it loaded (asked of the frame's own document); Back closes it
+    ['view-as-page', async () => {
+      await key('Escape')()
+      const d = await named('dark-mode')
+      mkdirSync(join(d.path, 'emails'), { recursive: true })
+      writeFileSync(join(d.path, 'emails/mail.css'), 'body { font: 16px sans-serif; padding: 40px } h1 { color: rgb(1, 2, 3) }')
+      writeFileSync(join(d.path, 'emails/mail.js'), 'document.title = "ran"; document.querySelector("p").textContent = "Its script ran."')
+      writeFileSync(join(d.path, 'emails/welcome.html'), '<link rel="stylesheet" href="mail.css"><h1>Welcome to Shop</h1><p></p><script src="mail.js"></script>')
+      writeFileSync(join(d.path, 'PLAN.md'), '# Dark mode plan\n\n## Goals\n\nShip it.\n\n### Colors\n\nTokens first.\n\n<h2>Rollout</h2>\n\nBehind a flag.\n')
+      await click(row(d.id))()
+      if (!(await has('[role=tab][aria-label="Changes"]'))) await js("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', metaKey: true, altKey: true, bubbles: true, cancelable: true }))")
+      await waitFor(() => has('[role=tab][aria-label="Changes"]'), 'the side panel')
+      await click('[role=tab][aria-label="Changes"]')()
+      await waitFor(() => has('.sp-change button[aria-label^="View as page"]'), 'its View as page', 15000)
+      await click('.sp-change button[aria-label^="View as page"]')()
+      await waitFor(() => has('iframe.art-frame[src*="/worktree/"]'), 'the frame')
+    }, async () => {
+      const f = w.webContents.mainFrame.framesInSubtree.find(f => f.url.includes('/worktree/'))
+      return !!f && (await f.executeJavaScript('document.title === "ran" && getComputedStyle(document.querySelector("h1")).color === "rgb(1, 2, 3)"').then(Boolean, () => false))
+    }],
+    ['view-as-page-back', () => clickText('.modal button', 'Back'), async () => !(await has('iframe.art-frame'))],
+    // Outline: a Markdown file in Files, its headings under Go to heading…, a raw <h2> among them
+    ['outline', async () => {
+      await click('[role=tab][aria-label="Files"]')()
+      await waitFor(() => hasText('.side-panel *', 'PLAN.md'), 'PLAN.md in Files', 15000)
+      await js(`[...document.querySelectorAll('.side-panel *')].find(e => !e.children.length && e.textContent.trim() === 'PLAN.md')?.click()`)
+      await waitFor(() => hasText('.pv-head button', 'Outline'), 'its Outline')
+      await clickText('.pv-head button', 'Outline')
+    }, async () => (await has('.menu .menu-filter')) && (await hasText('.menu-item', 'Rollout')) && (await hasText('.menu-item', 'Colors'))],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
       for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})
