@@ -54,7 +54,11 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // elsewhere) and ui-smoke (main marks the page data-smoke): fn at once. One whose change hasn't run in 400 ms is skipped
 // (its change runs then)
 let grewFrom: HTMLElement | null = null
-const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+// Not in a see-through window either (html.vibrant: macOS's glass behind the page, Frosted's or Glass's): while a
+// transition's picture fades, the desktop behind every see-through part (the sidebar, the rail) fades to flat grey with
+// it and snaps back as it ends, the whole panel flashing (seen only in a screen recording: Chromium's own frames are
+// right). ponytail: no transitions there at all; ones that only move (no fade) didn't flash and could come back
+const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !document.documentElement.classList.contains('vibrant') && !matchMedia('(prefers-reduced-motion: reduce)').matches
 const sheetOf = () => [...document.querySelectorAll<HTMLElement>('.overlay .modal, .main > .settings-page')].at(-1) ?? null
 export function morph(fn: () => void, grow?: 'open' | 'close') {
   if (!morphOk()) return fn()

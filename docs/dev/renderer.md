@@ -1094,8 +1094,17 @@ A transition's pictures belong to the root: while one runs the pointer is over `
 comes for the button under it again. Tips' `over` (ui.tsx) skips the root as a target, else a rail button just pressed
 showed its tip again 350 ms later, over the sidebar's corner.
 
-Seen frame by frame only in a focused Electron window (a preview pane draws none, and the UI walk turns `morph` off):
-`webContents.beginFrameSubscription` in main, the sidebar's area of each frame compared with the one before.
+No view transitions in a see-through window (`html.vibrant`: macOS's glass behind the page, Frosted's or Glass's;
+`morphOk`): while a transition's picture fades (its own opacity or its group's), the desktop behind every see-through
+part of the window (the sidebar, the rail) fades to flat grey with it and snaps back as the transition ends, so the
+whole panel flashed on every page change. Pages there change at once; Motion: High's own entrances still play. A
+transition with no fade (the old picture not shown, the new one at once) didn't flash: the ones that only move (a sheet
+growing, a row sliding) could come back that way.
+
+How these were seen: `webContents.beginFrameSubscription` in main for every frame Chromium draws (the sidebar's area
+of each compared with the one before; a preview pane draws none, and the UI walk turns `morph` off). The glass flash
+isn't in those frames: only a recording of the real screen shows it (`screencapture -v -R` on the window's bounds,
+`ffmpeg` for its frames).
 
 ## A page's head turns to glass
 
