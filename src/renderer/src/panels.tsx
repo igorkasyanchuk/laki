@@ -7,7 +7,7 @@ import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
-import { Markdown } from './MarkdownView'
+import { Markdown, outlineItems } from './MarkdownView'
 import { preview, THEMES } from './themes'
 import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
@@ -1975,7 +1975,8 @@ function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undef
 
 // stamp: its size and time, looked at every 1.5 s while it's open: a change (an agent writes it again) reads it again, a
 // page loads again
-export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
+// wt: View as page, a worktree's HTML file: said so, and Back instead of Close
+export function ArtifactView({ path, page, read, stamp, wt, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
@@ -1997,7 +1998,7 @@ export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onRe
         )}
       </div>
       <div className="buttons">
-        <span className="muted small grow">{html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
+        <span className="muted small grow">{wt ? 'The file as it is in the worktree now: a commit’s or the PR’s may differ. Sandboxed: its scripts run; it can’t read Laki or your files' : html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
         {onSource && <button onClick={onSource} data-tip="Its text in the side panel's preview">Source</button>}
         {onReveal && <button onClick={onReveal}>Show in Finder</button>}
         {onExternal && <button onClick={onExternal}>Open in the browser</button>}
@@ -2007,7 +2008,7 @@ export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onRe
           </button>
         )}
         <button className="primary" onClick={onClose}>
-          Close
+          {wt ? 'Back' : 'Close'}
         </button>
       </div>
     </Modal>
@@ -2220,6 +2221,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
               ) : (
                 <>
                   <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
+                  {/\.(md|markdown)$/i.test(at.path) && <button data-tip="Go to heading…" onClick={e => openMenu(e, outlineItems(e.currentTarget.closest('.modal')))}>Outline</button>}
                   {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}
                   {a.reveal && !card(at) && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
                   {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}

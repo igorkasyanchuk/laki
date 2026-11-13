@@ -1047,7 +1047,11 @@ line, after the tab restarts.
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
-in its header and remembered. A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
+in its header and remembered; *Outline* (⌘⇧O while the preview has the keyboard) lists the rendered page's headings by
+level under *Go to heading…*: type to filter, ↑↓ and ⏎ to go there (a Markdown artifact's big view has it too). An HTML
+file's right click (Files, Changes, the Review tab) and the 🌐 on its row have *View as page*: the file as it is in the
+worktree now, in a sandboxed frame, with the CSS, scripts and pictures beside it (its scripts run and fetch nothing;
+*Source* shows its text, *Back* closes it). A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
 row the head) or *Raw*: with the pencil, a click on a cell edits it (Enter: the cell below, Tab: the next, Esc: as it
 was), *+ Row*, *+ Column*, × on a row's number deletes it, ⌘S saves. Only the cells you change change in the file:
 its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest.
@@ -1113,7 +1117,12 @@ running), it has no conflicts, isn't a draft, is approved if the repo requires a
 (a push may come). It asks once, as you turn it on, and tries once per commit: a failure marks the agent ◆ and
 notifies you. The workspace stays (*Archive workspace when its PR merges* still applies).
 
-Each project says which of these Laki may do (its settings › *Pull requests*): *Merge*, *Approve* and *Close* are on
+A merged PR's menus (the status bar PR's right click, ⋯ in the panel, ⌘K) have *Revert…*: after you confirm, a new PR
+*Revert "<title>"* is opened that undoes it (GitHub's own revert, by `gh`; GitLab: the merge commit reverted onto a
+`revert-<sha>` branch, then an MR), and Laki offers it as a new workspace, to merge it or have an agent fix forward. A
+revert that conflicts is refused with the forge's words.
+
+Each project says which of these Laki may do (its settings › *Pull requests*): *Merge*, *Approve*, *Close* and *Revert* are on
 until you turn them off; *Merge when green* is off until you turn it on. What's off isn't shown, and the daemon
 refuses it.
 
@@ -2114,6 +2123,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⋯ › *Full screen* |
 | ⌘K | palette |
 | ⌘P | find a file in the workspace |
+| ⌘⇧O | a Markdown file's outline (*Go to heading…*), while its preview has the keyboard |
 | ⌘D | changes (the side panel) |
 | ⌥⌘B | side panel: info, files, changes, review, preview |
 | ⌘I | workspace info (the side panel on *Info*) |
@@ -2593,7 +2603,7 @@ tab). Saved as you type:
   it here (e.g. its own *Migrate*). Saved in the app only, not in `.laki.json`.
 - *Worktrees* (a git repository here): the folder this project's new worktrees go in, `<folder>/<id>`: a path
   relative to the repo, `~/…`, or a whole one. Empty: Settings › General's. Saved in the app only.
-- *Pull requests* (a git repository): what Laki may do to its PRs: *Merge*, *Merge when green*, *Approve*, *Close*
+- *Pull requests* (a git repository): what Laki may do to its PRs: *Merge*, *Merge when green*, *Approve*, *Close*, *Revert*
   (above, in *PRs*). Saved in the app only.
 
 These are saved in the app. A field left empty falls back to a `.laki.json` in the repo, which a team can

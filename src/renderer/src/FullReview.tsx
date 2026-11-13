@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
-import { atHead, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
+import { atHead, canPage, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -586,6 +586,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                   <IconButton icon="pin" title={pins.includes(f.path) ? 'Unpin (p)' : 'Pin to the top (p): first in both lists'} on={pins.includes(f.path)} onClick={e => (e.stopPropagation(), pinGo(f.path))} />
                   {!all && !IMAGE.test(f.path) && <IconButton icon="history" title={blaming ? 'Hide blame (b)' : "Blame (b): who last changed each line, the base's for lines taken out, the branch's for the rest"} on={blaming} onClick={e => (e.stopPropagation(), blame(f.path))} />}
                   {api.web && <IconButton icon="externalLink" title={`Open on remote: at ${baseName.replace(/^origin\//, '')} or at ${branch || 'the branch'}`} onClick={e => (e.stopPropagation(), openMenu(e, webSub(api, f.path, baseName, branch)))} />}
+                  {f.status[0] !== 'D' && !all && canPage(api, f.path) && <IconButton icon="globe" title="View as page: the file as it is in the worktree now" onClick={e => (e.stopPropagation(), api.page!(f.path))} />}
                   {f.status[0] !== 'D' && !all && <IconButton icon="file" title="Show the file" onClick={e => (e.stopPropagation(), api.preview(f.path))} />}
                   {f.status[0] !== 'D' && !all && <IconButton icon="code" title="Open in the editor" onClick={e => (e.stopPropagation(), api.openFile(f.path))} />}
                   <label className="sp-viewed fr-viewed-box" onClick={e => e.stopPropagation()}>

@@ -119,8 +119,8 @@ export type AppBase = {
   apps: AppInfo[]
   archive: (w: WorkspaceView, asked?: boolean) => Promise<void>
   artMenu: (w: WorkspaceView, path: string) => MenuItem[]
-  artPage: (w: WorkspaceView, path: string) => string | undefined
-  artView: { ws: string; path: string } | null
+  artPage: (w: WorkspaceView, path: string, wt?: boolean) => string | undefined
+  artView: { ws: string; path: string; wt?: boolean } | null
   asFile: (w: WorkspaceView, path: string) => (() => undefined) | undefined
   attachable: (w: WorkspaceView) => boolean
   bgUrl: string
@@ -308,7 +308,7 @@ export type AppBase = {
   sendLater: (to?: string, text?: string) => void
   setAiFloat: Dispatch<SetStateAction<boolean>>
   setArtsIn: Dispatch<SetStateAction<string | null>>
-  setArtView: Dispatch<SetStateAction<{ ws: string; path: string } | null>>
+  setArtView: Dispatch<SetStateAction<{ ws: string; path: string; wt?: boolean } | null>>
   setDialog: Dispatch<SetStateAction<Dialog>>
   setExtModal: Dispatch<SetStateAction<{ wid: string; ws?: string | undefined; m: SayModal; n: number } | null>>
   setFind: Dispatch<SetStateAction<Find | null>>

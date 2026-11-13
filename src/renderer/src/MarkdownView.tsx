@@ -5,7 +5,7 @@ import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, 
 import { openExternal } from './api'
 import { highlight } from './highlight'
 import { canRun, proposalOf, runText } from './text'
-import { useNear } from './ui'
+import { type MenuItem, useNear } from './ui'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
@@ -103,6 +103,15 @@ function DiffBlock({ text, lang }: { text: string; lang: string }) {
       </div>
     </div>
   )
+}
+
+// Outline (Go to heading…): a rendered Markdown page's headings as a menu's items, under the menu's filter box. Read
+// from the page, not the source (a raw <h2> counts, and the scroll lands on the one picked), each indented by its level
+export function outlineItems(root: Element | null | undefined): MenuItem[] {
+  const hs = [...(root?.querySelectorAll('.md :is(h1, h2, h3, h4, h5, h6)') ?? [])].filter(h => h.textContent?.trim())
+  if (!hs.length) return [{ head: 'No headings' }]
+  const top = Math.min(...hs.map(h => Number(h.tagName[1])))
+  return [{ filter: 'Go to heading…' }, ...hs.map(h => ({ label: '\u00a0\u00a0\u00a0'.repeat(Number(h.tagName[1]) - top) + h.textContent!.trim(), run: () => h.scrollIntoView({ block: 'start' }) }))]
 }
 
 // plain text with its web addresses as links that open in the browser (Reader's messages and steps); an address ends

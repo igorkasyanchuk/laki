@@ -1305,6 +1305,25 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.notEqual(bKey, widgetKey)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${bKey}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/plan/${p.id}/spec/x/p.html?key=${bKey}`)).status, 401)
+  // View as page: GET /worktree/<its own key>/<ws>/<path>, the worktree's file and what's beside it; no fetch at all
+  // (no connect-src), nothing of .git, nothing outside, not with the artifacts' key
+  const wv = (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
+  assert.notEqual(wv.wtKey, widgetKey)
+  mkdirSync(join(wv.path, 'docs'))
+  writeFileSync(join(wv.path, 'docs', 'mail.html'), '<link rel="stylesheet" href="m.css"><p>hello</p>')
+  writeFileSync(join(wv.path, 'docs', 'm.css'), 'p { color: blue }')
+  const wt = `http://127.0.0.1:${port}/worktree/${wv.wtKey}/${w.id}`
+  const mail = await fetch(`${wt}/docs/mail.html`)
+  assert.equal(mail.status, 200)
+  assert.equal(await mail.text(), '<link rel="stylesheet" href="m.css"><p>hello</p>')
+  assert.match(mail.headers.get('content-security-policy')!, /^sandbox allow-scripts; default-src 'none'/)
+  assert.doesNotMatch(mail.headers.get('content-security-policy')!, /connect-src/)
+  assert.equal((await fetch(`${wt}/docs/m.css`)).headers.get('content-type'), 'text/css')
+  assert.equal((await fetch(`${wt}/.git/HEAD`)).status, 404)
+  assert.equal((await fetch(`${wt}/..%2f..%2fstate.json`)).status, 404)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/worktree/${widgetKey}/${w.id}/docs/mail.html`)).status, 401)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${wv.wtKey}/${w.id}/site/index.html`)).status, 401)
+  rmSync(join(wv.path, 'docs'), { recursive: true })
   rmSync(join(dir, 'site'), { recursive: true })
   // a link an agent kept (a .url file): moved into the links file, in the view for the info panel, first in the
   // gallery (the app's: not a file); only http(s); one that isn't a link stays a file

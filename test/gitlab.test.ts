@@ -46,6 +46,17 @@ test('GitLab: a gitlab.com project’s MR by glab (its pipeline’s jobs as chec
   assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), [])
   assert.deepEqual(await rig.rpc('prTalk', { ws: ws.id }), [])
   assert.ok(!log(rig).split('\n').some(l => l.startsWith('gh pr ')), 'gh not asked')
+  // a merged one reverted: a branch off the target, its merge commit reverted onto it (the commits API), an MR from
+  // it; a revert GitLab can't make takes the branch off again; not merged, no merge commit: said
+  await assert.rejects(rig.rpc('prAct', { ws: ws.id, act: 'revert' }), /isn't merged/)
+  const merged = { iid: 12, state: 'merged', web_url: 'https://gitlab.com/o/repo/-/merge_requests/12', title: 'Fix the cart', author: { username: 'ann' }, sha: 'abc1234', target_branch: 'main', merge_commit_sha: 'feedc0de1234' }
+  for (const f of [`mr-${ws.branch.replaceAll('/', '-')}.json`, 'mr-12.json']) writeFileSync(join(lab, f), JSON.stringify(merged))
+  await rig.rpc('prRefresh', {})
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr?.state === 'MERGED', 'merged')
+  assert.deepEqual(await rig.rpc('prAct', { ws: ws.id, act: 'revert' }), { pr: { number: 7, url: 'https://gitlab.com/o/repo/-/merge_requests/7', title: 'Revert "Fix the cart"' } })
+  for (const l of ['glab api -X POST projects/:id/repository/branches -f branch=revert-feedc0de -f ref=main', 'glab api -X POST projects/:id/repository/commits/feedc0de1234/revert -f branch=revert-feedc0de', 'glab mr create --source-branch revert-feedc0de --target-branch main --title Revert "Fix the cart" --description Reverts !12 --yes']) assert.ok(log(rig).split('\n').includes(l), l)
+  writeFileSync(join(lab, 'mr-12.json'), JSON.stringify({ ...merged, merge_commit_sha: null }))
+  await assert.rejects(rig.rpc('prAct', { ws: ws.id, act: 'revert' }), /MR !12 has no merge commit to revert/)
   // none any more: the MR gone from the view
   rmSync(join(lab, `mr-${ws.branch.replaceAll('/', '-')}.json`))
   await rig.rpc('prRefresh', {})

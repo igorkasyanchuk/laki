@@ -639,6 +639,14 @@ export function artifactFile(id: string, rel: string) {
   return inside({ ...ws, path: ws.storage }, rel)
 }
 
+// a file of a workspace's worktree, for View as page (main.ts' GET /worktree/…: a changed HTML file and what it loads
+// beside it): its path, inside the worktree (links followed, none out of it), nothing of .git; never on a host
+export function worktreeFile(id: string, rel: string) {
+  const ws = findWs(id)
+  if (ws.host || rel.split('/').includes('.git')) throw new Error('not a file of the worktree')
+  return inside(ws, rel)
+}
+
 export const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const MAX_TEXT = 512 << 10
 // audio and video the preview and the artifacts viewer play: a file's kind always, its data URL with media: true

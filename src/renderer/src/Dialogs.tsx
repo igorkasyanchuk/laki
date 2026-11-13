@@ -634,13 +634,13 @@ export function Pages({ app }: { app: AppCtx }) {
         <ArtifactView
           key={`${w.id}/${artView.path}`}
           path={artView.path}
-          page={artPage(w, artView.path)}
-          read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
-          stamp={() => api.call<{ size: number; at?: number }>('fileRead', { ws: w.id, path: artView.path, storage: true, stat: true })}
-          onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
-          onFile={asFile(w, artView.path)}
-          onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, storage: true }))}
-          onReveal={bridge?.openPath && (() => revealArt(w, artView.path))}
+          page={artPage(w, artView.path, artView.wt)}
+          read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: !artView.wt })}
+          stamp={() => api.call<{ size: number; at?: number }>('fileRead', { ws: w.id, path: artView.path, storage: !artView.wt, stat: true })}
+          {...(artView.wt
+            ? { wt: true, onExternal: bridge?.openExternal && (() => bridge!.openExternal!(artPage(w, artView.path, true)!)) } // View as page: the worktree's file; the browser for its devtools
+            : { onExternal: bridge?.openPath && (() => inBrowser(w, artView.path)), onFile: asFile(w, artView.path), onReveal: bridge?.openPath && (() => revealArt(w, artView.path)) })}
+          onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, ...(!artView.wt && { storage: true }) }))}
           onClose={() => setArtView(null)}
         />
       ))(view.workspaces.find(x => x.id === artView.ws))}

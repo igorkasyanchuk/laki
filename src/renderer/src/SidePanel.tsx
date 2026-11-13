@@ -5,8 +5,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent,
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
-import { Markdown } from './MarkdownView'
-import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
+import { Markdown, outlineItems } from './MarkdownView'
+import { atHead, canPage, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -59,6 +59,7 @@ export type PanelApi = {
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   fileItems?: (path: string) => MenuItem[] // that menu's items for a file, in another menu (the full review's right click)
   look?: (path: string, storage?: boolean) => void // U14: Space on a file's row, macOS's Quick Look (storage: an artifact); none: no local file (SSH, cloud) or off a Mac
+  page?: (path: string) => void // View as page: an HTML file of the worktree, as it is now, in the app's sandboxed viewer; none: no local file
   web?: (path: string, at: 'base' | 'branch', line?: number) => void // the file's page on origin's site (the daemon's fileWeb), in the browser
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
@@ -342,6 +343,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}
               </span>
+              {f.status[0] !== 'D' && canPage(api, f.path) && <IconButton icon="globe" title="View as page: the file as it is in the worktree now" onClick={e => (e.stopPropagation(), api.page!(f.path))} />}
               {f.add !== undefined && !IMAGE.test(f.path) /* git counts no lines in an image */ && (
                 <span className="mono small">
                   <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
@@ -1544,8 +1546,14 @@ export function FilePreview(p: {
   const pickMode = (m: typeof mode) => (setMode(m), localStore(modeKey, m))
   const lines = useMemo(() => (f?.text === undefined || rendered || p.edit ? [] : highlight(p.path, f.text)), [f, p.path, rendered, !!p.edit]) // colored up to 50 KB
   const cut = p.path.lastIndexOf('/') + 1
+  // Outline: a rendered Markdown file's headings (⌘⇧O while the preview has the keyboard). A menu: any click outside
+  // closes it, so another file never opens under it
+  const [menu, openMenu] = useMenu()
+  const outlineAt = useRef<HTMLButtonElement>(null)
+  const outline = () => outlineAt.current && openMenu(outlineAt.current.getBoundingClientRect(), outlineItems(body.current), 'right')
   return (
-    <div className="preview">
+    <div className="preview" tabIndex={-1} onKeyDown={e => e.code === 'KeyO' && e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && (e.preventDefault(), e.stopPropagation(), outline())}>
+      {menu}
       <div className="pv-head">
         <Icon name="file" />
         <span className="pv-path" data-tip={p.path}>
@@ -1572,6 +1580,11 @@ export function FilePreview(p: {
               Raw
             </button>
           </div>
+        )}
+        {md && rendered && (
+          <button ref={outlineAt} className="small" data-tip="Go to heading… (⌘⇧O)" onClick={outline}>
+            Outline
+          </button>
         )}
         {editable && <IconButton icon="pencil" title="Edit here: small changes, ⌘S saves" onClick={startEdit} />}
         <IconButton icon="refresh" title="Reload" onClick={() => setN(x => x + 1)} />

@@ -737,7 +737,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), wtKey: urlKey(`worktree:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -1229,7 +1229,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
 // a project's PR switches: only the ones turned from their default (prAllows)
 function prAllowOk(a: unknown): PRAllow | undefined {
   if (!a || typeof a !== 'object') return undefined
-  const r = Object.fromEntries((['approve', 'close', 'merge', 'land'] as const).filter(k => typeof (a as PRAllow)[k] === 'boolean' && (a as PRAllow)[k] !== (k !== 'land')).map(k => [k, (a as PRAllow)[k]]))
+  const r = Object.fromEntries((['approve', 'close', 'merge', 'land', 'revert'] as const).filter(k => typeof (a as PRAllow)[k] === 'boolean' && (a as PRAllow)[k] !== (k !== 'land')).map(k => [k, (a as PRAllow)[k]]))
   return Object.keys(r).length ? r : undefined
 }
 

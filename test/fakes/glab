@@ -12,6 +12,7 @@ case "$1 $2" in
     mkdir -p "$d"; printf '{"iid":7,"state":"opened","web_url":"https://gitlab.com/o/repo/-/merge_requests/7","title":"%s","sha":"abc","target_branch":"main","author":{"username":"me"}}\n' "$b" > "$d/mr-$(echo "$b" | tr / -).json"
     echo "https://gitlab.com/o/repo/-/merge_requests/7" ;;
   "mr merge"|"mr approve"|"mr close"|"mr update") [ -f "$d/refuse" ] && { cat "$d/refuse" >&2; exit 1; }; echo ok ;;
+  "api -X") [ -f "$d/refuse" ] && { cat "$d/refuse" >&2; exit 1; }; echo '{}' ;; # a revert's branch made, the commit reverted onto it, the branch taken off
   "issue view") f "issue-$3.json" || { echo '404 Not Found' >&2; exit 1; } ;;
   "issue list") f issues.json || echo '[]' ;;
   "api projects/:id/pipelines/"*) i=${2#projects/:id/pipelines/}; f "jobs-${i%%/*}.json" || echo '[]' ;;

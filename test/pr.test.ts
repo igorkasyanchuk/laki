@@ -497,7 +497,7 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [] }
   writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
-  await assert.rejects(act('rebase'), /approve, close or merge/)
+  await assert.rejects(act('rebase'), /approve, close, merge or revert/)
   await act('approve')
   writeFileSync(join(gh, 'refuse'), 'failed to create review: GraphQL: Can not approve your own pull request (addPullRequestReview)')
   await assert.rejects(act('approve'), /^Error: gh: failed to create review: GraphQL: Can not approve your own pull request/)
@@ -509,6 +509,24 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, state: 'CLOSED' }))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'CLOSED', 'closed, scanned')
   await assert.rejects(act('close'), /PR #9 is closed/)
+  // revert: only a merged one, by GitHub's own Revert through gh (the PR's id, then the mutation): the new PR back;
+  // GitHub's refusal said; off by the project's switch
+  await assert.rejects(act('revert'), /PR #9 isn't merged: only a merged one is reverted/)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, state: 'MERGED', title: 'Fix the cart' }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'MERGED', 'merged, scanned')
+  const made = { number: 10, url: 'https://github.com/o/r/pull/10', title: 'Revert "Fix the cart"' }
+  writeFileSync(join(gh, 'revert.json'), JSON.stringify({ data: { revertPullRequest: { revertPullRequest: made } } }))
+  assert.deepEqual(await act('revert'), { pr: made })
+  const log2 = readFileSync(rig.env.FAKE_LOG, 'utf8')
+  assert.match(log2, /gh pr view --json id -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  assert.match(log2, /gh api graphql -f query=mutation\(\$id: ID!, \$title: String!\) \{ revertPullRequest\(.*-f id=PR_fake1 -f title=Revert "Fix the cart"\n/)
+  writeFileSync(join(gh, 'refuse'), 'GraphQL: Pull request could not be reverted automatically (revertPullRequest)')
+  await assert.rejects(act('revert'), /^Error: gh: GraphQL: Pull request could not be reverted automatically/)
+  rmSync(join(gh, 'refuse'))
+  writeFileSync(join(gh, 'revert.json'), JSON.stringify({ data: { revertPullRequest: null }, errors: [{ message: 'no can do' }] }))
+  await assert.rejects(act('revert'), /PR #9: GitHub didn't open the revert: no can do/)
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { revert: false } } })
+  await assert.rejects(act('revert'), /reverting PRs is off for this project/)
 })
 
 test('labels: the PR\'s from its scan (a color GitHub wouldn\'t give: none), the repo\'s kept a while, one put on or taken off by gh pr edit', async t => {

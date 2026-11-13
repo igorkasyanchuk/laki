@@ -107,6 +107,7 @@ const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['land', 'Merge when green', 'A switch per workspace: Laki merges the PR once every check passes, it has no conflicts and is approved if it must be. Off unless turned on here'],
   ['approve', 'Approve', 'An approving review, as you'],
   ['close', 'Close', 'Closes a PR without merging'],
+  ['revert', 'Revert', 'A merged PR undone: a new PR that reverts it, opened as you'],
 ]
 
 // a folder typed (~ is home) or picked (the app's folder picker; a browser has none)

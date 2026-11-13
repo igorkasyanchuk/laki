@@ -12,7 +12,7 @@ import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
 import { isLive } from './resources.ts'
-import { forgeOf, glabAct, glabDraft, glabIssues, glabPR, glabSays, githubOnly, isLab, noMR } from './gitlab.ts'
+import { forgeOf, glabAct, glabDraft, glabIssues, glabPR, glabSays, githubOnly, isLab, noMR, glabRevert } from './gitlab.ts'
 import { gatesKey, widgetEvent } from './widgets.ts'
 
 // ---------- branches: each workspace's follows its folder, the PRs it names, a scan soon after a turn
@@ -904,14 +904,15 @@ function diffLines(text: string) {
 
 // prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
 // as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
-// scan, for its new state
-export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean } & GateOpts) {
+// scan, for its new state. revert: a merged one undone by a new PR (prRevert), its answer
+export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge' | 'revert'; method?: MergeMethod; deleteBranch?: boolean } & GateOpts) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
-  if (o.act !== 'approve' && o.act !== 'close' && o.act !== 'merge') throw new Error('approve, close or merge?')
+  if (o.act !== 'approve' && o.act !== 'close' && o.act !== 'merge' && o.act !== 'revert') throw new Error('approve, close, merge or revert?')
   const proj = state.projects.find(p => p.id === ws.project)
-  if (!prAllows(proj?.config, o.act)) throw new Error(`${o.act === 'merge' ? 'merging' : o.act === 'close' ? 'closing' : 'approving'} PRs is off for this project: its settings' Pull requests`)
+  if (!prAllows(proj?.config, o.act)) throw new Error(`${o.act === 'merge' ? 'merging' : o.act === 'close' ? 'closing' : o.act === 'revert' ? 'reverting' : 'approving'} PRs is off for this project: its settings' Pull requests`)
+  if (o.act === 'revert') return prRevert(ws, pr)
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
   if (o.act === 'merge') {
     const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
@@ -929,6 +930,24 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
     })
   void scanPRs()
   return {}
+}
+
+// a merged PR undone: a new PR that reverts it, opened on the forge, nothing changed here. GitHub: its own Revert
+// (revertPullRequest: a merge commit, a squash or a rebase alike, onto a branch of GitHub's naming), by gh as you; when
+// GitHub can't (the revert conflicts), its words. GitLab: gitlab.ts' glabRevert. The answer: the new PR, for a
+// workspace of its own (wsNew's pr)
+const REVERT = 'mutation($id: ID!, $title: String!) { revertPullRequest(input: { pullRequestId: $id, title: $title }) { revertPullRequest { number url title } } }'
+async function prRevert(ws: Workspace, pr: PR): Promise<{ pr: { number: number; url: string; title: string } }> {
+  if (pr.state !== 'MERGED') throw new Error(`PR #${pr.number} isn't merged: only a merged one is reverted`)
+  const title = `Revert "${pr.title ?? `#${pr.number}`}"`
+  if (isLab(pr)) return { pr: await glabRevert(ws, pr, title) }
+  const says = (e: unknown) => Promise.reject(new Error(ghSays(e, `PR #${pr.number}`)))
+  const id = JSON.parse((await exec(ws, 'gh', ['pr', 'view', '--json', 'id', '--', pr.url], { timeout: 30000 }).catch(says)).stdout).id
+  if (typeof id !== 'string' || !id) throw new Error(`PR #${pr.number}: gh gave no id for it`)
+  const out = JSON.parse((await exec(ws, 'gh', ['api', 'graphql', '-f', `query=${REVERT}`, '-f', `id=${id}`, '-f', `title=${title}`], { timeout: 60000 }).catch(says)).stdout)
+  const made = out?.data?.revertPullRequest?.revertPullRequest
+  if (!made?.url) throw new Error(`PR #${pr.number}: GitHub didn't open the revert${out?.errors?.[0]?.message ? `: ${out.errors[0].message}` : ''}`)
+  return { pr: { number: Number(made.number), url: String(made.url), title: String(made.title ?? title) } }
 }
 
 // prDraft: the PR back to a draft (gh pr ready --undo: an agent's PR went ready too early) or ready for review, by gh as

@@ -561,7 +561,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset; `html`: GitHub's text and a repo's files, `fromHtml` reads its tags into the same tree, `<details>` a `details` block, unknown tags and code left as text; never for what people and agents say), which
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
-  line opens Raw). Tested in `test/markdown.test.ts`.
+  line opens Raw); its *Outline* (⌘⇧O on `.preview`) is `outlineItems`: the rendered page's `h1`…`h6` as a `useMenu` menu under its filter box, a pick `scrollIntoView`s it (the artifacts' big view's too). Tested in `test/markdown.test.ts`.
 - **Quick Look** (U14): Space on a focused file row (Changes, the full review's list, Files, Artifacts: ui.tsx `act`'s
   `space`) or a file menu's *Quick Look* (menus.ts `fileMenu`) calls `PanelApi.look`, App's: the workspace's `path` (an
   artifact: `storage`) joined with the row's path, never typed text, then `bridge.quickLook`, main's `quick-look` (`from(e,
@@ -572,7 +572,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
   *Artifacts: n* toggles `ArtifactsBar`; its ⋯ (`ArtifactsApi` `reveal('')`, `files`: `artifactsInFiles`) and the big
   view's buttons go to Finder or there (one shown big: the list again every 2 s, a file written anew read again by its
-  time; `ArtifactView` looks at `fileRead`'s `stat` every 1.5 s, a change reads it or loads the page again). An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
+  time; `ArtifactView` looks at `fileRead`'s `stat` every 1.5 s, a change reads it or loads the page again). *View as page* is the same viewer on a worktree's HTML file (`artView.wt`; `PanelApi.page`, Diff.tsx `canPage`, menus.ts' `fileMenu`): `GET /worktree/<the workspace's wtKey>/<ws>/<path>` (files.ts `worktreeFile`: `inside`, nothing of `.git`, never a host's; the artifacts' CSP without any `connect-src`). An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
   `Modal`; App's `artView`) unless `settings.artifactsIn` is `browser` (Settings › General › Storage; then main's
   `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through

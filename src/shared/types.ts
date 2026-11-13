@@ -123,7 +123,7 @@ export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' |
 export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; clone?: string[] /* F7: folders cloned whole into a new worktree */; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
-export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
+export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean; revert?: boolean }
 export type PRPerm = keyof PRAllow
 // a review key ("thread:n thread:n", pr.ts' reviewKey) has something new since sent: a thread it wasn't in, or more comments
 // on one than then. Fewer (one hidden on GitHub) is nothing new, and autoPR saves that lower count, so the next reply is.
@@ -1074,7 +1074,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number; mad
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)
 export type Ticket = { key: string; title?: string; status?: string; url?: string }
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; ticket?: Ticket; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; ticket?: Ticket; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -1240,7 +1240,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 178
+export const API = 179
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

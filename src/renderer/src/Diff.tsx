@@ -566,8 +566,12 @@ export const webSub = (api: PanelApi, path: string, base: string, branch?: strin
         { label: `At ${branch || 'this branch'}`, icon: 'gitBranch', sub: `as pushed to origin${line?.new ? `, line ${line.new}` : ''}`, run: () => api.web!(path, 'branch', line?.new) },
       ]
     : []
-export const webItems = (api: PanelApi, path: string, base: string, branch?: string, line?: { old?: number; new?: number }): MenuItem[] =>
-  api.web ? [{ label: 'Open on remote', icon: 'externalLink', items: webSub(api, path, base, branch, line) }] : []
+export const webItems = (api: PanelApi, path: string, base: string, branch?: string, line?: { old?: number; new?: number }): MenuItem[] => [
+  ...(canPage(api, path) ? [{ label: 'View as page', icon: 'globe', sub: 'as it is in the worktree now', run: () => api.page!(path) } as MenuItem] : []),
+  ...(api.web ? [{ label: 'Open on remote', icon: 'externalLink', items: webSub(api, path, base, branch, line) } as MenuItem] : []),
+]
+// View as page: an HTML file there is a local worktree for
+export const canPage = (api: PanelApi, path: string) => !!api.page && /\.html?$/i.test(path)
 
 // a thread's key across refreshes: where it is and when it began (the daemon gives no id)
 export const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`

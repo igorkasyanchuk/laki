@@ -12,7 +12,7 @@ import { api, bridge } from './api'
 import type { Collision } from '../../shared/overlap'
 import { ROW_MARKS, rowMarkUsed, rowMarkSet } from './settingsBase'
 export function menusOf(app: AppBase) {
-  const { accountsOf, apps, archive, attachable, byId, call, closeTabs, copy, copyTab, done, extItems, fail, floated, floatTab, flowMenu, fold, folded, forkWs, groupMoves, groups, inReader, isTerm, kh, laterCancel, laterChange, laterNow, mark, markUnread, newIn, newWord, openIn, openInItems, prMenu, projOf, rail, rawKind, readerOn, refreshPR, restore, rmItem, runMenu, selectTab, setDialog, setGroups, setOverlapsAt, setRead, setSharing, settings, setWsId, showInfo, showPanel, sortItems, split, stepItem, tabByWs, termIn, termsOk, termWhere, toast, view } = app
+  const { accountsOf, apps, archive, attachable, byId, call, closeTabs, copy, copyTab, done, extItems, fail, floated, floatTab, flowMenu, fold, folded, forkWs, groupMoves, groups, inReader, isTerm, kh, laterCancel, laterChange, laterNow, mark, markUnread, newIn, newWord, openIn, openInItems, prMenu, projOf, rail, rawKind, readerOn, refreshPR, restore, rmItem, runMenu, selectTab, setArtView, setDialog, setGroups, setOverlapsAt, setRead, setSharing, settings, setWsId, showInfo, showPanel, sortItems, split, stepItem, tabByWs, termIn, termsOk, termWhere, toast, view } = app
   // a workspace's first agent tab; ● again on a tab, as if its turn ended unseen (until it's looked at again)
   const agentTab = (id: string) => view?.tabs.find(t => t.workspace === id && t.kind === 'agent')
 
@@ -25,6 +25,7 @@ export function menusOf(app: AppBase) {
   // right click in Files: a file in its default app, a browser (for what they show), or any app (Finder reveals it,
   // a terminal opens its folder)
   const fileMenu = (w: WorkspaceView, file: string, dir: boolean): MenuItem[] => [
+    ...(!dir && !w.host && w.wtKey && /\.html?$/i.test(file) ? [{ label: 'View as page', icon: 'globe', sub: 'as it is in the worktree now', run: () => setArtView({ ws: w.id, path: file, wt: true }) } as MenuItem] : []),
     { head: 'Open in' },
     ...(dir ? [] : [{ label: 'Default app', icon: 'file', key: 'o', run: () => openIn('default', { ws: w.id, file }) } as MenuItem]),
     ...(dir || w.host || !bridge?.quickLook ? [] : [{ label: 'Quick Look', icon: 'eye', hint: 'Space', run: () => bridge!.quickLook!(`${w.path}/${file}`) } as MenuItem]),

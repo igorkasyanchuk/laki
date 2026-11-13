@@ -226,9 +226,9 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   the side panel's: `files`, `fileNew`, `imageRead` (a picture anywhere on this Mac by its full path, for a terminal link's hover card: an image's extension and bytes, 10 MB; not over remote access), `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads` (each thread's `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
   comment's `diffHunk`; comments hidden on GitHub left out, `prTalk`'s too), `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
-  PR's diff"), `prAct` (`act` approve, close or merge, each only where the project's `prAllows` says (`config.pr`:
-  approve, close, merge on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`
-  squash/merge/rebase, saved as the project's `mergeMethod`, `deleteBranch`: `merge()`, `gh pr merge --<method>
+  PR's diff"), `prAct` (`act` approve, close, merge or revert, each only where the project's `prAllows` says (`config.pr`:
+  approve, close, merge, revert on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`
+  squash/merge/rebase, saved as the project's `mergeMethod`, revert: a MERGED one only, `prRevert`: GitHub's `revertPullRequest` through `gh api graphql` (the PR's id by `gh pr view --json id`), GitLab's `glabRevert` (a `revert-<sha>` branch, `commits/<sha>/revert`, `glab mr create`), `{ pr: { number, url, title } }` back; `deleteBranch`: `merge()`, `gh pr merge --<method>
   [--delete-branch] -R <host/owner/repo> -- <url>`: `-R` keeps gh off the worktree's git (no checkout, no local branch
   deleted), then a scan a second later), `prLog` (`ws`, `job`: a GitHub Actions job id, `shared/types.ts` `jobOf` from a
   check's link; refused without a PR): `failedLog`, `gh run view --job <id> --log-failed`'s last 80 lines, colors and

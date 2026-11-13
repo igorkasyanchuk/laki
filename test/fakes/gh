@@ -8,6 +8,7 @@ case "$*" in
     [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/noauth" ] && { echo 'To get started with GitHub CLI, please run:  gh auth login' >&2; exit 4; }
     f prhead.json || { echo 'GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)' >&2; exit 1; }
     exit 0 ;;
+  "pr view --json id "*) f prid.json || echo '{"id":"PR_fake1"}'; exit 0 ;; # prAct revert: the PR's node id
   "pr checkout "*) b=$(f checkout) || exit 1; a="$*"; case "$a" in *" --branch "*) b=${a##* --branch }; esac; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
 esac
 case "$1" in
@@ -58,6 +59,7 @@ case "$1 $2" in
     case "$*" in
       *closedByPullRequestsReferences*) o=; n=; for a in "$@"; do case $a in owner=*) o=${a#owner=} ;; name=*) n=${a#name=} ;; esac; done
         f "issues-${o}_${n}.json" || f issues.json || exit 1 ;;
+      *revertPullRequest*) f refuse >&2 && exit 1; f revert.json || exit 1 ;; # prAct revert: the new PR, or GitHub's errors
       *) f graphql.json || exit 1 ;;
     esac ;;
   "api user") f user || echo me ;;

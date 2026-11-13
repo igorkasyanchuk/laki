@@ -272,15 +272,19 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
   }
 }
 
+// GET /worktree/<key>/<ws>/<path>: the same for a file of the workspace's worktree (View as page: a changed HTML file,
+// its relative CSS, scripts and pictures), under a key of its own. No connect-src at all: a page at the worktree's root
+// would have the whole of it as "its own folder", so its scripts fetch nothing (what it loads by a tag still loads)
 const ART_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:"
 function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
-  const m = /^\/artifact\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
-  if (!m || !urlKeyOk(m[1], `artifact:${m[2]}`)) return no(401, 'bad key') // that workspace's key only
+  const m = /^\/(?:artifact|worktree)\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
+  const wt = path.startsWith('/worktree/')
+  if (!m || !urlKeyOk(m[1], `${wt ? 'worktree' : 'artifact'}:${m[2]}`)) return no(401, 'bad key') // that workspace's key only
   let body: Buffer
   let file: string
   try {
-    file = filesMod.artifactFile(m[2], decodeURIComponent(m[3]))
+    file = wt ? filesMod.worktreeFile(m[2], decodeURIComponent(m[3])) : filesMod.artifactFile(m[2], decodeURIComponent(m[3]))
     if (statSync(file).size > 50 << 20) return no(413, 'over 50 MB')
     body = readFileSync(file)
   } catch {
@@ -290,7 +294,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
     'content-type': ART_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
     // fetch: its own folder and under it (hostOk checked the host; a raw ; or , in the path can't add a directive), not
     // the rest of the storage folder
-    'content-security-policy': host ? `${ART_CSP}; connect-src ${host}${path.slice(0, path.lastIndexOf('/') + 1).replace(/[;,\s]/g, encodeURIComponent)}` : ART_CSP,
+    'content-security-policy': host && !wt ? `${ART_CSP}; connect-src ${host}${path.slice(0, path.lastIndexOf('/') + 1).replace(/[;,\s]/g, encodeURIComponent)}` : ART_CSP,
     'cache-control': 'no-store',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
@@ -984,7 +988,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'queueNow' && core.agentCaller(p.from)) keyTail.set(core.resolveTarget(String(p.tab ?? '')).id, '\x1b') // it presses Esc for the agent
   else if (method === 'tabMode') notAgent(p, 'change a permission mode')
   else if (method === 'tabDraft') notAgent(p, "read or change what the user is typing")
-  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close' || p.act === 'merge')) notAgent(p, `${p.act} a PR as you${p.act === 'merge' ? ' (turn on Merge when green yourself)' : ''}`) // S3: merge too: code into the base with no one reading it
+  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close' || p.act === 'merge' || p.act === 'revert')) notAgent(p, `${p.act} a PR as you${p.act === 'merge' ? ' (turn on Merge when green yourself)' : ''}`) // S3: merge too: code into the base with no one reading it
   else if (method === 'wsSet' && ['autoFix', 'autoReview', 'autoMerge', 'autoLand'].some(k => p[k] !== undefined)) notAgent(p, "turn a workspace's PR switches on or off (Fix CI, Address reviews, Merge when green: the user's, in the status bar)")
   else if (method === 'prDraft' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can draft or ready its own workspace's PR only")
   else if ((method === 'prAttach' || method === 'prDetach' || method === 'prLabel') && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can attach, detach or label its own workspace's PR only") // S5
@@ -1229,7 +1233,7 @@ const server = createServer(async (req, res) => {
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
     if (u.pathname.startsWith('/mcp-app/')) return void mcpPage(u.pathname, u.searchParams).then(r => (res.writeHead(r.code, r.headers), res.end(r.body))) // an MCP App's page (mcpApps.ts): its own key, its own CSP
-    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
+    if (u.pathname.startsWith('/artifact/') || u.pathname.startsWith('/worktree/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
     if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
     if (PWA.has(u.pathname)) return pwaPage(u.pathname, res) // M4: the page as an app, while remote access runs
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin

@@ -5,6 +5,9 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
+- *Outline* on a Markdown file in Files (⌘⇧O): its headings under *Go to heading…*, type to filter, ⏎ to go there.
+- *View as page* on a changed HTML file (Changes, the Review tab, Files): the worktree's file in a sandboxed frame, with the CSS and scripts beside it, no server needed.
 - ▷ Run on a shell block in the Reader opens a new shell tab with the command typed (⌥-click: the last shell tab), several lines as one paste, `$ ` prompts left out; `console` blocks have it too.
 
 ## 0.50.0 · Nov 12, 2026

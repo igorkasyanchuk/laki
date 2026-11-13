@@ -489,7 +489,7 @@ export function App() {
   const [openFiles, setOpenFiles] = useState<Opened[]>([])
   const [shownFile, setShownFile] = useState<Record<string, string>>({})
   const [previewW, setPreviewW] = useState<number | null>(() => load<number | null>('laki.previewW', null)) // dragged: its width; null: it shares the room
-  const [artView, setArtView] = useState<{ ws: string; path: string } | null>(null) // an HTML or Markdown artifact in the app's viewer
+  const [artView, setArtView] = useState<{ ws: string; path: string; wt?: boolean } | null>(null) // an HTML or Markdown artifact in the app's viewer; wt: a worktree's HTML file as a page (View as page)
   const [base, setBase] = useState<string | null>(null) // the daemon's address, for the viewer's frame ('': the page's own, remote access)
   useEffect(() => void daemonBase().then(setBase, () => {}), [])
   const [artsIn, setArtsIn] = useState<string | null>(null) // the workspace whose side panel Files shows its Artifacts (the others: their worktree)
@@ -1997,6 +1997,7 @@ export function App() {
     fileItems: path => fileMenu(w, path, false),
     look: bridge?.quickLook && !w.host ? (path, storage) => (storage ? w.storage : w.path) && bridge!.quickLook!(`${storage ? w.storage : w.path}/${path}`) : undefined, // host: SSH or a codespace, no file here
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
+    page: w.wtKey && !w.host ? path => setArtView({ ws: w.id, path, wt: true }) : undefined, // View as page: a changed HTML file
     undoHunk: async (path, hunk, lines, then, uncommitted) => {
       if (!(await revertOk(w, path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk', uncommitted))) return false
       const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines, uncommitted })
@@ -2038,7 +2039,7 @@ export function App() {
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
   // rest a document in its app, else shown in Finder
   const inViewer = (path: string) => settings.artifactsIn !== 'browser' && VIEWED.test(path)
-  const artPage = (w: WorkspaceView, path: string) => (w.artKey && base !== null ? `${base}/artifact/${w.artKey}/${encodeURIComponent(w.id)}/${path.split('/').map(encodeURIComponent).join('/')}` : undefined) // its own key: one workspace's
+  const artPage = (w: WorkspaceView, path: string, wt?: boolean) => ((wt ? w.wtKey : w.artKey) && base !== null ? `${base}/${wt ? 'worktree' : 'artifact'}/${wt ? w.wtKey : w.artKey}/${encodeURIComponent(w.id)}/${path.split('/').map(encodeURIComponent).join('/')}` : undefined) // its own key: one workspace's
   // in the browser: an HTML one as the daemon's sandboxed page (L11: never a file: page), anything else by main's open-path
   const inBrowser = (w: WorkspaceView, path: string) => (/\.html?$/i.test(path) && artPage(w, path) ? void bridge?.openExternal?.(artPage(w, path)!) : void bridge?.openPath?.(`${w.storage}/${path}`))
   const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : inBrowser(w, path))
@@ -2815,7 +2816,7 @@ export function App() {
   const shortBranch = (b: string, pre = settings.branchPrefix?.trim() || 'laki/') => (b.startsWith(pre) ? b.slice(pre.length) : b)
   // a workspace for the info panel and the status bar's PR
   const cfgOf = (w: WorkspaceView) => view?.projects.find(p => p.id === w.project)?.config
-  const allows = (w: WorkspaceView, k: 'approve' | 'close' | 'merge' | 'land') => prAllows(cfgOf(w), k)
+  const allows = (w: WorkspaceView, k: 'approve' | 'close' | 'merge' | 'land' | 'revert') => prAllows(cfgOf(w), k)
   const infoOf = (w: WorkspaceView, cfg = cfgOf(w)): WsInfo => {
     const live = (id?: string) => view?.workspaces.find(x => x.id === id && !x.archived)
     const from = live(w.from)
@@ -2824,7 +2825,7 @@ export function App() {
       checking: checking === `merge:${w.id}`,
       from: from && { id: from.id, name: wsName(from), tab: creatorOf(w, view?.tabs ?? []) },
       started: view?.workspaces.filter(x => x.from === w.id && !x.archived).map(x => ({ id: x.id, name: wsName(x) })),
-      allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
+      allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land'), revert: prAllows(cfg, 'revert') && hasCap(view, 'pr.revert') },
       method: cfg?.mergeMethod,
       ...(w.fix?.pr === w.pr?.number && { fixTries: w.fix?.tries, mergeTries: w.fix?.merges }), // this PR's counts only
       prScan: settings.prScan || PR_SCAN,
@@ -2887,6 +2888,14 @@ export function App() {
     const pr = w.pr
     if (!pr) return
     if (act === 'draft') return prDraft(w)
+    // a merged one undone: a new PR that reverts it, then (if you like) a workspace on it, to merge it or fix forward
+    if (act === 'revert') {
+      if (!(await ask(`Revert ${prName(pr)}?`, { text: `${pr.title ?? ''}\nOpens a new ${pr.forge === 'gitlab' ? 'merge request' : 'pull request'} on ${forgeName(pr)} that undoes it. Nothing is merged until you merge that one.`.trim(), facts: prFacts(w), ok: 'Open the revert' }))) return
+      const r = await call<{ pr: { number: number; url: string; title: string } }>('prAct', { ws: w.id, act }).catch(() => null)
+      if (!r) return
+      if ((await choose(`Opened ${prNo({ ...pr, number: r.pr.number })}: ${r.pr.title}`, 'Open it as a workspace, to merge it or have an agent fix forward from there?', [{ label: 'Not now' }, { label: 'On the forge' }, { label: 'New workspace', primary: true }])) === 2) void call('wsNew', { project: w.project, pr: r.pr.url, preset: settings.agent ?? 'claude' }).catch(() => {})
+      return
+    }
     if (act === 'merge') {
       const del = { label: `Delete the branch on ${forgeName(pr)}`, on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
@@ -2926,6 +2935,7 @@ export function App() {
           ...(allows(w, 'close') ? [{ label: `Close ${K}…`, icon: 'x', danger: true, tip: `Closes it on ${F} without merging, after you confirm`, run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
+    ...(w.pr?.state === 'MERGED' && allows(w, 'revert') && hasCap(view, 'pr.revert') ? [null, { label: `Revert ${K}…`, icon: 'undo', key: 'v', tip: `A new ${K} on ${F} that undoes this one, after you confirm`, run: () => prAct(w, 'revert') } as MenuItem] : []),
     ...(w.pr ? [null, { label: `Detach ${prName(w.pr)}`, icon: 'unlink', key: 'd', sub: 'Only related, kept off this workspace (Attach a PR brings it back)', run: () => detachPr(w) } as MenuItem] : []),
   ]
 
