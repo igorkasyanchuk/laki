@@ -149,6 +149,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     - `laki.diffSplit`: Changes in two columns (`split`, `text.ts` `splitRows`) or one (`unified`, the default).
     - `laki.changesScope`, `laki.reviewScope`: Changes' and the Review tab's *Branch* or *Uncommitted* (Diff.tsx `useScope`).
     - `since` (R11): Changes' *Since I reviewed · n files*, never kept; only while the workspace has a `reviewed` mark.
+    - *Since ▾* (ChangesTab's `from`, never kept): Branch narrowed to what changed after a commit of the branch (`PanelApi.commits`' list; `commitChanges`: `diff { since: <sha> }`, files.ts `diff`'s `since`, a commit HEAD has behind it); read only as `since`; `prHeadOf` marks another workspace's PR head.
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`, `left`: paused, its ms left, kept as it is;
       `note`: its message, Go out: on its bar, the end dialog's title, the notification's); ones that ended while the

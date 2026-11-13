@@ -1126,6 +1126,8 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .turn-dot.rewind { background: none; }
 .turn-dot:hover, .turn-dot:focus-visible { opacity: 1; outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 1px; }
 .sp-turn-pick { max-width: 220px; }
+.sp-since { flex: none; white-space: nowrap; }
+.sp-since.on { color: var(--accent); }
 .plan-ask { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line); }
 .plan-ask textarea { margin: 0 12px; min-height: 60px; max-height: 220px; resize: vertical; padding: var(--sp-3) var(--sp-4); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-m); font: var(--fs-2)/1.45 var(--mono); }
 .plan-acts { display: flex; flex-wrap: wrap; gap: var(--sp-3); padding: var(--sp-3) var(--sp-5) var(--sp-4); }

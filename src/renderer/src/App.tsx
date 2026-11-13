@@ -1956,6 +1956,8 @@ export function App() {
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
     sinceChanges: () => api.call<Changes>('diff', { ws: w.id, since: true }),
+    ...(hasCap(view, 'diff.since') && { commitChanges: (sha: string) => api.call<Changes>('diff', { ws: w.id, since: sha }) }),
+    prHeadOf: sha => (x => x && prNo(x))(view?.workspaces.find(x => x.id !== w.id && !x.archived && x.pr?.head === sha)?.pr),
     turnChanges: n => api.call<Changes>('turnDiff', { ws: w.id, ...(n !== undefined && { n }) }),
     turns: () => api.call<TurnKept[]>('turnList', { ws: w.id }),
     ...(w.kind === 'worktree' && { bases: () => api.call('baseBranches', { ws: w.id }), setBase: (base: string) => api.call('wsBase', { ws: w.id, base }) }),

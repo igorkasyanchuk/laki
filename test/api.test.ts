@@ -341,6 +341,22 @@ test('workspaces: a bad base, what only worktrees do, a failed restore, a gone b
   writeFileSync(join(ws.path, 'README.md'), 'changed\n')
   const d = await rig.rpc('diff', { ws: ws.id })
   assert.deepEqual([d.from, d.files.map((f: any) => f.path)], ['HEAD', ['README.md']])
+  // Changes' Since: only what changed after a commit of the branch, what isn't committed too; its newest: only that;
+  // never a flag, another ref's name or a commit that isn't behind HEAD
+  const gitIn = (...a: string[]) => execFileSync('git', a, { cwd: ws.path, env: rig.env, encoding: 'utf8' }).trim()
+  const was = gitIn('rev-parse', 'HEAD')
+  gitIn('commit', '-qam', 'one')
+  const one = gitIn('rev-parse', 'HEAD')
+  writeFileSync(join(ws.path, 'b.txt'), 'b\n')
+  gitIn('add', 'b.txt')
+  gitIn('commit', '-qm', 'two')
+  writeFileSync(join(ws.path, 'README.md'), 'changed again\n')
+  const since = await rig.rpc('diff', { ws: ws.id, since: one })
+  assert.deepEqual([since.base, since.from, since.files.map((f: any) => f.path).sort()], [one.slice(0, 7), one, ['README.md', 'b.txt']])
+  assert.deepEqual((await rig.rpc('diff', { ws: ws.id, since: gitIn('rev-parse', 'HEAD') })).files.map((f: any) => f.path), ['README.md'])
+  for (const bad of ['--output=x', 'main', 'f'.repeat(40)]) await assert.rejects(rig.rpc('diff', { ws: ws.id, since: bad }), /isn't a commit of this branch/, bad)
+  gitIn('reset', '-q', '--hard', was)
+  writeFileSync(join(ws.path, 'README.md'), 'changed\n')
 
   assert.equal((await rig.rpc('wsRestore', { id: ws.id })).archived, undefined) // not archived: as it is
   await rig.rpc('wsArchive', { id: ws.id })

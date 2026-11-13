@@ -979,7 +979,10 @@ line, after the tab restarts.
   count) use it, and the worktree, its branch and its PR stay as they are (a PR's base is GitHub's). A base that isn't
   there any more says so in amber, with *Change base…*. *Branch* / *Uncommitted* (a worktree's) switch between everything
   against the base and only what isn't committed yet (against the last commit; its Revert puts a file or hunk back
-  to that commit); Changes and the Review tab each remember theirs. With a PR, *PR #n* switches to the
+  to that commit); Changes and the Review tab each remember theirs. *Since ▾* (Changes, on *Branch*) narrows it to what
+  changed after one of the branch's commits, newest first, what isn't committed included: what an agent did since you
+  last looked, or only your layer of a stacked branch (a commit that is another workspace's PR head is marked *Head of
+  #n*); read only there, and *<base> (all changes)* is the whole branch again. With a PR, *PR #n* switches to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
   its *Files changed* there. Each file in the PR has a *Viewed* box, in both views, the same one as on GitHub's
   *Files changed* (ticked here, it's ticked there): a viewed file folds and dims, *Expand all* skips it, and the bar

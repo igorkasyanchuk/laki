@@ -7,6 +7,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 - Revert a merged PR: *Revert…* in a merged PR's menu opens a new PR that undoes it (GitLab too), then offers it as a workspace. Each project allows it in its settings › Pull requests.
 - Settings › Voice: *Test the microphone* (talk for 10 seconds, hear it back, see what the speech model wrote) and *Stop after silence* (30 seconds, 1 or 2 minutes).
+- Changes › *Since ▾*: only what changed after a commit of the branch, to review what an agent did since you last looked or your layer of a stack.
 - *Outline* on a Markdown file in Files (⌘⇧O): its headings under *Go to heading…*, type to filter, ⏎ to go there.
 - *View as page* on a changed HTML file (Changes, the Review tab, Files): the worktree's file in a sandboxed frame, with the CSS and scripts beside it, no server needed.
 - ▷ Run on a shell block in the Reader opens a new shell tab with the command typed (⌥-click: the last shell tab), several lines as one paste, `$ ` prompts left out; `console` blocks have it too.

@@ -73,9 +73,12 @@ const diffBase = (ws: Workspace, uncommitted?: boolean) => (ws.kind === 'worktre
 // revert would no longer match the file); a/ and b/ whatever the user's config says (diff.mnemonicPrefix, noprefix,
 // srcPrefix): Changes, Review and Revert read each file's name off them
 const AB = ['--src-prefix=a/', '--dst-prefix=b/']
-export async function diff(ref: string, uncommitted?: boolean) {
+// since: a commit of the branch (Changes' Since: only what changed after it, what isn't committed too), by its sha:
+// one HEAD has behind it, never a flag or another ref's name to git
+export async function diff(ref: string, uncommitted?: boolean, since?: string) {
   const ws = findWs(ref)
-  const from = await diffBase(ws, uncommitted)
+  if (since !== undefined && (!/^[0-9a-f]{7,64}$/.test(since) || !(await git(ws, 'merge-base', '--is-ancestor', since, 'HEAD').then(() => true, () => false)))) throw new Error(`${since.slice(0, 12)} isn't a commit of this branch`)
+  const from = since ?? (await diffBase(ws, uncommitted))
   const [text, numstat, untracked] = await Promise.all([
     exec(ws, 'git', ['diff', '--no-color', '--no-ext-diff', ...AB, '-M', from]).then(r => r.stdout.replace(/\n$/, '')),
     git(ws, 'diff', '--numstat', '-M', from),
@@ -110,7 +113,7 @@ export async function diff(ref: string, uncommitted?: boolean) {
     files.push({ path: f, add: d.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).length, del: 0, status: 'A' })
   }
   const MAX = 4 << 20
-  return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
+  return { base: since ? since.slice(0, 7) : ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
 }
 const CUT = '\n… (cut)'
 

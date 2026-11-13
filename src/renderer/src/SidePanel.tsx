@@ -34,6 +34,8 @@ export type PanelApi = {
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   turnChanges: (n?: number) => Promise<Changes> // an agent's last turn's (turns.ts turnDiff); n: a kept turn's (F1)
   sinceChanges?: () => Promise<Changes> // R11: from your last review's mark to now (diff since)
+  commitChanges?: (sha: string) => Promise<Changes> // Changes' Since: only what changed after that commit of the branch (diff since <sha>)
+  prHeadOf?: (sha: string) => string | undefined // the PR (#n, !n) of another workspace whose head that commit is: a stack's parent, marked in Since's list
   turns?: () => Promise<TurnKept[]> // the workspace's kept turns: This turn's picker
   bases?: () => Promise<{ base: string; gone: boolean; local: string[]; remote: string[] }> // a worktree's: the branches its diff could compare with (Change base)
   setBase?: (base: string) => Promise<unknown> // its new base: the diff and later compares go against it
@@ -276,16 +278,34 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
     if (inTurn) void wsApi.turns?.().then(l => on && setTurns(l), () => {})
     return () => void (on = false)
   }, [ws, inTurn, turnN])
-  const all = scope === 'pr' || inTurn || scope === 'since' // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
+  // Since: Branch narrowed to what changed after one of its commits (picked from the branch's own, newest first); never
+  // kept, and another workspace or scope drops it
+  const [from, setFrom] = useState<{ sha: string; short: string } | null>(null)
+  useEffect(() => setFrom(null), [ws, scope])
+  const after = scope === 'branch' && wsApi.commitChanges ? from : null
+  const all = scope === 'pr' || inTurn || scope === 'since' || !!after // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
   const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
-  const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : scope === 'since' && api.sinceChanges ? api.sinceChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : ''}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
+  const [d, err, reload] = useLoad(inTurn ? () => api.turnChanges(turnN) : after ? () => api.commitChanges!(after.sha) : scope === 'since' && api.sinceChanges ? api.sinceChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}#${inTurn ? (turnN ?? '') : (after?.sha ?? '')}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, scope])
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
-  const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}`)
+  const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}#${after?.sha ?? ''}`)
   const findAt = useRef<HTMLDivElement>(null) // ⌘F's bar and what it searches (Diff.tsx DiffFind)
   const [menu, openMenu] = useMenu()
+  const sinceMenu = (e: MouseEvent) => {
+    const at = (e.currentTarget as HTMLElement).getBoundingClientRect() // the list comes after the click
+    void wsApi.commits().then(
+      c =>
+        openMenu(at, [
+          ...(c.commits.length > 8 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
+          { head: 'Show what changed since' },
+          { label: `${c.base ?? 'Base'} (all changes)`, icon: 'gitBranch', hint: after ? undefined : ON, run: () => setFrom(null) },
+          ...c.commits.map(x => ({ label: x.subject || x.short, icon: 'gitCommit', sub: [x.short, ago(x.at), (n => n && `Head of ${n}`)(wsApi.prHeadOf?.(x.sha))].filter(Boolean).join(' · '), hint: after?.sha === x.sha ? ON : undefined, run: () => setFrom({ sha: x.sha, short: x.short }) }) as MenuItem),
+        ]),
+      () => {},
+    )
+  }
   // Change base: another branch to compare with (its own deleted, or the wrong one), local or origin's; a PR keeps its own
   const [baseErr, setBaseErr] = useState('')
   const pickBase = (b: string) => (setBaseErr(''), void api.setBase?.(b).then(reload, e => setBaseErr((e as Error).message)))
@@ -399,6 +419,11 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
     <>
       <div className="sp-tools">
         <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} turn={turn} since={since} />
+        {scope === 'branch' && worktree && wsApi.commitChanges && (
+          <button className={`small sp-since ${after ? 'on' : ''}`} data-tip="Only what changed after a commit of this branch: what an agent did since you last looked, or your layer of a stack" onClick={sinceMenu}>
+            Since{after ? ` ${after.short}` : ''} ▾
+          </button>
+        )}
         {inTurn && turns.length > 0 && (
           <select className="sp-turn-pick small" aria-label="Which turn" value={turnN ?? ''} onChange={e => setTurnN(e.target.value ? Number(e.target.value) : undefined)}>
             <option value="">Last turn</option>

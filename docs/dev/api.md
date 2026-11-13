@@ -206,7 +206,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   (`ws`, `port` (never the daemon's own), `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
   `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file
   beside the certificate or in `~/.cloudflared`; `name`, `domain`: the form's as typed, Settings saving 300 ms later);
-- worktree actions: `diff` (git's text but its last newline: a hunk to revert must match; `from`: the merge base, or
+- worktree actions: `diff` (git's text but its last newline: a hunk to revert must match; `since` a sha: from that commit of the branch instead, Changes' Since; `from`: the merge base, or
   `HEAD` when it has none with its base: deleted), `baseBranches` and `wsBase` (Changes' base: a worktree's local and
   origin's branches, `gone`; a new `Workspace.base`, local else `origin/<b>`, its own branch refused, agent-refused),
   `run`, `ship` (U5, the Ship sheet's, all optional: `files`, the paths to commit, each `inside` and one of
