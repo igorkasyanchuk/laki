@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
 import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
+import { appOf } from '../shared/helper.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
 import { completion } from './completion.ts'
@@ -258,7 +259,7 @@ async function main() {
       // whatever LaunchServices knows as laki
       const here = dirname(fileURLToPath(import.meta.url))
       const dist = `dist/${process.arch === 'arm64' ? 'mac-arm64' : 'mac'}/Laki.app`
-      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../..', dist), resolve(here, '../../..', dist)].find(p => p.endsWith('.app') && existsSync(p))
+      const app = [appOf(process.execPath) ?? '', resolve(here, '../..', dist), resolve(here, '../../..', dist)].find(p => p.endsWith('.app') && existsSync(p))
       try {
         execFileSync('open', app ? [app] : ['-b', 'dev.laki.app'], { stdio: 'ignore' })
       } catch {

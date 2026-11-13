@@ -20,7 +20,7 @@ import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
-import { hookRunner } from '../src/shared/helper.ts'
+import { appOf, helperBin } from '../src/shared/helper.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
@@ -641,15 +641,19 @@ test('R7: writeAtomic and readJson', t => {
   assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
 })
 
-// docs/dev/helper.md: laki hook runs on the bundle's Laki Hook when it has one, else the binary that runs the daemon
-test('hookRunner: the bundle’s Laki Hook when it’s there; the app binary without it; node from source as it is', () => {
+// docs/dev/helper.md: hooks, the CLI and laki mcp run on the bundle's helper when it has one, else the binary given
+test('helperBin: the bundle’s helper when it’s there, from the app or the helper itself; the binary without it', () => {
   const app = '/Applications/Laki.app/Contents/MacOS/Laki'
   const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper'
-  assert.equal(hookRunner(app, p => p === helper), helper)
-  assert.equal(hookRunner(app, () => false), app, 'an older build: none')
-  assert.equal(hookRunner('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook Helper')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper', 'spaces in the path')
-  assert.equal(hookRunner('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
-  assert.equal(hookRunner('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
+  assert.equal(helperBin(app, p => p === helper), helper)
+  assert.equal(helperBin(app, () => false), app, 'an older build: none')
+  assert.equal(helperBin(helper, () => false), helper, 'the CLI already on the helper keeps it (not a helper inside the helper)')
+  assert.equal(helperBin('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook Helper')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper', 'spaces in the path')
+  assert.equal(helperBin('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
+  assert.equal(helperBin('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
+  assert.equal(appOf(helper), '/Applications/Laki.app', 'laki open: the outer app, not the helper')
+  assert.equal(appOf(app), '/Applications/Laki.app')
+  assert.equal(appOf('/usr/local/bin/node'), undefined)
 })
 
 // themes.ts p3Sheet: a theme's accent and status colors a little more vivid on a Display P3 screen

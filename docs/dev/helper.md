@@ -13,7 +13,7 @@ nothing of Laki's needs the app binary to run as node. This moves them, one at a
   by a name ending in ` Helper`; `Laki Hook` alone looked beside itself and trapped as ICU started),
   `CFBundleIdentifier` `<appId>.hook` (`dev.laki.app.hook`), `LSUIElement`, no `NS…UsageDescription` keys.
   electron-builder signs it with the rest (ad hoc, or the Developer ID and hardened runtime in a release).
-- `src/shared/helper.ts` `hookRunner(execPath, exists)` (pure, `test/units-more.test.ts`): the bundle's Laki Hook when
+- `src/shared/helper.ts` `helperBin(execPath, exists)` (`hookRunner` then) (pure, `test/units-more.test.ts`): the bundle's Laki Hook when
   it's there, else the daemon's own binary (an older build, Linux, node from source). core.ts' `hookArgv` starts with it,
   so every hook command an agent's settings get (`claude-settings.json`, codex's `-c notify`, the others') runs on it.
 - `scripts/pack-smoke.sh` checks the hook command names Laki Hook, its bundle id isn't the app's, and prints the
@@ -29,8 +29,6 @@ by bundle). It doesn't close the hole yet: Laki's own binary still runs as node 
 |---|---|---|
 | the daemon | the app (`conn.ts` `ensureDaemon`, env from main's `start`) | `out/main/daemon.js` |
 | the pty host | the daemon (`ptyHost.ts` `up`: `process.execPath`) | `out/main/ptyhost.js` |
-| the CLI (`laki …`) | the launcher on PATH (`cliInstall`), agents' skills | `out/main/cli.js` |
-| `laki mcp` | Laki AI's claude and codex (`ai.ts`), MCP clients | `out/main/cli.js mcp` |
 | widget scripts | the daemon (`widgets.ts` runs, `cliArgv`) | an extension's `.js` |
 | `--headless` | you (`Laki --headless`: main runs `serve` through it) | `out/main/cli.js serve` |
 | Laki AI's tools | `laki mcp` above | |
@@ -38,8 +36,11 @@ by bundle). It doesn't close the hole yet: Laki's own binary still runs as node 
 ## The order to move them
 
 1. **Hooks** (done): the most started, the least needed (no grants, no window).
-2. **The CLI and `laki mcp`**: the launcher (`cliInstall`) and `cliArgv` point at Laki Hook (renamed *Laki Node* then)
-   with `hookRunner`'s rule; the skills quote the launcher, not the binary.
+2. **The CLI and `laki mcp`** (done): core.ts' `cliArgv` starts with `helperBin` (helper.ts, `hookRunner` before), so the
+   launcher on PATH (`cliInstall`), the skills' `laki` and their MCP command, Laki AI's `laki mcp` (`ai.ts` `mcpWith`)
+   and an extension's `$LAKI_CLI` run on the helper; `hookArgv` is `cliArgv`'s binary. `laki open` finds the outer app
+   (`appOf`), not the helper it runs in. Launchers written before update on their own (`refreshSkills`; Settings ›
+   General's launcher says it's outdated).
 3. **Widget scripts and the pty host**: spawned by the daemon with `process.execPath`; once the daemon itself runs on
    the helper, they follow by inheriting it.
 4. **The daemon**: `ensureDaemon`'s spawn from the app names the helper; the daemon's Screen Recording use (laki screen's

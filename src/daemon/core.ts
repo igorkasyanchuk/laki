@@ -30,7 +30,7 @@ import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
-import { hookRunner } from '../shared/helper.ts'
+import { helperBin } from '../shared/helper.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
@@ -280,14 +280,15 @@ export function save() {
 
 const here = dirname(fileURLToPath(import.meta.url))
 const cliPath = [join(here, 'cli.js'), join(here, '../cli/main.ts')].find(p => existsSync(p))!
-// node (or Electron as node) + the CLI script
-export const cliArgv = [process.execPath, ...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), cliPath]
+// node (or Electron as node: the bundle's helper when it has one, helper.ts) + the CLI script: the launchers on PATH, the
+// skills', laki mcp's, an extension's $LAKI_CLI
+export const cliArgv = [helperBin(process.execPath, existsSync), ...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), cliPath]
 export const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : []
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 export const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/ // what an env var's name may be (settings, projects, a host's script)
 // `laki hook` as its own script (cli/hook.ts: conn.ts only, 2-3x quicker to start than the whole CLI), else the CLI's
 const hookPath = [join(here, 'hook.js'), join(here, '../cli/hook.ts'), cliPath].find(p => existsSync(p))!
-const hookArgv = [hookRunner(process.execPath, existsSync), ...cliArgv.slice(1, -1), hookPath] // the bundle's Laki Hook when it has one (helper.ts)
+const hookArgv = [...cliArgv.slice(0, -1), hookPath] // on the CLI's binary: the bundle's helper when it has one
 const hookCmd = (st: string) => [...cliEnv, ...hookArgv.map(q), 'hook', st].join(' ')
 
 // where an agent's hook files are, and the command its hooks run (`<argv> hook <state>`): this Mac's `laki hook`, or
@@ -405,6 +406,12 @@ export function cliInstall() {
   writeFileSync(at, cliText(), { mode: 0o755 })
   chmodSync(at, 0o755)
   return cliState()
+}
+// as the daemon starts: Laki's launcher on PATH written again when an update changed its paths (the app's binary to the
+// helper: docs/dev/helper.md), only one that drives this data dir's daemon
+export function cliRefresh() {
+  const { path, current } = cliState()
+  if (path && !current && readFileSync(path, 'utf8').includes(` ${q(`LAKI_HOME=${dir}`)} `)) writeFileSync(path, cliText(), { mode: 0o755 })
 }
 export function cliRemove() {
   const at = cliState().path

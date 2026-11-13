@@ -117,6 +117,7 @@ flowResume() // workflow runs back at their blocks
 scanWidgets()
 try {
   refreshSkills()
+  core.cliRefresh()
 } catch (e) {
   log(`skills: ${(e as Error).message}`)
 }
