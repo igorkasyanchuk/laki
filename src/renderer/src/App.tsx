@@ -2956,11 +2956,11 @@ export function App() {
   // right click on a tab (or a pane header: one session)
   // Reader view (Reader.tsx): a claude or codex tab as its chat; a phone opens them so, else the terminal
   const readerOn = settings.reader !== false
-  const inReader = (id: string) => readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader'
+  const inReader = (id: string) => byId(id)?.preset === 'acp' || (readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader') // an ACP agent's tab has no terminal to show
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   // U2: Terminal | Reader, in the pane's header (split panes) or the tab bar (one pane): never over the terminal's lines
   const readSwitch = (id?: string) =>
-    id && readerOn && readable(byId(id)) ? (
+    id && readerOn && readable(byId(id)) && byId(id)?.preset !== 'acp' ? (
       <div className="reader-switch capsule nodrag" role="group" aria-label="Show it as">
         <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
         <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>

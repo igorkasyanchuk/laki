@@ -17,7 +17,7 @@ export type Client = { id: number; send(msg: unknown): void }
 // what a Session needs of its terminal: node-pty's, or the pty host's (ptyHost.ts' HostPty, whose group signals the
 // whole job there: this process isn't its parent's)
 export type Pty = { pid: number; write(d: string): void; resize(cols: number, rows: number): void; kill(signal?: string): void; onData(f: (d: string) => void): unknown; onExit(f: (e: { exitCode: number; signal?: number }) => void): unknown; group?(signal: string): void }
-type PtyOpts = { file: string; args: string[]; cwd: string; env: Record<string, string>; cols: number; rows: number }
+export type PtyOpts = { file: string; args: string[]; cwd: string; env: Record<string, string>; cols: number; rows: number }
 
 const SCROLLBACK = 5000
 const PROGRAM_SETTLE = 2000 // a report has stood this long before it's compared: a hook and a report of one change never come at once

@@ -13,6 +13,7 @@ import { dir } from './dir.ts'
 import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, num, type Said, transcriptOf } from './share.ts'
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
+import { acpChat } from './acp.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -61,6 +62,8 @@ export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: 
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) throw new Error('no such tab')
   for (const id of readers.keys()) if (!state.tabs.some(t => t.id === id)) readers.delete(id) // closed tabs'
+  const acp = acpChat(tab.id) // an ACP tab's: what acp.ts kept as it came
+  if (acp) return p.v === acp.v ? { v: acp.v } : { v: acp.v, said: acp.said.slice(-400) }
   const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0, bg: bgNew(), calls: new Map(), ids: new Map() }), readers.get(tab.id)!)
   const text = tailOf(tab, r, () => {
     if (r.chat && r.chat !== tab.resumeId && r.said.length) r.past = [...(r.past ?? []), ...r.said, { who: 'new', text: '' } as Said].slice(-400)

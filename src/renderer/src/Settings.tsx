@@ -2794,6 +2794,11 @@ export function SettingsPage(p: {
                         ) : (
                           <input className="mono" value={pr.args ?? ''} placeholder={`flags: ${ARGS_EG[pr.agent as Agent]}`} aria-label="Flags" onChange={e => setPreset(i, { args: e.target.value })} />
                         )}
+                        {pr.agent === 'command' && (s.labs || pr.acp) && (
+                          <Switch className="switch-row" on={!!pr.acp} onChange={on => setPreset(i, { acp: on || undefined })}>
+                            <Says title="Speaks ACP (Labs)" hint="The Agent Client Protocol on its stdio (gemini --experimental-acp, an ACP adapter): its tabs open in the Reader, with no terminal. Laki's permission modes and sandbox aren't applied to it yet: it asks as its own settings say" />
+                          </Switch>
+                        )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
                         <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
                         {pr.agent !== 'command' && FAST[pr.agent] && (

@@ -30,6 +30,7 @@ import { limitReset } from './limits.ts'
 import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
+import { AcpPty } from './acp.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
 import { appBinOk, helperBin } from '../shared/helper.ts'
 import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
@@ -687,7 +688,7 @@ export const rtOf = (id: string) => {
 export const tabStatus = (id: string): Status => rt.get(id)?.status ?? 'idle'
 
 // an agent whose turns Laki follows: by its hooks (HOOKED), or by its screen (sweepRunning)
-export const tracked = (t: Tab) => t.kind === 'agent' && isAgent(t.preset)
+export const tracked = (t: Tab) => t.kind === 'agent' && (isAgent(t.preset) || t.preset === 'acp')
 // a hook, notify or plugin says when a turn ends; gemini's do in versions that have hooks (Runtime.hooked: one came)
 const HOOKED = new Set(['claude', 'codex', 'opencode'])
 // what an agent shows while it works, on screen or in its window title: a quiet screen without it means the turn is over
@@ -1746,16 +1747,17 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   else {
     const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, o.prompt, !!o.resume) : undefined
     argEnv = a?.env
-    args = ['-lic', wait + (o.cmd ?? a?.cmd ?? (tab.cmd || 'true'))]
+    args = [tab.preset === 'acp' ? '-lc' : '-lic', wait + (o.cmd ?? a?.cmd ?? (tab.cmd || 'true'))] // an ACP agent's stdout is its protocol: no interactive shell's
   }
   sessions.get(tab.id)?.kill()
   asleep.delete(tab.id)
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const viaHost = !!state.settings?.ptyHost && ptyTakes() // R6: its terminal in the pty host, where it outlives this daemon
+  if (tab.preset === 'acp' && ws.host) throw new Error('ACP agents run on this Mac, not an SSH host')
+  const viaHost = !!state.settings?.ptyHost && ptyTakes() && tab.preset !== 'acp' // R6: its terminal in the pty host, where it outlives this daemon
   const ptyId = `${tab.id}.${randomBytes(6).toString('hex')}`
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : tab.preset === 'acp' ? { pty: p => new AcpPty(tab.id, p, o.resume ? undefined : o.prompt) } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
   // R6: in the pty host, its start's keys are kept (pty.json, 0600) for the daemon that finds it there after this one
   if (s.pty instanceof HostPty) {
     const id = s.pty.id
@@ -1940,7 +1942,7 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
   if (!o.kind) presetCheck(o.preset, o.cmd)
   const pr = o.kind ? undefined : presetNamed(o.preset)
   const cmd = pr?.agent === 'command' ? pr.cmd || 'true' : o.cmd
-  const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (cmd ? 'custom' : 'shell')
+  const preset = pr ? (pr.agent === 'command' ? (pr.acp ? 'acp' : 'custom') : pr.agent) : o.preset || (cmd ? 'custom' : 'shell') // acp: an ACP agent's (acp.ts)
   const kind = o.kind ?? (preset === 'shell' && !cmd ? 'shell' : 'agent')
   const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
@@ -2334,7 +2336,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   for (const [k, v] of Object.entries(set)) {
     if (v === '' || v === null) delete next[k]
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
-    else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer') next[k] = !!v
+    else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
   }
@@ -2343,6 +2345,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.name !== name && list.some(x => x.name === pr.name)) throw new Error(`there's a profile ${pr.name} already`)
   if (pr.agent !== 'command' && !isAgent(pr.agent)) throw new Error(`agent: ${AGENTS.join(', ')} or command`)
   if (pr.agent === 'command' && !pr.cmd) throw new Error('a command profile needs --cmd')
+  if (pr.acp && pr.agent !== 'command') delete pr.acp // ACP: a command's
   if (pr.effort && !EFFORTS[pr.agent as Agent]?.includes(pr.effort)) throw new Error(`effort: ${EFFORTS[pr.agent as Agent]?.join(', ') ?? `none for ${pr.agent}`}`)
   if (pr.perm && !PERMS[pr.agent as Agent]?.some(x => x[0] === pr.perm)) throw new Error(`perm: ${PERMS[pr.agent as Agent]?.map(x => x[0]).join(', ') ?? `none for ${pr.agent}`}`)
   if (pr.fast && !FAST[pr.agent as Agent]) delete pr.fast
@@ -4267,7 +4270,7 @@ export function sweepRunning(now = Date.now()) {
       if (asks && r.status === 'running') turn({ tab: t.id, state: 'waiting' })
       else if (!asks && r.status === 'waiting') turn({ tab: t.id, state: 'running' }) // answered
     }
-    if (!s || s.exited || r?.status !== 'running' || !tracked(t) || now - s.lastOutput < QUIET) continue
+    if (!s || s.exited || r?.status !== 'running' || !tracked(t) || t.preset === 'acp' || now - s.lastOutput < QUIET) continue // an ACP agent's turn ends with its prompt's answer
     if (r.bg && now - r.bg < BG_MAX) continue // its subagents work (turn): its next turn says when it's done
     if (r.compacting && now - r.compacting < COMPACT_MAX) continue // summing up a long chat may print nothing for a while
     if (BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue

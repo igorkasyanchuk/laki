@@ -30,7 +30,7 @@ type App = { id: string; at: number; server: string; tool: string; src: string; 
 export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
-export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
+export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex' || t.preset === 'acp') // acp: an ACP agent's (Labs), the Reader only
 // Settings › Appearance's: which tool calls show (text.ts readerShown), and whether sending scrolls to the latest (on unless false)
 export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean; times?: boolean } // times: F6, on unless false
 

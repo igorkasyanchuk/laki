@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+// fake ACP agent (Agent Client Protocol v1, newline-delimited JSON-RPC on stdio): initialize, session/new; a prompt
+// streams two updates (a message chunk, a tool call), asks one permission, then ends its turn with what was picked. A
+// prompt with "wait" in it waits for session/cancel instead (stopReason cancelled). Every message it gets goes to
+// $FAKE_ACP_LOG, a JSON line each
+const fs = require('fs')
+const log = m => fs.appendFileSync(process.env.FAKE_ACP_LOG || '/dev/null', JSON.stringify(m) + '\n')
+const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n')
+const update = (sessionId, update) => out({ method: 'session/update', params: { sessionId, update } })
+let n = 1000
+const asked = new Map() // a permission's id → its prompt's
+let waiting // a "wait" prompt's id
+require('readline').createInterface({ input: process.stdin }).on('line', line => {
+  const m = JSON.parse(line)
+  log(m)
+  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: {}, agentInfo: { name: 'fake-acp', title: 'Fake ACP' }, authMethods: [] } })
+  if (m.method === 'session/new') return out({ id: m.id, result: { sessionId: 'sess-acp-1' } })
+  if (m.method === 'session/prompt') {
+    const sid = m.params.sessionId
+    const text = m.params.prompt.map(b => b.text).join('')
+    update(sid, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `answer: ${text}` } })
+    update(sid, { sessionUpdate: 'tool_call', toolCallId: 't1', title: 'npm test', kind: 'execute', status: 'pending', rawInput: { command: 'npm test' } })
+    if (/wait/.test(text)) return void (waiting = m.id)
+    const id = ++n
+    asked.set(id, m.id)
+    return out({ id, method: 'session/request_permission', params: { sessionId: sid, toolCall: { toolCallId: 't1', title: 'npm test', kind: 'execute', rawInput: { command: 'npm test' } }, options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }, { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' }] } })
+  }
+  if (m.method === 'session/cancel') return void (waiting !== undefined && (out({ id: waiting, result: { stopReason: 'cancelled' } }), (waiting = undefined)))
+  if (m.id !== undefined && asked.has(m.id)) {
+    const p = asked.get(m.id)
+    asked.delete(m.id)
+    update('sess-acp-1', { sessionUpdate: 'tool_call_update', toolCallId: 't1', status: 'completed' })
+    update('sess-acp-1', { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: ` (picked ${m.result?.outcome?.optionId ?? m.result?.outcome?.outcome})` } })
+    return out({ id: p, result: { stopReason: 'end_turn' } })
+  }
+})

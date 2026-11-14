@@ -498,3 +498,32 @@ Shadow: once a change of the root's state has stood 2 s (`PROGRAM_SETTLE`; a hoo
 counts it against the status from hooks (`nativeAgrees`), per agent since the daemon started: `hooksSeen`'s `native`, Settings › Agents &
 profiles' line. Nothing else reads the records: a tab's status, notifications, asks and approvals stay with hooks, so a file shown in a tab
 can't move them. Next, once the counts say so: a fresh report overriding hooks for working, idle and done, under a written policy.
+
+### ACP agents (Labs, `daemon/acp.ts`)
+
+A command profile with `acp: true` (Settings › Agents & profiles, its *Speaks ACP* switch, shown with Labs on) is an
+agent spoken to over the Agent Client Protocol, version 1 (agentclientprotocol.com, `protocolVersion: 1`): newline-
+delimited JSON-RPC 2.0 on its stdio. Its tabs' preset is `acp` (`addTab`), `tracked` like any agent's, never on an SSH
+host or in the pty host. `spawnTab` runs its command with `-lc` (no interactive shell writing to its stdout) and gives
+the Session an `AcpPty` for a pty, so the rest of Laki goes as for any agent:
+
+- what's typed (`send`, the Reader's box, a queue's `deliver`, its start's prompt) is a prompt: Enter sends
+  `session/prompt`, one at a time (one typed meanwhile waits for it); its start: `initialize` with no client
+  capabilities (`fs` and `terminal` false, said outright: Gemini CLI 0.4 refuses an `initialize` without `fs`), then
+  `session/new` in the workspace's folder, no MCP servers. A `-32000` (sign-in needed) is said with its auth methods:
+  none is run;
+- `session/update`: message chunks to the Reader (`acpChat`, `chatRead`'s shapes: you, agent, tool) and the mirror as
+  plain text; a tool call a tool line (`failed` counts on it); a plan the live plan (`r.plan`, whole each time);
+- `session/request_permission`: an extension's gate first (`toolGate`: its no picks a reject option), then a numbered
+  menu on the mirror (`askOf` reads it) and a `PermissionRequest` hook with the tool named as Laki's rules name it
+  (execute is Bash, edit Edit…: `TOOLS`), so a project's auto-answer rule, the cards, Needs you and `answer` (its arrows
+  and Enter) pick an option, sent back as `selected`;
+- the prompt's answer is the turn's end: a `Stop` hook with its words (`stopReason` refusal: failed), so Done check and
+  kept turns run; `cancelled` is `interrupted` (no turn end);
+- Esc or ⌃C (Stop) is `session/cancel`, a pending permission answered `cancelled` first; an agent's request Laki doesn't
+  offer (`fs/*`, `terminal/*`) gets `-32601`.
+
+`sweepRunning` leaves its turns alone (its prompt's answer ends them). The renderer shows such a tab in the Reader only
+(`inReader`; no Terminal | Reader switch). ponytail: one session per start (no `session/load`: a restart starts a new
+chat); Laki's permission modes and sandbox aren't applied (its settings say so); tried with the fake in
+`test/fakes/acp-agent` and Gemini CLI 0.4.1's `--experimental-acp` handshake.
