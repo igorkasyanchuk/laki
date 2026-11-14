@@ -444,6 +444,16 @@ WebSocket events:
 window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
 
 - `limits` (`{ agent?, from? }`, `laki limits`, MCP's `laki_limits`): `usage`'s own cache and back-off for each account, only the agents the managed policy allows; no `name` or `account` in Recording mode unless the caller's workspace isn't private.
+- `chatSearch` (`{ q, limit?, tools? }`, meters.ts; API 181, `chat.search`): Search chats. Every claude and codex
+  transcript Laki knows (each workspace's agent tabs, an archived one's too, and `closed`'s with a `resumeId`; a host's
+  left out), newest file first, read through `readline` a line at a time; a line without q's longest plain word isn't
+  parsed. A line's messages are `chatOf`'s (`saidIn`): what you and the agent said, the tools' calls and output
+  (claude's `tool_result`, codex's `*_output`) only with `tools`. Matched case-insensitively, whitespace as one space;
+  `{ hits: ChatHit[], more? }`: newest first, `limit` (50, at most 200), each with its workspace, tab (none: a closed
+  tab's), name, agent, time, who, 160 characters around the words and the line's id (claude's `uuid`, else `L<n>`);
+  `more` past the limit or `SEARCH_MS` (3 s). The user's only (AGENT_NO); Recording mode leaves private workspaces'
+  out; remote access reads it (ANSWER). The window's dialog is ChatSearch.tsx, Reader.tsx `readerJump` and text.ts
+  `saidAt` its scroll to the message.
 - `tabDraft` (`{ tab, text? }`): a Reader box's unsent text, read or kept; on the tab (`draft`, never in the view: `drafted`; `tabSet` and `tabReopen` answer without it), moved to `closed` by `closeTab` and back by `tabReopen`; agents refused (`agentNo`, by the peer: `FROM`).
 - `reviewMark { ws }` (R11, turns.ts): Since I reviewed's mark, the worktree's tree now (`treeOf`) pinned as a commit under `refs/laki/reviewed/<ws>` (gc keeps it; `reviewDrop` deletes it with the workspace), on the workspace as `reviewed { at, tree, turn? }` (saved: a restart keeps it). FullReview calls it after comments go to an agent, after a posted review, and as the last unviewed file is ticked. `diff { ws, since: true }` (`reviewDiff`): from that tree to now, as `turnDiff` diffs two trees (`filesOf`, `git diff`); no mark: refused. Changes' scope `since` (Diff.tsx `ScopeSeg`'s *Since I reviewed · n files*, only with a mark and something changed: SidePanel asks for the count as the mark or `stat` moves). `AGENT_NO` (in `FROM`), `ANSWER`.
 - `reviewNotesGet { ws }`, `reviewNotesSet { ws, notes }` (R10): the Review tab's unsent comments, `<data>/review-notes/<ws>.json` (0600, `writeAtomic`); `{ notes, at? }` (no `at`: never set, FullReview's own copy moves in once); 200 comments at most, each 4 KB as JSON, only its fields kept (`id`, `path`, `line`, `startLine?`, `side` LEFT or RIGHT, `body`, `quote`). Kept through an archive, deleted with the workspace (`dropWs`). `AGENT_NO` (in `FROM`), and `ANSWER` (a phone at Answer only reads and sets them). FullReview draws its `laki.reviewNotes` cache at once, then the daemon's; each change goes there 400 ms after the last, and as the tab closes.

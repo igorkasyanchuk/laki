@@ -31,6 +31,7 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     find: () => dialog || findIn() || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog; a diff's own (findIn) first
     // the sidebar's filter: open, its box focused; pressed again in the box: closed
     filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),
+    chatSearch: () => setDialog(d => (d === 'chats' ? null : 'chats')),
     next: nextNeed,
     step: stepsOn && !!ws && !dialog && (() => (st => st && doStep(ws, st))(stepOf(ws))),
     later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),

@@ -2586,6 +2586,7 @@ const appMenu = () => Menu.setApplicationMenu(
         { role: 'selectAll' },
         { type: 'separator' },
         bound('Find…', 'find'),
+        bound('Search Chats…', 'chatSearch'),
       ],
     },
     {

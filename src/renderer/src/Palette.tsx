@@ -153,6 +153,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     if (w) items.push({ kind: 'tab', more: () => tabMenu([t.id]), label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
   }
   a({ label: 'Next tab that needs you', icon: 'bell', hint: kh('next'), run: nextNeed })
+  a({ label: 'Search chats', icon: 'search', hint: kh('chatSearch'), run: () => setDialog('chats') })
   for (const { w, m } of extMenus('palette', ws)) a({ label: `${w.name}: ${m.title}`, icon: 'panel', hint: m.key ? keyText(m.key) : 'extension', run: () => void extRun(w, m, hereCtx()) })
   a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: kh('full'), run: () => toggleFull() })
   if (aiOn(settings)) a({ id: 'aiLater', label: 'Ask Laki AI later…', icon: 'timer', run: () => sendLater('ai') })

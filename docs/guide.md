@@ -1797,6 +1797,13 @@ laki flow pause <run> | flow resume <run>      # pause after the block it's on |
 
 ### Reader view
 
+**Search chats** (⌥⌘F, ⌘K's *Search chats*, Edit › *Search Chats…*) finds words in what you and your Claude Code and
+Codex agents said, in every workspace's chats (archived ones and closed tabs' too), newest first: the 50 newest, or what
+3 seconds found, then *More…*. Each hit shows its words, its tab and when, under its workspace; Enter opens that tab's
+Reader at that message. An archived workspace's opens only from its *Restore*. Tool output isn't searched. Agents can't
+search (`laki screen` reads one tab); in Recording mode, private workspaces' chats are left out. Change its key in
+Settings › Keys.
+
 Each Claude Code and Codex tab has a *Terminal | Reader* switch: in the tab bar, or in a split pane's header (never over the terminal). Reader shows its chat as a
 conversation, read from the agent's own transcript: your messages on the right (a long one folds to 10 lines: *Show more*), its answers as formatted text, each run
 of tool calls folded into one line (click for the list), and what it's doing now. When it asks something, its choices
@@ -2133,6 +2140,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⇧A (a Needs you card focused) | Allow all (it lists each first) |
 | ⌘G | the workspace's next step (first in its ⋯) |
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
+| ⌥⌘F | search chats: what you and your agents said, in every workspace |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
 | ↑ in an empty prompt box, ⌥↑ | search your earlier prompts (Settings › Keys › *Prompt history*) |

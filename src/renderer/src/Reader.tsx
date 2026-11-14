@@ -15,7 +15,7 @@ import { daemonBase, openExternal } from './api'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
-import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, withMentions } from './text'
+import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
 import { optLabel, ruleFrom } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
@@ -41,6 +41,13 @@ export const modeItems = (tab: TabView, set: (mode: string) => unknown): MenuIte
     return { label, sub: no ?? sub, hint: tab.mode === id ? (tab.modeUnknown ? 'last seen' : ON) : undefined, danger: id === 'bypassPermissions', off: !!no, run: () => void (no || set(id)) }
   })
 export const modeLabel = (mode?: string) => (mode === 'auto' ? 'Auto' : mode === 'dontAsk' ? "Don't ask" : CLAUDE_MODES.find(([id]) => id === mode)?.[1])
+
+// Search chats' Enter (Dialogs.tsx openHit): the tab's Reader scrolls to that message once it has it (text.ts saidAt)
+const jumps = new Map<string, { who: string; text: string; at?: number }>()
+export function readerJump(tab: string, to: { who: string; text: string; at?: number }) {
+  jumps.set(tab, to)
+  dispatchEvent(new CustomEvent('laki-reader-jump', { detail: tab }))
+}
 
 // the Reader's box, per tab: here at once (a switch of tabs), in the daemon a moment after you stop typing
 const drafts = new Map<string, string>()
@@ -94,6 +101,14 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   const at = useComplete(box, api.mentions && { key: tab.id, mentions: () => api.mentions!(tab) }, setText) // @ a workspace or project
   const pinned = useRef(true) // at the bottom: it stays there as the chat grows
   const [opened, setOpened] = useState<Set<number>>(new Set()) // the hidden runs shown by a click, by their first line
+  const [jump, setJump] = useState<{ who: string; text: string; at?: number }>() // Search chats' message to scroll to
+  useEffect(() => {
+    const take = () => (j => j && (jumps.delete(tab.id), setJump(j)))(jumps.get(tab.id))
+    take()
+    const on = (e: Event) => (e as CustomEvent).detail === tab.id && take()
+    addEventListener('laki-reader-jump', on)
+    return () => removeEventListener('laki-reader-jump', on)
+  }, [tab.id])
   useEffect(() => {
     let alive = true
     v.current = undefined
@@ -196,18 +211,39 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   // the chat's lines: what Tool calls in the Reader hides goes in runs, each one line (n steps hidden · Show)
   const running = tab.status === 'running'
   const shown = useMemo(() => readerShown(said ?? [], look.tools, running), [said, look.tools, running])
+  // a jump: its message found, its hidden run shown, scrolled to the middle and lit a moment. Not among them yet: the
+  // next read (ponytail: one older than the Reader's last 400 messages never is)
+  useEffect(() => {
+    if (!jump || !said) return
+    const i = saidAt(said, jump)
+    if (i < 0) return
+    setJump(undefined)
+    let f = i // its hidden run's first line (flush's key)
+    while (f > 0 && !shown[f - 1]) f--
+    if (!shown[i]) setOpened(o => new Set(o).add(f))
+    pinned.current = false
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = scroll.current?.querySelector<HTMLElement>(`[data-i="${i}"]`)
+        if (!el) return
+        el.scrollIntoView({ block: 'center' })
+        el.classList.add('rd-hit')
+        setTimeout(() => el.classList.remove('rd-hit'), 2000)
+      }),
+    )
+  }, [jump, said, shown])
   // F6: when each message was sent, and each finished turn's end, length and cost
   const times = useMemo(() => (look.times === false ? [] : readerTimes(said ?? [], running)), [said, running, look.times])
   const runCode = useMemo(() => (api.run ? (text: string, same?: boolean) => api.run!(tab, text, same) : undefined), [tab.id])
   const line = (x: Said, i: number) => [
     x.who === 'you' ? (
-      <You key={i} text={x.text} stopped={x.stopped} onEdit={x.stopped && !running && i === said!.length - 1 ? () => (setText(x.text), box.current?.focus()) : undefined} />
+      <You key={i} i={i} text={x.text} stopped={x.stopped} onEdit={x.stopped && !running && i === said!.length - 1 ? () => (setText(x.text), box.current?.focus()) : undefined} />
     ) : x.who === 'new' ? (
       <div key={i} className="rd-new muted small" data-tip="The chat started over here (/clear): the agent doesn't see what's above">
         New session
       </div>
     ) : x.who === 'tool' ? (
-      <details key={i} className={x.fail ? 'rd-tool fail' : 'rd-tool'}>
+      <details key={i} data-i={i} className={x.fail ? 'rd-tool fail' : 'rd-tool'}>
         <summary>
           {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}
           {x.fail ? ` · ${x.fail} failed` : ''} · {x.text.split('\n').at(-1)}
@@ -216,7 +252,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         <pre>{linkify(x.text)}</pre>
       </details>
     ) : (
-      <div key={i} className="rd-agent">
+      <div key={i} data-i={i} className="rd-agent">
         <Markdown src={x.text} chat />
       </div>
     ),
@@ -489,11 +525,11 @@ function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
 // ponytail: long by lines or length, not by measuring the wrapped text; a 1,000-character line folds even if it fits
 const longSaid = (s: string) => s.split('\n').length > 12 || s.length > 1000
 // stopped: you stopped its turn there; onEdit: it never answered it, so Edit and resend puts it back in the box
-function You({ text, stopped, onEdit }: { text: string; stopped?: boolean; onEdit?: () => void }) {
+function You({ i, text, stopped, onEdit }: { i: number; text: string; stopped?: boolean; onEdit?: () => void }) {
   const [open, setOpen] = useState(false)
   const long = longSaid(text)
   return (
-    <div className="rd-you">
+    <div className="rd-you" data-i={i}>
       <div className={long && !open ? 'rd-fold' : undefined}>{linkify(text)}</div>
       {long && (
         <button type="button" className="link rd-more" onClick={() => setOpen(o => !o)}>

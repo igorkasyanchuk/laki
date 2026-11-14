@@ -19,7 +19,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, snap, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -869,4 +869,18 @@ test('snap: the nearest point within the threshold, a fraction of the room or px
   assert.equal(snap(303, 900, [300, 310]), 300)
   assert.equal(snap(320, 900, [300], 30), 300) // a threshold of its own
   assert.equal(snap(305, 900, []), 305)
+})
+
+test("saidAt: a chat search's hit among the Reader's messages, by who, time span and words; else by words; else -1", () => {
+  const said = [
+    { who: 'you', text: 'Fix the total', at: 1000 },
+    { who: 'agent', text: 'The rounding\nis off.\n\nFixed the rounding.', at: 2000, end: 4000 },
+    { who: 'tool', text: 'Read: cart.ts', at: 2500 },
+    { who: 'agent', text: 'Fixed the rounding.', at: 9000 },
+  ]
+  assert.equal(saidAt(said, { who: 'agent', text: 'Fixed the rounding.', at: 3000 }), 1) // inside its span, not the newest
+  assert.equal(saidAt(said, { who: 'agent', text: '…rounding is off…', at: 2000 }), 1) // the excerpt's … and a line break
+  assert.equal(saidAt(said, { who: 'agent', text: 'Fixed the rounding.', at: 99 }), 3) // no time fits: the newest by words
+  assert.equal(saidAt(said, { who: 'you', text: 'rounding' }), -1) // not yours
+  assert.equal(saidAt([], { who: 'you', text: 'x' }), -1)
 })

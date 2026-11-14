@@ -205,6 +205,9 @@ export function resetOf(windows: UsageWindow[], at: number) {
   return hit.length ? Math.min(...hit) : real.find(w => w.label === '5-hour')?.resets
 }
 // a tab you closed (⌘W), kept for ⇧⌘T: what brings it back (core.ts closeTab, tabReopen); cwd: a shell's folder
+// Search chats' hit (meters.ts chatSearch): its workspace and tab (none: a closed tab's chat), the tab's name and agent,
+// when it was said, who said it, 160 characters around the words, the transcript line's id (claude's uuid, else L<n>)
+export type ChatHit = { ws: string; tab?: string; name: string; agent: string; at?: number; who: 'you' | 'agent' | 'tool'; text: string; id: string }
 export type ClosedTab = { draft?: string; name: string; kind: 'agent' | 'shell'; preset?: string; profile?: string; resumeId?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; cmd?: string; cwd?: string; at: number }
 export type Workspace = {
   id: string
@@ -1252,7 +1255,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 180
+export const API = 181
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

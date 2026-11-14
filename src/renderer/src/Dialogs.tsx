@@ -6,7 +6,7 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type GateHeld, type Project, prIn, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
+import { type ChatHit, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type GateHeld, type Project, prIn, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
@@ -28,6 +28,8 @@ import { spanText, type Collision } from '../../shared/overlap'
 import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
 import { ShipSheet } from './Ship'
+import { ChatSearch } from './ChatSearch'
+import { readerJump } from './Reader'
 import { type ComponentType, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
@@ -655,7 +657,14 @@ export function Pages({ app }: { app: AppCtx }) {
 
 // the dialogs over everything (and the keys overlay, between them as it always was)
 export function Dialogs({ app }: { app: AppCtx }) {
-  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws } = app
+  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws, setRead, restore } = app
+  // a chat search's hit: its tab in the Reader at that message; a closed tab's: its workspace, ⇧⌘T to reopen it
+  const openHit = (h: ChatHit) => {
+    if (!h.tab || !view.tabs.some(t => t.id === h.tab)) return void (setWsId(h.ws), toast(`${h.name} is closed: ⇧⌘T reopens it`))
+    readerJump(h.tab, h)
+    setRead(h.tab, 'reader')
+    selectTab(h.tab)
+  }
   const [cloning, setCloning] = useState(false)
   const [cloneLine, setCloneLine] = useState('') // git's own progress, as it clones (the daemon's cloneProgress)
   useEffect(() => (cloning ? api.on(m => m.ev === 'cloneProgress' && setCloneLine(String(m.line))) : setCloneLine('')), [cloning])
@@ -707,6 +716,16 @@ export function Dialogs({ app }: { app: AppCtx }) {
         />
       )}
       {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
+      {dialog === 'chats' && (
+        <ChatSearch
+          search={q => call('chatSearch', { q })}
+          wsName={id => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id))}
+          archived={id => !!view.workspaces.find(w => w.id === id)?.archived}
+          onOpen={openHit}
+          onRestore={h => void restore(h.ws).then(() => openHit(h))}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'palette' && <Palette items={paletteItems(app)} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
       <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (

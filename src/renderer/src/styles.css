@@ -1786,6 +1786,16 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .ff-item .muted { overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-2); }
 .ff-item.sel { background: var(--sel); }
 .ff-item b { color: var(--accent-ink); font-weight: 700; }
+/* Search chats (ChatSearch.tsx): hits under their workspace's name, the words over where and when */
+.chat-search { width: 720px; }
+.cs-head { padding: var(--sp-3) var(--sp-4) var(--sp-1); font-weight: 600; }
+.cs-hit { align-items: flex-start; flex-wrap: wrap; white-space: normal; }
+.cs-hit > svg { margin-top: var(--sp-1); }
+.cs-text { flex: 1 1 0; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.cs-where { flex: 0 0 100%; padding-left: calc(1em + var(--sp-4)); }
+.cs-restore { flex: none; }
+/* the message a chat search opened the Reader at, lit a moment */
+.rd-hit { outline: 2px solid var(--accent); outline-offset: var(--sp-1); border-radius: var(--r-m); transition: outline-color var(--t-slow) var(--ease-out); }
 .settings-nav-head { margin: 14px 10px 4px; font-size: var(--fs-1); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .settings-nav button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-nav button > svg { flex: none; } /* a long project name squeezed its icon away */

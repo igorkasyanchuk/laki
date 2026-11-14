@@ -282,3 +282,40 @@ test('a draft: kept per tab through a restart and a closed tab (⇧⌘T), out of
   await rig.rpc('wsRm', { id: ws.id, force: true })
   await assert.rejects(draftOf(back.id), /no tab|not found/i)
 })
+
+// Search chats (meters.ts chatSearch): every chat Laki knows, line by line, what you and the agent said; the tools'
+// output only when asked; newest first up to limit; the user's only; Recording mode leaves a private workspace's out
+test('chatSearch: a phrase in what the agent said, newest first; tool output only when asked; the limit; refused to an agent; Recording mode', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'cart' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const at = (s: number) => new Date(Date.UTC(2026, 10, 1, 9, 0, s)).toISOString()
+  writeFileSync(
+    join(dir, 'chat-s.jsonl'),
+    line({ type: 'user', uuid: 'u1', timestamp: at(0), message: { content: 'Fix the cart total' } }) +
+      line({ type: 'assistant', uuid: 'a1', timestamp: at(1), message: { content: [{ type: 'text', text: 'The Rounding in\ncart.ts is off by one cent.' }, { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: 'cart.ts' } }] } }) +
+      line({ type: 'user', uuid: 'r1', timestamp: at(2), message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'export const rounding in cart = 1' }] } }) +
+      Array.from({ length: 12 }, (_, i) => line({ type: 'assistant', uuid: `n${i}`, timestamp: at(10 + i), message: { content: [{ type: 'text', text: `needle number ${i}` }] } })).join(''),
+  )
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-s' } })
+  await until(async () => (await rig.tab(ws.id))?.resumeId === 'chat-s', 'its chat')
+  const r = await rig.rpc('chatSearch', { q: '  ROUNDING   in cart ' })
+  assert.deepEqual(r.hits, [{ ws: ws.id, tab: tab.id, name: tab.name, agent: 'claude', at: Date.parse(at(1)), who: 'agent', text: 'The Rounding in cart.ts is off by one cent.', id: 'a1' }]) // a line break as a space; the tool's output not
+  const all = await rig.rpc('chatSearch', { q: 'rounding in cart', tools: true })
+  assert.deepEqual(all.hits.map((h: any) => [h.who, h.id]), [['tool', 'r1'], ['agent', 'a1']]) // newest first
+  const some = await rig.rpc('chatSearch', { q: 'needle', limit: 5 })
+  assert.deepEqual(some.hits.map((h: any) => h.text), ['needle number 11', 'needle number 10', 'needle number 9', 'needle number 8', 'needle number 7'])
+  assert.equal(some.more, true)
+  assert.equal((await rig.rpc('chatSearch', { q: 'nowhere said' })).hits.length, 0)
+  await assert.rejects(rig.rpc('chatSearch', { q: '' }), /search for what/)
+  await assert.rejects(rig.rpc('chatSearch', { q: 'needle', from: { ws: ws.id, tab: tab.id } }), /search the user's chats/) // an agent's call
+  // Recording mode: a private workspace's chats left out; off again: back
+  await rig.rpc('wsSet', { id: ws.id, private: true })
+  await rig.rpc('settingsSet', { recording: true })
+  assert.equal((await rig.rpc('chatSearch', { q: 'needle' })).hits.length, 0)
+  await rig.rpc('settingsSet', { recording: false })
+  assert.equal((await rig.rpc('chatSearch', { q: 'needle' })).hits.length, 12)
+})

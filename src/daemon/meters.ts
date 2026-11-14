@@ -1,11 +1,12 @@
 // claude's and codex's transcripts, read as they grow: a tab's context and usage meters, and today's spend. core.ts
 // imports it, and its users import it directly.
 
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
+import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
-import { HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
+import { type ChatHit, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, presetOf, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -346,4 +347,90 @@ export function todayView(): Today | undefined {
   }
   const sum = (k: 'tokens' | 'cost') => chats.reduce((n, c) => n + c[k], 0)
   return { tokens: sum('tokens'), cost: Math.round(sum('cost') * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })) }
+}
+
+// Search chats (⇧⌘F, ⌘K): every claude and codex chat Laki knows: its workspaces' agent tabs (an archived one's too) and
+// the tabs closed there that ⇧⌘T keeps, newest file first, each read a line at a time (never whole). What you and the
+// agent said, case-insensitively, spaces as one (tools: the tools' calls and output too); newest first, limit hits (50)
+// or what SEARCH_MS found, then more. Recording mode: no private workspace's. A host's (SSH) chats are there: left out
+const SEARCH_MS = 3000
+export async function chatSearch(p: { q?: unknown; limit?: unknown; tools?: unknown }): Promise<{ hits: ChatHit[]; more?: true }> {
+  const q = String(p?.q ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+  if (!q) throw new Error('search for what?')
+  const limit = Math.max(1, Math.min(200, Math.floor(Number(p.limit) || 50)))
+  const tools = p.tools === true
+  const end = Date.now() + SEARCH_MS
+  const veil = !!state.settings?.recording
+  const hid = new Set(veil ? state.projects.filter(x => x.private).map(x => x.id) : [])
+  const files = new Map<string, Omit<ChatHit, 'at' | 'who' | 'text' | 'id'> & { mtime: number }>()
+  const add = (ws: Workspace, agent: string | undefined, id: string | undefined, account: string | undefined, name: string, tab?: string) => {
+    if ((agent !== 'claude' && agent !== 'codex') || !id) return
+    const file = transcriptOf(agent, accountNamed(account)?.dir ?? homeDir(agent), id)
+    const st = file && !files.has(file) ? statSync(file, { throwIfNoEntry: false }) : undefined
+    if (st) files.set(file!, { ws: ws.id, ...(tab && { tab }), name, agent, mtime: st.mtimeMs })
+  }
+  for (const w of state.workspaces) {
+    if (w.host || (veil && (w.private || hid.has(w.project)))) continue
+    for (const t of state.tabs) if (t.workspace === w.id && t.kind === 'agent') add(w, t.preset, t.resumeId, t.account, t.name, t.id)
+    for (const c of w.closed ?? []) add(w, c.preset, c.resumeId, c.account, c.name)
+  }
+  // a word of q as the JSON line has it (no quote, backslash or other escape): lines without it aren't parsed
+  const pre = q.split(' ').filter(w => /^[\x20-\x7e]+$/.test(w) && !/["\\]/.test(w)).sort((a, b) => b.length - a.length)[0]
+  const hits: ChatHit[] = []
+  let more = false
+  for (const [file, f] of [...files].sort((a, b) => b[1].mtime - a[1].mtime)) {
+    if (hits.length >= limit || Date.now() > end) {
+      more = true
+      break
+    }
+    const room = limit - hits.length
+    const found: ChatHit[] = [] // this file's newest room, oldest first
+    const input = createReadStream(file, { encoding: 'utf8' })
+    const lines = createInterface({ input, crlfDelay: Infinity })
+    let n = 0
+    try {
+      for await (const line of lines) {
+        n++
+        if (Date.now() > end) {
+          more = true
+          break
+        }
+        if (pre && !line.toLowerCase().includes(pre)) continue
+        for (const s of saidIn(f.agent, line, tools)) {
+          const flat = s.text.replace(/\s+/g, ' ').trim()
+          const i = flat.toLowerCase().indexOf(q)
+          if (i < 0) continue
+          const from = Math.max(0, Math.min(i - 50, flat.length - 160))
+          found.push({ ws: f.ws, ...(f.tab && { tab: f.tab }), name: f.name, agent: f.agent, ...(s.at && { at: s.at }), who: s.who, text: `${from > 0 ? '…' : ''}${flat.slice(from, from + 160)}${from + 160 < flat.length ? '…' : ''}`, id: s.id ?? `L${n}` })
+          if (found.length > room) (found.shift(), (more = true))
+        }
+      }
+    } catch {} // a file gone meanwhile: what it had
+    lines.close()
+    input.destroy()
+    hits.push(...found.reverse())
+  }
+  return { hits, ...(more && { more: true as const }) }
+}
+
+// one transcript line's messages for chatSearch (share.ts' chatOf: what you and the agent said, the tools' calls), with
+// the tools' output when asked (claude's tool_result, codex's function_call_output) and the line's id (claude's uuid)
+function saidIn(agent: string, line: string, tools: boolean): { who: 'you' | 'agent' | 'tool'; text: string; at?: number; id?: string }[] {
+  let j: { uuid?: unknown; timestamp?: string; type?: string; message?: { content?: unknown }; payload?: { type?: unknown; output?: unknown } }
+  try {
+    j = JSON.parse(line) ?? {}
+  } catch {
+    return []
+  }
+  const id = typeof j.uuid === 'string' ? j.uuid : undefined
+  const out: { who: 'you' | 'agent' | 'tool'; text: string; at?: number; id?: string }[] = chatOf(agent, line)
+    .filter(s => s.who === 'you' || s.who === 'agent' || (tools && s.who === 'tool'))
+    .map(s => ({ who: s.who as 'you' | 'agent' | 'tool', text: s.text, at: s.at, id }))
+  if (!tools) return out
+  const at = (t => (Number.isFinite(t) ? t : undefined))(Date.parse(String(j.timestamp)))
+  const text = (c: unknown): string => (typeof c === 'string' ? c : Array.isArray(c) ? c.map(x => (typeof x?.text === 'string' ? x.text : '')).join('\n') : '')
+  const content = j.message?.content
+  if (agent === 'claude' && j.type === 'user' && Array.isArray(content)) for (const x of content) x?.type === 'tool_result' && out.push({ who: 'tool', text: text(x.content), at, id })
+  if (agent === 'codex' && j.type === 'response_item' && /_output$/.test(String(j.payload?.type))) out.push({ who: 'tool', text: text(j.payload?.output), at })
+  return out.filter(s => s.text)
 }

@@ -968,6 +968,16 @@ export function wordDiff(oldLine: string, newLine: string): { old: WordSpans; ne
   return { old: spans(a, keepA), new: spans(b, keepB) }
 }
 
+// a chat search's hit (shared/types ChatHit) among the Reader's messages: the newest one by who said it whose time span
+// holds the hit's and whose words hold its excerpt (spaces as one), else by the words alone; -1: not among them (yet)
+export function saidAt(said: { who: string; text: string; at?: number; end?: number }[], hit: { who: string; text: string; at?: number }): number {
+  const core = hit.text.replace(/^…|…$/g, '').toLowerCase()
+  const has = (s: { text: string }) => s.text.replace(/\s+/g, ' ').toLowerCase().includes(core)
+  const timed = (s: { at?: number; end?: number }) => !!hit.at && !!s.at && s.at <= hit.at && hit.at <= (s.end ?? s.at)
+  const i = said.findLastIndex(s => s.who === hit.who && timed(s) && has(s))
+  return i >= 0 ? i : said.findLastIndex(s => s.who === hit.who && has(s))
+}
+
 // a resize edge's soft snap points (Panes.tsx' handles, ui.tsx Edge): the nearest point within threshold px, else px.
 // A point of 1 or less is that part of total (1/3, 1/2, 2/3 of the room), else px; ⌥ for none is the caller's
 export function snap(px: number, total: number, points: number[], threshold = 8): number {
