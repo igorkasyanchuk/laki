@@ -30,6 +30,38 @@ const SENT_MAX = 50
 type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string; rec: EventSent } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always); rec: what laki widget events says of it
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
+// laki events (main.ts' events): the objects extensions get (tool.call's aside: every tool call), numbered, the newest
+// STREAM_MAX kept while something listened within HEARD_IDLE (none: none kept). Each call waits up to its wait for one
+// past its after that it may see and asked for
+const STREAM_MAX = 500
+const HEARD_IDLE = 60_000
+const stream: { n: number; ws?: string; event: string; json: string }[] = []
+let streamN = 0
+let heardAt = 0
+const waiters = new Set<() => void>()
+function streamPush(event: string, ws: string | undefined, json: () => string) {
+  if (Date.now() - heardAt > HEARD_IDLE) return void (stream.length = 0)
+  stream.push({ n: ++streamN, ...(ws && { ws }), event, json: json() })
+  if (stream.length > STREAM_MAX) stream.shift()
+  for (const w of [...waiters]) w()
+}
+export async function eventsWait(o: { after?: number; ws?: string[]; type?: string[]; wait: number; ok: (ws?: string) => boolean }): Promise<{ next: number; events: Record<string, unknown>[] }> {
+  heardAt = Date.now()
+  const after = o.after !== undefined && o.after <= streamN ? o.after : streamN // none (or a daemon started since): from now
+  const pick = () => stream.filter(s => s.n > after && (!o.type?.length || o.type.includes(s.event)) && (!o.ws?.length || (!!s.ws && o.ws.includes(s.ws))) && o.ok(s.ws))
+  const end = Date.now() + o.wait
+  let got = pick()
+  while (!got.length && Date.now() < end) {
+    await new Promise<void>(r => {
+      const done = () => (clearTimeout(t), waiters.delete(done), r())
+      const t = setTimeout(done, end - Date.now())
+      waiters.add(done)
+    })
+    got = pick()
+  }
+  heardAt = Date.now()
+  return { next: streamN, events: got.map(s => JSON.parse(s.json)) }
+}
 const draining = new Set<string>()
 const sent: EventSent[] = []
 export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined, hops: number) => { flows: string[]; refused: string[] }; listens?: (name: string) => boolean } = {}
@@ -47,6 +79,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const i = x && wsInfo(x)
   const head = { event: name, at: Date.now(), ...(x && { ws: eventWs(x) }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(o.from && { from: o.from }) }
   const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
+  if (name !== 'tool.call') streamPush(name, x?.id, () => (JSON.stringify(extra).length > EVENT_MAX ? JSON.stringify({ ...head, cut: true }) : JSON.stringify({ ...head, ...extra })))
   if (name === 'tool.call' && ![...widgets.values()].some(w => handlerOf(w, name))) return rec // every tool call: kept only when an extension answers it, or it'd be the whole log
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()

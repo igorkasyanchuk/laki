@@ -2707,6 +2707,7 @@ laki new app --after-limit --prompt "…"                 # its agent once the p
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
 laki ls [--json]
 laki limits [--agent claude] [--json]      # each plan's use and when it resets (agents: laki_limits over MCP)
+laki events [--json] [--ws <ref>]... [--type a,b] [--once] [--timeout <s>]   # Laki's events as they happen, a line each (extensions' events; never starts Laki; exit 3: --timeout passed)
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
 laki name backend                                       # in an agent's tab: other agents reach it as @backend, in any workspace
 laki agents                                             # the named agents: where, which agent, what they're doing

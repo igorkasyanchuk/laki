@@ -8,6 +8,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
   laki limits [--agent claude] [--json]       how much of each agent's plan is used, and when it resets
+  laki events [--json] [--ws <ref>]... [--type a,b] [--once] [--timeout <s>]   Laki's events as they happen, a line each (never starts Laki)
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
   laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
@@ -276,6 +277,13 @@ or the words after <ws>) its agent starts on it, as a new workspace's does; --na
 ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
 
   laki progress 40 "Parser done, writing tests"`,
+  events: `Prints Laki's events as they happen, one line each: the same events extensions get (turn.done, turn.failed,
+ask, pr.opened, pr.merged, workspace.archived…: see docs/extensions.md), JSON with --json. --ws (again for more) and
+--type a,b keep only those; --once exits 0 after the first, --timeout <s> exits 3 if none came by then. It never starts
+Laki. In an agent's tab, only its own workspace's events.
+
+  laki events --json --type turn.done | while read -r e; do echo "$e" | jq -r .ws.name; done
+  laki events --ws fix-login --type turn.done --once --timeout 600 && say "fix-login is done"`,
   limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
   secret: `In an agent's tab: ask the user for a secret (an API key, a token, a password) without it going into the chat.
 They type it on a masked card under your tab; you get only the path of a 0600 file in $LAKI_STORAGE_FOLDER that holds

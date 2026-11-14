@@ -444,6 +444,13 @@ WebSocket events:
 window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
 
 - `limits` (`{ agent?, from? }`, `laki limits`, MCP's `laki_limits`): `usage`'s own cache and back-off for each account, only the agents the managed policy allows; no `name` or `account` in Recording mode unless the caller's workspace isn't private.
+- `events` (`{ after?, ws?, type?, wait? }`, `laki events`): Laki's events as extensions get them (`widgetEvent`'s
+  `{ event, at, ws, tab, …fields }`, `tool.call` aside), long-polled: widgetEvents.ts `eventsWait` keeps the newest 500,
+  numbered, only while something called in the last minute; a call waits up to `wait` seconds (25 at most) for one past
+  `after` (none: from now) that matches `ws` (refs) and `type` (names, a list or a,b), and answers `{ next, events }`.
+  An agent's tab (`from`) gets its own workspace's only; Recording mode leaves private workspaces' out; remote access
+  can't (REMOTE_NO). The CLI loops on it (`--once`, `--timeout`: exit 3), never starting a daemon. Not the WebSocket:
+  that one carries the whole view, and the CLI has no client for it.
 - `chatSearch` (`{ q, limit?, tools? }`, meters.ts; API 181, `chat.search`): Search chats. Every claude and codex
   transcript Laki knows (each workspace's agent tabs, an archived one's too, and `closed`'s with a `resumeId`; a host's
   left out), newest file first, read through `readline` a line at a time; a line without q's longest plain word isn't

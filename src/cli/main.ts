@@ -28,6 +28,7 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
+const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
 const BOOL = new Set(['simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
@@ -72,6 +73,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
   else if (!textOnly && args[0] === 'ship' && ['--title', '--body', '--files', '--draft'].includes(a)) a === '--draft' ? (flags.draft = true) : a === '--files' ? shipFiles.push(...(argv[++i] ?? '').split(',').filter(Boolean)) : (flags[k] = argv[++i] ?? '') // laki ship's only
   else if (!textOnly && args[0] === 'limits' && a === '--agent') flags.agent = argv[++i] ?? '' // laki limits' only
+  else if (!textOnly && args[0] === 'events' && ['--ws', '--type', '--once'].includes(a)) a === '--ws' ? wsRefs.push(argv[++i] ?? '') : a === '--once' ? (flags.once = true) : (flags.type = argv[++i] ?? '') // laki events' only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
   else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
   else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
@@ -107,6 +109,12 @@ function flowCheck(paths: string[]) {
 // actions as they run, a line each, until Ctrl-C (the link stays). --off <id|folder> unlinks, --list lists them
 // who runs this (the daemon's agentCaller tells an agent's tab from yours): laki widget's action, on, dev, run and check
 const caller = () => ({ ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB })
+// laki events' line: when, the event, its workspace and tab, the first words it says
+const eventLine = (e: Record<string, any>) => {
+  const said = [e.last, e.error, e.text, e.title, e.message].find(x => typeof x === 'string' && x.trim())
+  const t = new Date(typeof e.at === 'number' ? e.at : Date.now()).toLocaleTimeString([], { hourCycle: 'h23' })
+  return `${t}  ${e.event}${e.ws?.name ? `  ${e.ws.name}` : ''}${e.tab?.name ? ` · ${e.tab.name}` : ''}${said ? `: ${said.replace(/\s+/g, ' ').trim().slice(0, 100)}` : ''}`
+}
 // a gate said no: why (and its fix), exit 1
 function held(cmd: 'ship' | 'archive', r: { held: GateHeld[] }): never {
   out(r, [`Not ${cmd === 'ship' ? 'shipped' : 'archived'}:`, ...r.held.map(h => `  ${h.name}: ${h.why}${h.fix ? `\n    fix: ${h.fix.split('\n')[0]}` : ''}`), `laki ${cmd} --force does it anyway (you, not an agent)`].join('\n'))
@@ -266,6 +274,25 @@ async function main() {
         throw new Error(`Laki.app not found: build it with \`npm run pack\` (${dist}), or copy it to /Applications`)
       }
       return
+    }
+    case 'events': {
+      // Laki's events as they happen (the daemon's events, long-polled), a line each; never starts a daemon. --once: the
+      // first, exit 0; --timeout: none by then, exit 3
+      if (!(await alive())) throw new Error("Laki's daemon isn't running (laki events never starts it): open Laki")
+      const secs = flags.timeout === undefined ? Infinity : Number(flags.timeout)
+      if (!(secs > 0)) throw new Error('--timeout takes seconds')
+      const end = Date.now() + secs * 1000
+      let after: number | undefined
+      for (;;) {
+        const left = end - Date.now()
+        if (left <= 0) return void (process.exitCode = 3)
+        const r = await rpc<{ next: number; events: Record<string, any>[] }>('events', { after, ws: wsRefs.length ? wsRefs : undefined, type: typeof flags.type === 'string' ? flags.type : undefined, wait: Math.min(20, Math.ceil(left / 1000)), from: caller() }, 30000)
+        after = r.next
+        for (const e of r.events) {
+          console.log(json ? JSON.stringify(e) : eventLine(e))
+          if (flags.once) return
+        }
+      }
     }
     case 'stop':
       return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- `laki events` prints Laki's events as they happen, one line each (JSON with `--json`): `laki events --type turn.done --once` waits for the next finished turn. In an agent's tab, only its own workspace's.
 - A working agent's tab says how long its turns usually take in this project, *4 min · usually 6*, once five have ended; its timer takes the waiting color when it runs past twice that (and 5 minutes).
 - Search chats (⌥⌘F): find words in what you and your agents said, in every workspace, archived ones too; Enter opens the Reader at that message.
 - Resize edges snap softly: the sidebar, the side panel, split panes and the Review tab's columns stick to their usual width, and the side panel and splits to a third, a half and two thirds. Hold ⌥ while you drag for none.

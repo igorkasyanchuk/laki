@@ -527,3 +527,47 @@ test('laki completion: words from USAGE, a script per shell; laki _complete name
   assert.deepEqual([none.code, none.out], [0, ''], 'no daemon: nothing')
   assert.equal(JSON.parse((await rig.cli('version', '--json')).out).daemon, undefined, 'and none started')
 })
+
+// laki events: Laki's events as extensions get them, long-polled from the daemon; --type, --once, --timeout (exit 3);
+// an agent's tab hears only its own workspace's
+test('laki events: a turn done as a JSON line, --once exits after it; --type keeps others out (--timeout: exit 3); an agent hears only its workspace', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'aa' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'bb' })
+  const ta = await until(() => rig.tab(a.id), 'its tab')
+  const tb = await until(() => rig.tab(b.id), 'its tab')
+  const done = async (tab: any, last: string) => {
+    await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'go' } })
+    await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: last } })
+  }
+  // --once: the first turn.done, then exit 0 (turns again and again until it has heard one: it starts listening first)
+  const once = rig.cli('events', '--json', '--type', 'turn.done', '--once', '--timeout', '30')
+  let ended = false
+  void once.then(() => (ended = true))
+  for (let i = 0; !ended && i < 40; i++) await done(ta, `all done ${i}`), await new Promise(r => setTimeout(r, 300))
+  const r = await once
+  assert.equal(r.code, 0, r.err)
+  const lines = r.out.trim().split('\n')
+  assert.equal(lines.length, 1)
+  const e = JSON.parse(lines[0])
+  assert.equal(e.event, 'turn.done')
+  assert.equal(e.ws.id, a.id)
+  assert.equal(e.tab.id, ta.id)
+  assert.match(e.last, /^all done \d+$/)
+  // --type: a turn.done isn't a workspace.archived; none by --timeout: exit 3, nothing printed
+  const none = rig.cli('events', '--type', 'workspace.archived', '--timeout', '2')
+  await done(ta, 'again')
+  const n = await none
+  assert.equal(n.code, 3, n.err)
+  assert.equal(n.out, '')
+  // an agent's tab: its own workspace's only
+  const from = { ws: a.id, tab: ta.id }
+  const { next } = await rig.rpc('events', { from })
+  await done(tb, 'theirs')
+  await done(ta, 'mine')
+  const got = await rig.rpc('events', { from, after: next, wait: 2, type: 'turn.done' })
+  assert.deepEqual(got.events.map((x: any) => x.last), ['mine'])
+  const yours = await rig.rpc('events', { after: next, type: ['turn.done'] })
+  assert.deepEqual(yours.events.map((x: any) => x.last), ['theirs', 'mine'])
+})
