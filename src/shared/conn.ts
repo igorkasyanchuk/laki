@@ -178,13 +178,21 @@ export const pidRunning = (pid: number) => {
 }
 // a Laki daemon (its command line runs out/main/daemon.js) stopped by SIGTERM, its own whole shutdown; false: not one,
 // or still there 15 s on. The Restart button's, a daemon from before an update, Quit Laki Completely's
-export async function stopDaemon(pid: number) {
+// hung: it doesn't answer (its event loop blocked: its SIGTERM handler never runs), so SIGKILL after 5 s; the pty host's
+// terminals go on either way
+export async function stopDaemon(pid: number, hung = false) {
   if (!pidRunning(pid) || !isDaemonCmd(spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '')) return false
-  logLine(join(dataDir(), 'daemon.log'), `the app stops the daemon (pid ${pid}): it refused this app's shutdown (another Laki, or the one before an update, started it)`)
+  logLine(join(dataDir(), 'daemon.log'), hung ? `the app stops the daemon (pid ${pid}): it didn't answer (the window's Restart)` : `the app stops the daemon (pid ${pid}): it refused this app's shutdown (another Laki, or the one before an update, started it)`)
   process.kill(pid, 'SIGTERM')
-  for (let i = 0; i < 60 && pidRunning(pid); i++) await new Promise(r => setTimeout(r, 250))
+  for (let i = 0; i < (hung ? 20 : 60) && pidRunning(pid); i++) await new Promise(r => setTimeout(r, 250))
+  if (hung && pidRunning(pid)) process.kill(pid, 'SIGKILL')
+  for (let i = 0; hung && i < 20 && pidRunning(pid); i++) await new Promise(r => setTimeout(r, 100))
   return !pidRunning(pid)
 }
+// a hung daemon (main pings it every 5 s while a window is open): this many misses in a row is hung, the next answer
+// clears it
+export const HUNG_MISSES = 3
+export const pingStep = (misses: number, answered: boolean) => (m => ({ misses: m, hung: m >= HUNG_MISSES }))(answered ? 0 : misses + 1)
 export async function freshDaemon(start: () => Promise<DaemonInfo>, minApi: number, log: (line: string) => void = () => {}) {
   const info = await start()
   const r = await rpc<unknown>('ping', { caps: true }).catch(() => undefined)

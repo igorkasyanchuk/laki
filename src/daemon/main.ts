@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
 import { agentChat, aiAnswer, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
@@ -1207,6 +1208,23 @@ function remoteLine(method: string, p: any): string | undefined {
 const deviceName = (id?: string) => (id && core.state.remoteDevices?.find(d => d.id === id)?.name) || 'the link’s page'
 
 // known: the agent's tab a call's token is of (S12, /rpc only); app: the call came with the app's token (S1)
+// a blocked event loop (a hung daemon: main pings it, the window says so): a tick more than 2 s late is one line in the
+// log, with how late and the API methods running or begun since the last look (the one that blocked is among them: a
+// sync stretch ends before the look), at most once a minute
+const running: string[] = []
+const begun = new Set<string>()
+const loopDelay = monitorEventLoopDelay({ resolution: 20 })
+loopDelay.enable()
+let lateSaid = 0
+setInterval(() => {
+  const ms = loopDelay.max / 1e6
+  loopDelay.reset()
+  const who = [...new Set([...running, ...begun])].slice(0, 6)
+  begun.clear()
+  if (ms <= 2000 || Date.now() - lateSaid < 60_000) return
+  lateSaid = Date.now()
+  log(`the event loop was blocked for ${(ms / 1000).toFixed(1)} s (API methods running then: ${who.join(', ') || 'none'})`)
+}, 2000).unref()
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab, app = !!c && apps.has(c)) {
   method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
   const h = Object.hasOwn(api, method) ? api[method] : undefined
@@ -1219,7 +1237,15 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (sock) params = await whoCalls(sock, method, params, known, app)
   if (sock) agentNo(method, params ?? {})
   if (sock && method === 'hook') await hookWho(sock, params ?? {}, known, app)
-  const r = await h(params ?? {}, c)
+  running.push(method)
+  begun.add(method)
+  let r
+  try {
+    if (process.env.LAKI_TEST_BUSY === method) for (const end = Date.now() + 3000; Date.now() < end; ); // a test's blocked event loop (restart.test.ts)
+    r = await h(params ?? {}, c)
+  } finally {
+    running.splice(running.lastIndexOf(method), 1)
+  }
   if (remote && !READS.has(method)) (line => line && activity({ device: deviceName(c?.device), method, line }))(remoteLine(method, params ?? {})) // D9
   // S3: the settings these answer with, whole only to you (your window, your own CLI call): an agent's, remote access's
   // and Laki AI's get them as the view has them

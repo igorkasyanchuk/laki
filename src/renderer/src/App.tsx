@@ -2068,6 +2068,10 @@ export function App() {
   // it, an edit, half a folder): a bar with Update, read as it connects and on the window's focus (a minute apart);
   // not one another Laki set up (foreign: Update there would point it here). Not now: until the app starts again
   const [oldSkills, setOldSkills] = useState<SkillInfo[]>([])
+  const [hung, setHung] = useState<'no' | 'yes' | 'waited'>('no') // main's pings: the daemon isn't answering; Wait hides the bar until it answers and stops again
+  useEffect(() => {
+    bridge?.onDaemonHung?.(h => setHung(was => (!h ? 'no' : was === 'waited' ? 'waited' : 'yes')))
+  }, [])
   const [troubleSeen, setTroubleSeen] = useState(0) // R6: the trouble bar's ×: until another error (by its time: a restarted daemon counts from 1 again)
   // the daemon restarted, terminals kept (shutdown keep): the stale bar's and the trouble bar's; the app's own way when it isn't asked as you
   const restartDaemon = () => api.call('shutdown', { keep: true }).catch((e: Error) => (bridge?.restartDaemon && /who's calling/.test(e.message) ? bridge.restartDaemon().then(ok => ok || Promise.reject(e)) : Promise.reject(e)))
@@ -3773,6 +3777,16 @@ export function App() {
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
+        {hung === 'yes' && (
+          <div className="stale-bar soft" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>The daemon isn't answering.</b>{view.settings.ptyHost && !view.ptyHostOff && ' If you restart it, your terminals stay.'}
+            </span>
+            <button onClick={() => void bridge?.restartDaemon?.(true).then(ok => (ok ? setHung('no') : fail(new Error("the daemon didn't stop")))).catch(fail)}>Restart the daemon</button>
+            <button onClick={() => setHung('waited')}>Wait</button>
+          </div>
+        )}
         {connected && view.trouble && view.trouble.at > troubleSeen && (
           <div className="stale-bar soft" role="alert">
             <Icon name="alertCircle" size={16} />

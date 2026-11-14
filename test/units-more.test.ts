@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { copyTree, logLine, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
+import { copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -639,6 +639,16 @@ test('R7: writeAtomic and readJson', t => {
   writeFileSync(join(d, 'data', 'empty.json'), '')
   assert.equal(readJson(join(d, 'data', 'empty.json')), undefined)
   assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
+})
+
+// main's pings of the daemon: 3 misses in a row is hung, any answer clears it
+test('pingStep: misses in a row to hung, an answer clears it', () => {
+  let p = { misses: 0, hung: false }
+  for (const [ok, hung] of [[false, false], [false, false], [false, true], [false, true], [true, false], [false, false]] as const) {
+    p = pingStep(p.misses, ok)
+    assert.equal(p.hung, hung)
+  }
+  assert.equal(p.misses, 1, 'counting again from the answer')
 })
 
 // docs/dev/helper.md: what runs as node (hooks, the CLI, laki mcp, the daemon, the pty host) runs on the build's Laki

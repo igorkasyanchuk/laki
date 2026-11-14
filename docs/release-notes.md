@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- When Laki's background process stops answering, the window says so, with *Restart the daemon* and *Wait*; its log says how long it was stuck and on what.
 - Laki's own binary no longer runs other programs' scripts: the background process, the `laki` command, hooks and the MCP server run on Laki Node, a helper inside the app, so no program can borrow the permissions you gave Laki. The app is about 210 MB larger for it. Added Laki's MCP server to an agent by hand? Add it again: Settings › Agents & profiles shows the command.
 - Laki AI does several at once: *archive every workspace whose PR is merged* is one list with a box for each and one Yes, and each line says what became of it (Stop ends a long one). Its questions stay open until you answer them, in any order. [Try it](laki://ai)
 - Laki AI looks at your screen when you ask: a screenshot of an app you name, the iOS Simulator or the whole screen, shown in the chat. It opens apps and the web addresses you name, starts a project's scripts (never deploy) and restores archived workspaces.

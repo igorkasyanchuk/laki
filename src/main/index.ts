@@ -8,7 +8,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, rpc, stopDaemon } from '../shared/conn.ts'
+import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
@@ -886,13 +886,26 @@ ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.
 // This app asks it to stop as any of the user's processes can (SIGTERM: its own shutdown), then starts one from this
 // bundle. Only daemon.json's pid, and only while that pid is a Laki daemon
 const running = pidRunning // conn.ts' stopDaemon: a Laki daemon stopped by SIGTERM (the Restart button's, a daemon from before an update, Quit Laki Completely's)
-ipcMain.handle('daemon-restart', async e => {
+ipcMain.handle('daemon-restart', async (e, hung?: unknown) => {
   if (!from(e) || quitting) return false
   const pid = daemonInfo()?.pid
-  if (!pid || !(await stopDaemon(pid))) return false
+  if (!pid || !(await stopDaemon(pid, hung === true))) return false
   await daemon()
   return true
 })
+// a hung daemon: pinged every 5 s while a window is open (2 s to answer: any answer counts, a refusal too); 3 misses in
+// a row tell the window (daemon-hung, again each miss after: a reloaded page hears it), the next answer clears it. No
+// restart of its own: the window's Restart is a click. None while no daemon runs (gone isn't hung: the window reconnects)
+let pings = { misses: 0, hung: false }
+setInterval(async () => {
+  if (!win || win.isDestroyed() || quitting) return
+  const info = daemonInfo()
+  const answered = !info || !pidRunning(info.pid) || (await fetch(`http://127.0.0.1:${info.port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${info.token}` }, body: JSON.stringify({ method: 'ping', params: {} }), signal: AbortSignal.timeout(2000) }).then(r => (void r.body?.cancel().catch(() => {}), true), () => false))
+  const next = pingStep(pings.misses, answered)
+  if (next.hung || pings.hung) win?.webContents.send('daemon-hung', next.hung)
+  if (next.hung && !pings.hung) appLog(`the daemon (pid ${info?.pid}) hasn't answered ${next.misses} pings in a row`)
+  pings = next
+}, 5000).unref()
 ipcMain.handle('conn', async e => {
   if (!fromTokenPage(sender(e), devOrigin)) throw new Error('not the app') // the token: index.html's pages only (S9: not a card's, the bubbles' or the editor's)
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon

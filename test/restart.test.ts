@@ -19,6 +19,15 @@ test('single instance: a second daemon exits', async t => {
   assert.equal((await rig.rpc('state')).api, API) // or the app offers to restart it
 })
 
+test('a blocked event loop: one line in the log with how long and the API method that held it', async t => {
+  const rig = await fresh(t, { env: { LAKI_TEST_BUSY: 'cliState' } })
+  await rig.rpc('cliState') // 3 s of a busy loop inside the call
+  await until(() => /the event loop was blocked for [2-9]\.\d s \(API methods running then: [^)]*cliState/.test(rig.out), `the blocked loop's line (${rig.out.slice(-400)})`)
+  await rig.rpc('cliState')
+  await sleep(2500)
+  assert.equal(rig.out.match(/the event loop was blocked/g)?.length, 1, 'once a minute at most')
+})
+
 test("a test's daemon goes with its test process (LAKI_TEST_PARENT): a run killed midway leaves none behind", async t => {
   const rig = await fresh(t)
   await rig.stop()

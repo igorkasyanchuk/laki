@@ -12,7 +12,8 @@ export type NotifyAction = { text: string; reply?: boolean /* U15: a free-text q
 type Bridge = {
   menuPopup?(model: unknown, x: number, y: number): Promise<string | undefined> // Menus: macOS (main's menu-popup): the picked item's id
   conn(): Promise<{ port: number; token: string }>
-  restartDaemon?(): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown)
+  restartDaemon?(hung?: boolean): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown; hung: one that doesn't answer)
+  onDaemonHung?(cb: (hung: boolean) => void): void // main's pings: the daemon hasn't answered 3 in a row (true), or answered again
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card): void
   asking?(tabs: string[]): void // the tabs that wait (cards on screen)
   cardGone?(key: string): void // a laki alert over: its card goes

@@ -465,7 +465,14 @@ last 200 lines, all through `diagRedact` (the home folder as ~, share.ts' `redac
 what's before a URL's @, JSON's prompt/text/message…, `--prompt`, an alert's words). Help's head, About and ⌘K's *Copy
 diagnostics* (panels.tsx `CopyDiagnostics`) copy it. The daemon's uncaughtException and unhandledRejection (main.ts)
 count in `troubled`: the view's `trouble { n, last, at }`, the app's bar (Copy diagnostics, Restart the daemon: `shutdown
-{ keep: true }`, ×: until the next one). Its `state` (also `laki ls --json`, which the skill has agents
+{ keep: true }`, ×: until the next one). A hung daemon: its event loop watched by `monitorEventLoopDelay` (main.ts, every 2 s:
+a tick more than 2 s late is one log line with how long and the API methods running or begun meanwhile, `running` and
+`begun` around `call()`, at most once a minute; `LAKI_TEST_BUSY=<method>` makes that method spin 3 s, restart.test.ts);
+the app's main pings it every 5 s while a window is open (2 s to answer, any answer counts), conn.ts' `pingStep`: 3 misses
+in a row send the window `daemon-hung` (each miss after; the next answer clears it), its bar *The daemon isn't
+answering* with Restart the daemon (main's `daemon-restart` with `hung`: SIGTERM, then SIGKILL after 5 s; *your
+terminals stay* only with the pty host on and running) and Wait (hidden until it answers and stops again). No restart of
+its own, nothing in headless mode. Its `state` (also `laki ls --json`, which the skill has agents
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
 tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, for every local client, its Origin or not (`/rpc`'s
 `req.socket`, a WebSocket's `local`; not remote access's page, whose Origin takes only its own token: `tokenOk`) and the
