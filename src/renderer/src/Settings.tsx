@@ -16,7 +16,7 @@ import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
-import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
+import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
@@ -250,6 +250,10 @@ export type AppSettings = Paint & {
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
   quickOn?: boolean // Q1: the quick bar's global hotkey (unset: off)
   quickKey?: string // its keys (unset: QUICK_KEY)
+  allowOn?: boolean // Allow the newest ask from any app (a global hotkey; unset: off)
+  allowKey?: string // its keys (unset: keys.ts ANSWER_KEYS.allow.key)
+  denyOn?: boolean // Deny the newest ask from any app (unset: off)
+  denyKey?: string // its keys (unset: ANSWER_KEYS.deny.key)
   tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
   tellKey?: string // its keys (unset: TELL_KEY)
   talkOn?: boolean // Q2: the talk key (unset: off)
@@ -578,7 +582,7 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
 
 // a global hotkey (main's globalShortcut, registered by App as the settings come): on, and its keys; main says when
 // another app (or Laki's other one) has them. bind: main's (false: off); off: why it can't be on now
-function HotkeyField(p: { on: boolean; keys: string; def: string; title: string; hint: string; off?: string; bind: (keys: string | false) => Promise<boolean>; onOn: (on: boolean) => void; onKeys: (keys: string) => void }) {
+function HotkeyField(p: { clash?: string; on: boolean; keys: string; def: string; title: string; hint: string; off?: string; bind: (keys: string | false) => Promise<boolean>; onOn: (on: boolean) => void; onKeys: (keys: string) => void }) {
   const [taken, setTaken] = useState(false)
   const live = p.on && !p.off
   useEffect(() => void p.bind(live ? p.keys : false).then(ok => setTaken(live && !ok)), [live, p.keys])
@@ -594,6 +598,7 @@ function HotkeyField(p: { on: boolean; keys: string; def: string; title: string;
         </div>
       )}
       {live && taken && <p className="field-err">{p.keys}: another app (or macOS, or Laki's other hotkey) has these keys, or they need two of ⌃ ⌥ ⌘ (one is enough with Space or an F key)</p>}
+      {live && !taken && p.clash && <p className="field-err">{p.keys} is {p.clash}'s too: record others</p>}
     </div>
   )
 }
@@ -1123,6 +1128,32 @@ export function SettingsPage(p: {
           onKeys={quickKey => set({ quickKey })}
         />
       )}
+      {bridge.answerKey &&
+        (['allow', 'deny'] as const).map(w => {
+          const on = w === 'allow' ? s.allowOn === true : s.denyOn === true
+          const keys = (w === 'allow' ? s.allowKey : s.denyKey) ?? ANSWER_KEYS[w].key
+          const other = w === 'allow' ? ANSWER_KEYS.deny : ANSWER_KEYS.allow
+          const otherKeys = w === 'allow' ? (s.denyOn === true ? (s.denyKey ?? other.key) : '') : s.allowOn === true ? (s.allowKey ?? other.key) : ''
+          const others: [string, string][] = [
+            ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),
+            ...(s.quickOn === true && s.quickKey !== '' ? ([[s.quickKey ?? QUICK_KEY, 'the quick bar']] as [string, string][]) : []),
+            ...(otherKeys ? ([[otherKeys, other.label]] as [string, string][]) : []),
+          ]
+          return (
+            <HotkeyField
+              key={w}
+              on={on}
+              keys={keys}
+              def={ANSWER_KEYS[w].key}
+              title={`${ANSWER_KEYS[w].label} from any app`}
+              hint={`The agent that began waiting last: a card shows what it answers ${w === 'allow' ? 'Allow' : 'Deny'} to, and Esc within a moment stops it. Only a plain permission: a risky or chained command, a question, a plan, a secret or a private workspace's in Recording mode stays for Laki's window`}
+              clash={hotkeyClash(keys, keyMap(s.keys), others)}
+              bind={k => bridge!.answerKey!(w, k || '')}
+              onOn={v => set(w === 'allow' ? { allowOn: v } : { denyOn: v })}
+              onKeys={k => set(w === 'allow' ? { allowKey: k } : { denyKey: k })}
+            />
+          )
+        })}
       {bridge.tellKey && (
         <HotkeyField
           on={s.tellOn === true}

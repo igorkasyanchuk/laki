@@ -460,7 +460,11 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   On the +: `quickWin` with it (pictures as their paths; ponytail: a folder there is a path, never a project). Tested
   in `test/island.test.ts`; `npm run test:ui`'s `bubble-drop` drops a synthetic DataTransfer.
 - **The talk pill** (Q2, `settings.talkOn` with the cloud engine, `talkKey`, unset `TALK_KEY` ⌃⌥⌘M; App's `talkKey` to
-  main's `talk-hotkey`, `bindKey('talk')`): main's `talk()` opens `floater.html#talk` as a focusable panel window of its
+  main's `talk-hotkey`, `bindKey('talk')`; Allow / Deny the newest ask: `answer-hotkey`, `bindKey('allow' | 'deny')`, main's
+  `hotAnswer`: the newest waiting tab by `needAt`, shared/ask.ts `hotkeyAnswer` (refused: a card *Open Laki to answer this
+  one*, a private workspace's in Recording mode named by nothing; `veiled`), else an ask card (`HOT`) for `HOT_MS` 600 ms
+  with a global Esc registered meanwhile, then `answer` (first option or last) unless Esc or its × came first;
+  Settings' fields with keys.ts `hotkeyClash`): main's `talk()` opens `floater.html#talk` as a focusable panel window of its
   own at the pointer (`TALK` 320 by 78), or, open already, sends `talk-key` (the second press). The page (floater.ts
   `talkPage`) records at once (`getUserMedia`, stopped with the recording: the mic is open only while `#talk.rec`'s dot
   is red), an `AnalyserNode` on the same stream for the level, `talkTime`; who gets it: shared/talk.ts `talkDefault`

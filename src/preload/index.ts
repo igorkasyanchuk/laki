@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('laki', {
   // Screenshot to Laki AI's ('' none; false: it's off); macOS only: main's screenshot is screencapture
   ...(process.platform === 'darwin' && { shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label) }),
   quickKey: (label: string): Promise<boolean> => ipcRenderer.invoke('quick-hotkey', label), // Q1: the quick bar's global keys ('' none)
+  answerKey: (which: 'allow' | 'deny', label: string): Promise<boolean> => ipcRenderer.invoke('answer-hotkey', which, label), // Allow / Deny the newest ask's global keys ('' none)
   quickMore: (text: string) => ipcRenderer.send('quick-more', text), // the quick bar's More: the whole new-workspace page with its text
   quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
   tellKey: (label: string): Promise<boolean> => ipcRenderer.invoke('tell-hotkey', label), // Q7: show and tell's global keys ('' none)

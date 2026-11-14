@@ -113,6 +113,12 @@ export const keyClash = (id: KeyId, m: KeyMap, others: [string, string][] = []) 
   return clashOr(k, KEYS.find(x => x.id !== id && m[x.id] === k)?.label, others)
 }
 
+// Allow / Deny the newest ask from any app (main's globalShortcut, as the quick bar's; settings.allowOn, allowKey,
+// denyOn, denyKey): off until turned on, these keys suggested. What else has them: one of KEYS (Laki's own press would
+// never reach it), another global hotkey (others), a fixed one; '' nothing
+export const ANSWER_KEYS = { allow: { label: 'Allow the newest ask', key: '⌃⌥⌘Y' }, deny: { label: 'Deny the newest ask', key: '⌃⌥⌘N' } } as const
+export const hotkeyClash = (k: string, m: KeyMap, others: [string, string][] = []) => (k ? clashOr(k, KEYS.find(x => m[x.id] === k)?.label, others) : '')
+
 // the command a press is, by the character first, as keyFor
 export const cmdFor = (e: Press, m: CmdMap) => {
   for (const l of [keyLabel(e, true), keyLabel(e)]) {

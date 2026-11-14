@@ -130,6 +130,12 @@ changing it: [AGENTS.md](../AGENTS.md).
   ⏎ sends and closes it, and you're back in the app you were in; Esc closes it; if the send fails, your text stays.
   The mic (⌘⇧M) and a screenshot of a part of the screen (⌘⇧S) are on it; *More…* opens the whole new-workspace page
   with the text (project, agent, template). The menu bar's and the bubbles' *New task* open it too.
+- **Allow / Deny the newest ask** (each off until you turn it on: Settings › General, ⌃⌥⌘Y and ⌃⌥⌘N suggested): from
+  any app, answer the agent that began waiting last. A card shows the workspace, the agent and what it answers (the
+  tool and the command's first line) for a moment; Esc then stops it. Only a plain permission: a risky command
+  (deletes, force pushes), a chained one, a path outside the worktree, a question, a plan, a secret or a private
+  workspace's in Recording mode gets a card saying *Open Laki to answer this one*, and nothing is sent. None waiting:
+  *Nothing is waiting*.
 - **Show and tell** (off until you turn it on: Settings › General or Keys › Global hotkey, ⌃⌥⌘T suggested; the menu
   bar's *Show and Tell…* and the bubbles' + have it too): from any app, pick a part of the screen, and the quick bar
   opens with the picture in it and the mic on (Settings › Voice's cloud voice, or macOS dictation when it's on; without

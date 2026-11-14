@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Allow or deny the newest ask from any app with a hotkey (Settings › General, off until you turn it on): a card shows what it answers, Esc stops it. Risky or chained commands, questions, plans and secrets stay for Laki's window. [Try it](laki://settings/general?spot=Allow%20the%20newest%20ask)
 - Say just *yes* or *no* to the talk key while an agent waits on a permission: the pill shows what it answers and ⏎ answers it (a plain command, by itself in a moment). Questions, plans, secrets and risky commands stay for Laki's window. Settings › Voice › Talk key › *Answer asks*. [Try it](laki://settings/voice?spot=Answer%20asks)
 - The talk key can write down what you say on this Mac: Settings › Voice › Talk key › *Writes it down: On this Mac*, in a language your Mac recognizes on its own. Nothing leaves it, no key needed. [Try it](laki://settings/voice)
 - `laki events` prints Laki's events as they happen, one line each (JSON with `--json`): `laki events --type turn.done --once` waits for the next finished turn. In an agent's tab, only its own workspace's.

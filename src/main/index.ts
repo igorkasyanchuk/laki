@@ -16,7 +16,8 @@ import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
-import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
+import { type BrowseDid, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
+import { hotkeyAnswer } from '../shared/ask.ts'
 import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
@@ -841,9 +842,9 @@ function accelOf(label: string) {
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
   return accel(m)
 }
-type Key = 'open' | 'shot' | 'quick' | 'tell' | 'talk' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1); tell: show and tell (Q7, tellShot); talk: the talk pill (Q2, talk)
-const keys: Record<Key, string> = { open: '', shot: '', quick: '', tell: '', talk: '' } // what each holds
-const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show], tell: ['', show], talk: ['', show] } // what each asked for
+type Key = 'open' | 'shot' | 'quick' | 'tell' | 'talk' | 'allow' | 'deny' // allow, deny: the newest ask answered (hotAnswer); open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1); tell: show and tell (Q7, tellShot); talk: the talk pill (Q2, talk)
+const keys: Record<Key, string> = { open: '', shot: '', quick: '', tell: '', talk: '', allow: '', deny: '' } // what each holds
+const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show], tell: ['', show], talk: ['', show], allow: ['', show], deny: ['', show] } // what each asked for
 let shotOn = false // Screenshot to Laki AI is on (Settings › General): the menu bar has it too
 function grab(which: Key) {
   const [a, fn] = wants[which]
@@ -871,6 +872,46 @@ ipcMain.handle('quick-hotkey', (e, label: unknown) => from(e) && bindKey('quick'
 ipcMain.handle('tell-hotkey', (e, label: unknown) => from(e) && bindKey('tell', label, () => tellShot()))
 // Q2: the talk key ('' none: off until set, Settings › Voice): the pill at the pointer, recording; again: it sends
 ipcMain.handle('talk-hotkey', (e, label: unknown) => from(e) && bindKey('talk', label, () => talk()))
+// Allow / Deny the newest ask from any app ('' none: off until set, Settings › General)
+ipcMain.handle('answer-hotkey', (e, which: unknown, label: unknown) => from(e) && (which === 'allow' || which === 'deny') && bindKey(which, label, () => void hotAnswer(which === 'allow')))
+// the newest waiting ask (by when it began waiting, as Needs you dates them), as a card on screen for HOT_MS with what
+// will be answered; Esc meanwhile (a global Esc while it shows) cancels; then the cards' answer (first option: allow,
+// last: deny). shared/ask.ts hotkeyAnswer refuses what only Laki's window answers (a risky or chained command, a
+// question, a plan, a secret, a private workspace's in Recording mode): its card says so, nothing sent
+const HOT_MS = 600
+const HOT = 'hotkey:answer'
+let hotGo: { t: NodeJS.Timeout } | null = null
+const hotDone = () => (hotGo && clearTimeout(hotGo.t), (hotGo = null), globalShortcut.isRegistered('Escape') && globalShortcut.unregister('Escape'))
+async function hotAnswer(allow: boolean) {
+  if (hotGo) return // one at a time
+  const v = await rpc<View>('state').catch(() => null)
+  if (!v) return
+  const t = v.tabs.filter(x => x.status === 'waiting' && x.ask).sort((a, b) => (b.needAt ?? 0) - (a.needAt ?? 0))[0]
+  const at = Date.now()
+  const mine = (c: Card) => c.key === HOT && c.at === at // this press's card (a later press's replaces it)
+  const card = (c: Partial<Card>, ms: number) => (addCard({ key: HOT, tab: '', ask: false, tone: 'info', at, title: '', body: '', actions: [], ...c }), setTimeout(() => dropCards(x => !mine(x)), ms))
+  if (!t) return card({ title: 'Nothing is waiting' }, 1500)
+  const hidden = !veiled(v).tabs.some(x => x.id === t.id)
+  const r = hotkeyAnswer(t, hidden)
+  const w = v.workspaces.find(x => x.id === t.workspace)
+  const line = `${t.ask!.tool ?? ''}${t.ask!.what ? `: ${t.ask!.what.split('\n')[0].slice(0, 160)}` : t.ask!.question ? `: ${t.ask!.question.split('\n')[0].slice(0, 160)}` : ''}`
+  if (r !== 'allow') return card(hidden ? { title: 'An agent is waiting', body: 'Open Laki to answer this one' } : { tab: t.id, tone: 'ask', title: `${w?.name ?? t.workspace} · ${t.name}`, body: `Open Laki to answer this one (${r.slice(7)}).\n${line}` }, 4000)
+  const opt = allow ? t.ask!.options[0] : t.ask!.options.at(-1)!
+  addCard({ key: HOT, tab: t.id, ask: false, tone: 'ask', at, title: `${allow ? 'Allow' : 'Deny'}: ${w?.name ?? t.workspace} · ${t.name}`, body: `${line}\nEsc: don't`, actions: [] })
+  try {
+    globalShortcut.register('Escape', () => (hotDone(), dropCards(c => !mine(c))))
+  } catch {} // another app holds Esc: the card's own Esc then
+  hotGo = {
+    t: setTimeout(() => {
+      hotDone()
+      if (!cards.some(mine)) return // its × meanwhile: not answered
+      rpc('answer', { tab: t.id, n: opt.n, label: opt.label }).then(
+        () => dropCards(c => !mine(c)),
+        (err: Error) => (c => c && ((c.error = `${err.message}: open its tab`), sendCards()))(cards.find(mine)),
+      )
+    }, HOT_MS),
+  }
+}
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // updates (./update.ts): its state to the app window as it changes. Installing quits for good: quitAndInstall emits

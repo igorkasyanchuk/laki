@@ -18,7 +18,7 @@ import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
 import { Picker, PICKER_KEY } from './Picker'
-import { isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
+import { ANSWER_KEYS, isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
 import { type DeskAsk, onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
 import type { ProjectTab } from './Project' // a type alone: verbatimModuleSyntax keeps a { type } import's module in the bundle (E8)
@@ -2206,6 +2206,11 @@ export function App() {
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey).then(shot => setHeld(h => ({ ...h, shot })))), [shotKey])
   const quickKey = !view ? null : settings.quickOn === true ? settings.quickKey ?? QUICK_KEY : '' // Q1: the quick bar's ('' none: off until turned on)
   useEffect(() => void (quickKey !== null && bridge?.quickKey?.(quickKey).then(quick => setHeld(h => ({ ...h, quick })))), [quickKey])
+  // Allow / Deny the newest ask from any app ('' none: off until turned on, Settings › General)
+  const allowKey = !view ? null : settings.allowOn === true ? settings.allowKey ?? ANSWER_KEYS.allow.key : ''
+  const denyKey = !view ? null : settings.denyOn === true ? settings.denyKey ?? ANSWER_KEYS.deny.key : ''
+  useEffect(() => void (allowKey !== null && bridge?.answerKey?.('allow', allowKey)), [allowKey])
+  useEffect(() => void (denyKey !== null && bridge?.answerKey?.('deny', denyKey)), [denyKey])
   const tellKey = !view ? null : settings.tellOn === true ? settings.tellKey ?? TELL_KEY : '' // Q7: show and tell's ('' none: off until turned on)
   useEffect(() => void (tellKey !== null && bridge?.tellKey?.(tellKey).then(tell => setHeld(h => ({ ...h, tell })))), [tellKey])
   const talkKey = !view ? null : talkOn ? settings.talkKey ?? TALK_KEY : '' // Q2: the talk key ('' none: off until turned on, the cloud engine only)

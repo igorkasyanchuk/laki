@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
-import { cmdClash, cmdFor, cmdLive, cmdMap, cmdOthers, COMMANDS, keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
+import { ANSWER_KEYS, cmdClash, cmdFor, cmdLive, cmdMap, cmdOthers, COMMANDS, hotkeyClash, keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
 
 const press = (key: string, code: string, mods: { meta?: boolean; alt?: boolean; ctrl?: boolean; shift?: boolean } = { meta: true }) => ({ key, code, metaKey: !!mods.meta, altKey: !!mods.alt, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
 
@@ -93,4 +93,15 @@ test('⌘K commands: none has a key until given one; a press finds it; clashes a
   assert.deepEqual(ids.filter(id => !used.has(id)), [], 'listed, not in the palette')
   assert.deepEqual([...used].filter(id => !ids.includes(id)), [], 'in the palette, not listed')
   assert.equal(new Set(COMMANDS.map(c => c.id)).size, COMMANDS.length)
+})
+
+test('Allow / Deny the newest ask: suggested keys clash with nothing; one of Laki’s keys, another global hotkey or a fixed one is named', () => {
+  const d = keyMap()
+  assert.equal(ANSWER_KEYS.allow.label, 'Allow the newest ask')
+  assert.equal(ANSWER_KEYS.deny.label, 'Deny the newest ask')
+  for (const k of [ANSWER_KEYS.allow.key, ANSWER_KEYS.deny.key]) assert.equal(hotkeyClash(k, d, [['⌃⌥⌘L', 'the global hotkey']]), '', k)
+  assert.equal(hotkeyClash('⌥⌘F', d), 'Search chats') // Laki's own: its press would never reach the window
+  assert.equal(hotkeyClash('⌃⌥⌘L', d, [['⌃⌥⌘L', 'the global hotkey']]), 'the global hotkey')
+  assert.equal(hotkeyClash('⌘Q', d), 'Quit')
+  assert.equal(hotkeyClash('', d), '') // none set
 })

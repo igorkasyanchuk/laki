@@ -42,6 +42,7 @@ type Bridge = {
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
   quickKey?(label: string): Promise<boolean> // Q1: the quick bar's global keys ('' none)
+  answerKey?(which: 'allow' | 'deny', label: string): Promise<boolean> // Allow / Deny the newest ask's global keys ('' none)
   quickMore?(text: string): void // the quick bar's More: the whole new-workspace page with its text
   quickShot?(): Promise<string> // its screenshot button: a part of the screen ('' cancelled)
   tellKey?(label: string): Promise<boolean> // Q7: show and tell's global keys ('' none)

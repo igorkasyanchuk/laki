@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type AllowRule, allowRuleOf, askOf, bulkGroups, bulkOk, risky, ruleFrom, rulePattern } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, askOf, bulkGroups, bulkOk, hotkeyAnswer, risky, ruleFrom, rulePattern } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -129,4 +129,21 @@ test('F14: auto-answer rules match an ask by tool and pattern; a near miss, a ri
   assert.equal(rulePattern('Edit', './src/**'), 'src/**')
   assert.equal(ruleFrom({ options: yes, at: 1, tool: 'Bash', what: 'npm test' }), 'npm test')
   assert.equal(ruleFrom({ options: yes, at: 1, tool: 'Bash', what: 'rm -rf build' }), '')
+})
+
+test("hotkeyAnswer: a global hotkey answers only a plain permission; a delete, a chained command, a question, a plan, a secret or a private workspace's: refused, with why", () => {
+  const menu = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again" }, { n: 3, label: 'No' }]
+  const ask = (what: string, tool = 'Bash') => ({ status: 'waiting', ask: { options: menu, at: 1, tool, what } })
+  assert.equal(hotkeyAnswer(ask('npm test')), 'allow')
+  assert.equal(hotkeyAnswer(ask('src/cart.ts', 'Edit')), 'allow')
+  assert.equal(hotkeyAnswer(ask('rm -rf build')), 'refuse:a risky command')
+  assert.equal(hotkeyAnswer(ask('git push --force origin main')), 'refuse:a risky command')
+  assert.equal(hotkeyAnswer(ask('npm test && rm x')), 'refuse:a chained command or a path outside the worktree')
+  assert.equal(hotkeyAnswer(ask('cat ~/.ssh/config')), 'refuse:a chained command or a path outside the worktree')
+  assert.equal(hotkeyAnswer({ status: 'waiting', ask: { options: [{ n: 1, label: 'Postgres' }, { n: 2, label: 'SQLite' }], at: 1, question: 'Which database?' } }), 'refuse:a question')
+  assert.equal(hotkeyAnswer({ ...ask('npm test'), planAsk: '1. do it' }), 'refuse:a plan to approve')
+  assert.equal(hotkeyAnswer({ ...ask('npm test'), secret: { id: 's', label: 'Token' } }), 'refuse:it asks for a secret')
+  assert.equal(hotkeyAnswer({ status: 'waiting', ask: { ...ask('npm test').ask, steps: true } }), 'refuse:several questions')
+  assert.equal(hotkeyAnswer(ask('npm test'), true), 'refuse:a private workspace in Recording mode')
+  assert.equal(hotkeyAnswer({ status: 'running' }), 'refuse:nothing waits')
 })

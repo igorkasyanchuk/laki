@@ -247,5 +247,21 @@ export function spokenMode(t: { status?: string; ask?: Ask; secret?: unknown; pl
   if (!(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label)) || risky(a.what)) return 'laki'
   return ruleable(t) ? 'auto' : 'enter'
 }
+// Allow / Deny the newest ask by a global hotkey (main's hotAnswer): only what an auto-answer rule could take, a plain
+// yes … no permission; never a secret, a plan to approve, several questions, a question with other choices, a cut
+// command, a risky one (deletes, force pushes), a chained one or a path outside the worktree, nor (hidden) a private
+// workspace's in Recording mode. refuse: why, for its card ("Open Laki to answer this one")
+export function hotkeyAnswer(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }, hidden = false): 'allow' | `refuse:${string}` {
+  const a = t.ask
+  if (hidden) return 'refuse:a private workspace in Recording mode'
+  if (t.status !== 'waiting' || !a) return 'refuse:nothing waits'
+  if (t.secret) return 'refuse:it asks for a secret'
+  if (t.planAsk) return 'refuse:a plan to approve'
+  if (a.steps) return 'refuse:several questions'
+  if (!a.tool || !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return 'refuse:a question'
+  if (!a.what?.trim() || a.what.endsWith('…')) return "refuse:its command isn't all there"
+  if (risky(a.what)) return 'refuse:a risky command'
+  return ruleable(t) ? 'allow' : 'refuse:a chained command or a path outside the worktree'
+}
 // what Always allow in this project offers for an ask: its own command or path as the pattern, when one could be a rule
 export const ruleFrom = (a?: Ask) => (a?.tool && a.what && !a.what.endsWith('…') ? rulePattern(a.tool, a.what) : '')
