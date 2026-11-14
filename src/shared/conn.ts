@@ -167,6 +167,11 @@ export async function ensureDaemon(env: Record<string, string> = {}, asApp = fal
 // (keep: the pty host's terminals go on). One the app before the update started refuses that shutdown (who's calling:
 // this app's token isn't the one it was given), so it's stopped as the Restart button does (stopDaemon). Without that
 // the window stayed on the splash (0.48 to 0.49). test/upgrade.test.ts, with a fake old daemon
+// the first API whose daemon runs on Laki Node (docs/dev/helper.md): one under it, as a build with Laki Node opens (after
+// an update from 0.50.0 or earlier), is restarted at once by main, as freshDaemon does. Left running, its hooks would go
+// to Laki Hook.app (gone) and what it starts as node (the pty host, extensions' scripts, the laki launcher) to the
+// app's binary, which no longer runs as node: its agents' turns untracked until a Restart
+export const NODE_API = 182
 export const daemonStale = (ping: unknown, minApi: number) => ping !== undefined && !(typeof ping === 'object' && ping !== null && Number((ping as { api?: unknown }).api ?? 0) >= minApi) // pure: none (no answer) isn't stale, it's gone
 export const isDaemonCmd = (command: string) => /\bout\/main\/daemon\.js\b/.test(command) // a Laki daemon's command line (built), never another process on a reused pid
 export const pidRunning = (pid: number) => {

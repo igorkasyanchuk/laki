@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { daemonInfo, daemonStale, ensureDaemon, freshDaemon, isDaemonCmd, pidRunning, rpc } from '../src/shared/conn.ts'
+import { daemonInfo, daemonStale, ensureDaemon, freshDaemon, isDaemonCmd, NODE_API, pidRunning, rpc } from '../src/shared/conn.ts'
 import { API } from '../src/shared/types.ts'
 import { fresh, until } from './helpers.ts'
 
@@ -51,6 +51,10 @@ test('S9: the decision, pure: no answer is gone (not stale), an old API or a pla
   assert.equal(daemonStale('pong', ORIGIN_API), true, 'a daemon from before ping caps')
   assert.equal(daemonStale({ pong: true, api: 166 }, ORIGIN_API), true)
   assert.equal(daemonStale({ pong: true, api: 167 }, ORIGIN_API), false)
+  // a build with Laki Node: a daemon from before it (0.50.0's, on the app's binary) restarted too, one of this build not
+  assert.equal(daemonStale({ pong: true, api: 181 }, NODE_API), true, "0.50.0's daemon: hooks to Laki Hook.app, node to the app's binary")
+  assert.equal(daemonStale({ pong: true, api: API }, NODE_API), false)
+  assert.ok(NODE_API <= API)
   assert.equal(daemonStale({ pong: true, api: API }, ORIGIN_API), false)
   assert.ok(isDaemonCmd('/Applications/Laki.app/Contents/MacOS/Laki /Applications/Laki.app/Contents/Resources/app/out/main/daemon.js'))
   assert.ok(!isDaemonCmd('node /tmp/x/daemon.js') && !isDaemonCmd('/usr/bin/vim out/main/daemon.jsx'))

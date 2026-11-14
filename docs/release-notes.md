@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- After updating to this version, Laki restarts its daemon once as it opens: your agents pick up where they were.
 - A checked turn gets a Proof card under it, in the Reader and Needs you: each script Laki ran with its end (a click opens its output), the Preview's before and after pictures when it's open, and whether the turn touched tests, CI, migrations or lockfiles. Only what Laki saw itself, never the agent's words.
 - On remote access's page, a message or an answer sent while your Mac is out of reach waits with *Not sent yet* (Cancel takes it back) and goes once it's back; an answer to a question that was answered meanwhile is dropped, and said.
 - Remote access can show up on your iPhone, iPad or other Mac through Handoff while Laki is in front (Settings › Remote access › *Offer on my nearby devices*, off until you turn it on): only at a Tailscale or My domain address, and only the address, never its PIN.

@@ -21,12 +21,18 @@ async function nodeFuses(ctx, at) {
   const cfg = await ctx.packager.generateFuseConfig({ ...ctx.packager.config.electronFuses, runAsNode: true })
   await require('@electron/fuses').flipFuses(at, cfg)
 }
+// none made: the app's binary runs no node (its runAsNode fuse off), so neither would its daemon: the build stops. With
+// the fuse on (the back out: docs/dev/helper.md) the app's binary runs it, said in one line
+function noNode(ctx, why) {
+  if (ctx.packager.config.electronFuses?.runAsNode === false) throw new Error(`${NODE_APP}: ${why}, and the app's runAsNode fuse is off: its daemon couldn't start`)
+  console.log(`  • ${NODE_APP} skipped: ${why}`)
+}
 async function nodeHelper(ctx, app) {
   const fw = join(app, 'Contents/Frameworks')
   const exe = ctx.packager.appInfo.productFilename
   const plistFrom = join(fw, `${exe} Helper.app/Contents/Info.plist`)
   const efw = join(fw, 'Electron Framework.framework')
-  if (!existsSync(plistFrom) || !existsSync(efw)) return console.log(`  • ${NODE_APP} skipped: no helper app or framework to copy`)
+  if (!existsSync(plistFrom) || !existsSync(efw)) return noNode(ctx, 'no helper app or framework to copy')
   const to = join(fw, `${NODE_APP}.app`)
   rmSync(to, { recursive: true, force: true })
   mkdirSync(join(to, 'Contents/MacOS'), { recursive: true })
@@ -63,7 +69,7 @@ async function nodeHelper(ctx, app) {
 }
 async function nodeHelperLinux(ctx) {
   const exe = join(ctx.appOutDir, ctx.packager.executableName)
-  if (!existsSync(exe)) return console.log(`  • ${NODE_APP} skipped: no ${exe}`)
+  if (!existsSync(exe)) return noNode(ctx, `no ${exe}`)
   copyFileSync(exe, `${exe}-node`)
   chmodSync(`${exe}-node`, 0o755)
   await nodeFuses(ctx, `${exe}-node`)

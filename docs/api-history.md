@@ -187,3 +187,4 @@ needs no bump: `settingsSet` keeps any field.
 179: `prAct`'s `revert` (a merged PR undone by a new one; the `pr.revert` cap), `diff`'s `since` as a commit's sha (Changes' Since; the `diff.since` cap), a workspace's `wtKey` and `GET /worktree/<wtKey>/<ws>/<path>` (View as page). Laki AI: a question's `act.items` (several at one Yes) and `aiAnswer`'s `only`, a question with an `act` answerable after a newer ask, `aiShot`, `aiOpenApp`, `aiHelp`.
 180: `mergeQueueStart`, `mergeQueueStop`, the view's `mergeQueues` and a PR's `behind` (the merge queue; the `merge.queue` cap).
 181: `chatSearch` (Search chats: every chat Laki knows, what was said, newest first; the `chat.search` cap).
+182: no method: the daemon runs on Laki Node (conn.ts `NODE_API`): a build with Laki Node restarts one under it as it opens (main's `daemon()`), as one from 0.50.0 or earlier sends hooks to Laki Hook.app and node to the app's binary.

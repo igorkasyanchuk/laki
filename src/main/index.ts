@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
+import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
@@ -662,7 +662,8 @@ let checked = false
 async function daemon() {
   if (checked) return start()
   checked = true
-  return freshDaemon(start, ORIGIN_API, appLog) // conn.ts: the decision and the stop, tested without the app
+  // a build with Laki Node: a daemon from before it (on the app's binary, its hooks on Laki Hook) too: conn.ts NODE_API
+  return freshDaemon(start, helperBin(process.execPath, existsSync) !== process.execPath ? NODE_API : ORIGIN_API, appLog) // conn.ts: the decision and the stop, tested without the app
 }
 // S9: the built pages (out/renderer) on app://laki/, a file of that folder or a 404; other sessions (the preview,
 // Browsers, the agent browser) have no app: scheme at all
