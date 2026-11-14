@@ -19,7 +19,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, snap, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -856,4 +856,17 @@ test("S14: the page's WebCrypto half and the daemon's node:crypto half seal and 
   const w = d.wrap('a'.repeat(64), k)
   assert.deepEqual(d.unwrap('a'.repeat(64), w), k)
   assert.equal(d.unwrap('b'.repeat(64), w), undefined)
+})
+
+test('snap: the nearest point within the threshold, a fraction of the room or px; ⌥ is the caller skipping it', () => {
+  assert.equal(snap(305, 900, [300]), 300) // inside: 5 px off
+  assert.equal(snap(292, 900, [300]), 300) // 8 px off: still in
+  assert.equal(snap(291, 900, [300]), 291) // outside: 9 px
+  assert.equal(snap(452, 900, [1 / 3, 1 / 2, 2 / 3]), 450) // half the room
+  assert.equal(snap(305, 900, [1 / 3]), 300) // a third
+  assert.equal(snap(305, 900, [300, 310]), 300) // a tie: the first
+  assert.equal(snap(307, 900, [300, 310]), 310) // the nearer of two
+  assert.equal(snap(303, 900, [300, 310]), 300)
+  assert.equal(snap(320, 900, [300], 30), 300) // a threshold of its own
+  assert.equal(snap(305, 900, []), 305)
 })

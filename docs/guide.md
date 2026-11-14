@@ -437,7 +437,8 @@ selected workspace's PR is in the status bar.
   - *Remove project*;
   - its archived workspaces, which you click to restore.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. With the rail, each kind (Projects,
-  Terminals, Browsers) keeps its own width. ⌘B (or the sidebar icon) hides and shows it.
+  Terminals, Browsers) keeps its own width. Edges snap softly to their usual width (the side panel and split panes
+  also to a third, a half and two thirds); hold ⌥ while you drag for no snap. ⌘B (or the sidebar icon) hides and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace (or its ⋯) for its next step first (not Archive: that's at the bottom), then a color, then
   *Workspace ›*, a submenu of its own settings and copies: *Rename…* (the name it shows; its folder and branch keep the

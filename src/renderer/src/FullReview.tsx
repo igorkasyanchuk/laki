@@ -556,7 +556,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           {query && !listed.length && <div className="muted small pad">No file matches.</div>}
         </div>
         )}
-        {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} />}
+        {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
         <div className="fr-diff" ref={body} onScroll={() => requestAnimationFrame(spy)}>
           <DiffFind at={root} within={body} unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)} />
           {err && <div className="warn small pad">{err}</div>}
@@ -643,7 +643,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           </button>
         ) : (
           <>
-            <Edge x={{ right: nw }} to={(x, box) => setNw(Math.round(Math.max(200, Math.min(box.right - x, 720, box.width - left - 320))))} done={() => store(NOTES_W, nw)} reset={() => (setNw(NOTES_INIT), store(NOTES_W, NOTES_INIT))} />
+            <Edge x={{ right: nw }} to={(x, box) => setNw(Math.round(Math.max(200, Math.min(box.right - x, 720, box.width - left - 320))))} done={() => store(NOTES_W, nw)} reset={() => (setNw(NOTES_INIT), store(NOTES_W, NOTES_INIT))} init={NOTES_INIT} />
             <div className="fr-notes">
               <div className="fr-notes-head">
                 {pr ? (

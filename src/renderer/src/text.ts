@@ -967,3 +967,16 @@ export function wordDiff(oldLine: string, newLine: string): { old: WordSpans; ne
   }
   return { old: spans(a, keepA), new: spans(b, keepB) }
 }
+
+// a resize edge's soft snap points (Panes.tsx' handles, ui.tsx Edge): the nearest point within threshold px, else px.
+// A point of 1 or less is that part of total (1/3, 1/2, 2/3 of the room), else px; ⌥ for none is the caller's
+export function snap(px: number, total: number, points: number[], threshold = 8): number {
+  let best = px
+  let d = Infinity
+  for (const p of points) {
+    const at = p <= 1 ? p * total : p
+    const off = Math.abs(at - px)
+    if (off <= threshold && off < d) (best = at), (d = off) // a tie: the first
+  }
+  return best
+}

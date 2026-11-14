@@ -4,7 +4,7 @@ import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExterna
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { flushSync } from 'react-dom'
-import { menuKeys } from './text'
+import { menuKeys, snap } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
@@ -410,12 +410,31 @@ export const QUICK_KEY = '⌥Space' // Q1: the quick bar's suggested keys (off u
 export const TELL_KEY = '⌃⌥⌘T' // Q7: show and tell's suggested keys (off until turned on: settings.tellOn)
 export const TALK_KEY = '⌃⌥⌘M' // Q2: the talk key's suggested keys (off until turned on: settings.talkOn)
 
+// a resize edge's soft snap points while dragged (text.ts snap: within 8px; ⌥ held: none). Onto a point or off it, the
+// edge jumps: html[data-glide] for the spring's 350 ms gives what it moves a width transition (styles.css), nil with
+// Motion: Off or Reduce motion (their catch-alls), so the snap stays and the glide goes
+let glideT = 0
+let onPoint = false
+export const snapStart = () => void (onPoint = false) // a drag begins: its first move onto a point glides, off one doesn't
+export function snapped(px: number, total: number, points: number[], e: { altKey: boolean }): number {
+  const to = e.altKey ? px : snap(px, total, points)
+  if (to !== px === onPoint) return to
+  onPoint = to !== px
+  const html = document.documentElement
+  html.dataset.glide = ''
+  clearTimeout(glideT)
+  glideT = window.setTimeout(() => delete html.dataset.glide, 350)
+  return to
+}
+
 // an edge between two columns (the full review's, Notes'): dragged (to: the pointer's x in the columns' box), double-clicked back to its width
-export function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {
+// init: that width, a snap point (arrow keys move without one)
+export function Edge({ x, to, done, reset, init }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void; init: number }) {
   const held = (e: PE<HTMLDivElement>) => e.currentTarget.hasPointerCapture(e.pointerId)
+  const r = 'right' in x
   return (
     <div
-      className={`fr-edge ${'right' in x ? 'r' : ''}`}
+      className={`fr-edge ${r ? 'r' : ''}`}
       style={x}
       data-tip="Drag to resize · double-click to reset"
       role="separator"
@@ -427,12 +446,17 @@ export function Edge({ x, to, done, reset }: { x: { left: number } | { right: nu
         if (e.key === 'Enter') return reset()
         if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
         e.preventDefault()
-        const r = e.currentTarget.getBoundingClientRect()
-        to(r.left + ('right' in x ? r.width : 0) + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 64 : 16), e.currentTarget.parentElement!.getBoundingClientRect())
+        const at = e.currentTarget.getBoundingClientRect()
+        to(at.left + (r ? at.width : 0) + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 64 : 16), e.currentTarget.parentElement!.getBoundingClientRect())
         done()
       }}
-      onPointerDown={e => (e.currentTarget.setPointerCapture(e.pointerId), e.preventDefault())}
-      onPointerMove={e => held(e) && to(e.clientX, e.currentTarget.parentElement!.getBoundingClientRect())}
+      onPointerDown={e => (e.currentTarget.setPointerCapture(e.pointerId), e.preventDefault(), snapStart())}
+      onPointerMove={e => {
+        if (!held(e)) return
+        const box = e.currentTarget.parentElement!.getBoundingClientRect()
+        const w = snapped(r ? box.right - e.clientX : e.clientX - box.left, box.width, [init], e)
+        to(r ? box.right - w : box.left + w, box)
+      }}
       onLostPointerCapture={done}
       onDoubleClick={reset}
     />

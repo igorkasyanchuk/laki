@@ -3897,3 +3897,9 @@ html:is(.opaque, .glass) .edge-blur::before, html:is(.opaque, .glass) .edge-blur
   .edge-blur, .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
   .edge-blur::before, .edge-blur::after { display: none; }
 }
+/* a resize edge's snap points (ui.tsx snapped): the jump onto a point or off it glides on the spring while html has
+   data-glide (350 ms); Motion: Off and Reduce motion make it nil, the snap stays */
+html[data-glide] :is(.sidebar, .side-panel, .pv-wrap, .notes-side) { transition: width var(--t-spring-soft) var(--spring-soft); }
+html[data-glide] :is(.side-handle, .panes > .bar, .fr-edge) { transition: left var(--t-spring-soft) var(--spring-soft), right var(--t-spring-soft) var(--spring-soft), top var(--t-spring-soft) var(--spring-soft); }
+html[data-glide] .panes > .pane { transition: left var(--t-spring-soft) var(--spring-soft), top var(--t-spring-soft) var(--spring-soft), width var(--t-spring-soft) var(--spring-soft), height var(--t-spring-soft) var(--spring-soft); }
+html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-soft) var(--spring-soft); }

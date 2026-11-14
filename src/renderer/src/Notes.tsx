@@ -118,7 +118,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
             {shown.map(row)}
           </div>
         </aside>
-        {side && <Edge x={{ left: sideW }} to={(x, box) => setSideW(Math.round(Math.max(200, Math.min(x - box.left, 560, box.width - 360))))} done={() => keep(SIDE_W, sideW)} reset={() => (setSideW(SIDE_INIT), keep(SIDE_W, SIDE_INIT))} />}
+        {side && <Edge x={{ left: sideW }} to={(x, box) => setSideW(Math.round(Math.max(200, Math.min(x - box.left, 560, box.width - 360))))} done={() => keep(SIDE_W, sideW)} reset={() => (setSideW(SIDE_INIT), keep(SIDE_W, SIDE_INIT))} init={SIDE_INIT} />}
         {open ? (
           <NoteEdit key={open} id={open} meta={list?.find(x => x.id === open)} api={api} onSaved={saved} colorItems={colorItems} onRemove={remove} openMenu={openMenu} />
         ) : (

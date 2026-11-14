@@ -368,6 +368,14 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     `.tab-dragging` on `<html>`: grabbing, no selection. After a drop the pane's terminal gets the keyboard. Off on a
     phone;
   - `SideHandle` resizes the sidebar.
+  - Snap points: every resize edge while dragged (`SideHandle`, `PanelHandle`, a split's bar, ui.tsx `Edge`: the full
+    review's columns, Notes' list) goes through ui.tsx `snapped`, text.ts' pure `snap(px, total, points, 8)`: the
+    nearest point within 8px (a point of 1 or less is that part of `total`). Points: the edge's default width; the side
+    panel and the preview add a third, a half and two thirds of the room they share with the terminals, a split's bar
+    those of its box (`THIRDS`). ⌥ held: none. Onto a point or off it the edge jumps, so `snapped` sets
+    `html[data-glide]` for 350 ms and styles.css gives the sized elements a `--t-spring-soft` transition then (Motion:
+    Off and Reduce motion: nil, the snap stays). `snapStart` (pointer down) forgets the last drag's point. Arrow keys
+    (Edge) move without a snap; Enter and a double-click still reset.
 - **`annotate.ts`** (`annotate.html`, electron-vite's second renderer entry): the menu bar screenshot's editor, a
   window main keeps on top (`annotate()` in main, `bridge.annotate`): crop, arrow, text, rectangle, pen, six colors,
   ⌘Z, a note; *Add to prompt* sends the PNG and note to main (only from that window), which sends `shot` (png, note)

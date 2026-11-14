@@ -2,9 +2,11 @@
 // resize handle. Panes are absolutely placed siblings keyed by session, so splitting never remounts a terminal.
 import { useRef, useState, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { type Bar, type Layout, place, type Spot } from '../../shared/layout'
-import { colorVar } from './ui'
+import { colorVar, snapped, snapStart } from './ui'
 
 export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Spot; line?: { left: number; top: number; width: number; height: number } }
+
+const THIRDS = [1 / 3, 1 / 2, 2 / 3] // a split's and a right panel's snap points, of the room
 
 const ZONE = 0.3 // a pane's edge band, of its width or height: a split there; inside it, the center
 
@@ -89,6 +91,7 @@ export function useTabDrag(onDrop: (tab: string, whole: boolean, over: Spot) => 
 const grab = (e: PE) => {
   e.currentTarget.setPointerCapture(e.pointerId)
   e.preventDefault()
+  snapStart()
 }
 const held = (e: PE) => e.currentTarget.hasPointerCapture(e.pointerId)
 
@@ -112,9 +115,12 @@ export function Panes(p: {
   const area = useRef<HTMLDivElement>(null)
   const { panes, bars } = place(p.layout)
   const pct = (f: number) => `${f * 100}%`
+  // where the bar goes, as a part of its box: a third, a half or two thirds snap (⌥: none)
   const at = (e: PE, b: Bar) => {
     const r = area.current!.getBoundingClientRect()
-    return b.dir === 'row' ? ((e.clientX - r.left) / r.width - b.box.x) / b.box.w : ((e.clientY - r.top) / r.height - b.box.y) / b.box.h
+    const size = b.dir === 'row' ? r.width * b.box.w : r.height * b.box.h
+    const f = b.dir === 'row' ? ((e.clientX - r.left) / r.width - b.box.x) / b.box.w : ((e.clientY - r.top) / r.height - b.box.y) / b.box.h
+    return size > 0 ? snapped(f * size, size, THIRDS, e) / size : f
   }
   const over = p.drag?.over
   return (
@@ -166,7 +172,8 @@ export function Panes(p: {
   )
 }
 
-// a right panel's left edge (the side panel's, the info panel's): drag to resize, double-click for the default width
+// a right panel's left edge (the side panel's, the info panel's): drag to resize, double-click for the default width;
+// snap points: that width, a third, a half and two thirds of the room it shares with the terminals
 export function PanelHandle({ onWidth, init }: { onWidth: (w: number) => void; init: number }) {
   return (
     <div
@@ -178,14 +185,15 @@ export function PanelHandle({ onWidth, init }: { onWidth: (w: number) => void; i
         // as wide as you like, the terminals keep 280px (a tab strip beside them aside; CSS too, as the window narrows)
         const panel = e.currentTarget.parentElement!
         const terms = panel.parentElement!.querySelector<HTMLElement>(':scope > .term-wrap')?.offsetWidth ?? 0
-        onWidth(Math.round(Math.max(240, Math.min(panel.offsetWidth + terms - 280, panel.getBoundingClientRect().right - e.clientX))))
+        const room = panel.offsetWidth + terms
+        onWidth(Math.round(Math.max(240, Math.min(room - 280, snapped(panel.getBoundingClientRect().right - e.clientX, room, init > 1 ? [init, ...THIRDS] : THIRDS, e)))))
       }}
       onDoubleClick={() => onWidth(init)}
     />
   )
 }
 
-// the sidebar's right edge: drag to resize, double-click for the default width
+// the sidebar's right edge: drag to resize, double-click for the default width (a snap point too)
 // at: what's left of the sidebar (the layout's rail)
 export function SideHandle({ width, onWidth, init, at = 0 }: { width: number; onWidth: (w: number) => void; init: number; at?: number }) {
   return (
@@ -194,7 +202,7 @@ export function SideHandle({ width, onWidth, init, at = 0 }: { width: number; on
       style={{ left: at + width }}
       data-tip="Drag to resize · double-click to reset"
       onPointerDown={grab}
-      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(480, Math.max(160, e.clientX - at))))}
+      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(480, Math.max(160, snapped(e.clientX - at, 0, [init], e)))))}
       onDoubleClick={() => onWidth(init)}
     />
   )
