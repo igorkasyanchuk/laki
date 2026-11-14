@@ -1112,11 +1112,18 @@ isn't in those frames: only a recording of the real screen shows it (`screencapt
 
 styles.css: `.settings-page` (ui.tsx `Page` and Settings) is `timeline-scope: --page`; its scroller (`> .page-body`, Settings'
 `.settings-body > .settings-main`) is `scroll-timeline: --page block`. Inside `@supports (animation-timeline: scroll())`,
-over `animation-range: 0 60px`: `page-head` (see-through to `--surface-bg` and its blur, the line back). The title is
+over `animation-range: 0 60px`: `page-head` (`--edge-o` 0 to 1: the head's `.edge-blur` coming in). The title is
 one size on every page (a large one that shrank, `page-title`, showed only where the page's body scrolls: Schedule and
 Settings, not Board: gone). Motion: None and Reduce motion: the glass head always. Settings'
 scroll-edge fade (`mask-image`) is off, this replaces it. Only one scroller per page names `--page` (two would make the
 timeline inactive: a project's embedded `.settings-main` doesn't).
+`.edge-blur` (macOS 26's scroll edge): on a page's head (ui.tsx `Page`, Settings, Help), the Review tab's sticky file
+rows and the side panel's tabs. No background or rule of their own; two layers behind their content (`::before`: a
+`--edge-blur-1` blur and `--edge-tint`, the floating surface's color, fading over its upper two thirds; `::after`: a
+`--edge-blur-2` blur fading over the whole), reaching `--edge-fade` below the box (the layers, not the box: a head's drag
+area and clicks unchanged), `--edge-o` their opacity (`@property`, a number, so the page head's scroll animation
+moves it). Solid `--panel` and the rule back where the floating surface is: Reduce transparency, `html.opaque`,
+`html.glass`. Not on the tab bar: under it is a terminal's WebGL canvas, which a blur would repaint each frame.
 
 ## Native menus
 

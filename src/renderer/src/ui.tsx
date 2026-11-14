@@ -434,7 +434,7 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
   const el = usePageMark()
   return (
     <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
-      <div className="settings-head">
+      <div className="settings-head edge-blur">
         {head ?? <b>{title}</b>}
         <span className="grow" />
         {tools}

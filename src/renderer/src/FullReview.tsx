@@ -571,7 +571,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             const blaming = !all && blamed.has(f.path)
             return (
               <section key={f.path} className={`sp-change fr-file ${viewed(f.path) ? 'viewed' : ''}`}>
-                <div className="sp-row" data-file={f.path} {...act(fold)} onContextMenu={e => fileMenu(e, f.path)}>
+                <div className="sp-row edge-blur" data-file={f.path} {...act(fold)} onContextMenu={e => fileMenu(e, f.path)}>
                   <span className="sp-chev">
                     <Icon name={shown(f.path) ? 'chevron' : 'chevronRight'} />
                   </span>

@@ -335,7 +335,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
   const go = (id: string) => document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
     <div ref={pageEl} className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties} onScrollCapture={onScroll}>
-      <div className="settings-head">
+      <div className="settings-head edge-blur">
         <b>Help</b>
         <span className="grow" />
         <CopyDiagnostics className="ghost sm" />

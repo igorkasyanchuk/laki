@@ -3849,11 +3849,31 @@ html[data-motion='none'] .num > .num-in { animation: none; }
    size on every page: a large one that shrank showed only where the page scrolls (Schedule, Settings; not Board) */
 .settings-page { timeline-scope: --page; }
 .settings-page > .page-body, .settings-body > .settings-main { scroll-timeline: --page block; }
-@keyframes page-head { from { background: transparent; } to { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border-bottom-color: var(--line); } }
+@keyframes page-head { from { --edge-o: 0; } to { --edge-o: 1; } }
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
     html:not([data-motion='none']) .settings-page > .settings-head { animation: page-head linear both; animation-timeline: --page; animation-range: 0 60px; }
   }
-  @media (prefers-reduced-motion: reduce) { .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); } }
-  html[data-motion='none'] .settings-page > .settings-head { background: var(--surface-bg); backdrop-filter: var(--surface-blur); }
+}
+
+/* macOS 26's scroll edge: a header over scrolling content (a page's head, the Review tab's file headers, the side
+   panel's tabs) blurs what passes under it more at its top than at its bottom, in two layers behind its content: a
+   strong blur and the floating surface's tint fading out over its upper two thirds, a light blur fading over the whole,
+   reaching --edge-fade below the header (the layers, not its box: its drag area and clicks stay its own). No background
+   or rule of its own. --edge-o: how much of it shows (a page's head brings it in as it scrolls: page-head above). Solid
+   (--panel, its rule back) where the floating surface is: Reduce transparency, the flat looks (html.opaque) and the
+   window's glass (html.glass: a backdrop-filter over its native blur flickers). Never over a terminal (its WebGL canvas
+   would repaint the blur each frame): the tab bar keeps its own */
+@property --edge-o { syntax: '<number>'; inherits: true; initial-value: 1; }
+:root { --edge-blur-1: 14px; --edge-blur-2: 4px; --edge-fade: var(--sp-5); --edge-tint: var(--surface-bg); }
+.edge-blur { position: relative; z-index: 3; isolation: isolate; background: none; border-bottom-color: transparent; }
+.edge-blur::before, .edge-blur::after { content: ''; position: absolute; inset: 0 0 calc(-1 * var(--edge-fade)); z-index: -1; pointer-events: none; opacity: var(--edge-o); }
+.edge-blur::before { background: linear-gradient(var(--edge-tint), transparent); backdrop-filter: blur(var(--edge-blur-1)) saturate(1.5); mask-image: linear-gradient(#000, transparent 67%); }
+.edge-blur::after { backdrop-filter: blur(var(--edge-blur-2)); mask-image: linear-gradient(#000, transparent); }
+.sp-change > .sp-row.edge-blur, .sp-change > .sp-row.edge-blur:hover { background: none; } .sp-change > .sp-row.edge-blur:hover::before { background: linear-gradient(var(--hover), transparent), linear-gradient(var(--edge-tint), transparent); }
+html:is(.opaque, .glass) .edge-blur, html:is(.opaque, .glass) .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
+html:is(.opaque, .glass) .edge-blur::before, html:is(.opaque, .glass) .edge-blur::after { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .edge-blur, .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
+  .edge-blur::before, .edge-blur::after { display: none; }
 }

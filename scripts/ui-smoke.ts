@@ -2,7 +2,8 @@
 // LAKI_HOME, fake agents), the built app (out/: npm run build first) in Electron with --laki-smoke (main's uiSmoke:
 // each page opened, a selector of its own waited for, no Boundary, no console error, a screenshot). The screenshots end
 // in dist/ui-smoke; the demo daemon is stopped and the temp folder removed, pass or fail. LAKI_DEMO_RICH=1: the rich
-// world, and the README's stills instead of the walk (main's uiSmoke readme), copied to docs/img.
+// world, and the README's stills instead of the walk (main's uiSmoke readme), copied to docs/img. LAKI_UI_THEME=<theme id>:
+// the walk in that theme (laki, laki-light), not the system's.
 import { execFileSync, spawn } from 'node:child_process'
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -41,6 +42,7 @@ try {
   if (demo.token) env.LAKI_APP_TOKEN = process.env.LAKI_APP_TOKEN = demo.token // S1: the app's token (the demo daemon isn't the app's to pair with: plain node)
   const { rpc } = await import('../src/shared/conn.ts')
   await rpc('settingsSet', { labs: true, workflows: true }) // Workflows on the rail (the other Labs pages stay off: it fits)
+  if (process.env.LAKI_UI_THEME) await rpc('settingsSet', { theme: process.env.LAKI_UI_THEME, themeAuto: false }) // LAKI_UI_THEME=laki-light: the walk in that theme (a look's check in each)
   const app = spawn(createRequire(import.meta.url)('electron') as string, [ // Electron's binary itself: .bin/electron is a node script, and a version manager's node shim can't find node under the temp HOME
     join(root, 'out/main/index.js'), `--user-data-dir=${join(home, 'userdata')}`, `--laki-smoke=${join(home, 'shots')}`], { cwd: root, env, stdio: 'ignore' })
   const timer = setTimeout(() => app.kill(), 120_000) // E3: the flows too

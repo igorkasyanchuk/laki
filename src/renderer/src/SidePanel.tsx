@@ -641,7 +641,7 @@ export function SidePanel(p: {
     <div className="side-panel" style={{ width: p.width }}>
       <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />
       <div
-        className="sp-tabs"
+        className="sp-tabs edge-blur"
         role="tablist"
         aria-label="The side panel"
         onKeyDown={e => {

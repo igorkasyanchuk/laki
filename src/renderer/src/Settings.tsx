@@ -1138,7 +1138,7 @@ export function SettingsPage(p: {
   )
   return (
     <div ref={pageEl} className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties} onScrollCapture={onScroll}>
-      <div className="settings-head">
+      <div className="settings-head edge-blur">
         <b>Settings</b>
         <span className="grow" />
         <IconButton icon="x" title="Close (Esc)" onClick={onClose} />

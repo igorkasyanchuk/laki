@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Page headers, the Review tab's file headers and the side panel's tabs blur what scrolls under them more at the top than at the bottom, as macOS 26 does, with no line under them. Reduce transparency and the flat looks keep them solid.
 - Merge in order: the Board's Merge column merges your open PRs one after another, each once its checks pass; a conflict, a failing check or a gate stops it and says why. [Try it](laki://board)
 - Ship fills in your repo's pull request template (GitLab's merge request one too): Laki's summary goes under its Summary or Description heading, its checklists stay for you to tick. `laki ship` without `--body` does the same.
 - When Laki's background process stops answering, the window says so, with *Restart the daemon* and *Wait*; its log says how long it was stuck and on what.
