@@ -225,11 +225,27 @@ export function rulePattern(tool: string, pattern: unknown): string {
 // anything outside the worktree (the deny list and those win over any rule). menu: false before its menu is drawn
 export function allowRuleOf(rules: AllowRule[] | undefined, t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }, menu = true) {
   const a = t.ask
-  if (!rules?.length || t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what || a.what.endsWith('…') || a.steps || !RULE_TOOLS.includes(a.tool)) return
-  if (menu && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return
+  if (!rules?.length || !a?.what || !ruleable(t, menu)) return
   const w = a.what.trim()
-  if (risky(w) || OUTSIDE.test(w) || (a.tool === 'Bash' ? CHAIN.test(w) : w.split('/').includes('..'))) return
   return rules.find(r => r.tool === a.tool && (p => !!p && (a.tool === 'Bash' ? (p.includes('*') ? globRe(p).test(w) : w === p || w.startsWith(`${p} `)) : globRe(p).test(w)))(rulePattern(r.tool, r.pattern)))
+}
+// an ask a rule could answer (allowRuleOf's, the talk key's spoken yes or no on its own: spokenMode)
+function ruleable(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }, menu = true) {
+  const a = t.ask
+  if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what || a.what.endsWith('…') || a.steps || !RULE_TOOLS.includes(a.tool)) return false
+  if (menu && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return false
+  const w = a.what.trim()
+  return !(risky(w) || OUTSIDE.test(w) || (a.tool === 'Bash' ? CHAIN.test(w) : w.split('/').includes('..')))
+}
+// the talk key's spoken yes or no (talk.ts spokenAnswer) for a waiting ask: auto, answered by itself in 1.5 s (what an
+// auto-answer rule could take: a plain Allow … Deny permission); enter, only with ⏎ in the pill (a yes … no menu a rule
+// wouldn't take: a chained command, a path outside the worktree, another tool); laki, a click in Laki's window (a
+// question, a plan, a secret, several questions, a cut one, a risky command)
+export function spokenMode(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }): 'auto' | 'enter' | 'laki' {
+  const a = t.ask
+  if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what?.trim() || a.what.endsWith('…') || a.steps) return 'laki'
+  if (!(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label)) || risky(a.what)) return 'laki'
+  return ruleable(t) ? 'auto' : 'enter'
 }
 // what Always allow in this project offers for an ask: its own command or path as the pattern, when one could be a rule
 export const ruleFrom = (a?: Ask) => (a?.tool && a.what && !a.what.endsWith('…') ? rulePattern(a.tool, a.what) : '')

@@ -2591,6 +2591,9 @@ export function SettingsPage(p: {
                       }
                     />
                   </label>
+                  <Switch className="switch-row" on={s.voice?.answers !== false} onChange={on => set({ voice: { ...s.voice, answers: on ? undefined : false } })}>
+                    <Says title="Answer asks" hint="Say just yes or no (allow, deny, так, ні…) while an agent waits on a permission: the pill shows the ask, and ⏎ answers it. A plain command it answers by itself in 1.5 s; a question, a plan, a secret or a risky command stays for Laki's window. Tab sends your words as a message instead" />
+                  </Switch>
                 </div>
               )}
             </Group>

@@ -147,3 +147,28 @@ export function levelOf(buf: ArrayLike<number>) {
 export const SILENCES: [number, string][] = [[30, '30 seconds'], [60, '1 minute'], [120, '2 minutes']]
 export const silenceEnd = (quietMs: number, after: number | undefined, heard: boolean): 'type' | 'drop' | undefined => (after && SILENCES.some(s => s[0] === after) && quietMs >= after * 1000 ? (heard ? 'type' : 'drop') : undefined)
 export const quietSay = (device?: string) => `I can't hear you: check the input${device ? ` (${device})` : ''}`
+
+// The talk key answering a waiting ask: the whole transcript one of a few words for yes or no (fillers and punctuation
+// aside), in English, Ukrainian or a language the filler list knows (German, French, Russian, Japanese, Chinese); never
+// a longer sentence ("yes but use pnpm" is a message). lang: a locale or language ('uk-UA', 'en'); none: every one
+const SPOKEN: Record<string, { yes: string[]; no: string[] }> = {
+  en: { yes: ['yes', 'yeah', 'yep', 'allow', 'approve', 'ok', 'okay', 'allow it', 'approve it'], no: ['no', 'nope', 'deny', "don't", 'do not', 'deny it'] },
+  uk: { yes: ['так', 'дозволяю', 'дозволити', 'гаразд', 'ок', 'окей'], no: ['ні', 'не треба', 'заборонити', 'відхилити', 'не дозволяю'] },
+  ru: { yes: ['да', 'разрешаю', 'разрешить', 'хорошо', 'ок', 'окей'], no: ['нет', 'не надо', 'запретить', 'отклонить', 'не разрешаю'] },
+  de: { yes: ['ja', 'erlauben', 'okay', 'ok'], no: ['nein', 'ablehnen', 'nicht'] },
+  fr: { yes: ['oui', 'autoriser', "d'accord", 'ok'], no: ['non', 'refuser'] },
+  ja: { yes: ['はい', 'いいよ', '許可'], no: ['いいえ', 'だめ', '拒否'] },
+  zh: { yes: ['是', '好', '可以', '允许'], no: ['不', '不要', '拒绝'] },
+}
+const FILLER_WORDS = new Set(['um', 'umm', 'uh', 'uhh', 'er', 'hm', 'hmm', 'äh', 'ähm', 'euh', 'э', 'ээ', 'эээ', 'ну', 'えーと', 'ええと', 'えっと', '嗯'])
+export function spokenAnswer(text: string, lang?: string): 'yes' | 'no' | undefined {
+  const words = text.toLowerCase().replace(/[’`]/g, "'").replace(/[^\p{L}\p{N}'\s]+/gu, ' ').split(/\s+/).filter(w => w && !FILLER_WORDS.has(w))
+  const said = words.join(' ')
+  if (!said || words.length > 3) return
+  const l = lang?.toLowerCase().split(/[-_]/)[0]
+  for (const [k, w] of Object.entries(SPOKEN)) {
+    if (l && l !== k && Object.hasOwn(SPOKEN, l)) continue
+    if (w.yes.includes(said)) return 'yes'
+    if (w.no.includes(said)) return 'no'
+  }
+}

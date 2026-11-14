@@ -169,6 +169,8 @@ export const FIND: [string, string, string?][] = [
   ['voice', 'Route by first words', 'voice route address name workspace agent first words pause comma say send to laki ai new task'],
   ['ai', 'Show its work', 'laki ai window open talk key say it command output tab shown result'],
   ['voice', 'Talk key', 'global hotkey talk agent voice mic microphone from any app pill press record send push to talk laki ai screenshot screen it goes to'],
+  ['voice', 'Answer asks', 'talk key say yes no allow deny answer permission ask waiting spoken voice pill'],
+  ['voice', 'Writes it down', 'talk key on this mac on device apple speech recognition offline local language locale cloud engine'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
   ['voice', 'Test the microphone', 'mic test check input device level playback hear record speech model heard voice dictation'],
   ['voice', 'Stop after silence', 'silence quiet auto stop end recording timeout 30 seconds minute voice dictation'],

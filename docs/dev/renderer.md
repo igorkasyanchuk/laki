@@ -478,6 +478,14 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   line on its stdin, its final text; else killed), then `talk-fix` (the daemon's `voiceText { text }`: Cloud's cleanup,
   fillers and word fixes, nothing to OpenRouter) and `heard` (routing, sending) as Cloud's. A locale the Mac doesn't
   recognize on device: its `no-on-device` error, and Settings says so with *Use Cloud*.
+  A spoken yes or no (shared/talk.ts `spokenAnswer`: the whole transcript one of a few words a language, fillers and
+  punctuation aside; Settings › Voice › Talk key's *Answer asks*, `voice.answers`, unset on; App's floats `noAnswers`)
+  with an ask waiting (the pill's target's, else the newest: `talkList` carries a waiting one's `ask` and `held`, its
+  secret or plan) is that ask's answer: `answerAsk` shows *Answer Yes to: <tool: first line>*; shared/ask.ts
+  `spokenMode`: `auto` (what an auto-answer rule could take: a plain yes … no permission) answers in 1.5 s, `enter` (a
+  chained command, a path outside, another tool) on ⏎, `laki` (a question, plan, secret, several questions, a cut one,
+  a risky command) never from the pill. ⏎ or the key again: main's `talk-answer` (only a tab the pill offered), the
+  cards' `answer` with the first option (yes) or the last (no); Tab sends the words as a message; Esc drops it.
   `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. Q10: Settings › Voice › Talk key's *It goes to* (`settings.talkTo`:
   `ai`; App's floats `talkAi` while Laki AI is on) makes Laki AI (`AI_TO`) the pill's first target, and Tab goes on to
   it either way while it's on (`talkNext`'s `ai`); sent to it, main's `aiTalk`: words that ask for the screen

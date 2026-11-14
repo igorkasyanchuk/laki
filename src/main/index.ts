@@ -1339,8 +1339,8 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // the voice window are the bar's window.open: the four share one renderer process. Dragged anywhere (floater-drag: the
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
-type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
+type FloatOpts = { noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1525,6 +1525,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
     ...(o.talkAi === true && { talkAi: true }),
     ...(typeof o.speech === 'string' && /^[\w-]{2,20}$/.test(o.speech) && { speech: o.speech }),
+    ...(o.noAnswers === true && { noAnswers: true }),
     ...(o.aiShow === true && { aiShow: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
   }
@@ -2093,7 +2094,7 @@ let talkW: BrowserWindow | null = null
 let talkTo = new Set<string>() // the agents the pill offered
 let talkLast = '' // the one you last sent to (talkDefault's second choice)
 let talkUndo: { tab: string; text: string } | null = null // a send that's still in its queue: Undo takes it back
-const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string; pid?: string; alias?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }), ...(f.pid && { project: f.pid }), ...(f.alias && { alias: f.alias }) }))
+const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string; pid?: string; alias?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }), ...(f.pid && { project: f.pid }), ...(f.alias && { alias: f.alias }), ...(f.status === 'waiting' && f.ask && { ask: { options: f.ask.options.slice(0, 9), tool: f.ask.tool, what: f.ask.what?.slice(0, 300), question: f.ask.question?.slice(0, 300), steps: f.ask.steps } }), ...(f.held && { held: true }) })) // ask: what a spoken yes or no would answer
 let talkProject = '' // Q5: the project of the last talk or Say it sent: a route into another one shows a little longer
 const routeFor = () => floats.route && { ...floats.route, aiOn: floats.ai, last: talkProject, lastTab: talkLast }
 function talk() {
@@ -2108,7 +2109,7 @@ function talk() {
   w.webContents.on('did-finish-load', () => {
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
+    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), answers: !floats.noAnswers, list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -2168,6 +2169,15 @@ ipcMain.handle('talk-listen', e => {
   p.on('error', err => to({ kind: 'error', error: err.message, code: 'start' }))
   p.on('exit', () => (listen === p && (listen = null), to({ kind: 'end' })))
   return {}
+})
+// a spoken yes or no to a waiting ask the pill offered (spokenMode said it may): the cards' answer, its option by n and label
+ipcMain.handle('talk-answer', async (e, tab: unknown, n: unknown, label: unknown) => {
+  if (!fromTalk(e)) return { error: 'not the talk pill' }
+  if (typeof tab !== 'string' || !talkTo.has(tab) || typeof n !== 'number' || typeof label !== 'string') return { error: 'no such ask' }
+  return rpc('answer', { tab, n, label }).then(
+    () => ({}),
+    (err: Error) => ({ error: err.message }),
+  )
 })
 // stop it: keep, its final text (a line on its stdin); else dropped
 ipcMain.on('talk-listen-stop', (e, keep: unknown) => fromTalk(e) && listen && (keep === true ? listen.stdin?.end('\n') : (listen.kill(), (listen = null))))

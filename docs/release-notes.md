@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Say just *yes* or *no* to the talk key while an agent waits on a permission: the pill shows what it answers and ⏎ answers it (a plain command, by itself in a moment). Questions, plans, secrets and risky commands stay for Laki's window. Settings › Voice › Talk key › *Answer asks*. [Try it](laki://settings/voice?spot=Answer%20asks)
 - The talk key can write down what you say on this Mac: Settings › Voice › Talk key › *Writes it down: On this Mac*, in a language your Mac recognizes on its own. Nothing leaves it, no key needed. [Try it](laki://settings/voice)
 - `laki events` prints Laki's events as they happen, one line each (JSON with `--json`): `laki events --type turn.done --once` waits for the next finished turn. In an agent's tab, only its own workspace's.
 - A working agent's tab says how long its turns usually take in this project, *4 min · usually 6*, once five have ended; its timer takes the waiting color when it runs past twice that (and 5 minutes).

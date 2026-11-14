@@ -4,6 +4,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { handOff } from '../src/renderer/src/tell.ts'
+import { spokenAnswer } from '../src/shared/talk.ts'
+import { spokenMode } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 
 test('Q7 handOff: each target gets the picture and the words', () => {
@@ -34,4 +36,30 @@ test('Q7: a screenshot and a transcript reach an agent tab and a new workspace t
   const made = await rig.rpc(n.method, { ...n.params, preset: 'claude' })
   const first = (await rig.rpc('state')).tabs.find((x: any) => x.workspace === made.id && x.kind === 'agent')
   await until(async () => (s => s.includes(said) && s.includes(path))((await rig.screen(first.id)).replace(/\s+/g, ' ')), "the new agent's prompt", 15000)
+})
+
+// the talk key answering a waiting ask: only the whole transcript one of a few words, never a sentence
+test('spokenAnswer: yes or no when the whole of it is one of the words (fillers and punctuation aside); a sentence, nothing', () => {
+  for (const s of ['yes', 'Yes.', 'um, yeah!', 'OK', 'allow', 'так', 'Так!', 'да', 'ja', 'oui', 'はい', '可以']) assert.equal(spokenAnswer(s), 'yes', s)
+  for (const s of ['no', 'Nope.', "don't", 'Don’t', 'deny', 'ні', 'не треба', 'нет', 'nein', 'non', 'いいえ', '拒绝']) assert.equal(spokenAnswer(s), 'no', s)
+  for (const s of ['yes but use pnpm', 'no, use yarn instead', 'yes please run the tests again', '', '   ', '…', 'maybe', 'yes no']) assert.equal(spokenAnswer(s), undefined, s)
+  assert.equal(spokenAnswer('так', 'uk-UA'), 'yes')
+  assert.equal(spokenAnswer('ja', 'en-US'), undefined) // English only: German's ja isn't a word of it
+  assert.equal(spokenAnswer('ja', 'pt-BR'), 'yes') // a language it has no list for: any
+})
+
+test('spokenMode: a plain command answers by itself, a chained one waits for ⏎, a question, a plan, a secret or a risky command is for Laki', () => {
+  const menu = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again" }, { n: 3, label: 'No' }]
+  const ask = (what: string, tool = 'Bash', options = menu) => ({ status: 'waiting', ask: { options, at: 1, tool, what } })
+  assert.equal(spokenMode(ask('npm test')), 'auto')
+  assert.equal(spokenMode(ask('src/cart.ts', 'Edit')), 'auto')
+  assert.equal(spokenMode(ask('npm test && npm run build')), 'enter') // chained: a rule can't take it
+  assert.equal(spokenMode(ask('cat /etc/hosts')), 'enter') // outside the worktree
+  assert.equal(spokenMode(ask('https://example.com', 'WebFetch')), 'enter') // not a rule's tool
+  assert.equal(spokenMode({ status: 'waiting', ask: { options: [{ n: 1, label: 'Postgres' }, { n: 2, label: 'SQLite' }], at: 1, question: 'Which database?' } }), 'laki') // a question
+  assert.equal(spokenMode(ask('rm -rf build')), 'laki') // risky
+  assert.equal(spokenMode({ ...ask('npm test'), planAsk: '1. do it' }), 'laki')
+  assert.equal(spokenMode({ ...ask('npm test'), secret: { id: 's', label: 'Token' } }), 'laki')
+  assert.equal(spokenMode(ask('npm test…')), 'laki') // cut: its end unseen
+  assert.equal(spokenMode({ ...ask('npm test'), status: 'running' }), 'laki')
 })

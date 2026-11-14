@@ -2540,7 +2540,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   at the pointer records (a red dot while the microphone is on, a level, the time) and names who gets it: the agent
   that asked last, else the one you last sent to, else a new task (Tab, ⇧Tab: another). Press it again or ⏎ to send
   (an agent at work gets it when its turn ends, and *Undo* takes it back for 4 s; typed into an idle one's terminal it
-  can't be), Esc to drop it. macOS asks for the microphone the first time. *It goes to*: *An agent* (as above) or
+  can't be), Esc to drop it. Say just *yes* or *no* (allow, deny, так, ні…) while an agent waits on a permission and the
+  pill answers it: it shows what it answers, ⏎ answers (a plain command: by itself in 1.5 s), Tab sends your words as a
+  message instead; a question, a plan, a secret or a risky command stays for Laki's window (*Answer asks* turns it off).
+  macOS asks for the microphone the first time. *It goes to*: *An agent* (as above) or
   *Laki AI*, which does what you say (start a task, check a PR, stop an agent); say "screenshot" or "my screen" and
   the screen under the pill goes with it (Screen Recording for Laki); Tab reaches Laki AI either way. *Route by first words* (on; the talk
   key's pill and the bubbles' *Say it*): start with who gets it and a pause or a comma: "Checkout flow, fix the

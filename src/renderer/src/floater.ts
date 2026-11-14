@@ -13,7 +13,8 @@ import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/i
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
 import type { SpeechLine } from '../../shared/speech'
-import { AI_TO, type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
+import { spokenMode } from '../../shared/ask'
+import { AI_TO, type Route, routeOf, spokenAnswer, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
@@ -78,11 +79,14 @@ type Bridge = {
     onTalkHeard: (cb: (x: SpeechLine | { kind: 'end' }) => void) => void
     talkListenStop: (keep: boolean) => void
     talkFix: (text: string) => Promise<{ text?: string; error?: string }>
+    talkAnswer: (tab: string, n: number, label: string) => Promise<{ error?: string }>
   }
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
 // npm run test:ui's (no microphone opened); ai: Laki AI is on (Tab goes to it too)
-type Talk = { list: RouteTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string } // speech: the on-device engine's locale (main's Laki Speech), else Cloud
+type Talk = { list: TalkTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string; answers?: boolean } // answers: a spoken yes or no answers a waiting ask (Settings › Voice)
+// a waiting one's ask (what a spoken yes or no answers) and held: its secret or plan (never answered from the pill)
+type TalkTab = RouteTab & { ask?: Ask; held?: boolean } // speech: the on-device engine's locale (main's Laki Speech), else Cloud
 // Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
 // the project last sent to (a route into another one shows a little longer)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; aiOn?: boolean; fixes?: string; last?: string; lastTab?: string }
@@ -727,12 +731,15 @@ function talkPage() {
   const level = box.querySelector<HTMLElement>('.t-level > i')!
   const note = box.querySelector<HTMLElement>('.t-note')!
   const undo = box.querySelector<HTMLButtonElement>('.t-undo')!
-  let list: RouteTab[] = []
+  let list: TalkTab[] = []
+  let answers = false
+  let lang: string | undefined
+  let asking: { go: () => void; t?: ReturnType<typeof setTimeout>; text: string } | undefined // a spoken yes or no shown before it answers
   let to = ''
   let toProject: string | undefined // a new task's project (Q5)
   let cfg: RouteCfg | undefined
   let ai = false // Laki AI on: a Tab target
-  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'sending' | 'sent' = 'wait'
+  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'answer' | 'sending' | 'sent' = 'wait'
   let routed: { text: string; t: ReturnType<typeof setTimeout> } | undefined // Q5: shown before it goes
   let stopRec: ((send: boolean) => void) | undefined
   const close = () => bridge?.talkClose()
@@ -741,6 +748,13 @@ function talkPage() {
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   document.addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey) return
+    // a spoken yes or no shown: ⏎ answers, Tab sends the words as a message instead, Esc drops it
+    if (phase === 'answer' && asking) {
+      if (e.key === 'Enter') return void (e.preventDefault(), clearTimeout(asking.t), asking.go())
+      if (e.key === 'Tab') return void (e.preventDefault(), clearTimeout(asking.t), (phase = 'wait'), void send(asking.text))
+      if (e.key === 'Escape') return void (e.preventDefault(), clearTimeout(asking.t), close())
+      return
+    }
     if (e.key === 'Escape') return void (e.preventDefault(), routed && clearTimeout(routed.t), stopRec ? stopRec(false) : close())
     if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait' || phase === 'route')) {
       e.preventDefault()
@@ -753,7 +767,7 @@ function talkPage() {
     if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
     else if (e.key === 'Enter' && phase === 'route' && routed) e.preventDefault(), clearTimeout(routed.t), void send(routed.text) // now
   })
-  bridge?.onTalkKey(() => (phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  bridge?.onTalkKey(() => (phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
   undo.onclick = async () => {
     undo.disabled = true
     const r = await bridge?.talkUndo()
@@ -765,6 +779,8 @@ function talkPage() {
     paint(c.colors)
     list = c.list
     to = c.to
+    answers = c.answers !== false
+    lang = c.speech
     ai = !!c.ai
     cfg = c.route
     show()
@@ -887,6 +903,11 @@ function talkPage() {
       }
     }
     if (!text) return void (say('Nothing heard', true), setTimeout(close, 1500))
+    // a spoken yes or no with an ask waiting (the pill's target's, else the newest): that ask's answer, not a message
+    const yes = answers && spokenAnswer(text, lang)
+    const waiting = list.filter(x => x.status === 'waiting' && x.ask)
+    const t = yes && (waiting.find(x => x.tab === to) ?? waiting.sort((a, b) => (b.at ?? 0) - (a.at ?? 0))[0])
+    if (yes && t) return answerAsk(t, yes, text)
     // Q5: its first words name who gets it: shown a moment (Tab: another, ⏎: now, Esc: not at all), then the rest goes
     const r = cfg && routeOf(text, { tabs: list, projects: cfg.projects, aiOn: cfg.aiOn, aiWord: cfg.aiWord })
     const at = r && routeTo(r)
@@ -899,6 +920,33 @@ function talkPage() {
     phase = 'route'
     say(`${r.how}: sends in a moment · Tab: another · ⏎ now · Esc stops it`)
     routed = { text: r.rest, t: setTimeout(() => void send(r.rest), routeLong(r, list, cfg!)) }
+  }
+  function answerAsk(t: TalkTab, yes: 'yes' | 'no', text: string) {
+    const a = t.ask!
+    const what = `${a.tool ?? ''}${a.tool && (a.what || a.question) ? ': ' : ''}${(a.what || a.question || '').split('\n')[0]}`.slice(0, 120)
+    const mode = spokenMode({ status: 'waiting', ask: a, ...(t.held && { secret: true }) })
+    to = t.tab
+    show()
+    phase = 'answer'
+    const word = yes === 'yes' ? 'Yes' : 'No'
+    if (mode === 'laki') {
+      asking = { text, go: () => void bridge?.talkClose() }
+      return say(`${t.name} asks something to answer in Laki: ${what} · Tab: send “${text}” as a message · Esc`, true)
+    }
+    const opt = yes === 'yes' ? a.options[0] : a.options.at(-1)!
+    asking = {
+      text,
+      go: async () => {
+        asking = undefined
+        phase = 'sending'
+        const r = await bridge?.talkAnswer(t.tab, opt.n, opt.label)
+        phase = 'sent'
+        say(r?.error ? `Not answered: ${r.error}` : `Answered ${word}: ${t.name}`, !!r?.error)
+        setTimeout(close, r?.error ? 4000 : 2000)
+      },
+    }
+    say(`Answer ${word} to: ${what} · ${mode === 'auto' ? 'in a moment, ⏎ now' : '⏎ answers'} · Tab: send it as a message · Esc drops it`)
+    if (mode === 'auto') asking.t = setTimeout(() => asking?.go(), 1500)
   }
   async function send(text: string) {
     if (phase === 'sending' || phase === 'sent') return

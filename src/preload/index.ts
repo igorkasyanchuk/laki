@@ -148,6 +148,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalkHeard: (cb: (x: object) => void) => ipcRenderer.on('talk-heard', (_e, x) => cb(x)),
     talkListenStop: (keep: boolean) => ipcRenderer.send('talk-listen-stop', keep),
     talkFix: (text: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-fix', text),
+    talkAnswer: (tab: string, n: number, label: string): Promise<{ error?: string }> => ipcRenderer.invoke('talk-answer', tab, n, label), // a spoken yes or no to a waiting ask
     talkClose: () => ipcRenderer.send('talk-close'),
   },
   // cards on screen (ask.html): the cards in, the page's height, a choice, ×, Close all and Open out (by each card's key)
