@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { tabAgent } from '../shared/install.ts'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { queueOrder, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, rtOf, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
@@ -68,12 +68,68 @@ function item(text: string, id: string, source: WorkflowSource, project?: string
   const k = agentKey(source, id, project)
   const stats = statsView(state.flowStats?.[k])
   const events = lastEvents.get(k)
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(stats && { stats }), ...(events?.length && { events }), ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow, { find: callFinder(source, project), untrusted })], ...(stats && { stats }), ...(events?.length && { events }), ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
 }
 // a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
 // the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
 // event, a schedule or an agent's ask; the app's Start runs it, you're looking at it there
 const textHash = (t: string) => createHash('sha256').update(t).digest('hex')
+// a call block's workflow: in the caller's own folder (yours run yours, a project's its project's), by id or name, its
+// trust as item() has it
+function callFinder(source: WorkflowSource, project?: string): Calls['find'] {
+  const p = source === 'project' ? state.projects.find(x => x.id === project) : undefined
+  const d = source === 'yours' ? yoursDir() : p && usable(p) ? projectDir(p) : undefined
+  const read = (id: string) => {
+    try {
+      const path = join(d!, `${id}.md`)
+      return statSync(path).size > MAX_FILE ? undefined : readFileSync(path, 'utf8')
+    } catch {
+      return undefined
+    }
+  }
+  const ids = () => {
+    try {
+      return readdirSync(d!).filter(x => x.endsWith('.md') && ID.test(x.slice(0, -3))).sort().map(x => x.slice(0, -3))
+    } catch {
+      return []
+    }
+  }
+  return d ? filesFinder(ids, read, (id, text) => source === 'project' && state.flowTrust?.[agentKey(source, id, project)] !== textHash(text)) : () => undefined
+}
+// a run's call blocks' workflows (FlowRun's inner and calls), as the files are now: each one's blocks copied in as
+// <call>/<id> (nested: <call>/<call>/<id>), their ways, children and sessions renamed with them, an agent's mode its
+// head's when it has none. check has refused a missing one, a loop and past CALL_DEPTH
+function inlined(wf: WorkflowItem) {
+  const find = callFinder(wf.source, wf.project)
+  const inner: Block[] = []
+  const calls: NonNullable<FlowRun['calls']> = {}
+  const walk = (blocks: Block[], pre: string, depth: number) => {
+    for (const b of blocks.filter(x => x.kind === 'call')) {
+      const c = depth < CALL_DEPTH ? find(b.workflow?.trim() ?? '')?.workflow : undefined
+      if (!c) continue
+      const call = `${pre}${b.id}`
+      const ren = (id: string) => `${call}/${id}`
+      const start = c.blocks.find(x => x.kind === 'start')
+      calls[call] = { id: c.id, name: c.name, ...(c.vars && { vars: c.vars }), ...(start?.inputs && { inputs: start.inputs }) }
+      for (const x of c.blocks) {
+        const y: Block = { ...JSON.parse(JSON.stringify(x)), id: ren(x.id), name: `${blockName(b)} › ${blockName(x)}` }
+        delete y.at
+        for (const k of Object.keys(y.to ?? {})) y.to![k] = ren(y.to![k])
+        for (const o of y.options ?? []) if (o.to) o.to = ren(o.to)
+        if (y.max?.to) y.max.to = ren(y.max.to)
+        if (y.session && !['run', 'new'].includes(y.session)) y.session = ren(y.session)
+        if (y.kind === 'agent' && y.perm === undefined && c.perm) y.perm = c.perm
+        for (const k of y.children ?? []) Object.assign(k, { name: k.name || k.id, id: ren(k.id) })
+        inner.push(y)
+      }
+      walk(c.blocks, `${call}/`, depth + 1)
+    }
+  }
+  walk(wf.blocks, '', 0)
+  return { inner, calls }
+}
+// every block a run of it may run: its own, a parallel's children, its calls' workflows' (an agent's event, bypass)
+const everyBlock = (wf: WorkflowItem) => [...wf.blocks, ...inlined(wf).inner].flatMap(b => [b, ...(b.children ?? [])])
 function trust(source: WorkflowSource, id: string, project: string | undefined, text: string) {
   if (source !== 'project') return
   const k = agentKey(source, id, project)
@@ -315,7 +371,8 @@ const cause = (r: FlowRun) => ({ run: r.id, hops: hop(r) })
 const going = (r: FlowRun) => live(r) && r.status !== 'queued' && !r.sim // what at once: counts (a simulation never)
 const procs = new Map<string, ChildProcess>() // a run block's command, by run
 const calls = new Map<string, AbortController>() // an AI call's or a webhook's request, by run
-const blockOf = (r: FlowRun, id?: string) => r.flow.blocks.find(b => b.id === id)
+const blockOf = (r: FlowRun, id?: string) => r.flow.blocks.find(b => b.id === id) ?? r.inner?.find(b => b.id === id)
+const scopeOf = (id?: string) => (id?.includes('/') ? id.slice(0, id.lastIndexOf('/')) : undefined) // a called block's call block
 const wsOf = (r: FlowRun) => state.workspaces.find(w => w.id === r.ws)
 const clip = (s: string, n = 100) => {
   const l = String(s ?? '').trim().split('\n')[0]
@@ -332,7 +389,7 @@ export function flowGet(o: { id: string }): FlowRun {
 // a log entry: its time and line, then what went with it (a prompt, an answer, a command's output) on the lines after
 function say(r: FlowRun, line: string, detail?: string) {
   const t = new Date().toTimeString().slice(0, 8)
-  line = scrub(r, line)
+  line = `${'  '.repeat(r.cur?.split('/').length ? r.cur.split('/').length - 1 : 0)}${scrub(r, line)}` // inside a call: indented
   const d = scrub(r, String(detail ?? '').trim())
   r.log.push(`${t} ${line}${d ? `\n${d.length > LOG_DETAIL ? `…${d.slice(-LOG_DETAIL)}` : d}` : ''}`)
   if (r.log.length > LOG_LINES) r.log.splice(0, r.log.length - LOG_LINES)
@@ -361,11 +418,24 @@ function varsOf(r: FlowRun): Record<string, string> {
   const pr = ws && prOf(ws.id)
   // the agent variables ({{branch}}, {{path}}…: what actions and templates take) under the run's own
   const agent = ws ? Object.fromEntries(Object.entries(agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: pr?.url })).filter((e): e is [string, string] => e[1] !== undefined)) : {}
-  return { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
+  const all = { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
+  // inside a call: its workflow's own variables, task and inputs, and steps.<id>.* its own blocks' (kept as <call>/<id>)
+  const p = scopeOf(r.cur)
+  const c = p ? r.calls?.[p] : undefined
+  if (!p || !c) return all
+  const own = Object.fromEntries(Object.entries(r.vars).flatMap(([k, v]) => (k.startsWith(`steps.${p}/`) ? [[`steps.${k.slice(p.length + 7)}`, v]] : [])))
+  const outer = Object.fromEntries(Object.entries(all).filter(([k]) => !/^(steps|inputs|vars)\./.test(k)))
+  return { ...outer, ...varsFill(c.vars, state.settings?.flowVars), task: c.task ?? '', ...c.given, ...own }
 }
 
 // W1: what an agent's or a model's prompt fills: outside variables fenced as data (fillData). The run's event: its trigger's
-const dataFill = (r: FlowRun, text: string, vars: Record<string, string>) => fillData(text, vars, k => outsideVar(k, /^(?:event|try) (.+)$/.exec(r.trigger)?.[1], r.flow.blocks), ANSWER_MAX)
+const dataFill = (r: FlowRun, text: string, vars: Record<string, string>) => fillData(text, vars, k => outsideVar(k, /^(?:event|try) (.+)$/.exec(r.trigger)?.[1], scopeBlocks(r)), ANSWER_MAX)
+// the blocks {{steps.<id>…}} names where the run is: its own, or a call's (their ids as its workflow has them); children too
+const scopeBlocks = (r: FlowRun) => {
+  const p = scopeOf(r.cur)
+  const all = [...r.flow.blocks, ...(r.inner ?? [])].flatMap(b => [b, ...(b.children ?? [])])
+  return p ? all.filter(b => scopeOf(b.id) === p).map(b => ({ ...b, id: b.id.slice(p.length + 1) })) : all.filter(b => !b.id.includes('/'))
+}
 
 // an event's fields as {{event.<path>}}: each leaf by its path, an object or list also whole (JSON), 2000 keys at most
 function eventVars(ev: unknown) {
@@ -454,12 +524,13 @@ export async function flowStart(o: Start) {
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
   if (wf.untrusted && o.trigger?.startsWith('schedule ')) refused(wf, 'schedule')
+  const lined = inlined(wf) // its calls' workflows' blocks, as they are now
   const paused = !wf.untrusted && wf.stats?.paused // by itself only: Run, the CLI and MCP start it by hand
   if (paused && /^(schedule|event) /.test(o.trigger ?? '')) throw new Error(`paused: ${paused.why}; turn it on again in Workflows`)
   if (wf.untrusted && (o.by === 'agent' || (o.event && !o.editor) || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   const proj = findProject(pick?.project ?? o.project!)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
-  for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
+  for (const b of [...wf.blocks, ...lined.inner].filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)
     if (isAgent(ag))
       try {
@@ -470,7 +541,7 @@ export async function flowStart(o: Start) {
       }
   }
   const yours = o.tab ? yourTab(wf, o, mine, pick) : []
-  const never = bypass(wf).map(blockName)
+  const never = bypass({ ...wf, blocks: [...wf.blocks, ...lined.inner] }).map(blockName)
   if (o.by === 'agent' && never.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${never.join(', ')}): start it yourself`)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
   if (wf.where === 'here' && !pick) throw new Error(`${wf.name} runs in a workspace you have: pick one (its ⋯ › Run workflow, or --ws)`)
@@ -493,6 +564,7 @@ export async function flowStart(o: Start) {
   const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, events: _e, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
+  if (lined.inner.length) Object.assign(r, { inner: lined.inner, calls: lined.calls })
   for (const k of yours) r.tabs[k] = mine!.id
   if (budget) (r.budget = { ...budget }), (r.flow.budget = { ...budget }) // the run's copy: Give it more raises it by half of this
   else delete r.flow.budget
@@ -546,12 +618,14 @@ function simStart(o: Start) {
   const proj = findProject(project)
   const old = o.simulate!.from ? flowGet({ id: String(o.simulate!.from) }) : undefined
   if (old && !runOf(old, wf)) throw new Error(`run ${old.id} is ${old.flow.name}'s, not ${wf.name}'s`)
-  const answers = simAnswers(o.simulate!.answers, wf)
+  const lined = inlined(wf)
+  const answers = simAnswers(o.simulate!.answers, { ...wf, blocks: [...wf.blocks, ...lined.inner] }) // a called block's too, <call>/<id>
   const task = String(o.task ?? '').trim()
   const start = wf.blocks.find(b => b.kind === 'start')!
   const inputs = inputVals(start.inputs, Object.fromEntries(Object.entries(o.inputs ?? {}).map(([k, v]) => [k, String(v ?? '')])))
   const { source, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, events: _e, budget: _b, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, sim: { ...(old && { from: old.id }), ...(answers && { answers }), n: {}, sent: [] }, task, trigger: 'simulate', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), status: 'running', visits: {}, vars: { task, project: proj.name, ...inputs }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  if (lined.inner.length) Object.assign(r, { inner: lined.inner, calls: lined.calls })
   runs().push(r)
   say(r, `${wf.name} (simulated): ${task || 'started'}`)
   say(r, `nothing runs: each block's way is ${answers ? 'your answer, else ' : ''}${old ? `the way run ${old.id} went, else ` : ''}yours to pick`)
@@ -586,6 +660,8 @@ function simWhat(r: FlowRun, b: Block, vars: Record<string, string>): string {
       return b.link ? `link ${f(b.link)}` : `${f(b.file)}${b.from ? ` (from ${f(b.from)})` : ''}`
     case 'extension':
       return `fetch ${b.extension ?? ''}`
+    case 'parallel':
+      return (b.children ?? []).map(c => `${blockName(c)}: ${simWhat(r, c, vars)}`).join('\n\n')
     default:
       return '' // start, choice, case, wait: nothing goes out
   }
@@ -659,6 +735,7 @@ function enter(r: FlowRun, b: Block, again = false, cut = false): void {
     }
     r.visits[b.id] = n
     if (r.tries?.[b.id]) delete r.tries[b.id] // entered anew: its tries again are its own
+    if (r.par?.[b.id]) delete r.par[b.id] // and a parallel's children all run again
   }
   if (spend(r)) return budgetAsk(r, b) // its visit counted: Give it more enters it again without one
   Object.assign(r, { cur: b.id, at: Date.now(), wait: undefined, status: 'running' })
@@ -674,6 +751,7 @@ function leave(r: FlowRun, b: Block, exit: string, why: string, you = false): vo
   say(r, `${blockName(b)} → ${exit}: ${why}`)
   const e = exitsOf(b).find(x => x.name === exit)
   if (!e?.to && BAD_EXITS.includes(exit)) return stuck(r, b, `${blockName(b)}: ${why}`)
+  if (!e?.to && scopeOf(b.id)) return back(r, b, 'ok', `${blockName(b)}'s ${exit} leads nowhere: the end`)
   if (!e?.to) return r.hold ? park(r, undefined, false, `${blockName(b)}'s ${exit} leads nowhere: the end`) : finish(r, 'done', `${blockName(b)}'s ${exit} leads nowhere: the end`) // parked: no archive before Resume
   enter(r, blockOf(r, e.to)!)
 }
@@ -713,11 +791,16 @@ function again(r: FlowRun, b: Block, until?: number) {
 
 async function work(r: FlowRun, b: Block) {
   const vars = varsOf(r)
-  if (r.sim && b.kind !== 'end') return simWork(r, b, vars)
+  if (r.sim && b.kind !== 'end' && b.kind !== 'call') return simWork(r, b, vars) // a call: its blocks are simulated
   switch (b.kind) {
+    case 'parallel':
+      return parallel(r, b, vars)
+    case 'call':
+      return callIn(r, b, vars)
     case 'start':
       return leave(r, b, 'next', r.dry ? 'started (dry run: outward actions are said, not done)' : 'started')
     case 'end':
+      if (scopeOf(b.id)) return back(r, b, b.result === 'stopped' || b.result === 'failed' ? 'fail' : 'ok', fill(b.text ?? '', vars).trim().slice(0, 500) || blockName(b)) // a called workflow's: back to its call
       // its words (none: its name) end the log, and the notification it asks for
       return finish(r, b.result === 'stopped' ? 'stopped' : b.result === 'failed' ? 'failed' : 'done', fill(b.text ?? '', vars).trim().slice(0, 500) || blockName(b), b.notify, b.notify && b.phone, b)
     case 'agent':
@@ -801,7 +884,7 @@ async function extension(r: FlowRun, b: Block) {
 }
 
 // what a choice or a case tests: a variable, else a block's answer, else its output (none: empty)
-const valueOf = (r: FlowRun, vars: Record<string, string>, of = '') => r.vars[of] ?? vars[of] ?? r.vars[`steps.${of}.answer`] ?? r.vars[`steps.${of}.output`] ?? ''
+const valueOf = (_r: FlowRun, vars: Record<string, string>, of = '') => vars[of] ?? vars[`steps.${of}.answer`] ?? vars[`steps.${of}.output`] ?? '' // vars: varsOf's, a call's own inside it
 
 // a case's js: branch: a JS expression over the run's variables (vars, num(name): NaN when it's empty, json(name)), 200
 // ms at most; one that throws stops the run on that block (Try again or Stop), saying why. ponytail: node:vm is no sandbox, but it runs what a run: block could
@@ -1089,8 +1172,7 @@ function command(r: FlowRun, b: Block) {
   if (settingUp(ws)) return later(r, b, command)
   kill0(r) // never two at once
   const { cmd, env: vals } = shellFill(b.cmd ?? '', varsOf(r)) // every value an env reference: an answer, a PR's title, never shell
-  const storage = storageOf(ws)
-  const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), ...isolationEnv(ws.port, ws.project), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), ...vals, CI: '1' } })
+  const child = spawnIn(r, ws, cmd, vals)
   procs.set(r.id, child)
   let out = ''
   const take = (d: Buffer) => (out = (out + d.toString()).slice(-64000))
@@ -1104,7 +1186,7 @@ function command(r: FlowRun, b: Block) {
     clearTimeout(timer)
     if (procs.get(r.id) !== child) return // stopped, or run again
     procs.delete(r.id)
-    const lines = scrub(r, out.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '').trimEnd()).split('\n') // W3: what Laki's env gave it, masked
+    const lines = linesOf(r, out)
     r.vars[`steps.${b.id}.output`] = lines.slice(-OUTPUT_LINES).join('\n')
     r.vars[`steps.${b.id}.code`] = String(code ?? -1)
     if (b.out?.length) outs(r, b, lines.join('\n'))
@@ -1116,6 +1198,124 @@ function command(r: FlowRun, b: Block) {
   touch()
 }
 const kill = killGroup // its group: npm and what it started
+// a command's process in the run's folder, a group of its own: Laki's env and the project's, its values as env (shellFill)
+function spawnIn(r: FlowRun, ws: Workspace, cmd: string, vals: Record<string, string>) {
+  const storage = storageOf(ws)
+  return spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), ...isolationEnv(ws.port, ws.project), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), ...vals, CI: '1' } })
+}
+// its output's lines: colors and \r out, what Laki's env gave it masked (W3)
+const linesOf = (r: FlowRun, out: string) => scrub(r, out.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '').trimEnd()).split('\n')
+
+// a parallel block: its children at once (but those done this visit: a restart's), each its own command or request
+// under the run's one stop (calls'), its own log lines and steps.<child>.*, what it costs the run's. join all: ok once
+// every one is, fail at the first that fails; any: ok at the first that is, fail when all failed. The rest are stopped
+async function parallel(r: FlowRun, b: Block, vars: Record<string, string>) {
+  const ws = wsOf(r)
+  const kids = b.children ?? []
+  if (kids.some(c => c.kind === 'run')) {
+    if (!ws || ws.archived) throw new Error('its workspace is gone')
+    if (ws.host) throw new Error('run blocks run on this Mac: not in an SSH host’s workspace')
+    if (settingUp(ws)) return later(r, b, (r, b) => void parallel(r, b, varsOf(r)))
+  }
+  kill0(r)
+  const ctl = new AbortController()
+  calls.set(r.id, ctl)
+  r.wait = { kind: 'run' }
+  const done = ((r.par ??= {})[b.id] ??= {})
+  const any = b.join === 'any'
+  const mine = () => calls.get(r.id) === ctl && live(r) && r.cur === b.id
+  const end = (exit: string, why: string) => {
+    if (!mine()) return
+    calls.delete(r.id)
+    ctl.abort() // the rest
+    leave(r, b, exit, why)
+  }
+  const all = () => kids.every(c => done[c.id]) && end(any ? 'fail' : 'ok', any ? 'every one failed' : 'every one ok')
+  const left = kids.filter(c => !done[c.id])
+  say(r, `${blockName(b)}: ${left.map(blockName).join(', ')} at once${left.length < kids.length ? ` (${kids.length - left.length} done before)` : ''}`)
+  touch()
+  if (!left.length) return void all()
+  for (const c of left)
+    void (async () => {
+      const min = c.timeout ?? (c.kind === 'run' ? RUN_TIMEOUT : CALL_TIMEOUT)
+      const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(min * 60000)])
+      const log = (line: string, detail?: string) => mine() && say(r, `  ${line}`, detail)
+      let got: Got
+      try {
+        const hook = c.kind === 'webhook' ? hookSend(c, vars, envOf(ws), ws?.path, runBody(r)) : undefined
+        const send = hook ?? (c.kind === 'run' ? cmdSend(r, c, ws!, vars, min) : llmSend(c, vars, `${r.flow.name} · ${blockName(c)}`, (t, v) => dataFill(r, t, v)))
+        got = hook && r.dry ? { exit: 'ok', why: hook.dry, vars: {} } : await send(signal, log)
+      } catch (e) {
+        got = { exit: c.kind === 'run' ? 'fail' : 'error', why: why(e, min), vars: {} }
+      }
+      if (got.cost) r.cost = (r.cost ?? 0) + got.cost // spent, even when it was stopped meanwhile
+      if (!mine()) return
+      for (const [k, v] of Object.entries(got.vars)) r.vars[k] = scrub(r, v)
+      if (c.out?.length && got.text !== undefined) outs(r, c, scrub(r, got.text))
+      const ok = !BAD_EXITS.includes(got.exit)
+      done[c.id] = got.exit
+      say(r, `  ${blockName(c)} → ${got.exit}: ${got.why}`)
+      touch()
+      if (any ? ok : !ok) return end(any ? 'ok' : 'fail', `${blockName(c)} ${ok ? 'first' : 'failed'}: ${clip(got.why, 80)}`)
+      all()
+    })()
+}
+// a parallel block's command: a process of its own (its group stopped with the signal), its output and code as a run block's
+function cmdSend(r: FlowRun, b: Block, ws: Workspace, vars: Record<string, string>, min: number): Send {
+  const { cmd, env } = shellFill(b.cmd ?? '', vars)
+  return (signal, say) =>
+    new Promise(ok => {
+      say(`${blockName(b)}: ${clip(cmd, 120)}`)
+      if (signal.aborted) return ok({ exit: 'fail', why: 'stopped', vars: {} })
+      const child = spawnIn(r, ws, cmd, env)
+      let out = ''
+      const take = (d: Buffer) => (out = (out + d.toString()).slice(-64000))
+      child.stdout!.on('data', take)
+      child.stderr!.on('data', take)
+      const stop = () => kill(child)
+      signal.addEventListener('abort', stop, { once: true })
+      child.on('error', e => (out += `\n${e.message}`))
+      child.on('close', (code, sig) => {
+        signal.removeEventListener('abort', stop)
+        const lines = linesOf(r, out)
+        const tail = lines.slice(-OUTPUT_LINES).join('\n')
+        if (tail.trim()) say(`${blockName(b)}: its output`, tail)
+        const late = (signal.reason as Error | undefined)?.name === 'TimeoutError'
+        ok({ exit: code === 0 ? 'ok' : 'fail', why: late ? `stopped after ${min} min` : sig ? `killed (${sig})` : `exit ${code}${code ? `: ${clip(lines.at(-1) ?? '', 80)}` : ''}`, vars: { [`steps.${b.id}.output`]: tail, [`steps.${b.id}.code`]: String(code ?? -1) }, text: lines.join('\n') })
+      })
+    })
+}
+
+// a call block: its workflow's blocks (inlined as the run started) from their start, afresh: their visits, variables
+// and children's from an earlier visit go; its task and with:'s values filled from here (outside text fenced: dataFill)
+function callIn(r: FlowRun, b: Block, vars: Record<string, string>) {
+  const c = r.calls?.[b.id]
+  const start = r.inner?.find(x => scopeOf(x.id) === b.id && x.kind === 'start')
+  if (!c || !start) throw new Error(`${b.workflow}: not found as the run started`)
+  for (const k of Object.keys(r.visits)) if (k.startsWith(`${b.id}/`)) delete r.visits[k]
+  for (const k of Object.keys(r.vars)) if (k.startsWith(`steps.${b.id}/`) || k.startsWith(`steps.${b.id}.`)) delete r.vars[k]
+  for (const k of Object.keys(r.par ?? {})) if (k.startsWith(`${b.id}/`)) delete r.par![k]
+  const w = Object.fromEntries(Object.entries(b.with ?? {}).map(([k, v]) => [k, dataFill(r, v, vars).trim()]))
+  const isInput = (k: string) => !!c.inputs?.some(i => i.name === k)
+  const inputs = inputVals(c.inputs, Object.fromEntries(Object.entries(w).filter(([k]) => isInput(k))))
+  Object.assign(c, { task: w.task ?? '', given: { ...Object.fromEntries(Object.entries(w).filter(([k]) => k !== 'task' && !isInput(k)).map(([k, v]) => [`vars.${k}`, v])), ...inputs } })
+  say(r, `${blockName(b)}: runs ${c.name}${c.task ? `: ${clip(c.task, 80)}` : ''}`)
+  touch()
+  enter(r, start)
+}
+// a called workflow's end (or a way of it that leads nowhere): back at its call block, ok or fail; what its blocks
+// named with out: as the call's steps.<id>.<name>, the end's words its output
+function back(r: FlowRun, b: Block, exit: 'ok' | 'fail', words: string) {
+  const p = scopeOf(b.id)!
+  const call = blockOf(r, p)
+  if (!call) return stuck(r, b, `${blockName(b)}: its call block is gone`)
+  for (const x of (r.inner ?? []).filter(y => scopeOf(y.id) === p).flatMap(y => [y, ...(y.children ?? [])]))
+    for (const n of x.out ?? []) if (r.vars[`steps.${x.id}.${n}`] !== undefined) r.vars[`steps.${p}.${n}`] = r.vars[`steps.${x.id}.${n}`]
+  r.vars[`steps.${p}.output`] = words
+  if (b.kind === 'end') decide(r, b, exit, words)
+  r.cur = p
+  leave(r, call, exit, `${r.calls?.[p]?.name ?? 'its workflow'} ${exit === 'ok' ? 'is done' : b.result ?? 'failed'}: ${clip(words, 80)}`)
+}
 
 // out: its names' values as {{steps.<id>.<name>}}, from its result (an answer's JSON, a command's, a response's)
 function outs(r: FlowRun, b: Block, text: string) {
@@ -1323,7 +1523,7 @@ function scrub(r: FlowRun, text: string) {
 // a run's variables as a webhook's default body: the task and what the blocks gave
 const runBody = (r: FlowRun) => ({ task: r.task, ...Object.fromEntries(Object.entries(r.vars).filter(([k]) => k.startsWith('steps.'))) })
 // what the block before gave: its answer, else its output (an AI decision's default state)
-const before = (r: FlowRun, vars: Record<string, string>) => (id => (id ? valueOf(r, vars, id) : '') || r.task)(r.decisions.at(-1)?.block)
+const before = (r: FlowRun, vars: Record<string, string>) => (id => (id ? valueOf(r, vars, (p => (p && id.startsWith(`${p}/`) ? id.slice(p.length + 1) : id))(scopeOf(r.cur))) : '') || (vars.task ?? r.task))(r.decisions.at(-1)?.block)
 
 // the inspector's Test: an AI call, an AI decision or a webhook sent once, alone, with the variables given (a project's
 // env and folder, when it names one); what it says and gives back, never a run
@@ -1845,7 +2045,7 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
   if (hops > HOPS_MAX) return no(`${hops} hops: a loop of events? dropped`)
   if (!o.tried && wf.stats?.paused) return no(`paused: ${wf.stats.paused.why}; turn it on again in Workflows`) // a try is yours: Run starts a paused one too
   // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-  if (o.agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
+  if (o.agent && (bypass({ ...wf, blocks: everyBlock(wf) }).length || everyBlock(wf).some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
   const mine = runs().filter(r => runOf(r, wf))
   if (mine.some(r => r.id === payload.run || (!!ws && live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) return no('its own run sent it')
   const fails = whenFails(wf, payload)

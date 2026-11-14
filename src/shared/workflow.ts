@@ -6,13 +6,13 @@
 import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDGET_EVENTS } from './types.ts'
 import { fenced, plain, untrusted } from './fence.ts'
 
-export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
+export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'parallel', 'call', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
 // each kind's exits; choice, case and ask have options instead (each its own exit)
-export const EXITS: Record<BlockKind, string[]> = { start: ['next'], agent: ['next', 'error'], llm: ['ok', 'error'], decide: ['ok', 'error'], popup: ['next'], webhook: ['ok', 'error'], run: ['ok', 'fail'], choice: [], case: [], ask: [], action: ['ok', 'error'], wait: ['pass', 'fail'], save: ['ok'], extension: ['ok', 'error'], end: [] }
+export const EXITS: Record<BlockKind, string[]> = { start: ['next'], agent: ['next', 'error'], llm: ['ok', 'error'], decide: ['ok', 'error'], popup: ['next'], webhook: ['ok', 'error'], run: ['ok', 'fail'], choice: [], case: [], ask: [], action: ['ok', 'error'], wait: ['pass', 'fail'], save: ['ok'], extension: ['ok', 'error'], parallel: ['ok', 'fail'], call: ['ok', 'fail'], end: [] }
 export const BAD_EXITS = ['fail', 'error']
 export const optioned = (k: BlockKind) => k === 'choice' || k === 'case' || k === 'ask'
-export const BLOCK_NAMES: Record<BlockKind, string> = { start: 'Start', agent: 'Agent', llm: 'AI call', decide: 'AI decision', popup: 'Show you', webhook: 'Webhook', run: 'Run command', choice: 'If / else', case: 'Case', ask: 'Ask you', action: 'Laki action', wait: 'Wait', save: 'Save', extension: 'Extension', end: 'End' }
+export const BLOCK_NAMES: Record<BlockKind, string> = { start: 'Start', agent: 'Agent', llm: 'AI call', decide: 'AI decision', popup: 'Show you', webhook: 'Webhook', run: 'Run command', choice: 'If / else', case: 'Case', ask: 'Ask you', action: 'Laki action', wait: 'Wait', save: 'Save', extension: 'Extension', parallel: 'Parallel', call: 'Run workflow', end: 'End' }
 export const ACTIONS: Record<string, string> = { ship: 'Open a PR (commit, push, gh pr create)', approve: 'Approve its PR', merge: 'Merge its PR', dev: 'Run the dev server', archive: 'Archive the workspace' }
 export const OUTWARD = ['ship', 'approve', 'merge', 'archive'] // what others see: asks first unless the block says ask first: no
 export const WAITS: Record<string, string> = { checks: 'Its PR’s checks pass or fail' }
@@ -28,6 +28,14 @@ export const METHODS = ['POST', 'PUT', 'PATCH', 'GET', 'DELETE'] as const // a w
 export const OUT_NAME = /^[a-z][\w-]{0,40}$/i
 export const OUT_TAKEN = ['answer', 'output', 'code', 'status', 'head']
 export const OUT_KINDS: BlockKind[] = ['agent', 'llm', 'run', 'webhook']
+// parallel: its children run together (commands, AI calls, webhooks for now), join: all (every one ok) or any (the first
+// ok); each gives its own steps.<child>.*
+export const PAR_KINDS: BlockKind[] = ['run', 'llm', 'webhook']
+export const PAR_MIN = 2
+export const PAR_MAX = 6
+export const JOINS = ['all', 'any'] as const
+// call (the file's workflow:): another workflow of the same source run inside this run, CALL_DEPTH deep at most
+export const CALL_DEPTH = 3
 // an AI decision: OpenRouter's decision models (the Decisions API: typed questions in, probabilities out; no text). A
 // model id of any other works too
 export const DECIDE_MODELS: { id: string; name: string }[] = [
@@ -123,6 +131,10 @@ export type Block = {
   popover?: boolean // end, popup: a card in the window's corner (Open, ✕), the run going on
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes); ask: its reminder pushed too
+  children?: Block[] // parallel: what runs together (PAR_KINDS), each with no ways out of its own
+  join?: (typeof JOINS)[number] // parallel (unset: all)
+  workflow?: string // call: the workflow it runs, by id or name, in the same source (yours, or the project's)
+  with?: Record<string, string> // call: its task (task) and values for its variables and inputs ({{vars}} filled)
 }
 export type Workflow = { id: string; name: string; desc?: string; group?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; when?: string[]; budget?: Budget; vars?: Record<string, string>; blocks: Block[] } // group: the Workflows page's collapsible head it's under (none: no group); budget: a run's working time and AI money (budgetOf); when: only when: tests on the event's fields, each must hold (whenProblem); vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project' | 'builtin' // builtin: a template that comes with Laki (workflows/), never run or saved
@@ -262,14 +274,16 @@ export function exitsOf(b: Block): Exit[] {
 // are lines named after them (next:, ok:, fail:…), a choice's and an ask's options are - label → block; > lines are its
 // text; max: 3 → stuck limits it; at: x,y is where the canvas draws it.
 
-export const WHOLE = new Set(['inputs', 'name', 'ask', 'show', 'else', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
-const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', extension: 'extension', end: 'end' }
+export const WHOLE = new Set(['inputs', 'name', 'ask', 'show', 'else', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension', 'workflow']) // the rest of the line is the value: no · split
+const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', extension: 'extension', parallel: 'parallel', workflow: 'call', end: 'end' }
 
 export function parse(text: string, id = ''): { workflow: Workflow; problems: string[] } {
   const problems: string[] = []
   const wf: Workflow = { id, name: id || 'Workflow', where: 'worktree', session: 'new', blocks: [] }
   let b: Block | null = null
+  let kid: Block | null = null // a parallel's child its indented lines go to
   const desc: string[] = []
+  const taken = (id: string) => wf.blocks.some(x => x.id === id || x.children?.some(c => c.id === id))
   let head = true // before the first block
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n')
   lines.forEach((raw, i) => {
@@ -282,8 +296,9 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
     if (h2) {
       head = false
       if (!ID.test(h2[1])) problems.push(`${at}: ${h2[1]} isn't a block id (letters, digits, - _ ?)`)
-      if (wf.blocks.some(x => x.id === h2[1])) problems.push(`${at}: two blocks are called ${h2[1]}`)
+      if (taken(h2[1])) problems.push(`${at}: two blocks are called ${h2[1]}`)
       wf.blocks.push((b = { id: h2[1], kind: h2[1] === 'start' ? 'start' : ('' as BlockKind) }))
+      kid = null
       return
     }
     if (head) {
@@ -308,24 +323,43 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
       return
     }
     if (!b) return
-    if (/^\s/.test(line) && b.kind === 'decide' && b.qs?.length) {
-      // under a question: "  label: what it means" (yes/no, choice), "  - a level" (score, lowest first)
-      const q = b.qs.at(-1)!
-      const m = q.type === 'score' ? /^\s+-\s+(.*)$/.exec(line) : /^\s+([^:]+?):\s*(.*)$/.exec(line)
-      if (!m) return void problems.push(`${at}: ${q.type === 'score' ? '  - a level' : '  label: what it means'}`)
-      return void q.opts.push(q.type === 'score' ? { label: String(q.opts.length), text: m[1].trim() } : { label: m[1].trim(), text: m[2].trim() })
+    if (/^\s/.test(line) && b.kind === 'parallel') {
+      // a child: "  ## <id>", then its own lines, indented as it is
+      const sub = line.replace(/^\s+/, '')
+      const h = /^##\s+(\S+)\s*$/.exec(sub)
+      if (h) {
+        if (!ID.test(h[1])) problems.push(`${at}: ${h[1]} isn't a block id (letters, digits, - _ ?)`)
+        if (taken(h[1])) problems.push(`${at}: two blocks are called ${h[1]}`)
+        return void (b.children ??= []).push((kid = { id: h[1], kind: '' as BlockKind }))
+      }
+      if (!kid) return void problems.push(`${at}: a parallel block's blocks start with "  ## <id>"`)
+      return lineOf(kid, sub, at, problems)
     }
-    if (line.startsWith('>')) return void (b.text = b.text === undefined ? line.replace(/^> ?/, '') : `${b.text}\n${line.replace(/^> ?/, '')}`)
-    const opt = /^-\s+(.+?)\s*(?:→|->)\s*(\S*)\s*$/.exec(line)
-    if (opt) return void (b.options ??= []).push({ label: opt[1], ...(opt[2] && opt[2] !== '?' && { to: opt[2] }) })
-    const kv = /^([a-z][a-z ]*?):\s?(.*)$/i.exec(line)
-    if (!kv) return void problems.push(`${at}: ${clip(line.trim(), 40)}? (key: value, > text or - option → block)`)
-    const key = kv[1].toLowerCase()
-    for (const [k, v] of WHOLE.has(key) ? [[key, kv[2].trim()] as [string, string]] : pairs(line)) set(b, k, v, at, problems)
+    lineOf(b, line, at, problems)
   })
   wf.desc = desc.join(' ') || undefined
-  for (const x of wf.blocks) if (!x.kind) problems.push(`${x.id}: what kind of block? (agent:, llm:, decide:, run:, ask:, choice:, case:, popup:, action:, wait:, save:, webhook:, end:)`)
+  for (const x of wf.blocks.flatMap(y => [y, ...(y.children ?? [])])) if (!x.kind) problems.push(`${x.id}: what kind of block? (agent:, llm:, decide:, run:, ask:, choice:, case:, popup:, action:, wait:, save:, webhook:, parallel:, workflow:, end:)`)
   return { workflow: wf, problems }
+}
+
+// a block's line: a decision's question's (indented), > its text, - an option → block, with NAME: (a call's), key: value
+function lineOf(b: Block, line: string, at: string, problems: string[]) {
+  if (/^\s/.test(line) && b.kind === 'decide' && b.qs?.length) {
+    // under a question: "  label: what it means" (yes/no, choice), "  - a level" (score, lowest first)
+    const q = b.qs.at(-1)!
+    const m = q.type === 'score' ? /^\s+-\s+(.*)$/.exec(line) : /^\s+([^:]+?):\s*(.*)$/.exec(line)
+    if (!m) return void problems.push(`${at}: ${q.type === 'score' ? '  - a level' : '  label: what it means'}`)
+    return void q.opts.push(q.type === 'score' ? { label: String(q.opts.length), text: m[1].trim() } : { label: m[1].trim(), text: m[2].trim() })
+  }
+  if (line.startsWith('>')) return void (b.text = b.text === undefined ? line.replace(/^> ?/, '') : `${b.text}\n${line.replace(/^> ?/, '')}`)
+  const opt = /^-\s+(.+?)\s*(?:→|->)\s*(\S*)\s*$/.exec(line)
+  if (opt) return void (b.options ??= []).push({ label: opt[1], ...(opt[2] && opt[2] !== '?' && { to: opt[2] }) })
+  const w = /^with\s+([A-Za-z_][\w-]{0,40})\s*:\s?(.*)$/.exec(line) // a call's: with task: …, with NAME: …
+  if (w) return void ((b.with ??= {})[w[1]] = w[2].trim())
+  const kv = /^([a-z][a-z ]*?):\s?(.*)$/i.exec(line)
+  if (!kv) return void problems.push(`${at}: ${clip(line.trim(), 40)}? (key: value, > text or - option → block)`)
+  const key = kv[1].toLowerCase()
+  for (const [k, v] of WHOLE.has(key) ? [[key, kv[2].trim()] as [string, string]] : pairs(line)) set(b, k, v, at, problems)
 }
 
 // key: value · key: value (a value may hold colons: only " · " splits)
@@ -396,6 +430,10 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
     }
     case 'webhook': return void (b.url = v)
     case 'extension': return void (b.extension = v)
+    case 'parallel':
+      if (v && !(JOINS as readonly string[]).includes(v)) problems.push(`${at}: parallel: all or any`)
+      return void (b.join = v === 'any' ? 'any' : undefined)
+    case 'workflow': return void (b.workflow = v || undefined)
     case 'method': {
       const m = v.toUpperCase() as Block['method']
       if (!(METHODS as readonly string[]).includes(m!)) problems.push(`${at}: method: ${METHODS.join(', ')}`)
@@ -453,50 +491,61 @@ export function toFile(wf: Workflow): string {
   L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.done && `when done: ${wf.done}`, wf.budget && `budget: ${budgetText(wf.budget)}`, wf.on && `on: ${one(wf.on)}`, wf.group && `group: ${one(wf.group).replace(/\s+·\s+/g, ' - ')}`].filter(Boolean).join(' · '))
   for (const t of wf.when ?? []) L.push(`only when: ${one(t)}`)
   for (const [k, v] of Object.entries(wf.vars ?? {})) if (VAR_NAME.test(k)) L.push(`var ${k}: ${one(v)}`)
-  for (const b of wf.blocks) {
-    L.push('', `## ${b.id}`)
-    if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
-    switch (b.kind) {
-      case 'start': if (b.input) L.push(`input: ${b.input}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
-      case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.perm && `perm: ${b.perm}`, b.fast && 'fast: yes', b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
-      case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
-      case 'decide':
-        L.push([`decide: ${b.model ?? ''}`.trimEnd(), b.sure !== undefined && `sure: ${b.sure}`, b.timeout && `timeout: ${b.timeout}`].filter(Boolean).join(' · '))
-        for (const q of b.qs ?? []) {
-          L.push(`question: ${q.name} · ${q.type} · ${one(q.ask)}`)
-          for (const o of q.opts) L.push(q.type === 'score' ? `  - ${one(o.text)}` : `  ${one(o.label).replace(/:/g, '')}: ${one(o.text)}`)
-        }
-        if (b.route) L.push(`route: ${b.route}`)
-        break
-      case 'webhook': L.push(`webhook: ${one(b.url)}`); if (b.method && b.method !== 'POST') L.push(`method: ${b.method}`); for (const h of b.headers ?? []) L.push(`header: ${one(h)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
-      case 'run': L.push(`run: ${one(b.cmd)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
-      case 'extension': L.push(`extension: ${one(b.extension)}`.trimEnd()); break
-      case 'ask':
-        L.push(`ask: ${one(b.question)}`)
-        if (b.show) L.push(`show: ${one(b.show)}`)
-        if (b.deadline || b.remind || b.phone) L.push([b.deadline && `wait: ${askWait(b.deadline)}`, b.remind && `remind: ${askWait(b.remind)}`, b.phone && 'phone: yes'].filter(Boolean).join(' · '))
-        if (b.fallback) L.push(`else: ${one(b.fallback)}`)
-        break
-      case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.modal === false) L.push('modal: no'); if (b.popover) L.push('popover: yes'); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
-      case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
-      case 'case': L.push(`case: ${b.of ?? ''}`.trimEnd()); break
-      case 'action': L.push([`action: ${b.action || 'ship'}`, b.confirm === false && 'ask first: no'].filter(Boolean).join(' · ')); break
-      case 'wait': L.push(`wait: ${b.for || 'checks'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
-      case 'save': L.push(`save: ${one(b.file)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.link) L.push(`link: ${one(b.link)}`); break
-      case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes', b.popover && 'popover: yes', b.modal && 'modal: yes'].filter(Boolean).join(' · ')); break
-    }
-    if (b.retry !== undefined || b.retryOn?.length) L.push([b.retry !== undefined && `retry: ${b.retry}`, b.retryOn?.length && `retry on: ${b.retryOn.join(', ')}`].filter(Boolean).join(' · '))
-    if (b.out?.length && OUT_KINDS.includes(b.kind)) L.push(`out: ${b.out.join(', ')}`)
-    if (b.text !== undefined && b.text !== '') for (const l of b.text.split('\n')) L.push(l ? `> ${l}` : '>')
-    const routed = b.kind === 'decide' && !!b.route
-    // a routed decision: its answers that go somewhere (the rest end the run there), in its question's order
-    const opts = routed ? (routesOf(b)?.map(r => ({ label: r.name, to: b.options?.find(x => x.label === r.name)?.to })).filter(o => o.to) ?? b.options ?? []) : (b.options ?? [])
-    if (optioned(b.kind) || routed) for (const o of opts) L.push(`- ${one(o.label)} → ${o.to || '?'}`)
-    for (const e of optioned(b.kind) ? [] : routed ? ['error'] : EXITS[b.kind]) if (b.to?.[e]) L.push(`${e}: ${b.to[e]}`)
-    if (b.max) L.push(`max: ${b.max.n}${b.max.to ? ` → ${b.max.to}` : ''}`)
-    if (b.at) L.push(`at: ${Math.round(b.at[0])},${Math.round(b.at[1])}`)
-  }
+  for (const b of wf.blocks) L.push('', ...blockFile(b))
   return L.join('\n') + '\n'
+}
+// a block's lines, from its ## id (a parallel's children's indented under it)
+function blockFile(b: Block): string[] {
+  const L = [`## ${b.id}`]
+  if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
+  switch (b.kind) {
+    case 'start': if (b.input) L.push(`input: ${b.input}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
+    case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.perm && `perm: ${b.perm}`, b.fast && 'fast: yes', b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'decide':
+      L.push([`decide: ${b.model ?? ''}`.trimEnd(), b.sure !== undefined && `sure: ${b.sure}`, b.timeout && `timeout: ${b.timeout}`].filter(Boolean).join(' · '))
+      for (const q of b.qs ?? []) {
+        L.push(`question: ${q.name} · ${q.type} · ${one(q.ask)}`)
+        for (const o of q.opts) L.push(q.type === 'score' ? `  - ${one(o.text)}` : `  ${one(o.label).replace(/:/g, '')}: ${one(o.text)}`)
+      }
+      if (b.route) L.push(`route: ${b.route}`)
+      break
+    case 'webhook': L.push(`webhook: ${one(b.url)}`); if (b.method && b.method !== 'POST') L.push(`method: ${b.method}`); for (const h of b.headers ?? []) L.push(`header: ${one(h)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'run': L.push(`run: ${one(b.cmd)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'extension': L.push(`extension: ${one(b.extension)}`.trimEnd()); break
+    case 'parallel':
+      L.push(`parallel: ${b.join ?? 'all'}`)
+      for (const c of b.children ?? []) L.push(...blockFile(c).map(l => `  ${l}`))
+      break
+    case 'call':
+      L.push(`workflow: ${one(b.workflow)}`.trimEnd())
+      for (const [k, v] of Object.entries(b.with ?? {})) if (VAR_NAME.test(k)) L.push(`with ${k}: ${one(v)}`)
+      break
+    case 'ask':
+      L.push(`ask: ${one(b.question)}`)
+      if (b.show) L.push(`show: ${one(b.show)}`)
+      if (b.deadline || b.remind || b.phone) L.push([b.deadline && `wait: ${askWait(b.deadline)}`, b.remind && `remind: ${askWait(b.remind)}`, b.phone && 'phone: yes'].filter(Boolean).join(' · '))
+      if (b.fallback) L.push(`else: ${one(b.fallback)}`)
+      break
+    case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.modal === false) L.push('modal: no'); if (b.popover) L.push('popover: yes'); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
+    case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
+    case 'case': L.push(`case: ${b.of ?? ''}`.trimEnd()); break
+    case 'action': L.push([`action: ${b.action || 'ship'}`, b.confirm === false && 'ask first: no'].filter(Boolean).join(' · ')); break
+    case 'wait': L.push(`wait: ${b.for || 'checks'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'save': L.push(`save: ${one(b.file)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.link) L.push(`link: ${one(b.link)}`); break
+    case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes', b.popover && 'popover: yes', b.modal && 'modal: yes'].filter(Boolean).join(' · ')); break
+  }
+  if (b.retry !== undefined || b.retryOn?.length) L.push([b.retry !== undefined && `retry: ${b.retry}`, b.retryOn?.length && `retry on: ${b.retryOn.join(', ')}`].filter(Boolean).join(' · '))
+  if (b.out?.length && OUT_KINDS.includes(b.kind)) L.push(`out: ${b.out.join(', ')}`)
+  if (b.text !== undefined && b.text !== '') for (const l of b.text.split('\n')) L.push(l ? `> ${l}` : '>')
+  const routed = b.kind === 'decide' && !!b.route
+  // a routed decision: its answers that go somewhere (the rest end the run there), in its question's order
+  const opts = routed ? (routesOf(b)?.map(r => ({ label: r.name, to: b.options?.find(x => x.label === r.name)?.to })).filter(o => o.to) ?? b.options ?? []) : (b.options ?? [])
+  if (optioned(b.kind) || routed) for (const o of opts) L.push(`- ${one(o.label)} → ${o.to || '?'}`)
+  for (const e of optioned(b.kind) ? [] : routed ? ['error'] : EXITS[b.kind]) if (b.to?.[e]) L.push(`${e}: ${b.to[e]}`)
+  if (b.max) L.push(`max: ${b.max.n}${b.max.to ? ` → ${b.max.to}` : ''}`)
+  if (b.at) L.push(`at: ${Math.round(b.at[0])},${Math.round(b.at[1])}`)
+  return L
 }
 
 // W8: an ask's deadline: else: is one of its options, and the safe way: nothing it leads to (until another ask, where
@@ -526,7 +575,33 @@ function deadlineProblems(b: Block, by: Map<string, Block>): string[] {
 
 // what keeps it from running: no start, a block nothing leads to, one with no way out, an exit to no block, a loop
 // with no limit (a max on one of its blocks, or an Ask you in it)
-export function check(wf: Workflow): string[] {
+// a call block's workflow, as calls.find finds it (by id or name, in the caller's source): its own problems (its calls'
+// aside: check follows those itself), whether it's trusted
+export type Called = { workflow: Workflow; problems?: string[]; untrusted?: boolean }
+export type Calls = { find: (ref: string) => Called | undefined; untrusted?: boolean } // untrusted: the workflow checked's own
+// calls.find over a folder's workflow files (ids: its files' ids, read: one's text): by id, else by its # name; each
+// parsed and checked on its own, once
+export function filesFinder(ids: () => string[], read: (id: string) => string | undefined, untrusted?: (id: string, text: string) => boolean): Calls['find'] {
+  const seen = new Map<string, Called | undefined>()
+  return ref => {
+    if (seen.has(ref)) return seen.get(ref)
+    let id = ID.test(ref) ? ref : ''
+    let text = id ? read(id) : undefined
+    if (text === undefined)
+      for (const x of ids()) {
+        const t = read(x)
+        if (t !== undefined && /^#\s+(.+)$/m.exec(t)?.[1].trim().toLowerCase() === ref.toLowerCase()) {
+          ;[id, text] = [x, t]
+          break
+        }
+      }
+    const got = text === undefined ? undefined : (({ workflow, problems }) => ({ workflow, problems: [...problems, ...check(workflow)], ...(untrusted?.(id, text) && { untrusted: true }) }))(parse(text, id))
+    seen.set(ref, got)
+    return got
+  }
+}
+const PAR_NO: Partial<Record<BlockKind, string>> = { agent: 'an agent block', ask: 'an ask', parallel: 'a parallel block' }
+export function check(wf: Workflow, calls?: Calls): string[] {
   const out: string[] = []
   const by = new Map(wf.blocks.map(b => [b.id, b]))
   const start = wf.blocks.find(b => b.kind === 'start')
@@ -539,9 +614,20 @@ export function check(wf: Workflow): string[] {
   if (wf.perm && !PERM_IDS.includes(wf.perm)) out.push(`the workflow's permission mode ${wf.perm}? ${PERM_IDS.join(', ')}`)
   if (wf.done && !(wf.done in DONES)) out.push(`when done: ${wf.done}? archive or keep`)
   if (wf.blocks.length > MAX_BLOCKS) return [...out, `${wf.blocks.length} blocks: ${MAX_BLOCKS} at most`] // the walks below recurse: not over thousands
-  for (const b of wf.blocks) {
-    for (const e of exitsOf(b)) if (e.to && !by.has(e.to)) out.push(`${blockName(b)}: ${e.name} goes to ${e.to}, which isn't a block`)
-    if (b.kind !== 'end' && !exitsOf(b).some(e => e.to)) out.push(`${blockName(b)} has no way out`)
+  const kids = wf.blocks.flatMap(b => b.children ?? [])
+  for (const b of [...wf.blocks, ...kids]) {
+    const kid = kids.includes(b)
+    if (kid) {
+      if (!PAR_KINDS.includes(b.kind)) out.push(`${blockName(b)}: ${PAR_NO[b.kind] ?? `a ${BLOCK_NAMES[b.kind]} block`} can't run inside a parallel block (yet): commands, AI calls and webhooks can`)
+      if (Object.keys(b.to ?? {}).length || b.max || b.options?.length) out.push(`${blockName(b)}: a parallel block's blocks have no ways out of their own: its ok: and fail: go on`)
+      if (b.retry !== undefined) out.push(`${blockName(b)}: retry: isn't for a parallel block's blocks`)
+    } else {
+      for (const e of exitsOf(b)) if (e.to && !by.has(e.to)) out.push(`${blockName(b)}: ${e.name} goes to ${e.to}, which isn't a block`)
+      if (b.kind !== 'end' && !exitsOf(b).some(e => e.to)) out.push(`${blockName(b)} has no way out`)
+    }
+    if (b.kind === 'parallel' && !((b.children?.length ?? 0) >= PAR_MIN && (b.children?.length ?? 0) <= PAR_MAX)) out.push(`${blockName(b)}: ${PAR_MIN} to ${PAR_MAX} blocks run together (it has ${b.children?.length ?? 0})`)
+    if (b.kind === 'call' && !b.workflow?.trim()) out.push(`${blockName(b)}: which workflow? (workflow: its id or name)`)
+    if (b.with && b.kind !== 'call') out.push(`${blockName(b)}: with: is for Run workflow blocks`)
     if (optioned(b.kind) && (b.options?.length ?? 0) < 2) out.push(`${blockName(b)} needs two options at least`)
     if (b.kind === 'case') out.push(...caseProblems(b))
     if (b.kind === 'agent' && !b.text?.trim() && !b.use?.trim()) out.push(`${blockName(b)} has no prompt (or agent action)`)
@@ -627,6 +713,36 @@ export function check(wf: Workflow): string[] {
     if (loop) out.push(`the loop through ${part.reverse().map(id => blockName(by.get(id)!)).join(', ')} has no limit: give one of its blocks a max`)
   }
   for (const b of wf.blocks) if (!idx.has(b.id)) scc(b.id)
+  // call blocks, followed down through what they run: one missing, a loop of workflows, deeper than CALL_DEPTH, a task
+  // it needs and isn't given, a trusted one into one that isn't (a repo's, new or changed)
+  if (calls) {
+    const down = (w: Workflow, path: string[], where: string) => {
+      for (const b of w.blocks.filter(x => x.kind === 'call' && x.workflow?.trim())) {
+        const at = `${where}${blockName(b)}`
+        const got = calls.find(b.workflow!.trim())
+        if (!got) {
+          out.push(`${at}: no workflow ${b.workflow} here (yours run yours, a project's its project's)`)
+          continue
+        }
+        const c = got.workflow
+        if (path.includes(c.id)) {
+          out.push(`${at}: ${[...path, c.id].join(' → ')} goes round: a workflow can't run itself`)
+          continue
+        }
+        if (path.length > CALL_DEPTH) {
+          out.push(`${at}: ${[...path, c.id].join(' → ')}: workflows run workflows ${CALL_DEPTH} deep at most`)
+          continue
+        }
+        const start = c.blocks.find(x => x.kind === 'start')
+        if (start?.input === 'task' && !b.with?.task?.trim()) out.push(`${at}: ${c.name} needs a task (with task: …)`)
+        for (const i of start?.inputs ?? []) if (!i.optional && i.default === undefined && !b.with?.[i.name]?.trim()) out.push(`${at}: ${c.name} needs ${i.name} (with ${i.name}: …)`)
+        if (got.untrusted && !calls.untrusted) out.push(`${at}: ${c.name} came with the repo and isn't allowed as it is yet: open it in Workflows, read it, then Allow it`)
+        if (got.problems?.length) out.push(`${at}: ${c.name} can't run: ${got.problems[0]}`)
+        down(c, [...path, c.id], `${at} › `)
+      }
+    }
+    down(wf, [wf.id], '')
+  }
   return out
 }
 
@@ -733,8 +849,9 @@ export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, are
     { name: 'ws.path', what: 'the run’s folder' },
     { name: 'base', what: 'the base branch' },
   ]
-  for (const b of wf.blocks) {
+  for (const b of wf.blocks.flatMap(x => [x, ...(x.children ?? [])])) {
     const at = (n: string, what: string) => out.push({ name: `steps.${b.id}.${n}`, what, from: b.id })
+    if (b.kind === 'call') at('output', 'its end’s words; and each name its blocks give (out:)')
     if (b.kind === 'agent' || b.kind === 'llm') at('answer', (b.kind === 'llm' ? (b.json ?? !!b.out?.length) : b.json) ? 'its answer: one JSON object (JSON mode)' : b.kind === 'agent' ? 'the agent’s answer: its last message this turn' : 'the model’s answer')
     if (b.kind === 'run') at('output', 'the command’s last 80 lines'), at('code', 'its exit code')
     if (b.kind === 'webhook') at('status', 'the HTTP status'), at('output', 'the response')
@@ -760,9 +877,11 @@ export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, are
 export function renameBlock(wf: Workflow, from: string, to: string) {
   if (from === 'start') throw new Error('start keeps its id')
   if (!ID.test(to)) throw new Error(`${to}? letters, digits, - _ ? (41 at most)`)
-  if (to !== from && wf.blocks.some(b => b.id === to)) throw new Error(`a block is called ${to} already`)
+  const all = wf.blocks.flatMap(b => [b, ...(b.children ?? [])])
+  if (to !== from && all.some(b => b.id === to)) throw new Error(`a block is called ${to} already`)
   const sub = (s?: string) => s?.split(`steps.${from}.`).join(`steps.${to}.`)
-  for (const b of wf.blocks) {
+  for (const b of all) {
+    if (b.with) b.with = Object.fromEntries(Object.entries(b.with).map(([k, v]) => [k, sub(v)!]))
     if (b.id === from) b.id = to
     for (const k of Object.keys(b.to ?? {})) if (b.to![k] === from) b.to![k] = to
     for (const o of b.options ?? []) {
@@ -1004,15 +1123,18 @@ export type FlowRun = {
   started: number
   ended?: number
   shown?: Shown[] // what its Show you blocks showed, the last 20
+  par?: Record<string, Record<string, string>> // a parallel block's children done this visit: their exits (a restart skips them)
+  inner?: Block[] // its call blocks' workflows' blocks, as <call>/<id> (nested: <call>/<call>/<id>): copied in as it started
+  calls?: Record<string, { id: string; name: string; vars?: Record<string, string>; inputs?: FlowInput[]; task?: string; given?: Record<string, string> }> // by call block: what it runs, its own variables and inputs; task and given (with's, filled) once entered
 }
 export type Shown = { at: number; block: string; title: string; body: string }
 // W7: a simulation's: the answers given (a block's exit, or one per visit, the last for the rest), the run it replays,
 // each block's visits so far, what each would have been sent (the newest SIM_SENT), its steps (SIM_STEPS at most)
 export type FlowSim = { from?: string; answers?: Record<string, string | string[]>; n: Record<string, number>; sent: { block: string; n: number; what: string }[]; steps?: number }
 export const SHOWN_MAX = 512 << 10 // a Show you's body
-export type FlowView = Omit<FlowRun, 'flow' | 'log' | 'decisions' | 'vars' | 'tabs' | 'resume' | 'shown'> & { name: string; block?: string; decisions: number; last?: Decision; steps?: number } // the view's: the details come from flowGet; steps: its blocks (U15: the Dock's progress)
-export const flowView = ({ flow, log, decisions, vars, tabs, resume, shown, ...r }: FlowRun): FlowView => {
-  const b = flow.blocks.find(x => x.id === r.cur)
+export type FlowView = Omit<FlowRun, 'flow' | 'log' | 'decisions' | 'vars' | 'tabs' | 'resume' | 'shown' | 'inner' | 'calls' | 'par'> & { name: string; block?: string; decisions: number; last?: Decision; steps?: number } // the view's: the details come from flowGet; steps: its blocks (U15: the Dock's progress)
+export const flowView = ({ flow, log, decisions, vars, tabs, resume, shown, inner, calls: _c, par: _p, ...r }: FlowRun): FlowView => {
+  const b = flow.blocks.find(x => x.id === r.cur) ?? inner?.find(x => x.id === r.cur)
   const wait = r.wait && 'show' in r.wait ? { ...r.wait, show: undefined } : r.wait // an agent's whole answer: flowGet has it
   return { ...r, wait, name: flow.name, steps: flow.blocks.length, block: b && blockName(b), decisions: decisions.length, last: decisions.at(-1), ...(r.sim && { sim: { ...r.sim, sent: [] } }) } // a simulation's sent: flowGet's
 }
@@ -1041,6 +1163,8 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - llm: <an OpenRouter model, e.g. anthropic/claude-sonnet-4.5; empty: Settings › AI's> (system: <its system prompt> · temperature: 0 to 2 · json: yes|no · timeout: <minutes>), the prompt as "> " lines: one call to OpenRouter with the key in Settings › AI, no tools, no agent. json: yes is JSON mode (its answer one JSON object; on by itself with out:). Exits ok, error. {{steps.<id>.answer}}: its answer.
 - decide: <a decision model: typesafe/jev-1.13 (the default), openai/gpt-6-luna-decisions, microsoft/microsoft-decision-1, ~perplexity/pplx-decider-latest, cloudflare/clef> · sure: 0.7, the state it judges as "> " lines (JSON with {{vars}}, values escaped; none: the block before's answer or output), then "question: <name> · yes/no|choice|score · <what it asks>" lines (yes/no is the API's noul: how true), each with its lines indented under it: yes/no's "  yes: <what yes means>" and "  no: …", a choice's "  <option>: <what it means>", a score's "  - <level>" lowest first. One call to OpenRouter's Decisions API: no text, probabilities. Each answer is {{steps.<id>.<name>}} (yes or no; the option; the level's number), with .p (its probability), .confidence, .score, .level (a score's words); {{steps.<id>.answers}} all of it as JSON. Under sure (yes/no between 1-sure and sure; a choice or score less confident) it asks the user. Its ways out: "ok: <block>" and "error: <block>", then route with a case (numbers, JS); or "route: <a question's name>" and a line per answer of it: "- yes → <block>", "- no → <block>", "- <option> → <block>", "- <level number> → <block>" (and error:).
 - webhook: <https URL (http only to localhost)> · method: POST|PUT|PATCH|GET|DELETE (POST unless said), "header: Name: value" lines ({{env.NAME}}: Settings' or the project's env, for a secret), the body as "> " lines (JSON when it starts with { or [: values go in escaped), or "from: <a file of the workspace>" sent as it is; no body: the run's variables as JSON. Exits ok (2xx), error (a redirect too: not followed). {{steps.<id>.status}}, {{steps.<id>.output}}: the response.
+- parallel: all|any, then ${PAR_MIN} to ${PAR_MAX} blocks indented under it, each "  ## <id>" and its own lines indented the same: run:, llm: or webhook: blocks (no agent, ask or parallel inside one, for now), with no ways out of their own. They start together, each with its own {{steps.<child>.*}}. all: ok once every one is ok, fail at the first that fails (the rest are stopped); any: ok with the first that's ok (the rest are stopped), fail when all failed. Exits ok, fail.
+- workflow: <another workflow's id or name, in the same place: yours run yours, a project's its project's>, then "with task: <its task>" and "with <NAME>: <value>" lines for its variables and inputs ({{vars}} filled): runs that workflow's blocks inside this run (its workspace, budget and log). Its end success is ok, failed or stopped is fail; what its blocks name with out: comes back as {{steps.<id>.<name>}}, its end's words as {{steps.<id>.output}}. ${CALL_DEPTH} deep at most, never round in a loop; one whose start says input: task needs with task:.
 - extension: <an extension's id: laki_extensions lists them>: fetches it now (one that's turned on; a per-workspace one for the run's workspace), waits, then its data: {{steps.<id>.data}} as JSON, and each field of it as {{steps.<id>.<field>}} (a list or an object as JSON). Exits ok, error (off, no fetch, the fetch failed).
 - retry: <1 to 5> on an agent, run, llm, decide or extension block: a bad exit (fail, error) tries the block again that many times, 10 s after the first and 60 s after each later one, before it takes that way ("retry: 2 · retry on: 1, 75" on a run block: only those exit codes are tried again; unset: any but 0). An agent's next try goes to the same tab.
 - out: <name>, <name>… on an agent, llm, run or webhook block: what it gives the blocks after it, {{steps.<id>.<name>}}. An agent or an llm is told to end its answer with a JSON object of them; a command's output or a webhook's response is one.

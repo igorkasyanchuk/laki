@@ -12,7 +12,7 @@ import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
 import { completion } from './completion.ts'
 import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
-import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
+import { blockName, check, filesFinder, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
 import { ICONS } from '../shared/icons.ts'
@@ -99,7 +99,11 @@ function flowCheck(paths: string[]) {
   if (!files.length) throw new Error(`no workflows (*.md) in ${paths.join(', ') || '.laki/workflows'}`)
   const r = files.map(file => {
     const { workflow, problems } = parse(readFileSync(file, 'utf8'), basename(file, '.md'))
-    return { file, name: workflow.name, problems: [...problems, ...check(workflow)] }
+    // a call's workflow: one of the file's folder's, by id or name (its trust isn't known here: not checked)
+    const d = dirname(file)
+    const read = (id: string) => (existsSync(join(d, `${id}.md`)) ? readFileSync(join(d, `${id}.md`), 'utf8') : undefined)
+    const find = filesFinder(() => readdirSync(d).filter(f => f.endsWith('.md')).map(f => f.slice(0, -3)), read)
+    return { file, name: workflow.name, problems: [...problems, ...check(workflow, { find })] }
   })
   out(r, r.map(x => [`${x.problems.length ? '✗' : '✓'} ${x.name}  ${x.file}`, ...x.problems.map(p => `  ${p}`)].join('\n')).join('\n'))
   if (r.some(x => x.problems.length)) process.exitCode = 1

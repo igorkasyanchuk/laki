@@ -270,3 +270,15 @@
 .wf-meter[data-level='over'] i { background: var(--error); }
 
 /* U11: its field has no border of its own: the box rings as you type in it */
+
+/* a parallel block: its children stacked in it; a call block: the workflow it runs, a link */
+.wf-node[data-kind='parallel'] { height: auto; min-height: 58px; padding-bottom: var(--sp-3); }
+.wf-kids { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); }
+.wf-kid { display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0; padding-left: var(--sp-3); border-left: 2px solid var(--kc); font-size: var(--fs-1); white-space: nowrap; }
+.wf-kid b { font-weight: 600; }
+.wf-kid span { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.wf-kid[data-state='done'] { border-left-color: var(--done); }
+.wf-kid[data-state='failed'] { border-left-color: var(--error); }
+.wf-call-open { font-size: var(--fs-1); }
+.wf-kid-edit { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); }
+.wf-kid-row { display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-3); align-items: center; }

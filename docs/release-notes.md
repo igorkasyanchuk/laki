@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Workflows run steps at once: a *Parallel* block runs 2 to 6 commands, AI calls or webhooks together and goes on when all pass, or with the first that does. A *Run workflow* block runs another of your workflows inside the run, with its own task and values, and gets its outputs back.
 - Allow or deny the newest ask from any app with a hotkey (Settings › General, off until you turn it on): a card shows what it answers, Esc stops it. Risky or chained commands, questions, plans and secrets stay for Laki's window. [Try it](laki://settings/general?spot=Allow%20the%20newest%20ask)
 - Say just *yes* or *no* to the talk key while an agent waits on a permission: the pill shows what it answers and ⏎ answers it (a plain command, by itself in a moment). Questions, plans, secrets and risky commands stay for Laki's window. Settings › Voice › Talk key › *Answer asks*. [Try it](laki://settings/voice?spot=Answer%20asks)
 - The talk key can write down what you say on this Mac: Settings › Voice › Talk key › *Writes it down: On this Mac*, in a language your Mac recognizes on its own. Nothing leaves it, no key needed. [Try it](laki://settings/voice)

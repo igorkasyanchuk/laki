@@ -1188,3 +1188,37 @@ test('a workflow an agent wrote runs only from its editor in the app: a schedule
   await rig.rpc('flowSave', { id: 'nightly', text })
   assert.equal((await rig.rpc('scheduleRun', { id: s.id })).ok, true)
 })
+
+test('workflow call: the file reads back; check follows its calls: one missing, a loop, 4 deep, a task or an input not given, an untrusted one from a trusted one', () => {
+  const flow = (id: string, to?: string, more = '', input = 'task?') =>
+    parse(`# ${id.toUpperCase()}\nruns in: main\n\n## start\ninput: ${input}\nnext: ${to ?? 'c'}\n\n## ${to ?? 'c'}\n${to ? `workflow: ${to}\n${more}` : 'run: echo hi\n'}ok: e\nfail: e\n\n## e\nend: success\n`, id).workflow
+  const files: Record<string, ReturnType<typeof flow>> = {}
+  const find = (ref: string) => (files[ref] ? { workflow: files[ref] } : undefined)
+  const a = flow('a', 'b', 'with task: fix {{task}}\nwith who: ann\n')
+  const b = a.blocks.find(x => x.id === 'b')!
+  assert.deepEqual([b.kind, b.workflow, b.with], ['call', 'b', { task: 'fix {{task}}', who: 'ann' }])
+  assert.match(toFile(a), /^## b\nworkflow: b\nwith task: fix \{\{task\}\}\nwith who: ann\nok: e\nfail: e$/m)
+  assert.equal(toFile(parse(toFile(a)).workflow), toFile(a))
+  assert.deepEqual(check(a), [], 'none followed without a finder (only its own)')
+  assert.deepEqual(check(a, { find }), ["b: no workflow b here (yours run yours, a project's its project's)"])
+  assert.deepEqual(check(parse('# X\n## start\nnext: c\n\n## c\nworkflow:\nok: e\n\n## e\nend: success\n').workflow), ['c: which workflow? (workflow: its id or name)'])
+  assert.deepEqual(check(parse('# X\n## start\nnext: c\n\n## c\nrun: echo\nwith who: x\nok: e\n\n## e\nend: success\n').workflow), ['c: with: is for Run workflow blocks'])
+  // a loop
+  files.b = flow('b', 'a')
+  files.a = a
+  assert.deepEqual(check(a, { find }), ["b › a: a → b → a goes round: a workflow can't run itself"])
+  // 3 deep is fine, 4 isn't
+  Object.assign(files, { b: flow('b', 'c'), c: flow('c', 'd'), d: flow('d') })
+  assert.deepEqual(check(a, { find }), [])
+  Object.assign(files, { d: flow('d', 'e'), e: flow('e') })
+  assert.deepEqual(check(a, { find }), ['b › c › d › e: a → b → c → d → e: workflows run workflows 3 deep at most'])
+  // a task it needs, an input with no default; one of the repo's not allowed yet, from one that is
+  files.t = parse('# T\n## start\ninput: task\ninputs: size, kind=x\nnext: e\n\n## e\nend: success\n', 't').workflow
+  assert.deepEqual(check(flow('a', 't'), { find }), ['t: T needs a task (with task: …)', 't: T needs size (with size: …)'])
+  assert.deepEqual(check(flow('a', 't', 'with task: x\nwith size: 2\n'), { find }), [])
+  const untrusted = (ref: string) => (files[ref] ? { workflow: files[ref], untrusted: true } : undefined)
+  assert.deepEqual(check(flow('a', 'e'), { find: untrusted }), ["e: E came with the repo and isn't allowed as it is yet: open it in Workflows, read it, then Allow it"])
+  assert.deepEqual(check(flow('a', 'e'), { find: untrusted, untrusted: true }), [], 'an untrusted one may: it runs only from its editor')
+  // what's wrong with it
+  assert.deepEqual(check(flow('a', 'e'), { find: () => ({ workflow: files.e, problems: ['c has no way out'] }) }), ["e: E can't run: c has no way out"])
+})

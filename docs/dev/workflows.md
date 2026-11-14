@@ -131,6 +131,35 @@ leaves the wait to `flowTick`. Past `at once` (`going`: live and not queued) `fl
 (`queueOrder`: Run First's `promoted`, the newest first, cleared as it starts; then the oldest), its `at once` the
 run's own copy. `flowResume` leaves queued ones (one cut short before its workspace: queued again);
 `flowStop`/`flowForget` end one without a workspace; a schedule's run queues (core's skip while one is live stays).
+Parallel blocks (`parallel: all|any`, `children`: `PAR_MIN`-`PAR_MAX` of `PAR_KINDS`, run, llm and webhook, written
+indented under it as `  ## id` and its lines: `parse`'s `lineOf` takes a child's lines as a block's; `blockFile` writes
+them back; ids unique across the workflow, children's included; `check` refuses another kind, a way out of its own and
+`retry:`): `parallel()` is one step to the rest of the engine (one `cur`, one decision, one visit). It starts the children
+not in `r.par[<block>]` (their exits this visit, saved as each ends; cleared on a new visit, so a restart's `enter(…, true)`
+runs only the rest) under one controller in `calls` (`kill0`, a stop and shutdown abort it), each with its own signal and
+timeout: a command through `cmdSend` (`spawnIn`, a process group of its own, `linesOf`), an AI call through `llmSend` with
+`dataFill`, a webhook through `hookSend` (a dry run's said). Each child's lines go in the log indented, its variables
+(`steps.<child>.*`, its `out:`) through `scrub`, its cost into the run's. `all`: the first bad exit leaves `fail` and
+aborts the rest, else `ok` once every one is; `any`: the first ok leaves `ok`, all bad `fail`. Simulate takes it as one
+block (`simWhat`: each child's); the canvas draws its children in the node (`wf-kids`; a run's `r.par` colors them).
+Call blocks (`call`, the file's `workflow: <id or name>` and `with task: …`/`with NAME: …` lines): the workflow it names
+in the caller's own folder (yours run yours, a project's its project's: `callFinder`, shared `filesFinder` by id, else
+by `# name`, each parsed and checked alone). `check(wf, calls)` follows them (`item()`'s, the editor's from the page's
+list, `laki flow check`'s from the file's folder): one missing, a loop, deeper than `CALL_DEPTH` (3), a task or an input
+it needs and isn't given, a trusted one calling one that isn't (a repo's, new or changed), what's wrong with it. As a run
+starts (`flowStart`, `simStart`), `inlined` copies each called workflow's blocks into `r.inner` as `<call>/<id>` (nested:
+`<call>/<call>/<id>`), ways, sessions and children renamed, an agent with no mode taking its head's; `r.calls[<call>]`
+keeps its name, variables and inputs. `blockOf` finds them, so pause, resume, Try again and a stop work inside as anywhere;
+`flowStart`'s model checks, bypass and `fromEvent`'s agent refusals see them (`everyBlock`). `callIn` (each visit) clears
+the call's earlier visits, variables and children's, fills `with:` from the caller's variables (`dataFill`: outside text
+fenced), keeps the task and values in `r.calls`, says it and enters its start. Inside, `varsOf` is the call's (`scopeOf`
+of `cur`): its own variables, task and inputs, `steps.<id>.*` its own blocks' (kept as `steps.<call>/<id>.*`); `dataFill`'s
+outside blocks and `before` too; `say` indents by depth. A called `end`, or a way of it that leads nowhere, is `back`: its
+blocks' `out:` names as `steps.<call>.<name>`, the end's words as `steps.<call>.output`, then the call leaves `ok`
+(success) or `fail`. Simulate goes into a call (it isn't a simulated block): `answers` take `<call>/<id>`. The run page
+lights the call block while it's inside (`top`), names called blocks by `blockIn`; the canvas's call node links to the
+workflow (`CallLink`, the inspector's Open). ponytail: no agent, ask or nested parallel inside a parallel yet; a call's
+workflow is read as the run starts, so editing it moves no run.
 Pause after this block (`flowHold` `on: true`, the run page's button, `laki flow pause <run>`): `r.hold` (saved at
 once) and nothing else; the block it's on goes on. The next `enter` (a next block, a retry's `again`, Try again, Give it
 more) or `leave` with nowhere to go `park`s instead: `sample` first, then `status: 'paused'`, `wait` `{ kind: 'hold' }`
