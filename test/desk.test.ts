@@ -57,11 +57,13 @@ test('the laki command for any shell: installed where it can write, run from any
   const text = readFileSync(s.path, 'utf8')
   assert.match(text, /LAKI_HOME=/)
   assert.match(text, /Settings › General › Command line/)
-  // an update moved the paths (the app's binary to its helper): written again as the daemon starts; another data dir's left
+  // another copy's launcher (an app bundle this daemon isn't of): left as the daemon starts; another data dir's too
+  // (the same bundle's after an update: units-more's launcherOurs)
   await rig.stop()
-  writeFileSync(s.path, text.replace(/(exec \/usr\/bin\/env .*?'LAKI_HOME=[^']*') '[^']*'/, "$1 '/Applications/Laki.app/Contents/MacOS/Laki'"))
+  const other = text.replace(/(exec \/usr\/bin\/env .*?'LAKI_HOME=[^']*') '[^']*'/, "$1 '/Applications/Laki.app/Contents/MacOS/Laki'")
+  writeFileSync(s.path, other)
   await rig.start()
-  assert.equal(readFileSync(s.path, 'utf8'), text, 'refreshed')
+  assert.equal(readFileSync(s.path, 'utf8'), other, "another copy's: left")
   await rig.stop()
   writeFileSync(s.path, text.replace(/LAKI_HOME=[^']*/, 'LAKI_HOME=/elsewhere'))
   await rig.start()

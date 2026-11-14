@@ -16,6 +16,10 @@ export function helperBin(execPath: string, has: (path: string) => boolean, linu
   const helper = app ? `${app}/Contents/Frameworks/${NODE_APP}.app/Contents/MacOS/${NODE_APP}` : linux && !execPath.endsWith(NODE_SUFFIX) ? execPath + NODE_SUFFIX : execPath
   return execPath === helper || has(helper) ? helper : execPath
 }
+// core.ts cliRefresh: Laki's launcher on PATH (its text) is this app bundle's, for this data dir (home: its quoted
+// LAKI_HOME=… word), so a daemon of that bundle may write it again (an update moved its paths); another copy's (a dev
+// checkout, the app run from its dmg) is left as it is
+export const launcherOurs = (text: string, app: string | undefined, home: string) => !!app && text.includes(` ${home} `) && text.includes(`'${app}/Contents/`)
 // S1 (core.ts appPeer): is this binary (a real path) the app's own, whose window may have the app's token? In a bundle:
 // the outer app's main executable (its Contents/MacOS), whether the daemon runs on that or on the helper inside; else
 // the daemon's own binary, or the one its Linux helper sits beside

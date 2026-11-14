@@ -876,7 +876,7 @@ function Editor({ item, all = [], onOpenFlow, projects, presets, actions, exts, 
       const pos = placed(w.blocks)
       const [fx, fy] = from ? pos.get(from.id)! : [70, 20]
       const b: Block = { id, kind, ...JSON.parse(JSON.stringify(NEW_BLOCK[kind])), ...more, at: at ?? [fx, fy + 90] }
-      for (const c of b.children ?? []) c.id = freeId({ ...w, blocks: [...w.blocks, b] }, c.id) // a second Checks: lint2, test2
+      ;(b.children ?? []).forEach((c, i, kids) => (c.id = freeId({ ...w, blocks: [...w.blocks, { ...b, children: kids.slice(0, i) }] }, c.id))) // a second Checks: lint2, test2 (the first: lint, test)
       // {{prev}} in its defaults: what the block before gives (an agent's or AI call's answer, a command's output), else the task
       const give = from?.kind === 'agent' || from?.kind === 'llm' ? 'answer' : from?.kind === 'run' || from?.kind === 'webhook' || from?.kind === 'wait' ? 'output' : ''
       const prev = give ? `{{steps.${from!.id}.${give}}}` : '{{task}}'
@@ -1531,8 +1531,8 @@ function Inspector({ wf, flows = [], onCall, id, presets, actions, exts, edit, o
             <label>At once ({PAR_MIN} to {PAR_MAX})</label>
             {(b.children ?? []).map((c, i) => (
               <div key={i} className="wf-kid-edit">
+                <IdField key={c.id} id={c.id} rename={to => edit(w => void renameBlock(w, c.id, to))} check={to => renameBlock(JSON.parse(JSON.stringify(wf)), c.id, to)} />
                 <div className="wf-kid-row">
-                  <Typed value={c.id} aria-label="Its id" onText={v => set(x => void (x.children![i].id = v.trim()))} />
                   <select value={c.kind} aria-label="What it is" onChange={e => set(x => void (x.children![i] = (({ name: _, ...d }) => ({ id: c.id, kind: e.target.value as BlockKind, ...JSON.parse(JSON.stringify(d)) }))(NEW_BLOCK[e.target.value as BlockKind])))}>
                     {PAR_KINDS.map(k => (
                       <option key={k} value={k}>{BLOCK_NAMES[k]}</option>

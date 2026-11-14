@@ -149,6 +149,14 @@ function MicTest({ cloud }: { cloud: boolean }) {
 
 // the talk key's engine (Settings › Voice › Talk key): On this Mac (Laki Speech, Apple's on-device recognition, main's)
 // with its language, or Cloud (Speech to text's). Not in this build (Linux, a dev run, no swiftc at pack): nothing to pick
+// a locale's language in words; one Intl doesn't take (en_US): none
+const langName = (l: string) => {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'language' }).of(l)
+  } catch {
+    return undefined
+  }
+}
 export function TalkEngine({ v, onChange }: { v: VoiceSettings; onChange: (v: VoiceSettings) => void }) {
   const [got, setGot] = useState<{ locales?: string[]; none?: true; error?: string }>()
   useEffect(() => void bridge?.speechLocales?.().then(setGot, (e: Error) => setGot({ error: e.message })), [])
@@ -173,7 +181,7 @@ export function TalkEngine({ v, onChange }: { v: VoiceSettings; onChange: (v: Vo
             <select value={locale} onChange={e => onChange({ ...v, locale: e.target.value === 'en-US' ? undefined : e.target.value })}>
               {[...new Set([...list, locale])].map(l => (
                 <option key={l} value={l}>
-                  {(n => (n ? `${n} (${l})` : l))(new Intl.DisplayNames(undefined, { type: 'language' }).of(l))}
+                  {(n => (n ? `${n} (${l})` : l))(langName(l))}
                 </option>
               ))}
             </select>

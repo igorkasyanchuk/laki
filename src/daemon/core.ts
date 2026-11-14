@@ -32,7 +32,7 @@ import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { AcpPty } from './acp.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
-import { appBinOk, helperBin } from '../shared/helper.ts'
+import { appBinOk, appOf, helperBin, launcherOurs } from '../shared/helper.ts'
 import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
@@ -414,10 +414,11 @@ export function cliInstall() {
   return cliState()
 }
 // as the daemon starts: Laki's launcher on PATH written again when an update changed its paths (the app's binary to the
-// helper: docs/dev/helper.md), only one that drives this data dir's daemon
+// helper: docs/dev/helper.md), only one that drives this data dir's daemon from this same app bundle (never another
+// copy's: a dev checkout, the app run from its dmg or Downloads)
 export function cliRefresh() {
   const { path, current } = cliState()
-  if (path && !current && readFileSync(path, 'utf8').includes(` ${q(`LAKI_HOME=${dir}`)} `)) writeFileSync(path, cliText(), { mode: 0o755 })
+  if (path && !current && launcherOurs(readFileSync(path, 'utf8'), appOf(cliArgv[0]), q(`LAKI_HOME=${dir}`))) writeFileSync(path, cliText(), { mode: 0o755 })
 }
 export function cliRemove() {
   const at = cliState().path

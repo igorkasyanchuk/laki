@@ -1138,6 +1138,9 @@ export function SettingsPage(p: {
           const others: [string, string][] = [
             ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),
             ...(s.quickOn === true && s.quickKey !== '' ? ([[s.quickKey ?? QUICK_KEY, 'the quick bar']] as [string, string][]) : []),
+            ...(s.shotAsk !== false && aiOn(s) && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
+            ...(s.tellOn === true && s.tellKey !== '' ? ([[s.tellKey ?? TELL_KEY, 'show and tell']] as [string, string][]) : []),
+            ...(s.talkOn === true && s.talkKey !== '' ? ([[s.talkKey ?? TALK_KEY, 'the talk key']] as [string, string][]) : []),
             ...(otherKeys ? ([[otherKeys, other.label]] as [string, string][]) : []),
           ]
           return (
@@ -2472,7 +2475,7 @@ export function SettingsPage(p: {
               set={o => set({ ...(o.when !== undefined && { remoteWhen: o.when }), ...(o.awake !== undefined && { remoteAwake: o.awake }), ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }), ...(o.host !== undefined && { remoteHost: o.host }), ...(o.wrong !== undefined && { remoteWrong: o.wrong }), ...(o.days !== undefined && { remoteDeviceDays: o.days }), ...(o.push !== undefined && { remotePush: o.push }), ...(o.passkey !== undefined && { remotePasskey: o.passkey }), ...(o.pinBack !== undefined && { remotePinFallback: o.pinBack }), ...(o.idle !== undefined && { remoteIdle: o.idle }), ...(o.level !== undefined && { remoteLevel: o.level }) })}
             />
           )}
-          {sec === 'remote' && p.remote && /Mac/.test(navigator.userAgent) && (
+          {sec === 'remote' && p.remote && !!bridge && /Mac/.test(navigator.userAgent) && ( // the Mac's window: an iPhone's remote page says "like Mac OS X" too
             <Group title="Handoff">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.remoteHandoff} onChange={v => set({ remoteHandoff: v || undefined })}>
@@ -2534,6 +2537,8 @@ export function SettingsPage(p: {
                 ...(s.shotAsk !== false && aiOn(s) && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
                 ...(s.quickOn === true && s.quickKey !== '' ? ([[s.quickKey ?? QUICK_KEY, 'the quick bar']] as [string, string][]) : []),
                 ...(s.pickerKey !== '' ? ([[s.pickerKey ?? PICKER_KEY, 'Pick an element (development mode)']] as [string, string][]) : []),
+                ...(s.allowOn === true ? ([[s.allowKey ?? ANSWER_KEYS.allow.key, ANSWER_KEYS.allow.label]] as [string, string][]) : []),
+                ...(s.denyOn === true ? ([[s.denyKey ?? ANSWER_KEYS.deny.key, ANSWER_KEYS.deny.label]] as [string, string][]) : []),
               ]}
               onChange={keys => set({ keys })}
               overlay={s.keyOverlay !== false}

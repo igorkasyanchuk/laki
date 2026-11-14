@@ -24,7 +24,7 @@ import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
-import { appBinOk, appOf, helperBin } from '../src/shared/helper.ts'
+import { appBinOk, appOf, helperBin, launcherOurs } from '../src/shared/helper.ts'
 import { speechLine } from '../src/shared/speech.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
@@ -922,4 +922,15 @@ test('the remote page’s outbox: kept in order, replayed while fresh, an answer
   assert.deepEqual(outParams(ans('b', 500)), { tab: 't2', n: 1, label: 'Yes', cid: 'b' })
   assert.deepEqual(outParams({ ...ans('p', 500), params: { tab: 't2', pick: 'first' } }), { tab: 't2', pick: 'first', cid: 'p' })
   assert.deepEqual(outParams({ ...send('e'), params: { target: 't1', text: 'hi e', enter: false, by: 'side' } }), { target: 't1', text: 'hi e', cid: 'e', enter: false, by: 'side' })
+})
+
+test("launcherOurs: Laki's launcher is this bundle's for this data dir (an update rewrites it), never another copy's", () => {
+  const home = "'LAKI_HOME=/Users/x/.laki'"
+  const text = (bin: string) => `#!/bin/sh\nexec /usr/bin/env ${home} '${bin}' '/Applications/Laki.app/Contents/Resources/app/out/main/cli.js' "$@"\n`
+  const app = '/Applications/Laki.app'
+  assert.equal(launcherOurs(text('/Applications/Laki.app/Contents/MacOS/Laki'), app, home), true, "the app's binary before an update")
+  assert.equal(launcherOurs(text('/Volumes/Laki/Laki.app/Contents/MacOS/Laki').replace(/Applications/g, 'Volumes/Laki'), app, home), false, "the dmg's copy")
+  assert.equal(launcherOurs(text('/Applications/Laki.app/Contents/MacOS/Laki'), undefined, home), false, 'a daemon in no bundle (a dev checkout)')
+  assert.equal(launcherOurs(text('/Applications/Laki.app/Contents/MacOS/Laki'), app, "'LAKI_HOME=/elsewhere'"), false, "another data dir's")
+  assert.equal(launcherOurs(text('/Applications/Laki 2.app/Contents/MacOS/Laki').replace(/Laki\.app\/Contents\/Resources/, 'Laki 2.app/Contents/Resources'), app, home), false, 'Laki 2.app')
 })

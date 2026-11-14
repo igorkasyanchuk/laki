@@ -26,8 +26,8 @@ Recording, Accessibility, the microphone, Keychain items allowed to Laki). What 
 - Privacy grants the daemon uses (laki screen's simulator shots, `device.ts`) stay the app's when the app starts it:
   macOS asks the responsible process, the app that started it, not the binary. Laki Node started by anything else has
   none of Laki's. So main never runs Laki Node for a caller that asked for node (its child would be Laki's to macOS).
-- After the update: launchers on PATH and the skills' are written again as the daemon starts (`cliRefresh`,
-  `refreshSkills`); an MCP command you added to an agent by hand points at the app's binary and stops working: add it
+- After the update: launchers on PATH and the skills' are written again as the daemon starts (`cliRefresh`:
+  only the launcher of this same app bundle and data dir, helper.ts `launcherOurs`, never another copy's; `refreshSkills`); an MCP command you added to an agent by hand points at the app's binary and stops working: add it
   again (Settings › Agents & profiles shows it). A codex tab started before the update keeps its old notify command
   (Laki Hook's path, gone) until it starts again.
 - Back out: `runAsNode: true` in package.json; with Laki Node missing (`nodeHelper`'s call dropped) `helperBin` gives
