@@ -1572,3 +1572,18 @@ test('remote access as an app (M4): its manifest, service worker and icons close
   await rig.rpc('remoteStop')
   assert.equal(await status('/icon-192.png'), 404)
 })
+
+test("a send or an answer with a client's id (the remote page's outbox) is applied once: a repeat gets the first one's answer", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'outbox' })
+  const tab = await rig.rpc('tabNew', { ws: w.id, preset: 'custom', cmd: 'cat' })
+  const first = await rig.rpc('send', { target: tab.id, text: 'once-only', cid: 'c-1' })
+  assert.deepEqual(await rig.rpc('send', { target: tab.id, text: 'once-only', cid: 'c-1' }), first, 'the same answer')
+  await rig.rpc('send', { target: tab.id, text: 'next-one', cid: 'c-2' })
+  await until(async () => (await rig.screen(tab.id)).includes('next-one'), 'the next one typed')
+  assert.equal((await rig.screen(tab.id)).match(/once-only/g)?.length, 2, 'typed once: cat echoes it once')
+  // one that failed isn't kept: its retry runs
+  await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1, cid: 'c-3' }), /isn't asking anything now/)
+  await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1, cid: 'c-3' }), /isn't asking anything now/)
+})

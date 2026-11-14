@@ -340,6 +340,16 @@ Chromium touches a display) makes `Laki.AppImage --headless …` work with no X 
 Docker: `scripts/linux.sh`'s image without Xvfb). It passes `LAKI_HEADLESS_PARENT`: `serve` stops when its parent goes
 (a kill of that pid alone), remote access with it.
 
+The page's outbox (`renderer/src/outbox.ts`, never the Mac's window: `api.call` uses it only without the bridge): a `send`
+or an `answer` whose call fails as the socket goes down (`not connected`, `disconnected`) or gets no reply in `OUT_WAIT`
+(15 s) is kept, mirrored to sessionStorage (ids, the text and its send's switches; gone with the tab), and shown by
+`OutboxStrip` with *Not sent yet* and Cancel; the call answers `{ kept }`. Each carries a client-made `cid`. With the next
+view after a reconnect (`outFlush`), `outReplay` sends them in order: a message as typed; an answer only while its ask
+still waits (its tab waiting since the same `needAt`), else dropped with *This question was already answered or is
+gone*; one past `OUT_MAX` (30 min) dropped and said; the socket failing again stops it there. The daemon (`main.ts` `once`)
+keeps the last 100 `cid`s of each paired device, else of the connection (`/rpc`'s: one list), with their call: a repeat
+gets the first one's answer and isn't done again; a call that failed is forgotten. Nothing else is kept.
+
 Handoff (macOS, `settings.remoteHandoff`, off unless true: Settings › Remote access › *Offer on my nearby devices*): the window sends
 the view's `remote` address (`url`, `via`, `host`; none while off or stopped) over the `handoff` IPC; main's `handoffUrl`
 (guards.ts, pure: `test/main-guards.test.ts`) keeps only a lasting one (Tailscale's, My domain's; never a quick tunnel's),

@@ -3914,3 +3914,9 @@ html[data-glide] :is(.sidebar, .side-panel, .pv-wrap, .notes-side) { transition:
 html[data-glide] :is(.side-handle, .panes > .bar, .fr-edge) { transition: left var(--t-spring-soft) var(--spring-soft), right var(--t-spring-soft) var(--spring-soft), top var(--t-spring-soft) var(--spring-soft); }
 html[data-glide] .panes > .pane { transition: left var(--t-spring-soft) var(--spring-soft), top var(--t-spring-soft) var(--spring-soft), width var(--t-spring-soft) var(--spring-soft), height var(--t-spring-soft) var(--spring-soft); }
 html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-soft) var(--spring-soft); }
+
+/* the remote page's outbox (OutboxStrip.tsx): what waits to go once the Mac is back, and what was dropped */
+.outbox { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--sp-2); width: max-content; max-width: min(560px, calc(100vw - 32px)); }
+.outbox-item { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-3) var(--sp-5); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--r-m); box-shadow: var(--lift-2); }
+.outbox-item.note { border-color: var(--line); }
+.outbox-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

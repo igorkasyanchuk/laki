@@ -29,6 +29,7 @@ import { speechLine } from '../src/shared/speech.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
+import { OUT_MAX, type OutItem, outAdd, outParams, outReplay } from '../src/renderer/src/outbox.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
   assert.equal(newReview('t1:1'), true, 'nothing sent yet')
@@ -897,4 +898,27 @@ test("speechLine: Laki Speech's JSON lines (level, partial, final, error, versio
   assert.deepEqual(speechLine('{"version":"1"}'), { kind: 'version', version: '1' })
   assert.deepEqual(speechLine('{"locales":["en-US","uk-UA","../x",3]}'), { kind: 'locales', locales: ['en-US', 'uk-UA'] })
   for (const bad of ['', 'not json', '2026-11-14 laki-speech[1] No Assistant asset', '[1]', 'null', '{"level":"loud"}', '{}']) assert.equal(speechLine(bad), undefined, bad)
+})
+
+test('the remote page’s outbox: kept in order, replayed while fresh, an answer only while its ask still waits', () => {
+  const now = 10 * 60e3 * 6
+  const send = (cid: string, at = now - 1000): OutItem => ({ cid, at, method: 'send', tab: 't1', text: `hi ${cid}`, whenIdle: true })
+  const ans = (cid: string, ask?: number): OutItem => ({ cid, at: now - 1000, method: 'answer', tab: 't2', n: 1, label: 'Yes', ...(ask !== undefined && { ask }) })
+  let box = outAdd([], send('a'))
+  box = outAdd(box, ans('b', 500))
+  box = outAdd(box, send('c'))
+  box = outAdd(box, send('a')) // the same id again: once, last
+  assert.deepEqual(box.map(x => x.cid), ['b', 'c', 'a'])
+  // t2 still waits since 500: all go, in order
+  const all = outReplay(box, now, tab => (tab === 't2' ? 500 : undefined))
+  assert.deepEqual([all.go.map(x => x.cid), all.dropped], [['b', 'c', 'a'], []])
+  // its ask answered (or another one now): dropped and said; an item past 30 minutes too
+  const later = outReplay([...box, send('old', now - OUT_MAX - 1)], now, tab => (tab === 't2' ? 900 : undefined))
+  assert.deepEqual(later.go.map(x => x.cid), ['c', 'a'])
+  assert.deepEqual(later.dropped.map(d => [d.item.cid, d.why]), [['b', 'This question was already answered or is gone'], ['old', 'Not sent: it waited over 30 minutes']])
+  assert.equal(outReplay([ans('d')], now, () => 500).dropped.length, 1, 'an answer with no ask known: dropped')
+  // what each sends: its id, the send's switches
+  assert.deepEqual(outParams(send('a')), { target: 't1', text: 'hi a', cid: 'a', whenIdle: true })
+  assert.deepEqual(outParams(ans('b', 500)), { tab: 't2', n: 1, label: 'Yes', cid: 'b' })
+  assert.deepEqual(outParams({ ...send('e'), enter: false, whenIdle: undefined }), { target: 't1', text: 'hi e', cid: 'e', enter: false })
 })

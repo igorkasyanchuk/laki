@@ -5,6 +5,7 @@ import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
+import { Outbox } from './OutboxStrip'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeyReady, passkeys, passkeySetUp, passkeyUnlock } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -4156,6 +4157,7 @@ export function App() {
           <span className="muted small">{achN}/{achAll.length}</span>
         </button>
       )}
+      {!bridge && <Outbox name={id => view.tabs.find(t => t.id === id)?.name ?? 'a tab'} />}
       {note && (
         <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''} ${note.err ? 'err' : ''}`} role={note.err ? 'alert' : 'status'}>
           {note.ok && <Icon name="check" size={14} />}

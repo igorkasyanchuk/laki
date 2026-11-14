@@ -2,6 +2,7 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the link's key alone in the hash (#t=…, S11) on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+import { outCall, outFlush } from './outbox'
 import type { InboxItem, TrayInfo } from '../../shared/tray'
 import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
@@ -164,6 +165,7 @@ class Api {
   answerOnly = false // D7: a phone at answer only (its view's remote.level): its terminals take no keys
   locked = false // D6: the page waits for its unlock (a passkey device's): its state, once it comes, opens it as a new socket would
   private caps: string[] = [] // the daemon's, from its last view
+  private waits?: { id: string; status?: string; needAt?: number }[] // the last view's tabs: an outbox answer's ask (outbox.ts)
 
   private fails = 0 // connects in a row that never opened
   private pinned = false // the remote page: no PIN asked for (or given)
@@ -231,10 +233,11 @@ class Api {
           if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): close this page and restart it from the yellow bar at the top (agents resume)` : m.error))
           else w?.res(m.result)
         } else {
-          if (m.ev === 'state') (this.caps = m.view?.caps ?? []), (this.answerOnly = m.view?.remote?.level === 'answer') // the namespaces it takes (caps.ts): call() sends the rest by their old names; D7: this page's access
+          if (m.ev === 'state') (this.caps = m.view?.caps ?? []), (this.answerOnly = m.view?.remote?.level === 'answer'), (this.waits = m.view?.tabs) // the namespaces it takes (caps.ts): call() sends the rest by their old names; D7: this page's access
           const opens = m.ev === 'state' && this.locked
           if (opens) this.locked = false
           this.emit(m)
+          if (m.ev === 'state' && !bridge && !this.locked) void outFlush((k, p) => this.direct(k, p), this.waitingSince) // the remote page's outbox, once it has a view
           if (opens) this.emit({ ev: 'open' }) // D6: unlocked: as a socket that just opened (what it sent while locked was refused): its terminals attach, its view is told, its lists come
         }
       }
@@ -267,7 +270,13 @@ class Api {
     void this.connect()
   }
 
+  // the remote page's send and answer keep what the socket couldn't take (outbox.ts); the Mac's window calls as it is
   call<T = any>(method: string, params: object = {}): Promise<T> {
+    if (bridge || (method !== 'send' && method !== 'answer')) return this.direct<T>(method, params)
+    return outCall((k, p) => this.direct(k, p), method, params as Record<string, unknown>, this.waitingSince) as Promise<T>
+  }
+  private waitingSince = (tab: string) => (t => (t?.status === 'waiting' ? t.needAt : undefined))(this.waits?.find(x => x.id === tab))
+  private direct<T = any>(method: string, params: object = {}): Promise<T> {
     method = sendAs(method, this.caps) // an older daemon (or no view yet): note.list as noteList
     const id = ++this.seq
     return new Promise((res, rej) => {

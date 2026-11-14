@@ -1238,6 +1238,22 @@ setInterval(() => {
   lateSaid = Date.now()
   log(`the event loop was blocked for ${(ms / 1000).toFixed(1)} s (API methods running then: ${who.join(', ') || 'none'})`)
 }, 2000).unref()
+// a remote page's outbox (renderer outbox.ts): a send or an answer it may send again after a lost reply carries its own
+// id (cid); the last CIDS of each device (else of the connection; /rpc's: rpc) are kept with their call: a repeat gets
+// its answer and isn't done again. A call that failed is forgotten (its retry runs)
+const CIDS = 100
+const cids = new Map<string, Map<string, Promise<unknown>>>()
+async function once(c: core.Conn | undefined, cid: string, run: () => Promise<unknown>) {
+  const who = c?.device ?? (c ? `conn ${c.id}` : 'rpc')
+  const kept = cids.get(who) ?? (cids.set(who, new Map()), cids.get(who)!)
+  const was = kept.get(cid)
+  if (was) return was
+  const p = run()
+  kept.set(cid, p)
+  if (kept.size > CIDS) kept.delete(kept.keys().next().value!)
+  p.catch(() => kept.get(cid) === p && kept.delete(cid))
+  return p
+}
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab, app = !!c && apps.has(c)) {
   method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
   const h = Object.hasOwn(api, method) ? api[method] : undefined
@@ -1255,7 +1271,8 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   let r
   try {
     if (process.env.LAKI_TEST_BUSY === method) for (const end = Date.now() + 3000; Date.now() < end; ); // a test's blocked event loop (restart.test.ts)
-    r = await h(params ?? {}, c)
+    const cid = (method === 'send' || method === 'answer') && typeof params?.cid === 'string' && params.cid ? params.cid.slice(0, 64) : undefined
+    r = cid ? await once(c, cid, async () => h(params ?? {}, c)) : await h(params ?? {}, c)
   } finally {
     running.splice(running.lastIndexOf(method), 1)
   }
