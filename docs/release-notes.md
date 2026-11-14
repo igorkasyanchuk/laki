@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.51.0 · Nov 14, 2026
 
 - After updating to this version, Laki restarts its daemon once as it opens: your agents pick up where they were.
 - A checked turn gets a Proof card under it, in the Reader and Needs you: each script Laki ran with its end (a click opens its output), the Preview's before and after pictures when it's open, and whether the turn touched tests, CI, migrations or lockfiles. Only what Laki saw itself, never the agent's words.
