@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Remote access through Tailscale: stopping it now stops `tailscale serve` too. With Tailscale's command-line tool installed from its app, the serve kept running and the next start failed with *listener already exists for port 443*; that error now says how to find the old one.
+
 ## 0.51.0 · Nov 14, 2026
 
 - After updating to this version, Laki restarts its daemon once as it opens: your agents pick up where they were.

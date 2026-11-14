@@ -71,9 +71,10 @@ function cloudflare(target: string, mails: string[], ended: (why: string) => voi
   return publisher('cloudflared', 'cloudflared', ['tunnel', '--no-autoupdate', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], TUNNEL_URL, ended, who)
 }
 // L14: each publisher's pid and start time in <data>/children.json while it runs: a daemon that died without stopping
-// them (a crash, a kill -9) leaves them there, and the next one stops them as it starts (reapChildren); off: what turns
-// a tailscale serve or funnel off again
-type Kid = { pid: number; start: string; bin: string; off?: string[] }
+// them (a crash, a kill -9) leaves them there, and the next one stops them as it starts (reapChildren), their process
+// group with them (publisher). A foreground tailscale serve's config goes with its process: `serve --https=443 off`
+// can't remove it ("handler does not exist")
+type Kid = { pid: number; start: string; bin: string }
 const kids = new Map<number, Kid>()
 const kidsFile = () => join(dir, 'children.json')
 const writeKids = () => {
@@ -84,7 +85,7 @@ const writeKids = () => {
   }
 }
 const lstart = (pid: number) => run('ps', ['-o', 'lstart=,command=', '-p', String(pid)]).then(r => r.stdout.trim(), () => '')
-let reaping: Promise<void> = Promise.resolve() // remoteStart waits for it: a tailscale off must come before a new serve
+let reaping: Promise<void> = Promise.resolve() // remoteStart waits for it: an old serve's stop must come before a new serve
 export const reapChildren = () => (reaping = reap())
 async function reap() {
   const old = readJson<Kid[]>(kidsFile())
@@ -95,34 +96,43 @@ async function reap() {
     const now = await lstart(k.pid)
     if (now.startsWith(k.start) && now.includes(basename(k.bin))) { // the same process (a pid can be another's by now)
       log(`stopping ${basename(k.bin)} (pid ${k.pid}): left running by a daemon that ended without stopping it`)
-      try {
-        process.kill(k.pid, 'SIGTERM')
-      } catch {}
+      group(k.pid)
     }
-    if (Array.isArray(k.off) && k.off.every(a => typeof a === 'string')) await run(k.bin, k.off, { timeout: 10000 }).catch(() => {})
+  }
+}
+// SIGTERM to pid's process group (publisher's children lead one), else to pid alone (an older daemon's, in its own group)
+const group = (pid: number) => {
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch {
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {}
   }
 }
 
 // a command that publishes something and prints its URL (cloudflared, tailscale serve), as a child of the daemon:
-// stopping it unpublishes
-function publisher(name: string, bin: string, args: string[], re: RegExp, ended: (why: string) => void, who: [name: string, stop: string], off?: string[]): { cf: Cf; url: Promise<string | undefined> } {
-  const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+// stopping it unpublishes. In a process group of its own, stopped as one: Tailscale.app's /usr/local/bin/tailscale is a
+// sh script that runs the app's binary without exec, and a signal to the script alone left that serve holding port 443
+function publisher(name: string, bin: string, args: string[], re: RegExp, ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
+  const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: true })
   own(proc, ...who)
   const pid = proc.pid
   if (pid)
     void lstart(pid).then(now => {
       const start = now.slice(0, 24) // lstart's fixed width: "Tue Oct 21 10:11:07 2026"
-      if (start && proc.exitCode === null && proc.signalCode === null) kids.set(pid, { pid, start, bin, ...(off && { off }) }), writeKids()
+      if (start && proc.exitCode === null && proc.signalCode === null) kids.set(pid, { pid, start, bin }), writeKids()
     })
   proc.on('close', () => pid && kids.delete(pid) && writeKids())
   let stopped = false
-  const cf = { stop: () => ((stopped = true), proc.kill()) }
+  const kill = () => (pid ? group(pid) : proc.kill())
+  const cf = { stop: () => ((stopped = true), kill()) }
   const url = new Promise<string | undefined>((resolve, reject) => {
     let out = ''
     let got = false
     const fail = (why: string) => {
       clearTimeout(timer)
-      proc.kill()
+      kill()
       if (stopped) return resolve(undefined)
       const tail = out.trim().split('\n').slice(-8).join('\n')
       reject(new Error(tail ? `${why}:\n${tail}` : why))
@@ -170,9 +180,15 @@ async function tsReady() {
 }
 // tailscale serve in the foreground: https on this machine's tailnet name, for the tailnet's devices only, until it's
 // stopped; funnel: tailscale funnel, the same on the internet (the tailnet's policy must allow it: its output says
-// where to turn it on). ponytail: port 443, its root; another serve of yours there is replaced while it runs
-const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
-  publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who, [funnel ? 'funnel' : 'serve', '--https=443', 'off'])
+// where to turn it on). ponytail: port 443, its root; another foreground serve there (yours, or one an older Laki's stop
+// left running: publisher) refuses it, and the error says how to find that one
+function tailscale(bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) {
+  const p = publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who)
+  const taken = (e: Error) => {
+    throw /listener already exists for port 443/.test(e.message) ? new Error(`${e.message}\nAnother tailscale serve has port 443: find it with ps ax | grep -i "tailscale serve", then stop it`) : e
+  }
+  return { cf: p.cf, url: p.url.catch(taken) }
+}
 
 // the webhook server's public address (inbound.ts): a quick cloudflared tunnel to its port, or tailscale funnel (on the
 // internet, so GitHub reaches it). ponytail: funnel takes port 443's root, as remote access over tailscale does

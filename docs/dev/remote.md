@@ -93,9 +93,13 @@ has an `expose`, which `exposeRule` holds every caller to (only those addresses 
 never anyone with the link); a
 remote client can't change `settings.tunnel` (`REMOTE_KEYS`). Resources' *Permanent tunnels* row stops them all
 (`tunnel:named`). Tested in `test/tunnel.test.ts` (the fake `test/cloudflared`'s `tunnel list`, `route dns`, `run`).
-Every `publisher` child (cloudflared, tailscale serve or funnel) is in `<data>/children.json` (pid, `ps -o lstart=`, its
-binary, tailscale's `off` args) while it runs; `reapChildren`, as a daemon starts, SIGTERMs those still running with the
-same start time and command (a crash or a kill -9 left them) and turns a tailscale one off (L14). One per workspace and port.
+Every `publisher` child (cloudflared, tailscale serve or funnel) runs in a process group of its own (`detached`) and is
+stopped as one (`group`): Tailscale.app's Install CLI puts `/usr/local/bin/tailscale` on PATH as a sh script that runs
+the app's binary without `exec`, and a SIGTERM to the script alone left that serve holding port 443 (the next start:
+*listener already exists for port 443*, which `tailscale()` now follows with how to find it). Each is in
+`<data>/children.json` (pid, `ps -o lstart=`, its binary) while it runs; `reapChildren`, as a daemon starts, SIGTERMs the
+group of those still running with the same start time and command (a crash or a kill -9 left them) (L14). A foreground
+serve's config goes with its process: `tailscale serve --https=443 off` can't remove it. One per workspace and port.
 
 Shared tabs (`remote.ts` `shareStart`, `daemon/share.ts`; the app's *Share live view…*, *Shared live view* once on): a tab as a view-only page at `<tunnel>/s/<uuid>`. The pages
 have their own `node:http` server on 127.0.0.1 (`shareServe`: `/s/<id>`, `.md` (`?download`), `.json?v=`; anything

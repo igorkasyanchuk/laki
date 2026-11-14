@@ -14,15 +14,18 @@ const script = (path: string, body: string) => (writeFileSync(path, body), chmod
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='
 
 // tailscale: up (or $HOME/ts-state's) with one other device online (none with $HOME/ts-alone), serve (and funnel)
-// prints its URL and waits, as the real one's foreground mode does
+// prints its URL and waits, as the real one's foreground mode does. On PATH as Tailscale.app's Install CLI puts it: a
+// sh script that runs the app's binary without exec, so a stop that signals only the script leaves the serve running
 function fakeTailscale(rig: Rig) {
+  script(join(rig.home, 'bin/tailscale'), '#!/bin/sh\n"$HOME/Tailscale" "$@"\n')
   script(
-    join(rig.home, 'bin/tailscale'),
+    join(rig.home, 'Tailscale'),
     `#!/bin/sh
 echo "$*" >> "$HOME/ts.log"
 case "$1" in
   status) [ -e "$HOME/ts-alone" ] && p='{}' || p='{"a":{"Online":true},"b":{"Online":false}}'; echo "{\\"BackendState\\":\\"$(cat "$HOME/ts-state" 2>/dev/null || echo Running)\\",\\"Peer\\":$p}" ;;
-  serve|funnel) echo "Available within your tailnet:"; echo; echo "https://box.tail1234.ts.net/"; echo "|-- proxy $3"; trap 'echo stopped >> "$HOME/ts.log"; exit 0' TERM; while :; do sleep 1; done ;;
+  serve|funnel) [ -e "$HOME/ts-taken" ] && { echo "sending serve config: updating config: listener already exists for port 443" >&2; exit 1; }
+    echo "Available within your tailnet:"; echo; echo "https://box.tail1234.ts.net/"; echo "|-- proxy $3"; trap 'echo stopped >> "$HOME/ts.log"; exit 0' TERM; while :; do sleep 1; done ;;
 esac
 `,
   )
@@ -64,6 +67,9 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').includes('stopped'), 'tailscale serve stopped')
   assert.equal(await ping(url), 403) // its origin went with it
   assert.match((await rig.cli('remote')).out, /remote access is off/)
+  writeFileSync(join(rig.home, 'ts-taken'), '') // port 443 held by another serve (one an older Laki's stop left): said how to find it
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, via: 'tailscale' }), /listener already exists for port 443\nAnother tailscale serve has port 443: find it with ps ax/)
+  rmSync(join(rig.home, 'ts-taken'))
 
   // Funnel: the internet, with a PIN only; alone on the tailnet: said
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, via: 'tailscale', funnel: true }), /Funnel puts it on the internet: only with a PIN/)
