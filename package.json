@@ -89,7 +89,7 @@
     ],
     "asar": false,
     "electronFuses": {
-      "runAsNode": true,
+      "runAsNode": false,
       "enableCookieEncryption": false,
       "enableNodeOptionsEnvironmentVariable": false,
       "enableNodeCliInspectArguments": false

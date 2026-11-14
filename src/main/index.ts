@@ -18,6 +18,15 @@ import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.t
 import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
+// the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
+// (an old launcher, `ELECTRON_RUN_AS_NODE=1 Laki x.js`, open --env) is this window process instead: it says so and ends
+// here, before a window or a daemon. Laki Node runs what used to run here; never spawned from here for the caller, as its
+// child would be Laki's to macOS (the responsible process) and keep Laki's privacy grants
+if (process.env.ELECTRON_RUN_AS_NODE) {
+  process.stderr.write("Laki: the app doesn't run scripts. Use the laki command (Settings › General › Command line) or Laki Node in its bundle.\n")
+  process.exit(1)
+}
+
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
 // environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
 if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN

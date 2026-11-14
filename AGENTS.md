@@ -84,13 +84,12 @@ npm run dev                       # Electron + renderer dev server on :5199
   `codesign --verify --deep --strict` on the built app must pass. `npm run release` overrides it with the Developer ID
   in the Keychain (`.env`'s `LAKI_SIGN_ID`, gitignored: `.env.example`), the hardened runtime and notarization (`laki-notary`): what goes to
   `igorkasyanchuk/laki-releases`, a plain double-click everywhere.
-- Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, and main quits
-  on Chromium's `--remote-debugging-*` switches. But `runAsNode` stays on (the daemon, the CLI, hooks, MCP, widget
-  scripts and `--headless` run through `ELECTRON_RUN_AS_NODE`), so any local program can still run its own JavaScript
-  inside Laki's signed binary (`ELECTRON_RUN_AS_NODE=1 Laki x.js`, `open --env`) and inherit Laki's privacy grants
-  (Screen Recording, Accessibility, the microphone, Keychain items allowed to Laki): the fuses don't stop that. The
-  planned fix: the daemon, CLI and hooks on a helper binary of their own, the app's with the fuse off (SECURITY.md's
-  known limits; the steps and what's moved: docs/dev/helper.md, hooks first: `Laki Hook.app`). The asar ones stay off (asar is off). Cookie encryption
+- Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `runAsNode`, `--inspect` and `NODE_OPTIONS` off,
+  and main quits on Chromium's `--remote-debugging-*` switches and on `ELECTRON_RUN_AS_NODE` (an old launcher: it says
+  so). What runs as node (the daemon, the CLI, hooks, MCP, the pty host, widget scripts, `--headless`) runs on Laki Node,
+  `Contents/Frameworks/Laki Node.app` (Linux: `laki-node`), the app's stub with its own copy of Electron's framework,
+  fuse on (`scripts/after-pack.cjs` `nodeHelper`; `src/shared/helper.ts` `helperBin`; ~210 MB: docs/dev/helper.md). The
+  asar ones stay off (asar is off). Cookie encryption
   stays off: Chromium's cookie store then waits on the Keychain's *Laki Safe Storage*, the window never reaches the daemon
   until it's answered (pack-smoke's temp home: never), and an ad-hoc signature asks again after each update.
   `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
@@ -149,8 +148,8 @@ for the part you change, and keep it up to date with the change.
   asks, agents' turns, retries, budgets, the queue, resume, trust, stats, events), the page.
 - [docs/dev/ai-and-notes.md](docs/dev/ai-and-notes.md): Laki AI (its backends, chats, key, call log), Specs &
   Brainstorms, Notes and To-dos.
-- [docs/dev/helper.md](docs/dev/helper.md): off the app's binary: Laki Hook (`laki hook`'s), what still runs through
-  `ELECTRON_RUN_AS_NODE`, the order to move it before the runAsNode fuse goes off.
+- [docs/dev/helper.md](docs/dev/helper.md): off the app's binary: Laki Node (the runAsNode fuse off on the app's), how it's
+  built, what runs on it and where each starts.
 - [docs/dev/remote.md](docs/dev/remote.md): SSH hosts and cloud workspaces, tunnels (cloudflared, tailscale), shared
   tabs, remote access and headless.
 
@@ -178,7 +177,7 @@ for the part you change, and keep it up to date with the change.
 | `src/main/guards.ts` | main's checks, pure (no electron: `test/main-guards.test.ts`): who sent an IPC message (`fromApp`, `pageIs`), and the URLs it lets through (`local`, `web`, `webviewOk`, `externalOf`), the partitions' names |
 | `src/main/update.ts` | the app's updates: GitHub's latest release, Squirrel.Mac's download and install (Updates: `docs/dev/scans.md`) |
 | `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES` |
-| `src/shared/helper.ts` | `hookRunner`: the binary `laki hook` runs on (Laki Hook.app when the build has it, else Electron's node), `HOOK_APP` (docs/dev/helper.md) |
+| `src/shared/helper.ts` | `helperBin`: the binary what runs as node runs on (Laki Node.app, Linux's `laki-node`, when the build has it, else the binary given), `appOf`, `appBinOk` (S1's window binary), `NODE_APP` (docs/dev/helper.md) |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), shotKey and onAiShot (Screenshot to Laki AI's keys; the AI window's picture), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
 | `src/daemon/gates.ts` | data only: every method's class for an agent's call (`AGENT_OK`, `AGENT_NO` with the why, `AGENT_OWN`) and for remote access (`REMOTE_OK`, `REMOTE_NO`), the ticks; main.ts' `classed` throws at load on one left out |

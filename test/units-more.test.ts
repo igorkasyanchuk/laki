@@ -641,16 +641,19 @@ test('R7: writeAtomic and readJson', t => {
   assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
 })
 
-// docs/dev/helper.md: hooks, the CLI and laki mcp run on the bundle's helper when it has one, else the binary given
-test('helperBin: the bundle’s helper when it’s there, from the app or the helper itself; the binary without it', () => {
+// docs/dev/helper.md: what runs as node (hooks, the CLI, laki mcp, the daemon, the pty host) runs on the build's Laki
+// Node when it has one, else the binary given
+test('helperBin: the bundle’s Laki Node when it’s there, from the app or the helper itself; the binary without it', () => {
   const app = '/Applications/Laki.app/Contents/MacOS/Laki'
-  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper'
-  assert.equal(helperBin(app, p => p === helper), helper)
-  assert.equal(helperBin(app, () => false), app, 'an older build: none')
-  assert.equal(helperBin(helper, () => false), helper, 'the CLI already on the helper keeps it (not a helper inside the helper)')
-  assert.equal(helperBin('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Hook Helper')), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper', 'spaces in the path')
-  assert.equal(helperBin('/usr/local/bin/node', () => true), '/usr/local/bin/node', 'not an app bundle')
-  assert.equal(helperBin('/opt/Laki/laki', () => true), '/opt/Laki/laki', 'Linux: none')
+  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Node.app/Contents/MacOS/Laki Node'
+  assert.equal(helperBin(app, p => p === helper, false), helper)
+  assert.equal(helperBin(app, () => false, false), app, 'an older build: none')
+  assert.equal(helperBin(helper, () => false, false), helper, 'the CLI already on the helper keeps it (not a helper inside the helper)')
+  assert.equal(helperBin('/Users/me/My Apps/Laki.app/Contents/MacOS/Laki', p => p.endsWith('/Laki Node'), false), '/Users/me/My Apps/Laki.app/Contents/Frameworks/Laki Node.app/Contents/MacOS/Laki Node', 'spaces in the path')
+  assert.equal(helperBin('/usr/local/bin/node', () => true, false), '/usr/local/bin/node', 'not an app bundle, not Linux')
+  assert.equal(helperBin('/tmp/.mount_Laki/laki', p => p === '/tmp/.mount_Laki/laki-node', true), '/tmp/.mount_Laki/laki-node', 'Linux: beside the binary')
+  assert.equal(helperBin('/tmp/.mount_Laki/laki-node', () => false, true), '/tmp/.mount_Laki/laki-node', 'Linux: the helper keeps itself')
+  assert.equal(helperBin('/usr/bin/node', () => false, true), '/usr/bin/node', 'Linux, node from source: none')
   assert.equal(appOf(helper), '/Applications/Laki.app', 'laki open: the outer app, not the helper')
   assert.equal(appOf(app), '/Applications/Laki.app')
   assert.equal(appOf('/usr/local/bin/node'), undefined)
@@ -659,7 +662,7 @@ test('helperBin: the bundle’s helper when it’s there, from the app or the he
 // S1 appPeer: the app's token only to the app's own window process, the daemon on the app's binary or on the helper
 test('appBinOk: the outer app’s binary, from the daemon on the helper or the app; nothing else in the bundle', () => {
   const app = '/Applications/Laki.app/Contents/MacOS/Laki'
-  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Hook.app/Contents/MacOS/Laki Hook Helper'
+  const helper = '/Applications/Laki.app/Contents/Frameworks/Laki Node.app/Contents/MacOS/Laki Node'
   assert.ok(appBinOk(app, helper), 'the daemon on the helper: the window is the app')
   assert.ok(appBinOk(app, app), 'the daemon on the app binary (an older build)')
   assert.ok(!appBinOk(helper, helper), 'the helper itself is no window')
@@ -667,6 +670,8 @@ test('appBinOk: the outer app’s binary, from the daemon on the helper or the a
   assert.ok(!appBinOk('/Applications/Other.app/Contents/MacOS/Laki', helper), 'another app')
   assert.ok(!appBinOk('/Applications/Laki.app/Contents/MacOS/sub/x', helper), 'not right in Contents/MacOS')
   assert.ok(appBinOk('/opt/Laki/laki', '/opt/Laki/laki'), 'Linux: the daemon’s own binary')
+  assert.ok(appBinOk('/opt/Laki/laki', '/opt/Laki/laki-node'), 'Linux: the binary its helper sits beside')
+  assert.ok(!appBinOk('/opt/Laki/laki-node', '/opt/Laki/laki-node'), 'Linux: the helper itself is no window')
   assert.ok(!appBinOk('/usr/bin/node', '/opt/Laki/laki'))
 })
 

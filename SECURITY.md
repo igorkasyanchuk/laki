@@ -173,11 +173,13 @@ project's test script is, which the agent can edit.
   source (`npm run pack`) is ad-hoc signed: macOS asks you to allow it once (Privacy & Security › Open Anyway; the
   guide's [Install](docs/guide.md#install)).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
-- Electron's `runAsNode` fuse is on (the daemon, the CLI, hooks and MCP run as Electron's node): any program running as
-  you can run its own JavaScript inside Laki's signed binary (`ELECTRON_RUN_AS_NODE=1`) and borrow the privacy grants
-  you gave Laki (Screen Recording, Accessibility, the microphone, Keychain items allowed to Laki). The `--inspect` and
-  `NODE_OPTIONS` fuses are off and Chromium's debugging switches are refused, but that one stays until the planned fix:
-  the daemon, CLI and hooks on a helper binary of their own, with the app's binary's fuse off.
+- Electron's `runAsNode` fuse is off on Laki's own binary: no program can run its JavaScript inside it
+  (`ELECTRON_RUN_AS_NODE=1`) to borrow the privacy grants you gave Laki. The daemon, the CLI, hooks and MCP run on Laki
+  Node, a binary of its own in the bundle (its own bundle id, no privacy usage strings) that does run as node: anything
+  started on it directly gets none of Laki's grants, but the Keychain items Laki Node itself may read (none today) and
+  what the daemon does for the app (started by the app, it is Laki's to macOS) are its. The `--inspect` and
+  `NODE_OPTIONS` fuses are off on both, and Chromium's debugging switches are refused. On Linux (a preview) there are
+  no per-binary grants; `laki-node` beside `laki` is the same split.
 - A public tunnel (Expose to the world, *anyone with the link*) comes back after Laki restarts or updates, at a new
   address, until its time runs out or you stop it. A permanent tunnel (your own domain) has no lock of Laki's: protect
   it with Cloudflare Access, as Settings › Tunnels says.

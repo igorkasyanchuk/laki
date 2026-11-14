@@ -11,7 +11,7 @@ export HOME=$H LAKI_HOME=$H/data SHELL=$ROOT/test/fakes/tsh FAKE_LOG=$H/fake.log
 export PATH=$ROOT/test/fakes:$NODE_DIR:/usr/bin:/bin:/usr/sbin:/sbin
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 cd "$H/repo" && git init -q -b main && echo hi > README.md && git add -A && git commit -qm init
-laki() { ELECTRON_RUN_AS_NODE=1 "$BIN" "$APP/Contents/Resources/app/out/main/cli.js" "$@"; }
+laki() { ELECTRON_RUN_AS_NODE=1 "$APP/Contents/Frameworks/Laki Node.app/Contents/MacOS/Laki Node" "$APP/Contents/Resources/app/out/main/cli.js" "$@"; } # docs/dev/helper.md: the app binary runs no node
 "$BIN" > "$H/app.out" 2>&1 &
 APP_PID=$!
 for i in $(seq 100); do [ -f "$LAKI_HOME/daemon.json" ] && break; sleep 0.1; done

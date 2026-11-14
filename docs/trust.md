@@ -106,11 +106,11 @@ codesign -dv --verbose=4 /Applications/Laki.app 2>&1 | grep -E 'Authority|TeamId
 npx @electron/fuses read --app /Applications/Laki.app
 ```
 
-The fuses: `--inspect` and `NODE_OPTIONS` are off, and Chromium's remote-debugging switches make it quit. Their limit,
-said plainly: the `runAsNode` fuse stays on, because the daemon, the CLI, hooks and the MCP server run as Electron's
-node. So any program running as you can run its own JavaScript inside Laki's signed binary and borrow the privacy
-grants you gave Laki (Screen Recording, Accessibility, the microphone). The planned fix is a helper binary of their own
-for those, with the app's fuse off ([SECURITY.md › Known limits](../SECURITY.md#known-limits)). A build from source
+The fuses: `runAsNode`, `--inspect` and `NODE_OPTIONS` are off, and Chromium's remote-debugging switches make it quit.
+So no program can run its own JavaScript inside Laki's signed binary to borrow the privacy grants you gave Laki
+(Screen Recording, Accessibility, the microphone). The daemon, the CLI, hooks and the MCP server run on Laki Node, a
+helper binary of its own in the bundle, with its own bundle id and none of those grants
+([SECURITY.md › Known limits](../SECURITY.md#known-limits)). A build from source
 (`npm run pack`) is ad-hoc signed and not notarized: macOS asks you to allow it once.
 
 ## Who maintains Laki
