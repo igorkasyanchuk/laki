@@ -136,6 +136,7 @@ export type AppSettings = Paint & {
   statusBridge?: boolean // Claude Code's status line read for its context and plan limits (unset: on)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: on)
+  wsTint?: boolean
   menus?: 'laki' | 'macos' // Layout › Menus: a workspace's and a tab's menu drawn by macOS (unset: Laki's)
   paneInset?: boolean // Terminal › Inset panes: each pane a rounded card with room around it (off unless true; not on a phone)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
@@ -2142,6 +2143,11 @@ export function SettingsPage(p: {
           {sec === 'extras' && (
             <>
               <h2>Extras</h2>
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.wsTint} onChange={v => set({ wsTint: v })}>
+                  <Says title="Tint with the workspace's color" hint="A little of the open workspace's color in the tab bar's capsules and the selected tab. Not in the flat looks or with Reduce transparency" />
+                </Switch>
+              </div>
               <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>

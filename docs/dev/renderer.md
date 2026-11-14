@@ -1117,6 +1117,14 @@ one size on every page (a large one that shrank, `page-title`, showed only where
 Settings, not Board: gone). Motion: None and Reduce motion: the glass head always. Settings'
 scroll-edge fade (`mask-image`) is off, this replaces it. Only one scroller per page names `--page` (two would make the
 timeline inactive: a project's embedded `.settings-main` doesn't).
+The workspace's tint (settings `wsTint`, Extras' *Tint with the workspace's color*; a new install: on, core.ts
+`NEW_DEFAULTS`): App puts `--ws` (`var(--tc-<its color>)`) and `.ws-tint` on `.main` when the open workspace has a color;
+a capsule's fill and the selected tab's are `color-mix(in srgb, var(--ws) var(--ws-mix), <the fill as it was>)`, a
+capsule's rim mixes `--ws-rim`. `--ws-mix` (8%) and `--ws-rim` (20%) are 0% unless `.ws-tint` (and not
+`[data-pages]`, `html.opaque`, Reduce transparency; the rim not in `html.away`), so the fill is exactly as before
+otherwise; never in a text color, but a tinted capsule's `--muted` goes 35% toward `--fg` so hints still read
+(test/contrast.test.ts `WS_MIX`, `WS_HINT`, every theme and color). The three are `@property` (a color, two
+percentages), so a workspace switch cross-fades them at `--t-slow`.
 `.edge-blur` (macOS 26's scroll edge): on a page's head (ui.tsx `Page`, Settings, Help), the Review tab's sticky file
 rows and the side panel's tabs. No background or rule of their own; two layers behind their content (`::before`: a
 `--edge-blur-1` blur and `--edge-tint`, the floating surface's color, fading over its upper two thirds; `::after`: a

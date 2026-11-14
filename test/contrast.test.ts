@@ -19,6 +19,8 @@ const PAIRS: [string, string, number][] = [
   ['sel', 'bg', 1.2],
   ['line', 'bg', 1.15],
 ]
+const WS_MIX = 0.08 // styles.css' --ws-mix: the workspace's color in the glass
+const WS_HINT = 0.35 // and how far a tinted capsule's hints go toward its text
 const rgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))
 const hex = (c: number[]) => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('')
 // a see-through color (#rrggbbaa) over a solid one
@@ -82,10 +84,24 @@ test('contrast: every theme is readable', () => {
     on('surface: fg', c.fg, under.map(u => over(top, u)), 4.5)
     on('surface: muted', c.muted, under.map(u => over(top, u)), 4.5)
     // V11's capsules (the tab bar's buttons, the Reader's composer, the status bar's groups) are the same fill: covered above
+    // the open workspace's color in the glass (styles.css: --ws-mix, 8%): the selected tab's label on its tinted fill,
+    // a capsule's text and hints on its tinted surface, for each workspace color (themes.ts' --tc-*; lime, brown and
+    // gray are mixes of these)
+    const tc: Record<string, string | undefined> = t.c ? { red: ansi[1], orange: c.orange, yellow: ansi[3], green: ansi[2], teal: ansi[6], blue: ansi[4], purple: c.purple, pink: c.pink } : Object.fromEntries(['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink'].map(k => [k, v(`tc-${k}`)]))
+    const tint = (col: string, base: string) => hex(rgb(col).map((x, i) => x * WS_MIX + rgb(base)[i] * (1 - WS_MIX)))
+    for (const [name, col] of Object.entries(tc)) {
+      if (!col) continue
+      for (const b of bg) need(`selected tab on its ${name} tint`, c.fg, tint(col, b), 4.5)
+      // a tinted capsule's hints a step toward the text (styles.css: --muted mixed with --fg by WS_HINT there)
+      const hint = hex(rgb(c.muted).map((x, i) => x * (1 - WS_HINT) + rgb(c.fg)[i] * WS_HINT))
+      for (const u of under.map(u => over(top, u))) need(`capsule text on its ${name} tint`, c.fg, tint(col, u), 4.5), need(`capsule hints on its ${name} tint`, hint, tint(col, u), 4.5)
+    }
   }
   assert.deepEqual(bad, [])
   const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
   assert.match(css, /--cap-bg: color-mix\(in srgb, var\(--panel\) var\(--surface-a\), transparent\)/, "V11: a capsule's fill is the floating surface's, whose text the pairs above check")
+  assert.match(css, new RegExp(`\\.main\\.ws-tint \\{ --ws-mix: ${WS_MIX * 100}%;`), "the workspace's tint is the mix checked above")
+  assert.match(css, new RegExp(`\\.main\\.ws-tint \\.capsule \\{ --muted: color-mix\\(in srgb, var\\(--muted\\) ${Math.round((1 - WS_HINT) * 100)}%, var\\(--fg\\)\\); \\}`), "and its hints' step is the one checked above")
 })
 
 test("contrast: readable keeps a color that reads, else darkens it on light (lightens on dark), the hue kept", () => {

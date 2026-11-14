@@ -625,6 +625,7 @@ export type Settings = {
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (off unless true; overlapCheck asks for one)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: on)
+  wsTint?: boolean // Extras › Tint with the workspace's color: the open workspace's color in the glass capsules and the selected tab (unset: off; a new install: on)
   aiEndpoint?: { url: string; model: string } // Settings › AI › Your endpoint: an OpenAI-compatible server (ai.ts endpointOk; its key: <data>/ai-endpoint-key); the user's only (AGENT_KEYS, REMOTE_KEYS), a policy can lock it
   menuBarClick?: 'menu' | 'inbox' // Settings › General › Menu bar click: the tray's menu, or the Inbox (macOS; unset: menu)
   menus?: 'laki' | 'macos' // Settings › Layout › Menus: a workspace's and a tab's menu drawn by macOS (unset: Laki's)

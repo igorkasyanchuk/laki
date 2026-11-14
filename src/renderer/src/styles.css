@@ -671,7 +671,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 /* the selected tab: joined to the terminal (--tab-sel: its background, or a lift over a gradient), a bar on
    top in its color or the accent; the others only a faint line in theirs (--tab-c, set inline) */
 .tab { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tab.sel { color: var(--fg); background: var(--tab-sel, var(--term-bg)); border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); } /* V1: underlined, as every tab and segment */
+.tab.sel { color: var(--fg); background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--tab-sel, var(--term-bg))); border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); } /* V1: underlined, as every tab and segment */
 .tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 14%, var(--hover)); }
 /* a real tab (the top bar's): the bar's line runs up to the selected tab, up its sides and over its top, and never
    under it, so the tab opens into its terminal (a see-through one, glass, can't show it either). The bar's ::before and
@@ -3712,12 +3712,27 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
    Reduce transparency, Motion: None, and while the window is behind another app (html.away) */
 :root { --glass-hi: color-mix(in srgb, var(--fg) 14%, transparent); --glass-lo: color-mix(in srgb, #000 22%, transparent); --glass-rim: color-mix(in srgb, var(--fg) 7%, transparent); --glass-light: color-mix(in srgb, var(--fg) 9%, transparent); }
 html:is(.opaque, .away) { --glass-hi: transparent; --glass-lo: transparent; --glass-rim: transparent; --glass-light: transparent; }
+/* the open workspace's color in the glass (Appearance › Extras › Tint with the workspace's color: App sets --ws, a
+   --tc-* color, and .ws-tint on .main): 8% of it in a capsule's fill and the selected tab's, 20% in a capsule's rim,
+   never in text. --ws-mix and --ws-rim are 0% unless it's on, so a workspace with no color, a page over the main area
+   (.main[data-pages]), the flat looks and Reduce transparency keep the fill exactly as it was. All three registered,
+   so switching workspaces cross-fades them at --t-slow */
+@property --ws { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --ws-mix { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+@property --ws-rim { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+.main { transition: --ws var(--t-slow) var(--ease), --ws-mix var(--t-slow) var(--ease), --ws-rim var(--t-slow) var(--ease); }
+html:not(.opaque) .main.ws-tint { --ws-mix: 8%; --ws-rim: 20%; }
+.main.ws-tint .capsule { --muted: color-mix(in srgb, var(--muted) 65%, var(--fg)); } /* its hints a step toward its text: they read on the tinted fill (test/contrast.test.ts WS_HINT) */
+html .main.ws-tint[data-pages] { --ws-mix: 0%; --ws-rim: 0%; }
+html.away .main.ws-tint { --ws-rim: 0%; } /* the rim's light goes with the glass depth's */
+@media (prefers-reduced-transparency: reduce) { html .main.ws-tint { --ws-mix: 0%; --ws-rim: 0%; } }
+html[data-motion='none'] .main { transition: none; }
 html[data-motion='none'] { --glass-light: transparent; }
 @media (prefers-reduced-transparency: reduce) { :root { --glass-hi: transparent; --glass-lo: transparent; --glass-rim: transparent; --glass-light: transparent; } }
 html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
 html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
-.capsule { position: relative; background: var(--cap-bg); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-hi), inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px var(--glass-rim), var(--lift-1); }
+.capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-hi), inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
 .capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle var(--sp-6) at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent); opacity: 0; transition: opacity 0.2s; }
 .capsule[data-lit]::after { opacity: 1; }
 .term-wrap .capsule { --cap-blur: none; background: var(--panel); }

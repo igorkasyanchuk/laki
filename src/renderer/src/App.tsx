@@ -3495,6 +3495,7 @@ export function App() {
   }
   // the rail stays while Projects' sidebar is open: a kind whose list is hidden (Terminals, Browsers) keeps it
   const railUp = rail && (sideOpen || (sideOpens.projects ?? true))
+  const wsTint = settings.wsTint && ws?.color && ws.color !== 'none' ? ws.color : undefined // the open workspace's color in the glass (none on a page: .main[data-pages])
   const railBar = railUp && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }} onContextMenu={e => !e.defaultPrevented && railMenu(e)}>
       {histNav}
@@ -3773,7 +3774,7 @@ export function App() {
       {strip === 'left' && stripBar}
       {sideOpen && !listOff && !strip && (narrow ? <div role="presentation" className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (looks.css --f-gap) */} />)}
 
-      <main className="main">
+      <main className={`main ${wsTint ? 'ws-tint' : ''}`} style={wsTint ? ({ '--ws': `var(--tc-${wsTint})` } as CSSProperties) : undefined /* Extras › Tint with the workspace's color: styles.css' --ws */}>
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}

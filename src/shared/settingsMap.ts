@@ -132,6 +132,7 @@ export const FIND: [string, string, string?][] = [
   ['terminal', 'Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫', 'cmd option arrow keys line start end word caret cursor home natural text editing iterm'],
   ['terminal', 'Inset panes', 'cards margins rounded nested panels gap'],
   ['terminal', 'Dim other panes', 'split focus fade'],
+  ['extras', "Tint with the workspace's color", 'workspace color glass tint capsule tab bar selected tab'],
   ['terminal', 'Focus the pane under the mouse', 'split hover caret cursor follows'],
   ['terminal', 'New tabs open as a split', 'pane panel nested inside tab beside'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
