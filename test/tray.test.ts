@@ -94,6 +94,9 @@ test('U15 dockProgress: none, a Ship (its pct or unknown), workflow runs by bloc
   assert.equal(dockProgress({ tabs: [], flows: [run(['a'], 4), run(['a', 'b', 'c'], 4)] } as any), 0.5, 'two runs: their mean')
   assert.equal(dockProgress({ tabs: [], flows: [run(['a'])] } as any), 2, "an older daemon's run, no steps: unknown")
   assert.equal(dockProgress({ tabs: [], flows: [run(['a'], 4, 'waiting')] } as any), -1, 'waiting on you is no progress')
+  const q = (statuses: string[], o = {}) => ({ project: 'p', at: 0, items: statuses.map((status, i) => ({ ws: `w${i}`, pr: i, status })), ...o })
+  assert.equal(dockProgress({ tabs: [], mergeQueues: [q(['merged', 'checking', 'waiting', 'waiting'])] } as any), 0.25, 'a merge queue: its merged share')
+  assert.equal(dockProgress({ tabs: [], mergeQueues: [q(['merged', 'stopped'], { stopped: 'x' }), q(['merged'], { done: 1 })] } as any), -1, 'stopped or done: no bar')
 })
 
 test('U15 bounceOf: once as a workspace starts waiting, Laki not in front; muted, Do not disturb and the setting', () => {

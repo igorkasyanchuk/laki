@@ -915,3 +915,78 @@ test("ship: the repo's PR template is the body, Laki's words under its Summary, 
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /pr create --title More --body my own words/)
 })
 
+// the merge queue: three workspaces' PRs, each its own fake PR (pr-<branch>.json), merged in the order given
+async function queueWorld(t: any, prOf: (n: number) => object = () => ({})) {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const wss = []
+  for (const n of [1, 2, 3]) {
+    const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: `q${n}` })
+    const pr = { number: n, state: 'OPEN', url: `https://github.com/o/r/pull/${n}`, headRefOid: String(n).repeat(40), mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviewDecision: '', baseRefName: 'main', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }], ...prOf(n) }
+    writeFileSync(join(gh, `pr-${ws.branch.replace(/\//g, '_')}.json`), JSON.stringify(pr))
+    wss.push(ws)
+  }
+  await rig.rpc('prRefresh')
+  await until(async () => (await rig.rpc('state')).workspaces.filter((w: any) => w.pr).length === 3, 'PRs scanned')
+  const merged = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr merge')).map(l => Number(/pull\/(\d+)$/.exec(l)?.[1]))
+  const queue = async () => (await rig.rpc('state')).mergeQueues?.[0]
+  return { rig, p, wss, merged, queue }
+}
+
+test('merge queue: three green PRs merged in order, one after another; an agent can\'t start one; merging off refuses it', async t => {
+  const { rig, p, wss, merged, queue } = await queueWorld(t)
+  const agent = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'agent' })
+  const tab = await until(async () => rig.tab(agent.id), 'its agent tab')
+  await assert.rejects(rig.rpc('mergeQueueStart', { wss: wss.map(w => w.id), from: { tab: tab.id } }), /start a merge queue/)
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { merge: false } } })
+  await assert.rejects(rig.rpc('mergeQueueStart', { wss: wss.map(w => w.id) }), /merging PRs is off for this project/)
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { merge: true } } })
+  const q = await rig.rpc('mergeQueueStart', { wss: [wss[2].id, wss[0].id, wss[1].id] })
+  assert.deepEqual(q.items.map((i: any) => i.pr), [3, 1, 2])
+  await assert.rejects(rig.rpc('mergeQueueStart', { wss: [wss[0].id] }), /runs in .* already/)
+  await until(async () => (await queue())?.done, 'all merged', 20000)
+  assert.deepEqual(merged(), [3, 1, 2], 'in the order given')
+  assert.deepEqual((await queue()).items.map((i: any) => i.status), ['merged', 'merged', 'merged'])
+})
+
+test('merge queue: the second, behind its base, gets Update first and stops there (Laki pushes no Update); the third left alone', async t => {
+  const { rig, wss, merged, queue } = await queueWorld(t, n => (n === 2 ? { mergeStateStatus: 'BEHIND' } : {}))
+  writeFileSync(join(rig.repo, 'later.txt'), 'on main\n')
+  execFileSync('git', ['add', '-A'], { cwd: rig.repo, env: rig.env })
+  execFileSync('git', ['commit', '-qm', 'later on main'], { cwd: rig.repo, env: rig.env })
+  await rig.rpc('mergeQueueStart', { wss: wss.map(w => w.id) })
+  await until(async () => (await queue())?.stopped, 'stopped', 20000)
+  const q = await queue()
+  assert.deepEqual(q.items.map((i: any) => i.status), ['merged', 'stopped', 'waiting'])
+  assert.match(q.items[1].why, /behind main: Update merged main in here, and Laki doesn't push for Update/)
+  assert.ok(readFileSync(join(wss[1].path, 'later.txt'), 'utf8'), 'main merged into the second')
+  assert.deepEqual(merged(), [1], 'the third untouched')
+})
+
+test('merge queue: a failing check stops it with why and leaves the third untouched; Stop ends one', async t => {
+  const { rig, p, wss, merged, queue } = await queueWorld(t, n => (n === 2 ? { statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }] } : {}))
+  await rig.rpc('mergeQueueStart', { wss: wss.map(w => w.id) })
+  await until(async () => (await queue())?.stopped, 'stopped', 20000)
+  const q = await queue()
+  assert.deepEqual(q.items.map((i: any) => [i.status, i.why]), [['merged', undefined], ['stopped', 'its checks failed'], ['waiting', undefined]])
+  assert.deepEqual(merged(), [1])
+  await rig.rpc('mergeQueueStart', { wss: [wss[2].id] }) // a stopped one: a new queue may start
+  await rig.rpc('mergeQueueStop', { project: p.id }).catch(() => {}) // done already, or stopped now
+  await assert.rejects(rig.rpc('mergeQueueStop', { project: p.id }), /no merge queue runs/)
+})
+
+test('merge queue: goes on after a daemon restart, from the PR it waited on', async t => {
+  const pending = { statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'IN_PROGRESS', conclusion: '' }] }
+  const { rig, wss, merged, queue } = await queueWorld(t, n => (n === 1 ? pending : {}))
+  await rig.rpc('mergeQueueStart', { wss: wss.map(w => w.id) })
+  await until(async () => (await queue())?.items[0].status === 'checking', 'waiting on its checks')
+  await rig.stop()
+  await rig.start()
+  writeFileSync(join(rig.env.FAKE_GH, `pr-${wss[0].branch.replace(/\//g, '_')}.json`), JSON.stringify({ number: 1, state: 'OPEN', url: 'https://github.com/o/r/pull/1', headRefOid: '1'.repeat(40), mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', baseRefName: 'main', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }))
+  await rig.rpc('prRefresh')
+  await until(async () => (await queue())?.done, 'all merged', 20000)
+  assert.deepEqual(merged(), [1, 2, 3])
+})
+

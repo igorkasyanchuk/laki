@@ -19,7 +19,7 @@ export const oldName = (method: string) => (Object.hasOwn(RPC_NAMES, method) ? R
 export const sendAs = (method: string, caps: readonly string[]) => (caps.includes(`ns:${method.split('.')[0]}`) ? method : oldName(method))
 
 // the behaviors the renderer asks about, and the API number each came with: what an older daemon is judged by
-export const CAP_SINCE: Record<string, number> = { 'archive.dirty': 12, layouts: 60, 'ws.peek': 94, 'project.terminal': 107, 'hooks.seen': 146, sample: 160, 'ship.sheet': 161, 'pr.revert': 179, 'diff.since': 179 }
+export const CAP_SINCE: Record<string, number> = { 'archive.dirty': 12, layouts: 60, 'ws.peek': 94, 'project.terminal': 107, 'hooks.seen': 146, sample: 160, 'ship.sheet': 161, 'pr.revert': 179, 'diff.since': 179, 'merge.queue': 180 }
 // this build's: each one above, and ns:<namespace> for each namespace RPC_NAMES has
 export const CAPS = [...Object.keys(CAP_SINCE), ...new Set(Object.keys(RPC_NAMES).map(m => `ns:${m.split('.')[0]}`))]
 

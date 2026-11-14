@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
+import { type Check, fillTemplate, type FixWhat, type MergeQueue, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { fenced } from '../shared/fence.ts'
@@ -14,6 +14,7 @@ import { phone } from './phone.ts'
 import { isLive } from './resources.ts'
 import { forgeOf, glabAct, glabDraft, glabIssues, glabPR, glabSays, githubOnly, isLab, noMR, glabRevert } from './gitlab.ts'
 import { gatesKey, widgetEvent } from './widgets.ts'
+import { alertShow } from './alerts.ts'
 
 // ---------- branches: each workspace's follows its folder, the PRs it names, a scan soon after a turn
 
@@ -236,6 +237,7 @@ export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   if (quietAt.size > 500) quietAt.clear() // ponytail: archived ones' too; a clear costs each one scan
   prScan = (bg ? quotaLow(now) : Promise.resolve(false)).then(low => (low ? undefined : Promise.all(scanned.map(scanPR)))).then(() => {
     prScan = null
+    for (const q of state.mergeQueues ?? []) if (queueOn(q)) void queueStep(q.project) // each running queue's next step, on what this scan saw
     const again = prAgain
     prAgain = undefined
     if (again) return scanPRs(false, again === true ? undefined : again)
@@ -396,6 +398,7 @@ async function scanPR(ws: Workspace) {
         conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
         ...(j.isCrossRepository && { cross: true }),
         ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
+        ...(j.mergeStateStatus === 'BEHIND' && { behind: true }),
         base: j.baseRefName,
         additions: j.additions,
         deletions: j.deletions,
@@ -1040,6 +1043,119 @@ export async function prLabel(o: { ws: string; label: string; on: boolean }) {
   changed()
   void scanPRs()
   return { labels: now.labels ?? [] }
+}
+
+// ---------- the merge queue: a project's PRs merged in the order you gave, each once it's green, the next only after
+// the one before merged (merge's guard: only the head the last scan saw). A step after every PR scan (scanPRs), one at
+// a time per project; its state saved (state.mergeQueues), so it goes on after a daemon restart. A PR behind its base
+// (GitHub's BEHIND: the repo wants the base in first) gets Update (wsUpdate: the base, fetched, merged in here), but
+// Laki doesn't push for Update, so the queue stops there and says so. A conflict, a failing check, a draft, GitHub
+// blocking it (a required review), a gate holding it or gh refusing stops it with why, as one notice; the rest stay
+// as they were. Each project's merge permission and its extensions' merge gates (by: 'auto') apply to every PR in it
+export const queueOn = (q: MergeQueue) => !q.stopped && !q.done
+const queueBusy = new Set<string>()
+export function mergeQueueStart(o: { wss?: unknown }) {
+  const ids = Array.isArray(o.wss) ? [...new Set(o.wss.map(String))] : []
+  if (!ids.length) throw new Error('which workspaces, in the order to merge?')
+  const wss = ids.map(id => findWs(id))
+  const project = wss[0].project
+  if (wss.some(w => w.project !== project)) throw new Error("a merge queue is one project's: pick workspaces of one")
+  const proj = findProject(project)
+  if (!prAllows(proj.config, 'merge')) throw new Error("merging PRs is off for this project: its settings' Pull requests")
+  for (const w of wss) {
+    const pr = prs.get(w.id)
+    if (!pr || pr.state !== 'OPEN') throw new Error(`${w.name ?? w.id} has no open PR`)
+    if (isLab(pr)) throw new Error(`${w.name ?? w.id}: the merge queue is GitHub's PRs only (a GitLab MR merges on its own)`)
+  }
+  if ((state.mergeQueues ?? []).some(q => q.project === project && queueOn(q))) throw new Error(`a merge queue runs in ${proj.name} already: stop it first`)
+  const q: MergeQueue = { project, at: Date.now(), items: wss.map(w => ({ ws: w.id, pr: prs.get(w.id)!.number, status: 'waiting' })) }
+  state.mergeQueues = [...(state.mergeQueues ?? []).filter(x => x.project !== project), q]
+  save()
+  changed()
+  void queueStep(project)
+  return q
+}
+export function mergeQueueStop(o: { project?: unknown }) {
+  const q = (state.mergeQueues ?? []).find(x => x.project === String(o.project ?? '') && queueOn(x))
+  if (!q) throw new Error('no merge queue runs in that project')
+  q.stopped = 'stopped by you'
+  for (const i of q.items) if (i.status !== 'merged') i.status = 'waiting'
+  save()
+  changed()
+  return q
+}
+function queueSay(q: MergeQueue, text: string, ws?: string) {
+  log(`merge queue ${q.project}: ${text}`)
+  try {
+    alertShow({ title: 'Merge queue', text, ...(ws && { to: ws }) }, 'notice', 'Laki')
+  } catch {} // Recording mode hides its workspace: the log has it
+}
+async function queueStep(project: string) {
+  if (queueBusy.has(project)) return
+  queueBusy.add(project)
+  try {
+    for (;;) {
+      const q = (state.mergeQueues ?? []).find(x => x.project === project && queueOn(x))
+      if (!q) return
+      const item = q.items.find(i => i.status !== 'merged')
+      const set = (st: MergeQueue['items'][number]['status'], why?: string) => {
+        if (!item || (item.status === st && item.why === why)) return
+        item.status = st
+        item.why = why
+        save()
+        changed()
+      }
+      if (!item) {
+        q.done = Date.now()
+        save()
+        changed()
+        return queueSay(q, `Merged ${q.items.length} PR${q.items.length === 1 ? '' : 's'} in order: ${q.items.map(i => `#${i.pr}`).join(', ')}`)
+      }
+      const ws = state.workspaces.find(w => w.id === item.ws)
+      const pr = ws && prs.get(ws.id)
+      const stop = (why: string) => {
+        set('stopped', why)
+        q.stopped = why
+        save()
+        changed()
+        queueSay(q, `Stopped at PR #${item.pr}: ${why}. ${q.items.filter(i => i.status === 'waiting').length ? 'The rest are left as they are.' : ''}`.trim(), ws?.id)
+      }
+      if (!ws || !pr || pr.number !== item.pr) return stop('its workspace or PR is gone')
+      if (pr.state === 'MERGED') {
+        set('merged')
+        continue
+      }
+      const proj = state.projects.find(p => p.id === ws.project)
+      if (!prAllows(proj?.config, 'merge')) return stop("merging PRs is off for this project (its settings' Pull requests)")
+      if (pr.state !== 'OPEN') return stop(`it's ${pr.state.toLowerCase()}`)
+      if (pr.draft) return stop("it's a draft")
+      if (pr.checks === 'fail' || pr.checks === 'cancelled') return stop(`its checks ${pr.checks === 'fail' ? 'failed' : 'were cancelled'}`)
+      if (pr.conflict) return stop(`it conflicts with ${pr.base ?? 'its base'}`)
+      if (pr.behind) {
+        set('updating')
+        const base = ws.base.replace(/^origin\//, '')
+        await git(ws, 'fetch', 'origin', base).catch(() => '')
+        if ((await mergeClean(ws)) === false) return stop(`it's behind ${base}, and merging ${base} in conflicts`)
+        const up = await wsUpdate({ ws: ws.id }).then(() => '', e => (e as Error).message)
+        if (up) return stop(`it's behind ${base}: ${up}`)
+        return stop(`it was behind ${base}: Update merged ${base} in here, and Laki doesn't push for Update. Push it (Ship › Push), then start the queue again`)
+      }
+      if (pr.checks === 'pending' || pr.conflict === undefined || pr.ready === undefined) return set('checking') // the next scan says
+      if (!pr.ready) return stop('GitHub blocks it (a required review or check)')
+      set('checking')
+      const h = await gated('merge', ws, { by: 'auto' })
+      if (h) return stop(`held: ${h.held.map(x => `${x.name}: ${x.why}`).join('; ')}`)
+      const how = proj?.config?.mergeMethod ?? 'squash'
+      const failed = await merge(ws, pr, how, true).then(() => '', e => (e as Error).message)
+      if (/got new commits/.test(failed)) return set('checking') // pushed to since the scan: its checks run again
+      if (failed) return stop(failed)
+      wsLog(ws, `merge queue: merged (${how})`)
+      set('merged')
+      return // the next one on the scan merge() starts: GitHub has moved its base by then
+    }
+  } finally {
+    queueBusy.delete(project)
+  }
 }
 
 // gh pr merge by the PR's URL. -R (its repo, from the URL) keeps gh off this worktree's git: without it,

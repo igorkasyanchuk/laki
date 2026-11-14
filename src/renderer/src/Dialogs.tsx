@@ -487,6 +487,11 @@ export function Pages({ app }: { app: AppCtx }) {
           onClose={() => setDialog(null)}
           api={{
             merge: w => allows(w, 'merge'),
+            queue: async ws => {
+              if (await ask(`Merge ${ws.length} PR${ws.length === 1 ? '' : 's'} in order?`, { text: "Each once its checks pass, the next after it. One that can't (a conflict, a failing check, a gate) stops the queue.", facts: ws.map((w, i) => ({ label: `${i + 1}. #${w.pr?.number}`, value: wsName(w), pr: 'open' })), ok: 'Merge in order' }))
+                await call('mergeQueueStart', { wss: ws.map(w => w.id) })
+            },
+            queueStop: project => void call('mergeQueueStop', { project }),
             open: id => (setWsId(id), setDialog(null)),
             start: t => {
               // a folder's own workspace has its session already: another one beside it, for this prompt

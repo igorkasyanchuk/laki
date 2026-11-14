@@ -26,8 +26,9 @@ export function stateOf(view: Pick<View, 'tabs' | 'workspaces'>, now = Date.now(
 // taken keeps it under 1; an older daemon's run, no steps: unknown). -1: none; 2: unknown (macOS's indeterminate bar);
 // else their mean, 0 to 1
 type Run = { status: string; visits: Record<string, number>; steps?: number }
-export function dockProgress(view: Pick<View, 'tabs'> & { flows?: Run[] }): number {
+export function dockProgress(view: Pick<View, 'tabs' | 'mergeQueues'> & { flows?: Run[] }): number {
   const parts = [
+    ...(view.mergeQueues ?? []).filter(q => !q.stopped && !q.done).map(q => Math.min(q.items.filter(i => i.status === 'merged').length / q.items.length, 0.99)), // a merge queue at work: its merged share
     ...view.tabs.filter(t => t.kind === 'ship' && t.status === 'running').map(t => (t.progress ? Math.max(0, Math.min(1, t.progress.pct / 100)) : NaN)),
     ...(view.flows ?? []).filter(f => f.status === 'running').map(f => (f.steps ? Math.min(Object.keys(f.visits).length / f.steps, 0.99) : NaN)),
   ]

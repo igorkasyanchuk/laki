@@ -173,6 +173,17 @@
   project's `mergeMethod` or squash, the branch deleted) once per head (`fix.land`; `wsSet` turning it on again clears it
   at the next scan: `retry`);
   a failure is `overToYou`. The app asks once as it's turned on. A project's `land` turned off clears its workspaces' `autoLand` (`projectSet`).
+- The merge queue (pr.ts `mergeQueueStart({ wss })`, `mergeQueueStop({ project })`; the user's only: gates.ts AGENT_NO,
+  allowed over remote access as `prAct` is, not at the answer level): one project's PRs merged in the order given,
+  `state.mergeQueues` (the view's `mergeQueues`: each item's `status` waiting, updating, checking, merged or stopped, its
+  `why`). A step (`queueStep`, one at a time per project) as it starts and after every PR scan: the first not merged is
+  merged by `merge` (its head the scan saw, the branch deleted) once its checks pass and GitHub says CLEAN (`ready`),
+  `gated('merge', …, { by: 'auto' })` first; a draft, failing or cancelled checks, a conflict, GitHub blocking it, a gate
+  holding it or gh refusing stops the queue (`stopped`, one notice: `alertShow`'s, Laki's own); one pushed to since the
+  scan waits for its checks. `behind` (GitHub's BEHIND) gets Update (`git fetch origin <base>`, `mergeClean`, `wsUpdate`)
+  and stops there: Laki pushes nothing for Update. Saved, so it goes on after a restart at the next scan. The Board's
+  Merge column: *Merge in order (n)* per project (a confirm listing them), the queue's list with Stop; tray.ts
+  `dockProgress` its merged share.
 - `merge` (the button's, `autoMerge`'s): `gh pr merge --match-head-commit <the scan's head>` (glab: `--sha`), so a push
   after the scan refuses it (*PR #n got new commits: its checks run again*); a scan follows either way.
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head

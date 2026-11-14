@@ -774,6 +774,7 @@ export function view(): View {
     ...(state.settings?.ptyHost && ptyWhy() && { ptyHostOff: ptyWhy() }), // R9: why new terminals run in the daemon
     ...(updateIdle && { updateIdle }),
     ...(trouble && { trouble }),
+    ...(state.mergeQueues?.length && { mergeQueues: state.mergeQueues }),
     ...(newerData && { newerData }),
     ...((m => m && { managed: m })(managedView())),
   }

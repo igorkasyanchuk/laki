@@ -4,8 +4,9 @@
 // is its menu: open, archive, delete; Done's ⋯ archives the merged ones. A to-do takes screenshots and files pasted or dropped
 // in: their paths go after its text as it starts.
 import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
+import { hasCap } from '../../shared/caps'
 import { BOARD, type BoardCol, boardCol } from '../../shared/nextStep'
-import type { Todo, View, WorkspaceView } from '../../shared/types'
+import type { QueueStatus, Todo, View, WorkspaceView } from '../../shared/types'
 import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
@@ -23,6 +24,8 @@ export type BoardApi = {
   menu: (e: MouseEvent, w: WorkspaceView) => void // a card's: open, archive, delete
   archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Done's ⋯: the merged ones
   merge: (w: WorkspaceView) => boolean // its project lets the app merge (nextStep's)
+  queue: (ws: WorkspaceView[]) => void // Merge in order: a confirm that lists them, then mergeQueueStart
+  queueStop: (project: string) => void
 }
 
 const TODO = 'text/x-laki-todo' // a dragged to-do's id
@@ -30,6 +33,7 @@ const isImage = (p: string) => /\/images\/[^/]+$/.test(p) // imageSave's (<data>
 
 const TIPS: Record<BoardCol, string> = { working: 'An agent works, or its setup runs', answer: 'An agent asks you, or stopped', review: 'An agent finished: look at what it changed, then ship', fix: 'A failing check, CI, conflicts or a review asking for changes', merge: 'A PR open: its CI and reviews, then merge', done: 'Nothing left: merged, closed or untouched' }
 const merged = (ws: { w: WorkspaceView }[]) => ws.map(c => c.w).filter(w => w.kind === 'worktree' && w.pr?.state === 'MERGED')
+const QUEUED: Record<QueueStatus, string> = { waiting: 'waiting', updating: 'updating', checking: 'checks', merged: 'merged', stopped: 'stopped' }
 
 export function BoardPage({ view, timers, going = {}, api, onClose }: { view: View; timers?: boolean; going?: Record<string, string>; api: BoardApi; onClose: () => void }) {
   const [pick, setPick] = useState('')
@@ -136,6 +140,18 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
             <section key={col} className={`board-col ${over === col ? 'over' : ''} ${ws.length ? '' : 'empty'}`} data-tip={ws.length ? undefined : TIPS[col]} {...drop(col)}>
               <h3>
                 {title} <span className="board-count">{ws.length || 0}</span>
+                {col === 'merge' &&
+                  hasCap(view, 'merge.queue') &&
+                  // the merge queue (pr.ts): each project's open GitHub PRs here that it lets the app merge, in this column's order
+                  [...new Set(ws.map(c => c.w.project))].map(pid => {
+                    const mine = ws.map(c => c.w).filter(w => w.project === pid && w.pr?.state === 'OPEN' && !w.pr.forge && api.merge(w))
+                    const on = view.mergeQueues?.some(q => q.project === pid && !q.stopped && !q.done)
+                    return mine.length > 0 && !on ? (
+                      <button key={pid} className="board-queue" data-tip="Merge these PRs one after another in this order, each once its checks pass" onClick={() => api.queue(mine)}>
+                        Merge in order{new Set(ws.map(c => c.w.project)).size > 1 ? `: ${name(pid)}` : ''} ({mine.length})
+                      </button>
+                    ) : null
+                  })}
                 {col === 'done' && merged(ws).length > 0 && (
                   <>
                     <span className="spacer" />
@@ -143,6 +159,27 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                   </>
                 )}
               </h3>
+              {col === 'merge' &&
+                (view.mergeQueues ?? [])
+                  .filter(q => (!q.stopped && !q.done) || (q.stopped && Date.now() - q.at < 3_600_000))
+                  .map(q => (
+                    <div key={q.project} className="board-queue-list" role="status">
+                      <div className="board-foot">
+                        <b className="small">{q.stopped ? 'Merge queue stopped' : 'Merge queue'}</b>
+                        <span className="muted small">{name(q.project)}</span>
+                        <span className="spacer" />
+                        {!q.stopped && <button className="small" onClick={() => api.queueStop(q.project)}>Stop</button>}
+                      </div>
+                      <ol>
+                        {q.items.map(i => (
+                          <li key={i.ws} className={`q-${i.status}`}>
+                            #{i.pr} {(w => (w ? wsShown(w) : i.ws))(view.workspaces.find(w => w.id === i.ws))} <span className="muted">· {QUEUED[i.status]}</span>
+                            {i.why && <div className="muted small">{i.why}</div>}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
               {ws.map(({ w, tabs }) => {
                 const last = tabs.find(t => t.kind === 'agent' && t.last)?.last
                 return (

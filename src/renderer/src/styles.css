@@ -2614,6 +2614,10 @@ button.board-name:hover { background: none; }
 .board-last { font-size: var(--fs-2); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .board-pr { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-2); color: var(--muted); } /* the PR's mark in its state's colors (.ws-pr), its checks and conflicts in theirs: failing red, as everywhere */
 .board-pr { flex-wrap: wrap; } .board-pr > span { white-space: nowrap; }
+.board-queue { margin-left: auto; font: inherit; font-size: var(--fs-1); font-weight: 600; padding: 0 var(--sp-3); height: var(--h-s); border-radius: var(--r-pill); } /* the Merge column's Merge in order (n) */
+.board-queue-list { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--panel); font-size: var(--fs-2); }
+.board-queue-list ol { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); }
+.board-queue-list .q-merged { color: var(--muted); } .board-queue-list .q-stopped { color: var(--error); } .board-queue-list .q-checking, .board-queue-list .q-updating { color: var(--waiting); }
 .board-pr .ci-fail { color: var(--error); } .board-pr .ci-pass { color: var(--done); } .board-pr .ci-pending { color: var(--waiting); } .board-pr .ci-cancelled { color: var(--muted); }
 .board-add.nw-card { flex: none; background: var(--bg); }
 .board-add.nw-card.nw-composer textarea { resize: none; field-sizing: content; min-height: 64px; max-height: 12em; padding: var(--sp-4) var(--sp-5) var(--sp-2); font: inherit; font-size: var(--fs-3); }
