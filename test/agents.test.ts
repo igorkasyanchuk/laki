@@ -258,3 +258,33 @@ test("F6: agentContext lists an agent's rule files and MCP servers, masked; an a
   await assert.rejects(rig.rpc('agentContextOpen', { agent: 'claude', project: p.id, path: '/etc/hosts' }), /not one of its rule files/)
   await assert.rejects(rig.rpc('agentContext', { agent: 'gemini' }), /claude or codex/)
 })
+
+// How long a turn usually takes: each clean end's working time (an ask's wait out) by its hooks' at, per project and
+// profile; a running tab carries the median once 5 turns of 20 s or more ended
+test("usual: after 5 turns a running claude tab's view carries the median of their working time, asks' waits out", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(() => rig.tab(ws.id), 'its tab')
+  const base = Date.now() + 60_000
+  const hook = (state: string, hook_event_name: string, at: number) => rig.rpc('hook', { tab: tab.id, state, payload: { hook_event_name, ...(hook_event_name === 'UserPromptSubmit' && { prompt: 'go' }) }, at })
+  // worked: 60, 90, 120, 150, 180 s, each after a 60 s wait on an ask; then a 10 s one, too short to count
+  const turn = async (n: number, worked: number) => {
+    const at = base + n * 600_000
+    await hook('running', 'UserPromptSubmit', at)
+    await hook('waiting', 'PermissionRequest', at + 5_000)
+    await hook('running', 'PostToolUse', at + 65_000)
+    await hook('idle', 'Stop', at + 60_000 + worked * 1000)
+  }
+  for (const [n, worked] of [60, 90, 120, 150].entries()) await turn(n, worked)
+  await hook('running', 'UserPromptSubmit', base + 4 * 600_000)
+  assert.equal((await rig.tab(ws.id)).usual, undefined, '4 turns: too few')
+  await hook('idle', 'Stop', base + 4 * 600_000 + 180_000) // the 5th: 180 s, no ask
+  await turn(5, 10)
+  await hook('running', 'UserPromptSubmit', base + 6 * 600_000)
+  const now = await rig.tab(ws.id)
+  assert.equal(now.status, 'running')
+  assert.equal(now.usual, 120)
+  await hook('idle', 'Stop', base + 6 * 600_000 + 1000)
+  assert.equal((await rig.tab(ws.id)).usual, undefined, 'idle: none')
+})

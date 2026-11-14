@@ -2,7 +2,7 @@
 // to you, a closed PR, conflicts, CI, a review, the radar, merge, look, ship; busy while an agent or CI works.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { nextStep, boardCol, needsTab } from '../src/shared/nextStep.ts'
+import { nextStep, boardCol, needsTab, overUsual, usual, usualText } from '../src/shared/nextStep.ts'
 import type { TabView, WorkspaceView } from '../src/shared/types.ts'
 
 const ws = (o: object = {}) => ({ id: 'w', kind: 'worktree', ...o }) as unknown as WorkspaceView
@@ -66,4 +66,18 @@ test("U5: the Board's columns follow the next step, and hold what the sidebar's 
   const needs = cases.filter(([, tabs]) => tabs.some(needsTab))
   assert.equal(needs.length, 7)
   for (const [w, tabs] of cases) assert.equal(['answer', 'review', 'fix'].includes(col(w, tabs)), tabs.some(needsTab), JSON.stringify([w, tabs]))
+})
+
+test('usual: the median of the turns that ran 20 s or more, once there are 5; its words; past twice it and 5 minutes', () => {
+  assert.equal(usual([60, 120, 180, 240]), undefined) // 4: too few
+  assert.equal(usual([60, 120, 180, 240, 10, 19]), undefined) // the short ones don't count
+  assert.equal(usual([300, 60, 180, 120, 240]), 180) // odd: the middle one
+  assert.equal(usual([60, 120, 180, 240, 300, 301]), 210) // even: the two middle ones' mean
+  assert.equal(usual([20, 20, 20, 20, 21]), 20) // 20 s counts
+  assert.equal(usualText(240, 360), '4 min · usually 6')
+  assert.equal(usualText(10, 25), '1 min · usually 1') // never 0 min
+  assert.equal(overUsual(719, 360), false)
+  assert.equal(overUsual(720, 360), true)
+  assert.equal(overUsual(200, 60), false) // under 5 minutes
+  assert.equal(overUsual(300, 60), true)
 })

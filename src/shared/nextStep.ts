@@ -51,3 +51,19 @@ export function boardCol(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   if (needs || st?.id === 'look' || st?.id === 'ship') return 'review'
   return st?.id === 'merge' || st?.id === 'wait' ? 'merge' : 'done'
 }
+
+// How long a turn usually takes (a running agent tab's "4 min · usually 6"): the median of a project's and profile's
+// last turns' working time in seconds (core.ts turnTook keeps USUAL_KEEP that ran USUAL_MIN or more), none under USUAL_N
+export const USUAL_MIN = 20
+export const USUAL_N = 5
+export const USUAL_KEEP = 20
+export function usual(samples: number[]): number | undefined {
+  const s = samples.filter(x => x >= USUAL_MIN).sort((a, b) => a - b)
+  if (s.length < USUAL_N) return
+  const m = s.length >> 1
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2)
+}
+const mins = (sec: number) => Math.max(1, Math.round(sec / 60))
+export const usualText = (ran: number, usualSec: number) => `${mins(ran)} min · usually ${mins(usualSec)}`
+// past twice its usual and 5 minutes: its time drawn in the waiting color (no notice: settings.longTurn is the alert)
+export const overUsual = (ran: number, usualSec: number) => ran >= 2 * usualSec && ran >= 300

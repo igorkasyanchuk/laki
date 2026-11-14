@@ -390,6 +390,14 @@ row says *merged* while the setting is on.
 
 A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minutes): only ticks where the tab is `running` and not at a limit add up, each at most `LONG_GAP` (a Mac asleep); once per turn the `long` event (Open, Stop: main's `stop` action, `longStop`: its Esc through `input`, only while that turn runs and asks nothing), `phoneLong` (no Stop on a phone) and `turn.long`.
 
+How long a turn usually takes (`core.ts` `turnTook`, `shared/nextStep.ts` `usual`): `turn` times each turn by its hooks'
+`at` (else the daemon's clock): `turnFrom` at its prompt (or its first hook), an ask's wait (`waitFrom` to the next
+`running`) added to `waited`; a clean end (not failed, not a limit, not `interrupted`) keeps `now − turnFrom − waited`
+in `state.turnTimes[project\tprofile]` when 20 s or more, the newest 20. A `running` tracked tab's view gets `usual`:
+their median once 5 are kept. The tab's tooltip and the sidebar's peek card say *4 min · usually 6*; past twice it and
+5 minutes (`overUsual`) its timer turns the waiting color, nothing more (`longTurn` stays the only notice). Shells and
+agents without turn hooks have none.
+
 ### Updates
 
 `src/main/update.ts` (main) and `src/shared/update.ts` (pure, tested in `test/update.test.ts`; R7: `verdict` decides none, passed, held or offer; *Skip this version* keeps `pass` in update.json, the state's `passed`, *Offer it again* clears it; it's main's file, no setting an agent could change): `updater` checks

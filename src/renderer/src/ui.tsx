@@ -6,6 +6,7 @@ import { TAB_COLORS } from '../../shared/types'
 import { flushSync } from 'react-dom'
 import { menuKeys, snap } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
+import { overUsual } from '../../shared/nextStep'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -164,14 +165,15 @@ export function IconButton({ icon, title, onClick, on, className = '', label, ti
 }
 
 // how long a turn has been going (since: the daemon's clock, a phone's may differ a little): 42s, 12m, 1h 5m
-export function Elapsed({ since }: { since: number }) {
+// usual: its project's and profile's usual turn (seconds): past twice it and 5 minutes, drawn in the waiting color
+export function Elapsed({ since, usual }: { since: number; usual?: number }) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
   const s = Math.max(0, Math.round((now - since) / 1000))
-  return <span className="elapsed">{s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`}</span>
+  return <span className={`elapsed ${usual && overUsual(s, usual) ? 'over' : ''}`}>{s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`}</span>
 }
 
 // seconds left until `to`, ticking
@@ -202,9 +204,10 @@ export function Ghosts({ rows, children, className = '' }: { rows?: [string, str
   )
 }
 
-export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
+export function TurnTime({ tabs }: { tabs: { runAt?: number; usual?: number }[] }) {
   const since = Math.min(...tabs.map(t => t.runAt ?? Infinity))
-  return since < Infinity ? <Elapsed since={since} /> : null
+  const first = tabs.find(t => t.runAt === since)
+  return since < Infinity ? <Elapsed since={since} usual={first?.usual} /> : null
 }
 
 // a file Laki doesn't draw as text or a picture: audio and video play (src, the daemon's data URL); anything else, or

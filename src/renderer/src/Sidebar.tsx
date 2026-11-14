@@ -18,6 +18,7 @@ import { planCount } from '../../shared/todos'
 import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
+import { usualText } from '../../shared/nextStep'
 import { bulkGroups } from '../../shared/ask'
 import { fresh } from './motion'
 import { BLOCK, type Clash, portClashes } from '../../shared/isolation'
@@ -424,7 +425,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <span key={t.id} className="muted">
               {t.name}
               {t.progress ? ` ${t.progress.pct}%` : ''}
-              {settings.timers && <TurnTime tabs={[t]} />}
+              {t.usual && t.runAt ? ` ${usualText((Date.now() - t.runAt) / 1000, t.usual)}` : settings.timers && <TurnTime tabs={[t]} />}
             </span>
           ))}
         </div>

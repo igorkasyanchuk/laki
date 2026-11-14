@@ -19,6 +19,7 @@ import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
+import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir, inRig } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
@@ -96,7 +97,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -715,6 +716,17 @@ export function updateWhenIdle(o: { on?: boolean; caller?: { ws?: unknown; tab?:
   return updateIdle ?? null
 }
 
+// How long a turn usually takes: a clean end's working time (its asks' waits out), kept per project and profile when it
+// ran USUAL_MIN or more, the newest USUAL_KEEP (state.turnTimes); a running tab's view carries their usual (nextStep.ts)
+const turnKey = (t: Tab) => `${state.workspaces.find(w => w.id === t.workspace)?.project ?? ''}\t${t.profile ?? t.preset ?? ''}`
+function turnTook(tab: Tab, sec: number) {
+  if (!tracked(tab) || !(sec >= USUAL_MIN)) return
+  const list = ((state.turnTimes ??= {})[turnKey(tab)] ??= [])
+  list.push(Math.round(sec))
+  list.splice(0, Math.max(0, list.length - USUAL_KEEP))
+  save()
+}
+
 export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
@@ -732,7 +744,8 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
+    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -3706,6 +3719,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   // before it too, never its answer (a tool run after you answer comes later)
   const skew = r.status === 'waiting' && p.state === 'running' && /^(Pre|Post)ToolUse$/.test(String(pl.hook_event_name)) ? ASYNC_SKEW : 0
   const late = at !== undefined && at < (r.hookAt ?? 0) + skew && (r.hookAt ?? 0) - at < 30_000 // ponytail: 30 s, so a clock set back doesn't hold its hooks for longer
+  const now = at ?? Date.now() // the turn's working time (turnTook): by when each hook started
   if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
@@ -3737,8 +3751,11 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (!late) {
         r.status = 'running'
         r.limit = r.escAt = r.suggest = r.failed = undefined
+        r.turnFrom ??= now
+        if (r.waitFrom !== undefined) (r.waited = (r.waited ?? 0) + Math.max(0, now - r.waitFrom)), (r.waitFrom = undefined) // an ask answered
       }
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
+        if (!late) (r.turnFrom = now), (r.waited = r.waitFrom = undefined) // a turn of its own (an Esc ended the last with no hook)
         if (r.contSent) r.contSent = false // the continue it was sent: still that turn's one
         else r.autoContinued = false
         titleFrom(tab, pl.prompt) // claude's, gemini's
@@ -3777,6 +3794,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       }
       r.status = 'waiting'
       r.limit = undefined
+      r.turnFrom ??= now
+      r.waitFrom ??= now
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
       // F14: an ask a project rule allows is answered as your click would, told to no one; one it can't answer is told
@@ -3791,6 +3810,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     case 'idle':
     case 'done': // codex notify: {"type":"agent-turn-complete","thread-id":…,"last-assistant-message":…}
     case 'failed': {
+      const took = r.turnFrom !== undefined ? now - r.turnFrom - (r.waited ?? 0) - (r.waitFrom !== undefined ? now - r.waitFrom : 0) : undefined
+      r.turnFrom = r.waitFrom = r.waited = undefined
       r.status = 'idle'
       r.limit = undefined
       r.planAsk = undefined
@@ -3819,6 +3840,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
       if (!r.limit) phone(tab, 'done', r.last ?? '')
+      if (!r.limit && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
@@ -3837,6 +3859,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     }
     case 'interrupted':
       r.status = 'idle'
+      r.turnFrom = r.waitFrom = r.waited = undefined
       break
   }
   changed()
