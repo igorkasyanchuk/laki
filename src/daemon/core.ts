@@ -31,6 +31,7 @@ import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
 import { appBinOk, helperBin } from '../shared/helper.ts'
+import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
@@ -5031,22 +5032,53 @@ async function treePick(ws: Workspace, tree: string, files: string[]) {
   return (await gAt(ws, idx, ['write-tree'])).trim()
 }
 
-// U5: the Ship sheet's start: what ship would commit (each uncommitted file, +/−), the commits already on the branch,
-// and words to start from (no model asked): the PR's title from the workspace's name, its body from the first prompt
-// and the agent's last answer
-export async function shipDraft(ref: string) {
-  const ws = findWs(ref)
-  if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
-  const tree = await treeOf(ws, true)
-  const files = await changedIn(ws, tree)
-  const ahead = Number((await git(ws, 'rev-list', '--count', `${ws.base}..HEAD`).catch(() => '0')).trim()) || 0
+// the repo's PR template (GitLab's MR one), the first of PR_TEMPLATES there is in the worktree: a regular file inside it
+// (never through a link out of it), its first 20 KB. On an SSH host: a file that isn't a link
+async function prTemplate(ws: Workspace, lab: boolean): Promise<string | undefined> {
+  for (const rel of lab ? MR_TEMPLATES : PR_TEMPLATES) {
+    if (ws.host) {
+      const out = (await exec(ws, 'sh', ['-c', '[ -f "$1" ] && [ ! -L "$1" ] && head -c "$2" -- "$1"', 'sh', rel, String(TEMPLATE_MAX)]).catch(() => ({ stdout: '' }))).stdout
+      if (out.trim()) return out
+      continue
+    }
+    try {
+      const abs = inside(ws, rel)
+      if (!statSync(abs).isFile()) continue
+      const fd = openSync(abs, 'r')
+      try {
+        const buf = Buffer.alloc(TEMPLATE_MAX)
+        return buf.subarray(0, readSync(fd, buf, 0, TEMPLATE_MAX, 0)).toString('utf8')
+      } finally {
+        closeSync(fd)
+      }
+    } catch {} // not there, a link out, a folder
+  }
+}
+// Ship's words to start from (no model asked): the PR's title from the workspace's name, its body from the first prompt
+// and the agent's last answer, put into the repo's PR template when it has one
+async function shipWords(ws: Workspace) {
   const tab = state.tabs.find(t => t.workspace === ws.id && t.kind === 'agent' && t.resumeId)
   const said = tab ? ((() => { try { return chatRead({ tab: tab.id }).said ?? [] } catch { return [] } })()) : []
   const cut = (t = '', n: number) => (t = t.trim()).length > n ? `${t.slice(0, n).trimEnd()}…` : t
   const first = said.find(x => x.who === 'you')?.text
   const last = said.findLast(x => x.who === 'agent')?.text
   const title = ws.name ?? (first ? taskTitle(first, 10) : ws.id)
-  const body = [first && `## Task\n\n${cut(first, 1500)}`, last && `## Summary\n\n${cut(last, 2500)}`].filter(Boolean).join('\n\n')
+  const template = await prTemplate(ws, (await gitlab.forgeOf(ws)) === 'gitlab')
+  const body = template
+    ? fillPrTemplate(template, [last && cut(last, 2500), first && `Task: ${cut(first, 1500)}`].filter(Boolean).join('\n\n'))
+    : [first && `## Task\n\n${cut(first, 1500)}`, last && `## Summary\n\n${cut(last, 2500)}`].filter(Boolean).join('\n\n')
+  return { title, body, template: !!template }
+}
+
+// U5: the Ship sheet's start: what ship would commit (each uncommitted file, +/−), the commits already on the branch,
+// and shipWords' title and body
+export async function shipDraft(ref: string) {
+  const ws = findWs(ref)
+  if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
+  const tree = await treeOf(ws, true)
+  const files = await changedIn(ws, tree)
+  const ahead = Number((await git(ws, 'rev-list', '--count', `${ws.base}..HEAD`).catch(() => '0')).trim()) || 0
+  const { title, body } = await shipWords(ws)
   return { title, message: title, body, files, ahead, base: ws.base.replace(/^origin\//, ''), branch: ws.branch }
 }
 
@@ -5060,7 +5092,10 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   for (const r of reviewers) if (!NAME_OK.test(r)) throw new Error(`reviewer ${r}? a GitHub login or org/team`)
   const files = o.files?.map(String) // []: none committed (the commits already there pushed)
   if (files && !files.length && mode === 'commit') throw new Error('no files picked to commit')
-  const prTitle = o.title?.trim() || (o.body?.trim() ? message.trim() : '') // a body without a title: the commit's message as it (--fill has no room for a body)
+  // no body given (laki ship without --body) and the repo has a PR template: shipWords' body in it; a body given wins
+  const filled = mode === 'pr' && o.body === undefined ? await shipWords(ws).then(w => (w.template ? w.body : undefined)) : undefined
+  const body = o.body ?? filled
+  const prTitle = o.title?.trim() || (body?.trim() ? message.trim() : '') // a body without a title: the commit's message as it (--fill has no room for a body)
   const prBase = o.base?.trim().replace(/^origin\//, '')
   if (prBase !== undefined && (!prBase || prBase.startsWith('-') || !/^[\w./-]+$/.test(prBase))) throw new Error(`base ${prBase || '(none)'}? a branch name`)
   // nothing to commit and no commit the base hasn't: gh would open no PR (no commits between them), so said here, before
@@ -5116,7 +5151,7 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
         ]),
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const words: Record<string, string> = prTitle ? { LAKI_TITLE: prTitle, LAKI_BODY: o.body ?? '' } : {}
+  const words: Record<string, string> = prTitle ? { LAKI_TITLE: prTitle, LAKI_BODY: body ?? '' } : {}
   const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, LAKI_TREE: tree, LAKI_INDEX: index, ...words, ...(reviewers.length && { LAKI_REVIEWERS: reviewers.join(',') }), ...(lab ? { LAKI_BASE: base } : { LAKI_HEAD: head, ...(B && { LAKI_BASE: base }) }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()

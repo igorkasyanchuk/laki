@@ -215,7 +215,11 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   the PR's (said: always passed); `reviewers`, logins or org/team, `--reviewer`; `mode` `commit` or `push` stops the
   script there), `shipDraft` (the sheet's start: `treeOf`'s files with +/−, `ahead` of the base, a `title` from the
   name, else the first prompt's words, a `body` from the first prompt and the agent's last answer, no model asked;
-  agent-refused: it quotes the chat); Changes'
+  agent-refused: it quotes the chat). A repo with a PR template (core.ts `prTemplate`: the first of shared/prTemplate.ts'
+  `PR_TEMPLATES`, GitLab's `MR_TEMPLATES`, a regular file inside the worktree through `inside`, its first 20 KB; on a
+  host one that isn't a link) gets `fillTemplate`'s body: its HTML comments gone, the answer and the task under its first
+  heading like a description (What, Summary, Description, Changes), else before its first heading, its checklists as
+  they are; `ship` with no `body` in `pr` mode (`laki ship` without `--body`) uses it too, a `body` given wins; Changes'
   Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
   as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
   indexes into its body; a forward patch from the worktree to the base, `git apply --check` then `git apply`: a temp

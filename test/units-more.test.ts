@@ -9,6 +9,7 @@ import { copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '.
 import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
+import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -706,6 +707,15 @@ test('debtOf: a // comment and its next lines, a (ponytail: …) to its paren, a
     { line: 5, text: 'a block that goes on' },
     { line: 7, text: 'in JSX' },
   ])
+})
+
+// Ship's body in the repo's PR template
+test("fillTemplate: Laki's words under the template's Summary, else before its first heading; comments gone, checklists kept", () => {
+  assert.equal(fillPrTemplate('<!-- what changed? -->\n## Summary\n\n## Checklist\n- [ ] Tests\n- [ ] Docs\n', 'Adds X.'), '## Summary\n\nAdds X.\n\n## Checklist\n- [ ] Tests\n- [ ] Docs')
+  assert.equal(fillPrTemplate('### What does this do?\n\nDescribe\n', 'Adds X.'), '### What does this do?\n\nAdds X.\n\nDescribe', 'What, under a heading of any level')
+  assert.equal(fillPrTemplate('## Testing\n- [ ] ran it\n', 'Adds X.'), 'Adds X.\n\n## Testing\n- [ ] ran it', 'no heading like a description: before the first')
+  assert.equal(fillPrTemplate('Fixes #\n<!--\nmany\nlines\n-->\n- [ ] ok', 'Adds X.'), 'Adds X.\n\nFixes #\n\n- [ ] ok', 'no heading: at the top; a comment over lines gone')
+  assert.equal(fillPrTemplate('## Changes\n', ''), '## Changes', 'no words: the template alone')
 })
 
 // main's pings of the daemon: 3 misses in a row is hung, any answer clears it

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Ship fills in your repo's pull request template (GitLab's merge request one too): Laki's summary goes under its Summary or Description heading, its checklists stay for you to tick. `laki ship` without `--body` does the same.
 - When Laki's background process stops answering, the window says so, with *Restart the daemon* and *Wait*; its log says how long it was stuck and on what.
 - Laki's own binary no longer runs other programs' scripts: the background process, the `laki` command, hooks and the MCP server run on Laki Node, a helper inside the app, so no program can borrow the permissions you gave Laki. The app is about 210 MB larger for it. Added Laki's MCP server to an agent by hand? Add it again: Settings › Agents & profiles shows the command.
 - Laki AI does several at once: *archive every workspace whose PR is merged* is one list with a box for each and one Yes, and each line says what became of it (Stop ends a long one). Its questions stay open until you answer them, in any order. [Try it](laki://ai)
