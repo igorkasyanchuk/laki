@@ -51,12 +51,14 @@ export class AcpPty implements Pty {
   private next: string[] = [] // typed while a prompt runs: after it
   private chat = { said: [] as Said[], v: 0 }
   private err = '' // its stderr's end: said if it ends badly
+  private dead = false // its start failed: what's typed after is said not sent
 
   private tab: string
   private first?: string // its start's prompt
   constructor(tab: string, o: PtyOpts, first?: string) {
     this.tab = tab
     this.first = first
+    for (const id of chats.keys()) if (!state.tabs.some(t => t.id === id)) chats.delete(id) // closed tabs'
     chats.set(tab, this.chat)
     this.child = spawn(o.file, o.args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true })
     this.pid = this.child.pid ?? 0
@@ -142,6 +144,8 @@ export class AcpPty implements Pty {
       if (this.first?.trim()) this.prompt(this.first)
     } catch (e) {
       this.print(`\r\n${(e as Error).message}\r\n`)
+      this.dead = true
+      this.next = []
       rtOf(this.tab).status = 'idle' // no turn to end: it never started
       changed()
     }
@@ -225,6 +229,7 @@ export class AcpPty implements Pty {
   }
 
   private async prompt(text: string) {
+    if (this.dead) return this.print(`\r\nNot sent: the agent didn't start (above). Start the tab again\r\n`)
     if (!this.session || this.busy) return void this.next.push(text)
     this.busy = true
     this.said('you', text)

@@ -1079,7 +1079,7 @@ export function mergeQueueStop(o: { project?: unknown }) {
   const q = (state.mergeQueues ?? []).find(x => x.project === String(o.project ?? '') && queueOn(x))
   if (!q) throw new Error('no merge queue runs in that project')
   q.stopped = 'stopped by you'
-  for (const i of q.items) if (i.status !== 'merged') i.status = 'waiting'
+  for (const i of q.items) if (i.status !== 'merged') (i.status = 'waiting'), (i.why = undefined)
   save()
   changed()
   return q

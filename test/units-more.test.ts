@@ -902,8 +902,8 @@ test("speechLine: Laki Speech's JSON lines (level, partial, final, error, versio
 
 test('the remote page’s outbox: kept in order, replayed while fresh, an answer only while its ask still waits', () => {
   const now = 10 * 60e3 * 6
-  const send = (cid: string, at = now - 1000): OutItem => ({ cid, at, method: 'send', tab: 't1', text: `hi ${cid}`, whenIdle: true })
-  const ans = (cid: string, ask?: number): OutItem => ({ cid, at: now - 1000, method: 'answer', tab: 't2', n: 1, label: 'Yes', ...(ask !== undefined && { ask }) })
+  const send = (cid: string, at = now - 1000): OutItem => ({ cid, at, method: 'send', tab: 't1', params: { target: 't1', text: `hi ${cid}`, whenIdle: true } })
+  const ans = (cid: string, ask?: number): OutItem => ({ cid, at: now - 1000, method: 'answer', tab: 't2', params: { tab: 't2', n: 1, label: 'Yes' }, ...(ask !== undefined && { ask }) })
   let box = outAdd([], send('a'))
   box = outAdd(box, ans('b', 500))
   box = outAdd(box, send('c'))
@@ -917,8 +917,9 @@ test('the remote page’s outbox: kept in order, replayed while fresh, an answer
   assert.deepEqual(later.go.map(x => x.cid), ['c', 'a'])
   assert.deepEqual(later.dropped.map(d => [d.item.cid, d.why]), [['b', 'This question was already answered or is gone'], ['old', 'Not sent: it waited over 30 minutes']])
   assert.equal(outReplay([ans('d')], now, () => 500).dropped.length, 1, 'an answer with no ask known: dropped')
-  // what each sends: its id, the send's switches
+  // what each sends: its call's params as given, with its id (an answer's pick, a send's by too)
   assert.deepEqual(outParams(send('a')), { target: 't1', text: 'hi a', cid: 'a', whenIdle: true })
   assert.deepEqual(outParams(ans('b', 500)), { tab: 't2', n: 1, label: 'Yes', cid: 'b' })
-  assert.deepEqual(outParams({ ...send('e'), enter: false, whenIdle: undefined }), { target: 't1', text: 'hi e', cid: 'e', enter: false })
+  assert.deepEqual(outParams({ ...ans('p', 500), params: { tab: 't2', pick: 'first' } }), { tab: 't2', pick: 'first', cid: 'p' })
+  assert.deepEqual(outParams({ ...send('e'), params: { target: 't1', text: 'hi e', enter: false, by: 'side' } }), { target: 't1', text: 'hi e', cid: 'e', enter: false, by: 'side' })
 })

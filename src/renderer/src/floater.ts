@@ -867,7 +867,7 @@ function talkPage() {
       if (x.kind === 'level') (level.style.width = `${x.level * 100}%`), x.level >= FLAT && (loud = Date.now())
       else if (x.kind === 'partial') (partial = x.text), phase === 'rec' && !deaf && say(x.text.length > 70 ? `…${x.text.slice(-70)}` : x.text)
       else if (x.kind === 'final') phase === 'writing' && end(x.text.trim() || partial)
-      else if (x.kind === 'error') (ended = true), stopRec?.(false), say(`${x.error}${x.code === 'no-on-device' || x.code === 'locale' ? ': Settings › Voice › Talk key, Cloud' : ''}`, true), setTimeout(close, 5000)
+      else if (x.kind === 'error') (ended = true), clearInterval(tick), clearTimeout(limit), stopRec?.(false), say(`${x.error}${x.code === 'no-on-device' || x.code === 'locale' ? ': Settings › Voice › Talk key, Cloud' : ''}`, true), setTimeout(close, 5000)
       else if (x.kind === 'end' && phase === 'writing') end(partial) // it stopped without a final line
     }
     phase = 'rec'

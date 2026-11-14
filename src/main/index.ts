@@ -881,10 +881,13 @@ ipcMain.handle('answer-hotkey', (e, which: unknown, label: unknown) => from(e) &
 const HOT_MS = 600
 const HOT = 'hotkey:answer'
 let hotGo: { t: NodeJS.Timeout } | null = null
+let hotLook = false // a press reading the state: another meanwhile is dropped (both would answer, then cancel each other)
 const hotDone = () => (hotGo && clearTimeout(hotGo.t), (hotGo = null), globalShortcut.isRegistered('Escape') && globalShortcut.unregister('Escape'))
 async function hotAnswer(allow: boolean) {
-  if (hotGo) return // one at a time
+  if (hotGo || hotLook) return // one at a time
+  hotLook = true
   const v = await rpc<View>('state').catch(() => null)
+  hotLook = false // from here to hotGo, nothing waits
   if (!v) return
   const t = v.tabs.filter(x => x.status === 'waiting' && x.ask).sort((a, b) => (b.needAt ?? 0) - (a.needAt ?? 0))[0]
   const at = Date.now()

@@ -2046,7 +2046,8 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
   if (hops > HOPS_MAX) return no(`${hops} hops: a loop of events? dropped`)
   if (!o.tried && wf.stats?.paused) return no(`paused: ${wf.stats.paused.why}; turn it on again in Workflows`) // a try is yours: Run starts a paused one too
   // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-  if (o.agent && (bypass({ ...wf, blocks: everyBlock(wf) }).length || everyBlock(wf).some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
+  const all = o.agent ? everyBlock(wf) : [] // its calls' files read once
+  if (o.agent && (bypass({ ...wf, blocks: all }).length || all.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
   const mine = runs().filter(r => runOf(r, wf))
   if (mine.some(r => r.id === payload.run || (!!ws && live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) return no('its own run sent it')
   const fails = whenFails(wf, payload)

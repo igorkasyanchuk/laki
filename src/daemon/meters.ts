@@ -357,12 +357,14 @@ export function todayView(): Today | undefined {
 // agent said, case-insensitively, spaces as one (tools: the tools' calls and output too); newest first, limit hits (50)
 // or what SEARCH_MS found, then more. Recording mode: no private workspace's. A host's (SSH) chats are there: left out
 const SEARCH_MS = 3000
+let searchN = 0 // the newest search: an older one still reading stops (the window asked again as you typed)
 export async function chatSearch(p: { q?: unknown; limit?: unknown; tools?: unknown }): Promise<{ hits: ChatHit[]; more?: true }> {
   const q = String(p?.q ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
   if (!q) throw new Error('search for what?')
   const limit = Math.max(1, Math.min(200, Math.floor(Number(p.limit) || 50)))
   const tools = p.tools === true
   const end = Date.now() + SEARCH_MS
+  const mine = ++searchN
   const veil = !!state.settings?.recording
   const hid = new Set(veil ? state.projects.filter(x => x.private).map(x => x.id) : [])
   const files = new Map<string, Omit<ChatHit, 'at' | 'who' | 'text' | 'id'> & { mtime: number }>()
@@ -382,7 +384,7 @@ export async function chatSearch(p: { q?: unknown; limit?: unknown; tools?: unkn
   const hits: ChatHit[] = []
   let more = false
   for (const [file, f] of [...files].sort((a, b) => b[1].mtime - a[1].mtime)) {
-    if (hits.length >= limit || Date.now() > end) {
+    if (hits.length >= limit || Date.now() > end || mine !== searchN) {
       more = true
       break
     }
@@ -394,7 +396,7 @@ export async function chatSearch(p: { q?: unknown; limit?: unknown; tools?: unkn
     try {
       for await (const line of lines) {
         n++
-        if (Date.now() > end) {
+        if (Date.now() > end || mine !== searchN) {
           more = true
           break
         }
