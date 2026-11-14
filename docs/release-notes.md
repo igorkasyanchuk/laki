@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Remote access can show up on your iPhone, iPad or other Mac through Handoff while Laki is in front (Settings › Remote access › *Offer on my nearby devices*, off until you turn it on): only at a Tailscale or My domain address, and only the address, never its PIN.
 - Labs: a command profile can speak ACP, the Agent Client Protocol (Settings › Agents & profiles › *Speaks ACP*, e.g. `gemini --experimental-acp`): its tabs open in the Reader with no terminal, and its permission asks, plan and turn ends work as for any agent.
 - Workflows run steps at once: a *Parallel* block runs 2 to 6 commands, AI calls or webhooks together and goes on when all pass, or with the first that does. A *Run workflow* block runs another of your workflows inside the run, with its own task and values, and gets its outputs back.
 - Allow or deny the newest ask from any app with a hotkey (Settings › General, off until you turn it on): a card shows what it answers, Esc stops it. Risky or chained commands, questions, plans and secrets stay for Laki's window. [Try it](laki://settings/general?spot=Allow%20the%20newest%20ask)

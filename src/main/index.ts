@@ -18,7 +18,7 @@ import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { hotkeyAnswer } from '../shared/ask.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
 // the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
@@ -1333,6 +1333,26 @@ function trayMenu() {
     ])
   tray?.setContextMenu(barInbox ? null : trayBuilt)
 }
+// Handoff (macOS, Settings › Remote access › Offer on my nearby devices, off unless on): the remote page's lasting
+// address (guards.ts handoffUrl, from the window's view) offered to your nearby Apple devices while Laki is in front;
+// dropped as remote access stops or moves, in Recording mode, or with Laki in the background
+let handoffWant: string | undefined // what the window says remote access runs at
+let handoffSet: string | undefined // what's offered now
+function handoffNow() {
+  if (!mac) return
+  const url = handoffWant && !recording && BrowserWindow.getFocusedWindow() ? handoffWant : undefined
+  if (url === handoffSet) return
+  handoffSet = url
+  if (url) app.setUserActivity('NSUserActivityTypeBrowsingWeb', {}, url)
+  else app.invalidateCurrentActivity()
+}
+ipcMain.on('handoff', (e, r: unknown) => {
+  if (!from(e)) return
+  handoffWant = handoffUrl(r)
+  handoffNow()
+})
+app.on('browser-window-focus', () => handoffNow())
+app.on('browser-window-blur', () => setImmediate(handoffNow)) // another of Laki's windows may take the focus
 // D9: remote access that follows the Mac's lock (Settings › Remote access › Start it): the lock and the unlock to the
 // daemon, as the app (its token); laki serve has no app, so none
 app.whenReady().then(() => {
@@ -1349,6 +1369,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
   if (inboxWin?.isVisible()) sendInbox()
   else if (!barInbox) inboxHide()
   recording = rec === true
+  handoffNow() // Recording mode on: offered nowhere
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
   // U15: a Ship at work or a workflow run going (shared/tray.ts dockProgress): -1 none, 2 unknown, else 0 to 1

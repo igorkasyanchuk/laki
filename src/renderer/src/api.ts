@@ -70,6 +70,7 @@ type Bridge = {
   procStop?(what: string): void
   browserMem?(ids: number[]): Promise<{ kb: number } | null>
   browserGuard?(id: number): Promise<string | undefined>
+  handoff?(r: { url?: string; via?: string; host?: string } | null): void // remote access's address for Handoff (none: off or not running)
   onDeepLink?(cb: (url: string) => void): void
   onFolders?(cb: (paths: string[]) => void): () => void // folders dropped on the Dock icon: projects, as a drop on the window
   capture?(webContentsId: number): Promise<string>

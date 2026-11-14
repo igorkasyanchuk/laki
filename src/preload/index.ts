@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('laki', {
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: object, progress?: number, inbox?: object[]) => ipcRenderer.send('badge', n, items, tray, recording, state, progress, inbox), // inbox: the menu bar's Inbox (tray.ts inboxOf), with Menu bar click: Inbox // state: Q8's (shared/tray.ts stateOf)
+  handoff: (r: { url?: string; via?: string; host?: string } | null) => ipcRenderer.send('handoff', r), // Handoff's address (main's handoffUrl checks it)
   onDeepLink: (cb: (url: string) => void) => {
     ipcRenderer.on('deep-link', (_e, url: string) => cb(url))
     ipcRenderer.send('deep-link-ready') // then main sends one that came first

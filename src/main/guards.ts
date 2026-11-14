@@ -44,6 +44,20 @@ export const BROWSER = 'persist:browser' // the sidebar's Browsers: any site, it
 export const AGENT_BROWSER = 'agent-browser' // S12: the agent browser's hidden windows: in memory, never the Preview's cookies
 // a <webview> may attach: a Browsers page on a website or about:blank, else only the Preview on localhost
 export const webviewOk = (partition: string | undefined, src: string) => (partition === BROWSER ? web(src) || src === 'about:blank' : partition === PREVIEW && local(src))
+// Handoff (Settings › Remote access › Offer on my nearby devices): the address a nearby Apple device is offered, the
+// remote page's own: only at a lasting one (Tailscale's, My domain's; never a quick tunnel's, which changes and whose
+// link is its key), https only, no # (the link's token or PIN) and no query. Else none
+export function handoffUrl(r: unknown): string | undefined {
+  const x = r && typeof r === 'object' ? (r as { url?: unknown; via?: unknown; host?: unknown }) : {}
+  if (typeof x.url !== 'string' || (x.via !== 'tailscale' && !(typeof x.host === 'string' && x.host))) return
+  try {
+    const u = new URL(x.url)
+    return u.protocol === 'https:' && !u.username && !u.password ? `${u.origin}${u.pathname}` : undefined
+  } catch {
+    return undefined
+  }
+}
+
 // open-external's: a website to the default browser, a laki: link to the app window, nothing else
 export const externalOf = (u: unknown) => (web(u) ? 'web' : typeof u === 'string' && u.startsWith('laki:') ? 'laki' : undefined)
 

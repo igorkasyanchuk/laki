@@ -1,7 +1,7 @@
 // E3: Electron main's checks (src/main/guards.ts), on plain node: who may send IPC, which URLs get through
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { appFile, appPage, BROWSER, externalOf, fromApp, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { appFile, appPage, BROWSER, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -110,4 +110,13 @@ test('main guards: menu-popup takes a plain menu only', () => {
     [Array.from({ length: MENU_ITEMS + 1 }, (_, i) => ({ id: String(i), label: 'a' })), 'too many'],
   ] as [unknown, string][])
     assert.equal(menuModelOk(m), undefined, why)
+})
+
+test('main guards: Handoff offers only a lasting https address, with no # secret or query', () => {
+  assert.equal(handoffUrl({ url: 'https://calm-fox.trycloudflare.com/' }), undefined, 'a quick tunnel: none')
+  assert.equal(handoffUrl({ url: 'https://mac.tail1234.ts.net/#t=secret&pin=1234', via: 'tailscale' }), 'https://mac.tail1234.ts.net/', 'the hash stripped')
+  assert.equal(handoffUrl({ url: 'https://laki.example.com/app?token=x#y', host: 'laki' }), 'https://laki.example.com/app', 'My domain, its query stripped')
+  assert.equal(handoffUrl({ url: 'http://mac.tail1234.ts.net/', via: 'tailscale' }), undefined, 'http refused')
+  assert.equal(handoffUrl({ url: 'https://a:b@mac.tail1234.ts.net/', via: 'tailscale' }), undefined, 'no credentials')
+  for (const r of [null, undefined, 'https://x/', { via: 'tailscale' }, { url: 'not a url', via: 'tailscale' }, { url: 'javascript:alert(1)', host: 'x' }]) assert.equal(handoffUrl(r), undefined)
 })

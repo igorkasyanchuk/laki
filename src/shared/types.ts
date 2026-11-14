@@ -609,6 +609,7 @@ export type Settings = {
   remotePasskey?: boolean // D6: paired devices unlock with a passkey (Face ID, Touch ID) at a stable address (unset: offered)
   remotePinFallback?: boolean // D6: a locked device may unlock with the PIN instead (unset: yes)
   remoteIdle?: number // D6: minutes without a call before a passkey device locks again (unset: 15; 0: only at each page load)
+  remoteHandoff?: boolean // Handoff: remote access's lasting address offered to your nearby Apple devices while Laki is in front (main's handoffNow; off unless true)
   remotePush?: boolean // D4: remote access's link (and its start, a new address, a stop on its own, a new device) to the phone webhook; off unless true, never with anyone-with-the-link
   remoteLevel?: 'answer' | 'full' // D7: a remote page's access when it isn't a paired device's (a quick tunnel's tab), and what a new device starts with; unset: full
   remoteWrong?: 'wait' | 'stop' // D5: after the wrong PINs, no PIN taken for a while (wait, unset too) or remote access stops

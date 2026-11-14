@@ -340,6 +340,14 @@ Chromium touches a display) makes `Laki.AppImage --headless …` work with no X 
 Docker: `scripts/linux.sh`'s image without Xvfb). It passes `LAKI_HEADLESS_PARENT`: `serve` stops when its parent goes
 (a kill of that pid alone), remote access with it.
 
+Handoff (macOS, `settings.remoteHandoff`, off unless true: Settings › Remote access › *Offer on my nearby devices*): the window sends
+the view's `remote` address (`url`, `via`, `host`; none while off or stopped) over the `handoff` IPC; main's `handoffUrl`
+(guards.ts, pure: `test/main-guards.test.ts`) keeps only a lasting one (Tailscale's, My domain's; never a quick tunnel's),
+https, with no # (the link's token or PIN), query or credentials. `handoffNow` offers it (`app.setUserActivity`,
+`NSUserActivityTypeBrowsingWeb`) while a Laki window has the focus and Recording mode is off (the badge IPC's), and
+`invalidateCurrentActivity` otherwise: remote access stopped or moved, Recording mode, Laki in the background. A paired
+device gets in with its cookie; another sees the PIN page. ponytail: not tried across two devices yet.
+
 ### End to end (S14)
 
 `e2e.ts` (node:crypto) and the page's `renderer/src/e2e.ts` (WebCrypto): a connection's key `keyOf(secret, salt)`,

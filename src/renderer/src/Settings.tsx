@@ -171,6 +171,7 @@ export type AppSettings = Paint & {
   remoteHost?: string // My domain's word (unset: laki)
   remoteWrong?: 'wait' | 'stop' // after the wrong PINs: wait (unset too) or stop remote access
   remotePush?: boolean // D4: the link to the phone webhook (off unless true)
+  remoteHandoff?: boolean // Handoff (off unless true)
   remotePasskey?: boolean // D6: passkeys for paired devices (unset: on)
   remotePinFallback?: boolean // D6: Use PIN instead (unset: on)
   remoteIdle?: number // D6: minutes before a passkey device locks again (unset: 15; 0: only on open)
@@ -2470,6 +2471,15 @@ export function SettingsPage(p: {
               opts={{ when: s.remoteWhen === 'locked' ? 'locked' : 'manual', awake: s.remoteAwake ?? 'ac', level: s.remoteLevel === 'answer' ? 'answer' : 'full', mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel, host: s.remoteHost ?? '', wrong: s.remoteWrong === 'stop' ? 'stop' : 'wait', days: s.remoteDeviceDays ?? 30, push: s.remotePush === true, hook: hookOf(s.webhook), passkey: s.remotePasskey !== false, pinBack: s.remotePinFallback !== false, idle: s.remoteIdle ?? 15, domain: s.tunnel?.name?.trim() && s.tunnel.domain?.trim() ? s.tunnel.domain.trim().toLowerCase() : undefined }}
               set={o => set({ ...(o.when !== undefined && { remoteWhen: o.when }), ...(o.awake !== undefined && { remoteAwake: o.awake }), ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }), ...(o.host !== undefined && { remoteHost: o.host }), ...(o.wrong !== undefined && { remoteWrong: o.wrong }), ...(o.days !== undefined && { remoteDeviceDays: o.days }), ...(o.push !== undefined && { remotePush: o.push }), ...(o.passkey !== undefined && { remotePasskey: o.passkey }), ...(o.pinBack !== undefined && { remotePinFallback: o.pinBack }), ...(o.idle !== undefined && { remoteIdle: o.idle }), ...(o.level !== undefined && { remoteLevel: o.level }) })}
             />
+          )}
+          {sec === 'remote' && p.remote && /Mac/.test(navigator.userAgent) && (
+            <Group title="Handoff">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.remoteHandoff} onChange={v => set({ remoteHandoff: v || undefined })}>
+                  <Says title="Offer on my nearby devices" hint="While remote access runs at a lasting address (Tailscale, My domain) and Laki is in front, your iPhone, iPad or other Mac on your Apple Account offers its page. Only the address goes: a paired device gets in, another sees the PIN page. Never a quick tunnel's, never in Recording mode" />
+                </Switch>
+              </div>
+            </Group>
           )}
           {on('needs') && (
             <>
