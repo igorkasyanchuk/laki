@@ -6,6 +6,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, r
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
+import { firstLoad } from '../scripts/size.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -639,6 +640,24 @@ test('R7: writeAtomic and readJson', t => {
   writeFileSync(join(d, 'data', 'empty.json'), '')
   assert.equal(readJson(join(d, 'data', 'empty.json')), undefined)
   assert.ok(existsSync(join(d, 'data', 'empty.json')), 'an empty one is no loss')
+})
+
+// scripts/size.ts: the window's first load is index.html's scripts and stylesheets and what they import statically
+test('firstLoad: static imports followed, a dynamic import() and an unlinked chunk left out', () => {
+  const files = {
+    'assets/index.js': 'import { a } from "./ui.js";\nimport "./side.js";\nconst Page = () => import("./page.js");\nexport { b } from "./b.js"',
+    'assets/ui.js': 'import {\n  r as react\n} from "./react.js"',
+    'assets/side.js': '',
+    'assets/react.js': 'import("./lazy.js")',
+    'assets/b.js': '',
+    'assets/page.js': 'import "./deep.js"',
+    'assets/deep.js': '',
+    'assets/lazy.js': '',
+    'assets/index.css': '',
+    'assets/page.css': '',
+  }
+  const html = '<script type="module" crossorigin src="./assets/index.js"></script><link rel="modulepreload" href="./assets/ui.js"><link rel="stylesheet" href="./assets/index.css"><link rel="icon" href="./assets/icon.svg">'
+  assert.deepEqual(firstLoad(html, files), { js: ['assets/index.js', 'assets/ui.js', 'assets/react.js', 'assets/side.js', 'assets/b.js'], css: ['assets/index.css'] })
 })
 
 // main's pings of the daemon: 3 misses in a row is hung, any answer clears it

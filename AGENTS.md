@@ -17,6 +17,7 @@ npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --tes
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
 npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~25 s, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
 npm run test:cov                  # the tests with node's coverage of src/daemon and src/shared (daemons too), the 10 least covered (scripts/cov.ts; not a gate)
+npm run size                      # the window's first load (index.html's scripts, stylesheets and static imports) against package.json's lakiSize, 3% allowed (scripts/size.ts; npm run build first; dmg runs it); -- --write sets it on purpose
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)

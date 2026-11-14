@@ -20,12 +20,14 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    npm run pack       # this Mac's architecture: dist/mac-arm64/Laki.app (Intel: dist/mac)
    npm run pack:x64   # the Intel app from an Apple silicon Mac: dist/mac/Laki.app
    ```
-   A disk image to hand out: `npm run dmg` bumps the minor version (`npm version minor`, no tag), builds, and writes
+   A disk image to hand out: `npm run dmg` bumps the minor version (`npm version minor`, no tag), builds, holds the
+   window's first load to its budget (`npm run size`: package.json's `lakiSize`, 3% allowed; `-- --write` raises it on
+   purpose), and writes
    `dist/release/Laki-<version>-arm64.dmg` (its own folder: a running `dist/mac-arm64/Laki.app` and its daemon stay
    as they are). Each run is a new minor version, and `docs/release-notes.md`'s `## Next` becomes it (Settings ›
    Release notes): add a line there for each user-visible change before.
 5. Run `scripts/pack-smoke.sh` once before a release: it runs the packaged app's daemon, CLI and hooks on Electron's
-   node with fake agents, in a temp home, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
+   node (Laki Node) with fake agents, in a temp home, checks the app's own binary runs no JavaScript as node, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
    the app's data folder under the real home, so a running one holds the single-instance lock and the smoke's window quits. For the Intel build:
    `APP=$PWD/dist/mac/Laki.app scripts/pack-smoke.sh` (under Rosetta).
 6. Open the app once by hand: a project, a workspace with an agent, a turn's notification, Settings.
