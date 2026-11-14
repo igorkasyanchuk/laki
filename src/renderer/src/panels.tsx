@@ -12,7 +12,7 @@ import { preview, THEMES } from './themes'
 import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, groupNew, laterText, nameOf, type PalKind, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
-import { AGENT_COLORS, colorVar, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu, act } from './ui'
+import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, openFrom, Page, ProjectMark, Switch, useMenu, act } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -2202,7 +2202,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
             key={f.path}
             className={`art-card ${linkOf(f.path) ? 'link' : ''}`}
             data-tip={linkOf(f.path) ? `${linkOf(f.path)!.url} · open in the browser` : `${f.path} · ${sizeOf(f.size)} · ${new Date(f.at).toLocaleString()}`}
-            onClick={() => (linkOf(f.path) ? go(linkOf(f.path)!.url) : setBig(f.path))}
+            onClick={e => (linkOf(f.path) ? go(linkOf(f.path)!.url) : openFrom(e.currentTarget, () => setBig(f.path)))}
             onContextMenu={e => rightClick(e, f)}
           >
             <span className="art-thumb">{look(f)}</span>
@@ -2211,8 +2211,8 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
         ))}
       </div>
       {at && here && (
-        <Modal title={`${linkOf(at.path)?.title ?? at.path} · ${i + 1} of ${here.length}`} onClose={() => setBig(null)} wide loose>
-          <div className="art-big" onContextMenu={e => rightClick(e, at)}>
+        <Modal title={`${linkOf(at.path)?.title ?? at.path} · ${i + 1} of ${here.length}`} onClose={() => closeTo(() => setBig(null))} wide loose>
+          <div className="art-big" data-zoom onContextMenu={e => rightClick(e, at)}>
             {look(at, true)}
           </div>
           <div className="buttons">

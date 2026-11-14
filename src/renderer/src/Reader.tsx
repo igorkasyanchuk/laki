@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
-import { ask, Icon, type MenuItem, ON, ScrollEdge, useMenu } from './ui'
+import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } from './ui'
+import { Modal } from './panels'
 import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
 import { daemonBase, openExternal } from './api'
@@ -58,6 +59,7 @@ export function flushDraft(id: string) {
   return due.go()
 }
 export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: ReaderApi; active: boolean; look?: ReaderLook }) {
+  const [big, setBig] = useState<{ src: string; alt: string } | null>(null) // a message's picture, large
   // U2: the AI button (App's .ai-fab-wrap, by the main area's bottom right) goes up over this box, not onto its Send
   const fabOver = useCallback((b: HTMLFormElement | null) => {
     const m = b?.closest<HTMLElement>('.main')
@@ -247,7 +249,15 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <ScrollEdge />
-        <div className="reader-col">
+        {/* a picture in a message opens large (one in a link stays the link's), zooming from where it was */}
+        <div
+          className="reader-col"
+          role="presentation" // a mouse's shortcut only: the picture shows in the message either way
+          onClick={e => {
+            const img = e.target instanceof HTMLImageElement && !e.target.closest('a') && e.target.closest('.md') ? e.target : null
+            if (img) openFrom(img, () => setBig({ src: img.currentSrc || img.src, alt: img.alt }))
+          }}
+        >
           {none && !said?.length && (
             <div className="reader-empty muted">
               {tab.name}'s chat shows here once it has said something.
@@ -342,6 +352,13 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           {histMenu}
           {at.menu}
         </form>
+      )}
+      {big && (
+        <Modal title={big.alt || 'Image'} onClose={() => closeTo(() => setBig(null))} loose>
+          <div className="art-big" data-zoom>
+            <img src={big.src} alt={big.alt} />
+          </div>
+        </Modal>
       )}
     </div>
     </RunCode.Provider>

@@ -15,7 +15,7 @@ import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './settingsBase'
 import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
-import { Icon, type IconName } from './ui'
+import { closeTo, Icon, type IconName, openFrom } from './ui'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 
@@ -391,10 +391,10 @@ export function Term({
             ))}
         </span>
       )}
-      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} onOpen={b => (peekGone(), setBig(b))} />}
+      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} onOpen={b => openFrom(document.querySelector('.link-peek .lp-img'), () => (peekGone(), setBig(b)))} />}
       {big && (
-        <Modal title={big.size ? `${big.name} · ${big.size}` : big.name} onClose={() => setBig(null)} loose>
-          <div className="art-big lp-big">
+        <Modal title={big.size ? `${big.name} · ${big.size}` : big.name} onClose={() => closeTo(() => setBig(null))} loose>
+          <div className="art-big lp-big" data-zoom>
             {big.kind === 'md' ? <div className="lp-big-md"><Markdown src={big.src.slice(0, 200_000)} /></div> : big.kind === 'text' ? <pre className="lp-big-text">{big.src.slice(0, 500_000)}</pre> : <img src={big.src} alt={big.name} />}
           </div>
         </Modal>

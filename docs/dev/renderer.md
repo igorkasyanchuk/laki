@@ -955,6 +955,14 @@ frames would hold the change until one comes: a daemon view, a page opened from 
 and ui-smoke (main's `uiSmoke` sets `data-smoke` on every load). A transition whose change hasn't run in 400 ms is
 skipped (`skipTransition`: its change runs then; measured in a hidden browser page: the sheet at 432 ms).
 
+Zoom: a picture opening large grows from its thumbnail and shrinks back into it. ui.tsx `openFrom(el, open)` names the
+thumbnail's `<img>` (el or the one in it) `zoom`, runs open in a view transition, then names the large one (an `<img>`
+under `[data-zoom]`); `closeTo(close)` the other way, only when the thumbnail it came from is still there and shows the
+same picture (`currentSrc`), else close at once. Same switches as `morph` (`morphOk`) and one at a time (`zooming`).
+Where: the artifacts gallery, the terminal's link card, an image diff (Changes, Review), Laki AI's thumbnails and the
+Reader's pictures (a click on one not in a link opens it). styles.css: `::view-transition-group(zoom)` at `--t-slow` on
+`--spring-soft`, the old and new pictures `object-fit: cover` so a cropped thumbnail grows without a stretch.
+
 Springs (V14): styles.css' `--spring` (ζ 0.55, ω 16, 600 ms: an overshoot) and `--spring-soft` (ζ 1, ω 22, 350 ms),
 `linear()` points from `scripts/spring.ts` (run once, pasted; times kept where a point on a straight stretch was
 dropped), `--t-spring` and `--t-spring-soft` beside them; `linear` under Reduce motion (and the catch-all makes every

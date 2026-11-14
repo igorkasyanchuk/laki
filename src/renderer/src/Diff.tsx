@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type H
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
-import { escapes, Icon, IconButton, type MenuItem, useMenu, act } from './ui'
+import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
 import { diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 
@@ -412,7 +412,7 @@ export function ImageDiff({ api, path, status }: { api: PanelApi; path: string; 
   }, [path, s])
   useEffect(() => {
     if (!zoom) return
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), setZoom(null))
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), closeTo(() => setZoom(null)))
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [zoom])
@@ -423,7 +423,7 @@ export function ImageDiff({ api, path, status }: { api: PanelApi; path: string; 
         <ImageSide key={label} label={label} c={c} onZoom={setZoom} />
       ))}
       {zoom && (
-        <div role="presentation" className="img-zoom" onClick={() => setZoom(null)} data-tip="Click or Esc to close">
+        <div role="presentation" className="img-zoom" data-zoom onClick={() => closeTo(() => setZoom(null))} data-tip="Click or Esc to close">
           <img src={zoom} alt={path} />
         </div>
       )}
@@ -442,7 +442,7 @@ function ImageSide({ label, c, onZoom }: { label: string; c: FileContent | strin
     )
   return (
     <figure className="img-side">
-      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} {...act(() => onZoom(c.image!))} />
+      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} {...act(e => openFrom(e.currentTarget, () => onZoom(c.image!)))} />
       <figcaption className="muted small">
         {label} · {px}
         {sizeText(c.size)}

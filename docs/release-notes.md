@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A picture you open large grows out of its thumbnail and goes back into it: artifacts, a link's preview in the terminal, an image diff, Laki AI's pictures. Pictures in the Reader open large on a click.
 - *Tint with the workspace's color* (Settings › Extras): a little of the open workspace's color in the tab bar's glass and the selected tab, fading as you switch. On for new installs. [Try it](laki://settings/extras?spot=Tint)
 - Page headers, the Review tab's file headers and the side panel's tabs blur what scrolls under them more at the top than at the bottom, as macOS 26 does, with no line under them. Reduce transparency and the flat looks keep them solid.
 - Merge in order: the Board's Merge column merges your open PRs one after another, each once its checks pass; a conflict, a failing check or a gate stops it and says why. [Try it](laki://board)

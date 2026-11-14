@@ -3782,7 +3782,12 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 ::view-transition { pointer-events: none; }
 ::view-transition-group(*) { animation-duration: var(--t-mid); animation-timing-function: var(--ease-out); }
 ::view-transition-old(*), ::view-transition-new(*) { animation-duration: var(--t-mid); }
-::view-transition-old(page) { clip-path: inset(0 0 0 var(--vt-cut, 0px)); } /* a rail page going, the sidebar back: not over it (ui.tsx morph) */
+::view-transition-old(page) { clip-path: inset(0 0 0 var(--vt-cut, 0px)); }
+/* a picture zooming from its thumbnail to its large view and back (ui.tsx openFrom, closeTo): the spring that settles,
+   the picture never stretched (both snapshots fill the moving box, cut to it), the rest of the page still */
+::view-transition-group(zoom) { animation-duration: var(--t-slow); animation-timing-function: var(--spring-soft); }
+.reader-col .md img:not(a img) { cursor: zoom-in; } /* a message's picture opens large (Reader.tsx) */
+::view-transition-old(zoom), ::view-transition-new(zoom) { block-size: 100%; object-fit: cover; } /* a rail page going, the sidebar back: not over it (ui.tsx morph) */
 
 /* F7: a workspace's server on another's port block (shared/isolation.ts portClashes): a chip on both rows */
 .ws-clash { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; color: var(--waiting); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }

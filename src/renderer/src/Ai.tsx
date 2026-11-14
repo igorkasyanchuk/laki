@@ -11,7 +11,7 @@ import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { type Complete, type Img, type Inserts, PromptInput, useDraft } from './PromptInput'
-import { ask as confirm, escapes, Icon, IconButton, Page, usePageSide } from './ui'
+import { ask as confirm, closeTo, escapes, Icon, IconButton, openFrom, Page, usePageSide } from './ui'
 import type { UiSpec } from '../../shared/widgetUi'
 import { CELL_W, KitBody } from './Widgets'
 
@@ -558,7 +558,7 @@ export function Thumbs({ paths }: { paths: string[] }) {
     <span className="ai-thumbs">
       {urls.map((u, i) =>
         u ? (
-          <button key={i} type="button" className="ai-thumb" data-tip="Show it big" onClick={() => setBig(u)}>
+          <button key={i} type="button" className="ai-thumb" data-tip="Show it big" onClick={e => openFrom(e.currentTarget, () => setBig(u))}>
             <img src={u} alt={`Image ${i + 1}`} />
           </button>
         ) : null,
@@ -569,12 +569,12 @@ export function Thumbs({ paths }: { paths: string[] }) {
         </span>
       )}
       {big && (
-        <Modal title="Image" onClose={() => setBig(null)} wide loose>
-          <div className="art-big">
+        <Modal title="Image" onClose={() => closeTo(() => setBig(null))} wide loose>
+          <div className="art-big" data-zoom>
             <img src={big} alt="" />
           </div>
           <div className="buttons">
-            <button className="primary" onClick={() => setBig(null)}>
+            <button className="primary" onClick={() => closeTo(() => setBig(null))}>
               Close
             </button>
           </div>

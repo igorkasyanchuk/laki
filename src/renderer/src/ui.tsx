@@ -83,6 +83,44 @@ export function morph(fn: () => void, grow?: 'open' | 'close') {
   t.ready.catch(() => {}) // skipped: its ready rejects
   setTimeout(() => ran || t.skipTransition(), 400)
 }
+// a picture opening large from its thumbnail (a shared element: it grows into place): the thumbnail's <img> named zoom,
+// and as open renders, the large one (an <img> in a [data-zoom] viewer) takes the name; closeTo is the way back, into
+// the thumbnail when it's still there showing the same picture. One zoom at a time; as morph, none without view
+// transitions, under Reduce motion or Motion: Off, in a window without the focus or in ui-smoke: a plain open or close
+let zoomed: HTMLImageElement | null = null
+let zooming = false
+const bigImg = () => document.querySelector<HTMLImageElement>('[data-zoom] img')
+const imgIn = (el: Element | null | undefined) => (el instanceof HTMLImageElement ? el : (el?.querySelector('img') ?? null))
+function zoom(from: HTMLElement, fn: () => void, to: () => HTMLElement | null) {
+  zooming = true
+  from.style.viewTransitionName = 'zoom'
+  let into: HTMLElement | null = null
+  let ran = false
+  const t = document.startViewTransition(() => {
+    ran = true
+    from.style.viewTransitionName = ''
+    flushSync(fn)
+    into = to()
+    if (into) into.style.viewTransitionName = 'zoom'
+  })
+  void t.finished.finally(() => ((zooming = false), into && (into.style.viewTransitionName = '')))
+  t.ready.catch(() => {})
+  setTimeout(() => ran || t.skipTransition(), 400)
+}
+export function openFrom(el: Element | null | undefined, open: () => void) {
+  const from = imgIn(el)
+  zoomed = from
+  if (!from || zooming || !morphOk()) return open()
+  zoom(from, open, bigImg)
+}
+export function closeTo(close: () => void) {
+  const from = bigImg()
+  const back = zoomed?.isConnected && from && zoomed.currentSrc === from.currentSrc ? zoomed : null
+  zoomed = null
+  if (!from || !back || zooming || !morphOk()) return close()
+  zoom(from, close, () => back)
+}
+
 // a workspace's row that moved to another group (Pinned and back): a name each (only those), so it slides there
 export function rowsMorph(ids: string[], fn: () => void) {
   if (!ids.length || !morphOk()) return fn()
