@@ -296,7 +296,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 
 - **Keep it small.** Use node's stdlib plus the existing deps (Electron, node-pty, xterm and its addons,
   React, mermaid: the user's call, loaded only for a diagram; BlockNote, Mantine, React Flow and html-to-image: the user's
-  call, for specs, loaded only with the Specs page); no new dependencies. Fonts are bundled (`fonts/`: OFL, Hack MIT; each in `NOTICE.md`), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit.
+  call, for specs, loaded only with the Specs page); no new dependencies. Fonts are bundled (`fonts/`: OFL, Hack MIT; each in `NOTICE.md`), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit; `npm run debt` lists them all by file (`--json` for tools, scripts/debt.ts). Type holes are counted too: `test/docs.test.ts` (in test:fast) holds `: any` and `as any` in src to `test/any-baseline.txt`; remove the `any`, or raise the baseline on purpose in the same commit.
 - **`laki hook` must never fail or block the agent.**
 - **Never write** `~/.claude/settings.json` or `~/.codex/*`. Agents get settings and notify through
   flags only.

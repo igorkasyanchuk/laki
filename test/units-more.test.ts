@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
+import { debtOf } from '../scripts/debt.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -686,6 +687,25 @@ test('pickTests: a changed test, a source imported directly or through one sourc
   assert.deepEqual(pickTests(['src/shared/conn.ts'], imports), [], 'only through helpers.ts: none')
   assert.deepEqual(pickTests(['src/daemon/widgetEvents.ts'], imports).map(p => p.test), ['test/widget-events.test.ts'], 'camelCase to kebab-case')
   assert.deepEqual(pickTests(['test/far.test.ts', 'README.md'], imports), [{ test: 'test/far.test.ts', why: ['changed'] }])
+})
+
+// scripts/debt.ts: a file's ponytail: comments, each to its end
+test('debtOf: a // comment and its next lines, a (ponytail: …) to its paren, a /* … */ to its end', () => {
+  const text = [
+    'const a = 1 // ponytail: one lock for all,',
+    '// per account if it matters',
+    'const b = 2',
+    'x() // a card (ponytail: an icon by name isn\'t drawn) and more',
+    '/* ponytail: a block',
+    '   that goes on */ const c = 3',
+    '{/* ponytail: in JSX */}',
+  ].join('\n')
+  assert.deepEqual(debtOf(text), [
+    { line: 1, text: 'one lock for all, per account if it matters' },
+    { line: 4, text: "an icon by name isn't drawn" },
+    { line: 5, text: 'a block that goes on' },
+    { line: 7, text: 'in JSX' },
+  ])
 })
 
 // main's pings of the daemon: 3 misses in a row is hung, any answer clears it
