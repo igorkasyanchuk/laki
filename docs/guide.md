@@ -2535,7 +2535,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   meant (`lucky, lakey → Laki`, `work tree → worktree`); whole words in any case, done in Laki after the transcript
   comes back (nothing more goes to OpenRouter), and the bar says what it changed (⌘Z in the field takes it back).
   *Remove filler words* (on) drops standalone hesitations (um, uh, hmm, äh, euh, えーと, 嗯, эээ…) the same way; words that
-  mean something stay. *Talk key* (Cloud only, off until set; ⌃⌥⌘M suggested): from any app, press it and talk: a pill
+  mean something stay. *Talk key* (Cloud, or *On this Mac* where the build has it: Apple's speech recognition on this
+  Mac, one language you pick, nothing leaves it; off until set; ⌃⌥⌘M suggested): from any app, press it and talk: a pill
   at the pointer records (a red dot while the microphone is on, a level, the time) and names who gets it: the agent
   that asked last, else the one you last sent to, else a new task (Tab, ⇧Tab: another). Press it again or ⏎ to send
   (an agent at work gets it when its turn ends, and *Undo* takes it back for 4 s; typed into an idle one's terminal it

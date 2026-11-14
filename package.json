@@ -123,6 +123,7 @@
       "minimumSystemVersion": "13.0",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Laki listens only while you dictate a prompt: the mic in a prompt box, holding Fn, or the talk key's pill (Settings › Voice).",
+        "NSSpeechRecognitionUsageDescription": "Laki writes down what you say to the talk key on this Mac (Settings › Voice › Talk key: On this Mac); nothing leaves it.",
         "ElectronSquirrelPreventDowngrades": true,
         "CFBundleDocumentTypes": [
           {

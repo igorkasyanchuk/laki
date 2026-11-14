@@ -184,8 +184,9 @@ export function aiKey(o: { key?: string | null }) {
 // ---------- voice (Settings › Voice, cloud): a recording, WAV in base64, written down by OpenRouter's speech-to-text
 // with the same key. Nothing is kept: not the audio, not the text
 const MAX_AUDIO = 24 << 20 // OpenRouter's 25 MB: about 9 minutes of the renderer's 16 kHz mono
-export async function voiceText(o: { audio?: unknown }) {
+export async function voiceText(o: { audio?: unknown; text?: unknown }) {
   if (!voiceOn(state.settings)) throw new Error('Voice is off: turn it on in Settings › Voice')
+  if (typeof o.text === 'string') return voiceClean(o.text.slice(0, 20000)) // the talk key's on-device engine wrote it down (main's laki-speech): Cloud's cleanup only
   const audio = typeof o.audio === 'string' ? o.audio : ''
   if (!audio) throw new Error('no audio')
   if (audio.length > MAX_AUDIO) throw new Error('a recording up to 9 minutes')
@@ -206,11 +207,8 @@ export async function voiceText(o: { audio?: unknown }) {
     })
     const j: any = await res.json().catch(() => ({}))
     if (res.ok && !j.error) {
-      const said = String(j.text ?? '').trim()
-      const c = state.settings?.voice?.fillers === false ? { text: said, n: 0 } : voiceFillers(said)
-      const f = voiceFix(c.text, state.settings?.voice?.fixes)
-      return { text: f.text, ...(f.fixed.length && { fixed: f.fixed }), ...(c.n && { fillers: c.n }) }
-    } // Word fixes: what changed, for the bar
+      return voiceClean(String(j.text ?? ''))
+    }
     const busy = res.status === 429 || res.status >= 500
     if (busy && n < VOICE_AGAIN.length) {
       await new Promise(r => setTimeout(r, VOICE_AGAIN[n]))
@@ -220,6 +218,13 @@ export async function voiceText(o: { audio?: unknown }) {
     const said = (j.error?.message ?? res.statusText) + (raw ? `: ${(typeof raw === 'string' ? raw : JSON.stringify(raw)).slice(0, 200)}` : '')
     throw new Error(`OpenRouter ${res.status}: ${said}${busy ? ` (${model} is busy: try again in a moment, or another model in Settings › Voice)` : ''}`)
   }
+}
+// a transcript's fillers out (unless Settings › Voice keeps them) and its word fixes in; what changed, for the bar
+function voiceClean(text: string) {
+  const said = text.trim()
+  const c = state.settings?.voice?.fillers === false ? { text: said, n: 0 } : voiceFillers(said)
+  const f = voiceFix(c.text, state.settings?.voice?.fixes)
+  return { text: f.text, ...(f.fixed.length && { fixed: f.fixed }), ...(c.n && { fillers: c.n }) }
 }
 const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map(Number) // ms before each try again (tests: shorter)
 

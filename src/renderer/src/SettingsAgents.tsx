@@ -147,6 +147,60 @@ function MicTest({ cloud }: { cloud: boolean }) {
   )
 }
 
+// the talk key's engine (Settings › Voice › Talk key): On this Mac (Laki Speech, Apple's on-device recognition, main's)
+// with its language, or Cloud (Speech to text's). Not in this build (Linux, a dev run, no swiftc at pack): nothing to pick
+export function TalkEngine({ v, onChange }: { v: VoiceSettings; onChange: (v: VoiceSettings) => void }) {
+  const [got, setGot] = useState<{ locales?: string[]; none?: true; error?: string }>()
+  useEffect(() => void bridge?.speechLocales?.().then(setGot, (e: Error) => setGot({ error: e.message })), [])
+  if (!bridge?.speechLocales || got?.none) return null
+  const mac = v.talkEngine === 'mac'
+  const locale = v.locale || 'en-US'
+  const list = got?.locales ?? []
+  const missing = mac && !!got?.locales && !list.includes(locale)
+  return (
+    <div className="setting-box">
+      <div className="grid2">
+        <label>
+          Writes it down
+          <select value={mac ? 'mac' : 'cloud'} onChange={e => onChange({ ...v, talkEngine: e.target.value === 'mac' ? 'mac' : undefined })}>
+            <option value="mac">On this Mac: nothing leaves it</option>
+            <option value="cloud">Cloud: Speech to text above</option>
+          </select>
+        </label>
+        {mac && (
+          <label>
+            Language
+            <select value={locale} onChange={e => onChange({ ...v, locale: e.target.value === 'en-US' ? undefined : e.target.value })}>
+              {[...new Set([...list, locale])].map(l => (
+                <option key={l} value={l}>
+                  {(n => (n ? `${n} (${l})` : l))(new Intl.DisplayNames(undefined, { type: 'language' }).of(l))}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      {mac && (
+        <p className={`small ${missing || got?.error ? 'warn' : 'muted'}`}>
+          {got?.error
+            ? `Couldn't ask this Mac which languages it knows: ${got.error}`
+            : missing
+              ? `This Mac doesn't recognize ${locale} on its own (System Settings › Keyboard › Dictation adds languages).`
+              : "Apple's speech recognition, on this Mac: one language at a time. macOS asks once for the microphone and speech recognition."}
+          {(missing || got?.error) && (
+            <>
+              {' '}
+              <button type="button" className="link" onClick={() => onChange({ ...v, talkEngine: undefined })}>
+                Use Cloud
+              </button>
+            </>
+          )}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
   const [has, setHas] = useState<boolean>()
   useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])

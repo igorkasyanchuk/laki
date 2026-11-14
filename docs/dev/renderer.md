@@ -468,6 +468,16 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   list there while the talk key is on, the bubbles off too), Tab `talkNext`. The key again or ⏎: `talk-text` (main's
   `rpc('voiceText')`), then `talk-send` (`send` `whenIdle` `agent: true`, only to a tab the pill offered, `talkTo`; '': `newWsWin`);
   queued: `talkUndo`, *Undo* (`talk-undo`: `queueSet` without it, refused once it went). Esc drops it;
+  On this Mac (Settings › Voice › Talk key's *Writes it down*, `voice.talkEngine: 'mac'`, `voice.locale`; SettingsAgents.tsx
+  `TalkEngine`, its languages from main's `speech-locales`): App's floats `speech` (the locale), main's `talk` payload
+  passes it on only while `speechBin()` (Contents/MacOS/laki-speech: native/laki-speech.swift, built by after-pack.cjs
+  `speechHelper` with swiftc; none on Linux, in a dev run or without swiftc). The pill's `listen` asks main
+  (`talk-listen`): main spawns it with the locale (so the microphone and speech grants are Laki's, Info.plist's
+  NSSpeechRecognitionUsageDescription), its stdout's JSON lines read by shared/speech.ts `speechLine` and sent as
+  `talk-heard` (level, partial words in the note, final, error; `end` as it exits). Stopped: `talk-listen-stop` (keep: a
+  line on its stdin, its final text; else killed), then `talk-fix` (the daemon's `voiceText { text }`: Cloud's cleanup,
+  fillers and word fixes, nothing to OpenRouter) and `heard` (routing, sending) as Cloud's. A locale the Mac doesn't
+  recognize on device: its `no-on-device` error, and Settings says so with *Use Cloud*.
   `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. Q10: Settings › Voice › Talk key's *It goes to* (`settings.talkTo`:
   `ai`; App's floats `talkAi` while Laki AI is on) makes Laki AI (`AI_TO`) the pill's first target, and Tab goes on to
   it either way while it's on (`talkNext`'s `ai`); sent to it, main's `aiTalk`: words that ask for the screen

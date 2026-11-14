@@ -26,7 +26,7 @@ import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import type { AllowRule } from '../../shared/ask'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
-import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection, WhatItSees } from './SettingsAgents'
+import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
@@ -2561,13 +2561,14 @@ export function SettingsPage(p: {
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'voice' && bridge?.talkKey && (
             <Group title="Talk key">
+              <TalkEngine v={s.voice ?? {}} onChange={voice => set({ voice })} />
               <HotkeyField
                 on={s.talkOn === true}
                 keys={s.talkKey ?? TALK_KEY}
                 def={TALK_KEY}
                 title="Talk to an agent from any app"
                 hint="Press it and talk: a small pill at the pointer records (its red dot), shows how loud and who gets it: the agent that asked last, else the one you last sent to, else a new task (Tab changes it). Press it again or ⏎ to send, Esc to drop it. macOS asks for the microphone the first time; it's on only while the pill records."
-                off={s.voice?.on !== false && s.voice?.engine === 'cloud' ? undefined : 'Needs the cloud engine (Speech to text above): macOS dictation only types into a field you are in'}
+                off={s.voice?.on !== false && (s.voice?.engine === 'cloud' || s.voice?.talkEngine === 'mac') ? undefined : 'Needs the cloud engine (Speech to text above) or On this Mac (above): macOS dictation only types into a field you are in'}
                 bind={k => bridge!.talkKey!(k || '')}
                 onOn={talkOn => set({ talkOn })}
                 onKeys={talkKey => set({ talkKey })}

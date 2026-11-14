@@ -163,6 +163,10 @@ test("voice: the cloud's recording goes to OpenRouter's speech-to-text with the 
   assert.deepEqual(await rig.rpc('voiceText', { audio: wav }), { text: 'Hello', fixed: ['hi → Hello'] }) // Word fixes, after the transcript
   assert.equal(or.hits[1].body.model, 'openai/whisper-large-v3-turbo')
   assert.equal(JSON.stringify(or.hits[1].body).includes('Hello'), false, 'the fixes never go to OpenRouter')
+  // the talk key's on-device engine's text (main's Laki Speech): Cloud's cleanup alone, nothing sent to OpenRouter
+  const sent = or.hits.length
+  assert.deepEqual(await rig.rpc('voiceText', { text: ' um, hi, make it blue ' }), { text: 'Hello, make it blue', fixed: ['hi → Hello'], fillers: 1 })
+  assert.equal(or.hits.length, sent)
   await rig.rpc('settingsSet', { voice: { on: true, engine: 'cloud', model: 5 } }) // not a string (an odd import): the default
   await rig.rpc('voiceText', { audio: wav })
   assert.equal(or.hits[2].body.model, 'microsoft/mai-transcribe-2')

@@ -26,6 +26,16 @@ case $OUT in *ran-as-node*) echo "the app's binary still runs JavaScript as node
 [ "$(uname)" = Linux ] || case $OUT in *"doesn't run scripts"*) ;; *) echo "the app's binary as node didn't end with its word: $OUT"; exit 1 ;; esac
 [ "$(ELECTRON_RUN_AS_NODE=1 "$NODEBIN" -e 'console.log("ran" + "-as-node")')" = ran-as-node ] || { echo "Laki Node doesn't run as node: $NODEBIN"; exit 1; }
 echo "the app's binary runs no JavaScript as node; Laki Node does"
+# the talk key's on-device engine (native/laki-speech.swift): built in by after-pack when swiftc was there
+if [ "$(uname)" = Darwin ]; then
+  SPEECH="$APP/Contents/MacOS/laki-speech"
+  if [ -x "$SPEECH" ]; then
+    "$SPEECH" --version 2>/dev/null | grep -q '"version"' || { echo "laki-speech doesn't print its version: $SPEECH"; exit 1; }
+    echo "laki-speech: $("$SPEECH" --version 2>/dev/null)"
+  else
+    echo "laki-speech: not in this build (no swiftc at pack): the talk key has Cloud only"
+  fi
+fi
 laki() { ELECTRON_RUN_AS_NODE=1 "$NODEBIN" "$RES/cli.js" "$@"; }
 ELECTRON_RUN_AS_NODE=1 "$NODEBIN" "$RES/daemon.js" > "$H/daemon.out" 2>&1 &
 APP_PID=

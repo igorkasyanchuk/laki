@@ -70,10 +70,24 @@ async function nodeHelperLinux(ctx) {
   console.log(`  • ${NODE_APP}: ${ctx.packager.executableName}-node`)
 }
 
+// Laki Speech (native/laki-speech.swift): the talk key's on-device engine, built with swiftc for this build's arch
+// (electron-builder's Arch: 1 x64, 3 arm64) into Contents/MacOS/laki-speech, signed with the rest (the release's
+// entitlementsInherit gives it audio-input). No swiftc here (Xcode's command line tools): left out, said in one line;
+// the talk key then has Cloud only
+function speechHelper(ctx, app) {
+  const arch = ctx.arch === 1 ? 'x86_64' : 'arm64'
+  try {
+    execFileSync('xcrun', ['swiftc', '-O', '-swift-version', '5', '-target', `${arch}-apple-macos13.0`, '-o', join(app, 'Contents/MacOS/laki-speech'), join(ctx.packager.projectDir, 'native/laki-speech.swift')], { stdio: ['ignore', 'ignore', 'pipe'] })
+    console.log(`  • Laki Speech: Contents/MacOS/laki-speech (${arch})`)
+  } catch (e) {
+    console.log(`  • Laki Speech skipped: no swiftc here (${String(e.stderr || e.message).trim().split('\n')[0].slice(0, 120)}); the talk key has Cloud only`)
+  }
+}
 exports.default = async function afterPack(ctx) {
   if (ctx.electronPlatformName === 'linux') return nodeHelperLinux(ctx)
   if (ctx.electronPlatformName !== 'darwin') return
   await nodeHelper(ctx, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`))
+  speechHelper(ctx, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`))
   let v = ''
   try {
     v = execFileSync('xcrun', ['actool', '--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })

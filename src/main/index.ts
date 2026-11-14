@@ -6,12 +6,14 @@ import { type ChildProcess, execFile, spawn, spawnSync } from 'node:child_proces
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
+import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -1338,7 +1340,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1522,6 +1524,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     at: o.at === 'notch' ? 'notch' : 'edge',
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
     ...(o.talkAi === true && { talkAi: true }),
+    ...(typeof o.speech === 'string' && /^[\w-]{2,20}$/.test(o.speech) && { speech: o.speech }),
     ...(o.aiShow === true && { aiShow: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
   }
@@ -2101,11 +2104,11 @@ function talk() {
   const url = pageURL('floater.html', '#talk')
   pin(w, url)
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null)))
+  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null), listen?.kill(), (listen = null)))
   w.webContents.on('did-finish-load', () => {
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
+    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -2149,6 +2152,38 @@ ipcMain.handle('talk-undo', async e => {
   )
 })
 ipcMain.on('talk-close', e => fromTalk(e) && talkW!.close())
+// the talk key's on-device engine (native/laki-speech.swift, built by after-pack.cjs beside the app's binary): main runs
+// it, so its microphone and speech grants are Laki's; its lines (shared/speech.ts) go on to the pill. None (Linux, a dev
+// run, a build without swiftc): Cloud only
+const speechBin = () => (p => (mac && existsSync(p) ? p : undefined))(join(dirname(process.execPath), 'laki-speech'))
+let listen: ChildProcess | null = null
+ipcMain.handle('talk-listen', e => {
+  if (!fromTalk(e)) return { error: 'not the talk pill' }
+  const bin = speechBin()
+  if (!bin || !floats.speech) return { error: "On this Mac isn't in this build: Settings › Voice › Talk key, Cloud" }
+  listen?.kill()
+  const p = (listen = spawn(bin, [floats.speech], { stdio: ['pipe', 'pipe', 'ignore'] }))
+  const to = (x: object) => talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-heard', x)
+  createInterface({ input: p.stdout! }).on('line', l => (x => x && to(x))(speechLine(l)))
+  p.on('error', err => to({ kind: 'error', error: err.message, code: 'start' }))
+  p.on('exit', () => (listen === p && (listen = null), to({ kind: 'end' })))
+  return {}
+})
+// stop it: keep, its final text (a line on its stdin); else dropped
+ipcMain.on('talk-listen-stop', (e, keep: unknown) => fromTalk(e) && listen && (keep === true ? listen.stdin?.end('\n') : (listen.kill(), (listen = null))))
+// what it wrote down, cleaned as Cloud's is (the daemon's voiceText: fillers out, word fixes in)
+ipcMain.handle('talk-fix', (e, text: unknown) => {
+  if (!fromTalk(e)) return { error: 'not the talk pill' }
+  if (typeof text !== 'string') return { error: 'no text' }
+  return rpc<{ text: string }>('voiceText', { text: text.slice(0, 20000) }).catch((err: Error) => ({ error: err.message }))
+})
+// Settings › Voice's: the languages it recognizes on this Mac ({ none }: not in this build)
+ipcMain.handle('speech-locales', e => {
+  if (!from(e)) return { error: "not Laki's window" }
+  const bin = speechBin()
+  if (!bin) return { none: true }
+  return new Promise(r => execFile(bin, ['--locales'], { timeout: 15000 }, (err, out) => r(err ? { error: err.message } : (x => (x?.kind === 'locales' ? { locales: x.locales } : { error: 'no answer' }))(speechLine(String(out).trim().split('\n').pop() ?? '')))))
+})
 ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
   if (!floater || e.sender !== floater.webContents || floats.at === 'notch') return
   if (phase === 'start') {

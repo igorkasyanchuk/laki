@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('laki', {
   quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
   tellKey: (label: string): Promise<boolean> => ipcRenderer.invoke('tell-hotkey', label), // Q7: show and tell's global keys ('' none)
   talkKey: (label: string): Promise<boolean> => ipcRenderer.invoke('talk-hotkey', label), // Q2: the talk key ('' none)
+  speechLocales: (): Promise<{ locales?: string[]; none?: true; error?: string }> => ipcRenderer.invoke('speech-locales'), // the talk key's on-device engine's languages (none: not in this build)
   // hold Fn (voice.ts): main watches Fn while this page asks (Chromium never gives a page Fn's own key events on macOS)
   fnWatch: (on: boolean) => ipcRenderer.send('fn-watch', on),
   onFn: (cb: (down: boolean) => void) => ipcRenderer.on('fn', (_e, down: boolean) => cb(down === true)),
@@ -142,6 +143,11 @@ contextBridge.exposeInMainWorld('laki', {
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
     talkSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project), // Q10: shot: the screen went with it to Laki AI
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
+    // the on-device engine (Laki Speech, main's): start, its lines, stop (keep: its final text), Cloud's cleanup of that text
+    talkListen: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-listen'),
+    onTalkHeard: (cb: (x: object) => void) => ipcRenderer.on('talk-heard', (_e, x) => cb(x)),
+    talkListenStop: (keep: boolean) => ipcRenderer.send('talk-listen-stop', keep),
+    talkFix: (text: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-fix', text),
     talkClose: () => ipcRenderer.send('talk-close'),
   },
   // cards on screen (ask.html): the cards in, the page's height, a choice, ×, Close all and Open out (by each card's key)

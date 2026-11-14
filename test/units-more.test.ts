@@ -25,6 +25,7 @@ import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
 import { appBinOk, appOf, helperBin } from '../src/shared/helper.ts'
+import { speechLine } from '../src/shared/speech.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
@@ -883,4 +884,17 @@ test("saidAt: a chat search's hit among the Reader's messages, by who, time span
   assert.equal(saidAt(said, { who: 'agent', text: 'Fixed the rounding.', at: 99 }), 3) // no time fits: the newest by words
   assert.equal(saidAt(said, { who: 'you', text: 'rounding' }), -1) // not yours
   assert.equal(saidAt([], { who: 'you', text: 'x' }), -1)
+})
+
+test("speechLine: Laki Speech's JSON lines (level, partial, final, error, version, locales); anything else, nothing", () => {
+  assert.deepEqual(speechLine('{"level":0.42}'), { kind: 'level', level: 0.42 })
+  assert.deepEqual(speechLine('{"level":7}'), { kind: 'level', level: 1 }) // held to 0…1
+  assert.deepEqual(speechLine('{"partial":"fix the"}'), { kind: 'partial', text: 'fix the' })
+  assert.deepEqual(speechLine('{"final":"Fix the total."}'), { kind: 'final', text: 'Fix the total.' })
+  assert.deepEqual(speechLine('{"final":""}'), { kind: 'final', text: '' }) // nothing heard
+  assert.deepEqual(speechLine('{"error":"uk-UA isn\'t recognized on this Mac","code":"no-on-device"}'), { kind: 'error', error: "uk-UA isn't recognized on this Mac", code: 'no-on-device' })
+  assert.deepEqual(speechLine('{"error":"x"}'), { kind: 'error', error: 'x', code: 'error' })
+  assert.deepEqual(speechLine('{"version":"1"}'), { kind: 'version', version: '1' })
+  assert.deepEqual(speechLine('{"locales":["en-US","uk-UA","../x",3]}'), { kind: 'locales', locales: ['en-US', 'uk-UA'] })
+  for (const bad of ['', 'not json', '2026-11-14 laki-speech[1] No Assistant asset', '[1]', 'null', '{"level":"loud"}', '{}']) assert.equal(speechLine(bad), undefined, bad)
 })

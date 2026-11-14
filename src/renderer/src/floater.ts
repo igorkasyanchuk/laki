@@ -12,6 +12,7 @@ import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
+import type { SpeechLine } from '../../shared/speech'
 import { AI_TO, type Route, routeOf, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 
@@ -73,11 +74,15 @@ type Bridge = {
     talkSend: (tab: string, text: string, project?: string) => Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }>
     talkUndo: () => Promise<{ error?: string }>
     talkClose: () => void
+    talkListen: () => Promise<{ error?: string }>
+    onTalkHeard: (cb: (x: SpeechLine | { kind: 'end' }) => void) => void
+    talkListenStop: (keep: boolean) => void
+    talkFix: (text: string) => Promise<{ text?: string; error?: string }>
   }
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
 // npm run test:ui's (no microphone opened); ai: Laki AI is on (Tab goes to it too)
-type Talk = { list: RouteTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg }
+type Talk = { list: RouteTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string } // speech: the on-device engine's locale (main's Laki Speech), else Cloud
 // Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
 // the project last sent to (a route into another one shows a little longer)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; aiOn?: boolean; fixes?: string; last?: string; lastTab?: string }
@@ -766,6 +771,7 @@ function talkPage() {
     if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
     if (c.mic === 'not-determined') say('macOS asks once: Laki hears what you say to an agent, and only while this pill shows red')
     else say(HINT)
+    if (c.speech && !c.smoke) return void listen()
     void record(!!c.smoke)
   })
   async function record(smoke: boolean) {
@@ -817,6 +823,53 @@ function talkPage() {
       }
       if (r && r.state !== 'inactive') (r.onstop = done), r.stop()
       else done()
+    }
+  }
+  // the on-device engine: main's Laki Speech listens (the mic open while the pill is red), its level and words as it
+  // goes; stopped, its final text is cleaned as Cloud's is (talkFix: fillers, word fixes), then routed and sent as Cloud's
+  let onHeard: ((x: SpeechLine | { kind: 'end' }) => void) | undefined
+  bridge?.onTalkHeard(x => onHeard?.(x))
+  async function listen() {
+    const at = Date.now()
+    let partial = ''
+    let ended = false
+    let loud = Date.now()
+    let deaf = false
+    const tick = setInterval(() => {
+      timeEl.textContent = talkTime(Date.now() - at)
+      const q = phase === 'rec' && Date.now() - loud >= QUIET_MS
+      if (q !== deaf) (deaf = q), say(q ? quietSay(undefined) : HINT, q)
+    }, 200)
+    const limit = setTimeout(() => stopRec?.(true), VOICE_MAX_MS)
+    const end = (text: string) => {
+      if (ended) return
+      ended = true
+      onHeard = undefined
+      void bridge?.talkFix(text).then(w => heard(w?.text ?? text), () => heard(text))
+    }
+    onHeard = x => {
+      if (x.kind === 'level') (level.style.width = `${x.level * 100}%`), x.level >= FLAT && (loud = Date.now())
+      else if (x.kind === 'partial') (partial = x.text), phase === 'rec' && !deaf && say(x.text.length > 70 ? `…${x.text.slice(-70)}` : x.text)
+      else if (x.kind === 'final') phase === 'writing' && end(x.text.trim() || partial)
+      else if (x.kind === 'error') (ended = true), stopRec?.(false), say(`${x.error}${x.code === 'no-on-device' || x.code === 'locale' ? ': Settings › Voice › Talk key, Cloud' : ''}`, true), setTimeout(close, 5000)
+      else if (x.kind === 'end' && phase === 'writing') end(partial) // it stopped without a final line
+    }
+    phase = 'rec'
+    box.classList.add('rec')
+    const r = await bridge?.talkListen()
+    if (r?.error) return void ((phase = 'wait'), box.classList.remove('rec'), say(r.error, true))
+    stopRec = keep => {
+      stopRec = undefined
+      clearTimeout(limit)
+      clearInterval(tick)
+      box.classList.remove('rec')
+      level.style.width = '0'
+      if (!keep || Date.now() - at < VOICE_SHORT_MS) bridge?.talkListenStop(false)
+      if (!keep) return ended || close()
+      if (Date.now() - at < VOICE_SHORT_MS) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
+      phase = 'writing'
+      say('Writing it down…')
+      bridge?.talkListenStop(true)
     }
   }
   async function heard(given?: string, audio?: Blob | null) {
