@@ -10,6 +10,7 @@ import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
 import { bulkOk } from '../../shared/ask'
 import { AskDiff } from './Diff'
+import { ProofList } from './Proof'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
 import { Elapsed, Icon, Num } from './ui'
@@ -29,6 +30,7 @@ export type NeedsApi = {
   keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
   bulk?: (ts: TabView[], allow: boolean) => void // U8: Allow all (it asks first, naming each) and Deny all
   allowKey?: string // Allow all's key, for its tip
+  openProof?: (t: TabView, path: string) => void // the Proof card's file (a script's output, a picture): its storage folder's
 }
 
 const EARLIER = 'laki.needsEarlier' // '1': the Earlier row unfolded
@@ -158,6 +160,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
       ) : (
         <>
           {last && <div className="need-q need-last">{last}</div>}
+          {w.proof?.tab === t.id && api.openProof && <ProofList p={w.proof} open={path => api.openProof!(t, path)} />}
           <div className="need-acts" onClick={stop}>
             {stat && (
               <span className="ws-stat">

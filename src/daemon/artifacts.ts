@@ -55,7 +55,7 @@ async function scanOnce() {
       // a .url file (an agent saved one, or an older Laki did): its link moved into LINKS, the file gone
       if (all.some(f => /\.url$/i.test(f)) && (await serial(() => fileUrls(w.storage!, all)))) all = await walkFiles(w.storage!)
       const ls = w.storage && !w.archived ? viewOf(await readLinks(w.storage)) : []
-      const n = all.length + ls.length // the status bar's count: a link is one too
+      const n = all.filter(f => !f.startsWith('proof/')).length + ls.length // the status bar's count: a link is one too; the Proof card's files (verify.ts) aren't the agent's
       if ((artifacts.get(w.id) ?? 0) !== n) (moved = true), n ? artifacts.set(w.id, n) : artifacts.delete(w.id)
       if (JSON.stringify(ls) !== JSON.stringify(links.get(w.id) ?? [])) (moved = true), ls.length ? links.set(w.id, ls) : links.delete(w.id)
     }

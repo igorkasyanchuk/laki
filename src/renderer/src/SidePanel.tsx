@@ -51,6 +51,7 @@ export type PanelApi = {
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string, line?: boolean, tab?: string) => Promise<unknown> // to the workspace's agent (tab: that one), when its turn ends; line: a comment on a line (an achievement)
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
+  proofShot?: (turn: number, png: string) => Promise<unknown> // the Proof card's picture of a checked turn (verify.ts proofShot)
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   sourceGuess?: (words: string[]) => Promise<string[]> // F5: the worktree's files a picked element likely comes from (one or two, or none)
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
@@ -1079,6 +1080,18 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   }
   const pickRef = useRef(pick)
   pickRef.current = pick
+  // the Proof card: a checked turn's picture of this workspace's dev server, as the Preview shows it (open, loaded, local)
+  const proofRef = useRef<(turn: number) => void>(undefined)
+  proofRef.current = turn => {
+    const id = on(v => v.getWebContentsId())
+    if (!bridge?.capture || !api.proofShot || !id || parked || err || !LOCAL.test(on(v => v.getURL()) || url)) return
+    bridge.capture(id).then(png => api.proofShot!(turn, png)).catch(() => {}) // nothing on screen yet: no picture
+  }
+  useEffect(() => {
+    const f = (e: Event) => (d => d?.ws === w.id && typeof d.turn === 'number' && proofRef.current?.(d.turn))((e as CustomEvent).detail)
+    window.addEventListener('laki-proof', f)
+    return () => window.removeEventListener('laki-proof', f)
+  }, [w.id])
   useEffect(() => {
     const f = () => pickRef.current()
     window.addEventListener('laki-preview-pick', f) // ⌥⌘P (keydown.ts' previewPick)

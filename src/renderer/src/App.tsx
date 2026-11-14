@@ -1347,6 +1347,8 @@ export function App() {
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
+      } else if (m.ev === 'proof') {
+        window.dispatchEvent(new CustomEvent('laki-proof', { detail: m })) // a checked turn: its Preview's screenshot (SidePanel's)
       } else if (m.ev === 'check') {
         // Done means checked: the turn's notification, now that its check is over (skipped: nothing changed; failed: sent
         // back to the agent, which works again, so none)
@@ -1992,6 +1994,7 @@ export function App() {
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
     toAgent: (text, line, tab) => api.call('send', { target: tab ?? w.id, text, whenIdle: true, steer: true }).then(() => (line && earn('comment'), toast(`Sent to ${(tab && view?.tabs.find(t => t.id === tab)?.name) || 'the agent'}`))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
+    proofShot: (turn, png) => api.call('proofShot', { ws: w.id, turn, png }),
     toPrompt: text => intoAgent(w.id, text),
     sourceGuess: words => api.call<string[]>('sourceGuess', { ws: w.id, words }).catch(() => []),
     sim: p => api.call('sim', p),
@@ -2990,6 +2993,8 @@ export function App() {
       selectTab(sh)
     },
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
+    proof: t => (p => (p?.tab === t.id ? p : undefined))(view?.workspaces.find(w => w.id === t.workspace)?.proof), // the Proof card: its last checked turn's
+    openProof: (t, path) => openFile({ ws: t.workspace, path, storage: true }),
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
     answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts

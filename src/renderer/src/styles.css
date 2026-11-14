@@ -3920,3 +3920,11 @@ html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-sof
 .outbox-item { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-3) var(--sp-5); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--r-m); box-shadow: var(--lift-2); }
 .outbox-item.note { border-color: var(--line); }
 .outbox-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Proof.tsx: the Proof card, under a checked turn */
+.proof { display: flex; flex-direction: column; gap: 1px; margin: var(--sp-2) 0; }
+.proof-line { display: flex; align-items: center; gap: var(--sp-2); padding: 1px 0; background: none; border: 0; color: inherit; text-align: left; font: inherit; }
+button.proof-line:not(:disabled) { cursor: pointer; }
+button.proof-line:not(:disabled):hover .mono { text-decoration: underline; }
+.proof-ok svg { color: var(--done); }
+.proof-bad svg { color: var(--error); }
+.rd-proof { margin: 0 0 var(--sp-4); padding: var(--sp-2) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); }

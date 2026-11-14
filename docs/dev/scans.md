@@ -54,6 +54,19 @@
   a workspace's `check`; panels.tsx `CheckStrip` at the pane's foot; App's `offerCheck` (once per project,
   `laki.checkOffered`); SettingsProject.tsx' *Done check* group. `checkTidy`: hourly, gone workspaces' last trees and
   `<data>/check` (each check's own index before 0.42).
+- The Proof card (verify.ts, with the Done check): only what Laki saw of a checked turn, never the agent's words nor a
+  model's (the review isn't in it). Each script that ran: name, exit code, time, a `summary` (passed, exited with n,
+  took over n minutes) and its last `PROOF_LINES` lines, masked by share.ts `redact`, as `<storage>/proof/<turn>/<name>.md`
+  (turn: the check's `at`; `writeAtomic`, 0600); git's facts: the paths between the tree the last check saw (or the
+  base) and now (`factsBetween`, `git diff --name-only -z`), `PROOF_FACTS`' patterns for tests, CI config, migrations
+  and lockfiles (`factsOf`). `proof.json` beside them, `PROOF_KEEP` turns' folders kept. Core's `proofs`, the view's
+  workspace `proof` (the last checked turn's; gone as that tab's next turn starts: `turnStarts`). The `proof` event:
+  SidePanel's Preview, when it's open on a local page that loaded, captures (main's `capture`) and calls `proofShot`
+  (the app only: FROM, AGENT_NO, REMOTE_NO): `after.png`, the newest earlier turn's copied as `before.png`. Proof.tsx
+  `ProofList`: a line each under the Reader's last turn and on Needs you's finish card (`proof.tab` that tab's), a click
+  opens the file from the storage folder (`openFile`, `storage`). `proof/` is Laki's: core's `proofIn` refuses it to
+  workflows' save block; `storageFull` and the Artifacts count leave it out. ponytail: the agent's shell can still write
+  there (it's its `LAKI_STORAGE_FOLDER`).
 - Reader view (F6: a line's `at`/`end` are its transcript lines' times, a `you`'s `cost` its turn's claude usage at API
   prices, counted once per message id (`chatOf`'s `spent`); text.ts `readerTimes` makes the small lines
   (`settings.readerTimes`, on unless false), `canRun` says which fenced block gets *▷ Run* (MarkdownView's `RunCode`,

@@ -119,6 +119,11 @@ export const checkOk = (c: unknown): DoneCheck | undefined => {
 }
 export type CheckStep = { name: CheckStepName; state: 'wait' | 'run' | 'pass' | 'fail' | 'skip'; ms?: number; out?: string }
 // a workspace's last check: the agent tab whose turn it checked, how it went, how many failures in a row went back
+// the Proof card (verify.ts): what Laki saw of a checked turn itself, never the agent's words: each script's end (its
+// output in the storage folder's file: proof/<turn>/<name>.md), the Preview's pictures, git's facts on what changed
+export type ProofCheck = { name: string; ok: boolean; code: number; ms: number; summary: string; file?: string }
+export type ProofFacts = { files: number; tests?: true; ci?: true; migrations?: true; lockfiles?: true }
+export type Proof = { turn: number; tab: string; checks: ProofCheck[]; shots: { before?: string; after?: string }; facts: ProofFacts }
 export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' | 'over'; steps: CheckStep[]; review?: { agent: string; state: 'wait' | 'run' | 'pass' | 'note' | 'fail'; note?: string }; tries: number; at: number }
 export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; clone?: string[] /* F7: folders cloned whole into a new worktree */; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
@@ -1094,7 +1099,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number; mad
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)
 export type Ticket = { key: string; title?: string; status?: string; url?: string }
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; ticket?: Ticket; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; ticket?: Ticket; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports

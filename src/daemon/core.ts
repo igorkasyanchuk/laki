@@ -9,11 +9,11 @@ import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, release, userInfo } from 'node:os'
 import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
-import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
-import { endpointOk, MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { endpointOk, MASK, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
@@ -106,6 +106,9 @@ export const prs = new Map<string, PR>()
 export const prOf = (ws: string) => prs.get(ws)
 // what follows agents' turns (workflows): each turn's end, its last answer, a usage limit's reset, a failure
 export const checks = new Map<string, CheckRun>() // Done means checked (verify.ts): each workspace's last check
+export const proofs = new Map<string, Proof>() // and the Proof card of its last checked turn (verify.ts)
+// a path in a storage folder's proof/: Laki's own (the Proof card's), never another method's to write
+export const proofIn = (root: string, path: string) => relative(root, path).split(sep)[0] === 'proof'
 export const checkHooks: { will?: (tab: Tab) => boolean } = {} // verify.ts': a check follows this turn's end (the app waits for it to notify)
 // each turn's start (claude's UserPromptSubmit: its first hook, before any edit) and end
 export const turnStarts = new Set<(tab: Tab) => void>()
@@ -760,7 +763,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), proof: proofs.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -3301,7 +3304,7 @@ export const soonSay: { fn?: (ws: Workspace) => void } = {} // main.ts': the not
 const DAY = 86400e3
 const TRASH_DAYS = 30 // Linux's trash folder (Laki's own): what's in it this long goes, as workflows' trash
 const trashRoot = () => (process.platform === 'darwin' ? join(homedir(), '.Trash') : join(dir, 'trash'))
-const storageFull = (ws: Workspace) => !!ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id) && (() => { try { return readdirSync(ws.storage!).length > 0 } catch { return false } })()
+const storageFull = (ws: Workspace) => !!ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id) && (() => { try { return readdirSync(ws.storage!).some(f => f !== 'proof') } catch { return false } })() // the Proof card's folder: Laki's own record, not yours
 const repoOf = (ws: Workspace) => (ws.host ? '' : (state.projects.find(p => p.id === ws.project)?.path ?? ''))
 // what deleting it would lose for good, in words: none, nothing of its own
 export async function hasSaved(ws: Workspace) {

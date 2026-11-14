@@ -147,6 +147,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
+    openProof: (t, path) => (setDialog(null), selectTab(t), app.openFile({ ws: t.workspace, path, storage: true }), narrow && setSideOpen(false)),
     keys: (t, data) => void api.call('input', { tab: t.id, data }).catch(() => {}),
     // U8: each answered as its card would be (its first option or Allow; its last or Deny), one after another; the
     // daemon refuses a menu that changed since, named in the toast
