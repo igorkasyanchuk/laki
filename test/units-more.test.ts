@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { firstLoad } from '../scripts/size.ts'
+import { pickTests } from '../scripts/test-changed.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -658,6 +659,33 @@ test('firstLoad: static imports followed, a dynamic import() and an unlinked chu
   }
   const html = '<script type="module" crossorigin src="./assets/index.js"></script><link rel="modulepreload" href="./assets/ui.js"><link rel="stylesheet" href="./assets/index.css"><link rel="icon" href="./assets/icon.svg">'
   assert.deepEqual(firstLoad(html, files), { js: ['assets/index.js', 'assets/ui.js', 'assets/react.js', 'assets/side.js', 'assets/b.js'], css: ['assets/index.css'] })
+})
+
+// scripts/test-changed.ts: the tests for what changed, and why each
+test('pickTests: a changed test, a source imported directly or through one source file, a test named for it; never through helpers.ts', () => {
+  const imports = {
+    'test/pr.test.ts': ['test/helpers.ts', 'src/daemon/pr.ts'],
+    'test/pr-background.test.ts': ['test/helpers.ts'],
+    'test/program.test.ts': ['src/daemon/program.ts'],
+    'test/units.test.ts': ['src/shared/types.ts'],
+    'test/widget-events.test.ts': ['test/helpers.ts'],
+    'test/far.test.ts': ['test/helpers.ts'],
+    'test/helpers.ts': ['src/daemon/pr.ts', 'src/shared/conn.ts'],
+    'src/daemon/pr.ts': ['src/shared/types.ts'],
+    'src/daemon/program.ts': [],
+    'src/shared/types.ts': ['src/shared/when.ts'],
+    'src/shared/when.ts': [],
+    'src/shared/conn.ts': [],
+    'src/daemon/widgetEvents.ts': [],
+  }
+  assert.deepEqual(pickTests(['src/daemon/pr.ts'], imports), [
+    { test: 'test/pr-background.test.ts', why: ['named for src/daemon/pr.ts'] },
+    { test: 'test/pr.test.ts', why: ['imports src/daemon/pr.ts'] },
+  ], 'program.test.ts holds "pr" in a word of its own only')
+  assert.deepEqual(pickTests(['src/shared/when.ts'], imports), [{ test: 'test/units.test.ts', why: ['imports src/shared/types.ts, which imports src/shared/when.ts'] }], 'one level through a source file')
+  assert.deepEqual(pickTests(['src/shared/conn.ts'], imports), [], 'only through helpers.ts: none')
+  assert.deepEqual(pickTests(['src/daemon/widgetEvents.ts'], imports).map(p => p.test), ['test/widget-events.test.ts'], 'camelCase to kebab-case')
+  assert.deepEqual(pickTests(['test/far.test.ts', 'README.md'], imports), [{ test: 'test/far.test.ts', why: ['changed'] }])
 })
 
 // main's pings of the daemon: 3 misses in a row is hung, any answer clears it

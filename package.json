@@ -25,6 +25,7 @@
     "test:ui": "node --experimental-strip-types --no-warnings scripts/ui-smoke.ts",
     "test:cov": "node --experimental-strip-types --no-warnings scripts/cov.ts",
     "size": "node --experimental-strip-types --no-warnings scripts/size.ts",
+    "test:changed": "node --experimental-strip-types --no-warnings scripts/test-changed.ts",
     "test:fast": "node --experimental-strip-types --no-warnings --test $(grep -L 'fresh(' test/*.test.ts)",
     "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",
     "pack": "electron-vite build && electron-builder --dir --publish never",
