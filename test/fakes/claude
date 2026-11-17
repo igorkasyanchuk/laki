@@ -115,6 +115,7 @@ let ticker // a tick turn's redraws
 // "menu": a permission prompt like the real one's, ↑↓ move its ❯, Enter picks
 const MENU0 = ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)']
 let MENU = MENU0
+const QUIZ = ['Red', 'Green', 'Blue']
 let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
@@ -137,6 +138,8 @@ const turn = text => {
     hook('PermissionRequest', pl)
     process.stdout.write(`${pl.tool_name}\r\n\r\nDo you want to proceed?\r\n`); menu = 1; drawMenu(); return
   }
+  // "quiz": AskUserQuestion's menu, asked through PermissionRequest (an Esc declines it: no hook, as the real one)
+  if (text.startsWith('quiz')) { hook('PermissionRequest', { hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Which color?' }] } }); process.stdout.write('Which color?\r\n'); MENU = QUIZ; menu = 1; drawMenu(); return }
   if (text.startsWith('menu')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true
@@ -189,6 +192,12 @@ process.stdin.on('data', d => {
     s = s.replaceAll('\x1b[Z', '')
     if (!process.env.FAKE_NO_MODES) (mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length]), drawFoot()
     if (!s) return
+  }
+  if (menu && s === '\x1b' && MENU === QUIZ) {
+    // Esc on AskUserQuestion's menu: the real one's words, then its input box, status line and mode line (no hook)
+    menu = 0
+    MENU = MENU0
+    return process.stdout.write('\x1b[3A\x1b[J● User declined to answer questions\r\n  ⎿  · Which color? (Red / Green / Blue)\r\n\r\n✻ Worked for 3s\r\n\r\n' + '─'.repeat(20) + '\r\n❯ \r\n' + '─'.repeat(20) + '\r\n  test (main) [Opus]\r\n  ⏵⏵ auto mode on (shift+tab to cycle)\r\n')
   }
   if (menu) {
     const keys = s.match(/\x1b[[O][AB]|\r/g) // each key, in order: a busy machine hands keys sent 40 ms apart over in one read

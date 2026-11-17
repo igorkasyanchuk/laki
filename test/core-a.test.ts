@@ -231,6 +231,12 @@ test('interrupts: a turn again or its end first, a waiting agent; dev mode logs 
   await sleep(1200)
   assert.equal(await status(asker.id), 'waiting')
 
+  // Esc on AskUserQuestion's menu: claude says it declined (no hook, no "Interrupted", 12 lines up): idle, not asking
+  const quiz = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'quiz' })
+  await until(async () => (await status(quiz.id)) === 'waiting', 'it asks a question')
+  await rig.rpc('input', { tab: quiz.id, data: '\x1b' })
+  await until(async () => (await status(quiz.id)) === 'idle', 'declined: its turn over')
+
   // a queue on an agent that ended: Enter starts it again, running until what waits goes in
   const third = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'slow three' })
   await working(third.name)

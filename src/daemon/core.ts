@@ -4248,8 +4248,11 @@ export function input(id: string, data: string, c?: Client) {
 }
 
 // Esc or ⌃C stops a turn, and no hook says so: idle once the screen shows "Interrupted" (claude's
-// "Interrupted · What should Claude do instead?", codex's "Conversation interrupted").
+// "Interrupted · What should Claude do instead?", codex's "Conversation interrupted") or claude's "User declined to
+// answer questions" (an Esc on AskUserQuestion's menu), with no menu left. 15 lines: claude's
+// input box, status line and mode line come under it.
 // ponytail: matched by message, like CHAT_GONE.
+const ESC_ENDED = /interrupted|declined to answer/i
 function interrupted(id: string, s: Session) {
   const r = rtOf(id)
   if (r.status !== 'running' && r.status !== 'waiting') return
@@ -4257,7 +4260,7 @@ function interrupted(id: string, s: Session) {
   for (const ms of [300, 1000, 2500, 6000, 12000]) // a loaded Mac draws it late
     setTimeout(() => {
       if (r.escAt !== at || (r.status !== 'running' && r.status !== 'waiting')) return // a new turn since
-      if (!/interrupted/i.test(s.screenText(6))) return
+      if (!ESC_ENDED.test(s.screenText(15)) || s.ask()) return
       r.status = 'idle'
       r.escAt = undefined
       changed()
