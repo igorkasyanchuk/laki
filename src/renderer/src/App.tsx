@@ -1,3 +1,4 @@
+import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type AgentDid, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
@@ -1181,7 +1182,7 @@ export function App() {
     window.addEventListener('contextmenu', f)
     return () => window.removeEventListener('contextmenu', f)
   }, [])
-  const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
+  const call = useCallback(((method: Method, params?: ParamsOf<Method>) => api.call(method, params).catch(e => (fail(e), Promise.reject(e)))) as Call, [])
   // Done means checked, offered once per project (laki.checkOffered) as a turn ends in one with a test or lint script
   // and no check of its own yet. Above the early return (no view yet): the
   // socket's handler is the first render's, where a const further down is never set

@@ -1,6 +1,7 @@
 // U5: the Ship sheet (a workspace's Ship): on the left what goes in the commit (the uncommitted files, each with a box,
 // its +/− and its diff a click away), on the right the commit's and the PR's words (shipDraft's to start: no model
 // asked) and the PR's switches; a line on top with what to know first (Done check, Collision radar, behind its base)
+import type { Call } from '../../shared/api'
 import { useEffect, useState } from 'react'
 import type { SecretFound, WorkspaceView } from '../../shared/types'
 import { DiffRows, diffByFile, type FileDiff, lineClass, NO_DIFF } from './Diff'
@@ -11,7 +12,7 @@ export type ShipMode = 'commit' | 'push' | 'pr'
 const withProof = (body: string, md: string) => (md && !body.includes(md) ? [body.trimEnd(), md].filter(Boolean).join('\n\n') : body) // the section at the end, once
 export type ShipAsk = { message: string; files?: string[]; title?: string; body?: string; draft: boolean; base?: string; reviewers?: string[]; mode: ShipMode; autoLand: boolean; autoFix: boolean; allowSecrets?: string[]; proof?: boolean }
 
-export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws: WorkspaceView; title: string; busy?: string; land: boolean; call: <T>(m: string, p?: object) => Promise<T>; onClose: () => void; onShip: (a: ShipAsk) => Promise<unknown> }) {
+export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws: WorkspaceView; title: string; busy?: string; land: boolean; call: Call; onClose: () => void; onShip: (a: ShipAsk) => Promise<unknown> }) {
   const [d, setD] = useState<Draft | null>(null)
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')

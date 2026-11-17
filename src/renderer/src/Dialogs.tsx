@@ -2,6 +2,7 @@
 // schedulesFor…) says: Pages, in the main area (Settings, Help, the AI page, the board, New workspace…), and Dialogs,
 // over everything (Ship, Check overlaps, the timers', renames, a project's notes…). App renders them with what
 // appCtx.ts says they read.
+import type { Call } from '../../shared/api'
 import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, specsOf, wsName } from './appCtx'
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
@@ -228,7 +229,7 @@ export function Pages({ app }: { app: AppCtx }) {
           uiReset={() => api.call('uiReset')}
           simulator={p => api.call('sim', p)}
           tunnels={n => api.call('tunnelCheck', n)}
-          call={(m, x) => api.call(m, x)}
+          call={api.call.bind(api) as Call}
           resources={{
             load: () => api.call<Resources>('resources'),
             tabs: view.tabs,
@@ -351,12 +352,12 @@ export function Pages({ app }: { app: AppCtx }) {
         o &&
         notesOn && (
           <Lazy title="Notes" onClose={() => setDialog(null)}>
-            <NotesPage id={o.note} api={{ call: (m, p) => api.call(m, p), ...(hasCap(view, 'note.restore') && { undo: (text: string, undo: () => void) => done(text, undo) }) }} onOpen={note => setDialog({ note })} onClose={() => setDialog(null)} />
+            <NotesPage id={o.note} api={{ call: api.call.bind(api) as Call, ...(hasCap(view, 'note.restore') && { undo: (text: string, undo: () => void) => done(text, undo) }) }} onOpen={note => setDialog({ note })} onClose={() => setDialog(null)} />
           </Lazy>
         ))(notesOf(dialog))}
       {dialog === 'todos' && todosOn && (
         <Lazy title="To-dos" onClose={() => setDialog(null)}>
-          <TodoListPage api={{ call: (m, p) => api.call(m, p) }} onClose={() => setDialog(null)} />
+          <TodoListPage api={{ call: api.call.bind(api) as Call }} onClose={() => setDialog(null)} />
         </Lazy>
       )}
       {dialog === 'calendar' && calOn && (

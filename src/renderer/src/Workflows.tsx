@@ -5,6 +5,7 @@
 // where it is and where it went, with what it asks you, its decisions, its variables, and its whole log. Esc doesn't
 // close the page: it stays open while runs go. The engine is the daemon's (daemon/workflow.ts). Loaded as the page
 // opens (App's lazy import).
+import type { Call } from '../../shared/api'
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
@@ -20,7 +21,7 @@ import { Ghosts, ask, choose, Icon, IconButton, type MenuItem, Page, Switch, use
 import './workflows.css'
 
 export type WorkflowsApi = {
-  call: <T = any>(method: string, params?: object) => Promise<T>
+  call: Call
   openWs: (id: string) => void
   openTab?: (ws: string, tab: string) => void // a block's session, in its workspace
   toast: (text: string, undo?: () => void) => void // undo: its Undo button

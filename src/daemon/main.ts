@@ -323,7 +323,10 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 // ---------- the API: same methods over HTTP and WebSocket
 
 type Handler = (p: any, c?: core.Conn) => unknown
-const api: Record<string, Handler> = {
+// a handler's params as its function takes them, and what the daemon adds to every call (an agent's from)
+type In<F extends (p: never, ...a: never[]) => unknown> = NonNullable<Parameters<F>[0]> & { from?: unknown }
+// T14: satisfies, not a type: each method's own name, params and result stay its own (Api, shared/api.ts)
+const api = {
   ping: p => (p.caps ? { pong: true, api: API, caps: CAPS, version: VERSION } : 'pong'), // plain: 'pong', as every CLI's alive() wants; version: A9's laki --version
   state: (p, c) => (v => (c && own.get(c)?.() ? v : masked(v)))((v => (p?.byClient && clientsMod.clientWho(p.byClient)?.projects ? onlyProjects(v, clientsMod.clientWho(p.byClient)!.projects!) : v))(core.agentCaller(p?.from) || p?.byClient ? recorded(core.view()) : core.view())), // T1: a trusted client's too, kept to its projects // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then); S3: its secrets only to your own window (own)
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
@@ -660,16 +663,17 @@ const api: Record<string, Handler> = {
   widgetNew: p => widgetNew(p), // laki widget new, Settings › Extensions › New ▾: a starter, yours, on
   widgetFromTerm: p => widgetFromTerm(p), // C1: a shell tab's Make a tile from this command: yours, off
   widgetCheck: p => widgetCheck(p), // laki widget check, the inspector's Check (run: its fetch once), MCP's (never runs)
-  noteList: p => noteList(p), // notes: notes.ts
-  noteGet: p => noteGet(p),
-  noteNew: p => noteNew(p),
-  noteSave: p => noteSave(p),
+  // T14: notes' params typed (each its function's): rpc('noteGet', { idd }) fails the typecheck
+  noteList: (p: In<typeof noteList>) => noteList(p), // notes: notes.ts
+  noteGet: (p: In<typeof noteGet>) => noteGet(p),
+  noteNew: (p: In<typeof noteNew>) => noteNew(p),
+  noteSave: (p: In<typeof noteSave>) => noteSave(p),
   noteRm: async p => (core.agentCaller(p.from) && (await rmAsk(p, 'delete a note of yours', `${String((() => { try { return noteGet(p)?.title } catch {} })() || p.id || '').slice(0, 120)}: it goes to the trash for 30 days.`)), noteRm(p)), // S5: an agent's asks you
-  noteRestore: p => noteRestore(p), // the newest of it in the trash, back (Notes' Undo)
-  noteUpload: p => noteUpload(p),
-  noteFile: p => noteFile(p),
+  noteRestore: (p: In<typeof noteRestore>) => noteRestore(p), // the newest of it in the trash, back (Notes' Undo)
+  noteUpload: (p: In<typeof noteUpload>) => noteUpload(p),
+  noteFile: (p: In<typeof noteFile>) => noteFile(p),
   todoListGet: () => todoListGet(), // To-dos: notes.ts
-  todoListSave: p => todoListSave(p),
+  todoListSave: (p: In<typeof todoListSave>) => todoListSave(p),
   planList: p => planList(p), // specs and brainstorms: plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),
@@ -736,7 +740,9 @@ const api: Record<string, Handler> = {
   clientAnswer: p => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
   clientWho: p => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
-}
+} satisfies Record<string, Handler>
+export type Api = typeof api
+const table: Record<string, Handler> = api // a name looked up at run time
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
 const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|sandboxNew|hideSecrets|hideSecretsAsked)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allowOn, allowKey, denyOn, denyKey, talkOn, talkKey: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you); sandboxNew: the default profiles' sandbox; hideSecrets: what agents get of Laki's environment
@@ -1584,7 +1590,7 @@ async function once(c: core.Conn | undefined, cid: string, run: () => Promise<un
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab, app = !!c && apps.has(c), client?: clientsMod.Client) {
   method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
   if (params && typeof params === 'object' && 'byClient' in params) params = { ...params, byClient: undefined } // T1: the daemon's to say (clientCalls)
-  const h = Object.hasOwn(api, method) ? api[method] : undefined
+  const h = Object.hasOwn(table, method) ? table[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
   if (!TEST_CLOCK && params && typeof params === 'object' && 'now' in params) params = { ...params, now: undefined }
   if (method === 'settingsSet' && params && typeof params === 'object') params = unmasked(params, core.state.settings ?? {}) // S3: the masks a masked view's Settings sends back are the values it has

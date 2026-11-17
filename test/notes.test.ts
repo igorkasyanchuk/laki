@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { CAPS, hasCap, oldName, sendAs } from '../src/shared/caps.ts'
-import { rpc } from '../src/shared/conn.ts'
+import { rpc, rpcAny } from '../src/shared/conn.ts'
 import { API } from '../src/shared/types.ts'
 import { VERSION } from '../src/shared/version.ts'
 import { fresh } from './helpers.ts'
@@ -122,7 +122,7 @@ test('caps against an older daemon: hasCap by its API number; the CLI sends a na
   t.after(() => (was === undefined ? delete process.env.LAKI_HOME : (process.env.LAKI_HOME = was)))
   assert.deepEqual(await rpc('note.list'), ['old'])
   assert.deepEqual(await rpc('note.list'), ['old'])
-  await assert.rejects(rpc('note.nope'), /^Error: unknown method note\.nope$/) // not an alias: refused as it is
+  await assert.rejects(rpcAny('note.nope'), /^Error: unknown method note\.nope$/) // not an alias: refused as it is
   assert.deepEqual(seen, ['note.list', 'noteList', 'noteList', 'note.nope'])
 })
 

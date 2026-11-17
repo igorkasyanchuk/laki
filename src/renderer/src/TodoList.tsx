@@ -3,11 +3,12 @@
 // above, its handle (⋮⋮ on hover) drags it, and its nested ones, into place; / for any other block. Saved 600 ms after a
 // change and as it closes (daemon/notes.ts' todoListGet and todoListSave). No files: a pasted picture says so. Loaded
 // only as it opens (App's lazy import), BlockNote with it. App.tsx passes a TodoListApi.
+import type { Call } from '../../shared/api'
 import { useEffect, useRef, useState } from 'react'
 import { SpecEditor } from './SpecEditor'
 import { Ghosts, Icon, Page } from './ui'
 
-export type TodoListApi = { call<T = any>(method: string, params?: object): Promise<T> }
+export type TodoListApi = { call: Call }
 type List = { blocks: unknown[]; md: string; at: number }
 const FIRST = [{ type: 'checkListItem' }] // a new list: a to-do to write in
 // how many are done: its Markdown's checkboxes (specmd.ts writes "- [x] "), an empty one (a new list's) not counted
@@ -27,7 +28,7 @@ export default function TodoListPage({ api, onClose }: { api: TodoListApi; onClo
     if (p) void api.call('todoListSave', p).then(() => setErr(''), e => ((pending.current ??= p), setErr((e as Error).message)))
   }
   useEffect(() => {
-    api.call<List>('todoListGet').then(l => (setList(l), setMd(l.md)), e => setErr((e as Error).message))
+    api.call('todoListGet').then(l => (setList(l), setMd(l.md)), e => setErr((e as Error).message))
     return flush // what's typed in its last 600 ms too
   }, [])
   const { all, done } = doneOf(md)

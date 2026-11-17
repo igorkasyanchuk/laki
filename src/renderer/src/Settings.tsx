@@ -1,6 +1,7 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The daemon keeps
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
+import type { Call } from '../../shared/api'
 import { TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
@@ -802,7 +803,7 @@ export function SettingsPage(p: {
   bg?: { url: string; set(file: File | null): Promise<unknown> } // Appearance › Background image: the picture now (App's blob URL), and a new one or none (the daemon's bgSet)
   remote?: RemoteApi
   tunnels?: (n: NamedTunnel) => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck) of the name and domain as typed
-  call?: <T>(m: string, p?: object) => Promise<T> // Settings › Tunnels › Webhooks' (inbound.ts)
+  call?: Call // Settings › Tunnels › Webhooks' (inbound.ts)
   widgets?: WidgetsApi
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)

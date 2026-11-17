@@ -274,7 +274,7 @@ export function QuickWindow() {
     setErr('')
     try {
       const c = handOff(t, text, images.map(i => i.path), load<LastNew>(LAST_NEW, {}))
-      await api.call(c.method, c.params)
+      await api.callAny(c.method, c.params) // a name it was handed
       window.close()
     } catch (e) {
       setErr((e as Error).message) // the text stays

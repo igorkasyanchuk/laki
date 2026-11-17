@@ -4,7 +4,7 @@ import type { View } from './types.ts'
 
 // a namespaced name → the flat one the daemon's api table keeps (and every check keyed by a method's name). The daemon
 // resolves it first thing in call(), so an alias passes the same checks as its old name
-export const RPC_NAMES: Record<string, string> = {
+export const RPC_NAMES = {
   'note.list': 'noteList',
   'note.get': 'noteGet',
   'note.new': 'noteNew',
@@ -13,8 +13,8 @@ export const RPC_NAMES: Record<string, string> = {
   'note.restore': 'noteRestore',
   'note.upload': 'noteUpload',
   'note.file': 'noteFile',
-}
-export const oldName = (method: string) => (Object.hasOwn(RPC_NAMES, method) ? RPC_NAMES[method] : method)
+} as const satisfies Record<string, string>
+export const oldName = (method: string): string => (Object.hasOwn(RPC_NAMES, method) ? (RPC_NAMES as Record<string, string>)[method] : method)
 // the name a client with a view sends: the namespaced one when the daemon's caps list its namespace, else the old one
 // (an older daemon, or none read yet)
 export const sendAs = (method: string, caps: readonly string[]) => (caps.includes(`ns:${method.split('.')[0]}`) ? method : oldName(method))

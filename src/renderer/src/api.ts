@@ -2,6 +2,7 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the link's key alone in the hash (#t=…, S11) on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+import type { Method, Out, ParamsOf } from '../../shared/api'
 import { outCall, outFlush } from './outbox'
 import type { InboxItem, TrayInfo } from '../../shared/tray'
 import type { UpdateState } from '../../shared/update'
@@ -277,12 +278,19 @@ class Api {
   }
 
   // the remote page's send and answer keep what the socket couldn't take (outbox.ts); the Mac's window calls as it is
-  call<T = any>(method: string, params: object = {}): Promise<T> {
+  // T14: the name checked (shared/api.ts); callAny for one made at run time
+  callAny<T = any>(method: string, params: object = {}): Promise<T> {
+    return this.call<T>(method as Method, params as ParamsOf<Method>)
+  }
+  call<K extends Method>(method: K, params?: ParamsOf<K>): Promise<Out<K>>
+  call<T, K extends Method = Method>(method: K, params?: ParamsOf<K>): Promise<T>
+  call(method: Method, p: unknown = {}): Promise<any> {
+    const params = p as Record<string, unknown>
     // Touch ID (shared/confirm.ts): main asks, the ticket it gets goes with the call; no ticket, no call
-    const what = bridge?.confirm && this.touch ? confirmOf(oldName(method), params as Record<string, unknown>, this.touch) : undefined
-    if (what) return bridge!.confirm!(what).then(t => (t ? this.direct<T>(method, { ...params, touchTicket: t }) : Promise.reject(new Error(`Not done: Touch ID didn't confirm it`))))
-    if (bridge || (method !== 'send' && method !== 'answer')) return this.direct<T>(method, params)
-    return outCall((k, p) => this.direct(k, p), method, params as Record<string, unknown>, this.waitingSince) as Promise<T>
+    const what = bridge?.confirm && this.touch ? confirmOf(oldName(method), params, this.touch) : undefined
+    if (what) return bridge!.confirm!(what).then(t => (t ? this.direct(method, { ...params, touchTicket: t }) : Promise.reject(new Error(`Not done: Touch ID didn't confirm it`))))
+    if (bridge || (method !== 'send' && method !== 'answer')) return this.direct(method, params)
+    return outCall((k, q) => this.direct(k, q), method, params, this.waitingSince)
   }
   private waitingSince = (tab: string) => (t => (t?.status === 'waiting' ? t.needAt : undefined))(this.waits?.find(x => x.id === tab))
   private direct<T = any>(method: string, params: object = {}): Promise<T> {

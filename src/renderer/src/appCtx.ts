@@ -1,6 +1,7 @@
 // What App's parts read of App: menus.ts, keydown.ts, Palette.tsx, TabBar.tsx, Sidebar.tsx and Dialogs.tsx. App builds
 // it each render, after `if (!view)` (so `view` is there), from its own state and helpers: all state and every hook
 // stay in App, and a part destructures what it uses. A new field: its type here, then its name in App's `appBase`.
+import type { Call } from '../../shared/api'
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react'
 import type { ExtTab } from './Extension'
 import type { DeskAsk } from './Desk'
@@ -126,7 +127,7 @@ export type AppBase = {
   bgUrl: string
   busyWith: <T>(ids: string[], what: string, f: () => Promise<T>) => Promise<T>
   byId: (id: string) => TabView | undefined
-  call: <T>(method: string, params?: object) => Promise<T>
+  call: Call
   calOn: boolean
   canLater: boolean
   cfgSheet: (p: Project) => Promise<void>

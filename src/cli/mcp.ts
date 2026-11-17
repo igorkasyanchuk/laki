@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
-import { alive, asClient, ensureDaemon, rpc as conn } from '../shared/conn.ts'
+import { alive, asClient, ensureDaemon, rpcAny as conn } from '../shared/conn.ts' // T14: tools call by name
 import { aiRpc, extCall, GROUPS, obj, skillTools, str, toolGroup, type Tool, tools } from '../shared/tools.ts'
 import { API } from '../shared/types.ts'
 

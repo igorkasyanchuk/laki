@@ -4,6 +4,7 @@
 // colors or deletes one. The open one on the right: its title, color, pin, and the editor (SpecEditor: BlockNote, as
 // specs have it: headings, lists, checklists, tables, code, images, diagrams), saved 600 ms after a change and as it
 // closes. Loaded only as it opens (App's lazy import), BlockNote with it. App.tsx passes a NotesApi.
+import type { Call } from '../../shared/api'
 import { useEffect, useRef, useState } from 'react'
 import { ago } from './Info'
 import { SpecEditor } from './SpecEditor'
@@ -12,9 +13,10 @@ import { Ghosts, ask, colorVar, Edge, Icon, IconButton, keep, load as stored, ty
 const SIDE_W = 'laki.notesW' // the list's width
 const SIDE_INIT = 290
 
-type Item = { id: string; title: string; color?: string; pinned?: boolean; preview: string; created: number; at: number }
-type Note = Item & { blocks: unknown[]; md: string }
-export type NotesApi = { call<T = any>(method: string, params?: object): Promise<T>; undo?: (text: string, undo: () => void) => void } // undo: App's toast with Undo (a daemon that keeps a trash)
+// the daemon's own (T14: its noteGet has no preview, which this page's copy of the type said it had)
+import type { Note, NoteItem as Item } from '../../daemon/notes'
+type Head = Omit<Item, 'preview'> // a list row's or an open note's: what a menu or a delete needs
+export type NotesApi = { call: Call; undo?: (text: string, undo: () => void) => void } // undo: App's toast with Undo (a daemon that keeps a trash)
 type Change = { title?: string; blocks?: unknown[]; md?: string; color?: string | null; pinned?: boolean }
 
 const fileData = (f: File) =>
@@ -38,7 +40,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const [menu, openMenu] = useMenu()
   const qNow = useRef(q)
   qNow.current = q
-  const load = () => api.call<Item[]>('note.list', { q: qNow.current }).then(l => (setList(l), setErr('')), e => setErr((e as Error).message))
+  const load = () => api.call('note.list', { q: qNow.current }).then(l => (setList(l), setErr('')), e => setErr((e as Error).message))
   useEffect(() => {
     const t = setTimeout(load, q ? 150 : 0)
     return () => clearTimeout(t)
@@ -46,11 +48,11 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const shown = (list ?? []).filter(n => !only || n.color === only)
   const open = id || (!q && !only ? list?.[0]?.id : undefined) // none asked for: the first
   const colors = TAB_COLORS.filter(c => list?.some(n => n.color === c))
-  const make = () => api.call<Note>('note.new', { color: only ?? undefined }).then(n => (q ? setQ('') : void load(), onOpen(n.id)), e => setErr((e as Error).message)) // a search typed: clearing it loads
+  const make = () => api.call('note.new', { color: only ?? undefined }).then(n => (q ? setQ('') : void load(), onOpen(n.id)), e => setErr((e as Error).message)) // a search typed: clearing it loads
   // a save's item in the list as it is now, not the whole list read again (a search's match: at the next one)
   const saved = (it: Item) => setList(l => l && order(l.map(x => (x.id === it.id ? it : x))))
-  const save = (nid: string, c: Change) => api.call<Item>('note.save', { id: nid, ...c }).then(saved)
-  const remove = (n: Item) =>
+  const save = (nid: string, c: Change) => api.call('note.save', { id: nid, ...c }).then(saved)
+  const remove = (n: Head) =>
     void ask(`Delete ${named(n)}?`, { text: api.undo ? 'The note and the files in it go to the trash: Undo brings them back, and after 30 days they go for good.' : 'The note and the files in it go for good.', ok: 'Delete', danger: true }).then(y => {
       if (!y) return
       const next = shown[shown.findIndex(x => x.id === n.id) + 1] ?? shown[shown.findIndex(x => x.id === n.id) - 1]
@@ -63,7 +65,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
         e => setErr((e as Error).message),
       )
     })
-  const colorItems = (n: Item, set: (c: string | null) => void): MenuItem[] => [{ colors: TAB_COLORS, value: n.color, pick: c => set(c === 'none' ? null : c) }, ...(n.color ? [{ label: 'No color', icon: 'x', run: () => set(null) } as MenuItem] : [])]
+  const colorItems = (n: Head, set: (c: string | null) => void): MenuItem[] => [{ colors: TAB_COLORS, value: n.color, pick: c => set(c === 'none' ? null : c) }, ...(n.color ? [{ label: 'No color', icon: 'x', run: () => set(null) } as MenuItem] : [])]
   const rowMenu = (e: React.MouseEvent, n: Item) => (
     e.preventDefault(),
     openMenu(e, [
@@ -144,17 +146,17 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
 }
 
 // the open note: its title, color, pin, the editor; a change saved 600 ms later, and as it closes
-function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { id: string; meta?: Item; api: NotesApi; onSaved: (it: Item) => void; colorItems: (n: Item, set: (c: string | null) => void) => MenuItem[]; onRemove: (n: Item) => void; openMenu: (e: React.MouseEvent, items: MenuItem[]) => void }) {
+function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { id: string; meta?: Item; api: NotesApi; onSaved: (it: Item) => void; colorItems: (n: Head, set: (c: string | null) => void) => MenuItem[]; onRemove: (n: Head) => void; openMenu: (e: React.MouseEvent, items: MenuItem[]) => void }) {
   const [n, setN] = useState<Note | null>(null)
   const [err, setErr] = useState('')
   const pending = useRef<Change | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => void api.call<Note>('note.get', { id }).then(setN, e => setErr((e as Error).message)), [])
+  useEffect(() => void api.call('note.get', { id }).then(setN, e => setErr((e as Error).message)), [])
   const flush = () => {
     clearTimeout(timer.current)
     const p = pending.current
     pending.current = null
-    if (p) return api.call<Item>('note.save', { id, ...p }).then(onSaved, e => setErr((e as Error).message))
+    if (p) return api.call('note.save', { id, ...p }).then(onSaved, e => setErr((e as Error).message))
   }
   useEffect(() => () => void flush(), []) // leaving it (another note, the page closed) saves
   // a row's right click pins or colors it too: the list's item, as it changes
@@ -164,7 +166,7 @@ function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { 
     clearTimeout(timer.current)
     timer.current = setTimeout(flush, 600)
   }
-  const now = (c: Change) => (setN(x => x && { ...x, ...c, color: c.color === null ? undefined : (c.color ?? x.color) }), api.call<Item>('note.save', { id, ...c }).then(onSaved, e => setErr((e as Error).message)))
+  const now = (c: Change) => (setN(x => x && { ...x, ...c, color: c.color === null ? undefined : (c.color ?? x.color) }), api.call('note.save', { id, ...c }).then(onSaved, e => setErr((e as Error).message)))
   if (err) return <div className="note-edit"><p className="warn small">{err}</p></div>
   if (!n) return <div className="note-edit muted small">Loading…</div>
   const { color, pinned } = n
@@ -183,8 +185,8 @@ function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { 
         <SpecEditor
           initial={{ blocks: n.blocks }}
           files={{
-            upload: f => fileData(f).then(data => api.call<{ path: string }>('note.upload', { id, name: f.name, data }).then(r => r.path)),
-            resolve: path => api.call<{ image?: string }>('note.file', { id, path }).then(r => r.image ?? path),
+            upload: f => fileData(f).then(data => api.call('note.upload', { id, name: f.name, data }).then(r => r.path)),
+            resolve: path => api.call('note.file', { id, path }).then(r => r.image ?? path),
           }}
           onChange={(blocks, md) => later({ blocks, md })}
         />

@@ -5,6 +5,7 @@
 // the new-workspace page with a prompt naming its README.md; a brainstorm has its own chat with Laki AI in a side panel
 // (daemon/ai.ts: it ends after 12 hours unused). New ones start empty or from a template (Templates, settings.planTemplates).
 // Loaded as the page opens (App's lazy import).
+import type { Call } from '../../shared/api'
 import { sendKeyName, sendTip } from '../../shared/keys'
 import { memo, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planRef } from '../../shared/plans'
@@ -22,7 +23,7 @@ import { shortPath } from './text'
 import { Ghosts, ask, Icon, IconButton, keep, load as stored, type MenuItem, Page, useMenu } from './ui'
 
 export type SpecsApi = {
-  call: <T = any>(method: string, params?: object) => Promise<T>
+  call: Call
   aiOn: boolean
   start: (p: Plan) => void // a spec's Start: the new-workspace page, its prompt filled in
   aiSettings: () => void

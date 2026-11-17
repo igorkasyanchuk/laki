@@ -269,7 +269,8 @@ export function Term({
     const sizing = () => !readOnly || ![...peers.values()].some(r => !r) // a live view of it sizes it
     const attach = async (quiet = false) => {
       try {
-        const r = await api.call('attach', { tab, ...(sizing() && { cols: term.cols, rows: term.rows }), ...(readOnly && { ro: true }) }) // ro: it can't answer the program's queries (disableStdin), so never the responder
+        // attach: the socket's own, not in the api table (callAny)
+        const r = await api.callAny('attach', { tab, ...(sizing() && { cols: term.cols, rows: term.rows }), ...(readOnly && { ro: true }) }) // ro: it can't answer the program's queries (disableStdin), so never the responder
         if (!alive) return
         term.reset()
         term.write(r.snapshot, where) // the scroll button as the snapshot leaves it

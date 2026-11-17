@@ -1,4 +1,5 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
+import type { Method, Out, ParamsOf } from './api.ts'
 import { spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -33,7 +34,11 @@ export function daemonInfo(): DaemonInfo | null {
 // a namespaced name (note.list): an older daemon refuses it as unknown, so it's sent once more by its old name (caps.ts),
 // and by that one from then on in this process
 const oldOnly = new Set<string>()
-export async function rpc<T = any>(method: string, params: any = {}, timeoutMs = 30000): Promise<T> {
+// T14: the name is checked (shared/api.ts Method), a typed handler's params too; rpcAny for a name made at run time
+export const rpcAny = <T = any>(method: string, params: any = {}, timeoutMs = 30000): Promise<T> => rpc<T>(method as Method, params, timeoutMs)
+export function rpc<K extends Method>(method: K, params?: ParamsOf<K>, timeoutMs?: number): Promise<Out<K>>
+export function rpc<T, K extends Method = Method>(method: K, params?: ParamsOf<K>, timeoutMs?: number): Promise<T>
+export async function rpc(method: Method, params: unknown = {}, timeoutMs = 30000): Promise<any> {
   const old = oldName(method)
   if (old === method || oldOnly.has(method)) return post(old, params, timeoutMs)
   try {

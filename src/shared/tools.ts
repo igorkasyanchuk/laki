@@ -1,7 +1,7 @@
 // Laki's tools for agents: what laki mcp gives an MCP client (cli/mcp.ts) and what Laki AI calls through the daemon's
 // own call (daemon/ai.ts). Each is one or two rpc calls through the daemon's API; none deletes, archives or ships. Here,
 // not in cli/, so the daemon imports nothing of the CLI.
-import { rpc as conn } from './conn.ts'
+import { rpcAny as conn } from './conn.ts' // T14: a tool's names are its own to say
 import { oldName } from './caps.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { dist, norm } from './talk.ts'
@@ -29,7 +29,7 @@ export const GROUPS: Record<string, { words: string; tools: string[] }> = {
   settings: { words: "Laki's settings and its guide, found by words; Laki AI's screenshots and apps", tools: ['laki_settings_find', 'laki_help', 'laki_screenshot', 'laki_open_app'] },
 }
 export const toolGroup = (name: string) => Object.keys(GROUPS).find(g => GROUPS[g].tools.includes(name))
-export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T>
+export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T> // the tools call names they're handed: conn.ts rpcAny (T14), not the typed rpc
 export const str = (description: string) => ({ type: 'string', description })
 export const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })
 

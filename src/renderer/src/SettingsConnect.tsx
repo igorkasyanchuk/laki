@@ -1,4 +1,5 @@
 // Settings' connect sections: phone pushes, tunnels, remote access and the simulators. Settings.tsx re-exports it.
+import type { Call } from '../../shared/api'
 import { ANSWER_WHY, answerOk, type InHook, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Group, Says } from './SettingsKit'
@@ -878,7 +879,7 @@ function RemoteActivity({ load }: { load: NonNullable<RemoteApi['log']> }) {
 type HookRow = InHook & { local?: string; url?: string }
 type HookState = { port: number; via?: string; url?: string; down?: string; hooks: HookRow[] }
 const HOOK_KINDS: [InHook['kind'], string][] = [['github', 'GitHub (X-Hub-Signature-256)'], ['linear', 'Linear (Linear-Signature)'], ['key', 'Anything else (X-Laki-Key)']]
-export function WebhooksSection({ call, projects }: { call: <T>(m: string, p?: object) => Promise<T>; projects: { id: string; name: string }[] }) {
+export function WebhooksSection({ call, projects }: { call: Call; projects: { id: string; name: string }[] }) {
   const [st, setSt] = useState<HookState | null>(null)
   const [add, setAdd] = useState<{ name: string; kind: InHook['kind']; project: string }>({ name: '', kind: 'github', project: '' })
   const [secret, setSecret] = useState<{ name: string; secret: string } | null>(null)

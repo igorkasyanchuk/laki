@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
+import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc, rpcAny } from '../shared/conn.ts'
 import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { appOf } from '../shared/helper.ts'
@@ -406,7 +406,7 @@ async function main() {
       const project = here || rest[0]
       // a group (the sidebar's heading it goes under: its template and agent too), a prompt template, an agent action
       const str = (f: string) => (flags[f] as string | undefined) || undefined // a valued flag's: always a string
-      const k = await newWsKit(rpc, { project, prompt: str('prompt') || rest.slice(1).join(' ') || undefined, group: str('group'), template: str('template'), action: str('action'), pr: str('pr'), base: str('base') })
+      const k = await newWsKit(rpcAny, { project, prompt: str('prompt') || rest.slice(1).join(' ') || undefined, group: str('group'), template: str('template'), action: str('action'), pr: str('pr'), base: str('base') })
       const o = {
         project,
         base: flags.base,
@@ -467,7 +467,7 @@ async function main() {
     case 'archive':
     case 'restore':
     case 'fork': {
-      const m = { rm: 'wsRm', archive: 'wsArchive', restore: 'wsRestore', fork: 'wsFork' }[cmd]
+      const m = ({ rm: 'wsRm', archive: 'wsArchive', restore: 'wsRestore', fork: 'wsFork' } as const)[cmd as 'rm' | 'archive' | 'restore' | 'fork']
       // archive: the extensions' gates run first (by you, or the agent whose tab this is); --force past them, yours only
       // R1: rm and archive take the worktree: with work only there (uncommitted paths; rm: commits on no remote too) they
       // say so and stop; --force does it (yours only: an agent's archive is refused, its rm asks you)
@@ -652,7 +652,7 @@ async function main() {
     }
     case 'wait': {
       // A5: laki wait <ws>[/<tab>]… [--timeout 20m]: until none of their agents works; exit 0 idle, 2 one waits, 3 timed out
-      const r = await waitTabs(rpc, rest, parseWait(flags.timeout))
+      const r = await waitTabs(rpcAny, rest, parseWait(flags.timeout))
       out(r, r.tabs.map(t => `${t.ws}/${t.name}  ${t.status}${t.text ? `: ${t.text}` : ''}`).join('\n') || 'no agent tab there')
       process.exitCode = r.timedOut ? 3 : r.waiting ? 2 : 0
       return
@@ -685,7 +685,7 @@ async function main() {
       // laki ask <@name|ws[/tab]> <question> [--wait min]: typed in as its turn ends, then its reply printed
       const [target, ...words] = rest
       if (!target || !words.length) throw new Error('usage: laki ask <@name|ws[/tab]> <question> [--wait minutes]')
-      const said = await askAgent(rpc, target, words.join(' '), process.env.LAKI_TAB, Number(flags.wait))
+      const said = await askAgent(rpcAny, target, words.join(' '), process.env.LAKI_TAB, Number(flags.wait))
       return out({ answer: said }, said || '(it answered with no text)')
     }
     case 'update': {
