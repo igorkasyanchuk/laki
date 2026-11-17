@@ -4,7 +4,7 @@ import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExterna
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { menuKeys, snap } from './text'
+import { menuKeys, midCut, snap } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 
@@ -175,6 +175,43 @@ export function IconButton({ icon, title, onClick, on, className = '', label, ti
 
 // how long a turn has been going (since: the daemon's clock, a phone's may differ a little): 42s, 12m, 1h 5m
 // usual: its project's and profile's usual turn (seconds): past twice it and 5 minutes, drawn in the waiting color
+// a name cut in the middle to its room (text.ts midCut), both ends readable: the whole one in a hidden span beside it
+// sets the box's width, so the cut never shrinks it; one ResizeObserver for every MidText, so nothing is measured
+// unless a box changes size (the sidebar resized) or its name changes. The whole name is its title and what a screen
+// reader reads; one that fits is shown as it is
+const fits = new WeakMap<Element, () => void>()
+let midRo: ResizeObserver | undefined
+export function MidText({ text, className = '' }: { text: string; className?: string }) {
+  const box = useRef<HTMLSpanElement>(null)
+  const whole = useRef<HTMLSpanElement>(null)
+  const cut = useRef<HTMLSpanElement>(null)
+  const [max, setMax] = useState(Infinity)
+  // the estimate (characters by the whole name's average width) can be a little long: one fewer until the cut fits
+  useLayoutEffect(() => {
+    const c = cut.current
+    if (c && max !== Infinity && max > 2 && c.scrollWidth > c.clientWidth + 0.5) setMax(max - 1)
+  }, [max])
+  useLayoutEffect(() => {
+    const el = box.current!
+    const fit = () => {
+      const w = el.clientWidth
+      const fw = whole.current!.offsetWidth
+      setMax(!fw || fw <= w + 0.5 ? Infinity : Math.max(2, Math.floor(([...text].length * w) / fw) - 1))
+    }
+    fit()
+    midRo ??= new ResizeObserver(es => es.forEach(e => fits.get(e.target)?.()))
+    fits.set(el, fit)
+    midRo.observe(el)
+    return () => (midRo!.unobserve(el), void fits.delete(el))
+  }, [text])
+  return (
+    <span ref={box} className={`mid ${className}`} title={text}>
+      <span ref={cut} className="mid-cut" aria-hidden>{midCut(text, max)}</span>
+      <span ref={whole} className="mid-whole">{text}</span>
+    </span>
+  )
+}
+
 export function Elapsed({ since, usual }: { since: number; usual?: number }) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {

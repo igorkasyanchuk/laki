@@ -25,7 +25,9 @@ addEventListener('pointermove', () => root.dataset.typing !== undefined && delet
 let unfold: ReturnType<typeof setTimeout> | undefined
 addEventListener('click', e => (e.target as Element | null)?.closest?.('[aria-expanded], .rd-more, .help-q') && ((root.dataset.unfold = ''), clearTimeout(unfold), (unfold = setTimeout(() => delete root.dataset.unfold, 400))), true)
 const vv = window.visualViewport
-vv?.addEventListener('resize', () => document.documentElement.style.setProperty('--vh', `${vv.height * vv.scale}px`))
+// T8: the keyboard up (the visual viewport well short of the layout's): it covers the home indicator, so its safe-area
+// inset goes (styles.css html[data-kb]), the message box right on the keyboard
+vv?.addEventListener('resize', () => (root.style.setProperty('--vh', `${vv.height * vv.scale}px`), root.toggleAttribute('data-kb', innerHeight - vv.height * vv.scale > 120)))
 
 // the bundled fonts first, every subset (Latin, Latin Extended, Cyrillic): a terminal measures its cells and
 // caches its glyphs as it opens

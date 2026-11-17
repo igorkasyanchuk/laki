@@ -11,7 +11,7 @@ import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
-import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
+import { bgDoneOf, midCut, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -1045,4 +1045,16 @@ test('envSplit: each pattern held, the harmless ones and the allow list passed, 
   assert.deepEqual(envSplit(env, envAllowOf('codex')).held, ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN'])
   assert.deepEqual(envAllowOf('custom'), [])
   assert.ok(AGENT_KEY_ENV.claude.includes('ANTHROPIC_API_KEY'))
+})
+
+test('midCut: a long name cut in the middle, both ends kept, the end on a dash; short ones as they are; emoji and wide characters by code point', () => {
+  assert.equal(midCut('fix-checkout-total', 11), 'fix-c…total')
+  assert.equal(midCut('fix-checkout-total', 18), 'fix-checkout-total', 'one that fits')
+  assert.equal(midCut('fix-checkout-total', Infinity), 'fix-checkout-total')
+  assert.equal(midCut('check-radar-dark-mode', 12), 'check-r…mode', 'the end after a dash')
+  assert.equal(midCut('abcdefghijklmnop', 8), 'abcd…nop', 'no dash: half and half')
+  for (const n of [5, 8, 12]) assert.equal([...midCut('check-radar-dark-mode', n)].length, n)
+  assert.equal(midCut('🚀rocket-launch-🚀🚀', 9), '🚀rocke…🚀🚀', 'an emoji is one')
+  assert.equal(midCut('日本語の名前がとても長い', 6), '日本語…長い')
+  assert.equal(midCut('dark-mode', 3), 'da…', 'too little room: the start')
 })

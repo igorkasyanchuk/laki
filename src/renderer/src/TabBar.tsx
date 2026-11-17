@@ -3,7 +3,7 @@
 import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
-import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act } from './ui'
+import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText } from './ui'
 import { type TabView, HOME_ACCOUNT, creatorOf } from '../../shared/types'
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
@@ -101,7 +101,7 @@ export function TabList({ app }: { app: AppCtx }) {
             data-tip={[...ts.filter(t => t.compacting).map(t => `${t.name} is compacting its chat: summing up a long one takes a few seconds`), ...ts.filter(retrying).map(t => `${t.name}: ${retryText(t.retry!)}`), ...ts.filter(t => t.usual && t.runAt).map(t => `${t.name}: ${usualText((Date.now() - t.runAt!) / 1000, t.usual!)}`), ...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
-            <span>{ts.map(t => t.name).join(' · ')}</span>
+            <MidText text={ts.map(t => t.name).join(' · ')} />
             {ts.some(t => t.compacting) && <span className="tab-compact">Compacting…</span>}
             {ts.some(retrying) && <span className="tab-compact">Retrying…</span>}
             {ts.some(t => t.drafted) && <span className="tab-compact" data-tip="Typed in its box and not sent">Draft</span>}

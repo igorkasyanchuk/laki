@@ -75,11 +75,13 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
         <span className="project-count"><Num value={items.length} /></span>
         {many.length > 1 && api.bulk && (
           <span className="needs-bulk" onClick={e => e.stopPropagation()}>
-            <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} onClick={() => api.bulk!(many, true)}>
-              Allow all ({many.length})
+            <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} aria-label={`Allow all (${many.length})`} title={`Allow all (${many.length})`} onClick={() => api.bulk!(many, true)}>
+              <Icon name="check" size={12} />
+              <span className="nb-word">Allow all</span> ({many.length})
             </button>
-            <button type="button" className="needs-deny-all" data-tip={`Deny the ${many.length} permission asks`} onClick={() => api.bulk!(many, false)}>
-              Deny all
+            <button type="button" className="needs-deny-all" data-tip={`Deny the ${many.length} permission asks`} aria-label="Deny all" title="Deny all" onClick={() => api.bulk!(many, false)}>
+              <Icon name="x" size={12} />
+              <span className="nb-word">Deny all</span>
             </button>
           </span>
         )}

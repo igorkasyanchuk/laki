@@ -55,7 +55,7 @@ export function TurnStrip({ tab, api }: { tab: TabView; api: TurnApi }) {
   const [menu, open] = useMenu()
   if (!turns.length) return null
   return (
-    <div className="turn-strip" role="group" aria-label={`${tab.name}'s turns`}>
+    <div className="turn-strip" data-dock="bottom" role="group" aria-label={`${tab.name}'s turns`}>
       <span className="muted small">Turns</span>
       {turns.length > SHOWN && <span className="muted small">… {turns.length - SHOWN} earlier</span>}
       {turns.slice(-SHOWN).map(t => (

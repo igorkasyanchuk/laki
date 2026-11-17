@@ -324,6 +324,15 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => hasText('.pv-head button', 'Outline'), 'its Outline')
       await clickText('.pv-head button', 'Outline')
     }, async () => (await has('.menu .menu-filter')) && (await hasText('.menu-item', 'Rollout')) && (await hasText('.menu-item', 'Colors'))],
+    // T8: the phone's layout with a notched phone's insets (set as styles.css' --safe-*, as env() would): its bottom
+    // bar's buttons end 34px over the bottom, clear of the home indicator; then back to the desktop's
+    ['phone-safe', async () => {
+      await size(390, 844)
+      await waitFor(() => has('.app.narrow'), 'the phone layout')
+      await js("(s => [['t', 47], ['r', 0], ['b', 34], ['l', 0]].forEach(([k, v]) => s.setProperty(`--safe-${k}`, `${v}px`)))(document.documentElement.style)")
+      await nap(300)
+    }, () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.status button, .side-foot button')].filter(b => b.getBoundingClientRect().height > 0); return bs.length > 0 && bs.every(b => b.getBoundingClientRect().bottom <= innerHeight - 34) })()")],
+    ['phone-safe-off', async () => (await js("['t', 'r', 'b', 'l'].forEach(k => document.documentElement.style.removeProperty(`--safe-${k}`))"), await size(1440, 900)), () => js<boolean>("!document.querySelector('.app.narrow')")],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
       for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})
@@ -358,7 +367,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     }, () => hasText('.needs-allow-all', 'Allow all (2)')])
     for (const [theme, look] of [['laki', 'dark'], ['laki-light', 'light']]) {
       readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await nap(800)), '.needs-cards'])
-      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), '.check-strip'])
+      // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock)
+      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))"))])
       readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844)), '.app.narrow'])
     }
     readme.push(['readme-done', () => size(1440, 900), async () => true])

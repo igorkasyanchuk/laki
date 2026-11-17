@@ -1018,3 +1018,17 @@ export function marksOf(spans: { top: number; h: number; kind: MapKind | 'both' 
   }
   return out
 }
+
+// a name too long for its room, cut in the middle so both ends stay readable ("fix-c…total"): max characters in all,
+// the … one of them; the end starts after a dash, a space, a dot, a slash or an underscore when one leaves it at most
+// half; counted by code point (an emoji is one). One that fits comes back as it is
+export function midCut(name: string, max: number): string {
+  const cps = [...name]
+  if (!(max < cps.length)) return name
+  if (max < 4) return `${cps.slice(0, Math.max(1, max - 1)).join('')}…`
+  const room = max - 1
+  const half = Math.floor(room / 2)
+  let tail = half
+  for (let i = cps.length - 2; i > 0 && cps.length - i <= half; i--) if (/[-\s._/]/.test(cps[i - 1])) tail = cps.length - i // the longest end on a boundary
+  return `${cps.slice(0, room - tail).join('')}…${cps.slice(cps.length - tail).join('')}`
+}

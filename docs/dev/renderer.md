@@ -321,7 +321,27 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
-  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
+  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. T8, a notched
+  phone (index.html's `viewport-fit=cover`): `:root`'s `--safe-t/r/b/l` are `env(safe-area-inset-*)` (0 on a Mac); the
+  narrow block pads what touches an edge with them (the main area's top and sides, the status bar's and the sidebar
+  foot's bottom inside the bar, the sidebar's top and left, toasts, overlays, the widget sheet, `.splash`: the lock
+  screen and pairing). main.tsx sets `html[data-kb]` while the visual viewport is 120px or more short of the layout's
+  (iOS's keyboard), which zeroes `--safe-b`: the keyboard covers the home indicator. test:ui's `phone-safe` sets the
+  four as inline custom properties (a 34px bottom) and checks the bottom bars' buttons end 34px over the bottom.
+- **Names cut in the middle** (T6): ui.tsx `MidText` (text.ts `midCut`: the end on a dash, space, dot, slash or
+  underscore when that leaves it at most half, by code point) for sidebar rows, tab titles and the status bar's branch:
+  the cut over the whole name (transparent, so a screen reader reads it whole; its title too) in one grid cell, so the
+  box is as wide as the whole name until its room is less; one ResizeObserver for every MidText (a box resized or its
+  name changed is measured, nothing else). Needs you's head never cuts its title: under 280px (a container query,
+  `needs-head`) Allow all and Deny all become an icon with the count; a card's agent name is whole, and under 170px
+  (`need`) goes to a line of its own; the workspace's name is cut first.
+- **The AI button's corner** (T7, App.tsx `FabCorner`): `--fab-r`, what's right of the terminals, and `--fab-b`, how far
+  up from the main area's bottom the top of what's docked under it reaches (`data-dock="bottom"`: each pane's strips,
+  `.queue-strip` and the turn strip, and the ask bar); the button sits 16px over it (34px at least), a spring on
+  `bottom`. One ResizeObserver: the main area, the terminals and each pane's body (a strip that comes, grows or goes
+  resizes it). Over a plain terminal, no chat open and not a page, it fades to 55% (`.far`) while the pointer is over
+  120px away (back on approach or focus; Motion off, never). Pages keep `--fab-room` at their bottom
+  (`.page-body`, `.settings-main`). test:ui's README run checks it meets no `data-dock` element on the Done check's still.
 - **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own, an agent
   tab or a shell running one; a plain shell has none): a pill (`.term-reply`) where the mouse let go of a selection, gone
   at a key, a press, a scroll or an empty selection; it opens panels.tsx' `ReplyPop` (the quote, your words, a pick of

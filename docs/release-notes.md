@@ -5,6 +5,9 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Long names in the sidebar, tab titles and the status bar's branch are cut in the middle (`fix-c…total`), so both ends stay readable. Needs you's title is never cut: its Allow all and Deny all become icons when the sidebar is narrow, and an agent's name in a card is whole or on a line of its own.
+- The floating AI button rises above the Done check, the queue and the other strips under a terminal instead of covering them, fades while the pointer is far from it, and pages keep room for it at their bottom.
+- Remote access on an iPhone: the bars clear the notch and the home indicator, in Safari and from the Home Screen.
 - A worktree whose folder was deleted, or that lost its link to the repo, shows a red mark in the sidebar and a card with *Recreate* (its branch checked out again; what was lost said), *Relink*, or *Archive, keep the branch*. On SSH hosts and codespaces Laki says so; repair it there.
 - A one-time bell: *Tell me when it finishes* in a tab's or a workspace's menu (⌘K too, `laki bell`) tells you once when it next finishes, asks, fails or hits a plan limit, even with finish notifications off. A bell on the tab and the row while it's set; a click turns it off.
 - Security: an agent, or a phone over remote access, can no longer turn on or rebind the keys that allow or deny the newest ask from any app, nor the talk key. An agent can't change scheduled runs' limits, Labs, Workflows or how many turns are kept either.

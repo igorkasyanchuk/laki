@@ -31,6 +31,8 @@
   /* V2: the design tokens. Space, a 2-4px grid; corners (each a look's own in looks.css; Settings' Corners, --rs, over
      them all); elevation; control heights; the stacking order. --radius is --r-m's old name */
   --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px;
+  --safe-t: env(safe-area-inset-top, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); /* T8: a notched phone's (viewport-fit=cover); 0 on a Mac */
+  --fab-room: 72px; /* T7: room a page keeps at its bottom for the AI button */
   --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px);
   --r-pill: calc(var(--r-xl) * 999); /* a capsule, but square where every corner is (a look's, Corners' Square): no round tab among square cards; a circle is 50% */
   --radius: var(--r-m);
@@ -487,8 +489,10 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .need:hover { background: color-mix(in srgb, var(--raised) 85%, var(--fg) 4%); }
 .need:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .need-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
-.need-ws { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.need-tab { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.need { container: need / inline-size; }
+.need-ws { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } /* T6: cut before the time is squeezed */
+.need-tab { flex: 1 0 auto; color: var(--muted); white-space: nowrap; } /* T6: whole, never a letter: too narrow, it goes to a line of its own */
+@container need (max-width: 170px) { .need-head { flex-wrap: wrap; row-gap: 0; } .need-tab { order: 1; flex-basis: 100%; padding-left: var(--sp-5); } }
 .need-head .elapsed { flex: none; color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
 .need-diff { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: 4px; min-width: 0; } .need-diff > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .need-diff pre { max-height: 160px; } /* an Edit's ask: AskDiff */
 .need-q { color: var(--fg); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -563,6 +567,11 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
 .drop-into { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); } /* a group's head: first in it */
 .ws-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 4em; } /* a row's marks and chips don't squeeze it out */
+/* T6: ui.tsx MidText: the cut name over the whole one (transparent: still read aloud), in one grid cell: the box is as wide
+   as the whole name until its room is less */
+.mid { display: inline-grid; min-width: 0; overflow: hidden; }
+.mid > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mid > .mid-whole { justify-self: start; overflow: visible; color: transparent; pointer-events: none; user-select: none; }
 .listen { background: none; border: none; padding: 0; color: var(--done); font-family: var(--mono); font-size: var(--fs-2); }
 .listen:hover { text-decoration: underline; background: none; }
 .badge { font-size: var(--fs-1); color: var(--waiting); font-family: var(--mono); }
@@ -617,6 +626,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .electron.list-off .settings-head { padding-left: max(16px, calc(76px - var(--rail-w, 68px))); } /* the rail's page: past the traffic lights */
 .settings-body { flex: 1; display: flex; min-height: 0; }
 .page-body { flex: 1; overflow-y: auto; padding: 28px 32px 48px; } /* a page like Settings: the new-workspace form */
+:where(.main[data-pages]) :is(.page-body, .settings-main) { padding-bottom: var(--fab-room); } /* T7: a page's last row clear of the AI button in its corner */
 .to-top { position: absolute; right: 24px; bottom: 22px; z-index: 6; display: grid; place-items: center; width: 34px; height: var(--h-l); padding: 0; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: var(--lift-2); cursor: pointer; animation: to-top-in 0.16s ease-out; } /* ui.tsx Page: scrolled well down */
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent); }
 @keyframes to-top-in { from { opacity: 0; transform: translateY(6px); } }
@@ -768,6 +778,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 /* the branch: its name cut short, all of it (and its base) on a click */
 .status .sb-branch { display: inline-block; flex: none; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; padding: 0; border: none; background: none; color: inherit; }
 .status .sb-branch.full { max-width: none; flex: 0 1 auto; min-width: 12ch; }
+.status .sb-branch:not(.full) { display: inline-flex; align-items: center; } .status .sb-branch .mid { flex: 0 1 auto; } /* MidText: its room after the icon */
 .status .sb-branch:hover { color: var(--fg); background: none; }
 .status .sb-flow { display: inline-flex; align-items: center; gap: var(--sp-3); flex: 0 1 auto; min-width: 0; max-width: 34ch; white-space: nowrap; line-height: 20px; padding: 0; border: none; background: none; color: inherit; }
 .status .sb-flow:hover { color: var(--fg); background: none; }
@@ -1139,7 +1150,7 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .app[data-inset]:not(.narrow) .pane.active { outline-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .app[data-inset]:not(.narrow) .pane-head { background: color-mix(in srgb, var(--tab-c, transparent) 8%, var(--term-bg)); }
 /* a tab's queue (panels.tsx' QueueStrip) under its terminal: its own height, at most a third of the pane, the rest scrolls */
-.queue-strip { flex: none; max-height: 34%; padding-right: 48px; /* clear of the floating AI button */ display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--side); font-size: var(--fs-2); }
+.queue-strip { flex: none; max-height: 34%; /* the floating AI button rises above it (data-dock, App's FabCorner) */ display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--side); font-size: var(--fs-2); }
 .show-strip .show-text { padding: var(--sp-1) var(--sp-5) var(--sp-3); white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: var(--fs-3); } /* laki show's card (panels.tsx ShowStrip) */
 .show-strip .show-open { display: flex; flex-wrap: wrap; gap: var(--sp-3); padding: 0 var(--sp-5) var(--sp-4); }
 .show-strip .show-open button { display: inline-flex; align-items: center; gap: var(--sp-3); }
@@ -1968,6 +1979,17 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 /* 16px: iOS zooms into a smaller field it focuses */
 .narrow input, .narrow select, .narrow textarea, .narrow .xterm-helper-textarea { font-size: var(--fs-4) !important; }
 .narrow .page-body > .new-ws { margin-top: 0; } /* a phone: the keyboard takes the bottom half */
+/* T8: a notched phone (remote access's page, its Home Screen app too): what touches an edge clears the notch and the
+   home indicator. The keyboard up (main.tsx' data-kb) covers the indicator: no room for it twice */
+html[data-kb] { --safe-b: 0px; }
+.narrow .main { padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
+.narrow .status { height: calc(26px + var(--safe-b)); padding-bottom: var(--safe-b); }
+.narrow .sidebar { padding-top: var(--safe-t); padding-left: var(--safe-l); }
+.narrow .side-foot { height: calc(var(--h-m) + var(--safe-b)); padding-bottom: var(--safe-b); }
+.narrow .toast { bottom: calc(36px + var(--safe-b)); }
+.narrow .overlay { padding-top: max(var(--sp-4), var(--safe-t)); padding-bottom: var(--safe-b); }
+.narrow .modal.widget-modal { height: calc(100dvh - var(--sp-6) - var(--safe-t) - var(--safe-b)); }
+.splash { padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l); } /* the lock screen, pairing */
 .narrow :is(.nw-chip, .nw-top .nw-pick) { height: 38px; font-size: var(--fs-4); } /* its input is 16px (no zoom): the label matches, and a finger fits */
 /* a touch screen: no hover to find buttons, fingers to hit them */
 @media (pointer: coarse) {
@@ -2323,7 +2345,8 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .ai-window :is(.ai-tools, .ai-error, .ai-working) { margin-left: 0; }
 /* the floating chat (Settings › AI's Chat button): a round button in the main area's bottom right corner, over the
    status bar's line, and the AI window's chat in a panel above it; over pages too. Nearly opaque, no backdrop-filter */
-.ai-fab-wrap { position: absolute; right: calc(var(--fab-r, 0px) + 16px); bottom: 34px; z-index: calc(var(--z-ask) + 1); } /* --fab-r: what's right of the terminals (App's FabCorner) */
+.ai-fab-wrap { position: absolute; right: calc(var(--fab-r, 0px) + 16px); bottom: max(34px, calc(var(--fab-b, 0px) + 16px)); z-index: calc(var(--z-ask) + 1); transition: bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s; } /* --fab-r: what's right of the terminals, --fab-b: what's docked under it (App's FabCorner) */
+.ai-fab-wrap.far { opacity: 0.55; } .ai-fab-wrap.far:focus-within, html[data-motion='none'] .ai-fab-wrap.far { opacity: 1; } /* T7: faded far from the pointer over a terminal; Motion off: as it is */
 .ai-fab { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--panel); color: var(--accent-ink); box-shadow: var(--lift-2); cursor: pointer; transition: transform 0.12s, background 0.12s; }
 .ai-fab:hover { transform: scale(1.06); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
 .ai-fab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
@@ -2367,7 +2390,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-grip.l, .ai-grip.r { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; } .ai-grip.l { left: -4px; } .ai-grip.r { right: -4px; }
 .ai-grip:is(.tl, .tr, .bl, .br) { width: 16px; height: 16px; } .ai-grip.tl { top: -5px; left: -5px; cursor: nwse-resize; } .ai-grip.br { right: -5px; bottom: -5px; cursor: nwse-resize; } .ai-grip.tr { top: -5px; right: -5px; cursor: nesw-resize; } .ai-grip.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
 .ai-float[class*='sizing-'], .ai-float[class*='sizing-'] * { user-select: none; } .ai-float:is(.sizing-t, .sizing-b) * { cursor: ns-resize !important; } .ai-float:is(.sizing-l, .sizing-r) * { cursor: ew-resize !important; } .ai-float:is(.sizing-tl, .sizing-br) * { cursor: nwse-resize !important; } .ai-float:is(.sizing-tr, .sizing-bl) * { cursor: nesw-resize !important; }
-@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-fab-min, .ai-window::before { transition: none; } .ai-fab-wrap, .sb-ai, .ai-float, .ai-shimmer, .ai-window .ai-mark::after, .ext-ai .ai-mark::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-fab-min, .ai-window::before, .ai-fab-wrap { transition: none; } .ai-fab-wrap, .sb-ai, .ai-float, .ai-shimmer, .ai-window .ai-mark::after, .ext-ai .ai-mark::after { animation: none; } }
 /* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
 @property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .ai-peek { position: fixed; z-index: 9; pointer-events: none; border-radius: var(--r-l); box-shadow: inset 0 0 18px 3px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 48px 10px color-mix(in srgb, var(--tc-purple) 34%, transparent), inset 0 0 110px 24px color-mix(in srgb, var(--tc-pink) 16%, transparent); animation: ai-peek 2.6s ease-out forwards; }
@@ -3767,7 +3790,11 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 /* U8: Needs you's Allow all and Deny all, in its head */
 .needs-bulk { display: flex; gap: var(--sp-2); margin-left: auto; flex: none; }
 .needs-bulk button { font-size: var(--fs-1); height: 20px; padding: 0 var(--sp-3); white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 600; }
-.needs-list > .project-head .project-name { flex: 0 1 auto; min-width: 0; }
+.needs-list > .project-head .project-name { flex: none; } /* T6: never cut; the buttons give way */
+.needs-list > .project-head { container: needs-head / inline-size; }
+.needs-bulk button { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.needs-bulk button .icon-svg { display: none; }
+@container needs-head (max-width: 280px) { .needs-bulk button .icon-svg { display: block; } .needs-bulk .nb-word { display: none; } .needs-bulk button { padding: 0 var(--sp-2); } }
 .needs-bulk .needs-allow-all { color: var(--accent-ink); border-color: var(--accent); }
 
 /* U10: Settings' Basic | All, and Basic's view: only its cards (Shown), none of the sections' own heads and notes */

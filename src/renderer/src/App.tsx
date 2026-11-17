@@ -54,7 +54,7 @@ import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, Usage
 import { BgButton } from './BgTasks'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
-import { Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { MidText, Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -91,7 +91,10 @@ const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own �
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
 
 // the AI button keeps to the terminals' corner (--fab-r: what's right of them), so the file preview's and the side
-// panel's last rows show
+// panel's last rows show; T7: and above what's docked at their bottom under it (--fab-b: a pane's strips, the ask bar:
+// data-dock="bottom"). One ResizeObserver: the main area, the terminals and each pane's body (a strip that comes,
+// grows or goes resizes it), its panes looked for again each time. Over a plain terminal with no chat open it fades
+// (.far) while the pointer is over 120px away
 function FabCorner({ className, children }: { className: string; children: ReactNode }) {
   const at = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -99,11 +102,38 @@ function FabCorner({ className, children }: { className: string; children: React
     const main = fab?.parentElement
     const wrap = main?.querySelector('.term-wrap')
     if (!fab || !main || !wrap) return
-    const set = () => fab.style.setProperty('--fab-r', `${Math.max(0, main.getBoundingClientRect().right - wrap.getBoundingClientRect().right)}px`)
+    let mid = { x: 0, y: 0 }
+    const watched = new Set<Element>()
+    const set = () => {
+      const m = main.getBoundingClientRect()
+      fab.style.setProperty('--fab-r', `${Math.max(0, m.right - wrap.getBoundingClientRect().right)}px`)
+      const f = fab.getBoundingClientRect()
+      let b = 0
+      for (const d of main.querySelectorAll('[data-dock="bottom"]')) {
+        const r = d.getBoundingClientRect()
+        if (r.height > 0 && r.left < f.right && r.right > f.left) b = Math.max(b, m.bottom - r.top)
+      }
+      fab.style.setProperty('--fab-b', `${Math.round(b)}px`)
+      for (const p of main.querySelectorAll('.pane-body')) if (!watched.has(p)) watched.add(p), ro.observe(p)
+      for (const p of watched) if (!p.isConnected) watched.delete(p), ro.unobserve(p)
+      const g = fab.getBoundingClientRect()
+      mid = { x: g.left + g.width / 2, y: g.top + g.height / 2 }
+    }
     const ro = new ResizeObserver(set)
     ro.observe(wrap)
     ro.observe(main)
-    return () => ro.disconnect()
+    let frame = 0
+    let pt: { x: number; y: number } | null = null
+    const fade = () => {
+      frame = 0
+      const far = !!pt && Math.hypot(pt.x - mid.x, pt.y - mid.y) > 120 && main.dataset.pages === undefined && !fab.querySelector('.ai-fab.on')
+      fab.classList.toggle('far', far)
+    }
+    const move = (e: PointerEvent) => ((pt = { x: e.clientX, y: e.clientY }), frame || (frame = requestAnimationFrame(fade)))
+    const leave = () => ((pt = { x: -1e4, y: -1e4 }), frame || (frame = requestAnimationFrame(fade)))
+    main.addEventListener('pointermove', move, { passive: true })
+    main.addEventListener('pointerleave', leave)
+    return () => (ro.disconnect(), main.removeEventListener('pointermove', move), main.removeEventListener('pointerleave', leave), cancelAnimationFrame(frame))
   }, [])
   return (
     <div className={className} ref={at}>
@@ -3661,7 +3691,7 @@ export function App() {
                   onClick={() => setBranchFull(f => !f)}
                 >
                   <Icon name="fork" size={11} />
-                  {branchFull ? ws.branch : shortBranch(ws.branch)}
+                  {branchFull ? ws.branch : <MidText text={shortBranch(ws.branch)} />}
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </button>
               )}
@@ -4159,7 +4189,7 @@ export function App() {
         {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && !(app.needsShown && sideOpen && !video && !listOff) /* the sidebar's Needs you card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
           <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff}>{chip => (
-          <div className="ask-bar">
+          <div className="ask-bar" data-dock="bottom">
             {tab.ask!.tool ? (
               // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)
               <>

@@ -2311,7 +2311,7 @@ export function SecretStrip({ tab, onGive }: { tab: TabView; onGive: (id: string
   if (!s) return null
   const give = (value?: string) => (setBusy(true), void onGive(s.id, value).then(() => setV(''), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
   return (
-    <form className="queue-strip secret-strip" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), v && give(v))}>
+    <form className="queue-strip secret-strip" data-dock="bottom" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), v && give(v))}>
       <div className="queue-head">
         <Icon name="lock" size={13} />
         <span className="queue-what">
@@ -2337,7 +2337,7 @@ export function ShowStrip({ tab, onClose, onCopy }: { tab: TabView; onClose: () 
   if (!c) return null
   const go = (o: (typeof c.open)[number]) => (o.kind === 'url' ? openExternal(o.target) : bridge?.openPath ? void bridge.openPath(o.target) : onCopy(o.target))
   return (
-    <div className="queue-strip show-strip" role="region" aria-label={`${tab.name} shows you`}>
+    <div className="queue-strip show-strip" data-dock="bottom" role="region" aria-label={`${tab.name} shows you`}>
       <div className="queue-head">
         <Icon name="agent" size={13} />
         <span className="queue-what">
@@ -2377,7 +2377,7 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
           ? `${failed?.name ?? 'The check'} failed ${check.tries} times in a row: over to you`
           : `Checked: ${check.review!.agent} has notes`
   return (
-    <div className={`queue-strip check-strip s-${check.status}`} role="region" aria-label={`${tab.name}'s check`}>
+    <div className={`queue-strip check-strip s-${check.status}`} data-dock="bottom" role="region" aria-label={`${tab.name}'s check`}>
       <div className="queue-head">
         {check.status === 'checking' ? <Glyph s="running" /> : <Icon name={check.status === 'passed' ? 'checkCircle' : 'alertCircle'} size={13} />}
         <span className="queue-what">{head}</span>
@@ -2419,7 +2419,7 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
   const i = INSTALL[agent]
   return (
-    <div className="queue-strip show-strip hook-strip" role="region" aria-label={`${AGENT_NAMES[agent]} isn't installed`}>
+    <div className="queue-strip show-strip hook-strip" data-dock="bottom" role="region" aria-label={`${AGENT_NAMES[agent]} isn't installed`}>
       <div className="queue-head">
         <Icon name="alertCircle" size={13} />
         <span className="queue-what">
@@ -2457,7 +2457,7 @@ export function HookStrip({ tab, onCopy, onHide }: { tab: TabView; onCopy: (text
   const h = tab.hookless
   if (!h) return null
   return (
-    <div className="queue-strip show-strip hook-strip" role="region" aria-label={`${tab.name}: hooks not heard`}>
+    <div className="queue-strip show-strip hook-strip" data-dock="bottom" role="region" aria-label={`${tab.name}: hooks not heard`}>
       <div className="queue-head">
         <Icon name="alertCircle" size={13} />
         <span className="queue-what">Laki isn't hearing from this agent. Asks, finishes and notifications come from the screen only.</span>
@@ -2492,7 +2492,7 @@ export function WorkerAsks({ asks, onAnswer, onOpen }: { asks: { ws: string; nam
   const [busy, setBusy] = useState('')
   if (!asks.length) return null
   return (
-    <div className="queue-strip worker-asks" role="region" aria-label="Your workers ask">
+    <div className="queue-strip worker-asks" data-dock="bottom" role="region" aria-label="Your workers ask">
       {asks.map(({ ws, name, tab: t }) => (
         <div key={t.id} className="plan-ask">
           <div className="queue-head">
@@ -2531,7 +2531,7 @@ export function PlanStrip({ tab, onAnswer, onSend }: { tab: TabView; onAnswer: (
   const changed = !!ask && !!last && draft !== undefined && draft.trim() !== ask.trim()
   const now = plan && planNow(plan)
   return (
-    <div className={`queue-strip plan-strip${plan?.stale ? ' stale' : ''}`} role="region" aria-label={`${tab.name}'s plan`}>
+    <div className={`queue-strip plan-strip${plan?.stale ? ' stale' : ''}`} data-dock="bottom" role="region" aria-label={`${tab.name}'s plan`}>
       {ask && (
         <div className="plan-ask">
           <div className="queue-head">
@@ -2596,7 +2596,7 @@ export function LaterStrip({ tab, later, onNow, onEdit, onCancel }: { tab: TabVi
   if (!any) return null
   const at = (end: number) => new Date(end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   return (
-    <div className="queue-strip later-strip" role="region" aria-label={`Sent later to ${tab.name}`}>
+    <div className="queue-strip later-strip" data-dock="bottom" role="region" aria-label={`Sent later to ${tab.name}`}>
       <div className="queue-head">
         <Icon name="timer" size={13} />
         <span className="queue-what">
@@ -2639,7 +2639,7 @@ export function QueueStrip({ tab, onSave, onNow, onResume, onClear, onRemove }: 
   }
   const save = () => edit && void onSave(q.map((x, j) => (j === edit.i ? edit.text : x)), q).then(ok => ok && setEdit(null))
   return (
-    <div className="queue-strip" role="region" aria-label={`Queued for ${tab.name}`}>
+    <div className="queue-strip" data-dock="bottom" role="region" aria-label={`Queued for ${tab.name}`}>
       <div className="queue-head">
         <Icon name="clock" size={13} />
         <span className="queue-what">

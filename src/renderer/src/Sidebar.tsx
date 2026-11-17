@@ -4,7 +4,7 @@
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
-import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge } from './ui'
+import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
@@ -234,7 +234,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : w.pending && !wt.length ? 'idle' /* its agent comes later: not ended */ : rollup(wt)} />}
         {marksAt === 'start' && yes}
-        <span className="ws-name">{wsName(w)}</span>
+        <MidText className="ws-name" text={wsName(w)} />
         {marksAt === 'name' && yes}
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
