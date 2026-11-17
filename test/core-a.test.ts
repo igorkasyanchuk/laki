@@ -236,6 +236,11 @@ test('interrupts: a turn again or its end first, a waiting agent; dev mode logs 
   await until(async () => (await status(quiz.id)) === 'waiting', 'it asks a question')
   await rig.rpc('input', { tab: quiz.id, data: '\x1b' })
   await until(async () => (await status(quiz.id)) === 'idle', 'declined: its turn over')
+  // Esc on a permission menu: "Interrupted", 7 lines up under claude's input box, status line and mode line
+  const permEsc = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'menu' })
+  await until(async () => (await status(permEsc.id)) === 'waiting', 'it asks for permission')
+  await rig.rpc('input', { tab: permEsc.id, data: '\x1b' })
+  await until(async () => (await status(permEsc.id)) === 'idle', 'interrupted at its menu')
 
   // a queue on an agent that ended: Enter starts it again, running until what waits goes in
   const third = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'slow three' })

@@ -193,11 +193,14 @@ process.stdin.on('data', d => {
     if (!process.env.FAKE_NO_MODES) (mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length]), drawFoot()
     if (!s) return
   }
-  if (menu && s === '\x1b' && MENU === QUIZ) {
-    // Esc on AskUserQuestion's menu: the real one's words, then its input box, status line and mode line (no hook)
+  if (menu && s === '\x1b') {
+    // Esc on a menu ends the turn with no hook, as the real one: AskUserQuestion's says it declined, a permission
+    // prompt's that it was interrupted; then its input box, status line and mode line
+    const said = MENU === QUIZ ? '● User declined to answer questions\r\n  ⎿  · Which color? (Red / Green / Blue)\r\n\r\n✻ Worked for 3s' : '  ⎿  Interrupted · What should Claude do instead?'
+    process.stdout.write(`\x1b[${MENU.length}A\x1b[J${said}\r\n\r\n${'─'.repeat(20)}\r\n❯ \r\n${'─'.repeat(20)}\r\n  test (main) [Opus]\r\n  ⏵⏵ auto mode on (shift+tab to cycle)\r\n`)
     menu = 0
     MENU = MENU0
-    return process.stdout.write('\x1b[3A\x1b[J● User declined to answer questions\r\n  ⎿  · Which color? (Red / Green / Blue)\r\n\r\n✻ Worked for 3s\r\n\r\n' + '─'.repeat(20) + '\r\n❯ \r\n' + '─'.repeat(20) + '\r\n  test (main) [Opus]\r\n  ⏵⏵ auto mode on (shift+tab to cycle)\r\n')
+    return
   }
   if (menu) {
     const keys = s.match(/\x1b[[O][AB]|\r/g) // each key, in order: a busy machine hands keys sent 40 ms apart over in one read

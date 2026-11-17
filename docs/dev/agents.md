@@ -400,8 +400,9 @@ there: each change of status comes with `changed()`), for the turn timers (`sett
 ### Interrupts
 
 Esc or ⌃C ends a Claude/Codex turn without any hook. `input` sees the key and `interrupted` checks the
-bottom 15 lines for "Interrupted" or claude's "User declined to answer questions" (an Esc on AskUserQuestion's menu)
-with no menu left (`Session.ask`), a few times over 12s; a `running` hook in between cancels it. A turn can also end
+bottom 15 lines for "Interrupted" or claude's "User declined to answer questions" (an Esc on AskUserQuestion's menu),
+below any line that says it still works (`BUSY`) and, for a waiting tab, with no menu left (`Session.ask`), a few times
+over 12s; a `running` hook in between cancels it. The ask's `perm` goes with it. A turn can also end
 with no hook and no key (a resumed chat's recap): `sweepRunning` (every 2s) sets a running tab idle after 4s
 without output when its last 15 lines lack "esc to interrupt" (claude and codex show it, and redraw, while
 they work).

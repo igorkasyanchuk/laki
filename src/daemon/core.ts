@@ -4249,20 +4249,24 @@ export function input(id: string, data: string, c?: Client) {
 
 // Esc or ⌃C stops a turn, and no hook says so: idle once the screen shows "Interrupted" (claude's
 // "Interrupted · What should Claude do instead?", codex's "Conversation interrupted") or claude's "User declined to
-// answer questions" (an Esc on AskUserQuestion's menu), with no menu left. 15 lines: claude's
-// input box, status line and mode line come under it.
+// answer questions" (an Esc on AskUserQuestion's menu). 15 lines: claude's input box, status line and mode line come
+// under it; so the line must sit below any line that says it still works (BUSY: an older one higher up is a past
+// turn's, opencode's first Esc only arms its second), and a waiting tab's menu must be gone.
 // ponytail: matched by message, like CHAT_GONE.
 const ESC_ENDED = /interrupted|declined to answer/i
 function interrupted(id: string, s: Session) {
   const r = rtOf(id)
   if (r.status !== 'running' && r.status !== 'waiting') return
+  const busy = BUSY[state.tabs.find(t => t.id === id)?.preset ?? '']
   const at = (r.escAt = Date.now())
   for (const ms of [300, 1000, 2500, 6000, 12000]) // a loaded Mac draws it late
     setTimeout(() => {
       if (r.escAt !== at || (r.status !== 'running' && r.status !== 'waiting')) return // a new turn since
-      if (!ESC_ENDED.test(s.screenText(15)) || s.ask()) return
+      const lines = s.screenText(15).split('\n')
+      const lastOf = (re?: RegExp) => (re ? lines.findLastIndex(l => re.test(l)) : -1)
+      if (lastOf(ESC_ENDED) <= lastOf(busy) || (r.status === 'waiting' && s.ask())) return
       r.status = 'idle'
-      r.escAt = undefined
+      r.escAt = r.perm = undefined // the ask is over, as any hook but a wait says (turn)
       changed()
     }, ms)
 }
