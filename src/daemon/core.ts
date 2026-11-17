@@ -140,6 +140,8 @@ const readState = (p: string): State => {
 // agent waits, the floating windows kept out of screen recording. On a Mac its window is
 // the Frosted design (Settings › Layout › Design: macOS's glass), set where the theme pair is
 const NEW_DEFAULTS = { syncBase: 'origin', rowMarks: { step: true }, memoryCompact: { on: false }, notifyOn: { done: false }, wsTint: true, edgeGlow: true, hideFloats: true } as const // wsTint: a new install starts on Laki's theme (and Frosted on a Mac), where it's made to show
+// an install from before hideSecrets, not asked yet (load): main.ts' one notice
+export const askSecrets = { on: false }
 // R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
 // state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
 // may not survive
@@ -241,8 +243,10 @@ export function load() {
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
-  // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts)
+  // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts:
+  // askSecrets). A test's daemon neither, but with LAKI_TEST_LEAN=1 (a new install) or LAKI_TEST_ASK_SECRETS=1
   if (!had && state.settings?.hideSecrets === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, hideSecrets: true, hideSecretsAsked: true }
+  askSecrets.on = had && state.settings?.hideSecrets === undefined && !state.settings?.hideSecretsAsked && (!inRig() || process.env.LAKI_TEST_ASK_SECRETS === '1')
   // a new install's default profiles start claude and codex in their sandbox (presets); one from before keeps none. A
   // test's daemon, as with Labs below, only with LAKI_TEST_LEAN=1: the rest of the tests are of agents without one
   if (!had && state.settings?.sandboxNew === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, sandboxNew: true }

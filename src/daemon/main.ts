@@ -727,7 +727,7 @@ const api: Record<string, Handler> = {
   clientAdd: p => clientAsk('add', p), // T1: a trusted client, once you say yes in Laki's window
   clientRotate: p => clientAsk('rotate', p), // a new token (its scopes too), asked the same way
   clientRm: p => (c => (log(`trusted client ${c.label}: revoked`), c))(clientsMod.clientRm(p.id)), // at once: no ask, it only takes away
-  clientList: () => clientsMod.clientList(),
+  clientList: () => clientsMod.clientList().map(c => ({ ...c, use: clientUseOf(c) })), // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
   clientAnswer: p => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
   clientWho: p => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
@@ -821,15 +821,15 @@ async function termAsk(term: core.Term) {
   }
   if (!(await a.done)) throw new Error(`${NO_TERM}: Allow it in Laki's window (it asked there), then try again`)
 }
-const termAsksTo = (c: core.Conn) => apps.has(c) && (termAsks.forEach(a => c.send(a.msg)), clientAsks.forEach(a => c.send(a.msg))) // a window that opened meanwhile
+const termAsksTo = (c: core.Conn) => apps.has(c) && (termAsks.forEach(a => c.send(a.msg)), clientAsks.forEach(a => c.send(a.msg)), clientExpiring(c)) // a window that opened meanwhile
 
 // T1: a trusted client (clients.ts) made, or rotated with its scopes, only once you say yes in Laki's window: clientAsk to
 // the app's windows alone, answered by clientAnswer with the app's token (call() checks it, as termAnswer's), else no in
 // TERM_WAIT. Asked from your own terminal (S1's: allowed) or the app; never from a tab (an agent's is AGENT_NO, and a
 // shell tab's typing may be an agent's: #1), a client's token (not a scope: clientNo) or remote access (REMOTE_NO). No
 // window: refused at once. #TODO: Settings › Trusted clients lists them, with add, rotate and revoke (the app's own ask)
-const clientAsks = new Map<string, { msg: { ev: 'clientAsk'; req: string }; answer: (allow: boolean) => void }>()
-async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; id?: unknown; label?: unknown; scopes?: unknown; projects?: unknown }) {
+const clientAsks = new Map<string, { msg: { ev: 'clientAsk'; req: string }; answer: (allow: boolean, never?: boolean) => void }>()
+async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; id?: unknown; label?: unknown; scopes?: unknown; projects?: unknown; expires?: unknown; limits?: unknown }) {
   if (p.from?.tab) throw new Error("a trusted client is added from your own terminal, not from a Laki tab (an agent may be typing there)")
   const was = what === 'rotate' ? clientsMod.clientFind(p.id) : undefined
   const label = was?.label ?? clientsMod.labelOf(p.label)
@@ -838,24 +838,29 @@ async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; 
   const said = p.projects === undefined || p.projects === null || p.projects === '' ? undefined : (Array.isArray(p.projects) ? p.projects : String(p.projects).split(',')).map(x => String(x).trim()).filter(Boolean)
   const projects = said ? (said.length === 1 && said[0] === 'all' ? undefined : [...new Set(said.map(x => core.findProject(x).id))]) : was?.projects
   if (!was && clientsMod.clientList().some(c => c.label.toLowerCase() === label.toLowerCase())) throw new Error(`${label} is a client already: laki client rotate gives it a new token`)
+  // T9: its token lasts 90 days (or --expires), from now; never only if you pick that on the card. T11: its limits (a
+  // rotate keeps the ones it had unless it names new ones)
+  const asked = clientsMod.expiresOf(p.expires)
+  const limits = clientsMod.limitsOf(p.limits, was ? clientsMod.limitsFor(was) : clientsMod.LIMITS)
   const windows = [...core.clients].filter(c => apps.has(c))
   if (!windows.length) throw new Error(`Laki's window isn't open to allow ${label}: open Laki, then try again`)
-  const msg = { ev: 'clientAsk' as const, req: randomBytes(8).toString('hex'), what, label, scopes: scopes.map(s => `${s}: ${clientsMod.SCOPES[s]}`), ...(projects && { projects: projects.map(id => core.state.projects.find(x => x.id === id)?.name ?? id) }), file: clientsMod.tokenPath(was?.id ?? clientsMod.clientIdFor(label)) }
+  const msg = { ev: 'clientAsk' as const, req: randomBytes(8).toString('hex'), what, label, scopes: scopes.map(s => `${s}: ${clientsMod.SCOPES[s]}`), ...(projects && { projects: projects.map(id => core.state.projects.find(x => x.id === id)?.name ?? id) }), days: asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, ...(asked === 'never' && { never: true }), limits: `${limits.wsPerHour} workspaces an hour, ${limits.agentsAtOnce} agents at once, ${limits.sendsPerMinute} messages a minute`, file: clientsMod.tokenPath(was?.id ?? clientsMod.clientIdFor(label)) }
   log(`trusted client ${label}: ${what} asked in the window (${scopes.join(', ') || 'reads only'})`)
+  let never = false
   const allow = await new Promise<boolean>(ok => {
     const timer = setTimeout(() => ok(false), TERM_WAIT())
-    clientAsks.set(msg.req, { msg, answer: a => (clearTimeout(timer), ok(a)) })
+    clientAsks.set(msg.req, { msg, answer: (a, n) => (clearTimeout(timer), (never = !!n && asked === 'never'), ok(a)) })
     for (const c of windows) c.send(msg)
   })
   clientAsks.delete(msg.req)
   for (const c of core.clients) if (apps.has(c)) c.send({ ev: 'clientDone', req: msg.req })
   if (!allow) throw new Error(`${label} wasn't ${what === 'add' ? 'added' : 'given a new token'}: not allowed in Laki's window`)
   if (was && !clientsMod.clientList().some(c => c.id === was.id)) throw new Error(`${label} was revoked while its new token waited for Allow: laki client add makes it again`)
-  const made = clientsMod.clientMint(label, scopes, was?.id, projects)
+  const made = clientsMod.clientMint(label, scopes, was?.id, projects, { expires: never ? 'never' : asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, limits })
   log(`trusted client ${label}: ${what === 'add' ? 'added' : 'rotated'} (${scopes.join(', ') || 'reads only'}${projects ? `; projects ${projects.join(', ')}` : ''})`)
   return made
 }
-const clientAnswer = (p: { req?: unknown; allow?: unknown }) => void clientAsks.get(String(p?.req))?.answer(p?.allow === true)
+const clientAnswer = (p: { req?: unknown; allow?: unknown; never?: unknown }) => void clientAsks.get(String(p?.req))?.answer(p?.allow === true, p?.never === true) // never: the card's Allow, never expires (only offered when --expires never asked)
 // T1: a trusted client's call: the tab its process runs in when it's in one (S12's rule: a token read out of a file
 // names its reader, not its owner), for what asks who; else the client, within its scopes (clientNo), as itself: what
 // its env says (from, caller) is dropped, byClient (its id) set; call() drops any byClient an RPC says. A process that
@@ -876,6 +881,8 @@ async function clientCalls(sock: Socket, method: string, p: unknown, c: clientsM
   }
   const o: Record<string, unknown> = { ...(p && typeof p === 'object' ? p : {}), from: undefined, caller: undefined, byClient: c.id }
   try {
+    if (clientsMod.expired(c)) throw new Error(`${c.label}'s token expired on ${new Date(clientsMod.expiryOf(c)!).toDateString()}: laki client rotate ${c.id} gives it a new one`)
+    clientsMod.clientUsed(c.id)
     clientNo(method, o, c)
   } catch (e) {
     clientLine(method, o, e)
@@ -923,6 +930,59 @@ function clientNo(method: string, p: ClientCall, c: clientsMod.Client) {
     if (method === 'send' && !has('cmd')) (why => why && no(why, 'cmd'))(p.enter === false ? 'send keys without Enter' : bangNo(String(p.text ?? ''), t.name))
     if (method === 'send' && !has('yolo') && core.tabNeverAsks(t)) no(`send to ${t.name}: it runs in a mode that never asks`, 'yolo')
   }
+  clientLimit(method, p, c)
+}
+// T11: a client's limits (clients.ts Limits), after its scopes: workspaces and agent tabs it starts in a sliding hour
+// (wsNew, wsFan: each fanned agent, tabNew with an agent), its agents running or waiting at once (its workspaces' agent
+// tabs, read from the state: right after a restart too), its messages in a sliding minute. Counted as a call is let
+// through (one that then fails still counts). A refusal says which limit and when it frees; daemon.log once a minute per
+// client, the window one quiet line the first time in an hour. Reads aren't limited
+const clientUse = new Map<string, { ws: number[]; sends: number[]; logged?: number; told?: number }>()
+const SEND_MS = (inRig() && Number(process.env.LAKI_CLIENT_SEND_MS)) || 60_000 // a test's daemon: a shorter minute
+function clientLimit(method: string, p: ClientCall, c: clientsMod.Client) {
+  const lim = clientsMod.limitsFor(c)
+  const now = Date.now()
+  const u = clientUse.get(c.id) ?? { ws: [], sends: [] }
+  clientUse.set(c.id, u)
+  u.ws = u.ws.filter(at => now - at < 3600_000)
+  u.sends = u.sends.filter(at => now - at < SEND_MS)
+  const at = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(ms - now < 120_000 && { second: '2-digit' }), hourCycle: 'h23' })
+  const over = (text: string) => {
+    if (now - (u.logged ?? 0) >= 60_000) (u.logged = now), log(`client ${c.label}: ${method} refused: ${text}`)
+    if (now - (u.told ?? 0) >= 3600_000) (u.told = now), broadcastApps({ ev: 'clientQuiet', text: `${c.label} hit a limit: ${text}` })
+    throw new Error(`${c.label} reached its limit of ${text}`)
+  }
+  if (method === 'send') {
+    if (u.sends.length >= lim.sendsPerMinute) over(`${lim.sendsPerMinute} messages a minute: next at ${at(u.sends[0] + SEND_MS)}`)
+    u.sends.push(now)
+    return
+  }
+  const agents = method === 'wsFan' && Array.isArray(p.presets) ? p.presets.length : method === 'tabNew' ? ((pr => (pr && pr.agent !== 'command' ? 1 : 0))(core.presetNamed(String(p.preset ?? '')))) : method === 'wsNew' ? (p.preset === 'none' || p.preset === 'shell' ? 0 : 1) : 0
+  if (!agents && method !== 'wsNew') return
+  const count = Math.max(1, agents)
+  if (u.ws.length + count > lim.wsPerHour) over(`${lim.wsPerHour} workspaces an hour${count > 1 ? ` (this one asks for ${count})` : ''}: next at ${at(u.ws[Math.max(0, u.ws.length + count - lim.wsPerHour - 1)] + 3600_000)}`)
+  const mine = new Set(core.state.workspaces.filter(w => w.client === c.label && !w.archived).map(w => w.id))
+  const live = core.state.tabs.filter(t => mine.has(t.workspace) && t.kind === 'agent' && ['running', 'waiting'].includes(core.tabStatus(t.id))).length
+  if (agents && live + agents > lim.agentsAtOnce) over(`${lim.agentsAtOnce} agents at once (${live} running or waiting${agents > 1 ? `, this one asks for ${agents}` : ''}): one frees as an agent's turn ends or its workspace is archived`)
+  for (let i = 0; i < count; i++) u.ws.push(now)
+}
+const broadcastApps = (m: object) => { for (const c of core.clients) if (apps.has(c)) c.send(m) }
+// what a client uses of its limits now: workspaces in the last hour, agents running or waiting, messages in the last minute
+function clientUseOf(c: { id: string; label: string }) {
+  const now = Date.now()
+  const u = clientUse.get(c.id)
+  const mine = new Set(core.state.workspaces.filter(w => w.client === c.label && !w.archived).map(w => w.id))
+  return { wsHour: u?.ws.filter(at => now - at < 3600_000).length ?? 0, agents: core.state.tabs.filter(t => mine.has(t.workspace) && t.kind === 'agent' && ['running', 'waiting'].includes(core.tabStatus(t.id))).length, sendsMinute: u?.sends.filter(at => now - at < SEND_MS).length ?? 0 }
+}
+// T9: a client whose token ends within 7 days: one quiet line in the window, once a day each (as a window connects)
+const expiryTold = new Map<string, number>()
+function clientExpiring(c: core.Conn) {
+  const now = Date.now()
+  for (const x of clientsMod.clientList())
+    if (x.daysLeft !== undefined && x.daysLeft <= 7 && now - (expiryTold.get(x.id) ?? 0) >= 86400_000) {
+      expiryTold.set(x.id, now)
+      c.send({ ev: 'clientQuiet', text: x.daysLeft ? `${x.label}'s token ends in ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'}: laki client rotate ${x.id}` : `${x.label}'s token has ended: laki client rotate ${x.id}` })
+    }
 }
 // T1: what a client's call names, by the parameter its method reads (gates.ts CLIENT_WS): a project, or a workspace
 // (a send's or screen's target's: its tab's) and the words a missing one gets
@@ -1934,7 +1994,7 @@ void remoteMod
   .then(() => (remoteMod.remoteBack(), remoteMod.tunnelsBack())) // then the ones state.json kept (remote access first: My domain's on the tunnels' connector): after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
 // an install from before hideSecrets: asked once, in Laki's window (a notice kept until answered), to turn it on
-if (core.state.settings?.hideSecrets === undefined && !core.state.settings?.hideSecretsAsked) {
+if (core.askSecrets.on) {
   const held = envSplit(core.plainEnv(), envAllowOf('claude', core.presetNamed('claude')?.envAllow)).held
   if (held.length)
     void Promise.resolve()

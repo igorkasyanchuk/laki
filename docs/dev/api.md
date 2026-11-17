@@ -664,6 +664,19 @@ such an app with a capability of its own: a token that names it and says what it
   access. App.tsx shows it on the tool ask's card (no Allow on the notification). `clientRm` asks nothing (it only takes
   away); `clientList` is yours (`AGENT_NO`). A rotate whose client was revoked while it waited is refused at Allow;
   `clientFind` refuses a name that is one client's id and another's name. #TODO: Settings › Trusted clients (list, add, rotate, revoke).
+- **Expiry, use, limits (T9, T11).** A token lasts `EXPIRE_DAYS` (90) from its making or rotate (`clientAdd`/`clientRotate`'s
+  `expires`: `30d`, a number of days, or `never`, which the card then offers as *Allow, never expires*: only that pick
+  makes it so; `clientAnswer`'s `never`). One past its `expires` (a record from before: `at` + 90 days) is refused in
+  `clientCalls` before anything else, naming `laki client rotate`. Each call sets `lastAt` and `calls` (`clientUsed`:
+  in memory, clients.json written once a minute at most). `limits` (`Limits`: `wsPerHour` 10, `agentsAtOnce` 3,
+  `sendsPerMinute` 50; `--limits ws=…,agents=…,send=…` at add or rotate, a rotate keeping its own unless named; the
+  card says them) are `clientLimit`'s, after the scopes in `clientNo`: `wsNew`, `wsFan` (each fanned agent) and an
+  agent's `tabNew` against a sliding hour and against its agents running or waiting in its own unarchived workspaces
+  (`ws.client`, read from the state each time, so a restart keeps it), `send` against a sliding minute
+  (`LAKI_CLIENT_SEND_MS` in a test's daemon); counted as a call is let through. A refusal names the limit and when it
+  frees; daemon.log once a minute per client, and `clientQuiet` (a toast in the window) the first time in an hour. Reads
+  aren't limited. `clientList` adds `daysLeft`, `expiresAt`, `unused` (no call in 30 days), `limits` and `use`; a token
+  ending within 7 days is a `clientQuiet` line once a day as a window connects.
 - **The CLI.** `src/shared/conn.ts` reads `LAKI_CLIENT_TOKEN_FILE` (wins) or `LAKI_CLIENT_TOKEN` once and deletes both
   from its env (and the daemon and the app's main from theirs), so nothing Laki starts inherits them. `asClient()`: none
   with `LAKI_TAB_TOKEN` (the tab wins; a note on stderr once) or in the app's main (`appMode`). A 401 with it throws the

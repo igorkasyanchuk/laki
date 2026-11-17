@@ -2884,13 +2884,20 @@ A trusted client is such an app with a token of its own: a name, the things it m
 ```bash
 laki client add "Grok Bot"                  # from your own terminal: Allow it in Laki's window
 laki client add ci-bot --scopes create,send,remove
+laki client add ci-bot --expires 30d --limits ws=5,agents=2,send=20
 laki client add "Grok Bot" --projects candy    # in that project only (ids or names; --projects all: every one again)
 laki client ls                              # name, scopes and token file of each
 laki client rotate grok-bot --scopes send   # a new token (and scopes): asked again; the old one stops at once
 laki client revoke grok-bot                 # its token stops working at once, its file goes
 ```
 
-`add` and `rotate` wait for *Allow* in Laki's window, which shows the name and what it may do. Run them from your own
+`add` and `rotate` wait for *Allow* in Laki's window, which shows the name, what it may do, its limits and when its
+token ends: 90 days from then unless `--expires 30d` says otherwise; `--expires never` adds *Allow, never expires* to the
+card, and only that pick makes it so. `rotate` gives a fresh 90 days and keeps its scopes, projects and limits unless you
+name new ones. Its limits (`--limits ws=10,agents=3,send=50`, the defaults) cap the workspaces and agent tabs it starts
+in an hour, its agents running or waiting at once, and its messages a minute; past one, a call is refused with the limit
+and when it frees, and Laki's window says so once an hour. `laki client ls` shows each one's last call, calls, days
+left, limits and use; one unused for 30 days is marked, and the window says so a week before a token ends. Run them from your own
 terminal: an agent, any Laki tab, remote access and another client can't make or change one. The token goes once to
 `~/.laki/clients/<id>.token` (0600); Laki keeps only its hash. Give the app the file's path, never the token:
 

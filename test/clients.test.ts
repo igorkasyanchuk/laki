@@ -309,3 +309,81 @@ test('T1: each scope lifts its own refusal: create, send, cmd, yolo, remove, shi
     assert.match((await keep(m, params)).error, /Keeper can't fork or resume a chat by its id/, m)
 })
 
+test("T9, T11: a token ends (90 days; never only when picked on the card), rotate renews it; last call and calls; limits: workspaces an hour, agents at once (a fan whole, archive frees one), messages a minute; nobody but you raises them", async t => {
+  const rig = await fresh(t, { env: { LAKI_TERM_WAIT: '5000', LAKI_CLIENT_SEND_MS: '3000' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const app = await connect(rig)
+  const allow = async (method: string, params: object, never = false) => {
+    const from = app.events.length
+    const made = rig.rpc(method, params)
+    const ask: any = await until(() => app.events.slice(from).find((e: any) => e.ev === 'clientAsk'), `${method} asked`)
+    await app.call('clientAnswer', { req: ask.req, allow: true, ...(never && { never: true }) })
+    return { made: await made, ask }
+  }
+  const DAY = 86400_000
+  // added: 90 days unless said, never only when picked (asked with --expires never, the card offers it)
+  const { made: a, ask } = await allow('clientAdd', { label: 'Bot', scopes: 'create,send,remove', limits: 'ws=3,agents=10,send=3' })
+  assert.deepEqual([ask.days, ask.never, ask.limits], [90, undefined, '3 workspaces an hour, 10 agents at once, 3 messages a minute'])
+  assert.deepEqual([a.daysLeft, a.limits], [90, { wsPerHour: 3, agentsAtOnce: 10, sendsPerMinute: 3 }])
+  const forever = await allow('clientAdd', { label: 'Forever', expires: 'never' }, true)
+  assert.deepEqual([forever.ask.never, forever.made.daysLeft], [true, undefined])
+  const asked = await allow('clientAdd', { label: 'Asked', expires: 'never' }) // never asked, not picked: 90 days
+  assert.equal(asked.made.daysLeft, 90)
+  await assert.rejects(rig.rpc('clientAdd', { label: 'X', expires: 'soon' }), /--expires soon: 30d, 90d/)
+  await assert.rejects(rig.rpc('clientAdd', { label: 'X', limits: 'ws=0' }), /--limits ws=0/)
+  const token = readFileSync(a.file, 'utf8').trim()
+  const post = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ method, params }) })).json()
+  const listed = async () => (await rig.rpc('clientList')).find((c: any) => c.id === 'bot')
+  // a call: its last call and count
+  assert.equal((await listed()).lastAt, undefined)
+  await post('state', {})
+  const one = await listed()
+  assert.ok(one.lastAt > Date.now() - 60_000 && one.calls === 1, JSON.stringify(one))
+  // workspaces an hour: the fourth refused, naming the limit and when it frees
+  const made: string[] = []
+  for (let i = 0; i < 3; i++) {
+    const r = await post('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: `w${i}` })
+    assert.ok(r.result, JSON.stringify(r))
+    made.push(r.result.id)
+  }
+  assert.match((await post('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'w3' })).error, /Bot reached its limit of 3 workspaces an hour: next at \d\d:\d\d/)
+  assert.deepEqual([(await listed()).use.wsHour, (await listed()).use.sendsMinute], [3, 0])
+  // messages a minute (here 3 s): the fourth refused, then again after the window
+  const tab = (await until(() => rig.tab(made[0]), 'its claude')).id
+  await until(async () => (await rig.tab(made[0])).status === 'idle', 'idle')
+  for (let i = 0; i < 3; i++) assert.ok((await post('send', { target: `${made[0]}/${tab}`, text: `hi ${i}`, whenIdle: true })).result !== undefined)
+  assert.match((await post('send', { target: `${made[0]}/${tab}`, text: 'hi 3', whenIdle: true })).error, /Bot reached its limit of 3 messages a minute/)
+  await until(async () => (await post('send', { target: `${made[0]}/${tab}`, text: 'later', whenIdle: true })).result !== undefined, 'sends again after the window', 8000)
+  // agents at once: a second client, 2 at once; a fan of 3 is refused whole; archive frees a slot
+  const b = (await allow('clientAdd', { label: 'Busy', scopes: 'create,send,remove', limits: 'agents=2,ws=50' })).made
+  const bt = readFileSync(b.file, 'utf8').trim()
+  const bpost = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${bt}` }, body: JSON.stringify({ method, params }) })).json()
+  const before = (await rig.rpc('state')).workspaces.length
+  assert.match((await bpost('wsFan', { project: p.id, presets: ['claude', 'claude', 'claude'], prompt: 'slow' })).error, /Busy reached its limit of 2 agents at once \(0 running or waiting, this one asks for 3\)/)
+  assert.equal((await rig.rpc('state')).workspaces.length, before, 'none of the fan made')
+  const slow: string[] = []
+  for (let i = 0; i < 2; i++) slow.push((await bpost('wsNew', { project: p.id, preset: 'claude', prompt: 'slow', name: `s${i}` })).result.id)
+  await until(async () => (await Promise.all(slow.map(w => rig.tab(w)))).every((x: any) => x?.status === 'running'), 'both at work')
+  assert.match((await bpost('wsNew', { project: p.id, preset: 'claude', prompt: 'slow', name: 's2' })).error, /Busy reached its limit of 2 agents at once/)
+  const arch = await bpost('wsArchive', { id: slow[0] })
+  assert.equal(arch.error, undefined, JSON.stringify(arch))
+  const freed = await bpost('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 's3' })
+  assert.ok(freed.result, JSON.stringify(freed))
+  // nobody but you raises them: the client itself, an agent
+  assert.match((await bpost('clientRotate', { id: 'busy', limits: 'agents=99' })).error, /Busy can't call clientRotate: no trusted client can/)
+  await assert.rejects(rig.rpc('clientRotate', { id: 'busy', limits: 'agents=99', from: { ws: slow[1], tab: (await rig.tab(slow[1])).id } }), /a trusted client is added from your own terminal|an agent can't/)
+  // rotate: a fresh 90 days, its limits kept unless named
+  const st = JSON.parse(readFileSync(join(rig.data, 'clients.json'), 'utf8'))
+  st.find((c: any) => c.id === 'bot').expires = Date.now() - 1000 // ended a second ago
+  writeFileSync(join(rig.data, 'clients.json'), JSON.stringify(st))
+  await rig.stop()
+  await rig.start()
+  const app2 = await connect(rig)
+  assert.match((await post('state', {})).error, /Bot's token expired on .+: laki client rotate bot gives it a new one/)
+  const rot = rig.rpc('clientRotate', { id: 'bot' })
+  await app2.call('clientAnswer', { req: ((await seen(app2, (e: any) => e.ev === 'clientAsk' && e.what === 'rotate', 'rotate asked')) as any).req, allow: true })
+  const r2 = await rot
+  assert.deepEqual([r2.daysLeft, r2.limits.wsPerHour, r2.limits.agentsAtOnce], [90, 3, 10])
+  assert.ok((await (await fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${readFileSync(a.file, 'utf8').trim()}` }, body: JSON.stringify({ method: 'state', params: {} }) })).json()).result, 'its new token works')
+  assert.ok(Math.abs(r2.expiresAt - (Date.now() + 90 * DAY)) < 60_000)
+})

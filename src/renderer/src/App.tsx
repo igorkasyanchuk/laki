@@ -1322,6 +1322,7 @@ export function App() {
         toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
       } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal, close: m.close }, m.ws)
       else if (m.ev === 'toolAsk' || m.ev === 'termAsk' || m.ev === 'clientAsk') toolAsk.current ? toolAsk.current(m) : earlyAsks.current.push(m)
+      else if (m.ev === 'clientQuiet') toast(String(m.text)) // T9, T11: a client's token ending soon, a limit it hit
       else if (m.ev === 'toolDone' || m.ev === 'termDone' || m.ev === 'clientDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
@@ -2578,9 +2579,9 @@ export function App() {
       // T1: laki client add or rotate (main.ts' clientAsk): a token an app outside Laki drives it with, until revoked. No
       // Allow on the notification: read here first
       const title = m.what === 'rotate' ? `Give ${m.label} a new token?` : `Let ${m.label} drive Laki?`
-      const picks: Pick[] = [{ label: m.what === 'rotate' ? 'New token' : 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      const picks: Pick[] = [{ label: m.what === 'rotate' ? 'New token' : 'Allow', allow: 'once' }, ...(m.never ? [{ label: 'Allow, never expires', allow: 'always' as const }] : []), { label: 'Deny', allow: 'deny' }]
       notify(title, 'Open Laki to see what it may do', '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `laki client ${m.what} asks for a token an app outside Laki uses to act as you, within:\n\n${(m.scopes ?? []).map((x: string) => `• ${x}`).join('\n') || '• reads only'}\n\n${m.projects ? `In ${m.projects.join(', ')} only.` : 'In every project.'}\n\nIt goes to ${m.file} (yours alone), until laki client revoke. Allow it only if you just ran laki client ${m.what} yourself.`, picks, answer: allow => void api.call('clientAnswer', { req: m.req, allow: allow === 'once' }).catch(() => {}) })
+      toolLine.add({ req: m.req, title, text: `laki client ${m.what} asks for a token an app outside Laki uses to act as you, within:\n\n${(m.scopes ?? []).map((x: string) => `• ${x}`).join('\n') || '• reads only'}\n\n${m.projects ? `In ${m.projects.join(', ')} only.` : 'In every project.'}\n\nAt most ${m.limits}. Its token ends in ${m.days} days${m.never ? ' (or never, if you pick that)' : ''}; laki client rotate renews it.\n\nIt goes to ${m.file} (yours alone), until laki client revoke. Allow it only if you just ran laki client ${m.what} yourself.`, picks, answer: allow => void api.call('clientAnswer', { req: m.req, allow: allow === 'once' || allow === 'always', never: allow === 'always' }).catch(() => {}) })
       return toolShow()
     }
     if (typeof m.perm === 'string') {
