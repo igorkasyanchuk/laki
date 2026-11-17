@@ -332,8 +332,8 @@ once. The page shows it on top with *Fix*: its form, at that field. An edit that
 A run's time limit and the runs going at once (T8, `timeTick` and `lineTick`, each `scheduleTick` before the due
 ones): an agent run's `spent` is its agent's working time, sampled (`sample`, at `clock`) only while its tab is
 `running` (a wait for you isn't counted; a step over `STEP`, 2 min, is the Mac asleep, not counted either). Past its
-task's `maxMinutes` (unset: `settings.scheduleMaxMinutes`, else 60; 0 none; not a workflow's, which has its budget, nor an
-extension's) its turn gets Esc, as Stop does (the chat stays: a prompt goes on in it; a wait isn't Esc'd, Esc would
+task's `maxMinutes` (unset: `settings.scheduleMaxMinutes`, else 60; 0 none, never an agent's to set: `agentNo`, as both
+settings are `AGENT_KEYS`; not a workflow's, which has its budget, nor an extension's) its turn gets Esc, as Stop does (the chat stays: a prompt goes on in it; a wait isn't Esc'd, Esc would
 answer it), the run is `stopped`, *time limit 45 min* its `said`, told as a failure is (`ranTold`'s `limit`: Tell me's
 needs too), and `runEnded` leaves a stopped run as it is. `settings.scheduleAtOnce` (unset 2; 0 no cap; a bad value: the
 default, `count`) caps the runs going (`holds`: running, in its first day, its tab still there and not idle after it

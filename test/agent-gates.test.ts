@@ -78,6 +78,7 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   await rig.rpc('settingsSet', { allowKey: '⌃⌥A' }) // yours
   await rig.rpc('settingsSet', { allowKey: '⌃⌥A', from }) // unchanged: through
   assert.equal((await rig.rpc('state')).settings.allowKey, '⌃⌥A')
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: one.id, prompt: 'go', when: 'every day at 9am', maxMinutes: 0, from }), /an agent can't turn off a scheduled task's time limit/) // T8: a task's own 0 is none too
   await assert.rejects(rig.rpc('tabSet', { id: other.id, muted: true, from }), /an agent can't rename, color or mute a tab that isn't its own/)
   await rig.rpc('tabSet', { id: tab, name: 'mine', from })
   await rig.rpc('tabSet', { id: other.id, muted: true })

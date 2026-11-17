@@ -397,8 +397,9 @@ as the response closes), so two copies in flight can't both pass. None younger t
 `SALTS_MAX` (20,000) live ones and a call is refused, 503. They're kept in `<data>/e2e-salts.json` (0600, `writeAtomic`,
 before the call runs), so a restart forgets none; refusing an `at` before the daemon's start would refuse a phone whose
 clock is behind for that long after every start. A sealed call that fails (a salt again, not its key, too old) counts
-against the address the tunnel says (`ipOf`, `sealedFailed`): `FAILS_MAX` (20) in a minute and it's refused (429) till
-the minute's out; a tunnel that lies about it dodges that, the salts kept only after a call opens are what hold.
+against its address (`farWho`: X-Forwarded-For's last entry, the hop the proxy appended, else CF-Connecting-IP;
+`sealedFailed`): `FAILS_MAX` (20) in a minute and it's refused (429) till the minute's out; a tunnel that lies about
+it dodges that, the salts kept only after a call opens are what hold.
 The page (`api.ts`): `pageToken` takes `k` out of the hash as it does `t`; `sealUp` imports it (not extractable),
 keeps it in IndexedDB (`laki-e2e`, `keys`: `link`, `device`), and seals with this tab's link key, else the device's, else
 a kept link one; sends go through `out` one after another (their counters in order), frames are opened in the order

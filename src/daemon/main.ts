@@ -148,11 +148,15 @@ const isApp = (t: string | null | undefined, o: string | undefined) => !!t && !(
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
 let port = 0
 // D5: the address the tunnel says a remote request came from (CF-Connecting-IP, Tailscale's login), for the log and the
-// Mac's notice only: shown, never decided on
+// Mac's notice only: shown, never decided on (the sealed-call counter's is farWho's)
 const ipOf = (req: IncomingMessage) => {
   const h = (k: string) => String(req.headers[k] ?? '').split(',')[0].trim()
   return [h('cf-connecting-ip') || h('x-forwarded-for'), h('tailscale-user-login')].filter(Boolean).join(' ').replace(/[^\w.:@ -]/g, '').slice(0, 80)
 }
+// S14: the address a failed sealed call counts against (sealedFailed): X-Forwarded-For's last entry, the hop the proxy
+// added (Cloudflare and Tailscale serve both append it: its first ones and CF-Connecting-IP behind Tailscale are the
+// client's to pick), else CF-Connecting-IP, else the socket's
+const farWho = (req: IncomingMessage) => (String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1)!.trim() || String(req.headers['cf-connecting-ip'] ?? '').trim() || req.socket.remoteAddress || '?').slice(0, 80)
 const hostOk = (h: string | undefined) => h === `127.0.0.1:${port}` || h === `localhost:${port}` || (!!h && h === (o => o && new URL(o).host)(remoteMod.remoteOrigin()))
 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
@@ -727,7 +731,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allow*, deny*, talk*: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you)
+const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allowOn, allowKey, denyOn, denyKey, talkOn, talkKey: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you)
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
 // S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
@@ -1176,6 +1180,7 @@ function agentNo(method: string, p: any) {
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
   else if (method === 'scheduleSet' && p?.onlyIf?.kind === 'cmd') notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
+  else if (method === 'scheduleSet' && p?.maxMinutes === 0 && core.state.schedules?.find(x => x.id === p.id)?.maxMinutes !== 0) notAgent(p, "turn off a scheduled task's time limit (settings.scheduleMaxMinutes is the user's too)") // T8: 1 to 1440 minutes is fine; a task already without one, sent back as it is, too
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
@@ -1625,12 +1630,11 @@ const server = createServer(async (req, res) => {
   // S14: remote access's /rpc is sealed: a salt of the page's own in x-laki-e2e (never one seen in the last 10 minutes),
   // its body a frame (e2e.ts), the answer one too. A clear call: refused (426). An address whose sealed calls keep
   // failing is refused a while (429: sealedFailed)
-  const who = far ? ipOf(req) || req.socket.remoteAddress || '?' : ''
+  const who = far ? farWho(req) : ''
   if (far && (failsOf(who)?.n ?? 0) >= FAILS_MAX) return reply(429, { error: 'too many failed calls: try again in a minute' })
   const salt = far ? saltOf(req.headers['x-laki-e2e']) : undefined
   if (far && !salt) return req.headers['x-laki-e2e'] ? (sealedFailed(who), reply(400, { error: 'a salt seen before: a replay' })) : reply(426, { error: OLD_PAGE })
   if (salt) res.once('close', () => saltsBusy.delete(salt.h)) // reserved while its body streams and opens: kept by then (saltKeep), or free again
-  const sealedSalt = salt?.b
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
@@ -1639,8 +1643,8 @@ const server = createServer(async (req, res) => {
   }
   let body = Buffer.concat(chunks).toString()
   let sealedCh: e2e.Channel | undefined
-  if (sealedSalt) {
-    const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), sealedSalt, Buffer.concat(chunks))
+  if (salt) {
+    const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), salt.b, Buffer.concat(chunks))
     if (!f) return sealedFailed(who), reply(400, { error: 'not sealed with its key' })
     sealedCh = f.ch
     body = String(f.plain)
@@ -1676,6 +1680,7 @@ const saltsSeen = new Map<string, number>(
     .sort((a, b) => a[1] - b[1]), // oldest first, as saltKeep drops them
 )
 const saltsBusy = new Set<string>()
+let saltsUnkept = false // the last write failed: said once in daemon.log
 function saltOf(h: unknown): { h: string; b: Buffer } | undefined {
   if (typeof h !== 'string' || !/^[A-Za-z0-9+/]{22}==$/.test(h) || saltsSeen.has(h) || saltsBusy.has(h)) return undefined
   saltsBusy.add(h)
@@ -1691,8 +1696,10 @@ function saltKeep(h: string): boolean {
   saltsBusy.delete(h)
   try {
     writeAtomic(SALTS_FILE, JSON.stringify(Object.fromEntries(saltsSeen)), 0o600)
+    saltsUnkept = false
   } catch (e) {
-    log(`e2e salts not kept: ${(e as Error).message}`) // ponytail: the call still runs; a restart before they're written again forgets them
+    if (!saltsUnkept) log(`e2e salts not kept: ${(e as Error).message}`) // once till a write works again; ponytail: the call still runs, a restart before then forgets them
+    saltsUnkept = true
   }
   return true
 }

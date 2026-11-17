@@ -480,11 +480,13 @@ test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a re
   const secret = farKey(url)!
   // a sealed ping as the page sends it, kept to be sent again as the tunnel would (it sees the headers in clear)
   const sealed = (salt = randomBytes(16)) => ({ salt: salt.toString('base64'), body: new Uint8Array(channel(keyOf(secret, salt), PAGE).seal(JSON.stringify({ method: 'ping', at: Date.now() }))) })
-  const send = (c: { salt: string; body: Uint8Array }, ip = '203.0.113.7') =>
-    fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin: url, cookie: jar, 'cf-connecting-ip': ip, 'x-laki-e2e': c.salt }, body: c.body as BodyInit }).then(r => r.status)
+  const post = (c: { salt: string; body: Uint8Array }, ip: Record<string, string> = { 'cf-connecting-ip': '203.0.113.7' }) =>
+    fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin: url, cookie: jar, ...ip, 'x-laki-e2e': c.salt }, body: c.body as BodyInit })
+  const send = (c: { salt: string; body: Uint8Array }, ip?: Record<string, string>) => post(c, ip).then(r => r.status)
+  const replayed = async (c: { salt: string; body: Uint8Array }, ip?: Record<string, string>) => (r => r.status === 400 && /a salt seen before: a replay/.test(r.text))(await post(c, ip).then(async r => ({ status: r.status, text: await r.text() }))) // the salt, not its age or key
   const one = sealed()
   assert.equal(await send(one), 200)
-  assert.equal(await send(one), 400, 'again: a replay')
+  assert.ok(await replayed(one), 'again: a replay')
   const both = sealed()
   assert.deepEqual((await Promise.all([send(both), send(both)])).sort(), [200, 400], 'two copies in flight: one runs')
   // the tunnel's flood: 20,001 salts of junk, each from an address it makes up (so no address is refused for it)
@@ -492,11 +494,13 @@ test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a re
   const junk = async () => {
     while (i < 20001) {
       const n = i++
-      assert.equal(await send({ salt: randomBytes(16).toString('base64'), body: new Uint8Array(randomBytes(40)) }, `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`), 400)
+      const got = await send({ salt: randomBytes(16).toString('base64'), body: new Uint8Array(randomBytes(40)) }, { 'cf-connecting-ip': `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}` })
+      if (got !== 400) i = Infinity // the other workers stop too
+      assert.equal(got, 400)
     }
   }
   await Promise.all(Array.from({ length: 32 }, junk))
-  assert.equal(await send(one), 400, 'after the flood: still a replay')
+  assert.ok(await replayed(one), 'after the flood: still a replay')
   assert.equal(await send(sealed()), 200, 'a new one')
   // a restart forgets none
   const two = sealed()
@@ -504,11 +508,13 @@ test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a re
   await rig.stop()
   await rig.start()
   await until(async () => (r => r?.url === url && !r.down)((await rig.rpc('stateOwn')).remote), 'back at its address')
-  assert.equal(await send(two), 400, 'after a restart: still a replay')
+  assert.ok(await replayed(two), 'after a restart: still a replay')
   assert.equal(await send(sealed()), 200, 'a new one')
   assert.equal(statSync(join(rig.data, 'e2e-salts.json')).mode & 0o777, 0o600)
-  // an address whose sealed calls keep failing is refused a while, others aren't
-  for (let k = 0; k < 20; k++) await send(one, '198.51.100.9')
-  assert.equal(await send(sealed(), '198.51.100.9'), 429)
+  // an address whose sealed calls keep failing is refused a while, others aren't; X-Forwarded-For's last entry is the
+  // proxy's, so a first one the client makes up each time doesn't dodge it
+  const xff = () => ({ 'x-forwarded-for': `${randomBytes(4).join('.')}, 198.51.100.9`, 'cf-connecting-ip': randomBytes(4).join('.') })
+  for (let k = 0; k < 20; k++) assert.ok(await replayed(one, xff()))
+  assert.equal(await send(sealed(), xff()), 429)
   assert.equal(await send(sealed()), 200)
 })
