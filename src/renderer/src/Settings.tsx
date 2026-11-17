@@ -1,6 +1,7 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The daemon keeps
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
+import { TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
@@ -786,6 +787,7 @@ export function SettingsPage(p: {
   updateIdle?: boolean // Update when idle asked (view.updateIdle)
   managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } // a managed policy's locks (view.managed)
   ptyHostOff?: string // R9: why new terminals run in the daemon (view.ptyHostOff)
+  clients?: { show: (label: string) => void; copy: (text: string) => void } // T12: Security › Trusted clients (the app's window: a client's list is yours)
   onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
@@ -822,7 +824,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'security' || p.clients) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
   // U10: Basic (four heads of the cards most people change) or All (every section); a new install starts on Basic,
   // one with projects on All; a link to a section, or Find a setting, goes to All
   const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))
@@ -2488,6 +2490,12 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} onLogs={widgetLogs => set({ widgetLogs })} />}
+          {sec === 'security' && p.clients && (
+            <>
+              <h2>Security</h2>
+              <TrustedClients showWorkspaces={p.clients.show} copy={p.clients.copy} />
+            </>
+          )}
           {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} other={p.remote && (() => openSec('remote'))} />}
           {sec === 'tunnels' && p.call && <WebhooksSection call={p.call} projects={(p.projects ?? []).filter(x => !x.host)} />}
           {sec === 'remote' && p.remote && (

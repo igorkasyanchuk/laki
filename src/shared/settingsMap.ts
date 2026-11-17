@@ -29,6 +29,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
   { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
   { id: 'tunnels', label: 'Tunnels', icon: 'share', group: 'Connect' },
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
+  { id: 'security', label: 'Security', icon: 'lock', group: 'Connect' },
   { id: 'simulator', label: 'Simulators', icon: 'phone', group: 'Connect' },
 ]
 
@@ -144,6 +145,7 @@ export const FIND: [string, string, string?][] = [
   ['open', 'Per project', 'editor xcode project own each per project ⌘e'],
   ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
   ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
+  ['security', 'Trusted clients', 'client token app mcp script scopes rotate revoke log refused grok bot outside'],
   ['presets', 'Network', "sandbox network hosts domains allow list allowedDomains registry offline internet"],
   ['presets', 'Hide secret-looking variables from agents', 'env environment variables token secret api key password npm github aws hide keep pass let through'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],

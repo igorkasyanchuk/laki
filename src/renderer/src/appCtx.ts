@@ -49,7 +49,7 @@ export const ONLY = [
   ['busy', 'Working'],
   ['pr', 'With a PR'],
 ] as const
-export type Find = { q: string; only?: (typeof ONLY)[number][0]; projects?: string[] } // projects: only these (none: all)
+export type Find = { q: string; only?: (typeof ONLY)[number][0]; projects?: string[]; client?: string } // projects: only these (none: all); client: a trusted client's workspaces (Settings › Security's Show its workspaces)
 
 // the sidebar's timers: what happens as one ends (a notification and a message always)
 export const TIMER_THEN = [

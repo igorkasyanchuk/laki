@@ -130,6 +130,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki client [ls]                            trusted clients: apps outside Laki (an MCP server, a script) with a token of their own
   laki client add|rotate <name> [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50]   a new one, or a new token (scopes, projects, limits; 90 days unless said) for one: asked in Laki's window
   laki client revoke <name>                   its token stops working at once, its file goes
+  laki client log <name> [--refused]          what it did, newest first (a read's line counts its calls in 5 minutes); calls with a token Laki doesn't know
   --json prints machine-readable output; an option the command doesn't have is refused (did you mean…?);
   after -- every word is text: laki send ws -- --not-an-option`
 

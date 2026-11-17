@@ -387,3 +387,49 @@ test("T9, T11: a token ends (90 days; never only when picked on the card), rotat
   assert.ok((await (await fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${readFileSync(a.file, 'utf8').trim()}` }, body: JSON.stringify({ method: 'state', params: {} }) })).json()).result, 'its new token works')
   assert.ok(Math.abs(r2.expiresAt - (Date.now() + 90 * DAY)) < 60_000)
 })
+
+test("T12: each client's log: a refusal with its reason, 20 reads one line of 20, never a message's text; a revoked token counted, never kept; the log is yours alone", async t => {
+  const rig = await fresh(t, { env: { LAKI_TERM_WAIT: '5000' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const app = await connect(rig)
+  const made = rig.rpc('clientAdd', { label: 'Logger' })
+  await app.call('clientAnswer', { req: (await seen(app, (e: any) => e.ev === 'clientAsk', 'asked') as any).req, allow: true })
+  const c = await made
+  const token = readFileSync(c.file, 'utf8').trim()
+  const post = async (method: string, params: object, bearer = token) => (await fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${bearer}` }, body: JSON.stringify({ method, params }) })).json()
+  const ws = (await post('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'logged' })).result
+  const tab = (await until(() => rig.tab(ws.id), 'its claude')).id
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle')
+  for (let i = 0; i < 20; i++) await post('screen', { target: `${ws.id}/${tab}` })
+  const SAID = 'the-secret-plan-42'
+  assert.equal((await post('send', { target: `${ws.id}/${tab}`, text: SAID, whenIdle: true })).error, undefined)
+  assert.match((await post('wsRm', { id: ws.id })).error, /can't call wsRm/)
+  assert.match((await post('send', { target: `${ws.id}/${tab}`, text: `!${SAID}` })).error, /Logger can't/)
+  const { lines } = await rig.rpc('clientLog', { id: 'logger' })
+  const screens = lines.filter((l: any) => l.method === 'screen')
+  assert.deepEqual(screens.map((l: any) => [l.target, l.n, l.ok]), [[`${ws.id}/${tab}`, 20, true]])
+  assert.ok(lines.some((l: any) => l.method === 'wsRm' && !l.ok && /takes the remove scope/.test(l.why) && l.target === ws.id), JSON.stringify(lines))
+  assert.ok(lines.some((l: any) => l.method === 'wsNew' && l.ok && l.target === p.id))
+  const refused = (await rig.rpc('clientLog', { id: 'logger', refused: true })).lines
+  assert.ok(refused.length === 2 && refused.every((l: any) => !l.ok), JSON.stringify(refused))
+  await until(() => existsSync(join(rig.data, 'client-log', 'logger.jsonl')), 'its file')
+  await new Promise(r => setTimeout(r, 5500)) // its folded line written
+  const file = readFileSync(join(rig.data, 'client-log', 'logger.jsonl'), 'utf8')
+  assert.ok(!file.includes(SAID) && !JSON.stringify(lines).includes(SAID), 'never the text it sent')
+  assert.ok(file.includes('"n":20'), file)
+  assert.equal(statSync(join(rig.data, 'client-log', 'logger.jsonl')).mode & 0o777, 0o600)
+  assert.ok((await rig.rpc('clientList')).find((x: any) => x.id === 'logger').today >= 23)
+  // the log is yours: an agent's call and a client's are refused
+  await assert.rejects(rig.rpc('clientLog', { id: 'logger', from: { ws: ws.id, tab } }), /an agent can't read what a trusted client did/)
+  assert.match((await post('clientLog', { id: 'logger' })).error, /Logger can't call clientLog/)
+  // a revoked token: counted, its caller said when the lookup finds one; the token kept nowhere
+  await rig.rpc('clientRm', { id: 'logger' })
+  for (let i = 0; i < 3; i++) assert.match((await post('state', {})).error, /revoked or isn't known/)
+  const u = (await rig.rpc('clientLog', {})).unknown
+  assert.ok(u.n === 3 && u.last > Date.now() - 60_000, JSON.stringify(u))
+  let kept = ''
+  try {
+    kept = execFileSync('grep', ['-rl', token.slice(6), rig.data], { encoding: 'utf8' })
+  } catch {} // grep: none found
+  assert.equal(kept, '', 'the token kept nowhere')
+})

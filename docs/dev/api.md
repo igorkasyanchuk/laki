@@ -663,7 +663,16 @@ such an app with a capability of its own: a token that names it and says what it
   A client's own token can't call them (no scope has them), nor a tab's token (whoCalls finds the tab), nor remote
   access. App.tsx shows it on the tool ask's card (no Allow on the notification). `clientRm` asks nothing (it only takes
   away); `clientList` is yours (`AGENT_NO`). A rotate whose client was revoked while it waited is refused at Allow;
-  `clientFind` refuses a name that is one client's id and another's name. #TODO: Settings › Trusted clients (list, add, rotate, revoke).
+  `clientFind` refuses a name that is one client's id and another's name. Settings › Security › Trusted clients (SettingsClients.tsx) lists them, with Rotate, Revoke and its log.
+- **Its log (T12).** `clientLog.ts`: every call of a client's, from `clientLine` (main.ts): when, the method, the target
+  its method names (`CLIENT_WS`' parameter: a workspace, `ws/tab` or a project id), ok or the refusal's first line;
+  never a message's text, a prompt or a screen. A read (`CLIENT_READ`) folds into one line per method and target per 5
+  minutes, with `n`. The newest 2,000 per client in `<data>/client-log/<id>.jsonl` (0600; appended, rewritten whole
+  when cut back or after a fold, at most every 5 s); gone with `clientRm`. A `lakic_` token nobody has: `unknownToken`
+  (today's count, the last time, its caller once `peerWho` says), never the token. `clientLog { id?, refused? }`
+  (`FROM`, `AGENT_NO`, `REMOTE_NO`, `ANSWER_NO`, no client's: the user's) gives `lines` (newest first) and `unknown`;
+  `clientList` adds `today` (calls today). `laki client log <name> [--refused]`. Settings › Security's *Show its
+  workspaces* is the sidebar's filter `Find.client` (its unarchived workspaces picked: the picked rows' bar archives them).
 - **Expiry, use, limits (T9, T11).** A token lasts `EXPIRE_DAYS` (90) from its making or rotate (`clientAdd`/`clientRotate`'s
   `expires`: `30d`, a number of days, or `never`, which the card then offers as *Allow, never expires*: only that pick
   makes it so; `clientAnswer`'s `never`). One past its `expires` (a record from before: `at` + 90 days) is refused in

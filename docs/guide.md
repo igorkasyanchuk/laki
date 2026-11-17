@@ -2896,7 +2896,11 @@ token ends: 90 days from then unless `--expires 30d` says otherwise; `--expires 
 card, and only that pick makes it so. `rotate` gives a fresh 90 days and keeps its scopes, projects and limits unless you
 name new ones. Its limits (`--limits ws=10,agents=3,send=50`, the defaults) cap the workspaces and agent tabs it starts
 in an hour, its agents running or waiting at once, and its messages a minute; past one, a call is refused with the limit
-and when it frees, and Laki's window says so once an hour. `laki client ls` shows each one's last call, calls, days
+and when it frees, and Laki's window says so once an hour. Settings › Security › Trusted clients lists them (name, scopes, made, last call, calls today) with *Rotate*, *Revoke*
+and each one's log (what it did, its refusals with why; a read polled often is one line with a count; never what it
+sent), today's calls with a token Laki doesn't know, *Add a client…* (the command to run) and *Show its workspaces*
+(the sidebar filtered to them, each picked, so the picked rows' bar archives them). `laki client log <name> [--refused]`
+prints the same. `laki client ls` shows each one's last call, calls, days
 left, limits and use; one unused for 30 days is marked, and the window says so a week before a token ends. Run them from your own
 terminal: an agent, any Laki tab, remote access and another client can't make or change one. The token goes once to
 `~/.laki/clients/<id>.token` (0600); Laki keeps only its hash. Give the app the file's path, never the token:

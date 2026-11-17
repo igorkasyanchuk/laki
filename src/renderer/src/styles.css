@@ -499,6 +499,11 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .need-opts button.on { border-color: color-mix(in srgb, var(--waiting) 60%, var(--line)); }
 .need-n { display: inline-block; min-width: 1.3em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .need-acts { display: flex; align-items: center; gap: var(--sp-3); }
+.clients { width: 100%; border-collapse: collapse; }
+.clients th,
+.clients td { text-align: left; padding: var(--sp-1) var(--sp-2); vertical-align: middle; }
+.clients th { font-weight: normal; }
+.client-log { margin-top: var(--sp-2); }
 .need-boxed { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
 .need-boxed code { overflow-wrap: anywhere; }
 .need-acts button { text-align: center; }

@@ -463,6 +463,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const shows = (w: WorkspaceView) => {
     if (!find) return true
     if (only.length && !only.includes(w.project)) return false
+    if (find.client && w.client !== find.client) return false
     const q = find.q.trim().toLowerCase()
     const wt = view.tabs.filter(t => t.workspace === w.id)
     if (q && ![wsName(w), w.name, w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
@@ -600,7 +601,8 @@ export function Sidebar({ app }: { app: AppCtx }) {
         <div className="side-find">
           <div className="find-field">
             <input autoFocus value={find.q} placeholder="Filter: name, branch, PR…" spellCheck={false} onChange={e => setFind({ ...find, q: e.target.value })} onKeyDown={e => e.key === 'Escape' && setFind(null)} />
-            {(find.q || find.only || !!find.projects?.length) && <IconButton icon="x" title="Clear and close the filter" onClick={() => setFind(null)} />}
+            {find.client && <span className="chip small" title="Its workspaces (Settings › Security › Trusted clients)">Created by {find.client}</span>}
+            {(find.q || find.only || !!find.projects?.length || !!find.client) && <IconButton icon="x" title="Clear and close the filter" onClick={() => setFind(null)} />}
           </div>
           <span className="seg">
             {ONLY.map(([id, label]) => (

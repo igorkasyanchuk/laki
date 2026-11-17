@@ -203,6 +203,11 @@ export function Pages({ app }: { app: AppCtx }) {
           accounts={layoutsOn ? accountsApi : undefined}
           hooks={hasCap(view, 'hooks.seen') ? () => api.call('hooksSeen') : undefined}
           typeIn={(cmd, project) => void termType(cmd, project)}
+          clients={{
+            // T12: the sidebar's filter on its workspaces, each picked (the picked rows' bar archives them)
+            show: label => (setDialog(null), app.setFind({ q: '', client: label }), app.setPicked(view.workspaces.filter(w => w.client === label && !w.archived).map(w => w.id))),
+            copy,
+          }}
           ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), endpointKey: key => api.call('aiEndpointKey', { key }), endpointTest: () => api.call('aiEndpointTest'), open: () => setDialog('ai') }}
           bg={{
             url: bgUrl,
