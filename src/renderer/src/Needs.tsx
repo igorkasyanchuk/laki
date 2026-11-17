@@ -30,6 +30,7 @@ export type NeedsApi = {
   keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
   bulk?: (ts: TabView[], allow: boolean) => void // U8: Allow all (it asks first, naming each) and Deny all
   allowKey?: string // Allow all's key, for its tip
+  unbox?: (t: TabView) => void // a command its sandbox stopped (t.boxed): restart it without the sandbox, after a confirm
   openProof?: (t: TabView, path: string) => void // the Proof card's file (a script's output, a picture): its storage folder's
   turnChips?: (t: TabView) => React.ReactNode // P5: its last turn's chips from turn place extensions
 }
@@ -133,6 +134,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
       {!open ? null : waiting ? (
         <>
           <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
+          {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} />}
           {t.ask?.steps && api.keys && <div className="need-steps muted small">One of several questions: ← → (the card focused) go between them</div>}
           {t.ask?.diff && (
             // an Edit's or Write's change, before its Yes
@@ -163,6 +165,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
           {last && <div className="need-q need-last">{last}</div>}
           {w.proof?.tab === t.id && api.openProof && <ProofList p={w.proof} open={path => api.openProof!(t, path)} />}
           {api.turnChips?.(t)}
+          {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} />}
           <div className="need-acts" onClick={stop}>
             {stat && (
               <span className="ws-stat">
@@ -177,6 +180,19 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// a command its sandbox stopped (t.boxed): one line, and a restart without the sandbox (unbox asks first)
+function Boxed({ t, unbox }: { t: TabView; unbox: (t: TabView) => void }) {
+  const b = t.boxed!
+  return (
+    <div className="need-boxed" onClick={e => e.stopPropagation()}>
+      <span className="muted small" title={b.why}>
+        The sandbox stopped {b.cmd ? <code>{b.cmd}</code> : 'a command'}
+      </span>
+      <button onClick={() => unbox(t)}>Restart without sandbox</button>
     </div>
   )
 }

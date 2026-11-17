@@ -1216,7 +1216,7 @@ never the last prompt.
   picked for a model comes back when you pick that model again) and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
   permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast
-  tier), 🔒 the sandbox (the profile's *Sandbox*, on or off for this workspace; not with *Bypass permissions*), the mic
+  tier), 🔒 the sandbox (the profile's *Sandbox*, on or off for this workspace; not with *Bypass permissions*; a new install's Claude and Codex profiles start with it on, and a card in Needs you offers *Restart without sandbox* when it stopped a command), the mic
   and its ⌄, and ↑. All of them are kept for its restarts and forks. A profile with its own permission
   mode or fast mode starts with them picked (its mode marked *profile* in the menu); change them for this workspace
   only. Left as the profile's, an edit of the profile applies at the next start. Their menus have a filter box

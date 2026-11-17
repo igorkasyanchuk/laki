@@ -388,7 +388,15 @@ and asks, as do `git stash` and `git commit <paths>` (their temp index is named 
 (2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked, and claude's leaves `rebase-merge` and
 `sequencer` writable there (a todo's `exec` runs as you when you continue that rebase). Hooks
 and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git
-folders aren't added.
+folders aren't added. A new install's default profiles (`presets()` with no saved list) start claude and codex in their
+sandbox: `settings.sandboxNew`, set by `load` only when there was no state before (a test's daemon only with
+`LAKI_TEST_LEAN=1`, as Labs; one from before stays unset, its
+profiles as they were; a phone's or an agent's `settingsSet` can't change it: REMOTE_KEYS). A command the sandbox
+stopped (`sandboxStop`: claude's `PostToolUseFailure` for Bash whose `error` has the sandbox's words, `SANDBOX_DENIED`,
+or its `PermissionRequest` to run one again with `dangerouslyDisableSandbox`) is the tab's `boxed` (`{ cmd, why }`, while
+waiting or idle, until its next prompt): its Needs you card says so and offers *Restart without sandbox*, which asks
+first, then `tabUnbox` (the user's: AGENT_NO, REMOTE_NO) sets the tab's `sandbox: false` (its profile keeps its own) and
+starts it again, its chat resumed. ponytail: codex's denials reach no hook, so it gets no card.
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
 is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):

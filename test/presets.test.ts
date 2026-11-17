@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { type TestContext, test } from 'node:test'
+import { sandboxStop } from '../src/shared/types.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
 // a prompt that would break out of POSIX quoting under fish (\' is an escape there) reaches the agent as typed
@@ -347,6 +348,46 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   await assert.rejects(rig.rpc('tabNew', { ws: off.tab.workspace, preset: 'boxed', perm: 'bypassPermissions' }), /turns the agent's sandbox off/)
 })
 
+test("a new install starts claude and codex in their sandbox, one from before keeps none; a command its sandbox stopped: its card's line and a restart without it, the user's only", async t => {
+  const rig = await fresh(t, { env: { LAKI_TEST_LEAN: '1' } }) // a new install as you get it (the rig's others start without)
+  const boxes = async () => Object.fromEntries((await rig.rpc('state')).presets.map((p: { name: string; sandbox?: boolean }) => [p.name, p.sandbox]))
+  const now = await boxes()
+  assert.deepEqual([now.claude, now.codex], [true, true])
+  assert.equal((await rig.rpc('state')).settings.sandboxNew, true)
+  // the words a stop is read from: a failure that says so, the ask to run it outside; anything else is none
+  assert.deepEqual(sandboxStop({ hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'touch /etc/x\nmore' }, error: 'Exit code 1\ntouch: /etc/x: Operation not permitted' }), { cmd: 'touch /etc/x', why: 'touch: /etc/x: Operation not permitted' })
+  assert.deepEqual(sandboxStop({ hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'curl x.dev', dangerouslyDisableSandbox: true } }), { cmd: 'curl x.dev', why: 'it asks to run it outside the sandbox' })
+  assert.equal(sandboxStop({ hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'npm test' }, error: 'Exit code 1\n2 failing' }), undefined)
+  assert.equal(sandboxStop({ hook_event_name: 'PostToolUseFailure', tool_name: 'Edit', error: 'Operation not permitted' }), undefined)
+  // a stopped command: the tab's boxed until its next turn; an agent can't take it out of its sandbox, you can
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', local: true })
+  const tab = await until(() => rig.tab(ws.id, 'claude'), 'its claude')
+  const started = () => rig.fakeLog().filter(l => l.bin === 'claude')
+  await until(() => existsSync(rig.env.FAKE_LOG) && started().length === 1, 'claude up')
+  assert.ok(started()[0].args.some((a: string) => a.endsWith('-sandbox.json')), 'in its sandbox')
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'touch /etc/x' }, error: 'Exit code 1\ntouch: /etc/x: Operation not permitted' } })
+  await rig.rpc('hook', { tab: tab.id, state: 'idle' })
+  assert.deepEqual((await rig.tab(ws.id, 'claude')).boxed, { cmd: 'touch /etc/x', why: 'touch: /etc/x: Operation not permitted' })
+  await assert.rejects(rig.rpc('tabUnbox', { tab: tab.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't restart a tab outside its sandbox/)
+  assert.deepEqual(await rig.rpc('tabUnbox', { tab: tab.id }), { restarted: true })
+  const after = await rig.tab(ws.id, 'claude')
+  assert.deepEqual([after.sandbox, after.boxed], [false, undefined])
+  await until(() => started().length === 2, 'started again')
+  assert.ok(!started()[1].args.some((a: string) => a.endsWith('-sandbox.json')), 'out of its sandbox')
+  assert.equal((await boxes()).claude, true, 'its profile keeps its sandbox')
+  await assert.rejects(rig.rpc('tabUnbox', { tab: tab.id }), /isn't in a sandbox/)
+  // an install from before (its state.json without the key): its default profiles have no sandbox, and never get one
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  delete st.settings.sandboxNew
+  writeFileSync(file, JSON.stringify(st))
+  await rig.start()
+  const old = await boxes()
+  assert.deepEqual([old.claude, old.codex], [undefined, undefined])
+  assert.equal((await rig.rpc('state')).settings.sandboxNew, undefined)
+})
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
   const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1500' } })
   const asks = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] === 'app-server').length

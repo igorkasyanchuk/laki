@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
-import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -96,13 +96,14 @@ export const firstLine = (e: unknown) => String((e as { stderr?: string }).stder
 // ponytail: looked for once; one installed later shows after a daemon restart, or added in Settings
 let found: Preset[] | undefined
 export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
-export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a })))
+// a new install's (settings.sandboxNew) start claude and codex in their sandbox
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }))).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true } : p))
 export const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { boxed?: { cmd: string; why: string } /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -239,6 +240,9 @@ export function load() {
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
+  // a new install's default profiles start claude and codex in their sandbox (presets); one from before keeps none. A
+  // test's daemon, as with Labs below, only with LAKI_TEST_LEAN=1: the rest of the tests are of agents without one
+  if (!had && state.settings?.sandboxNew === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, sandboxNew: true }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
     state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted' }), ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
@@ -332,6 +336,7 @@ export function hookFiles(h: Hooks): Record<string, string> {
       UserPromptSubmit: c('running'),
       PreToolUse: c('running', '*', local && !gated),
       PostToolUse: c('running', '*', local),
+      PostToolUseFailure: c('running', 'Bash', local), // a command that failed: its sandbox's words (sandboxStop) give the tab its boxed
       // permission prompts and questions, not the 60s idle reminder
       Notification: c('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
       // a permission ask as it's shown, with the tool and its input (turn: the tab's perm); laki hook prints nothing for
@@ -756,7 +761,7 @@ export function view(): View {
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
-    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -1771,6 +1776,18 @@ export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?:
 // marks them (ungated) and gateRestart starts the idle ones again, their chats resumed. ponytail: a closed tab's id stays
 const ungated = new Set<string>()
 const uncovered = (t: Tab) => t.preset === 'claude' && ungated.has(t.id) && toolGateOn() && !!sessions.get(t.id) && !sessions.get(t.id)!.exited && !asleep.has(t.id)
+// a tab whose command its sandbox stopped (the view's boxed): started once more without it, its chat resumed. The tab's
+// switch only (its profile keeps its sandbox; a closed tab reopened keeps the tab's); the user's alone (gates.ts)
+export function tabUnbox(p: { tab?: unknown }) {
+  const tab = findTab(String(p.tab ?? ''))
+  if (tab.kind !== 'agent' || !sandboxed(tab)) throw new Error(`${tab.name} isn't in a sandbox`)
+  tab.sandbox = false
+  rtOf(tab.id).boxed = undefined
+  save()
+  if (!asleep.has(tab.id)) spawnTab(tab, { resume: true }) // asleep: it starts so as it wakes
+  changed()
+  return { restarted: !asleep.has(tab.id) }
+}
 export function gateRestart(p: { tab?: string } = {}) {
   const all = state.tabs.filter(t => uncovered(t) && (!p.tab || t.id === findTab(p.tab).id))
   const idle = all.filter(t => rtOf(t.id).status === 'idle' && !asking(t.id))
@@ -3874,7 +3891,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
               log(`turn ${tab.id}: ${(e as Error).message}`)
             }
         if (r.plan) r.plan.stale = true // the list it had is an earlier turn's until it writes one
-        r.planAsk = undefined
+        r.planAsk = r.boxed = undefined
       }
       // its own to-do list (shared/todos.ts) and a plan it asks you to approve (ExitPlanMode's); a subagent's are its
       // own (ponytail: by agent_id, which newer claudes give)
@@ -3888,6 +3905,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         const got = publishedBy(pl)
         if (got) (r.published ??= []).push(got)
       }
+      if (pl.hook_event_name === 'PostToolUseFailure' && sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
       break
     case 'waiting': {
       // claude's PermissionRequest comes as its menu is shown, before its Notification (if any: that one comes later,
@@ -3896,6 +3914,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (pl.hook_event_name === 'PermissionRequest') {
         const w = state.workspaces.find(w => w.id === tab.workspace)
         r.perm = permOf(pl, w?.path, homedir(), priorOf(pl, w))
+        if (sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
       }
       r.status = 'waiting'
       r.limit = undefined
@@ -4266,7 +4285,7 @@ function interrupted(id: string, s: Session) {
       const lastOf = (re?: RegExp) => (re ? lines.findLastIndex(l => re.test(l)) : -1)
       if (lastOf(ESC_ENDED) <= lastOf(busy) || (r.status === 'waiting' && s.ask())) return
       r.status = 'idle'
-      r.escAt = r.perm = undefined // the ask is over, as any hook but a wait says (turn)
+      r.escAt = r.perm = undefined // the ask is over, as every hook but a wait says (turn)
       changed()
     }, ms)
 }

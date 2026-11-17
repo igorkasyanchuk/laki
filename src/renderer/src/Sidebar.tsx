@@ -172,6 +172,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       else done(`${word} ${ts.length}`)
     },
     allowKey: kh('allowAll'),
+    unbox: async t => {
+      if (await ask(`Restart ${t.name} without its sandbox?`, { text: 'It starts again with its chat. Its commands can then write anywhere you can and reach any host. Its profile keeps its sandbox.', ok: 'Restart without sandbox' })) void call('tabUnbox', { tab: t.id }).catch(e => toast((e as Error).message))
+    },
   }
   // a folded project's or sep's busiest workspace state (a setup script counts as running, as on its row)
   const busiest = (list: WorkspaceView[]) => rollup([...view.tabs.filter(t => list.some(w => w.id === t.workspace)), ...(list.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])])
