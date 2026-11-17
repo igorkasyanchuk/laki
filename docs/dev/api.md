@@ -571,7 +571,10 @@ started itself is its own to delete; no window: refused); `fileWrite`, `fileNew`
 `fileApp`; S7) never (a page it wrote would run outside Laki); `tunnelStart` asks in the app (`exposeAsk`: a `toolAsk`
 with `cross: 'expose'`, who and how long shown, once only) unless the project has an `expose`, which remote.ts'
 `exposeRule` holds every caller to. A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
-`AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`. Recording mode (S7): `state` from an agent,
+`AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`, the global answer keys (`allowOn`, `allowKey`,
+`denyOn`, `denyKey`, `talkOn`, `talkKey`: in `REMOTE_KEYS` too; one bound to a key you press for something else would
+allow for you), scheduled runs' limits (`scheduleAtOnce`, `scheduleMaxMinutes`: 0 is none), `labs` and `workflows`
+(a workflow's triggers start runs) and `turnsKept` (0 deletes the kept turns). Recording mode (S7): `state` from an agent,
 Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
 `recorded` (no private workspace, its tabs, nor a private project), and `turnList` and `turnDiff` refuse an agent a
 private workspace that isn't its own (`turnsSeen`); `whoCalls` looks the caller of those three (`RECORDED`) up only

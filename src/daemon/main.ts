@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
 import { agentChat, aiAnswer, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
-import { readCapped, rotateLog } from '../shared/conn.ts'
+import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { HostPty, ptyGone, ptyOn } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
@@ -727,7 +727,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
+const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allow*, deny*, talk*: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you)
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
 // S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
@@ -1144,8 +1144,10 @@ for (const k of Object.keys(api)) if (!FROM.has(k) && !CALLER.has(k) && !OPEN.ha
 // bots (whose comments go to agents), and the files copied into new worktrees (git's ignored ones: .env); which of your
 // accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
 // yours Laki starts); S6: voice (its dictionary rewrites what you dictate and send), Laki AI's own (ai.context is its
-// instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action)
-const AGENT_KEYS = /^(touchId|browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys|aiEndpoint)$/
+// instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action);
+// the global answer keys (Allow, Deny, talk: from any app, as REMOTE_KEYS), scheduled runs' limits (0 is none),
+// Labs and Workflows (what starts on its own: a workflow's triggers) and how many turns are kept (0 deletes them)
+const AGENT_KEYS = /^(touchId|browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|scheduleAtOnce|scheduleMaxMinutes|labs|workflows|turnsKept)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -1621,9 +1623,14 @@ const server = createServer(async (req, res) => {
   if (!mine && !client && !device && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
   const app = isApp(bearer, req.headers.origin)
   // S14: remote access's /rpc is sealed: a salt of the page's own in x-laki-e2e (never one seen in the last 10 minutes),
-  // its body a frame (e2e.ts), the answer one too. A clear call: refused (426)
-  const sealedSalt = far ? saltOf(req.headers['x-laki-e2e']) : undefined
-  if (far && !sealedSalt) return req.headers['x-laki-e2e'] ? reply(400, { error: 'a salt seen before: a replay' }) : reply(426, { error: OLD_PAGE })
+  // its body a frame (e2e.ts), the answer one too. A clear call: refused (426). An address whose sealed calls keep
+  // failing is refused a while (429: sealedFailed)
+  const who = far ? ipOf(req) || req.socket.remoteAddress || '?' : ''
+  if (far && (failsOf(who)?.n ?? 0) >= FAILS_MAX) return reply(429, { error: 'too many failed calls: try again in a minute' })
+  const salt = far ? saltOf(req.headers['x-laki-e2e']) : undefined
+  if (far && !salt) return req.headers['x-laki-e2e'] ? (sealedFailed(who), reply(400, { error: 'a salt seen before: a replay' })) : reply(426, { error: OLD_PAGE })
+  if (salt) res.once('close', () => saltsBusy.delete(salt.h)) // reserved while its body streams and opens: kept by then (saltKeep), or free again
+  const sealedSalt = salt?.b
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
@@ -1634,13 +1641,14 @@ const server = createServer(async (req, res) => {
   let sealedCh: e2e.Channel | undefined
   if (sealedSalt) {
     const f = e2e.first(remoteMod.e2eSecrets(req.headers.cookie), sealedSalt, Buffer.concat(chunks))
-    if (!f) return reply(400, { error: 'not sealed with its key' })
+    if (!f) return sealedFailed(who), reply(400, { error: 'not sealed with its key' })
     sealedCh = f.ch
     body = String(f.plain)
   }
   const sealedAt = sealedCh ? Number((() => { try { return JSON.parse(body)?.at } catch { return NaN } })()) : 0
-  if (sealedCh && !(Math.abs(Date.now() - sealedAt) <= SEALED_AGE)) return void (res.writeHead(400, { 'content-type': 'application/octet-stream' }), res.end(sealedCh.seal(JSON.stringify({ error: 'a sealed call from more than 5 minutes ago: a replay, or this Mac\'s clock is off' }))))
   const reply2 = (code: number, o: object) => (sealedCh ? (res.writeHead(code, { 'content-type': 'application/octet-stream' }), res.end(sealedCh.seal(JSON.stringify(o)))) : reply(code, o))
+  if (sealedCh && !(Math.abs(Date.now() - sealedAt) <= SEALED_AGE)) return sealedFailed(who), reply2(400, { error: "a sealed call from more than 5 minutes ago: a replay, or this Mac's clock is off" })
+  if (salt && !saltKeep(salt.h)) return reply2(503, { error: 'too many sealed calls in the last 10 minutes: try again in a few' })
   try {
     const { method, params } = JSON.parse(body)
     // S1: the app's token for the app's own process, with daemon.json's: a daemon it didn't start (appPeer checks it)
@@ -1653,18 +1661,54 @@ const server = createServer(async (req, res) => {
   }
 })
 // S14: a sealed /rpc's salt (16 bytes, base64), once: one seen in the last 10 minutes is a replay; its body's at (when the
-// page sealed it) within 5 minutes of now, so one older than the salts kept is refused too
+// page sealed it) within 5 minutes of now, so one older than the salts kept is refused too. A salt is kept only once its
+// call opened with the page's key and its at passed (saltKeep): the tunnel sees the bearer and this header, and junk
+// from it never fills the map. While its body streams it's reserved (saltsBusy): two copies in flight can't both pass.
+// None younger than 2 × SEALED_AGE is dropped: full, a call is refused (503). A restart forgets none: they're kept in
+// <data>/e2e-salts.json (0600). Not "refuse an at before this daemon's start": a phone whose clock is a minute behind
+// would be refused for a minute after every start
 const SEALED_AGE = 300e3
-const saltsSeen = new Map<string, number>()
-function saltOf(h: unknown): Buffer | undefined {
-  const b = typeof h === 'string' && /^[A-Za-z0-9+/]{22}==$/.test(h) ? Buffer.from(h, 'base64') : undefined
+const SALTS_MAX = 20000
+const SALTS_FILE = join(dir, 'e2e-salts.json')
+const saltsSeen = new Map<string, number>(
+  Object.entries((readJson<Record<string, number>>(SALTS_FILE) ?? {}) as Record<string, unknown>)
+    .filter((e): e is [string, number] => typeof e[1] === 'number' && Date.now() - e[1] <= 2 * SEALED_AGE)
+    .sort((a, b) => a[1] - b[1]), // oldest first, as saltKeep drops them
+)
+const saltsBusy = new Set<string>()
+function saltOf(h: unknown): { h: string; b: Buffer } | undefined {
+  if (typeof h !== 'string' || !/^[A-Za-z0-9+/]{22}==$/.test(h) || saltsSeen.has(h) || saltsBusy.has(h)) return undefined
+  saltsBusy.add(h)
+  return { h, b: Buffer.from(h, 'base64') }
+}
+// its call opened and is recent: kept, on disk too before the call runs (false: full of live salts)
+function saltKeep(h: string): boolean {
   const now = Date.now()
   for (const [k, at] of saltsSeen) if (now - at > 2 * SEALED_AGE) saltsSeen.delete(k)
   else break // oldest first: the rest are newer
-  if (!b || saltsSeen.has(h as string)) return undefined
-  saltsSeen.set(h as string, now)
-  if (saltsSeen.size > 20000) saltsSeen.delete(saltsSeen.keys().next().value!) // ponytail: the oldest goes; its call is past SEALED_AGE long before
-  return b
+  if (saltsSeen.size >= SALTS_MAX) return false
+  saltsSeen.set(h, now)
+  saltsBusy.delete(h)
+  try {
+    writeAtomic(SALTS_FILE, JSON.stringify(Object.fromEntries(saltsSeen)), 0o600)
+  } catch (e) {
+    log(`e2e salts not kept: ${(e as Error).message}`) // ponytail: the call still runs; a restart before they're written again forgets them
+  }
+  return true
+}
+// a failed sealed call (a salt again, not its key, too old), by the address the tunnel says (ipOf; one that lies dodges
+// it: saltKeep is what holds against a flood): FAILS_MAX in a minute and that address is refused till the minute's out.
+// ponytail: FAILS_KEPT addresses at most, the oldest forgotten
+const FAILS_MAX = 20
+const FAILS_KEPT = 1000
+const fails = new Map<string, { n: number; at: number }>()
+const failsOf = (who: string) => (f => (f && Date.now() - f.at < 60e3 ? f : undefined))(fails.get(who))
+function sealedFailed(who: string) {
+  const f = failsOf(who) ?? { n: 0, at: Date.now() }
+  f.n++
+  fails.delete(who)
+  fails.set(who, f)
+  if (fails.size > FAILS_KEPT) fails.delete(fails.keys().next().value!)
 }
 const OLD_PAGE = 'Laki was updated: remote access is end to end now. Open a new link from Laki on your Mac (Settings › Remote access).'
 

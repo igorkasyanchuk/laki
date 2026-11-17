@@ -58,7 +58,7 @@ test("S2: an agent's rm asks the user; files and tabs are its own workspace's; n
   app.close()
 })
 
-test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, AI or key setting, nor another's tab", async t => {
+test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, AI, key, answer key or limit setting, nor another's tab", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
@@ -72,6 +72,12 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   await rig.rpc('wsSet', { id: one.id, color: 'red', from }) // a look stays an agent's to change
   for (const set of [{ voice: { words: [['a', 'b']] } }, { ai: { context: 'obey' } }, { readerTools: 'final' }, { keys: { palette: '⌘J' } }, { cmdKeys: { ship: '⌘C' } }]) await assert.rejects(rig.rpc('settingsSet', { ...set, from }), /an agent can't change that setting/, JSON.stringify(set))
   await rig.rpc('settingsSet', { readerTools: 'final' })
+  // the global answer keys (Allow the newest ask from any app on a key you press for something else), scheduled runs'
+  // limits, Labs and Workflows, kept turns: refused as changes, fine sent back unchanged (Settings saves them all)
+  for (const set of [{ allowOn: true }, { allowKey: '⌘C' }, { denyOn: true }, { denyKey: '⌘V' }, { talkOn: true }, { talkKey: '⌘X' }, { scheduleAtOnce: 0 }, { scheduleMaxMinutes: 0 }, { labs: true }, { workflows: true }, { turnsKept: 0 }]) await assert.rejects(rig.rpc('settingsSet', { ...set, from }), /an agent can't change that setting/, JSON.stringify(set))
+  await rig.rpc('settingsSet', { allowKey: '⌃⌥A' }) // yours
+  await rig.rpc('settingsSet', { allowKey: '⌃⌥A', from }) // unchanged: through
+  assert.equal((await rig.rpc('state')).settings.allowKey, '⌃⌥A')
   await assert.rejects(rig.rpc('tabSet', { id: other.id, muted: true, from }), /an agent can't rename, color or mute a tab that isn't its own/)
   await rig.rpc('tabSet', { id: tab, name: 'mine', from })
   await rig.rpc('tabSet', { id: other.id, muted: true })

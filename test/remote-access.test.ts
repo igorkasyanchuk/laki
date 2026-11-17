@@ -2,13 +2,15 @@
 // restarts (D2). remote.ts; api.test.ts has the rest of remote access
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
-import { connect, fresh, until, tokenOf, farFetch, FarWs } from './helpers.ts'
+import { channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
+import { connect, fresh, until, tokenOf, farFetch, farKey, FarWs } from './helpers.ts'
 
 const kids = (data: string) => (f => (existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as { pid: number }[]) : []))(join(data, 'children.json'))
 const saved = (data: string) => JSON.parse(readFileSync(join(data, 'state.json'), 'utf8')).remote
@@ -466,4 +468,47 @@ test('D9: remote access while the Mac is locked: started by the lock (My domain,
   assert.deepEqual(lines.slice(0, 2), ['stopped: you came back to the Mac', 'the Mac unlocked: remote access stops in a minute'])
   // the CLI prints it
   assert.match((await rig.cli('remote', 'log')).out, /stopped: you came back to the Mac/)
+})
+
+test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a restart or as two copies at once, refused; a new one goes through', async t => {
+  const rig = await fresh(t)
+  await named(rig)
+  const url = 'https://laki.example.dev'
+  const on = await rig.rpc('remoteStart', { hours: 4, host: '' })
+  const { cookie } = await pinRaw(rig.info().port, url, { token: tokenOf(on.link), pin: on.pin }, UA)
+  const jar = cookie!.split(';')[0]
+  const secret = farKey(url)!
+  // a sealed ping as the page sends it, kept to be sent again as the tunnel would (it sees the headers in clear)
+  const sealed = (salt = randomBytes(16)) => ({ salt: salt.toString('base64'), body: new Uint8Array(channel(keyOf(secret, salt), PAGE).seal(JSON.stringify({ method: 'ping', at: Date.now() }))) })
+  const send = (c: { salt: string; body: Uint8Array }, ip = '203.0.113.7') =>
+    fetch(`http://127.0.0.1:${rig.info().port}/rpc`, { method: 'POST', headers: { authorization: 'Bearer device', origin: url, cookie: jar, 'cf-connecting-ip': ip, 'x-laki-e2e': c.salt }, body: c.body as BodyInit }).then(r => r.status)
+  const one = sealed()
+  assert.equal(await send(one), 200)
+  assert.equal(await send(one), 400, 'again: a replay')
+  const both = sealed()
+  assert.deepEqual((await Promise.all([send(both), send(both)])).sort(), [200, 400], 'two copies in flight: one runs')
+  // the tunnel's flood: 20,001 salts of junk, each from an address it makes up (so no address is refused for it)
+  let i = 0
+  const junk = async () => {
+    while (i < 20001) {
+      const n = i++
+      assert.equal(await send({ salt: randomBytes(16).toString('base64'), body: new Uint8Array(randomBytes(40)) }, `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`), 400)
+    }
+  }
+  await Promise.all(Array.from({ length: 32 }, junk))
+  assert.equal(await send(one), 400, 'after the flood: still a replay')
+  assert.equal(await send(sealed()), 200, 'a new one')
+  // a restart forgets none
+  const two = sealed()
+  assert.equal(await send(two), 200)
+  await rig.stop()
+  await rig.start()
+  await until(async () => (r => r?.url === url && !r.down)((await rig.rpc('stateOwn')).remote), 'back at its address')
+  assert.equal(await send(two), 400, 'after a restart: still a replay')
+  assert.equal(await send(sealed()), 200, 'a new one')
+  assert.equal(statSync(join(rig.data, 'e2e-salts.json')).mode & 0o777, 0o600)
+  // an address whose sealed calls keep failing is refused a while, others aren't
+  for (let k = 0; k < 20; k++) await send(one, '198.51.100.9')
+  assert.equal(await send(sealed(), '198.51.100.9'), 429)
+  assert.equal(await send(sealed()), 200)
 })

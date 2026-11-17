@@ -391,6 +391,14 @@ message that doesn't open, or opens out of order, closes 4400). `/rpc` from the 
 in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay), its body a sealed frame with `at` (when it was
 sealed: over 5 minutes from now, `SEALED_AGE`, refused, so one older than the salts kept can't come back), the answer sealed
 (`application/octet-stream`); none: 426 after the token check (so the page's `whyNot` still tells a dead link by 401).
+A salt is kept (`saltKeep`) only once its call opened with the page's key and its `at` passed: the tunnel sees the bearer
+and the header in clear, and its junk never fills `saltsSeen`. It's reserved while its body streams (`saltsBusy`, freed
+as the response closes), so two copies in flight can't both pass. None younger than 2 × `SEALED_AGE` is dropped:
+`SALTS_MAX` (20,000) live ones and a call is refused, 503. They're kept in `<data>/e2e-salts.json` (0600, `writeAtomic`,
+before the call runs), so a restart forgets none; refusing an `at` before the daemon's start would refuse a phone whose
+clock is behind for that long after every start. A sealed call that fails (a salt again, not its key, too old) counts
+against the address the tunnel says (`ipOf`, `sealedFailed`): `FAILS_MAX` (20) in a minute and it's refused (429) till
+the minute's out; a tunnel that lies about it dodges that, the salts kept only after a call opens are what hold.
 The page (`api.ts`): `pageToken` takes `k` out of the hash as it does `t`; `sealUp` imports it (not extractable),
 keeps it in IndexedDB (`laki-e2e`, `keys`: `link`, `device`), and seals with this tab's link key, else the device's, else
 a kept link one; sends go through `out` one after another (their counters in order), frames are opened in the order
