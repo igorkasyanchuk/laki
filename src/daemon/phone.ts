@@ -19,11 +19,13 @@ import { register } from './ticks.ts'
 // within the 30 ms before a view is built looks like the same one, and its end isn't pushed
 export const pushed = new Map<string, string>()
 export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
-export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
+// bell: T16's one-time bell rang (core's ring, never under Do not disturb): sent whatever the webhook's waiting and
+// done say, muted or not
+export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = false) {
   const w = state.settings?.webhook
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   if ((state.dnd?.until ?? 0) > Date.now() && !(kind === 'waiting' && ws?.important)) return // U8: Do not disturb: an important workspace's ask only
-  if (!pushOn(w) || (kind === 'waiting' ? w.waiting === false : w.done !== true) || pushed.get(tab.id) === kind || tab.muted || ws?.muted || hidden(ws)) return
+  if (!pushOn(w) || (!bell && (kind === 'waiting' ? w.waiting === false : w.done !== true)) || pushed.get(tab.id) === kind || (!bell && (tab.muted || ws?.muted)) || hidden(ws)) return
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)

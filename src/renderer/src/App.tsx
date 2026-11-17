@@ -1348,7 +1348,8 @@ export function App() {
           const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
           const s = viewRef.current?.settings
           const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
-          if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted || (m.kind === 'waiting' && t.status !== 'waiting')) return
+          // T16: a bell rang (the daemon's ring): told as an important workspace's, notifyOn and mutes aside
+          if (!t || shown || (!m.bell && (s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted)) || (m.kind === 'waiting' && t.status !== 'waiting')) return
           const perm = m.kind === 'waiting' && t.ask?.tool ? t.ask : undefined // claude's permission ask: what it wants to do
           const body = perm ? `${perm.what ?? ''}${perm.diff ? (c => ` (+${c.add} −${c.del})`)(diffCounts(perm.diff)) : ''}` : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
           // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
@@ -1360,7 +1361,7 @@ export function App() {
           const cut = !noteWhole(body) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
-          const card = !w?.important ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
+          const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
@@ -1373,10 +1374,10 @@ export function App() {
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const s = viewRef.current?.settings
         const w = viewRef.current?.workspaces.find(w => w.id === m.ws)
-        if (!t || m.status === 'failed' || s?.notify === false || t.muted || w?.muted) return
-        if (m.status !== 'over' && (s?.notifyOn?.done === false || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
+        if (!t || m.status === 'failed' || (!m.bell && (s?.notify === false || t.muted || w?.muted))) return
+        if (m.status !== 'over' && ((!m.bell && s?.notifyOn?.done === false) || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined)
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important || m.bell ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined)
       } else if (m.ev === 'scheduled') {
         // T1: a scheduled run waits for you, failed, or (Tell me: always) is done: a notification and a toast to it
         const s = viewRef.current?.settings

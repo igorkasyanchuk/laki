@@ -2129,8 +2129,9 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
 // and workflows' turnWaits
 function told(tab: Tab, r: Runtime, text: string) {
   dndNote(tab, 'wait', text)
-  broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
-  phone(tab, 'waiting', text)
+  const bell = ring(tab)
+  broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text, ...(bell && { bell }) })
+  phone(tab, 'waiting', text, bell)
   setTimeout(() => {
     // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
     const s = sessions.get(tab.id)
@@ -2266,6 +2267,31 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
   save()
   changed()
   return { ...t, draft: undefined } // an agent names its own tab: what you typed stays yours
+}
+
+// T16: a one-time bell (tab.bell): its next ask or turn end (a failure, a limit) told once as an important workspace's
+// is (a card, its answers, the phone), notifyOn and mutes aside, then it's off. Do not disturb holds it (still set);
+// Recording mode's hidden workspaces stay quiet (the app's QUIET, phone.ts hidden). A workspace's: its running agents'
+// (none: its first agent's); off: all of its tabs'
+export function ring(tab: Tab) {
+  if (!tab.bell || dndOn()) return false
+  delete tab.bell
+  save()
+  changed()
+  return true
+}
+export function tabBell(o: { id?: string; ws?: string; on?: unknown }) {
+  const on = o.on !== false
+  const ref = String(o.ws ?? o.id ?? '')
+  const one = !o.ws && (state.tabs.some(t => t.id === ref) || /[/@]/.test(ref))
+  const all = one ? [resolveTarget(ref)] : tabsOf(findWs(ref).id).filter(t => t.kind === 'agent')
+  const busy = all.filter(t => ['running', 'waiting'].includes(tabStatus(t.id)))
+  const tabs = one || !on ? all : busy.length ? busy : all.slice(0, 1)
+  if (!tabs.length || tabs.some(t => t.kind !== 'agent')) throw new Error('a bell is for an agent tab')
+  for (const t of tabs) t.bell = on || undefined
+  save()
+  changed()
+  return { tabs: tabs.map(t => t.id), on }
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
@@ -4008,8 +4034,10 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (r.failed) continueLater(tab, r)
       else if (p.state !== 'failed') r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
       if (!viewed(tab.id)) r.done = true
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
-      if (!r.limit) phone(tab, 'done', r.last ?? '')
+      const checking = !r.limit && p.state !== 'failed' && !!checkHooks.will?.(tab)
+      const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
+      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(checking && { checking }), ...(bell && { bell }) })
+      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : (r.last ?? ''), bell)
       if (!r.limit && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)

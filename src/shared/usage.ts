@@ -53,6 +53,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
+  laki bell <ws|tab> [--off]                  told once when it next finishes, asks, fails or hits a limit
   laki agents                                 the named agents, wherever they run
   laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
   laki wait <ws>[/<tab>]… [--timeout 20m] [--json]   until none of their agents works, then a line each: idle (its
@@ -240,6 +241,12 @@ one's goes to the next). It stays with the tab until the tab closes or its works
 
   laki name backend
   laki agents                                   who has a name, where, and what it's doing`,
+  bell: `Tells you once when a tab next finishes its turn, asks you something, fails or hits a plan limit: a notification
+and a phone push as an important workspace's, even with finish notifications off (Do not disturb holds it). Then it's
+off. A workspace sets it on its running agents. Yours only: an agent can't set one.
+
+  laki bell fix-login                           its running agents
+  laki bell fix-login/claude --off`,
   agents: `Lists the agents with a name (laki name): @name, the agent, its status, its workspace and tab.`,
   ask: `Asks another agent something and waits for its reply: the question goes in as its turn ends (--when-idle), saying
 who asks, and the answer its next turn ends with is printed. 15 minutes unless --wait. From an agent's tab, an agent

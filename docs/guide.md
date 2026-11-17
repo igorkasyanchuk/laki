@@ -2614,7 +2614,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   workspaces it started without Laki asking you; any other workspace, Laki asks first. Agents can also talk by name:
   `laki name <name>` in one's tab makes it `@<name>` for the others (`laki agents` lists them), `laki ask @<name>
   "<question>"` asks it and prints its reply, `laki send @<name>` tells it something; MCP's `laki_name` and
-  `laki_ask_agent` do the same. A tab keeps its name until it closes or its workspace is archived; the tab bar shows it.
+  `laki_ask_agent` do the same. `laki bell <ws|tab>` (`--off`), or *Tell me when it finishes* in a tab's or a
+  workspace's menu and ⌘K, tells you once when it next finishes, asks, fails or hits a plan limit: a notification and
+  a phone push as an important workspace's, even with finish notifications off (Do not disturb holds it). An agent
+  can't set one. A tab keeps its name until it closes or its workspace is archived; the tab bar shows it.
   It holds the app's path: update it after moving the app. A skill installed with other text than this Laki's (an
   older Laki's, or edited) says *out of date*, with *Update* (*Update all* for several); the app shows a bar with
   *Update* too, until *Not now*. One set up by another Laki (another data folder) says so, with *Use this one*. *Remove* takes only its own files. Below it, *MCP

@@ -348,6 +348,12 @@ clock chip sets the task's limit and, below it, every task's and how many at onc
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
+T16's one-time bell (`tab.bell`, `tabBell`: the user's or a phone's, AGENT_NO; a workspace's sets its running agents',
+none running: its first agent's) rings once at its next ask (`told`), turn end, failure or limit (the `idle` case), or,
+when a Done check follows, at the check's end (verify.ts `say`; a failed check leaves it set): core's `ring` clears it
+and the event carries `bell`, which the app tells as an important workspace's (a card, its answers) whatever `notify`,
+`notifyOn` and a mute say, and `phone(…, bell)` pushes whatever the webhook's `waiting` and `done` say. Do not disturb
+holds it (`ring` returns false, the bell stays); Recording mode's hidden workspaces stay quiet (QUIET, `hidden`).
 `settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`. A waiting
 turn is posted 800 ms later (its menu is often drawn after the hook; none if it isn't waiting by then), with an action
 per choice of the tab's `ask` (`NotifyAction`: `n` and `label`, main calls `answer` with both), else, when its text

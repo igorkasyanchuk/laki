@@ -72,7 +72,7 @@ export function layoutOf(app: AppBase) {
 
 // the tabs: a tab per group of panes (its split's sessions), a drag moves them (Panes.tsx useTabDrag)
 export function TabList({ app }: { app: AppCtx }) {
-  const { accountsOf, byId, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
+  const { accountsOf, byId, call, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
   return (
@@ -109,6 +109,11 @@ export function TabList({ app }: { app: AppCtx }) {
             {ts.filter(t => t.alias).map(t => <span key={t.id} className="tab-alias">@{t.alias}</span> /* laki name: what other agents call it */)}
             {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}
+            {ts.some(t => t.bell) && ( // T16: a bell; its click turns it off
+              <span className="ws-mark ws-bell" aria-label="Bell off" data-tip="A bell: told once when it next finishes or asks. Click to turn it off" onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), ts.filter(t => t.bell).forEach(t => void call('tabBell', { id: t.id, on: false }).catch(() => {}))))}>
+                <Icon name="bell" size={11} />
+              </span>
+            )}
             {ts.some(t => t.muted) && (
               <span className="ws-mark">
                 <Icon name="bellOff" size={11} />

@@ -629,6 +629,13 @@ async function main() {
       const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] }, 150000) // another workspace's from an agent: the user is asked first
       return out(r, r.sent ? 'sent' : `queued (${r.queued} waiting): sent when the agent finishes its turn`)
     }
+    case 'bell': {
+      // T16: laki bell <ws|tab> [--off]: told once when it next finishes or asks (a workspace: its running agents)
+      const ref = rest[0] || (flags.off as string | undefined) // --off takes a value elsewhere: laki bell --off <ws> too
+      if (!ref) throw new Error('usage: laki bell <ws|tab> [--off]')
+      const r = await rpc('tabBell', { id: ref, on: flags.off === undefined, from: caller() })
+      return out(r, r.on ? `bell on: ${r.tabs.join(', ')}` : 'bell off')
+    }
     case 'name': {
       // laki name <name> [--tab id]: an agent's @name (its own tab, $LAKI_TAB), for other agents' laki send and ask; '' none
       const tab = (flags.tab as string) || process.env.LAKI_TAB

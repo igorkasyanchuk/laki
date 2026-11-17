@@ -241,6 +241,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
     if (git) a({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })
     a({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })
+    if (tab?.kind === 'agent') a({ label: tab.bell ? 'Bell off: no one-time notification' : 'Tell me when this one finishes', icon: tab.bell ? 'bellOff' : 'bell', run: () => void call('tabBell', { id: tab.id, on: !tab.bell }).catch(fail) }) // T16
     if (tab) a({ id: 'copyTab', label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
     if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { id: 'floatTab', label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { id: 'floatTab', label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
     a({ id: 'run', label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })

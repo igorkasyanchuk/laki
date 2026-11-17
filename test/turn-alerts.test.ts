@@ -142,3 +142,67 @@ test('continueOnError: once per turn, by itself, after the wait; off, never', as
   await rig.rpc('send', { target: tab, text: 'apierror yours' })
   await until(async () => (await continues()) === 2, 'a new turn')
 })
+
+test('T16: a bell tells once, finish notifications off; the next end is silent; Do not disturb holds it; an agent cannot set one', async t => {
+  const posts: string[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', c => (body += c))
+    req.on('end', () => {
+      if (req.method === 'POST') posts.push(body)
+      res.writeHead(200).end()
+    })
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'fix-login' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.last && x.status === 'idle' && x
+  }, 'first turn')
+  await rig.rpc('settingsSet', { notifyOn: { done: false }, webhook: { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`, done: false } })
+  const c = await rig.connect()
+  t.after(() => c.ws.close())
+  const turn = async (last: string) => {
+    const from = c.events.length
+    await rig.rpc('hook', { tab: tab.id, state: 'running', payload: {} })
+    await until(async () => (await rig.tab(ws.id))?.status === 'running', 'running in the view') // a turn the view never saw run is the same one (phone.ts pushed)
+    await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: last } })
+    return until(() => c.events.slice(from).find(e => e.ev === 'turn' && e.tab === tab.id && e.kind === 'done'), `${last}'s end`)
+  }
+
+  await assert.rejects(rig.rpc('tabBell', { id: tab.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't set a bell/)
+  assert.equal((await rig.tab(ws.id))?.bell, undefined)
+
+  assert.deepEqual(await rig.rpc('tabBell', { id: tab.id }), { tabs: [tab.id], on: true })
+  assert.equal((await rig.tab(ws.id))?.bell, true, 'in the view: the mark')
+  const rang = await turn('all done')
+  assert.equal(rang.bell, true, 'the app tells it as an important workspace’s')
+  await until(() => posts.length === 1 && posts, 'one push, with finish pushes off')
+  assert.equal((await rig.tab(ws.id))?.bell, undefined, 'then it is off')
+
+  const quiet = await turn('again')
+  assert.equal(quiet.bell, undefined, 'the next end: as the settings say')
+  await sleep(300)
+  assert.equal(posts.length, 1, 'no push')
+
+  // Do not disturb holds it: nothing told, still set; once it ends, the next end rings
+  await rig.rpc('dndSet', { minutes: 30 })
+  await rig.rpc('tabBell', { id: tab.id })
+  assert.equal((await turn('in the quiet')).bell, undefined)
+  await sleep(300)
+  assert.equal(posts.length, 1)
+  assert.equal((await rig.tab(ws.id))?.bell, true, 'held')
+  await rig.rpc('dndSet', { off: true })
+  assert.equal((await turn('after')).bell, true)
+  await until(() => posts.length === 2 && posts, 'its push')
+
+  // a workspace's: its agents (none running: its first); off from the CLI
+  assert.deepEqual(await rig.rpc('tabBell', { ws: ws.id }), { tabs: [tab.id], on: true })
+  const off = await rig.cli('bell', ws.id, '--off')
+  assert.equal(off.code, 0, off.err)
+  assert.equal((await rig.tab(ws.id))?.bell, undefined)
+  await assert.rejects(rig.rpc('tabBell', { id: (await rig.rpc('tabNew', { ws: ws.id, preset: 'shell' })).id }), /a bell is for an agent tab/)
+})

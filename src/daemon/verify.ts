@@ -15,7 +15,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:f
 import { basename, join } from 'node:path'
 import { type CheckRun, type CheckStepName, checkOk, type DoneCheck, type Preset, type Proof, type ProofFacts, type Tab, type Workspace } from '../shared/types.ts'
 import { writeAtomic } from '../shared/conn.ts'
-import { broadcast, changed, checkHooks, checks, git, plainEnv, presets, projectConfig, proofs, send, settingUp, shell, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
+import { broadcast, changed, checkHooks, checks, git, plainEnv, presets, projectConfig, proofs, ring, send, settingUp, shell, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
 import { redact } from './share.ts'
 import { dir } from './dir.ts'
 import { diff, treeOf } from './files.ts'
@@ -250,8 +250,10 @@ export function proofShot(o: { ws: string; turn: number; png: string }) {
 // the app's notification (the turn's own waited for it: checkHooks.will), a phone push when it's over to you
 function say(ws: Workspace, tab: Tab, status: 'skipped' | 'passed' | 'failed' | 'over', text: string) {
   if (status !== 'skipped') wsLog(ws, `check: ${status}: ${text}`)
-  broadcast({ ev: 'check', ws: ws.id, tab: tab.id, status, text })
-  if (status === 'over') phone(tab, 'waiting', `${tab.name}: ${text}`)
+  const bell = status !== 'failed' && ring(tab) // T16: a turn whose check failed works again: its next end rings it
+  broadcast({ ev: 'check', ws: ws.id, tab: tab.id, status, text, ...(bell && { bell }) })
+  if (status === 'over') phone(tab, 'waiting', `${tab.name}: ${text}`, bell)
+  else if (bell) phone(tab, 'done', text, true)
 }
 
 // the app's Check again (the strip's): now, its tries from 0

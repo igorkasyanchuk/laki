@@ -268,6 +268,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             {n}
           </span>
         ))(new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size)}
+        {wt.some(t => t.bell) && ( // T16: a bell on its agents; its click turns it off
+          <span className="ws-mark ws-bell" aria-label="Bell off" data-tip="A bell: told once when its agents next finish or ask. Click to turn it off" onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), void call('tabBell', { ws: w.id, on: false }).catch(() => {})))}>
+            <Icon name="bell" size={11} />
+          </span>
+        )}
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />
@@ -408,6 +413,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     const marks = [
       w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
       w.race && 'in a race: ⋯ › Compare the race',
+      wt.some(t => t.bell) && 'a bell: told once when it next finishes or asks',
       w.muted && 'notifications muted',
       w.important && !w.muted && 'important: cards on screen',
       w.pending && `${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`,
