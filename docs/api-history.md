@@ -202,3 +202,4 @@ needs no bump: `settingsSet` keeps any field.
 193: `tabUnbox` (a tab whose command its sandbox stopped, the view's `boxed`: restarted once without its sandbox, its chat resumed; the user's only).
 194: `projectNetAllow` (a sandboxed profile's network list, `net: 'list'`: a host added to or taken off a project's `netAllow`, the card's *Allow this domain in this project*; the view's `boxed.host`; the user's only).
 195: `tabBell` (T16's one-time bell: a tab's, or a workspace's running agents', `tab.bell` in the view; its next ask or turn end rings once, the `turn` and `check` events' `bell`; the user's or a phone's, never an agent's).
+196: `wsRepair` (T13: a worktree that broke, the view's `broken`: `recreate` a gone one at its branch, `relink` an unlinked or moved one with git worktree repair, `forget` archives it as it is; the user's only).

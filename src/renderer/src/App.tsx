@@ -3877,6 +3877,22 @@ export function App() {
             <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.at)} />
           </div>
         )}
+        {connected && ws?.broken && ( // T13: its worktree broke: what Laki found, and the repairs for that kind
+          <div className="stale-bar" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>{ws.broken.kind === 'gone' ? "This workspace's worktree folder is gone." : ws.broken.kind === 'moved' ? 'The repo moved: this worktree lost its link to it.' : "This worktree isn't linked to its repo."}</b> {ws.broken.detail}.
+              {ws.broken.remote ? ` Repair it on ${ws.host}: Laki only finds it there.` : ws.broken.kind === 'gone' ? ` Recreate checks out ${ws.branch} there again.` : ' Relink runs git worktree repair.'}
+            </span>
+            {!ws.broken.remote &&
+              (([how, label]) => <button onClick={() => void api.call<{ lost?: string }>('wsRepair', { ws: ws.id, how }).then(r => toast(r.lost ? `Recreated. Lost: ${r.lost}` : 'Relinked'), fail)}>{label}</button>)(ws.broken.kind === 'gone' ? ['recreate', 'Recreate'] : ['relink', 'Relink'])}
+            {!ws.broken.remote && (
+              <button className="ghost" onClick={() => void api.call<{ kept?: string }>('wsRepair', { ws: ws.id, how: 'forget' }).then(r => toast(r.kept ? `Archived. Its folder stays at ${r.kept}` : 'Archived. Its branch stays'), fail)}>
+                Archive, keep the branch
+              </button>
+            )}
+          </div>
+        )}
         {connected && view.diskFull && (
           <div className="stale-bar" role="alert">
             <Icon name="alertCircle" size={16} />

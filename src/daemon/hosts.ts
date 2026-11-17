@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { basename, dirname, join, sep } from 'node:path'
-import { type Project, type ProjectConfig, type Tab, type Workspace } from '../shared/types.ts'
+import { type Broken, type Project, type ProjectConfig, type Tab, type Workspace } from '../shared/types.ts'
 import * as cs from './codespace.ts'
 import { agentCmd, allocPort, type At, branchPrefix, cfgHash, changed, ENV_KEY, exec, fileCfg, findProject, firstLine, git, hookFiles, type Hooks, lakiEnv, log, type NewWs, q, run, runDir, save, slug, type SpawnOpts, state, uniqueWsId, wsLog } from './core.ts'
 import { dir } from './dir.ts'
@@ -260,7 +260,10 @@ export const readHostCfgs = async (ws: Workspace, fresh = true) => {
 export const making = new Map<string, Promise<void>>() // by workspace: gh making its codespace
 export const live = new Set<string>() // hosts with a connection up (connect)
 // one no scan should reach now: being made, stopped, not connected (a scan never wakes one, nor waits minutes for it)
-export const away = (ws: Workspace) => ws.codespace !== undefined && !live.has(ws.host!)
+// T13: worktrees found broken (files.ts brokenScan), by workspace: away too, so the scans that skip a codespace asleep
+// (diff size, the radar, PR scans, wsPeek) skip them until they're repaired
+export const broken = new Map<string, Broken>()
+export const away = (ws: Workspace) => broken.has(ws.id) || (ws.codespace !== undefined && !live.has(ws.host!))
 const csSet = (ws: Workspace, st: string, err?: string) => ((ws.csState = st), (ws.csError = err), save(), changed())
 
 // the files .worktreeinclude names (ignored or not) in the project's checkout, as copyIncludes finds them: what a

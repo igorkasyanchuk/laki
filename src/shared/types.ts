@@ -1155,12 +1155,16 @@ export type NamedTunnel = { name?: string; domain?: string }
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
 // (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's); made and gone:
 // files created (untracked ones too) and deleted, of those files
+// T13: a worktree that broke under Laki (files.ts brokenOf): gone, its folder; unlinked, its .git file and the repo's
+// record of it don't name each other; moved, its .git names the repo at another place. remote: an SSH host's or a
+// codespace's, found only (no repair there)
+export type Broken = { kind: 'gone' | 'unlinked' | 'moved'; detail: string; remote?: boolean }
 export type Stat = { add: number; del: number; files: number; dirty: number; made?: number; gone?: number; behind?: number; ahead?: number; clean?: boolean } // F8: commits its base has that it hasn't (behind) and the other way (ahead), as this clone has the base (no fetch); clean: merging the base in would have no conflicts (behind only)
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)
 export type Ticket = { key: string; title?: string; status?: string; url?: string }
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; broken?: Broken /* T13: its worktree broke (wsRepair) */; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -1364,7 +1368,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 195
+export const API = 196
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

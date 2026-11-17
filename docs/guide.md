@@ -3136,6 +3136,11 @@ Laki starts agents and what Laki does itself, not what you type in a shell tab: 
   in an env of yours (use an account instead, Settings › Agents & profiles); Laki's hook command gone after the app
   moved (restart Laki); an agent too old for hooks. Fix it, then restart the tab. Settings › Agents & profiles says
   when each agent's hooks were last heard, and the first-run checks try the hook command.
+- **A workspace says its worktree is broken**: its folder was deleted, or it lost its link to the repo (the repo
+  moved, or its `.git` file changed). The card over its terminals says which: *Recreate* checks its branch out again at
+  the same path (never over a folder that's there now; uncommitted files are lost unless an archive kept them),
+  *Relink* runs `git worktree repair`, *Archive, keep the branch* archives it and leaves its folder and branch alone.
+  On an SSH host or a codespace Laki only says so: repair it there.
 - **A host won't connect**: run `ssh <host>` in a terminal; it must sign in without asking anything (keys or agent, a
   known host key). Laki's error is in `~/.laki/daemon.log` and in the tab.
 

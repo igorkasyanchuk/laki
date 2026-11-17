@@ -268,6 +268,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             {n}
           </span>
         ))(new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size)}
+        {w.broken && ( // T13: its worktree broke
+          <span className="ws-mark err" data-tip={`Broken worktree: ${w.broken.detail}`}>
+            <Icon name="alertCircle" size={11} />
+          </span>
+        )}
         {wt.some(t => t.bell) && ( // T16: a bell on its agents; its click turns it off
           <span className="ws-mark ws-bell" aria-label="Bell off" data-tip="A bell: told once when its agents next finish or ask. Click to turn it off" onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), void call('tabBell', { ws: w.id, on: false }).catch(() => {})))}>
             <Icon name="bell" size={11} />
@@ -364,7 +369,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             )}
           </div>
         )}
-        {fact && (
+        {w.broken ? (
+          <div className="ws-sub ws-fact t-error" data-tip={w.broken.detail}>
+            <span>{w.broken.kind === 'gone' ? 'Worktree folder gone' : w.broken.kind === 'moved' ? 'Repo moved: worktree unlinked' : 'Worktree unlinked from the repo'}</span>
+          </div>
+        ) : fact && (
           <div className={`ws-sub ws-fact t-${fact.tone}`} data-tip={fact.text.length > 40 ? fact.text : undefined}>
             <span>{w.setup ? 'Setting up' : fact.text}</span>
             {!w.setup && fact.since && <Elapsed since={fact.since} />}

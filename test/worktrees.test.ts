@@ -987,3 +987,57 @@ test("R8: an archived workspace's saved work goes to the trash, not away; told a
   assert.equal(await has(again.id), true, 'kept: a full archivedDays again')
   app.close()
 })
+
+test('T13: a broken worktree: gone, recreated (never over a folder there now); unlinked, relinked; forget archives it; an agent cannot repair', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(() => rig.tab(ws.id), 'its agent')
+  const view = async () => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === ws.id)
+  const scan = () => rig.rpc('settingsSet', { diffStat: true }) // scanStats now, brokenScan first
+  const broken = async (kind?: string) => (await until(async () => (await scan(), (b => ((kind ? b?.kind === kind : !b) ? { b } : undefined))((await view()).broken)), kind ?? 'fine again')) as { b: { kind: string; detail: string } }
+
+  assert.equal((await view()).broken, undefined)
+  await assert.rejects(rig.rpc('wsRepair', { ws: ws.id, how: 'relink' }), /isn't broken/)
+  await assert.rejects(rig.rpc('wsRepair', { ws: ws.id, how: 'recreate', from: { ws: ws.id, tab: tab.id } }), /an agent can't repair a broken worktree/)
+
+  // gone: its folder deleted, then a different folder made at its path: recreate never writes over it
+  writeFileSync(join(ws.path, 'mine.txt'), 'uncommitted')
+  rmSync(ws.path, { recursive: true, force: true })
+  assert.match((await broken('gone')).b.detail, /Its folder is gone/)
+  await assert.rejects(rig.rpc('wsRepair', { ws: ws.id, how: 'relink' }), /recreate it/)
+  mkdirSync(ws.path)
+  writeFileSync(join(ws.path, 'other.txt'), 'not yours')
+  await broken('unlinked')
+  await assert.rejects(rig.rpc('wsRepair', { ws: ws.id, how: 'recreate' }), /a folder is at .* now: Laki won't make the worktree over it/)
+  assert.equal(readFileSync(join(ws.path, 'other.txt'), 'utf8'), 'not yours')
+  rmSync(ws.path, { recursive: true, force: true })
+  await broken('gone')
+  const made = await rig.rpc('wsRepair', { ws: ws.id, how: 'recreate' })
+  assert.equal(made.fixed, 'recreate')
+  assert.match(made.lost, /uncommitted files/)
+  assert.equal(execFileSync('git', ['-C', ws.path, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim(), ws.branch)
+  assert.ok(!existsSync(join(ws.path, 'mine.txt')))
+  await broken()
+
+  // unlinked: its .git file broken; relink (git worktree repair) puts it back
+  writeFileSync(join(ws.path, '.git'), 'not a link\n')
+  await broken('unlinked')
+  assert.deepEqual(await rig.rpc('wsRepair', { ws: ws.id, how: 'relink' }), { fixed: 'relink' })
+  assert.equal(execFileSync('git', ['-C', ws.path, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim(), ws.branch)
+  await broken()
+
+  // moved: its .git names the repo at another place (the repo moved); relink, the same
+  writeFileSync(join(ws.path, '.git'), `gitdir: /old/place/.git/worktrees/${basename(ws.path)}\n`)
+  assert.match((await broken('moved')).b.detail, /names the repo at \/old\/place/)
+  assert.deepEqual(await rig.rpc('wsRepair', { ws: ws.id, how: 'relink' }), { fixed: 'relink' })
+  await broken()
+
+  // forget: archived as it is, its folder and branch left alone
+  writeFileSync(join(ws.path, '.git'), 'not a link\n')
+  await broken('unlinked')
+  assert.deepEqual(await rig.rpc('wsRepair', { ws: ws.id, how: 'forget' }), { fixed: 'forget', kept: ws.path })
+  assert.equal((await view()).archived, true)
+  assert.ok(existsSync(join(ws.path, '.git')))
+  assert.ok(execFileSync('git', ['-C', rig.repo, 'branch', '--list', ws.branch], { encoding: 'utf8' }).includes(ws.branch))
+})

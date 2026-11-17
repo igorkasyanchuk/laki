@@ -45,9 +45,9 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
+import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
-import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
+import { away, broken, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 import { ticketOf } from './tickets.ts'
 import { managedView, policy, policyAgent, policySettings, policyTick } from './policy.ts'
@@ -782,7 +782,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), proof: proofs.get(w.id), annotAt: annotAt.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), broken: broken.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), proof: proofs.get(w.id), annotAt: annotAt.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -3315,7 +3315,8 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   if (copied.length) log(`copied into ${ws.id} in ${Date.now() - began} ms: ${copied.length > 50 ? `${copied.length} files` : copied.join(', ')}`)
 }
 
-async function teardown(ws: Workspace) {
+// its tunnels, shares, forwarded port and terminals stopped (teardown's start, wsRepair's forget)
+function stopWs(ws: Workspace) {
   stopTunnels(ws.id)
   stopShares({ ws: ws.id })
   forward(ws, false)
@@ -3324,6 +3325,9 @@ async function teardown(ws: Workspace) {
     sessions.delete(t.id)
     asleep.delete(t.id)
   }
+}
+async function teardown(ws: Workspace) {
+  stopWs(ws)
   const cfg = projectConfig(ws)
   const none: Tab = { id: '', workspace: ws.id, name: '', kind: 'shell' }
   // a worktree's, as setup is: a local workspace is the project's own folder, which other sessions (and you) still use
@@ -3590,6 +3594,9 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   keepChats(ws) // its agents' chats, in case an agent deletes its own old ones
   if (prs.get(ws.id)?.state === 'MERGED' || ws.autoArchived) ws.merged = true // Disk's Tidy: an archive whose PR merged
   await teardown(ws)
+  archivedNow(ws, o)
+}
+function archivedNow(ws: Workspace, o: GateOpts) {
   ws.archived = true
   ws.archivedAt = Date.now()
   delete ws.closed // ⇧⌘T's: gone with it
@@ -3601,6 +3608,51 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   save()
   changed()
   widgetEvent('workspace.archived', causeRun(o), ws.id, undefined, causeEv(callerAgent(o.from) ?? o.agent, o))
+}
+
+// T13: a broken worktree repaired (the user's: AGENT_NO, REMOTE_NO). recreate: gone, its branch checked out again at
+// its path (never over a folder there now), the archive's saved copy of its files put back, else said lost; relink:
+// unlinked or moved, git worktree repair; forget: archived as it is, the branch and a folder still there left alone
+// (imported: teardown and Disk's Tidy never remove it). git in the project's repo only, no hooks, no fsmonitor; an SSH
+// host's or a codespace's is found, not repaired
+const SAFE_GIT = ['-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null']
+export async function wsRepair(o: { ws: string; how?: unknown } & GateOpts) {
+  const w = findWs(o.ws)
+  const b = w.host ? broken.get(w.id) : brokenOf(w)
+  if (!b) throw new Error(`${w.name ?? w.id}'s worktree isn't broken`)
+  if (w.host) throw new Error(`its worktree is on ${w.host}: Laki finds it broken there, but doesn't repair it`)
+  const proj = findProject(w.project)
+  if (proj.host || !existsSync(join(proj.path, '.git'))) throw new Error(`the project's repo isn't at ${proj.path}`)
+  const gitErr = (what: string) => (e: { stderr?: unknown; message: string }) => {
+    throw new Error(`git worktree ${what} failed: ${String(e.stderr || e.message).trim()}`)
+  }
+  let lost: string | undefined
+  if (o.how === 'forget') {
+    stopWs(w)
+    if (existsSync(w.path)) w.imported = true
+    await git(proj, ...SAFE_GIT, 'worktree', 'prune').catch(() => {})
+    broken.delete(w.id)
+    wsLog(w, `broken worktree (${b.kind}): archived as it is`)
+    archivedNow(w, o)
+    return { fixed: 'forget', ...(w.imported && existsSync(w.path) && { kept: w.path }) }
+  } else if (o.how === 'recreate') {
+    if (existsSync(w.path)) throw new Error(`a folder is at ${w.path} now: Laki won't make the worktree over it`)
+    if (!(await hasRef(proj, `refs/heads/${w.branch}`))) throw new Error(`its branch ${w.branch} is gone too: nothing to check out`)
+    await git(proj, ...SAFE_GIT, 'worktree', 'prune').catch(gitErr('prune'))
+    await git(proj, ...SAFE_GIT, 'worktree', 'add', w.path, w.branch).catch(gitErr('add'))
+    if (await archiveHas(proj.path, w.id)) await archiveBack(w).catch(e => (lost = `its saved files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${w.id}`))
+    else lost = `uncommitted files, if it had any: it's back at ${w.branch}'s last commit`
+  } else if (o.how === 'relink') {
+    if (b.kind === 'gone') throw new Error('its folder is gone: recreate it')
+    // it exits 1 as it says what it repaired (".git file broken"): the link, read again, says whether it worked
+    const said = await git(proj, ...SAFE_GIT, 'worktree', 'repair', w.path).then(() => '', e => String(e.stderr || e.message).trim())
+    const still = brokenOf(w)
+    if (still) throw new Error(`git worktree repair didn't fix it: ${said || still.detail}`)
+  } else throw new Error('how? recreate, relink or forget')
+  broken.delete(w.id)
+  wsLog(w, `broken worktree (${b.kind}): ${o.how}${lost ? `; lost: ${lost}` : ''}`)
+  changed()
+  return { fixed: o.how, ...(lost && { lost }) }
 }
 
 export async function wsRestore(ref: string) {

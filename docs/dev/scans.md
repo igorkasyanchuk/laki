@@ -150,6 +150,18 @@
   always, for Compare): each live git
   workspace's `git diff --numstat` against `diff`'s base, new files' lines (the first 100, up to 1 MB) and `git status`'s
   count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
+- Broken worktrees (T13: files.ts `brokenScan`, at each `scanStats`' start, every live worktree whatever is shown):
+  `brokenOf` reads the folder and its `.git` file, no git: `gone` (no folder), `moved` (its `.git` names
+  `<repo>/.git/worktrees/<x>` of another repo: the repo moved), `unlinked` (no `.git` link, or the repo's
+  `worktrees/<x>/gitdir` doesn't name it back); a project whose `.git` is a file isn't checked. An SSH host's or a
+  codespace's (awake): one `sh` there a minute apart, gone or no `.git`, `remote: true`. Kept in hosts.ts' `broken`
+  (the view's `WorkspaceView.broken`, a `wsLog` line as it breaks), which `away` reads: the diff size, the radar, PR
+  scans and `wsPeek` skip it. `wsRepair` (the user's: AGENT_NO, REMOTE_NO; none on a host): `recreate` (gone: refused
+  over any folder at its path, or when its branch is gone; `worktree prune`, then `worktree add <path> <branch>`, the
+  archive's saved copy put back, else `lost` says what), `relink` (`worktree repair <path>`, which exits 1 as it
+  reports a fix: the link read again decides), `forget` (archived as it is: its terminals stopped, a folder still there
+  marked `imported` so teardown and Disk's Tidy never remove it, its branch kept). Each git in the project's repo with
+  `-c core.fsmonitor=false -c core.hooksPath=/dev/null`.
 - PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
   branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, mergeStateStatus: `PR.ready` (CLEAN or HAS_HOOKS; UNKNOWN: none), size, body, reviews:
   `reviewersOf`'s (each author's last approval or ask for changes) `approved`, `changes` (the PR section's *Approved by*, the hover card, the status bar's tip); `yoursOn`'s `approvedByMe` and `commentedByMe` (someone else's PR: your approval, your comments or reviews with them; `comments` in `PR_FIELDS`), the sidebar's ✓, ✓✓ and 👀 (`settings.prMarks`: `approved`, `mine`, `commented`, unset on; `at`: start, name or end); `mine`: the author is `ghLogin`'s,

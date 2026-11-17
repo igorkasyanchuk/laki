@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A worktree whose folder was deleted, or that lost its link to the repo, shows a red mark in the sidebar and a card with *Recreate* (its branch checked out again; what was lost said), *Relink*, or *Archive, keep the branch*. On SSH hosts and codespaces Laki says so; repair it there.
 - A one-time bell: *Tell me when it finishes* in a tab's or a workspace's menu (⌘K too, `laki bell`) tells you once when it next finishes, asks, fails or hits a plan limit, even with finish notifications off. A bell on the tab and the row while it's set; a click turns it off.
 - Security: an agent, or a phone over remote access, can no longer turn on or rebind the keys that allow or deny the newest ask from any app, nor the talk key. An agent can't change scheduled runs' limits, Labs, Workflows or how many turns are kept either.
 - Security: a call from remote access's page can't be replayed: a flood of junk from the tunnel no longer pushes out the record of calls seen, a restart keeps it, and an address whose calls keep failing is refused for a minute.

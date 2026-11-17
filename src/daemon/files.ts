@@ -9,10 +9,10 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { writeAtomic } from '../shared/conn.ts'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
-import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
-import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, noNested, q, run, save, state, within, wsLog } from './core.ts'
+import { type Blame, type Broken, type Stat, type Workspace } from '../shared/types.ts'
+import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, log, noNested, q, run, save, state, within, wsLog } from './core.ts'
 import { dir } from './dir.ts'
-import { away, hostUp, sshIn } from './hosts.ts'
+import { away, broken, hostUp, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
 
 // ---------- the worktree as a tree
@@ -456,6 +456,59 @@ export async function mergeClean(w: Workspace): Promise<boolean | undefined> {
   if (key && clean !== undefined) cleanAt.set(w.id, { key, clean })
   return clean
 }
+// T13: a live worktree whose folder or link broke under Laki: gone (no folder), unlinked (its .git names no record of
+// the repo's, or that record doesn't name it back), moved (its .git names the repo at another place: the repo moved).
+// brokenScan, at scanStats' start: every live worktree, no git call (an SSH host's or a codespace's by one sh there, a
+// minute apart: gone, or no .git), kept in hosts.ts' broken for the view; the other scans skip them (away)
+const realOr = (p: string) => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return resolve(p)
+  }
+}
+export function brokenOf(w: Workspace): Broken | undefined {
+  const proj = state.projects.find(p => p.id === w.project)
+  if (w.kind !== 'worktree' || w.archived || w.host || !proj || proj.git === false) return
+  if (!existsSync(w.path)) return { kind: 'gone', detail: `Its folder is gone: ${w.path}` }
+  const repo = join(proj.path, '.git')
+  if (!existsSync(repo) || !statSync(repo).isDirectory()) return // ponytail: a project whose .git is a file (a worktree or a submodule itself): not checked
+  let link = ''
+  try {
+    link = /^gitdir:\s*(.+)$/m.exec(readFileSync(join(w.path, '.git'), 'utf8'))?.[1]?.trim() ?? ''
+  } catch {}
+  if (!link) return { kind: 'unlinked', detail: 'Its .git file is missing or names no repo' }
+  const gd = resolve(w.path, link)
+  const home = realOr(join(repo, 'worktrees'))
+  const at = realOr(dirname(gd))
+  if (basename(dirname(gd)) === 'worktrees' && basename(dirname(dirname(gd))) === '.git' && at !== home) return { kind: 'moved', detail: `Its .git names the repo at ${dirname(dirname(dirname(gd)))}, not ${proj.path}` }
+  let back = ''
+  try {
+    back = readFileSync(join(gd, 'gitdir'), 'utf8').trim()
+  } catch {}
+  if (at !== home || !back || realOr(dirname(resolve(gd, back))) !== realOr(w.path)) return { kind: 'unlinked', detail: "The project's repo has no record of it" }
+}
+const remoteAt = new Map<string, number>()
+async function brokenRemote(w: Workspace): Promise<Broken | undefined> {
+  if (w.codespace !== undefined && w.codespace !== '' && w.csState !== 'Available') return broken.get(w.id) // asleep: as it was
+  if (Date.now() - (remoteAt.get(w.id) ?? 0) < 60_000) return broken.get(w.id)
+  remoteAt.set(w.id, Date.now())
+  const out = await exec({ host: w.host, path: '/' }, 'sh', ['-c', 'test -d "$1" || echo gone; test -e "$1/.git" || echo unlinked', 'sh', w.path]).then(r => r.stdout, () => undefined)
+  if (out === undefined) return broken.get(w.id) // the host didn't answer: not known
+  return out.includes('gone') ? { kind: 'gone', detail: `Its folder on ${w.host} is gone: ${w.path}`, remote: true } : out.includes('unlinked') ? { kind: 'unlinked', detail: `Its folder on ${w.host} has no .git`, remote: true } : undefined
+}
+export async function brokenScan() {
+  for (const id of broken.keys()) if (!state.workspaces.some(w => w.id === id && !w.archived)) broken.delete(id), remoteAt.delete(id)
+  for (const w of state.workspaces) {
+    if (w.kind !== 'worktree' || w.archived || w.codespace === '') continue
+    const b = w.host ? await brokenRemote(w) : brokenOf(w)
+    if (JSON.stringify(b) === JSON.stringify(broken.get(w.id))) continue
+    if (b) broken.set(w.id, b), wsLog(w, `broken worktree: ${b.kind}: ${b.detail}`)
+    else broken.delete(w.id)
+    changed()
+  }
+}
+
 // the hover card's: one workspace's now (the scan keeps only the shown ones'); none off a git repo or for a codespace asleep
 export async function wsStat(o: { ws: string; fresh?: boolean }): Promise<Stat | null> {
   const w = findWs(o.ws)
@@ -469,6 +522,7 @@ export async function scanStats(): Promise<void> {
   if (statting) return void (restat = true)
   statting = true
   try {
+    await brokenScan().catch(e => log(`broken worktrees: ${(e as Error).message}`))
     // the sidebar's (settings.diffStat, off by default: every workspace), a race's always (Compare shows them), or the
     // full review's tab (settings.fullReview, on unless false: shown while there's a diff), which needs only the
     // workspaces a shown window has selected (core's setView scans again as that changes)
