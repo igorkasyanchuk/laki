@@ -27,6 +27,7 @@ undo() {
     # only the bundle's own daemon (a stale file's pid may be another process's now)
     if [ -n "$pid" ] && ps -o command= -p "$pid" 2> /dev/null | grep -qF "$APP/Contents/Resources/app/out/main/daemon.js"; then kill "$pid" 2> /dev/null || true; fi
   fi
+  for p in $(lsof -t "$H/data/pty.sock" 2> /dev/null); do pkill -P "$p" 2> /dev/null; kill "$p" 2> /dev/null; done # its pty host, its terminals with it
   if [ $DONE = 0 ]; then
     cp "$T/package.json" "$T/package-lock.json" . && cp "$T/release-notes.md" docs/
     [ -n "$V" ] && rm -f "$OUT/Laki-$V-"*.dmg "$OUT/Laki-$V-"*.dmg.blockmap

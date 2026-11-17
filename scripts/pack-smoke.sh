@@ -39,7 +39,16 @@ fi
 laki() { ELECTRON_RUN_AS_NODE=1 "$NODEBIN" "$RES/cli.js" "$@"; }
 ELECTRON_RUN_AS_NODE=1 "$NODEBIN" "$RES/daemon.js" > "$H/daemon.out" 2>&1 &
 APP_PID=
-trap 'kill $APP_PID 2> /dev/null; laki stop > /dev/null 2>&1' EXIT # a failed step (set -e) leaves no window or daemon behind: a running one stops the next release at its preflight
+# a failed step (set -e) leaves no window, daemon or pty host behind (a running one stops the next release at its
+# preflight); the pty host, which laki stop doesn't always end in time, by its socket, its terminals with it
+# ponytail: a data folder whose pty.sock path is too long for a socket (proto.ts' sockPath) has it in the temp folder
+reap() {
+  kill $APP_PID 2> /dev/null
+  laki stop > /dev/null 2>&1
+  for p in $(lsof -t "$LAKI_HOME/pty.sock" 2> /dev/null); do pkill -P "$p" 2> /dev/null; kill "$p" 2> /dev/null; done
+  true
+}
+trap reap EXIT
 for i in $(seq 50); do [ -f "$LAKI_HOME/daemon.json" ] && break; sleep 0.1; done
 laki project add "$H/repo"
 laki new repo --preset claude --name packed --prompt "hello from the bundle"
