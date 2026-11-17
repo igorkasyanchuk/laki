@@ -15,17 +15,28 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    npm test
    ```
    Run `npm test` twice: a test that fails once and passes alone is a flake to look at, not to ship past.
+   Then `npm run audit:deps` (`scripts/audit.ts`): `npm audit` of the production dependencies (what ships in the app and
+   the daemon), a line per advisory (package, version, severity, id, the fix); a high or critical one fails unless
+   `scripts/audit-allow.json` allows it (`{ id, package, reason, until }`: past its date it no longer does, and is named).
+   The build tools' high and critical ones only warn. The registry not answering warns and passes, unless
+   `LAKI_AUDIT_STRICT=1` (release.sh sets it); `LAKI_SKIP_AUDIT=1` skips it loudly. package.json's minimatch override
+   (electron-builder's own copies) stays until electron-builder takes minimatch 11 itself.
 4. Build:
    ```bash
    npm run pack       # this Mac's architecture: dist/mac-arm64/Laki.app (Intel: dist/mac)
    npm run pack:x64   # the Intel app from an Apple silicon Mac: dist/mac/Laki.app
    ```
-   A disk image to hand out: `npm run dmg` bumps the minor version (`npm version minor`, no tag), builds, holds the
-   window's first load to its budget (`npm run size`: package.json's `lakiSize`, 3% allowed; `-- --write` raises it on
-   purpose), and writes
-   `dist/release/Laki-<version>-arm64.dmg` (its own folder: a running `dist/mac-arm64/Laki.app` and its daemon stay
-   as they are). Each run is a new minor version, and `docs/release-notes.md`'s `## Next` becomes it (Settings ›
-   Release notes): add a line there for each user-visible change before.
+   A disk image to hand out: `npm run dmg` (`scripts/dmg.sh`) runs `npm run check` and the dependency audit (step 3),
+   bumps the minor version (`npm version minor`, no tag), builds, holds the window's first load to its budget
+   (`npm run size`: package.json's `lakiSize`, 3% allowed; `-- --write` raises it on purpose), builds the unpacked app
+   (`electron-builder --dir`), runs `scripts/pack-smoke.sh` on it (step 5; from a shell that isn't a terminal, under
+   `script -q`, its log's tail shown when it fails), and only then writes `dist/release/Laki-<version>-arm64.dmg`
+   from that same app (`--prepackaged`): what was tested is what ships (its own folder: a running
+   `dist/mac-arm64/Laki.app` and its daemon stay as they are). A failed step stops it with no dmg, the version and the
+   release notes as they were, and no smoke daemon left. `LAKI_SKIP_SMOKE=1` skips the smoke and says so loudly (a
+   release then shipped a daemon that didn't start once). Each run is a new minor version, and
+   `docs/release-notes.md`'s `## Next` becomes it (Settings › Release notes): add a line there for each user-visible
+   change before.
 5. Run `scripts/pack-smoke.sh` once before a release: it runs the packaged app's daemon, CLI and hooks on Electron's
    node (Laki Node) with fake agents, in a temp home, checks the app's own binary runs no JavaScript as node, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
    the app's data folder under the real home, so a running one holds the single-instance lock and the smoke's window quits. For the Intel build:

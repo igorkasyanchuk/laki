@@ -33,3 +33,19 @@ test("the Homebrew tap's cask: both Macs, Apple silicon only, none without an ar
 
   assert.equal(cask(`${b}  Laki-1.2.3-x64.dmg\n`).status, 1)
 })
+
+test('the dependency audit (scripts/audit.ts auditOf): a high production advisory fails, allowed passes, an expired allowance fails and is named, moderate ones warn', async () => {
+  const { auditOf } = await import('../scripts/audit.ts')
+  const adv = (name: string, severity: string, ghsa: string) => ({ name, severity, via: [{ source: 1, name, title: `${name} is bad`, url: `https://github.com/advisories/${ghsa}`, severity }], nodes: [`node_modules/${name}`], fixAvailable: { name, version: '9.9.9' } })
+  const npm = { vulnerabilities: { ws: adv('ws', 'high', 'GHSA-aaaa-bbbb-cccc'), qs: adv('qs', 'moderate', 'GHSA-dddd-eeee-ffff'), dep: { name: 'dep', severity: 'high', via: ['ws'] } } }
+  const now = Date.parse('2026-11-18')
+  const plain = auditOf(npm, [], now)
+  assert.deepEqual(plain.fail.map(f => [f.package, f.id, f.severity, f.fixed]), [['ws', 'GHSA-aaaa-bbbb-cccc', 'high', 'ws@9.9.9']], 'a via by name is its dependency’s, listed once')
+  assert.deepEqual(plain.warn.map(f => f.package), ['qs'], 'moderate: a warning')
+  const allowed = auditOf(npm, [{ id: 'GHSA-aaaa-bbbb-cccc', package: 'ws', reason: 'not reachable', until: '2026-12-31' }], now)
+  assert.deepEqual([allowed.fail, allowed.expired], [[], []])
+  const old = { id: 'GHSA-aaaa-bbbb-cccc', package: 'ws', reason: 'not reachable', until: '2026-11-01' }
+  const expired = auditOf(npm, [old], now)
+  assert.deepEqual([expired.fail.map(f => f.package), expired.expired], [['ws'], [old]])
+  assert.deepEqual(auditOf(npm, [{ ...old, package: 'qs', until: '2027-01-01' }], now).fail.length, 1, 'an allowance is for its package')
+})
