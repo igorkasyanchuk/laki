@@ -610,7 +610,7 @@ const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // the PIN), and is dead then (used); access: that token's hash (the token itself is the page's alone); left: wrong tries
 // left; host, named: My domain's hostname and the named tunnel its DNS record goes to; tries, was, down, timer: started
 // again (remoteAgain), its address before, why it's down
-type RemoteRun = { e2e: Buffer; byLock?: boolean; graceUntil?: number; check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
+type RemoteRun = { serve?: boolean; start?: StartOpts; e2e: Buffer; byLock?: boolean; graceUntil?: number; check?: RemoteCheck; fails?: number; checking?: Promise<RemoteCheck | undefined>; mail: string; open?: boolean; until?: number; token: string; url?: string; cf?: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; named?: string; tries: number; was?: string; moved?: boolean; down?: string; timer?: ReturnType<typeof setTimeout>; keyUntil?: number; lockUntil?: number; locks?: number; wrong?: number[] } // keyUntil: an Add a device link's 10 minutes; lockUntil, locks: D5's wait, how many this start; wrong: today's wrong PINs' times
 let remote: RemoteRun | undefined
 export let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
@@ -619,7 +619,7 @@ const hashOf = (t: string) => createHash('sha256').update(t).digest('hex')
 export const accessOk = (t: unknown) => !!remote?.used && !!remote.access && typeof t === 'string' && !!t && same(hashOf(t), remote.access)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { ...(remote.check && { check: remote.check }), mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}&k=${remote.e2e.toString('base64url')}` } // S14: k, its end-to-end secret: never sent either // S11: in the hash: never sent in a request, so no log or proxy has it
+  remote && { ...((t => t !== undefined && { idleOffAt: t })(idleOffAt())), ...(remote.check && { check: remote.check }), mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(remote.host && { host: remote.host }), ...(remote.open && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), ...(remote.down && { down: remote.down }), ...(remote.moved && remote.was && { was: remote.was }), ...(remote.lockUntil && { locked: remote.lockUntil }), ...(remote.wrong?.length && { wrong: remote.wrong.length }), ...(remote.keyUntil && !remote.used && { pairUntil: remote.keyUntil }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#t=${remote.token}&k=${remote.e2e.toString('base64url')}` } // S14: k, its end-to-end secret: never sent either // S11: in the hash: never sent in a request, so no log or proxy has it
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 const newPin = () => String(randomInt(0, 1e6)).padStart(6, '0')
 const hex = () => randomBytes(32).toString('hex')
@@ -629,7 +629,7 @@ const hex = () => randomBytes(32).toString('hex')
 function keepRemote() {
   const r = remote
   if (!r) return
-  state.remote = { mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }), ...(stable(r) && { e2e: r.e2e.toString('base64') }) } // S14: a stable address's page reconnects after a restart with the secret it has
+  state.remote = { ...(r.serve && { serve: true }), mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }), ...(stable(r) && { e2e: r.e2e.toString('base64') }) } // S14: a stable address's page reconnects after a restart with the secret it has
   save()
 }
 const forget = () => state.remote && (delete state.remote, save())
@@ -637,7 +637,33 @@ const forget = () => state.remote && (delete state.remote, save())
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
 // funnel: tailscale funnel, on the internet, so with a PIN only. host (D1, via cloudflare): My domain, that word (or
 // hostname) under settings.tunnel's domain ('': laki), a PIN always
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean; host?: string; lock?: boolean }): Promise<Remote | undefined> {
+type StartOpts = { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean; host?: string; lock?: boolean; serve?: boolean }
+// T10: remote access turns itself off after settings.remoteIdleOff hours (12; open to anyone with the link: 2 at most;
+// never: one email or Tailscale only) with no device's call or frame (remoteSeen, main.ts); laki serve's (headless:
+// its only door) never. Ten minutes before, a push with Keep and a line in the window (remoteHooks.warn); at the limit
+// it stops as Stop does, and a notice offers Turn on again (remoteHooks.off): its devices stay paired
+let lastRemoteAt = 0
+let warned = false
+export const remoteHooks: { warn?: (text: string) => void; off?: (text: string, again: () => Promise<unknown>) => void } = {}
+export function remoteSeen(now = Date.now()) {
+  if (!remote) return
+  const was = warned
+  lastRemoteAt = now
+  warned = false
+  if (was) changed() // its countdown starts over
+}
+export const remoteKeep = () => (remoteSeen(), changed(), { idleOffAt: idleOffAt() })
+function idleLimit(r = remote): number | undefined {
+  if (!r || r.serve) return
+  const s = state.settings?.remoteIdleOff
+  const h = typeof s === 'number' && s > 0 && s <= 168 ? s : undefined
+  if (r.open) return Math.min(h ?? 2, 2) * 3600e3
+  if (s === 'never' && (r.via === 'tailscale' || (!!r.mail && !r.pin))) return
+  return (h ?? 12) * 3600e3
+}
+const idleOffAt = () => (l => (l === undefined ? undefined : lastRemoteAt + l))(idleLimit())
+const hoursText = (ms: number) => (ms >= 3600e3 ? `${+(ms / 3600e3).toFixed(1)} h` : `${Math.max(1, Math.round(ms / 60e3))} min`)
+export async function remoteStart(o: StartOpts): Promise<Remote | undefined> {
   policyRemote() // a managed policy may turn it off
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
@@ -667,7 +693,10 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   const r: RemoteRun = { e2e: e2eSecret(), mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: hex(), access: '', tries: 0, ...(open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel, peers }), ...(host && { host, named: n!.name }) }
   if (pin) Object.assign(r, { pin: newPin(), left: triesOf() })
   if (o.lock === true) r.byLock = true // D9: the Mac's lock started it: its unlock stops it
+  if (o.serve === true) r.serve = true
+  r.start = { hours, ...(o.mail && { mail: o.mail }), ...(o.open && { open: true }), ...(o.pin && { pin: true }), ...(o.via && { via: o.via }), ...(o.funnel && { funnel: true }), ...(o.host !== undefined && { host: o.host }) }
   remote = r
+  remoteSeen()
   changed()
   try {
     r.url = await remoteUp(r, bin)
@@ -759,7 +788,9 @@ export function remoteBack(now = Date.now()) {
   if ((s.until && s.until <= now) || (!ts && !s.pin && !s.open && !s.host && !ONE_MAIL.test(mail)) || (s.host !== undefined && (typeof s.host !== 'string' || typeof s.named !== 'string'))) return forget()
   const r: RemoteRun = { e2e: typeof s.e2e === 'string' && Buffer.from(s.e2e, 'base64').length === 32 ? Buffer.from(s.e2e, 'base64') : e2eSecret(), mail: ts || s.pin || s.open ? '' : mail, until: typeof s.until === 'number' ? s.until : undefined, token: hex(), access: typeof s.access === 'string' ? s.access : '', used: typeof s.access === 'string', tries: 0, was: typeof s.url === 'string' ? s.url : undefined, down: 'starting again after a restart', ...(s.open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel: !!s.funnel }), ...(s.host && { host: s.host, named: s.named }) }
   if (s.pin || s.host) Object.assign(r, { pin: newPin(), left: triesOf() })
+  if (s.serve) r.serve = true
   remote = r
+  remoteSeen(now) // a restart starts its clock again
   log('remote access: starting again after a restart')
   changed()
   void reaping
@@ -1116,6 +1147,22 @@ export function remoteTick(now?: number) {
   if (r?.lockUntil && at >= r.lockUntil) Object.assign(r, { lockUntil: undefined, left: triesOf() }), changed() // D5: the wait is over
   if (r?.graceUntil && at >= r.graceUntil) return log('remote access: the Mac unlocked a minute ago: stopped'), remoteStop('you came back to the Mac') // D9
   devicesTidy(at)
+  const lim = idleLimit(r)
+  if (r && lim !== undefined) {
+    const idle = at - lastRemoteAt
+    if (idle >= lim) {
+      const text = `Remote access turned itself off after ${hoursText(lim)} without a device`
+      log(`remote access: no device for ${hoursText(lim)}: stopped`)
+      const again = r.start
+      remoteStop(`no device used it for ${hoursText(lim)}`)
+      remoteHooks.off?.(text, () => (again ? remoteStart(again) : Promise.resolve()))
+      return
+    }
+    if (!warned && idle >= lim - 10 * 60e3) {
+      warned = true
+      remoteHooks.warn?.(`Remote access turns off ${lim - idle > 60e3 ? `in ${hoursText(lim - idle)}` : 'in a minute'}: no device has used it for ${hoursText(idle)}`)
+    }
+  }
   if (r?.url && (woke || at - (r.check?.at ?? 0) >= CHECK_EVERY)) void selfCheck(r, woke ? 1 : 2, at)
   if (r) void power()
   // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note

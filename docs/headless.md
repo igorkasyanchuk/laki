@@ -71,6 +71,9 @@ Cloudflare account needed). Install `cloudflared` from Cloudflare's packages.
 
 ## Keep it secure
 
+Remote access started by `laki serve` (`--headless`) never turns itself off for want of a device, as it does from
+the app after 12 hours: it's the server's only door. Its `--hours` still end it.
+
 Whoever gets in has a shell on that machine as the user Laki runs as: their files, keys and agents.
 
 - The daemon listens on 127.0.0.1 only. Nothing reaches it but the tunnel (cloudflared or tailscale serve) on the same

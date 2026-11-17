@@ -67,7 +67,7 @@ function tapKey() {
 // Answer from the phone (webhook.answer): a push with buttons leaves its nonce here, with the tab (or a workflow run,
 // flow) and its choices as pushed, until a tap answers it, the tab or run stops waiting or asks something else, or a day
 // goes by. While any is here, phoneTick asks Telegram or ntfy for taps every 5 s; none: it stops
-const awaiting = new Map<string, { tab?: string; flow?: string; key: string; until: number }>()
+const awaiting = new Map<string, { tab?: string; flow?: string; keep?: boolean; key: string; until: number }>()
 // a push's nonce: its buttons, only with Answer from the phone where taps can come back (answerOk)
 const nonceFor = (w: Webhook) => (w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'telegram' || w.format === 'webpush' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined)
 // still asking what it pushed: a tab's menu on screen, a run's wait (workflow.ts' waitKey)
@@ -113,6 +113,7 @@ export async function takeTap(tap: Tap) {
   const a = awaiting.get(tap.nonce)
   if (!a) return
   awaiting.delete(tap.nonce)
+  if (a.keep) return void (remoteKeepHook.fn?.(), log('remote access kept on from the phone'))
   if (a.flow) {
     // a run's choice: its wait as pushed (0-based in flowAnswer)
     if (flowHooks.waitKey?.(a.flow) !== a.key || !flowHooks.answer) return
@@ -161,6 +162,16 @@ export function phoneRemote(title: string, o: { url?: string; open?: boolean } =
   const w = state.settings?.webhook
   if (state.settings?.remotePush !== true || !pushOn(w) || o.open) return
   pushTo(w, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title, ...(o.url && { url: o.url }) }).catch(e => log(`push remote access: ${e.message}`))
+}
+// T10: remote access about to turn itself off: a push (with remote pushes or not: the webhook's host sees no link here)
+// with Keep where taps come back (its tap: remoteKeepHook, remote.ts' remoteKeep)
+export const remoteKeepHook: { fn?: () => void } = {}
+export function phoneRemoteIdle(text: string) {
+  const w = state.settings?.webhook
+  if (!pushOn(w)) return
+  const nonce = nonceFor(w)
+  if (nonce) awaiting.set(nonce, { keep: true, key: 'keep', until: Date.now() + 15 * 60_000 }), listen(w)
+  pushTo(w, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title: text, ...(nonce && { options: [{ n: 1, label: 'Keep' }], nonce, key: tapKey() }) }).catch(e => log(`push remote access: ${e.message}`))
 }
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)

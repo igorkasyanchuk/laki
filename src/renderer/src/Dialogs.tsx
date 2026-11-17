@@ -243,7 +243,7 @@ export function Pages({ app }: { app: AppCtx }) {
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             ...(hasCap(view, 'disk.usage') && { disk: (again?: boolean) => api.call<DiskUsage>('diskUsage', { again }), tidy: (what: DiskTidyWhat, days: number, dry: boolean) => api.call<{ goes: string[] }>('diskTidy', { what, days, dry }) }),
           }}
-          remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), log: remoteLog, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+          remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), log: remoteLog, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), keep: () => api.call('remoteKeep'), copy, open: openExternal }}
           widgets={extCfg}
           logs={(key, title) => setDialog({ logs: key, title })}
           scriptLogs={() => setDialog('scriptLogs')}

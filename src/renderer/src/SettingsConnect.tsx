@@ -405,17 +405,17 @@ export function TunnelsSection({ named, onNamed, check, other }: { named: NamedT
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { check?: import('../../shared/types').RemoteCheck; mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number }
+export type Remote = { check?: import('../../shared/types').RemoteCheck; mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number; idleOffAt?: number }
 export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; level?: 'answer' | 'full' }
 // devices, pair, revoke (D3): the paired ones, Add a device, Revoke (one; none: all)
-export type RemoteApi = { log?: () => Promise<{ at: number; device?: string; line: string }[]>; check?: () => Promise<unknown>; state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type RemoteApi = { keep?: () => Promise<unknown>; log?: () => Promise<{ at: number; device?: string; line: string }[]>; check?: () => Promise<unknown>; state?: Remote; devices?: RemoteDevice[]; pair: () => Promise<unknown>; revoke: (id?: string) => Promise<unknown>; level: (id: string, level: 'answer' | 'full') => Promise<unknown>; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean, host?: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale' | 'domain'
 // domain: settings.tunnel's, once a named tunnel is set (My domain); host: the word under it
-type RemoteOpts = { when: 'manual' | 'locked'; awake: 'ac' | 'always' | 'off'; level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
+type RemoteOpts = { when: 'manual' | 'locked'; awake: 'ac' | 'always' | 'off'; level: 'answer' | 'full'; mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean; host: string; domain?: string; wrong: 'wait' | 'stop'; days: number; push: boolean; hook?: string; passkey: boolean; pinBack: boolean; idle: number; idleOff: number | 'never' } // passkey, pinBack, idle: D6's switches and minutes; wrong: after the wrong PINs (D5); days: a paired device's (D3); push, hook: D4, the link to the phone webhook, and whose server that is (hookOf)
 // D4: who gets a push: the webhook's host, Web Push's (your paired phones), none (no webhook set)
 export function hookOf(w?: Webhook) {
   if (w?.format === 'webpush') return 'your paired phones'
@@ -478,6 +478,11 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         <div className="remote-on">
           <QR text={r.link} label="the remote access link" />
           <div className="remote-side">
+            {r.idleOffAt && (
+              <p className="muted small">
+                Turns itself off {ends(r.idleOffAt)} unless a device uses it first. <button type="button" className="ghost sm" onClick={() => void api.keep?.()}>Keep</button>
+              </p>
+            )}
             <div className="tunnel-code">
               <code>{r.link}</code>
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
@@ -638,6 +643,18 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
           )}
           {pin ? (
             <>
+            <div className="field">
+              <span>
+                Turn off without a device for <span className="muted">· anyone with the link: 2 hours at most; Never: one email or Tailscale only</span>
+              </span>
+              <div className="seg" role="radiogroup" aria-label="Turn off without a device for">
+                {([1, 2, 4, 12, 24, 'never'] as const).map(n => (
+                  <button key={n} type="button" role="radio" aria-checked={n === opts.idleOff} className={n === opts.idleOff ? 'on' : ''} onClick={() => set({ idleOff: n })}>
+                    {n === 'never' ? 'Never' : `${n} h`}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="field">
               <span>
                 Wrong PINs in a row <span className="muted">· a new PIN each start, shown here</span>

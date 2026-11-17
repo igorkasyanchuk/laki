@@ -250,10 +250,13 @@ test('D3: trusted devices at a stable address: paired by the link (and PIN), a c
   assert.equal(await b.call('ping'), 'pong')
   await assert.rejects(rig.rpc('remoteDeviceRm', { id: dev.id }), /no device/)
 
-  // past its time: off the list, its socket closed, refused
+  // past its time: off the list, its socket closed, refused (31 days unused turn remote access itself off too, T10:
+  // started again for what follows)
   await rig.rpc('remoteTick', { now: Date.now() + 31 * 86400e3 })
   assert.equal(await b.shut, 4401)
   assert.equal(await devices(), undefined)
+  assert.equal((await rig.rpc('state')).remote, undefined, 'off: no device for 31 days')
+  await rig.rpc('remoteStart', { hours: 0, host: 'laki' })
   assert.equal(await rpcAt(port, url, jar2), 401)
 
   // a stop keeps the devices, but nothing connects; Forget devices clears them
@@ -517,4 +520,58 @@ test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a re
   for (let k = 0; k < 20; k++) assert.ok(await replayed(one, xff()))
   assert.equal(await send(sealed(), xff()), 429)
   assert.equal(await send(sealed()), 200)
+})
+
+test("T10: remote access turns itself off without a device: a device's call and Keep start its clock over; off, the old link is refused and a notice offers it again; laki serve's never; the setting is yours", async t => {
+  const rig = await fresh(t)
+  await named(rig)
+  const { port } = rig.info()
+  const url = 'https://laki.example.dev'
+  const app = await connect(rig)
+  const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
+  const st = async () => (await rig.rpc('state')).remote
+  await rig.rpc('settingsSet', { remoteIdleOff: 4 / 3600 }) // 4 s
+  const on = await rig.rpc('remoteStart', { hours: 1, host: '' })
+  const jar = (await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin })).cookie!.split(';')[0]
+  assert.ok((await st()).idleOffAt > Date.now(), 'its countdown in the view')
+  // a device's calls keep it on
+  for (let i = 0; i < 3; i++) {
+    await wait(1500)
+    assert.equal(await rpcAt(port, url, jar), 200)
+    await rig.rpc('remoteTick')
+  }
+  assert.ok(await st(), 'still on: a device used it')
+  assert.ok(app.events.some((e: any) => e.ev === 'remoteIdle' && /Remote access turns off in/.test(e.text)), 'the line in the window, before the limit')
+  // Keep (the window's line, the push's tap) too
+  await wait(2500)
+  await rig.rpc('remoteKeep')
+  await wait(2500)
+  await rig.rpc('remoteTick')
+  assert.ok(await st(), 'still on: kept')
+  // none: off, as Stop does; the device's call refused; a notice with Turn on again, its devices still paired
+  await wait(4200)
+  await rig.rpc('remoteTick')
+  assert.equal(await st(), undefined)
+  assert.notEqual(await rpcAt(port, url, jar), 200)
+  const notice: any = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Remote access is off'), 'the notice')
+  assert.match(notice.text, /Remote access turned itself off after 4 s|without a device/)
+  assert.deepEqual(notice.choices, ['Turn on again', 'OK'])
+  assert.ok((await rig.rpc('state')).remoteDevices?.length >= 1, 'its device still paired')
+  await app.call('alertAnswer', { id: notice.id, choice: 'Turn on again' })
+  await until(async () => !!(await st()), 'on again')
+  tokenOf((await rig.rpc('stateOwn')).remote.link) // the rig seals with the link's key, as a page does
+  assert.equal(await rpcAt(port, url, jar), 200, 'a paired device gets in again, no new pairing')
+  await rig.rpc('remoteStop')
+  // laki serve's (headless): never off for want of a device
+  await rig.rpc('remoteStart', { hours: 1, host: '', serve: true })
+  assert.equal((await st()).idleOffAt, undefined)
+  await wait(4500)
+  await rig.rpc('remoteTick')
+  assert.ok(await st(), "laki serve's stays")
+  await rig.rpc('remoteStop')
+  // the setting is yours: an agent's and a phone's settingsSet refused
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', local: true })
+  const tab = (await until(() => rig.tab(ws.id), 'its claude')).id
+  await assert.rejects(rig.rpc('settingsSet', { remoteIdleOff: 'never', from: { ws: ws.id, tab } }), /can't change/)
 })

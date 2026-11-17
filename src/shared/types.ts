@@ -662,6 +662,7 @@ export type Settings = {
   aiGlow?: boolean // Settings › AI: a glow over what Laki AI looks at (a tab's pane, else the window), on unless false
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
+  remoteIdleOff?: number | 'never' // T10: hours without a device's call before remote access turns itself off (unset: 12; open to anyone: 2 at most; never: one email or Tailscale only; laki serve's never); the user's alone (REMOTE_KEYS' remote.*)
   remoteWhen?: 'manual' | 'locked' // D9: remote access as you start it (unset), or on its own while the Mac is locked (remote.ts screenLock)
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs (core's caffeinate, reason remote): on AC power (unset), also on battery, or never
   remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); both at a quick tunnel's address; tailscale, your tailnet (tailscale serve); domain, My domain (D1: settings.tunnel's named tunnel, a PIN always)
@@ -1023,12 +1024,12 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
 export type RemoteCheck = { ok: boolean; ms: number; at: number; what: string; why?: string } // D8: the self-check's last: what it reached (its public address; through Tailscale, tailscale status) and how long it took
-export type Remote = { check?: RemoteCheck; mail: string; level?: 'answer' | 'full'; /* D7: a remote page's own (its view only) */ open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
+export type Remote = { check?: RemoteCheck; mail: string; level?: 'answer' | 'full'; /* D7: a remote page's own (its view only) */ open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number; host?: string; down?: string; was?: string; locked?: number; wrong?: number; pairUntil?: number; idleOffAt?: number /* T10: when it turns itself off with no device's call meanwhile (settings.remoteIdleOff) */ } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 // host: My domain's (D1: a hostname of your named tunnel, a PIN always); down: why it's starting again (D2: no url
 // meanwhile); was: the address it had before it came back at a new one (a quick tunnel's: a new link)
 // state.json's (D2, remote.ts keepRemote): how remote access runs, until when, the page's token's hash once it has one,
 // its last address; what remoteBack starts again. Never a token or the PIN
-export type SavedRemote = { mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string; e2e?: string } // e2e: S14's link secret (base64), a stable address's only
+export type SavedRemote = { serve?: boolean /* laki serve's (headless): never turned off for want of a device */; mail: string; open?: boolean; pin?: boolean; via?: 'tailscale'; funnel?: boolean; host?: string; named?: string; until?: number; access?: string; url?: string; e2e?: string } // e2e: S14's link secret (base64), a stable address's only
 // locked: no PIN taken until then (D5); wrong: wrong PINs today; pairUntil: Add a device's link ends then (D3)
 // a paired device of remote access (D3): the view's (no hash); SavedDevice: state.json's, its token's hash
 export type RemoteDevice = { id: string; name: string; addedAt: number; seenAt: number; until: number; notify?: boolean; passkey?: boolean; level?: 'answer' | 'full' } // notify: it takes Web Push notifications (M4); passkey: it unlocks with one (D6); level: D7, answer only or full (unset: full, paired before D7)

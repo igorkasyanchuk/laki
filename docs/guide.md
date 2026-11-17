@@ -744,6 +744,10 @@ email address only, unless you leave the email out on purpose (below).
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
+- It turns itself off after 12 hours with no device using it (*Turn off without a device for*: 1 to 24 hours, or
+  *Never* for one email or Tailscale; anyone with the link: 2 hours at most). Ten minutes before, a push and a line in
+  the window offer *Keep*; once off, a notice offers *Turn on again*, and paired devices stay paired. Settings shows when.
+  `laki serve` (headless) never turns off this way: remote access is its only door.
 - It stays reachable (D8): *Keep the Mac awake* holds the Mac awake while remote access runs: *On power* (the usual,
   plugged in only), *Always* (on battery too) or *Never*; a closed lid still sleeps a MacBook without an external
   display. Laki checks its address from outside as it starts, after the Mac wakes and every 5 minutes (through

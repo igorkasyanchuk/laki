@@ -769,7 +769,8 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal((await rig.rpc('state')).remote, undefined)
   await until(() => stops() >= 2, 'cloudflared stopped at its time', 30000)
 
-  // forever: no until, the clock never ends it
+  // forever: no until, the clock never ends it (nor, with one email and Never, its time without a device: T10)
+  await rig.rpc('settingsSet', { remoteIdleOff: 'never' })
   const ever = await rig.rpc('remoteStart', { hours: 0 })
   assert.equal(ever.until, undefined)
   await rig.rpc('remoteTick', { now: Date.now() + 3650 * 86400e3 })
