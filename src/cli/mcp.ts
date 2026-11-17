@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
-import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
+import { alive, asClient, ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { aiRpc, extCall, GROUPS, obj, skillTools, str, toolGroup, type Tool, tools } from '../shared/tools.ts'
 import { API } from '../shared/types.ts'
 
@@ -65,9 +65,21 @@ const more: Tool = {
     return `${a.group}: ${TOOLS.filter(t => toolGroup(t.name) === a.group).map(t => t.name).join(', ') || 'none here'}`
   },
 }
-const listed = () => (all ? TOOLS : [...TOOLS.filter(t => opened.has(toolGroup(t.name) ?? 'core')), more])
+// T1: a trusted client's laki mcp (conn.ts' asClient: its token outside a tab): only the tools its scopes allow, listed
+// and run; the rest refused here by name, as the daemon refuses their calls (main.ts' clientNo). Its scopes asked once
+// (clientWho; a restart sees new ones), else create and send. No extension tools
+const CLIENT_TOOLS: Record<string, string> = { laki_state: 'read', laki_screen: 'read', laki_wait: 'read', laki_diff: 'read', laki_new_workspace: 'create', laki_new_tab: 'create', laki_send: 'send', laki_ask_agent: 'send' }
+const client = !!asClient()
+let scopes: Promise<string[]> | undefined
+const clientScopes = () => (scopes ??= alive().then(up => (up ? conn<{ scopes: string[] } | null>('clientWho') : null)).then(c => c?.scopes ?? ['create', 'send'], () => ['create', 'send']))
+const clientMay = async (name: string) => {
+  const need = CLIENT_TOOLS[name]
+  return need === 'read' || (!!need && (await clientScopes()).includes(need))
+}
+const listed = async () => (client ? (await Promise.all(TOOLS.map(async t => ((await clientMay(t.name)) ? [t] : [])))).flat() : all ? TOOLS : [...TOOLS.filter(t => opened.has(toolGroup(t.name) ?? 'core')), more])
 
 async function call(name: string, args: unknown) {
+  if (client && !(await clientMay(name))) throw new Error(`${name} isn't one of this client's tools: its scopes don't allow it (laki client ls, then laki client rotate <name> --scopes …)`)
   if (name === 'laki_more' && !all) return String(await more.run(args ?? {})) // no daemon; its group's open before the next line is read
   const tool = TOOLS.find(t => t.name === name)
   if (!tool && name.startsWith('ext_')) {
@@ -86,14 +98,14 @@ async function answer(m: any): Promise<object | undefined> {
     case 'initialize':
       return {
         protocolVersion: typeof m.params?.protocolVersion === 'string' ? m.params.protocolVersion : '2025-06-18',
-        capabilities: { tools: all ? {} : { listChanged: true } },
+        capabilities: { tools: all || client ? {} : { listChanged: true } },
         serverInfo: { name: 'laki', version: `api ${API}` },
         instructions: 'Laki runs coding agents side by side, each task in its own git worktree. Ask the user before scheduling tasks.',
       }
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: [...listed().map(({ run, max, ...t }) => t), ...[...extNames(await extTools())].map(([name, t]) => ({ name, description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
+      return { tools: [...(await listed()).map(({ run, max, ...t }) => t), ...[...extNames(client ? [] : await extTools())].map(([name, t]) => ({ name, description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
     case 'tools/call':
       try {
         return { content: [{ type: 'text', text: await call(m.params?.name, m.params?.arguments) }] }

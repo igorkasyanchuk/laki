@@ -127,6 +127,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               its link opens once, its PIN prints on a terminal only (else laki remote)
   laki remote [stop|log]                      remote access's link and PIN now | stop it | what was done over it
   laki agent log <ws> [--json]                what its agents did through Laki, newest first (refused ones marked); not from an agent's tab
+  laki client [ls]                            trusted clients: apps outside Laki (an MCP server, a script) with a token of their own
+  laki client add|rotate <name> [--scopes create,send] [--projects a,b|all]   a new one, or a new token (scopes, projects) for one: asked in Laki's window
+  laki client revoke <name>                   its token stops working at once, its file goes
   --json prints machine-readable output; an option the command doesn't have is refused (did you mean…?);
   after -- every word is text: laki send ws -- --not-an-option`
 
@@ -295,6 +298,23 @@ Laki. In an agent's tab, only its own workspace's events.
   laki events --json --type turn.done | while read -r e; do echo "$e" | jq -r .ws.name; done
   laki events --ws fix-login --type turn.done --once --timeout 600 && say "fix-login is done"`,
   limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
+  client: `Trusted clients: an app outside Laki (a desktop app's MCP server, a script, a launchd job) that drives it with
+a token of its own, where a call from no tab and no terminal is refused ("couldn't tell who's calling"). From your own
+terminal, never an agent's tab: add and rotate wait for Allow in Laki's window, then print the token's file (0600). The
+app passes its path: LAKI_CLIENT_TOKEN_FILE=<file> (or the token in LAKI_CLIENT_TOKEN); in a Laki tab the tab's own
+token wins. A revoked or unknown token fails loudly. Reads (laki ls, agents, wait, screen of an agent) always; scopes:
+create (new workspaces and agent tabs) and send (laki send, laki ask) unless --scopes says; cmd (a command of its own, Run ▾, a terminal's screen or a send into it),
+yolo (an agent that never asks, or a message to one), remove (archive, rm), ship (ship, PR merge) only when named. Never
+settings, profiles, secrets, schedules, --force, a cloud workspace, or an answer to an agent's question (a send to one
+that asks waits only with --when-idle). Each call it makes that changes something is a line in daemon.log, and what
+it starts says Created by <name>.
+
+  laki client add "Grok Bot"
+  laki client add ci-bot --scopes create,send,remove
+  LAKI_CLIENT_TOKEN_FILE=~/.laki/clients/grok-bot.token laki new myrepo --prompt "fix the flaky test"
+  laki client add "Grok Bot" --projects candy       # in candy only
+  laki client rotate grok-bot --scopes send
+  laki client revoke grok-bot`,
   secret: `In an agent's tab: ask the user for a secret (an API key, a token, a password) without it going into the chat.
 They type it on a masked card under your tab; you get only the path of a 0600 file in $LAKI_STORAGE_FOLDER that holds
 it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat "$path"). Waits up to 15 minutes;

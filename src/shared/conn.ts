@@ -61,9 +61,31 @@ async function pair(info: DaemonInfo) {
   app = { token: r.result.token, pid: info.pid }
 }
 
+// T1: a trusted client's token (daemon/clients.ts), LAKI_CLIENT_TOKEN_FILE's (a 0600 file: the docs' way; it wins) or
+// LAKI_CLIENT_TOKEN's, read once and taken out of this process's env, so nothing it starts (a daemon, its agents and
+// shells) gets it. In a Laki tab the tab's own token wins (S12: the CLI in a tab is that tab's; the daemon says so too).
+// One the daemon doesn't know (revoked, rotated) or a file that can't be read fails loudly: never daemon.json's instead
+export const CLIENT_GONE = "this client's token was revoked or isn't known"
+const clientFile = process.env.LAKI_CLIENT_TOKEN_FILE
+let client: string | Error | undefined = process.env.LAKI_CLIENT_TOKEN?.trim() || undefined
+if (clientFile)
+  try {
+    client = readFileSync(clientFile, 'utf8').trim() || new Error(`LAKI_CLIENT_TOKEN_FILE: ${clientFile} is empty`)
+  } catch {
+    client = new Error(`LAKI_CLIENT_TOKEN_FILE: can't read ${clientFile}`)
+  }
+delete process.env.LAKI_CLIENT_TOKEN
+delete process.env.LAKI_CLIENT_TOKEN_FILE
+let clientSaid = false
+// a client's calls, outside a tab and not the app's (its main, opened with one in its env, is the app): its token, or why it can't be used
+export const asClient = () => (client && !process.env.LAKI_TAB_TOKEN && !appMode ? client : undefined)
+
 async function post(method: string, params: any, timeoutMs: number) {
   const info = daemonInfo()
   if (!info) throw new Error('daemon not running')
+  const own = asClient()
+  if (own instanceof Error) throw own
+  if (client && process.env.LAKI_TAB_TOKEN && !clientSaid) (clientSaid = true), process.stderr.write("laki: in a Laki tab its own token is used, not the client's\n")
   // S1: a terminal Laki hasn't seen before: the daemon holds the call until you allow it in the window; say so here, and
   // wait as long as it does (a minute)
   const stop = new AbortController()
@@ -79,9 +101,10 @@ async function post(method: string, params: any, timeoutMs: number) {
   // S12: in a Laki tab, with that tab's token (LAKI_TAB_TOKEN, this start's): the daemon knows the caller by it. One
   // of a start that ended (its tab restarted under a process that lives on, another Laki's): the daemon's own, as before
   if (appMode && app?.pid && app.pid !== info.pid) await pair(info).catch(() => {}) // the app's daemon started again
-  const mine = process.env.LAKI_TAB_TOKEN || app?.token // a tab's first: a CLI in a tab is that tab's, whatever else it has
+  const mine = process.env.LAKI_TAB_TOKEN || own || app?.token // a tab's first: a CLI in a tab is that tab's, whatever else it has
   try {
     let res = await send(mine || info.token)
+    if (own && res.status === 401) throw new Error((await res.json().catch(() => ({}))).error || CLIENT_GONE) // T1: never daemon.json's instead
     if (mine && res.status === 401) (await res.arrayBuffer(), (res = await send(info.token)))
     var body = await res.json()
   } finally {
@@ -95,8 +118,8 @@ async function post(method: string, params: any, timeoutMs: number) {
 export async function alive(): Promise<boolean> {
   try {
     return (await rpc('ping', {}, 1500)) === 'pong'
-  } catch {
-    return false
+  } catch (e) {
+    return (e as Error).message === CLIENT_GONE // T1: it runs, and refuses this client: the call itself says so (no second daemon started)
   }
 }
 
@@ -136,6 +159,8 @@ export function logLine(path: string, ...a: unknown[]) {
 // demo world): the app's token too (S1), on fd 3 from the one it starts, else asked for
 export async function ensureDaemon(env: Record<string, string> = {}, asApp = false): Promise<DaemonInfo> {
   const paired = async (info: DaemonInfo) => (asApp && (await pair(info).catch(e => console.error(`laki: no app token: ${(e as Error).message}`))), info)
+  if (asApp) appMode = true // T1: before its first call: the app's own, never a client's (asClient)
+  else if (asClient() instanceof Error) throw asClient() // T1: its file unreadable: said, not a daemon started
   if (await alive()) return paired(daemonInfo()!)
   if (inTab()) throw new Error(NO_START)
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 })

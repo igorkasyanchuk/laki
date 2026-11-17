@@ -260,6 +260,7 @@ export type Workspace = {
   related?: string[] // GitHub PRs and issues it's about, not its primary: its prompt's (a session an agent started), a primary its own PR replaced, one you moved off
   from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
   fromTab?: string // …and that agent's tab (the one that ran laki new): Created by on the worker, its asks in that tab
+  client?: string // T1: the trusted client (an app outside Laki: laki client) that started it, by its name then: Created by
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   touchedAt?: number // settings.archiveIdle's: the last look it saw, or when it was restored (ms)
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
@@ -1251,7 +1252,15 @@ export function recorded(v: View): View {
   const off = new Set(v.projects.filter(p => p.private).map(p => p.id))
   const gone = new Set(v.workspaces.filter(w => w.private || off.has(w.project)).map(w => w.id))
   if (!gone.size && !off.size) return v
-  return { ...v, projects: v.projects.filter(p => !off.has(p.id)), workspaces: v.workspaces.filter(w => !gone.has(w.id)), tabs: v.tabs.filter(t => !gone.has(t.workspace)), layouts: v.layouts && Object.fromEntries(Object.entries(v.layouts).filter(([k]) => !gone.has(k))), today: v.today && { ...v.today, ws: v.today.ws.filter(x => !gone.has(x.ws)) }, digest: v.digest && { ...v.digest, rows: v.digest.rows.filter(r => !gone.has(r.ws)) } }
+  return viewWithout(v, off, gone)
+}
+// a view without some projects and workspaces: their tabs, layouts, today's and the digest's rows too
+const viewWithout = (v: View, off: Set<string>, gone: Set<string>): View => ({ ...v, projects: v.projects.filter(p => !off.has(p.id)), workspaces: v.workspaces.filter(w => !gone.has(w.id)), tabs: v.tabs.filter(t => !gone.has(t.workspace)), layouts: v.layouts && Object.fromEntries(Object.entries(v.layouts).filter(([k]) => !gone.has(k))), today: v.today && { ...v.today, ws: v.today.ws.filter(x => !gone.has(x.ws)) }, digest: v.digest && { ...v.digest, rows: v.digest.rows.filter(r => !gone.has(r.ws)) } })
+// T1: a trusted client kept to some projects (clients.ts): only those, and their scheduled tasks, runs and archived ones
+export function onlyProjects(v: View, ids: readonly string[]): View {
+  const off = new Set(v.projects.filter(p => !ids.includes(p.id)).map(p => p.id))
+  const w = viewWithout(v, off, new Set(v.workspaces.filter(x => off.has(x.project)).map(x => x.id)))
+  return { ...w, schedules: v.schedules?.filter(s => ids.includes(s.project)), runs: v.runs?.filter(r => !r.project || ids.includes(r.project)), archivedProjects: v.archivedProjects?.filter(p => ids.includes(p.id)) }
 }
 // S3: the view for anyone but your own window: the CLI and MCP (an agent's too: telling them apart costs a process
 // lookup per call), Laki AI, an agent's connection, remote access's page. No secrets in it: remote access's link (its
@@ -1302,7 +1311,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 191
+export const API = 192
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -57,8 +57,8 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | Account needed | None | None |
 | Platforms | macOS 13+; Linux (preview); Windows through WSL 2 | Any |
 
-Everything else (themes, extensions, workflows, scheduled prompts, the CLI and its MCP server):
-[docs/features.md](docs/features.md).
+Everything else (themes, extensions, workflows, scheduled prompts, the CLI and its MCP server, trusted clients for apps
+outside Laki): [docs/features.md](docs/features.md).
 
 ## Install
 

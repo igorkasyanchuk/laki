@@ -334,7 +334,7 @@ async function main() {
   // A6: no daemon started for a typo, a command's or one of its subcommands' (laki plan <project> is one word)
   if (!Object.hasOwn(FLAGS, cmd) && !Object.hasOwn(ALIAS, cmd)) unknown('', cmd)
   const base = ALIAS[cmd] ?? cmd
-  if (['widget', 'flow', 'schedule', 'project', 'preset'].includes(base) && rest[0] !== undefined && !subsOf(base).includes(rest[0])) unknown(base, rest[0])
+  if (['widget', 'flow', 'schedule', 'project', 'preset', 'client'].includes(base) && rest[0] !== undefined && !subsOf(base).includes(rest[0])) unknown(base, rest[0])
   if (base === 'plan' && rest.length > 1 && !['ls', ...subsOf('plan')].includes(rest[0])) unknown('plan', rest[0])
   await ensureDaemon()
   switch (cmd) {
@@ -345,13 +345,27 @@ async function main() {
         console.log(`${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`)
         for (const w of v.workspaces.filter(w => w.project === p.id)) {
           const tabs = v.tabs.filter(t => t.workspace === w.id)
-          const by = !w.archived && v.workspaces.some(x => x.id === w.from && !x.archived) && (creatorOf(w, v.tabs)?.label ?? w.from)
+          const by = !w.archived && ((v.workspaces.some(x => x.id === w.from && !x.archived) && (creatorOf(w, v.tabs)?.label ?? w.from)) || w.client) // T1: a trusted client's
           const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '', by ? `created by ${by}` : '']
           console.log(`  ${w.id}  ${w.branch || 'folder'}  ${extra.filter(Boolean).join('  ')}`)
           for (const t of tabs) console.log(`    ${t.status === 'exited' && t.code === 0 ? '✓' : (glyph[t.status] ?? ' ')}${t.done ? '●' : ' '} ${t.name} (${t.id})${t.queue?.length ? ` +${t.queue.length} queued` : ''}`)
         }
       }
       return
+    }
+    case 'client': {
+      // T1: trusted clients (daemon/clients.ts): an app outside Laki with a token of its own; add and rotate ask in the window
+      const [sub = 'ls'] = rest
+      const name = rest.slice(1).join(' ')
+      if (sub === 'ls') {
+        const l = await rpc<{ id: string; label: string; scopes: string[]; projects?: string[]; file: string }[]>('clientList', { from: caller() })
+        return out(l, l.map(c => `${c.id}  ${c.label}  ${c.scopes.join(',') || 'reads only'}  ${c.projects ? `projects ${c.projects.join(',')}  ` : ''}${c.file}`).join('\n') || 'no trusted clients yet: laki client add "<name>"')
+      }
+      if (!name) throw new Error(`usage: laki client ${sub} <name>${sub === 'revoke' ? '' : ' [--scopes create,send]'}`)
+      if (sub === 'revoke') return out(await rpc('clientRm', { id: name, from: caller() }), `revoked ${name}: its token no longer works`)
+      process.stderr.write("Allow it in Laki's window…\n")
+      const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes, projects: flags.projects, from: caller() }, 90000)
+      return out(c, `${c.label} (${c.id}): ${c.scopes.join(', ') || 'reads only'}${c.projects ? `, in ${c.projects.join(', ')} only` : ''}\nits token: ${c.file} (0600: give the app this path, never the token)\n  LAKI_CLIENT_TOKEN_FILE=${c.file} laki ls`)
     }
     case 'limits': {
       const list: AgentUsage[] = await rpc('limits', { agent: typeof flags.agent === 'string' ? flags.agent : undefined, from: caller() }, 30000)

@@ -156,6 +156,11 @@ export function TabBar({ app }: { app: AppCtx }) {
           <Icon name="agent" size={12} /> Created by <b>{by?.label ?? wsName(f)}</b>
         </button>
       ))(creatorOf(ws, view.tabs)))(live.find(x => x.id === ws.from))}
+      {ws && !narrow && !ws.from && ws.client && (
+        <span className="nodrag created-by" data-tip={`A trusted client started this workspace (laki client): ${ws.client}`}>
+          <Icon name="agent" size={12} /> Created by <b>{ws.client}</b>
+        </span>
+      )}
       <span className="spacer" />
       {onePane && readSwitch(tab?.id) /* U2: a split pane has it in its header */}
       {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}

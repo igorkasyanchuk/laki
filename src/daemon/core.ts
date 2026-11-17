@@ -23,6 +23,7 @@ import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir, inRig } from './dir.ts'
+import { clientName } from './clients.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
@@ -1949,9 +1950,15 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 // or a preset whose agent is a command): a prompt injected into it would leave a program of its own running elsewhere
 // nor one that never asks (neverAsks: its own pick, else its profile's mode or flags), as workflows' bypassIn
 export function agentNoCmd(o: { preset?: string; cmd?: string; perm?: string }) {
-  if (o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command') throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
+  if (ownCmd(o)) throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
+  if (startsAskless(o)) throw new Error("an agent can't start an agent that never asks (bypass permissions, or approvals off): the user starts it")
+}
+// agentNoCmd's two questions (main.ts' clientNo asks them for a trusted client: without cmd, without yolo): a command of
+// its own (--cmd, custom, a command profile), and an agent that never asks (its pick, else its profile's mode or flags)
+export const ownCmd = (o: { preset?: string; cmd?: string }) => !!o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command'
+export function startsAskless(o: { preset?: string; perm?: string }) {
   const pr = presetNamed(o.preset || state.settings?.agent || 'claude')
-  if (neverAsks(pr?.agent || o.preset || state.settings?.agent || 'claude', o.perm ?? pr?.perm, pr?.args)) throw new Error("an agent can't start an agent that never asks (bypass permissions, or approvals off): the user starts it")
+  return neverAsks(pr?.agent || o.preset || state.settings?.agent || 'claude', o.perm ?? pr?.perm, pr?.args)
 }
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
@@ -2544,6 +2551,9 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 
 // why a running claude can't be switched to Bypass (undefined: it can): the managed policy, its sandbox, or that it wasn't
 // started so: claude itself only offers Bypass then
+// T1: a running tab whose agent never asks: started so (its mode, its profile's mode or flags) or switched to Bypass since
+// (tabMode's rt mode): a message to it is as strong as a command (main.ts' clientNo)
+export const tabNeverAsks = (t: Tab) => (pr => neverAsks(t.preset, t.perm ?? pr?.perm, pr?.args) || rt.get(t.id)?.mode === 'bypassPermissions')(presetOf(t))
 export function bypassNo(t: Tab) {
   if (policy()?.bypass === false) return 'Your managed policy requires approvals'
   if (sandboxed(t)) return 'Its sandbox rules this out'
@@ -2690,7 +2700,7 @@ export function onGitHub(path: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit'; outside?: boolean } // outside: its prompt quotes an outsider's text (a scheduled task's event): no PR guessed from it (prIn); startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit'; outside?: boolean; byClient?: string } // outside: its prompt quotes an outsider's text (a scheduled task's event): no PR guessed from it (prIn); startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
 // (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
@@ -2923,6 +2933,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (o.issued) ws.issue = o.issued
   if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true, ...(o.guessed && { prSaid: true }) })
   if (o.from && state.workspaces.some(w => w.id === o.from)) ws.from = o.from
+  if (o.byClient) ws.client = clientName(o.byClient) // T1: Created by, its label as it was then
   if (o.named && !o.from && o.name?.trim()) ws.named = true // the name you typed: no agent renames it (an agent's laki new --name isn't)
   if (ws.from && o.fromTab && state.tabs.find(t => t.id === o.fromTab)?.workspace === ws.from) ws.fromTab = o.fromTab // the agent's own tab, as main.ts found it: Created by, and its workers' asks there
   if (!o.issued) for (const u of refsIn(o.prompt)) relate(ws, u) // the other PRs and issues it names (not an issue's text: any)
@@ -4041,7 +4052,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
   const tab = resolveTarget(p.target)
   if (p.vars) p = { ...p, text: varsIn(tab, p.text) } // an action's: its {{branch}}… now, queued or not
   if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: an agent's messages go to agents only (ask the user to run it there)`)
-  if (p.agent && !p.whenIdle && rtOf(tab.id).status === 'waiting') throw new Error(`${tab.name} is asking the user something: only they answer it (or send with when_idle)`)
+  if (p.agent && !p.whenIdle && rtOf(tab.id).status === 'waiting') throw new Error(`${tab.name} is asking the user something: only they answer it (or send with when_idle)`) // a trusted client's to an agent too (main.ts' agentSend sets agent)
   if (p.enter === false && asleep.has(tab.id)) throw new Error(`${tab.name} is asleep: look at it to wake it, then send again`)
   const woke = wake(tab.id) // running until it's up: what's sent waits for that (below)
   const s = sessions.get(tab.id)
@@ -4604,6 +4615,9 @@ async function ttys(pids: number[], proc: string) {
   const rows = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
   return new Map([...rows].filter(([, t]) => t && !/^\?+$/.test(t)))
 }
+// T1: a trusted client's process (main.ts' clientCalls): the tab it runs in, or none (in no tab: the client itself);
+// throws WHO only when it can't be found at all
+export const peerTab = async (port: number, proc = process.platform === 'linux' ? '/proc' : '') => (await peerInfo(port, proc)).tab
 // who a local connection is: its tab, a terminal of its own (term: asked about once, main.ts' termAsk), or neither (yours: the daemon's own)
 export async function peerWho(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<{ tab?: Tab; term?: Term }> {
   const p = await peerInfo(port, proc)

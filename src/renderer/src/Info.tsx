@@ -64,6 +64,7 @@ export type WsInfo = {
   related?: string[] // other GitHub PRs and issues it's about (not its PR): its prompt's, a PR its own replaced
   from?: { id: string; name: string; tab?: { id: string; label: string } } // the workspace whose agent started it; tab: that agent's (creatorOf), while open
   started?: { id: string; name: string }[] // the ones its agents started
+  client?: string // T1: the trusted client that started it (laki client)
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
@@ -617,6 +618,7 @@ export function InfoTab(p: {
             </Row>
           ))}
           {w.created ? <Row k="created" tip={new Date(w.created).toLocaleString()}>{ago(w.created)}</Row> : null}
+          {!w.from && w.client && <Row k="created by" tip="A trusted client (an app outside Laki: laki client) started this one">{w.client}</Row>}
           {w.from && (
             <Row k="created by" tip={`Its agent started this one: ${w.from.tab ? `${w.from.tab.label} in ` : ''}${w.from.name}`}>
               <a href="#" onClick={e => (e.preventDefault(), w.from!.tab && p.onTab ? p.onTab(w.from!.id, w.from!.tab.id) : p.onWs?.(w.from!.id))}>

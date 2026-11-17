@@ -7,6 +7,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 - The buttons under the terminal for an agent's question or permission ask hide while the sidebar's Needs you list shows the same card; with the sidebar closed they're back. A question's line there reads as its question, not JSON.
 - Plan limits show Claude's per-model weeks (Fable's) while a tab works, when Laki asks Anthropic for them (Settings › Layout); off, the popup says where they come from. The popup, and the status bar's tunnel and background tasks popups, open in every design again, not only Frosted.
+- Trusted clients: an app outside Laki (a desktop app's MCP server, a script) drives it with a token of its own. `laki client add "Grok Bot"` asks you in the window, then `LAKI_CLIENT_TOKEN_FILE` lets it start workspaces and agents and message them, within its scopes, never answering an agent's question for you; what it starts says *Created by Grok Bot*; `laki client revoke` stops it at once.
 
 ## 0.54.0 · Nov 15, 2026
 

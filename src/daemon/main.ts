@@ -14,7 +14,7 @@ import { agentChat, aiAnswer, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChat
 import { planChat } from '../shared/plans.ts'
 import { readCapped, rotateLog } from '../shared/conn.ts'
 import { HostPty, ptyGone, ptyOn } from './ptyHost.ts'
-import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, recorded, type Settings, type Tab, unmasked } from '../shared/types.ts'
+import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
@@ -54,7 +54,8 @@ import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRest
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
 import { agentContext, agentContextOpen } from './sees.ts'
-import { AGENT_NO, AGENT_OK, AGENT_OWN, REMOTE_NO, REMOTE_OK } from './gates.ts'
+import { AGENT_NO, AGENT_OK, AGENT_OWN, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_NO, REMOTE_OK } from './gates.ts'
+import * as clientsMod from './clients.ts'
 
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
 delete process.env.LAKI_WORKSPACE
@@ -62,6 +63,8 @@ delete process.env.LAKI_TAB
 delete process.env.LAKI_TAB_TOKEN_FILE // S13: Laki AI's codex's laki mcp's
 delete process.env.LAKI_TAB_TOKEN // S12: nor that tab's: what the daemon starts (Laki AI's laki mcp, the pty host) would call as its agent
 delete process.env.LAKI_APP_TOKEN // S1: nor the app's (a test's CLI has it), whatever this daemon's starter had
+delete process.env.LAKI_CLIENT_TOKEN // T1: nor a trusted client's (a CLI it ran started this daemon): never in an agent's or a shell's env
+delete process.env.LAKI_CLIENT_TOKEN_FILE
 const appPipe = process.env.LAKI_APP_PIPE === '3' // S1: the app (or the test rig) reads the app's token on fd 3
 delete process.env.LAKI_APP_PIPE
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -316,7 +319,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 type Handler = (p: any, c?: core.Conn) => unknown
 const api: Record<string, Handler> = {
   ping: p => (p.caps ? { pong: true, api: API, caps: CAPS, version: VERSION } : 'pong'), // plain: 'pong', as every CLI's alive() wants; version: A9's laki --version
-  state: (p, c) => (v => (c && own.get(c)?.() ? v : masked(v)))(core.agentCaller(p?.from) ? recorded(core.view()) : core.view()), // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then); S3: its secrets only to your own window (own)
+  state: (p, c) => (v => (c && own.get(c)?.() ? v : masked(v)))((v => (p?.byClient && clientsMod.clientWho(p.byClient)?.projects ? onlyProjects(v, clientsMod.clientWho(p.byClient)!.projects!) : v))(core.agentCaller(p?.from) || p?.byClient ? recorded(core.view()) : core.view())), // T1: a trusted client's too, kept to its projects // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then); S3: its secrets only to your own window (own)
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
   projectClone: p => core.projectClone(p.url, p.into), // U7: yours only (FROM, AGENT_NO)
   sampleNew: () => core.sampleNew(), // U4: Welcome's sample repo, made once
@@ -714,6 +717,12 @@ const api: Record<string, Handler> = {
   flowForget: p => flowForget(p),
   flowTick: p => flowTick(p.now), // tests move the clock
   termAnswer: p => termAnswer(p), // S1: Allow this terminal / Deny, from the app's window only (call's check)
+  clientAdd: p => clientAsk('add', p), // T1: a trusted client, once you say yes in Laki's window
+  clientRotate: p => clientAsk('rotate', p), // a new token (its scopes too), asked the same way
+  clientRm: p => (c => (log(`trusted client ${c.label}: revoked`), c))(clientsMod.clientRm(p.id)), // at once: no ask, it only takes away
+  clientList: () => clientsMod.clientList(),
+  clientAnswer: p => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
+  clientWho: p => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
 }
 
@@ -746,12 +755,12 @@ const remoteNo = (method: string, p: any) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetStore', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
+const FROM = new Set(['clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetStore', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 // S5: OPEN: what any caller may call, as it is (reads of the view and of a workspace's own facts, the ticks tests move,
 // a connection's own view and size, the hook: hookWho's). Every method of api is in FROM, CALLER or OPEN, checked as
 // the daemon loads (below api): a new one is classified, never open by default
-const OPEN = new Set(['voiceModels', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss', 'hookList', 'storageInfo', 'apps', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowHistory', 'flowStop', 'flowGet', 'flowForget'])
+const OPEN = new Set(['clientWho', 'voiceModels', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss', 'hookList', 'storageInfo', 'apps', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowHistory', 'flowStop', 'flowGet', 'flowForget'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.peerWho>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
@@ -805,7 +814,145 @@ async function termAsk(term: core.Term) {
   }
   if (!(await a.done)) throw new Error(`${NO_TERM}: Allow it in Laki's window (it asked there), then try again`)
 }
-const termAsksTo = (c: core.Conn) => apps.has(c) && termAsks.forEach(a => c.send(a.msg)) // a window that opened meanwhile
+const termAsksTo = (c: core.Conn) => apps.has(c) && (termAsks.forEach(a => c.send(a.msg)), clientAsks.forEach(a => c.send(a.msg))) // a window that opened meanwhile
+
+// T1: a trusted client (clients.ts) made, or rotated with its scopes, only once you say yes in Laki's window: clientAsk to
+// the app's windows alone, answered by clientAnswer with the app's token (call() checks it, as termAnswer's), else no in
+// TERM_WAIT. Asked from your own terminal (S1's: allowed) or the app; never from a tab (an agent's is AGENT_NO, and a
+// shell tab's typing may be an agent's: #1), a client's token (not a scope: clientNo) or remote access (REMOTE_NO). No
+// window: refused at once. #TODO: Settings › Trusted clients lists them, with add, rotate and revoke (the app's own ask)
+const clientAsks = new Map<string, { msg: { ev: 'clientAsk'; req: string }; answer: (allow: boolean) => void }>()
+async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; id?: unknown; label?: unknown; scopes?: unknown; projects?: unknown }) {
+  if (p.from?.tab) throw new Error("a trusted client is added from your own terminal, not from a Laki tab (an agent may be typing there)")
+  const was = what === 'rotate' ? clientsMod.clientFind(p.id) : undefined
+  const label = was?.label ?? clientsMod.labelOf(p.label)
+  const scopes = was && p.scopes === undefined ? was.scopes : clientsMod.scopesOf(p.scopes)
+  // only these projects (ids, names or paths; all: every one again), else the ones it had; shown on the card
+  const said = p.projects === undefined || p.projects === null || p.projects === '' ? undefined : (Array.isArray(p.projects) ? p.projects : String(p.projects).split(',')).map(x => String(x).trim()).filter(Boolean)
+  const projects = said ? (said.length === 1 && said[0] === 'all' ? undefined : [...new Set(said.map(x => core.findProject(x).id))]) : was?.projects
+  if (!was && clientsMod.clientList().some(c => c.label.toLowerCase() === label.toLowerCase())) throw new Error(`${label} is a client already: laki client rotate gives it a new token`)
+  const windows = [...core.clients].filter(c => apps.has(c))
+  if (!windows.length) throw new Error(`Laki's window isn't open to allow ${label}: open Laki, then try again`)
+  const msg = { ev: 'clientAsk' as const, req: randomBytes(8).toString('hex'), what, label, scopes: scopes.map(s => `${s}: ${clientsMod.SCOPES[s]}`), ...(projects && { projects: projects.map(id => core.state.projects.find(x => x.id === id)?.name ?? id) }), file: clientsMod.tokenPath(was?.id ?? clientsMod.clientIdFor(label)) }
+  log(`trusted client ${label}: ${what} asked in the window (${scopes.join(', ') || 'reads only'})`)
+  const allow = await new Promise<boolean>(ok => {
+    const timer = setTimeout(() => ok(false), TERM_WAIT())
+    clientAsks.set(msg.req, { msg, answer: a => (clearTimeout(timer), ok(a)) })
+    for (const c of windows) c.send(msg)
+  })
+  clientAsks.delete(msg.req)
+  for (const c of core.clients) if (apps.has(c)) c.send({ ev: 'clientDone', req: msg.req })
+  if (!allow) throw new Error(`${label} wasn't ${what === 'add' ? 'added' : 'given a new token'}: not allowed in Laki's window`)
+  if (was && !clientsMod.clientList().some(c => c.id === was.id)) throw new Error(`${label} was revoked while its new token waited for Allow: laki client add makes it again`)
+  const made = clientsMod.clientMint(label, scopes, was?.id, projects)
+  log(`trusted client ${label}: ${what === 'add' ? 'added' : 'rotated'} (${scopes.join(', ') || 'reads only'}${projects ? `; projects ${projects.join(', ')}` : ''})`)
+  return made
+}
+const clientAnswer = (p: { req?: unknown; allow?: unknown }) => void clientAsks.get(String(p?.req))?.answer(p?.allow === true)
+// T1: a trusted client's call: the tab its process runs in when it's in one (S12's rule: a token read out of a file
+// names its reader, not its owner), for what asks who; else the client, within its scopes (clientNo), as itself: what
+// its env says (from, caller) is dropped, byClient (its id) set; call() drops any byClient an RPC says. A process that
+// can't be found is refused (WHO). Each call that changed something or was refused: a line in daemon.log
+const clientPeers = new WeakMap<Socket, Promise<Tab | undefined>>()
+async function clientCalls(sock: Socket, method: string, p: unknown, c: clientsMod.Client) {
+  if (takesFrom(method) || CALLER.has(method)) {
+    if (!clientPeers.has(sock)) clientPeers.set(sock, core.peerTab(sock.remotePort ?? 0)) // once per connection (laki mcp keeps one), as peerOf
+    const tab = await clientPeers.get(sock)!.catch(() => (clientPeers.delete(sock), null))
+    if (tab === null || sock.readableEnded || sock.destroyed) {
+      log(`client ${c.label}: ${method} refused: ${core.WHO} (port ${sock.remotePort})`)
+      throw new Error(core.WHO)
+    }
+    if (tab) {
+      log(`client ${c.label}'s token from a process in ${tab.id}: that tab's call`)
+      return whoCalls(sock, method, p)
+    }
+  }
+  const o: Record<string, unknown> = { ...(p && typeof p === 'object' ? p : {}), from: undefined, caller: undefined, byClient: c.id }
+  try {
+    clientNo(method, o, c)
+  } catch (e) {
+    clientLine(method, o, e)
+    throw e
+  }
+  return o
+}
+// T1: what a trusted client may call: the reads (CLIENT_READ) and its scopes' methods (CLIENT_SCOPE). Without cmd: agents
+// only (no command, terminal, command profile or none; no terminal's screen or send, no ! line, no keys without Enter);
+// without yolo: no agent that never asks, by the mode it names or its profile's (as an agent's own laki new: agentNoCmd),
+// none outside its sandbox, no message into one running so (a prompt there is as strong as a command). No gate overridden
+// (force) and no secret check skipped. What asks you in the app still does: a handler's own asks, Touch ID
+type ClientCall = { kind?: unknown; preset?: unknown; presets?: unknown; cmd?: unknown; perm?: unknown; sandbox?: unknown; target?: unknown; enter?: unknown; text?: unknown; force?: unknown; allowSecrets?: unknown; codespace?: unknown; forkOf?: unknown; resume?: unknown; id?: unknown; ws?: unknown; project?: unknown }
+// T1: a trusted client's call is held by the rules agents already pass, a scope lifting one named refusal: the method
+// (gates.ts clientMethod: the reads, its scopes' methods), Recording mode (hiddenNo), then without cmd a command of its
+// own (core.ownCmd), a terminal's screen or send, keys without Enter, editing keys or a ! line (bangNo, boxNo's);
+// without yolo an agent that never asks (core.startsAskless, as an agent's laki new; per preset for a race) or outside
+// its sandbox, or a send into one running so (a prompt there is as strong as a command). Never force or allowSecrets
+// (core.gated's "never overrides a gate"), nor a codespace (billed). An ask's answer is core.send's own rule (agentSend
+// sets agent for a client); what asks you in the app still does
+function clientNo(method: string, p: ClientCall, c: clientsMod.Client) {
+  const has = (s: string) => (c.scopes as string[]).includes(s)
+  const no = (what: string, scope?: string) => {
+    throw new Error(`${c.label} can't ${what}: ${scope ? `that takes the ${scope} scope (it has ${c.scopes.join(', ') || 'reads only'}): laki client rotate ${c.id} --scopes …` : 'no trusted client can (do it in Laki)'}`)
+  }
+  const m = clientMethod(method, c.scopes)
+  if (m) no(`call ${method}`, m.scope)
+  clientHidden(method, p)
+  clientProject(method, p, c)
+  if (p.force === true || (p.allowSecrets !== undefined && p.allowSecrets !== false)) no('override a gate or the secret check') // any method's, by the parameter: one that gains a force later too
+  if (method === 'wsNew' || method === 'wsFan' || method === 'tabNew') {
+    if (p.codespace !== undefined) no('start a cloud workspace (a codespace, billed to you)')
+    // a chat by its id (claude's --resume, --fork-session) may be another project's or a hidden one's; no tab says whose
+    if (p.forkOf !== undefined || p.resume !== undefined) no('fork or resume a chat by its id (it may be any project\'s)')
+    const tab = method === 'tabNew'
+    for (const preset of method === 'wsFan' && Array.isArray(p.presets) ? p.presets : [p.preset]) {
+      const q = { preset: typeof preset === 'string' && preset ? preset : tab ? 'shell' : undefined, cmd: typeof p.cmd === 'string' ? p.cmd : undefined, perm: typeof p.perm === 'string' ? p.perm : undefined } // a tab with none: a shell (tabSpec's)
+      if (!has('cmd') && core.ownCmd(q)) no('start a command of its own (--cmd, or a command profile)', 'cmd')
+      if (!has('yolo') && (core.startsAskless(q) || p.sandbox === false)) no(`start an agent that never asks (bypass permissions, or approvals off) or outside its sandbox`, 'yolo')
+    }
+  }
+  if (method === 'send' || method === 'screen') {
+    const t = core.resolveTarget(String(p.target ?? ''))
+    if (!has('cmd') && !core.tracked(t)) no(`${method === 'send' ? 'send to' : 'read'} ${t.name}, a terminal`, 'cmd')
+    if (method === 'send' && !has('cmd')) (why => why && no(why, 'cmd'))(p.enter === false ? 'send keys without Enter' : bangNo(String(p.text ?? ''), t.name))
+    if (method === 'send' && !has('yolo') && core.tabNeverAsks(t)) no(`send to ${t.name}: it runs in a mode that never asks`, 'yolo')
+  }
+}
+// T1: what a client's call names, by the parameter its method reads (gates.ts CLIENT_WS): a project, or a workspace
+// (a send's or screen's target's: its tab's) and the words a missing one gets
+const quiet = <T,>(f: () => T) => { try { return f() } catch { return undefined } }
+function clientNamed(method: string, p: ClientCall): { project?: Project; ws?: Workspace; gone?: string } {
+  const key = CLIENT_WS[method]
+  if (key === 'project') return { project: quiet(() => core.findProject(String(p.project ?? ''))), gone: `no project ${String(p.project ?? '')}` }
+  if (key === 'target') {
+    const ref = String(p.target ?? '')
+    const ws = core.state.workspaces.find(w => w.id === quiet(() => core.resolveTarget(ref))?.workspace)
+    return { ws, gone: ref.startsWith('@') ? `no agent is named ${ref} (laki agents lists the names)` : `no workspace ${ref.split('/')[0]}` }
+  }
+  if (key === 'id' || key === 'ws') return { ws: quiet(() => core.findWs(String(p[key] ?? ''))), gone: `no workspace ${String(p[key] ?? '')}` }
+  return {}
+}
+// T1: a client kept to some projects: a call into another (a new workspace's project, the workspace or tab it names)
+// is refused; its state lists only its own (onlyProjects)
+function clientProject(method: string, p: ClientCall, c: clientsMod.Client) {
+  if (!c.projects) return
+  const n = clientNamed(method, p)
+  const proj = n.project?.id ?? n.ws?.project
+  if (proj && !c.projects.includes(proj)) {
+    const name = (id: string) => core.state.projects.find(x => x.id === id)?.name ?? id
+    throw new Error(`${c.label} works in ${c.projects.map(name).join(', ')} only, not ${name(proj)}: laki client rotate ${c.id} --projects …`)
+  }
+}
+// T1: Recording mode for a client: hiddenNo (no workspace of its own) on the workspace its call names, a private project
+// for a new one, in a missing one's words; state is recorded() already
+function clientHidden(method: string, p: ClientCall) {
+  if (!core.state.settings?.recording) return
+  const n = clientNamed(method, p)
+  if (n.project?.private || (n.ws && phoneMod.hidden(n.ws))) throw new Error(n.gone)
+}
+function clientLine(method: string, p: Record<string, unknown>, e?: unknown) {
+  if (e === undefined && CLIENT_READ.has(method)) return // reads aren't logged (as agentLog's)
+  log(`client ${clientsMod.clientName(p.byClient)}: ${method}${(w => (w ? ` (${w})` : ''))(agentWhat(p))}${e === undefined ? '' : ` refused: ${core.firstLine(e)}`}`)
+}
 // the app's answer (its token only: call() checks before anyone is looked up)
 const termAnswer = (p: any) => void [...termAsks.values()].find(a => a.msg.req === p?.req)?.answer(p?.allow === true)
 // the CLI's own question while its call waits (not a method of api: it reads the socket, as appPair does)
@@ -813,10 +960,15 @@ const termHeld = async (sock: Socket) => (who => !!who?.term && termAsks.has(who
 // S7: what Recording mode keeps from an agent in another workspace: the state's private rows, a private workspace's
 // kept turns (their prompts, their diffs). ponytail: its diff, files and screen go by their own gates (crossAsk)
 const RECORDED = new Set(['state', 'turnList', 'turnDiff'])
+// a workspace Recording mode hides is none to a caller outside it (an agent of another workspace; a trusted client, with
+// none of its own: clientHidden), in a missing one's words
+const hiddenNo = (me: string | undefined, ws: Workspace | undefined, ref: string) => {
+  if (ws && ws.id !== me && phoneMod.hidden(ws)) throw new Error(`no workspace ${ref}`)
+}
 const turnsSeen = (p: any) => {
   const me = core.agentCaller(p?.from)
   const ws = core.state.workspaces.find(w => w.id === (p?.ws ?? core.state.tabs.find(t => t.id === p?.tab)?.workspace))
-  if (me && ws && ws.id !== me && phoneMod.hidden(ws)) throw new Error(`no workspace ${ws.id}`)
+  if (me) hiddenNo(me, ws, ws?.id ?? '')
 }
 // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
 const takesFrom = (method: string) => FROM.has(method) || (RECORDED.has(method) && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
@@ -874,6 +1026,11 @@ const FILE_EDITS = new Set(['fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hun
 // S7: what runs a file it wrote as a page or a program: its default app, or a browser (its page's scripts, on file://)
 const fileApp = (app: unknown) => app === 'default' || (typeof app === 'string' && Object.hasOwn(core.BROWSERS, app))
 const GIT_PATH = /(^|[\\/])\.git([\\/]|$)/i // .git/config, .git/hooks: what git runs as you
+// what a message typed into an agent may not hold (boxNo's, a client's without cmd: clientNo): editing keys and other
+// controls (arrows, Backspace, ⌃U…: with them `a!`, ←, ⌫ leaves a ! first, in one call or over several; core's noKeys
+// strips them before typing, C1's too, so \x01!cmd would land as !cmd), and a ! line (claude's and codex's command mode)
+const bangNo = (text: string, name: string) =>
+  /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) ? `send editing keys into ${name} (they could make a ! line its agent runs as a command)` : /(?:^|[\r\n])[ \t]*!/.test(text) ? `send a ! line (${name}'s agent runs it as a command)` : undefined
 function boxNo(method: string, p: any) {
   if (!core.boxedCaller(p.caller) && !core.boxedCaller(p.from)) return
   const no = (what: string) => {
@@ -893,10 +1050,8 @@ function boxNo(method: string, p: any) {
   if (method === 'send' || method === 'input') {
     const tab = core.resolveTarget(String((method === 'send' ? p.target : p.tab) ?? ''))
     if (!(tab.kind === 'agent' && core.tracked(tab))) no(method === 'send' ? `send into ${tab.name}, a terminal` : `type into ${tab.name}, a terminal`)
-    const text = String((method === 'send' ? p.text : p.data) ?? '')
-    // no editing keys (arrows, Backspace, ⌃U…): with them `a!`, ←, ⌫ leaves a ! first, in one call or over several
-    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)) no(`send editing keys into ${tab.name} (they could make a ! line its agent runs as a command)`)
-    if (/(?:^|[\r\n])[ \t]*!/.test(text)) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
+    const why = bangNo(String((method === 'send' ? p.text : p.data) ?? ''), tab.name)
+    if (why) no(why)
   }
 }
 // M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's
@@ -923,6 +1078,8 @@ const classed = (what: string, sets: [string, Iterable<string>][]) => {
 }
 classed('agents', [['AGENT_OK', AGENT_OK], ['AGENT_NO', new Set(Object.keys(AGENT_NO))], ['AGENT_OWN', AGENT_OWN]])
 classed('remote access', [['REMOTE_OK', REMOTE_OK], ['REMOTE_NO', REMOTE_NO]])
+// T1: every method a client may call says which parameter names its workspace (gates.ts CLIENT_WS): one added to a scope later can't go unchecked
+for (const k of [...CLIENT_READ, ...Object.values(CLIENT_SCOPE).flat()]) if (!Object.hasOwn(CLIENT_WS, k)) throw new Error(`a trusted client's ${k} isn't in CLIENT_WS: say which parameter names its workspace (src/daemon/gates.ts)`)
 
 // D7: remote access's answer level (a device's, else the session's: remote.ts levelOf), an allowlist as S5's for agents:
 // reading (the view, screens, diffs, chats, turns, files), answering (asks, Laki AI's questions, alerts, a workflow's
@@ -968,7 +1125,7 @@ const ANSWER: Record<string, true | ((p: any) => string)> = {
   tabNew: newOk(true),
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
 }
-const ANSWER_NO = new Set(['events', 'ticketMint', 'diskTidy', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'diagnostics', 'agentContext', 'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet', 'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen', 'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet', 'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk', 'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook', 'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct', 'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount', 'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart', 'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick', 'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash', 'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetStore', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetCheck', 'noteNew', 'noteSave', 'noteRestore', 'noteRm', 'noteUpload', 'todoListSave', 'planNew', 'planSave', 'planUpload', 'planWrite', 'planRm', 'mcpAppCall', 'checkAgain', 'checkStop', 'proofShot', 'flowSave', 'flowTrust', 'flowPause', 'flowRm', 'flowRestore', 'flowTrash', 'flowTrashTidy', 'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
+const ANSWER_NO = new Set(['clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'diagnostics', 'agentContext', 'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet', 'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen', 'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet', 'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk', 'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook', 'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct', 'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount', 'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart', 'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick', 'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash', 'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetStore', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetCheck', 'noteNew', 'noteSave', 'noteRestore', 'noteRm', 'noteUpload', 'todoListSave', 'planNew', 'planSave', 'planUpload', 'planWrite', 'planRm', 'mcpAppCall', 'checkAgain', 'checkStop', 'proofShot', 'flowSave', 'flowTrust', 'flowPause', 'flowRm', 'flowRestore', 'flowTrash', 'flowTrashTidy', 'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
 for (const k of Object.keys(api)) if (Object.hasOwn(ANSWER, k) === ANSWER_NO.has(k)) throw new Error(`api's ${k} is ${ANSWER_NO.has(k) ? 'in ANSWER and ANSWER_NO' : 'in neither ANSWER nor ANSWER_NO'}: classify it for remote access's answer level (D7)`)
 for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, k)) throw new Error(`ANSWER's or ANSWER_NO's ${k} isn't a method of api`)
 const answerNo = (method: string, p: any) => {
@@ -1060,14 +1217,22 @@ const crossOk = new Set<string>()
 // ask. Yours gives it back
 // a new workspace's prompt, yours (no agent's tab asked: byCaller's from; no agent said, as MCP and Laki AI do), into
 // your prompts' history
-const yours = <T extends { from?: string; agent?: string; prompt?: string }>(p: T) => (p.from || p.agent || core.promptKeep(p.prompt), p)
+const yours = <T extends { from?: string; agent?: string; prompt?: string; byClient?: string }>(p: T) => (p.from || p.agent || p.byClient || core.promptKeep(p.prompt), p) // T1: a trusted client's isn't yours either
 function agentSend(p: any) {
   const tab = core.resolveTarget(String(p.target ?? ''))
   const by = core.agentCaller(p.from)
   if (by) delete p.steer // into a running turn is your follow-ups' only: an agent's waits its turn (an Enter typed now could answer a menu just drawn)
+  if (p.byClient) {
+    // T1: a client's too (vars: agent variables are Laki's own sends', never an RPC's); to an agent it's an agent's message,
+    // so core.send refuses a tab that asks as it types (no gap after a check); a terminal (cmd) not while its agent asks
+    delete p.steer
+    delete p.vars
+    if (core.tracked(tab)) p.agent = true
+    else if (core.asking(tab.id)) throw new Error(`${tab.name} is asking the user something: only they answer it`)
+  }
   if (!by) {
     core.youTyped(tab.id, String(p.text ?? ''))
-    if (p.enter !== false && !p.by && core.tracked(tab)) core.promptKeep(p.text, tab.workspace) // a prompt you sent an agent (not an insert, a command, Laki AI's or a side chat's: by)
+    if (p.enter !== false && !p.by && !p.byClient && core.tracked(tab)) core.promptKeep(p.text, tab.workspace) // a prompt you sent an agent (not an insert, a command, Laki AI's or a side chat's: by)
   }
   else if (core.tracked(tab)) p.agent = true
   else if (tab.workspace !== by) throw new Error(`${tab.name} isn't an agent, and it's in another workspace: an agent's messages go to agents only (ask the user to run it there)`)
@@ -1335,8 +1500,9 @@ async function once(c: core.Conn | undefined, cid: string, run: () => Promise<un
   p.catch(() => kept.get(cid) === p && kept.delete(cid))
   return p
 }
-async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab, app = !!c && apps.has(c)) {
+async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab, app = !!c && apps.has(c), client?: clientsMod.Client) {
   method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
+  if (params && typeof params === 'object' && 'byClient' in params) params = { ...params, byClient: undefined } // T1: the daemon's to say (clientCalls)
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
   if (!TEST_CLOCK && params && typeof params === 'object' && 'now' in params) params = { ...params, now: undefined }
@@ -1344,7 +1510,9 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   if (remote && remoteMod.levelOf(c?.device) === 'answer') answerNo(method, params) // D7
   if (method === 'termAnswer' && !app) throw new Error("only Laki's window allows a terminal") // before whoCalls: an unapproved terminal's would ask about itself
-  if (sock) params = await whoCalls(sock, method, params, known, app)
+  if (method === 'clientAnswer' && !app) throw new Error("only Laki's window allows a trusted client") // T1: as termAnswer's
+  if (client && sock) params = await clientCalls(sock, method, params, client)
+  else if (sock) params = await whoCalls(sock, method, params, known, app)
   let r
   try {
     if (sock) agentNo(method, params ?? {})
@@ -1362,9 +1530,11 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
     }
   } catch (e) {
     agentLine(method, params, e)
+    if (params?.byClient) clientLine(method, params, e)
     throw e
   }
   agentLine(method, params)
+  if (params?.byClient) clientLine(method, params)
   if (remote && !READS.has(method)) (line => line && activity({ device: deviceName(c?.device), method, line }))(remoteLine(method, params ?? {})) // D9
   // S3: the settings these answer with, whole only to you (your window, your own CLI call): an agent's, remote access's
   // and Laki AI's get them as the view has them
@@ -1443,9 +1613,12 @@ const server = createServer(async (req, res) => {
   const bearer = req.headers.authorization?.replace(/^Bearer /, '')
   const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
   const mine = far ? undefined : core.tabOfToken(bearer)
+  // T1: a trusted client's token (clients.ts): /rpc only, never remote access's page; one revoked or unknown says so
+  const client = far || mine ? undefined : clientsMod.clientOf(bearer)
+  if (!far && !mine && !client && clientsMod.isClientToken(bearer)) return reply(401, { error: clientsMod.CLIENT_GONE })
   const device = far && !tokenOk(bearer, req.headers.origin) ? remoteMod.deviceOf(req.headers.cookie) : undefined // D3: a paired device's cookie, from its origin only
   if (device && remoteMod.deviceLocks(device)) return reply(423, { error: 'this device unlocks on its page first (a passkey)' }) // D6: no call outside an unlocked page's socket
-  if (!mine && !device && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
+  if (!mine && !client && !device && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
   const app = isApp(bearer, req.headers.origin)
   // S14: remote access's /rpc is sealed: a salt of the page's own in x-laki-e2e (never one seen in the last 10 minutes),
   // its body a frame (e2e.ts), the answer one too. A clear call: refused (426)
@@ -1472,9 +1645,9 @@ const server = createServer(async (req, res) => {
     const { method, params } = JSON.parse(body)
     // S1: the app's token for the app's own process, with daemon.json's: a daemon it didn't start (appPeer checks it)
     if (method === 'termHeld') return reply(200, { result: !far && (await termHeld(req.socket)) }) // S1: the CLI's own, while its call waits for Allow this terminal
-    if (method === 'appPair') return reply(200, !far && !mine && !app && (await core.appPeer(req.socket.remotePort ?? 0)) ? { result: { token: appToken } } : { error: "only Laki's app gets its token" })
+    if (method === 'appPair') return reply(200, !far && !mine && !client && !app && (await core.appPeer(req.socket.remotePort ?? 0)) ? { result: { token: appToken } } : { error: "only Laki's app gets its token" })
     // remote access's: a Conn of its own (no socket to look up), its device's for D7's level
-    reply2(200, { result: (await (far ? call(method, params, { id: 0, remote: true, ...(device && { device }), send: () => {} }) : call(method, params, undefined, false, req.socket, mine?.kind === 'agent' ? mine : undefined, app))) ?? null })
+    reply2(200, { result: (await (far ? call(method, params, { id: 0, remote: true, ...(device && { device }), send: () => {} }) : call(method, params, undefined, false, req.socket, mine?.kind === 'agent' ? mine : undefined, app, client))) ?? null })
   } catch (e) {
     reply2(200, { error: (e as Error).message })
   }
