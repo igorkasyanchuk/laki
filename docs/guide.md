@@ -2419,7 +2419,10 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
   environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
-  don't use out of them (its tabs still start and resume). *Network*, beside it, says what the sandbox's commands may
+  don't use out of them (its tabs still start and resume). *Hide secret-looking variables from agents* (above the
+  profiles; on for a new install) keeps names like `…_TOKEN`, `…_SECRET` and `…_KEY` of the environment Laki was started
+  with out of agent tabs; a profile's *Let through* names the ones its agent still gets, and *What it sees* lists what's
+  kept, with *Allow for this profile*. *Network*, beside *Sandbox*, says what the sandbox's commands may
   reach: *All* (the agent's own default: Claude Code asks about each new host, Codex's network is on), *Listed hosts*
   (Claude Code: the package registries the project's files show, GitHub and its API, its model's host, `localhost`, and
   the hosts you allowed for the project; others are asked about) or *Off* (Codex: no network). Each agent has what its

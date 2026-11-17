@@ -428,6 +428,31 @@ test("a sandboxed profile's network: claude's list in a settings file of its own
   await assert.rejects(rig.rpc('presetSave', { name: 'listed', set: { net: 'all' }, from }), /an agent can't change a profile's network/)
   assert.deepEqual((await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id).netAllow, ['example.org'])
 })
+test("Hide secret-looking variables from agents: on, claude's env lacks NPM_TOKEN, keeps its own key and its profile's env; off, all of it; the user's alone", async t => {
+  const rig = await fresh(t, { env: { NPM_TOKEN: 'fake-npm', ANTHROPIC_API_KEY: 'fake-key', TEST_PLAIN: 'plain' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'claude', set: { env: { TEST_PROFILE_TOKEN: 'mine' } } })
+  const envOf = async (n: number) => (await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().filter(l => l.bin === 'claude' && l.args)[n], `claude #${n + 1}`)).env
+  assert.equal((await rig.rpc('state')).settings.hideSecrets, undefined, "the rig's: off, as an install from before")
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', local: true })
+  assert.deepEqual(await envOf(0), { NPM_TOKEN: 'fake-npm', ANTHROPIC_API_KEY: 'fake-key', TEST_PLAIN: 'plain', TEST_PROFILE_TOKEN: 'mine' })
+  await rig.rpc('settingsSet', { hideSecrets: true })
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  assert.deepEqual(await envOf(1), { ANTHROPIC_API_KEY: 'fake-key', TEST_PLAIN: 'plain', TEST_PROFILE_TOKEN: 'mine' })
+  // what it sees: the names held, never a value; let through for the profile, it's back
+  const seen = await rig.rpc('agentContext', { agent: 'claude' })
+  assert.equal(seen.profile, 'claude')
+  assert.ok(seen.held.includes('NPM_TOKEN') && !seen.held.includes('ANTHROPIC_API_KEY') && !seen.held.some((n: string) => n.startsWith('TEST_')), seen.held.join(' ')) // the shell's own may be there too
+  assert.match((await rig.cli('doctor')).out, /\d+ secret-looking variables? kept from agents/)
+  const tab = (await rig.tab(ws.id, 'claude')).id
+  const from = { ws: ws.id, tab }
+  await assert.rejects(rig.rpc('settingsSet', { hideSecrets: false, from }), /an agent can't change that setting/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'claude', set: { envAllow: ['NPM_TOKEN'] }, from }), /an agent can't let secret-looking variables through/)
+  await rig.rpc('presetSave', { name: 'claude', set: { envAllow: ['NPM_TOKEN', 'not a name'] } })
+  assert.ok(!(await rig.rpc('agentContext', { agent: 'claude' })).held.includes('NPM_TOKEN'))
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  assert.equal((await envOf(2)).NPM_TOKEN, 'fake-npm')
+})
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
   const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1500' } })
   const asks = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] === 'app-server').length

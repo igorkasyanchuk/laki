@@ -162,6 +162,8 @@ export type AppSettings = Paint & {
   usage?: Record<string, boolean> // R4: its usage endpoint asked too (true only); else Claude's and Codex's own numbers
   usageNote?: boolean // R4: Resources' one-time note
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
+  hideSecrets?: boolean // shared/types.ts Settings': secret-looking variables kept from agents
+  hideSecretsAsked?: boolean
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs
@@ -2749,6 +2751,9 @@ export function SettingsPage(p: {
                 that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use (their tabs still start). Flags go
                 after the command, before the prompt, through the shell (so the variables work); env goes on top of the project's.
               </p>
+              <Switch className="switch-row" on={!!s.hideSecrets} onChange={on => set({ hideSecrets: on, hideSecretsAsked: true })}>
+                <Says title="Hide secret-looking variables from agents" hint="Names like …_TOKEN, …_SECRET, …_KEY from where Laki was started stay out of agents' environment; their own sign-in key and what you set here, in a project or a profile still go through" />
+              </Switch>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
                   {(agent === 'claude' || agent === 'codex') && p.typeIn && (
@@ -2837,6 +2842,12 @@ export function SettingsPage(p: {
                         )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
                         <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
+                        {s.hideSecrets && pr.agent !== 'command' && (
+                          <label className="switch-row">
+                            <Says title="Let through" hint="Secret-looking variables this profile's agent still gets, by name" />
+                            <input key={(pr.envAllow ?? []).join(',')} defaultValue={(pr.envAllow ?? []).join(', ')} placeholder="NPM_TOKEN, GH_TOKEN" aria-label="Variables to let through" onBlur={e => setPreset(i, { envAllow: (v => (v.length ? v : undefined))(e.target.value.split(/[\s,]+/).filter(Boolean)) })} />
+                          </label>
+                        )}
                         {pr.agent !== 'command' && FAST[pr.agent] && (
                           <Switch className="switch-row" on={!!pr.fast} onChange={on => setPreset(i, { fast: on || undefined })}>
                             <Says title="Fast mode" hint="Quicker answers, at a higher price (a workspace may turn it off)" />

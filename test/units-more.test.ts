@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { AGENT_KEY_ENV, envAllowOf, envSplit, secretLooking } from '../src/shared/env.ts'
 import { abortAfter, copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
@@ -1031,4 +1032,17 @@ test('abortAfter fires after a GC: its timeout is held (AbortSignal.any alone ho
   const early = abortAfter(60_000, outer.signal)
   outer.abort()
   assert.ok(early.aborted, "a caller's signal ends it too")
+})
+
+test('envSplit: each pattern held, the harmless ones and the allow list passed, an agent\'s own key kept', () => {
+  for (const n of ['NPM_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN', 'SENTRY_AUTH_TOKEN', 'npm_config__authToken', 'STRIPE_SECRET', 'MY_SECRET_THING', 'SECRET_KEY_BASE', 'DB_PASSWORD', 'SIGNING_KEY', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'GOOGLE_CREDENTIALS', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITLAB_PAT'])
+    assert.ok(secretLooking(n), n)
+  for (const n of ['SSH_AUTH_SOCK', 'AWS_ACCESS_KEY_ID', 'GPG_KEY_ID', 'SIGNING_KEY_FILE', 'PATH', 'HOME', 'TOKENIZERS_PARALLELISM', 'KEYCHAIN', 'AWS_REGION', 'LESSKEY'])
+    assert.ok(!secretLooking(n), n)
+  const env = { PATH: '/bin', NPM_TOKEN: 'a', GH_TOKEN: 'b', ANTHROPIC_API_KEY: 'c', OPENAI_API_KEY: 'd', SSH_AUTH_SOCK: '/s', GONE: undefined }
+  assert.deepEqual(envSplit(env), { pass: { PATH: '/bin', SSH_AUTH_SOCK: '/s' }, held: ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN', 'OPENAI_API_KEY'] })
+  assert.deepEqual(envSplit(env, envAllowOf('claude', ['GH_TOKEN'])).held, ['NPM_TOKEN', 'OPENAI_API_KEY'])
+  assert.deepEqual(envSplit(env, envAllowOf('codex')).held, ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN'])
+  assert.deepEqual(envAllowOf('custom'), [])
+  assert.ok(AGENT_KEY_ENV.claude.includes('ANTHROPIC_API_KEY'))
 })

@@ -144,6 +144,8 @@ export const FIND: [string, string, string?][] = [
   ['open', 'Per project', 'editor xcode project own each per project ⌘e'],
   ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
   ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
+  ['presets', 'Network', "sandbox network hosts domains allow list allowedDomains registry offline internet"],
+  ['presets', 'Hide secret-looking variables from agents', 'env environment variables token secret api key password npm github aws hide keep pass let through'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
   ['pr', 'Check a quiet PR every', 'pr status refresh merged closed sidebar quiet idle how often minutes'],
@@ -358,6 +360,16 @@ export const HELP: Record<string, SettingHelp> = {
     what: "Starts this profile's agent in its own sandbox: its commands can write only in the worktree and what git commit writes in the repo's git folder (not its hooks or config), not elsewhere on the Mac; in a workspace on the repo itself (not a worktree), git commit runs outside it. Claude Code: its sandbox setting, with Laki's laki command outside it; new websites are asked about. Codex: workspace-write, its network left on (laki, npm, git push).",
     when: 'An agent left alone for a while, or a repo you trust less: a wrong command stays inside the worktree.',
     cost: "Some commands need a yes or fail in it (a global install, a tool that writes in your home folder). Not with Bypass permissions, which turns the sandbox off.",
+  },
+  Network: {
+    what: "What a sandboxed agent's commands may reach: All (the agent's own default), Listed hosts (Claude Code: the project's package registries, GitHub, its model's host, this Mac and the hosts you allowed for the project), or Off (Codex).",
+    when: 'Listed hosts for a repo you trust less: a command can\'t send what it read to a host you never allowed without asking.',
+    cost: 'A command that needs another host asks first, or fails; Allow this domain on its card adds it for the project.',
+  },
+  'Hide secret-looking variables from agents': {
+    what: "Agents don't get the variables Laki was started with whose names look like secrets (…_TOKEN, …_SECRET, …_KEY, AWS's, NPM_TOKEN, GITHUB_TOKEN…). An agent's own sign-in key, and what you set in Settings, a project or a profile, still go through.",
+    when: 'Laki started from a shell that exports tokens: an agent reading its environment no longer finds them.',
+    cost: "A tool an agent runs that needed one fails until you let it through for that profile (What it sees › Allow for this profile, or the profile's Let through).",
   },
   'Permission mode': {
     what: "How freely the agent acts: Ask first (the agent's own prompts), Auto, Accept edits, Plan (read only) or Bypass permissions (never asks).",

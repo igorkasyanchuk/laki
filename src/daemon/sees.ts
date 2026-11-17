@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'n
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { type AgentContext, type AgentRule, type AgentServer, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
-import { findProject, memoryNote, openPath, state } from './core.ts'
+import { findProject, memoryNote, openPath, state, heldFrom, presets } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
 import { redact } from './share.ts'
 
@@ -202,7 +202,8 @@ function tomlValue(v: string): unknown {
   }
 }
 
-export function agentContext(p: { agent?: string; project?: string }): AgentContext {
+// held: hideSecrets' names kept from this agent's profile (p.profile, else its agent's first): names only
+export function agentContext(p: { agent?: string; project?: string; profile?: string }): AgentContext {
   const agent = p.agent
   if (agent !== 'claude' && agent !== 'codex') throw new Error('agent: claude or codex')
   const proj = p.project ? findProject(p.project) : undefined
@@ -216,6 +217,7 @@ export function agentContext(p: { agent?: string; project?: string }): AgentCont
     rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
     memory: { global: mem(state.settings?.memory, false), mine: mem(proj?.memory, false), learned: mem(proj?.memory, true), bytes: Buffer.byteLength(note) },
     servers: agent === 'claude' ? claudeServers(path) : codexServers(path),
+    ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
   }
 }
 

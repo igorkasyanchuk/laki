@@ -13,6 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { agentChat, aiAnswer, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
+import { envAllowOf, envSplit } from '../shared/env.ts'
 import { HostPty, ptyGone, ptyOn } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
@@ -733,7 +734,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|sandboxNew)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allowOn, allowKey, denyOn, denyKey, talkOn, talkKey: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you); sandboxNew: the default profiles' sandbox
+const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|sandboxNew|hideSecrets|hideSecretsAsked)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allowOn, allowKey, denyOn, denyKey, talkOn, talkKey: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you); sandboxNew: the default profiles' sandbox; hideSecrets: what agents get of Laki's environment
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
 // S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
@@ -1153,7 +1154,7 @@ for (const k of Object.keys(api)) if (!FROM.has(k) && !CALLER.has(k) && !OPEN.ha
 // instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action);
 // the global answer keys (Allow, Deny, talk: from any app, as REMOTE_KEYS), scheduled runs' limits (0 is none),
 // Labs and Workflows (what starts on its own: a workflow's triggers) and how many turns are kept (0 deletes them)
-const AGENT_KEYS = /^(touchId|browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|scheduleAtOnce|scheduleMaxMinutes|labs|workflows|turnsKept)$/
+const AGENT_KEYS = /^(touchId|browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|scheduleAtOnce|scheduleMaxMinutes|labs|workflows|turnsKept|hideSecrets|hideSecretsAsked)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -1187,6 +1188,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'net' in p.set) notAgent(p, "change a profile's network (what its sandbox lets it reach)")
+  else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'envAllow' in p.set) notAgent(p, "let secret-looking variables through to agents")
   else if (method === 'projectSet' && p.allow !== undefined) notAgent(p, "change a project's auto-answer rules (what Laki allows for every agent: the user's, in Settings)")
   else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
@@ -1931,6 +1933,15 @@ void remoteMod
   .then(() => listening) // tunnelsBack skips the daemon's own port: known once it listens
   .then(() => (remoteMod.remoteBack(), remoteMod.tunnelsBack())) // then the ones state.json kept (remote access first: My domain's on the tunnels' connector): after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
+// an install from before hideSecrets: asked once, in Laki's window (a notice kept until answered), to turn it on
+if (core.state.settings?.hideSecrets === undefined && !core.state.settings?.hideSecretsAsked) {
+  const held = envSplit(core.plainEnv(), envAllowOf('claude', core.presetNamed('claude')?.envAllow)).held
+  if (held.length)
+    void Promise.resolve()
+      .then(() => alertShow({ title: 'Secret-looking variables reach your agents', text: `Laki was started with ${held.length} (${held.slice(0, 4).join(', ')}${held.length > 4 ? '…' : ''}), and every agent gets them. Hide them? An agent's own sign-in key and what you set in Settings, a project or a profile still go through.`, choices: ['Hide them', 'Not now'] }, 'notice', 'Laki'))
+      .then(a => (a as { choice?: string; timedOut?: boolean }).timedOut || core.settingsSet({ hideSecretsAsked: true, ...((a as { choice?: string }).choice === 'Hide them' && { hideSecrets: true }) }))
+      .catch(e => log(`hideSecrets: no notice (${(e as Error).message})`))
+}
 // R8: an archived workspace deleted within a day: a notice in Laki's window (kept until answered), Keep postpones it
 Object.assign(resourcesMod.turnsOf, { kept: turnsKept, drop: turnsDrop }) // Disk's kept turns (resources.ts turnsOf: no import of turns.ts there)
 core.soonSay.fn = ws => {

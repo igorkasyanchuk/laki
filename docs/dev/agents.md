@@ -397,6 +397,13 @@ or its `PermissionRequest` to run one again with `dangerouslyDisableSandbox`) is
 waiting or idle, until its next prompt): its Needs you card says so and offers *Restart without sandbox*, which asks
 first, then `tabUnbox` (the user's: AGENT_NO, REMOTE_NO) sets the tab's `sandbox: false` (its profile keeps its own) and
 starts it again, its chat resumed. ponytail: codex's denials reach no hook, so it gets no card.
+`settings.hideSecrets` (Settings › Agents & profiles; a new install's on, `load`, a test's daemon only with
+`LAKI_TEST_LEAN=1`; one from before is asked once by a notice, main.ts, `hideSecretsAsked`): an agent tab's environment
+(`childEnv`, not shells, setup or Run) is `shared/env.ts` `envSplit` over `plainEnv()`: `SECRET_ENV`'s names held but
+`HARMLESS` and `envAllowOf` (`AGENT_KEY_ENV`, the agent's own sign-in key, and the profile's `envAllow`, its *Let
+through*); Settings', the project's and the profile's env go on top as ever. `agentContext` (What it sees) gives
+`held` (names only) and `profile`, whose *Allow for this profile* is `presetSave`'s `envAllow`; `doctor`'s `secrets`
+counts them. An agent's `hideSecrets`, `hideSecretsAsked` (AGENT_KEYS, REMOTE_KEYS) and `envAllow` (`agentNo`) are refused.
 A sandboxed profile's `net` (`Net`: `all` unset, `list`, `off`; `NET_OK` per agent, `NET_NO` why not; `presetSave` refuses
 the rest, an agent's `net` refused by `agentNo`). From the agents' docs (Nov 2026): Claude Code's sandbox routes a
 command's connections through a proxy that checks each host against `sandbox.network.allowedDomains` (empty by default:

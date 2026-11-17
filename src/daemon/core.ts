@@ -13,6 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
+import { envAllowOf, envSplit } from '../shared/env.ts'
 import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
@@ -240,6 +241,8 @@ export function load() {
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
+  // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts)
+  if (!had && state.settings?.hideSecrets === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, hideSecrets: true, hideSecretsAsked: true }
   // a new install's default profiles start claude and codex in their sandbox (presets); one from before keeps none. A
   // test's daemon, as with Labs below, only with LAKI_TEST_LEAN=1: the rest of the tests are of agents without one
   if (!had && state.settings?.sandboxNew === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, sandboxNew: true }
@@ -1614,9 +1617,14 @@ export function plainEnv() {
   return env
 }
 
+// an agent tab's: with hideSecrets on, the daemon's own environment without its secret-looking names (shared/env.ts:
+// its agent's own key and its profile's envAllow pass); Settings', the project's and the profile's env go on top as ever
 function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
-  return { ...plainEnv(), ...lakiEnv(ws, tab, extra) }
+  const base = tab.kind === 'agent' && state.settings?.hideSecrets ? envSplit(plainEnv(), envAllowOf(tab.preset, presetOf(tab)?.envAllow)).pass : plainEnv()
+  return { ...base, ...lakiEnv(ws, tab, extra) }
 }
+// the names an agent of this profile doesn't get (What it sees, laki doctor): none while hideSecrets is off
+export const heldFrom = (agent: string, profile?: string) => (state.settings?.hideSecrets ? envSplit(plainEnv(), envAllowOf(agent, presetNamed(profile)?.envAllow)).held : [])
 
 // what Laki adds to a tab's environment: over this Mac's (childEnv), or all of it on an SSH host (hostScript); hooks:
 // where its agents' hook files are
@@ -2464,6 +2472,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
     else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
     else if (k === 'net') next.net = String(v)
+    else if (k === 'envAllow' && Array.isArray(v)) next.envAllow = [...new Set(v.map(String).filter(e => ENV_KEY.test(e)))].slice(0, 100)
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
   }
@@ -4968,7 +4977,7 @@ export async function doctor(): Promise<Doctor> {
       return { id, found, ...(s !== undefined && { signedIn: s }) }
     }),
   )
-  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk() }
+  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length } }
 }
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
 // version, counts, the Labs on, the logs' last lines; redacted (diagRedact)

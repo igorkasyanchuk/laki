@@ -137,6 +137,12 @@ project's test script is, which the agent can edit.
 
 ## Known limits
 
+- *Hide secret-looking variables from agents* (on for new installs) keeps names like `…_TOKEN`, `…_SECRET`, `…_KEY`,
+  `AWS_SECRET…`, `NPM_TOKEN` and `GITHUB_TOKEN` of the environment Laki was started with out of agent tabs, by name
+  only: a secret under a plain name (a `DATABASE_URL` with a password) still goes through, and so do the agent's own
+  sign-in key, what you set in Settings, a project or a profile, and a profile's *Let through*. Terminals you open,
+  setup scripts and Run actions get the whole environment. An agent can't turn it off or let a name through.
+
 - An agent's sandbox network (a profile's *Network*) is the agent's own: Claude Code's *Listed hosts* is its
   `sandbox.network.allowedDomains`, which pre-allows those hosts and still asks about others (a Yes there lets one
   through for that session); Codex's is on or off only. Neither limits what the agent itself sends to its model, nor

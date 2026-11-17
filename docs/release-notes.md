@@ -7,6 +7,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 - Security: an agent, or a phone over remote access, can no longer turn on or rebind the keys that allow or deny the newest ask from any app, nor the talk key. An agent can't change scheduled runs' limits, Labs, Workflows or how many turns are kept either.
 - Security: a call from remote access's page can't be replayed: a flood of junk from the tunnel no longer pushes out the record of calls seen, a restart keeps it, and an address whose calls keep failing is refused for a minute.
+- Agents no longer get the secret-looking variables Laki was started with (`…_TOKEN`, `…_SECRET`, `…_KEY`…): on for new installs, one card asks an existing install. Their own sign-in key and what you set in Settings, a project or a profile still go through; What it sees lists what's kept, with *Allow for this profile*.
 - A sandboxed profile has a *Network* setting: Claude Code to a list of hosts (the project's package registries, GitHub, its model, this Mac and what you allow), Codex on or off. A host the sandbox refused gets *Allow this domain in this project* on its card.
 - New installs start Claude and Codex in their own sandbox. When the sandbox stops a command, its card in Needs you says so, with *Restart without sandbox* for that tab. Existing installs keep their profiles as they are.
 - Esc on Claude's question menu now ends the wait: the tab goes idle and its card leaves Needs you, instead of asking for permission until its next turn.

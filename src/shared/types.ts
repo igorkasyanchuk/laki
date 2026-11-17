@@ -539,7 +539,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean; acp?: boolean; net?: Net } // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -614,6 +614,8 @@ export type Settings = {
   timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   presets?: Preset[] | null // null: the defaults
+  hideSecrets?: boolean // Hide secret-looking variables from agents (shared/env.ts envSplit over the daemon's own environment, agent tabs only): a new install's on; one from before off, asked once (hideSecretsAsked). Never an agent's or a phone's
+  hideSecretsAsked?: boolean // the one-time notice for an install from before was answered
   sandboxNew?: boolean // a new install's: its default profiles (claude, codex) start in their sandbox (core.ts presets); one from before: unset, none. Never an agent's or a phone's (main.ts REMOTE_KEYS)
   accounts?: Account[] // claude's and codex's other sign-ins (the agent's own is HOME_ACCOUNT)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: HOME_ACCOUNT)
@@ -1168,8 +1170,8 @@ export type HookSeen = { at?: number; tabs: number; deaf: number; native?: Nativ
 // name only, tokens masked; off: turned off in its config)
 export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
 export type AgentServer = { name: string; scope: 'user' | 'project' | 'local'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
-export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
+export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string }; secrets?: { on: boolean; held: number } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 // A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
 export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && process.platform === 'darwin'): [string, string, string?][] {
   return [
@@ -1181,6 +1183,7 @@ export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && pr
     ...d.agents.map((a): [string, string, string?] => (!a.found ? ['●', `${a.id} not found`, `install ${a.id}, then laki doctor again`] : a.signedIn === false ? ['●', `${a.id} found, not signed in`, `run ${a.id} in a terminal and sign in`] : ['✓', `${a.id}${a.signedIn ? ' signed in' : ''}`])),
     ...(d.agents.some(a => a.found) ? [] : [['✗', 'no agent found', 'install claude or codex'] as [string, string, string]]),
     ...(d.hooks ? [d.hooks.ok ? (['✓', "Laki's hooks reach the daemon"] as [string, string]) : (['✗', `Laki's hooks don't reach the daemon: ${d.hooks.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
+    ...(d.secrets?.held ? [d.secrets.on ? (['✓', `${d.secrets.held} secret-looking variable${d.secrets.held === 1 ? '' : 's'} kept from agents`] as [string, string]) : (['●', `${d.secrets.held} secret-looking variable${d.secrets.held === 1 ? '' : 's'} reach agents`, 'Settings › Agents & profiles: Hide secret-looking variables from agents'] as [string, string, string])] : []),
     ...(d.hookFiles ? [d.hookFiles.ok ? (['✓', "agents' hook files"] as [string, string]) : (['✗', `agents' hook files: ${d.hookFiles.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
   ]
 }
