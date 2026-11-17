@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
-import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -96,14 +96,14 @@ export const firstLine = (e: unknown) => String((e as { stderr?: string }).stder
 // ponytail: looked for once; one installed later shows after a daemon restart, or added in Settings
 let found: Preset[] | undefined
 export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
-// a new install's (settings.sandboxNew) start claude and codex in their sandbox
-export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }))).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true } : p))
+// a new install's (settings.sandboxNew) start claude and codex in their sandbox, claude's network to its list (netList)
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }))).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
 export const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { boxed?: { cmd: string; why: string } /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -1684,7 +1684,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   if (tab.preset === 'claude') {
     const gated = existsSync(toolFlag())
     gated ? ungated.delete(tab.id) : ungated.add(tab.id) // S8: a gate turned on later doesn't reach it until it starts again
-    argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated, sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
+    argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', (sandbox && h === localHooks && netFile(tab, pr?.net, claudeFile({ fast, gated, sandbox }))) || join(h.dir, claudeFile({ fast, gated, sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1720,7 +1720,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     } catch {}
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
   }
-  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs) : [])] // claude's fast and sandbox: its settings file
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   const line = [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' ')
   // S12: the values emptied for the agent itself (sh, bash, zsh: an assignment before a command takes effect after its
@@ -1733,9 +1733,39 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
 // codex's sandbox: workspace-write, unless its mode or its profile's flags pick a sandbox already (read-only is
 // stricter; an approval flag alone picks none); its network on, so laki (the daemon on 127.0.0.1), npm and git push
 // work; the git folders git commit writes in writable
-function codexBox(perm: string | undefined, args: string | undefined, gitDirs: string[]) {
+function codexBox(perm: string | undefined, args: string | undefined, gitDirs: string[], net?: Net) {
   const own = /(^|\s)(-s|--sandbox|--full-auto)(?=[\s=]|$)|\bsandbox_mode\s*=/.test(args ?? '') || perm === 'plan' || perm === 'acceptEdits'
-  return [...(own ? [] : ['-s', 'workspace-write']), '-c', 'sandbox_workspace_write.network_access=true', ...(gitDirs.length ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(gitDirs)}`] : [])] // a JSON array of strings is TOML's too
+  return [...(own ? [] : ['-s', 'workspace-write']), '-c', `sandbox_workspace_write.network_access=${net !== 'off'}`, ...(gitDirs.length ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(gitDirs)}`] : [])] // a JSON array of strings is TOML's too
+}
+
+// a sandboxed claude whose profile's network is its list (net: list): its settings file (the variant writeHooks wrote) with
+// sandbox.network.allowedDomains, netList's for its project, as <data>/net/<tab>.json (0600, written at each start; the
+// data folder is out of its sandbox's reach). Anything else: none (the variant as it is). ponytail: this Mac's tabs only
+function netFile(tab: Tab, net: Net | undefined, variant: string): string | undefined {
+  if (net !== 'list') return
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  const proj = state.projects.find(p => p.id === ws?.project)
+  const s = JSON.parse(readFileSync(join(localHooks.dir, variant), 'utf8'))
+  const hosts = netList(f => !!ws && existsSync(join(ws.path, f)), tab.preset ?? '', proj?.netAllow)
+  s.sandbox = { ...s.sandbox, network: { ...s.sandbox?.network, allowedDomains: hosts } }
+  const file = join(dir, 'net', `${tab.id}.json`)
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
+  writeFileSync(file, JSON.stringify(s, null, 2), { mode: 0o600 })
+  return file
+}
+// projectNetAllow: a host a sandboxed agent's list has in this project (the card's Allow this domain), or taken off
+// (rm); the user's alone (gates.ts). A tab gets it as it starts (its settings file is written then)
+export function projectNetAllow(p: { project?: unknown; host?: unknown; rm?: unknown }) {
+  const proj = state.projects.find(x => x.id === String(p.project ?? ''))
+  if (!proj) throw new Error(`no project ${String(p.project ?? '')}`)
+  const host = String(p.host ?? '').trim().toLowerCase()
+  if (!NET_HOST.test(host)) throw new Error(`a host's name (example.com, *.example.com): ${host || 'none'}`)
+  const now = (proj.netAllow ?? []).filter(h => h !== host)
+  proj.netAllow = p.rm ? now : [...now, host].slice(-200)
+  if (!proj.netAllow.length) delete proj.netAllow
+  save()
+  changed()
+  return { project: proj.id, netAllow: proj.netAllow ?? [] }
 }
 
 // a worktree's own folder: what git add, commit, switch, reset and merge write (each file and its lock), its reflog and
@@ -2433,6 +2463,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
     if (v === '' || v === null) delete next[k]
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
     else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
+    else if (k === 'net') next.net = String(v)
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
   }
@@ -2447,6 +2478,8 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.fast && !FAST[pr.agent as Agent]) delete pr.fast
   if (pr.sandbox && !SANDBOX[pr.agent as Agent]) delete pr.sandbox
   if (pr.sandbox && sandboxOff(pr.agent, pr.perm, pr.args)) throw new Error(SANDBOX_NO)
+  if (pr.net !== undefined && !NET_OK[pr.agent as Agent]) delete pr.net // no sandbox, no network of its own
+  if (pr.net !== undefined && !NET_OK[pr.agent as Agent]!.includes(pr.net)) throw new Error(NET_NO[pr.agent as Agent]?.[pr.net] ?? `net: ${NET_OK[pr.agent as Agent]!.join(', ')}`)
   return settingsSet({ presets: i >= 0 ? list.map((x, j) => (j === i ? pr : x)) : [...list, pr], ...(def && pr.name !== name && { agent: pr.name }) }).presets!
 }
 
@@ -3905,7 +3938,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         const got = publishedBy(pl)
         if (got) (r.published ??= []).push(got)
       }
-      if (pl.hook_event_name === 'PostToolUseFailure' && sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
+      if ((pl.hook_event_name === 'PostToolUseFailure' || pl.hook_event_name === 'PostToolUse') && sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
       break
     case 'waiting': {
       // claude's PermissionRequest comes as its menu is shown, before its Notification (if any: that one comes later,

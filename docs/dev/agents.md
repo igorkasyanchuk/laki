@@ -389,7 +389,7 @@ and asks, as do `git stash` and `git commit <paths>` (their temp index is named 
 `sequencer` writable there (a todo's `exec` runs as you when you continue that rebase). Hooks
 and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git
 folders aren't added. A new install's default profiles (`presets()` with no saved list) start claude and codex in their
-sandbox: `settings.sandboxNew`, set by `load` only when there was no state before (a test's daemon only with
+sandbox (claude's network on its list, `net: 'list'`): `settings.sandboxNew`, set by `load` only when there was no state before (a test's daemon only with
 `LAKI_TEST_LEAN=1`, as Labs; one from before stays unset, its
 profiles as they were; a phone's or an agent's `settingsSet` can't change it: REMOTE_KEYS). A command the sandbox
 stopped (`sandboxStop`: claude's `PostToolUseFailure` for Bash whose `error` has the sandbox's words, `SANDBOX_DENIED`,
@@ -397,6 +397,19 @@ or its `PermissionRequest` to run one again with `dangerouslyDisableSandbox`) is
 waiting or idle, until its next prompt): its Needs you card says so and offers *Restart without sandbox*, which asks
 first, then `tabUnbox` (the user's: AGENT_NO, REMOTE_NO) sets the tab's `sandbox: false` (its profile keeps its own) and
 starts it again, its chat resumed. ponytail: codex's denials reach no hook, so it gets no card.
+A sandboxed profile's `net` (`Net`: `all` unset, `list`, `off`; `NET_OK` per agent, `NET_NO` why not; `presetSave` refuses
+the rest, an agent's `net` refused by `agentNo`). From the agents' docs (Nov 2026): Claude Code's sandbox routes a
+command's connections through a proxy that checks each host against `sandbox.network.allowedDomains` (empty by default:
+a new host is asked about) and names a refused host in the command's result; it has no switch for no network at all.
+Codex's workspace-write has only `sandbox_workspace_write.network_access` (on or off); its domain list sits behind the
+experimental `features.network_proxy`, not used here. So: claude's `list` is `netFile`, `<data>/net/<tab>.json` (0600,
+written at each start, out of the sandbox's reach): the `-sandbox` variant with `allowedDomains` from `netList` (the
+registries the worktree's files show, `REGISTRIES`, GitHub and its API, the agent's model host, `localhost`, then the
+project's `netAllow`); `all` is the variant as it is; codex's `off` is `network_access=false` (`codexBox`). A refused
+host (`sandboxStop`: `Connection to <host> blocked`, from PostToolUse's output or PostToolUseFailure's error) is
+`boxed.host`; the card's *Allow this domain in this project* is `projectNetAllow` (`{ project, host, rm? }`, `NET_HOST`,
+the user's: AGENT_NO, REMOTE_NO). ponytail: a host's tabs (ssh) get the variant without the list; a closed tab's file
+stays until the data folder is tidied.
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
 is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):

@@ -200,3 +200,4 @@ needs no bump: `settingsSet` keeps any field.
 191: `widgetTerm` (K1: the UI kit's `term` element, a live terminal started as a window shows it; `term:<id>` in `resourceStop`; the `kit.term` cap).
 192: `clientAdd`, `clientRotate`, `clientRm`, `clientList`, `clientAnswer`, `clientWho` (T1: trusted clients, an app outside Laki with a named, revocable token of its own; the `clientAsk` and `clientDone` events, the window's Allow; a workspace's `client`).
 193: `tabUnbox` (a tab whose command its sandbox stopped, the view's `boxed`: restarted once without its sandbox, its chat resumed; the user's only).
+194: `projectNetAllow` (a sandboxed profile's network list, `net: 'list'`: a host added to or taken off a project's `netAllow`, the card's *Allow this domain in this project*; the view's `boxed.host`; the user's only).

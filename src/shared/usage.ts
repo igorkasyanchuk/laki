@@ -42,7 +42,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki plan new <project>|. <kind> "<title>" [text|-]   write a new one for the user (text: its Markdown; -: stdin)
   laki plan write <project>|. <kind> <slug> <file> [text|-]   a file beside one (ideas.md, a prototype); never README.md
   laki preset [ls]                            the agent profiles (Settings › Agents & profiles), your default marked
-  laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox]
+  laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox] [--net all|list|off]
             [--cmd c] [--env KEY=value…] [--account id] [--name new]   a new profile, or change one ('' drops a field)
   laki preset on|off|rm <name>                show it in the pickers or not | delete it
   laki remind <when> <text> [--ws <id>|.] [--important]  a reminder on the calendar (Calendar): in 2h, tomorrow at 9am, every weekday at 9am; --important: a card on screen until closed

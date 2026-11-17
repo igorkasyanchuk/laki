@@ -29,7 +29,7 @@ const opens: string[] = [] // laki show's --open <folder|file|url>, again and ag
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
-const VALUED = new Set(['out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const VALUED = new Set(['net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
 const BOOL = new Set(['simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
@@ -577,13 +577,13 @@ async function main() {
       if (sub === 'ls') {
         const v: View = await rpc('state')
         const def = v.settings?.agent
-        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
+        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.sandbox && p.net && `net ${p.net}`, p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
         return out(v.presets, v.presets.map(line).join('\n'))
       }
       if (!['add', 'set', 'on', 'off', 'rm'].includes(sub)) unknown('preset', sub)
-      if (!name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] | on|off|rm <name>')
+      if (!name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] [--net all|list|off] | on|off|rm <name>')
       const set: Record<string, unknown> = {}
-      for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
+      for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name', 'net'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
       if (flags.fast) set.fast = true
       if (flags.sandbox || flags['no-sandbox']) set.sandbox = flags.sandbox ? true : null // --no-sandbox: off
       const noEq = envs.find(e => !e.includes('='))

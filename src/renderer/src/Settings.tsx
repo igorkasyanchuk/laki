@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -2848,6 +2848,20 @@ export function SettingsPage(p: {
                               <Says title="Sandbox" hint={off ? "Not with bypass permissions (its mode or its flags): that turns the agent's sandbox off" : pr.agent === 'codex' ? 'Its commands write only in the worktree and what git commit writes (never git’s hooks or config); the network stays on (laki, npm, git push)' : 'Its commands write only in the worktree and what git commit writes (never git’s hooks or config); laki runs outside it, new websites are asked about'} />
                             </Switch>
                           ))(sandboxOff(pr.agent, pr.perm, pr.args))
+                        )}
+                        {pr.sandbox && NET_OK[pr.agent as Agent] && !sandboxOff(pr.agent, pr.perm, pr.args) && (
+                          // its sandbox's network: what this agent's sandbox can do, the rest shown off with why
+                          <label className="switch-row">
+                            <Says title="Network" hint={pr.agent === 'claude' ? 'Listed hosts: the registries the project uses, GitHub, its model and this Mac, plus what you allowed for the project; others are asked about' : 'All: its commands reach any host. Off: none'} />
+                            <select value={pr.net ?? 'all'} onChange={e => setPreset(i, { net: e.target.value === 'all' ? undefined : (e.target.value as Net) })}>
+                              {(['all', 'list', 'off'] as const).map(n => (
+                                <option key={n} value={n} disabled={!NET_OK[pr.agent as Agent]!.includes(n)} title={NET_NO[pr.agent as Agent]?.[n]}>
+                                  {n === 'all' ? 'All' : n === 'list' ? 'Listed hosts' : 'Off'}
+                                  {NET_NO[pr.agent as Agent]?.[n] ? ` (not in ${pr.agent === 'claude' ? 'Claude Code' : 'Codex'})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
                         )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
                           <Switch className="switch-row" on={pr.steer !== false} onChange={on => setPreset(i, { steer: on ? undefined : false })}>

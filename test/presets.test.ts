@@ -353,6 +353,7 @@ test("a new install starts claude and codex in their sandbox, one from before ke
   const boxes = async () => Object.fromEntries((await rig.rpc('state')).presets.map((p: { name: string; sandbox?: boolean }) => [p.name, p.sandbox]))
   const now = await boxes()
   assert.deepEqual([now.claude, now.codex], [true, true])
+  assert.deepEqual((await rig.rpc('state')).presets.map((p: { name: string; net?: string }) => [p.name, p.net]).filter((x: string[]) => x[0] === 'claude' || x[0] === 'codex'), [['claude', 'list'], ['codex', undefined]])
   assert.equal((await rig.rpc('state')).settings.sandboxNew, true)
   // the words a stop is read from: a failure that says so, the ask to run it outside; anything else is none
   assert.deepEqual(sandboxStop({ hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'touch /etc/x\nmore' }, error: 'Exit code 1\ntouch: /etc/x: Operation not permitted' }), { cmd: 'touch /etc/x', why: 'touch: /etc/x: Operation not permitted' })
@@ -365,7 +366,9 @@ test("a new install starts claude and codex in their sandbox, one from before ke
   const tab = await until(() => rig.tab(ws.id, 'claude'), 'its claude')
   const started = () => rig.fakeLog().filter(l => l.bin === 'claude')
   await until(() => existsSync(rig.env.FAKE_LOG) && started().length === 1, 'claude up')
-  assert.ok(started()[0].args.some((a: string) => a.endsWith('-sandbox.json')), 'in its sandbox')
+  const boxOf = (args: string[]) => JSON.parse(readFileSync(args[args.indexOf('--settings') + 1], 'utf8')).sandbox
+  assert.equal(boxOf(started()[0].args)?.enabled, true, 'in its sandbox')
+  assert.ok(boxOf(started()[0].args).network.allowedDomains.includes('api.anthropic.com'), "a new install's claude: its list")
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'touch /etc/x' }, error: 'Exit code 1\ntouch: /etc/x: Operation not permitted' } })
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
   assert.deepEqual((await rig.tab(ws.id, 'claude')).boxed, { cmd: 'touch /etc/x', why: 'touch: /etc/x: Operation not permitted' })
@@ -374,7 +377,7 @@ test("a new install starts claude and codex in their sandbox, one from before ke
   const after = await rig.tab(ws.id, 'claude')
   assert.deepEqual([after.sandbox, after.boxed], [false, undefined])
   await until(() => started().length === 2, 'started again')
-  assert.ok(!started()[1].args.some((a: string) => a.endsWith('-sandbox.json')), 'out of its sandbox')
+  assert.equal(boxOf(started()[1].args), undefined, 'out of its sandbox')
   assert.equal((await boxes()).claude, true, 'its profile keeps its sandbox')
   await assert.rejects(rig.rpc('tabUnbox', { tab: tab.id }), /isn't in a sandbox/)
   // an install from before (its state.json without the key): its default profiles have no sandbox, and never get one
@@ -387,6 +390,43 @@ test("a new install starts claude and codex in their sandbox, one from before ke
   const old = await boxes()
   assert.deepEqual([old.claude, old.codex], [undefined, undefined])
   assert.equal((await rig.rpc('state')).settings.sandboxNew, undefined)
+})
+test("a sandboxed profile's network: claude's list in a settings file of its own (net: list), none for all; codex's off by its flag; the list is the user's", async t => {
+  const rig = await fresh(t)
+  writeFileSync(join(rig.repo, 'package.json'), '{}') // a project on npm: its registry is on the list
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'listed', add: true, set: { agent: 'claude', sandbox: true, net: 'list' } })
+  await rig.rpc('presetSave', { name: 'open', add: true, set: { agent: 'claude', sandbox: true } })
+  await rig.rpc('presetSave', { name: 'cut', add: true, set: { agent: 'codex', sandbox: true, net: 'off' } })
+  await assert.rejects(rig.rpc('presetSave', { name: 'cut', set: { net: 'list' } }), /Codex's sandbox network is on or off: no list of hosts/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'open', set: { net: 'off' } }), /Claude Code has no switch that turns its network off/)
+  assert.deepEqual(await rig.rpc('projectNetAllow', { project: p.id, host: 'Example.org' }), { project: p.id, netAllow: ['example.org'] })
+  await assert.rejects(rig.rpc('projectNetAllow', { project: p.id, host: 'https://x.dev/path' }), /a host's name/)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'listed', prompt: 'hi', local: true })
+  const listed = await until(() => rig.tab(ws.id, 'listed'), 'its claude')
+  const run = (bin: string, n: number) => until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().filter(l => l.bin === bin)[n], `${bin} #${n + 1} up`)
+  const fileOf = (args: string[]) => args[args.indexOf('--settings') + 1]
+  const own = fileOf((await run('claude', 0)).args)
+  assert.equal(own, join(rig.data, 'net', `${listed.id}.json`))
+  assert.deepEqual(JSON.parse(readFileSync(own, 'utf8')).sandbox.network.allowedDomains, ['registry.npmjs.org', 'github.com', 'api.github.com', 'api.anthropic.com', 'localhost', 'example.org'])
+  assert.ok(JSON.parse(readFileSync(own, 'utf8')).sandbox.enabled, "the sandbox variant's own keys stay")
+  // all: the variant as it is, no network key
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'open' })
+  const shared = fileOf((await run('claude', 1)).args)
+  assert.ok(shared.endsWith('claude-settings-sandbox.json'), shared)
+  assert.equal(JSON.parse(readFileSync(shared, 'utf8')).sandbox.network, undefined)
+  // codex off: its flag
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'cut' })
+  assert.ok((await run('codex', 0)).args.includes('sandbox_workspace_write.network_access=false'))
+  // the host its sandbox named as it refused: the card's Allow this domain
+  await rig.rpc('hook', { tab: listed.id, state: 'running', payload: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'curl https://evil.dev' }, tool_response: { stdout: 'Connection to evil.dev blocked by the sandbox proxy', stderr: '' } } })
+  await rig.rpc('hook', { tab: listed.id, state: 'idle' })
+  assert.equal((await rig.tab(ws.id, 'listed')).boxed.host, 'evil.dev')
+  // an agent can't change its network, nor the list
+  const from = { ws: ws.id, tab: listed.id }
+  await assert.rejects(rig.rpc('projectNetAllow', { project: p.id, host: 'evil.dev', from }), /an agent can't change the hosts a sandboxed agent may reach/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'listed', set: { net: 'all' }, from }), /an agent can't change a profile's network/)
+  assert.deepEqual((await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id).netAllow, ['example.org'])
 })
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
   const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1500' } })

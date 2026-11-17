@@ -69,18 +69,51 @@ export const SANDBOX: Partial<Record<Agent, true>> = { claude: true, codex: true
 // what turns the sandbox off: bypass permissions (claude's --dangerously-skip-permissions, codex's
 // --dangerously-bypass-approvals-and-sandbox) or codex's danger-full-access
 export const SANDBOX_NO = "Bypass permissions turns the agent's sandbox off: pick one of the two"
+// a sandboxed profile's network (Settings › Agents & profiles, laki preset set --net): all (the agent's own default:
+// claude asks about each new host, codex's is on), list (the hosts netList gives, claude's settings file's
+// sandbox.network.allowedDomains; others asked about), off (codex's sandbox_workspace_write.network_access=false). Each
+// agent has what its sandbox can do (NET_OK); NET_NO says why not the rest. Unset: all
+export type Net = 'all' | 'list' | 'off'
+export const NET_OK: Partial<Record<Agent, Net[]>> = { claude: ['all', 'list'], codex: ['all', 'off'] }
+export const NET_NO: Partial<Record<Agent, Partial<Record<Net, string>>>> = { claude: { off: 'Claude Code has no switch that turns its network off: it asks about each new host' }, codex: { list: "Codex's sandbox network is on or off: no list of hosts" } }
+// a host as a list takes it: a name, *. for its subdomains (claude's wildcard), no scheme, port or path
+export const NET_HOST = /^(\*\.)?(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i
+// the hosts a list starts with: the package registries the project's files show it uses, GitHub and its API, the
+// agent's own model endpoint, this Mac; then the project's own (netAllow: the user's, by the card's Allow)
+const REGISTRIES: [string, string[]][] = [
+  ['package.json', ['registry.npmjs.org']],
+  ['yarn.lock', ['registry.yarnpkg.com']],
+  ['Gemfile', ['rubygems.org', 'index.rubygems.org']],
+  ['requirements.txt', ['pypi.org', 'files.pythonhosted.org']],
+  ['pyproject.toml', ['pypi.org', 'files.pythonhosted.org']],
+  ['Pipfile', ['pypi.org', 'files.pythonhosted.org']],
+  ['go.mod', ['proxy.golang.org', 'sum.golang.org']],
+  ['Cargo.toml', ['crates.io', 'index.crates.io', 'static.crates.io']],
+  ['composer.json', ['repo.packagist.org']],
+]
+const MODEL_HOST: Partial<Record<Agent, string>> = { claude: 'api.anthropic.com', codex: 'api.openai.com' }
+export function netList(has: (file: string) => boolean, agent: string, own: readonly string[] = []): string[] {
+  const reg = REGISTRIES.filter(([f]) => has(f)).flatMap(([, h]) => h)
+  return [...new Set([...reg, 'github.com', 'api.github.com', ...(MODEL_HOST[agent as Agent] ? [MODEL_HOST[agent as Agent]!] : []), 'localhost', ...own])]
+}
 // a command the agent's sandbox stopped (the view's boxed: its card offers a restart without it, tabUnbox): claude's
 // PostToolUseFailure whose error says so (macOS's "Operation not permitted", Linux's read-only mounts, the network
 // proxy's refusal), or its ask to run a command again outside the sandbox (Bash's dangerouslyDisableSandbox).
 // ponytail: matched by message, as claude's docs word them (Nov 2026); codex says nothing a hook carries
 export const SANDBOX_DENIED = /Operation not permitted|Read-only file system|blocked by (the )?sandbox|Connection to \S+ blocked/i
-export function sandboxStop(pl: { hook_event_name?: unknown; tool_name?: unknown; tool_input?: { command?: unknown; dangerouslyDisableSandbox?: unknown }; error?: unknown }): { cmd: string; why: string } | undefined {
+// the host claude's sandbox names as it refuses a connection ("Connection to <host> blocked…", in the command's result)
+const NET_BLOCKED = /Connection to ([^\s:/]+)(?::\d+)? blocked/i
+export type Boxed = { cmd: string; why: string; host?: string }
+export function sandboxStop(pl: { hook_event_name?: unknown; tool_name?: unknown; tool_input?: { command?: unknown; dangerouslyDisableSandbox?: unknown }; error?: unknown; tool_response?: unknown }): Boxed | undefined {
   if (pl.tool_name !== 'Bash') return
   const cmd = String(pl.tool_input?.command ?? '').trim().split('\n')[0].slice(0, 200)
   if (pl.hook_event_name === 'PermissionRequest' && pl.tool_input?.dangerouslyDisableSandbox === true) return { cmd, why: 'it asks to run it outside the sandbox' }
-  if (pl.hook_event_name !== 'PostToolUseFailure' || typeof pl.error !== 'string') return
-  const line = pl.error.split('\n').find(l => SANDBOX_DENIED.test(l))
-  return line ? { cmd, why: line.trim().slice(0, 200) } : undefined
+  // a failure's error, or a command that ended well but printed the proxy's refusal (curl without -f)
+  const said = pl.hook_event_name === 'PostToolUseFailure' && typeof pl.error === 'string' ? pl.error : pl.hook_event_name === 'PostToolUse' ? (r => (r && typeof r === 'object' ? `${(r as { stdout?: unknown }).stdout ?? ''}\n${(r as { stderr?: unknown }).stderr ?? ''}` : ''))(pl.tool_response) : ''
+  const line = said.split('\n').find(l => (pl.hook_event_name === 'PostToolUse' ? NET_BLOCKED : SANDBOX_DENIED).test(l))
+  if (!line) return
+  const host = NET_BLOCKED.exec(line)?.[1]?.toLowerCase()
+  return { cmd, why: line.trim().slice(0, 200), ...(host && NET_HOST.test(host) && { host }) }
 }
 export const sandboxOff = (agent?: string, perm?: string, args?: string) => bypassArgs(args) || /\bdanger-full-access\b/.test(args ?? '') || (!permInArgs(agent, args) && perm === 'bypassPermissions')
 // API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a
@@ -179,6 +212,7 @@ export type Project = {
   allow?: { tool: string; pattern: string; addedAt: number; hits?: number }[] // F14: its auto-answer rules (shared/ask.ts allowRuleOf): the user's only
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
   private?: boolean // Recording mode (settings.recording) hides it and its workspaces (veiled)
+  netAllow?: string[] // hosts a sandboxed agent's list (net: list) has here beyond netList's own: the user's alone (projectNetAllow, a card's Allow this domain)
   sample?: boolean // U4: Welcome's sample repo (<data>/sample, core.ts sampleNew): a tag on its head, Remove sample in its menu
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
@@ -505,7 +539,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean; acp?: boolean } // acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean; acp?: boolean; net?: Net } // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -1097,7 +1131,7 @@ export type BgTaskView = { id: string; kind: 'agent' | 'shell'; name: string; ou
 // claude waiting out an API error (a rate limit, an overloaded server, a lost connection): its try (n of max), when the
 // next one goes (until), when it said so (at: a turn that started after has none), why in its own words (share.ts meterOf)
 export type Retry = { n?: number; max?: number; until: number; at: number; why?: string }
-export type TabView = Tab & { boxed?: { cmd: string; why: string } /* a command its sandbox stopped this turn (sandboxStop): its card offers tabUnbox */; usual?: number /* a running agent's project's and profile's usual turn, in seconds (nextStep.ts usual) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered Allow, the last 20 */; failed?: string /* its turn ended on an API error: the error, a line (Continue, Dismiss) */; drafted?: boolean; ungated?: boolean /* S8: a claude tab started before any tool gate was on: not covered until it restarts */; mode?: string; modeUnknown?: boolean; bypassNo?: string /* mode: a running claude's, read off its screen (modeUnknown: its footer isn't on screen now, mode is the last one seen); bypassNo: why it can't be switched to Bypass */; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; marks?: TurnMark[] /* P5: its turns' chips from turn place extensions, the last 20 turns */; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number } } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop): its card offers tabUnbox */; usual?: number /* a running agent's project's and profile's usual turn, in seconds (nextStep.ts usual) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered Allow, the last 20 */; failed?: string /* its turn ended on an API error: the error, a line (Continue, Dismiss) */; drafted?: boolean; ungated?: boolean /* S8: a claude tab started before any tool gate was on: not covered until it restarts */; mode?: string; modeUnknown?: boolean; bypassNo?: string /* mode: a running claude's, read off its screen (modeUnknown: its footer isn't on screen now, mode is the last one seen); bypassNo: why it can't be switched to Bypass */; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; marks?: TurnMark[] /* P5: its turns' chips from turn place extensions, the last 20 turns */; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number } } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -1325,7 +1359,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 193
+export const API = 194
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -2419,7 +2419,13 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
   environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
-  don't use out of them (its tabs still start and resume). *Sandbox* starts the agent in its own sandbox: its commands
+  don't use out of them (its tabs still start and resume). *Network*, beside it, says what the sandbox's commands may
+  reach: *All* (the agent's own default: Claude Code asks about each new host, Codex's network is on), *Listed hosts*
+  (Claude Code: the package registries the project's files show, GitHub and its API, its model's host, `localhost`, and
+  the hosts you allowed for the project; others are asked about) or *Off* (Codex: no network). Each agent has what its
+  sandbox can do: *Off* isn't Claude Code's, *Listed hosts* isn't Codex's. When the sandbox refuses a host, its card in
+  Needs you offers *Allow this domain in this project*; agents started from then on reach it. `laki preset set <name>
+  --net all|list|off` does the same. *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
   the files that say where git finds them), not elsewhere on the Mac; in a workspace on the repo itself (not a
   worktree), `git commit` runs outside it. In a Codex tab, so do a rebase, `git stash` and a commit of some files only

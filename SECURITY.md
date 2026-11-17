@@ -137,6 +137,11 @@ project's test script is, which the agent can edit.
 
 ## Known limits
 
+- An agent's sandbox network (a profile's *Network*) is the agent's own: Claude Code's *Listed hosts* is its
+  `sandbox.network.allowedDomains`, which pre-allows those hosts and still asks about others (a Yes there lets one
+  through for that session); Codex's is on or off only. Neither limits what the agent itself sends to its model, nor
+  WebFetch, which Claude Code's list doesn't cover. Only you can change a profile's network or a project's list.
+
 - Remote access end to end stops a tunnel's provider from reading and logging what's said, not from changing it: the
   page's own code is still served through the tunnel, so a provider that rewrites that script could read what the page
   sees. A paired device's page that came from a link before S14 has no key of its own: Add a device again.

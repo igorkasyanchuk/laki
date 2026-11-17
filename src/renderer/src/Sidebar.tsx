@@ -172,6 +172,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       else done(`${word} ${ts.length}`)
     },
     allowKey: kh('allowAll'),
+    netAllow: (t, host) => void call('projectNetAllow', { project: view.workspaces.find(w => w.id === t.workspace)?.project, host }).then(() => done(`${host} allowed in this project: its sandboxed agents reach it as they start`), e => toast((e as Error).message)),
     unbox: async t => {
       if (await ask(`Restart ${t.name} without its sandbox?`, { text: 'It starts again with its chat. Its commands can then write anywhere you can and reach any host. Its profile keeps its sandbox.', ok: 'Restart without sandbox' })) void call('tabUnbox', { tab: t.id }).catch(e => toast((e as Error).message))
     },
