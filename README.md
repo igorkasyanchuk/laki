@@ -2,9 +2,15 @@
 
 <h1 align="center">Laki</h1>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/igorkasyanchuk/laki" alt="License: MIT"></a>
+  <a href="https://github.com/igorkasyanchuk/laki-releases/releases/latest"><img src="https://img.shields.io/github/v/release/igorkasyanchuk/laki-releases?label=release" alt="Latest release"></a>
+  <a href="https://github.com/igorkasyanchuk/homebrew-laki"><img src="https://img.shields.io/badge/brew_install_----cask-igorkasyanchuk%2Flaki%2Flaki-orange?logo=homebrew" alt="brew install --cask igorkasyanchuk/laki/laki"></a>
+</p>
+
 <p align="center"><b>Run a dozen coding agents at once without losing track: Laki shows which one needs you, checks
 what each did, and gets it merged.</b><br>
-Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linux preview) · MIT · <a href="https://laki.sh">laki.sh</a></p>
+Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Apple silicon) · MIT · <a href="https://laki.sh">laki.sh</a></p>
 
 ### One inbox for every agent
 
@@ -55,14 +61,14 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | A second agent checks the work | Done check, as each turn ends | No |
 | Conflicts between parallel tasks | Collision radar, while they work | At merge |
 | Account needed | None | None |
-| Platforms | macOS 13+; Linux (preview); Windows through WSL 2 | Any |
+| Platforms | macOS 13+ on Apple silicon; Intel, Linux and Windows (WSL 2): build it yourself | Any |
 
 Everything else (themes, extensions, workflows, scheduled prompts, the CLI and its MCP server, trusted clients for apps
 outside Laki): [docs/features.md](docs/features.md).
 
 ## Install
 
-macOS 13 or later. Download the dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest)
+macOS 13 or later on Apple silicon. Download the dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest)
 (signed and notarized), or:
 
 ```bash

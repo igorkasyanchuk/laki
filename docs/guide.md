@@ -10,9 +10,20 @@ side panel (files, changes, review), a Run button, dev servers, listening ports,
 
 Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.js, the same shape as Superset.
 
-[Features](#features) · [Install](#install) · [First run](#first-run) · [Using it](#using-it) · [Settings](#settings) ·
-[Project settings](#project-settings) · [CLI](#cli) · [Data](#data) · [Updating](#updating) ·
-[Troubleshooting](#troubleshooting) · [Known limits](#known-limits)
+Contents:
+
+- [Features](#features)
+- [Install](#install)
+- [First run](#first-run)
+- [Using it](#using-it)
+- [Settings](#settings)
+- [Project settings](#project-settings)
+- [CLI](#cli)
+- [Data](#data)
+- [Updating](#updating)
+- [Managed policy (teams)](#managed-policy-teams)
+- [Troubleshooting](#troubleshooting)
+- [Known limits](#known-limits)
 
 What Laki is and where it's going: [requirements](../requirements/README.md). How the code works, for agents
 changing it: [AGENTS.md](../AGENTS.md).
