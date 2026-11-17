@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- @ in a prompt box offers folders too (with a slash), bolds what matched, stays out of `code` and emails, and keeps up in big repos; screen readers follow the highlighted file.
+- Diffs in two columns have a key (⇧⌘D, Settings › Keys), stay one column when there's under 900px of room (the button says why), and a selection copies only the side it began on.
 - Long names in the sidebar, tab titles and the status bar's branch are cut in the middle (`fix-c…total`), so both ends stay readable. Needs you's title is never cut: its Allow all and Deny all become icons when the sidebar is narrow, and an agent's name in a card is whole or on a line of its own.
 - The floating AI button rises above the Done check, the queue and the other strips under a terminal instead of covering them, fades while the pointer is far from it, and pages keep room for it at their bottom.
 - Remote access on an iPhone: the bars clear the notch and the home indicator, in Safari and from the Home Screen.

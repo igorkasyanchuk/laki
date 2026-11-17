@@ -37,6 +37,7 @@ export const KEYS = [
   { id: 'stopAll', label: 'Stop all agents', key: '' }, // U8: the File menu's and ⌘K's
   { id: 'allowAll', label: 'Allow all in Needs you (a card focused; it asks first)', key: '⇧A' },
   { id: 'previewPick', label: 'Pick an element in the Preview (it has the focus): to the agent', key: '⌥⌘P' }, // F5
+  { id: 'diffSplit', label: 'Diffs: one column or two (Review, Changes)', key: '⇧⌘D' }, // T18: Diff.tsx useSplit
 ] as const
 export type KeyId = (typeof KEYS)[number]['id']
 export type KeyMap = Record<KeyId, string>

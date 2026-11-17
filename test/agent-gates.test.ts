@@ -19,7 +19,11 @@ test("S2: an agent's rm asks the user; files and tabs are its own workspace's; n
   const tab = (await until(() => rig.tab(one.id))).id
   const tab2 = (await until(() => rig.tab(two.id))).id
   const from = { ws: one.id, tab }
-  // files: its own workspace's, never git's
+  // files: its own workspace's, never git's; the list (a box's @, the Files panel) too (T17)
+  await assert.rejects(rig.rpc('files', { ws: two.id, from }), /list its own workspace's files only/)
+  await assert.rejects(rig.rpc('files', { project: p.id, from }), /list its own workspace's files only/)
+  assert.ok((await rig.rpc('files', { ws: one.id, from })).files.includes('README.md'))
+  assert.ok((await rig.rpc('files', { ws: two.id })).files.includes('README.md'), 'you: any')
   await assert.rejects(rig.rpc('fileNew', { ws: two.id, path: 'x.txt', from }), /its own workspace only/)
   await assert.rejects(rig.rpc('fileWrite', { ws: two.id, path: 'README.md', text: 'x', force: true, from }), /its own workspace only/)
   for (const m of ['fileUndo', 'hunkUndo', 'hunkRedo']) await assert.rejects(rig.rpc(m, { ws: two.id, path: 'README.md', id: 'x', hunk: '', from }), /its own workspace only/, m)
@@ -215,8 +219,8 @@ test("S1: a detached process with daemon.json's token is refused what's yours; t
 // S5: deny unless allowed: every method of api is classified (main.ts checks it as it loads; this reads its source)
 test('S5: every api method is in FROM, CALLER or OPEN', () => {
   const s = readFileSync(fileURLToPath(new URL('../src/daemon/main.ts', import.meta.url)), 'utf8')
-  const at = s.indexOf('const api: Record<string, Handler> = {')
-  const keys = [...s.slice(at, s.indexOf('\n}\n', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
+  const at = s.indexOf('const api = {') // T14: satisfies Record<string, Handler>
+  const keys = [...s.slice(at, s.indexOf('\n} satisfies', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
   const set = (n: string) => new Set(JSON.parse(`[${new RegExp(`const ${n} = new Set\\(\\[([^\\]]*)\\]`).exec(s)![1].replace(/'/g, '"')}]`) as string[])
   const [from, caller, open] = ['FROM', 'CALLER', 'OPEN'].map(set)
   assert.ok(keys.length > 250, 'the api table read')

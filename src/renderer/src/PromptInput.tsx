@@ -3,7 +3,7 @@
 // a folder dropped in is its path, typed in), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
-import { type ReactNode, type RefObject, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { sendIs } from '../../shared/keys'
 import { ago, bytes } from '../../shared/widget'
@@ -107,6 +107,7 @@ export type Complete = {
 // (true: the menu took it); menu goes beside the box, in a parent with position: relative
 export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete: Complete | undefined, onChange: (v: string) => void) {
   const [trig, setTrig] = useState<Trigger | null>(null)
+  const list = useId()
   const [shut, setShut] = useState(-1)
   const [lit, setLit] = useState(0)
   const [got, setGot] = useState<{ files?: string[]; changed?: string[]; refs?: Ref[]; commands?: AgentCommand[]; err?: string; loading?: boolean }>({})
@@ -137,7 +138,7 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
     // an answer for the one picked before: dropped (another agent's commands: read again when it's picked again)
     const put = (x: Partial<typeof got>) => now.current === of && (k === 'commands' && agentNow.current !== ag ? ((read.current[rk] = 0), setGot(g => ({ ...g, loading: false }))) : setGot(g => ({ ...g, ...x, loading: false })))
     setGot(g => ({ ...g, err: undefined, loading: true }))
-    ;(k === 'files' ? complete.files!().then(r => put({ files: r.files, changed: r.changed })) : k === 'refs' ? complete.refs!().then(refs => put({ refs })) : complete.commands!().then(commands => put({ commands }))).catch(e => ((read.current[rk] = 0), put({ err: String(e?.message ?? e) })))
+    ;(k === 'files' ? complete.files!().then(r => put({ files: r.files.slice(0, 20000), changed: r.changed })) /* T17: 20,000 at most */ : k === 'refs' ? complete.refs!().then(refs => put({ refs })) : complete.commands!().then(commands => put({ commands }))).catch(e => ((read.current[rk] = 0), put({ err: String(e?.message ?? e) })))
   }, [trig?.ch, whose, complete?.agent])
   useEffect(() => setGot(g => (g.commands ? { ...g, commands: undefined } : g)), [complete?.agent]) // another agent picked: not the last one's
   const shown = trig && trig.from !== shut ? trig : null
@@ -160,10 +161,10 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
   }
   const up = !!shown && !!box.current && box.current.getBoundingClientRect().bottom + 260 > innerHeight // no room under the box: over it
   const menu = shown && (rows.length > 0 || got.loading || got.err) && (
-    <div className={`pi-complete ${up ? 'up' : ''}`} role="listbox" onMouseDown={e => e.preventDefault() /* the box keeps the focus */}>
+    <div id={list} className={`pi-complete ${up ? 'up' : ''}`} role="listbox" onMouseDown={e => e.preventDefault() /* the box keeps the focus */}>
       {rows.map((r, i) => (
-        <div key={r.value + i} role="option" aria-selected={i === lit} className={`pi-row ${i === lit ? 'on' : ''}`} onMouseEnter={() => setLit(i)} onClick={() => pick(r)}>
-          <span className="pi-label">{r.label}</span>
+        <div key={r.value + i} id={`${list}-${i}`} role="option" aria-selected={i === lit} className={`pi-row ${i === lit ? 'on' : ''}`} onMouseEnter={() => setLit(i)} onClick={() => pick(r)}>
+          <span className="pi-label">{r.hits?.length ? [...r.label].map((ch, k) => (r.hits!.includes(k) ? <b key={k}>{ch}</b> : ch)) : r.label /* T17: what matched, bold */}</span>
           {r.sub && <span className="pi-sub">{r.sub}</span>}
         </div>
       ))}
@@ -171,7 +172,9 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
       <div className="pi-foot">↑↓ · ⏎ or ⇥ picks · esc {shown.ch === '/' ? `keeps /${shown.q}` : 'closes'}</div>
     </div>
   )
-  return { look, key, menu, blur: () => setTrig(null) }
+  // T17: a screen reader follows the lit row from the box (its aria-activedescendant)
+  const aria = menu ? { 'aria-controls': list, 'aria-expanded': true, 'aria-activedescendant': rows.length ? `${list}-${lit}` : undefined, 'aria-autocomplete': 'list' as const } : { 'aria-expanded': false }
+  return { look, key, menu, aria, blur: () => setTrig(null) }
 }
 
 // what a box can complete from the view: a workspace's files (else, files: true, the project's own folder's), the
@@ -379,6 +382,7 @@ export function PromptInput(p: {
         onChange={e => (p.onChange(e.target.value), cmp.look())}
         onSelect={cmp.look}
         onBlur={cmp.blur}
+        {...cmp.aria}
         onPaste={paste}
         onKeyDown={(e: KeyboardEvent) => {
           if (cmp.key(e)) return

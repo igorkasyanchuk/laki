@@ -1020,7 +1020,8 @@ line, after the tab restarts.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
   *Collapse all* closes them); the button beside it shows the diffs in two columns, old and new side by side like
-  GitHub's split view, and Laki remembers it; the tree button groups the files by folder (a folder holding only one
+  GitHub's split view, and Laki remembers it (⇧⌘D, in Settings › Keys; under 900px of room it stays one column and
+  its button says so; a selection copies the side it began on); the tree button groups the files by folder (a folder holding only one
   folder is one row with it; a click folds it), here and in the Review tab's file list, and that's remembered too.
   The branch after *changed vs* (a worktree's) changes its base: pick another branch, local or origin's, or type
   one, for a base that was deleted or wrong; the diff, its size and later compares (Commits, Collision radar, Ship's

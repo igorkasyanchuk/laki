@@ -11,7 +11,7 @@ import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
-import { bgDoneOf, midCut, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
+import { bgDoneOf, foldersOf, fuzzyFiles, midCut, pickProject, readerShown, retrying, retryText, triggerAt } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -1057,4 +1057,35 @@ test('midCut: a long name cut in the middle, both ends kept, the end on a dash; 
   assert.equal(midCut('🚀rocket-launch-🚀🚀', 9), '🚀rocke…🚀🚀', 'an emoji is one')
   assert.equal(midCut('日本語の名前がとても長い', 6), '日本語…長い')
   assert.equal(midCut('dark-mode', 3), 'da…', 'too little room: the start')
+})
+
+test('splitRows (T18): equal runs of removed and added lines pair up line by line, context beside itself', () => {
+  const L = (text: string, old?: number, now?: number) => ({ text, old, new: now })
+  const d1 = L('-a', 1), d2 = L('-b', 2), a1 = L('+A', undefined, 1), a2 = L('+B', undefined, 2), c = L(' c', 3, 3)
+  assert.deepEqual(splitRows([d1, d2, a1, a2, c]), [{ left: d1, right: a1 }, { left: d2, right: a2 }, { left: c, right: c }])
+  assert.deepEqual(splitRows([a1, a2]), [{ left: undefined, right: a1 }, { left: undefined, right: a2 }], 'all added: the left side empty')
+})
+
+test('fuzzyFiles (T17): the name beats the path, any case, the matched runs to bold, at most max; folders with a slash', () => {
+  const paths = ['src/app/main.ts', 'docs/maintain.md', 'src/renderer/src/App.tsx', 'test/app.test.ts']
+  const top = fuzzyFiles(paths, 'APP', 8)
+  assert.equal(top.length, 3)
+  assert.deepEqual(top.map(f => f.path).slice(0, 2).sort(), ['src/renderer/src/App.tsx', 'test/app.test.ts'], 'in the name first')
+  assert.equal(top.at(-1)!.path, 'src/app/main.ts', 'in the path last')
+  const [hit] = fuzzyFiles(['src/renderer/src/App.tsx'], 'app')
+  assert.deepEqual(hit.ranges, [[17, 20]], 'one run, where it is')
+  assert.equal('src/renderer/src/App.tsx'.slice(17, 20), 'App')
+  assert.deepEqual(fuzzyFiles(['a/xay.ts'], 'xy')[0].ranges, [[2, 3], [4, 5]], 'apart: two runs')
+  assert.equal(fuzzyFiles(Array.from({ length: 50 }, (_, i) => `f${i}.ts`), 'f', 8).length, 8, 'the cap')
+  assert.deepEqual(foldersOf(['src/ui/a.ts', 'src/b.ts', 'c.ts']).sort(), ['src/', 'src/ui/'])
+})
+
+test('triggerAt (T17): @ at a word start, not in an email or inside code; a space ends it', () => {
+  assert.deepEqual(triggerAt('look at @src/ap', 15), { ch: '@', q: 'src/ap', from: 8 })
+  assert.deepEqual(triggerAt('@', 1), { ch: '@', q: '', from: 0 })
+  assert.equal(triggerAt('mail me@example.com', 19), null, 'an email')
+  assert.equal(triggerAt('run `npm @sc', 12), null, 'inside `code`')
+  assert.equal(triggerAt('```\nimport @x', 13), null, 'inside a ``` block')
+  assert.deepEqual(triggerAt('`a` then @b', 11), { ch: '@', q: 'b', from: 9 }, 'after code: again')
+  assert.equal(triggerAt('@ ', 2), null, 'a space after it')
 })

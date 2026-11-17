@@ -148,7 +148,11 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
     - `laki.zoom`: each tab's ⌘± text size, in points over `settings.fontSize` (App's `sizeOf`; ⌘0 drops it; closed tabs'
       go); Settings and Help zoom with `pageZoom` instead.
-    - `laki.diffSplit`: Changes in two columns (`split`, `text.ts` `splitRows`) or one (`unified`, the default).
+    - `laki.diffSplit`: Changes in two columns (`split`, `text.ts` `splitRows`) or one (`unified`, the default). T18:
+      Diff.tsx `useSplit` (Review's and Changes'): one column under 900px of the element given as `room`, whatever
+      was picked (`SplitToggle` says why); Settings › Keys' `diffSplit` (⇧⌘D, keydown.ts' `laki-diff-split` event while a
+      `.sp-diff` shows); a cell's `data-side`, and a press in one sets its grid's `data-pick`, so the other side is
+      `user-select: none` and a selection copies one side. test:ui's `review-split`.
     - `laki.changesScope`, `laki.reviewScope`: Changes' and the Review tab's *Branch* or *Uncommitted* (Diff.tsx `useScope`).
     - `since` (R11): Changes' *Since I reviewed · n files*, never kept; only while the workspace has a `reviewed` mark.
     - *Since ▾* (ChangesTab's `from`, never kept): Branch narrowed to what changed after a commit of the branch (`PanelApi.commits`' list; `commitChanges`: `diff { since: <sha> }`, files.ts `diff`'s `since`, a commit HEAD has behind it); read only as `since`; `prHeadOf` marks another workspace's PR head.
@@ -328,6 +332,11 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   screen and pairing). main.tsx sets `html[data-kb]` while the visual viewport is 120px or more short of the layout's
   (iOS's keyboard), which zeroes `--safe-b`: the keyboard covers the home indicator. test:ui's `phone-safe` sets the
   four as inline custom properties (a 34px bottom) and checks the bottom bars' buttons end 34px over the bottom.
+- **A prompt box's @** (T17, PromptInput.tsx `useComplete`, text.ts `triggerAt`, `completions`): @ at a word's start, not
+  in an email and not inside `code` or a ``` block (an odd count of backticks before it); the workspace's `files`
+  (20,000 at most, read once a minute) and, once something's typed, their folders with a slash (`foldersOf`), ranked
+  by `findFiles` (the name before the path; 50 ms a key at most, `fuzzyFiles`' budget), the matched letters bold; the
+  pick is `@path` as plain text. The listbox's rows have ids, the box `aria-activedescendant` and `aria-controls`.
 - **Names cut in the middle** (T6): ui.tsx `MidText` (text.ts `midCut`: the end on a dash, space, dot, slash or
   underscore when that leaves it at most half, by code point) for sidebar rows, tab titles and the status bar's branch:
   the cut over the whole name (transparent, so a screen reader reads it whole; its title too) in one grid cell, so the

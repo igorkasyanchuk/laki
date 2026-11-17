@@ -102,6 +102,17 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['reader', click('.reader-switch button:last-child'), '.reader'],
     ['fab-apart', null, () => apart('.ai-fab', '.rd-box button.primary')], // U2: the AI button off the Reader's Send
     ['review', click('.review-tab'), '.full-review'],
+    // T18: two columns (its key's event) once the diff has 900px (the files and the comments folded away): each changed
+    // line's row has an old and a new cell; then one again
+    ['review-split', async () => {
+      await click('.full-review button[aria-label="Hide the files"]')()
+      await click('.full-review button[aria-label="Hide the comments"]')()
+      await js("localStorage.getItem('laki.diffSplit') === 'split' || window.dispatchEvent(new CustomEvent('laki-diff-split'))")
+    }, () => js<boolean>("(c => c.length > 0 && c.some(e => e.dataset.side === 'old') && c.some(e => e.dataset.side === 'new'))([...document.querySelectorAll('.full-review .sp-diff.split [data-side]')])")],
+    ['review-unsplit', async () => {
+      await js("window.dispatchEvent(new CustomEvent('laki-diff-split'))")
+      await js("document.querySelectorAll('.full-review .fr-strip').forEach(b => b.click())") // the files and the comments back (each fold is remembered)
+    }, async () => !(await has('.full-review .sp-diff.split')) && (await has('.full-review .sp-row'))],
     ['new-workspace', link('laki://new'), '.nw-composer'],
     ['settings', link('laki://settings'), '.settings-page'],
     // U10: Basic shows four heads, each only its cards (Look: Theme first); All again; Layout by its link

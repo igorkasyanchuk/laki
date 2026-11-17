@@ -698,11 +698,14 @@ function fileMatch(q: string, s: string) {
 
 // the files matching q best: its letters in the file name first, else anywhere in the path
 // ponytail: greedy first match per letter, not the best alignment; fine for picking files
-export function findFiles(q: string, files: string[], max = 60) {
+export function findFiles(q: string, files: string[], max = 60, budgetMs = Infinity) {
   q = q.toLowerCase().replace(/\s+/g, '')
   if (!q) return files.slice(0, max).map(path => ({ path, hits: [] as number[] }))
   const out: { path: string; hits: number[]; score: number }[] = []
-  for (const path of files) {
+  const t0 = performance.now()
+  for (let i = 0; i < files.length; i++) {
+    if (!(i & 511) && i && performance.now() - t0 > budgetMs) break // a big repo's every key: what it has by then
+    const path = files[i]
     const at = path.lastIndexOf('/') + 1
     const b = fileMatch(q, path.slice(at))
     const m = b ? { score: b.score * 2 + 10, hits: b.hits.map(h => h + at) } : fileMatch(q, path)
@@ -710,6 +713,12 @@ export function findFiles(q: string, files: string[], max = 60) {
   }
   return out.sort((a, b) => b.score - a.score).slice(0, max)
 }
+
+// T17: a box's @: findFiles with the matched characters as [from, to) runs to bold, 50 ms at most per key
+export const fuzzyFiles = (paths: string[], query: string, max = 8, budgetMs = 50) =>
+  findFiles(query, paths, max, budgetMs).map(f => ({ path: f.path, ranges: f.hits.reduce<[number, number][]>((r, h) => ((l => (l && l[1] === h ? (l[1] = h + 1) : r.push([h, h + 1])))(r.at(-1)), r), []) }))
+// the folders above some files, each with its slash (src/, src/ui/): a box's @ offers them too
+export const foldersOf = (paths: string[]) => [...new Set(paths.flatMap(p => p.split('/').slice(0, -1).map((_, i, a) => `${a.slice(0, i + 1).join('/')}/`)))]
 
 // @ in Reader's box: one of your workspaces or projects by its id (the one it's in left out; Terminals and Browsers
 // have none). As it's sent, a line for each @id in the text tells the agent what it is and how to reach it: context,
@@ -746,6 +755,8 @@ export type Trigger = { ch: '@' | '#' | '/'; q: string; from: number }
 export function triggerAt(v: string, caret: number): Trigger | null {
   const before = v.slice(0, caret)
   const m = /(^|\s)([@#])([^\s@#]*)$/.exec(before)
+  // T17: not inside `code` or a ``` block (an odd count of backticks before it), where an @ is the text's own
+  if (m && m[2] === '@' && (before.match(/`/g)?.length ?? 0) % 2) return null
   if (m) return { ch: m[2] as '@' | '#', q: m[3], from: caret - m[3].length - 1 }
   const s = /(^|\n)\/([^\s/]*)$/.exec(before)
   return s ? { ch: '/', q: s[2], from: caret - s[2].length - 1 } : null
@@ -757,13 +768,13 @@ const refSub = (r: Ref) => [r.repo, r.kind, r.assignees?.length ? r.assignees.ma
 // the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
 // templates by name
 export type AgentCommand = { name: string; sub: string; skill?: boolean } // the daemon's agentCommands: /name (codex's skills $name)
-export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[]; commands?: AgentCommand[]; mentions?: Mention[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
+export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[]; commands?: AgentCommand[]; mentions?: Mention[] }, max = 8): { label: string; hits?: number[]; sub?: string; value: string; template?: Template }[] {
   const q = t.q.toLowerCase()
   if (t.ch === '@' && o.mentions) return o.mentions.filter(m => m.token.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)).slice(0, max).map(m => ({ label: m.label, sub: `${m.sub} · @${m.token}`, value: `@${m.token}` })) // Reader's: workspaces and projects
   if (t.ch === '@') {
     const changed = new Set(o.changed ?? [])
-    const all = [...(o.changed ?? []).filter(f => (o.files ?? []).includes(f) || !o.files), ...(o.files ?? []).filter(f => !changed.has(f))]
-    return findFiles(q, all, max).map(f => ({ label: f.path.slice(f.path.lastIndexOf('/') + 1), sub: `${f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}${changed.has(f.path) ? (f.path.includes('/') ? ' · changed' : 'changed') : ''}`, value: f.path }))
+    const all = [...(o.changed ?? []).filter(f => (o.files ?? []).includes(f) || !o.files), ...(o.files ?? []).filter(f => !changed.has(f)), ...(q ? foldersOf(o.files ?? []) : [])] // T17: folders too, once something's typed
+    return findFiles(q, all, max, 50).map(f => ({ hits: f.hits.filter(h => h >= f.path.slice(0, -1).lastIndexOf('/') + 1).map(h => h - f.path.slice(0, -1).lastIndexOf('/') - 1), label: f.path.slice(f.path.slice(0, -1).lastIndexOf('/') + 1), sub: `${f.path.slice(0, -1).includes('/') ? f.path.slice(0, f.path.slice(0, -1).lastIndexOf('/')) : ''}${changed.has(f.path) ? (f.path.includes('/') ? ' · changed' : 'changed') : ''}`, value: f.path }))
   }
   if (t.ch === '#') {
     const words = q.replace(/^#/, '').split(/\s+/).filter(Boolean)

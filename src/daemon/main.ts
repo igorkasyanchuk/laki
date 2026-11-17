@@ -1292,6 +1292,7 @@ function agentNo(method: string, p: any) {
     if (GIT_PATH.test(String(p.path ?? ''))) throw new Error("an agent can't change a workspace's .git through Laki")
   }
   else if (method === 'wsUpdate' && core.agentCaller(p.from) && core.findWs(String(p.ws ?? '')).id !== core.agentCaller(p.from)) throw new Error('an agent can update its own workspace only')
+  else if (method === 'files' && core.agentCaller(p.from) && (p.project !== undefined || core.findWs(String(p.ws ?? '')).id !== core.agentCaller(p.from))) throw new Error("an agent can list its own workspace's files only") // T17: a box's @, the Files panel
   else if (method === 'tabClose' && core.agentCaller(p.from) && core.findTab(String(p.id ?? '')).workspace !== core.agentCaller(p.from)) throw new Error('an agent can close tabs in its own workspace only')
   else if (method === 'openIn' && p.file && fileApp(p.app)) notAgent(p, `open a file ${p.app === 'default' ? 'with its default app' : 'in a browser'} (a page it wrote would run outside Laki; laki show opens it in the viewer)`) // S7: a browser too
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])

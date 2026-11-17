@@ -44,6 +44,7 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     help: () => setDialog(d => (d === 'help' ? null : 'help')),
     // F5: the Preview's Pick, with the focus in it (its page's own press comes from main: force)
     previewPick: (force === 'previewPick' || !!document.activeElement?.closest('.web-tools, .web-body')) && (() => window.dispatchEvent(new CustomEvent('laki-preview-pick'))),
+    diffSplit: !!document.querySelector('.sp-diff') && (() => window.dispatchEvent(new CustomEvent('laki-diff-split'))), // T18: a diff on screen
     layout: !dialog && (() => (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())), // its menu at ⋯, where it's a submenu
   }
   const id = force ?? (fixed ? undefined : keyFor(e, kb))

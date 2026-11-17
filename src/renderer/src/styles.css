@@ -1511,6 +1511,7 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .sp-diff.split .dl:nth-child(odd of .dl:not(.dl-full)) { border-right: 1px solid var(--line); }
 .sp-diff.split .dl-full, .sp-diff.split > :not(.dl) { grid-column: 1 / -1; }
 .sp-diff.split .dl-none { background: color-mix(in srgb, var(--line) 25%, transparent); }
+.sp-diff.split[data-pick='old'] [data-side='new'], .sp-diff.split[data-pick='new'] [data-side='old'] { user-select: none; } /* T18: a selection takes the side it began on */
 .dl-comment { position: sticky; left: 8px; width: calc(100% - 16px); display: flex; flex-direction: column; gap: var(--sp-3); margin: 4px 8px 6px; white-space: normal; padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--bg)); font-family: var(--ui-font, inherit); }
 .web-tools input, .web-sizes input { font-family: var(--mono); font-size: var(--fs-2); }
 .web-sizes { flex-wrap: wrap; row-gap: var(--sp-2); }

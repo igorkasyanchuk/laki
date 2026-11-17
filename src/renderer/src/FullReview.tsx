@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
-import { type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
+import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -89,8 +89,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
   const files = d?.files ?? []
   const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}`)
-  const [split, setSplit] = useState(() => localStore('laki.diffSplit') === 'split')
-  const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
+  const sp = useSplit() // T18: one column under 900px
+  const split = sp.split
   const baseName = d?.base ?? base
 
   // the filter: words, or a glob (* or ?) as an extension's match takes it (a pattern without / is the file's name)
@@ -506,7 +506,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         ) : (
           <IconButton icon="expand" title={unread.length && unread.length < listed.length ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setShown(unread.length ? unread : listed.map(f => f.path), true)} />
         )}
-        <IconButton icon={split ? 'unsplit' : 'splitRight'} title={split ? 'One column: the changes in one' : 'Two columns: before and after side by side'} on={split} onClick={() => pickSplit(!split)} />
+        <SplitToggle s={sp} />
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
@@ -565,7 +565,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         </div>
         )}
         {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
-        <div className="fr-diff" ref={body} onScroll={() => requestAnimationFrame(spy)}>
+        <div className="fr-diff" ref={el => void ((body.current = el), sp.room(el))} onScroll={() => requestAnimationFrame(spy)}>
           <DiffFind at={root} within={body} unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)} />
           {err && <div className="warn small pad">{err}</div>}
           {gh.err && <div className="warn small pad">{gh.err}</div>}

@@ -241,6 +241,32 @@ export function wordMarks(lines: DiffLine[]) {
   return m
 }
 const marked = (spans: WordSpans, add: boolean) => spans.map(([t, on], i) => (on ? <mark key={i} className={add ? 'wd wd-add' : 'wd wd-del'}>{t}</mark> : t))
+// T18: two columns or one, every diff's (laki.diffSplit), its key (Settings › Keys' diffSplit: keydown.ts' event), and
+// one column whatever was picked while its room (the element room is given) is under 900px: the toggle says why
+const SPLIT_MIN = 900
+export function useSplit() {
+  const [picked, setPicked] = useState(() => localStore('laki.diffSplit') === 'split')
+  const [el, room] = useState<HTMLElement | null>(null)
+  const [wide, setWide] = useState(true)
+  useEffect(() => {
+    if (!el) return
+    const ro = new ResizeObserver(() => setWide(el.clientWidth >= SPLIT_MIN))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [el])
+  const pick = (on: boolean) => (setPicked(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
+  useEffect(() => {
+    const flip = () => setPicked(p => (localStore('laki.diffSplit', p ? 'unified' : 'split'), !p))
+    addEventListener('laki-diff-split', flip)
+    return () => removeEventListener('laki-diff-split', flip)
+  }, [])
+  return { split: picked && wide, picked, wide, pick, room }
+}
+export function SplitToggle({ s }: { s: ReturnType<typeof useSplit> }) {
+  const title = s.picked && !s.wide ? 'One column here: two need 900px of room' : s.picked ? 'One column: the changes in one' : 'Two columns: before and after side by side'
+  return <IconButton icon={s.split ? 'unsplit' : 'splitRight'} title={title} on={s.picked} onClick={() => s.pick(!s.picked)} keyId="diffSplit" />
+}
+
 export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode; gutter?: (l: DiffLine, side: Side) => ReactNode; nums?: boolean }) {
   // the line numbers, as GitHub's (one column: old and new; two: each side's), as wide as the file's biggest; then the
   // + a commentable line (.dl-line) shows on hover: a click anywhere on it opens the box
@@ -256,7 +282,7 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
       </>
     )
   const line = (l: DiffLine, more = '', side: Side = 'both') => (
-    <div className={`${cls(l)}${more}`} {...row(l)}>
+    <div className={`${cls(l)}${more}`} {...row(l)} {...(more && { 'data-side': side, onPointerDownCapture: (e: MouseEvent<HTMLDivElement>) => void (e.currentTarget.parentElement!.dataset.pick = side) })}>
       {l.text.startsWith('@@') ? head(l) : (
         <>
           {gutter?.(l, side)}
@@ -273,7 +299,8 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
         {after?.(l)}
       </Fragment>
     ))
-  const cell = (side: Side, l?: DiffLine) => (l ? line(l, ' dl-cell', side) : <div className="dl dl-none" />)
+  // T18: a cell says its side; a press in one picks it (its grid's data-pick), so a selection copies that side alone
+  const cell = (side: Side, l?: DiffLine) => (l ? line(l, ' dl-cell', side) : <div className="dl dl-none" data-side={side} />)
   return splitRows(fd.lines).map((r, i) => (
     <Fragment key={i}>
       {r.full ? <div className={`${cls(r.full)} dl-full`}>{r.full.text.startsWith('@@') ? head(r.full) : r.full.text || ' '}</div> : (

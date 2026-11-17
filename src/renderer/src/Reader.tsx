@@ -388,7 +388,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
             data-history
             onChange={e => (setText(e.target.value), at.look())}
             onSelect={at.look}
-            onBlur={at.blur}
+            onBlur={at.blur} {...at.aria}
             onKeyDown={e => {
               if (at.key(e)) return // @'s menu took it
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))

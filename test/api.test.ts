@@ -865,8 +865,8 @@ test('remote access: the page, one email for some hours, a token of its own; gon
 // M4: remote access at Full is classified as the answer level is: a method nobody listed is refused as the daemon loads
 test('M4: every api method is in REMOTE_OK or REMOTE_NO, once', () => {
   const s = readFileSync(new URL('../src/daemon/main.ts', import.meta.url), 'utf8')
-  const at = s.indexOf('const api: Record<string, Handler> = {')
-  const keys = [...s.slice(at, s.indexOf('\n}\n', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
+  const at = s.indexOf('const api = {') // T14: satisfies Record<string, Handler>
+  const keys = [...s.slice(at, s.indexOf('\n} satisfies', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
   assert.ok(keys.length > 250, 'the api table read')
   assert.deepEqual(keys.filter(k => REMOTE_OK.has(k) === REMOTE_NO.has(k)), [], 'each in exactly one')
   assert.deepEqual([...REMOTE_OK, ...REMOTE_NO].filter(k => !keys.includes(k)), [], 'every name listed is a method')
