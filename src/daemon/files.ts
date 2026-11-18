@@ -761,8 +761,10 @@ export async function sourceGuess(o: { ws: string; words?: unknown }) {
 export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean; media?: boolean; stat?: boolean }) { // stat: its size and time only (an open artifact's look for a change)
   let ws = findWs(o.ws)
   if (o.storage) {
-    // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own
+    // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own; never a
+    // secret's file (secrets.ts' .laki-secrets: an agent gets its path, nobody its text through Laki)
     if (!ws.storage || ws.host || o.base) throw new Error('no storage folder')
+    if (String(o.path ?? '').split(/[\\/]+/).filter(x => x && x !== '.').includes('.laki-secrets')) throw new Error("a secret's file isn't read here")
     ws = { ...ws, path: ws.storage }
   }
   const abs = inside(ws, o.path)

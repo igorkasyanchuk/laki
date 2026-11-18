@@ -145,6 +145,18 @@ field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<
 `.laki-secrets` link is refused and never tidied through; the file opened `O_EXCL | O_NOFOLLOW`); `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
 memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
 
+A secret pasted into a prompt box (renderer's `secretHint.tsx`, in `PromptInput` (New workspace, the quick bar, Laki
+AI's, the Board's) and the Reader's box, the phone's too): `shared/secrets.ts` `secretsIn` (the share mask's `SECRETS`
+plus `PAIR`, the generic `password=` pairs with an entropy check; a UUID, a 40-hex hash, a base64 picture never match)
+runs in the window as the text changes; a line under the box names the kind, the value `maskSecret`ed (first 4, last
+3), *Send as it is* (that exact text, a `Set` in memory) and *Pass as a secret*: `secretKeep` (`value`, `label`, `ws`;
+refused from an agent; a phone's) writes it with `secretGive`'s `writeSecret` into the workspace's `.laki-secrets`
+(no `ws`, a new workspace's prompt: `storageRoot()`'s own, tidied with the rest) and `secretLine` replaces the value
+with its path. ⏎ with the line showing arms it (`guard`), ⏎ again sends: never blocked. Drafts are kept
+`maskSecrets`ed (`useDraft`'s localStorage, `tabDraft`). `fileRead` with `storage` refuses a `.laki-secrets` path:
+nobody reads one through Laki. Off: `settings.secretHint === false` (Settings › Agents & profiles; never an agent's).
+Tested in `test/cli-agents.test.ts` and `test/units-more.test.ts`.
+
 `daemon/alerts.ts`: `laki alert <text> [--title t] [--choice A]…` (MCP's `laki_alert`; `ALERT_WAIT`, 30 minutes, the
 CLI's rpc waits as long): `alertShow` (refused with no app connected, from a workspace Recording mode hides: phone.ts
 `hidden`, or past `RATE`, 5 a minute from each tab or from outside one; its words without `HIDDEN`'s characters) broadcasts `alert` (`id`, `title`: yours or the

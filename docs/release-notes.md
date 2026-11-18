@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Paste a token or key into a prompt box and a line under it says so, masked: *Pass as a secret* puts it in a file only you and the agent read and its path in the prompt. Checked in the window; ⏎ twice sends it as it is.
 - A *don't ask again* choice shows the whole rule it grants on a line of its own (`npm init *`), in Needs you, the Reader, the ask bar, the cards on screen and notifications. A broad one (a wildcard, a folder, a whole tool) is amber and says what it covers: *every command that starts with npm init*. Allow all and the answer keys never pick it.
 - *Where it went*: a workspace's Info (and the Proof card) shows where its tokens went, by file read, command output, the carried conversation and more, with a hint when one file is read again and again or a command prints too much. `laki spend <ws>` too.
 - `laki mcp` serves resources (a workspace's diff and live plan, a project's memory) and your prompt templates as MCP prompts, behind the same rules as its tools.

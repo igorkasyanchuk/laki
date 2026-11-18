@@ -6,10 +6,12 @@
 import { type ReactNode, type RefObject, useEffect, useId, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { sendIs } from '../../shared/keys'
+import { maskSecrets } from '../../shared/secrets'
 import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, type MenuItem, useMenu } from './ui'
+import { useSecretHint } from './secretHint'
 import { cloudVoice, fnOn, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceIn, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
@@ -40,7 +42,7 @@ export function useDraft(key: string) {
   useEffect(() => {
     if (h.key !== key || !h.ready) return
     const all = load<Record<string, Draft>>(DRAFTS, {})
-    if (h.text.trim() || h.images.length) all[key] = { text: h.text, ...(h.images.length && { images: h.images.map(i => i.path) }) }
+    if (h.text.trim() || h.images.length) all[key] = { text: maskSecrets(h.text), ...(h.images.length && { images: h.images.map(i => i.path) }) } // a pasted secret kept masked (secretHint)
     else delete all[key]
     keep(DRAFTS, Object.keys(all).length ? all : undefined)
   }, [h])
@@ -250,8 +252,10 @@ export function PromptInput(p: {
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
   complete?: Complete
+  ws?: string // a pasted secret's file goes to its storage folder (Pass as a secret; none: the storage root's)
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
+  const hint = useSecretHint(p.value, p.onChange, { ws: p.ws, send: p.onSubmit })
   const [err, setErr] = useState('')
   const [menu, openMenu] = useMenu()
   // dictation types into what macOS sees as the text field, which it learns from the web view a moment after focus:
@@ -387,11 +391,12 @@ export function PromptInput(p: {
         onKeyDown={(e: KeyboardEvent) => {
           if (cmp.key(e)) return
           if (historyKey(e, !p.value)) return e.preventDefault(), history() // an empty box: your prompts
-          if (e.key === 'Enter' && (e.metaKey || (p.enter && sendIs(e) && !e.nativeEvent.isComposing))) e.preventDefault(), p.onSubmit?.() // a chat's: Settings › Keys › Send with
+          if (e.key === 'Enter' && (e.metaKey || (p.enter && sendIs(e) && !e.nativeEvent.isComposing))) e.preventDefault(), hint.guard(() => p.onSubmit?.()) // a chat's: Settings › Keys › Send with; a pasted secret's line first (secretHint)
         }}
         data-voice-send={p.onSubmit ? '' : undefined} // Send as you stop talking: voice.ts presses its ⌘⏎
         data-history // App's Prompt history key: laki-history
       />
+      {hint.line}
       {cmp.menu}
       {histMenu}
       {p.images.length > 0 && (

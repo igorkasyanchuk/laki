@@ -618,6 +618,7 @@ export type Settings = {
   presets?: Preset[] | null // null: the defaults
   hideSecrets?: boolean // Hide secret-looking variables from agents (shared/env.ts envSplit over the daemon's own environment, agent tabs only): a new install's on; one from before off, asked once (hideSecretsAsked). Never an agent's or a phone's
   hideSecretsAsked?: boolean // the one-time notice for an install from before was answered
+  secretHint?: boolean // a prompt box's warning as a secret is pasted in (renderer's secretHint.tsx: shared/secrets.ts secretsIn, in the window), on unless false. Never an agent's
   sandboxNew?: boolean // a new install's: its default profiles (claude, codex) start in their sandbox (core.ts presets); one from before: unset, none. Never an agent's or a phone's (main.ts REMOTE_KEYS)
   accounts?: Account[] // claude's and codex's other sign-ins (the agent's own is HOME_ACCOUNT)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: HOME_ACCOUNT)
@@ -1373,7 +1374,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 197
+export const API = 198
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

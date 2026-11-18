@@ -9,7 +9,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readdirSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { SECRET_WAIT } from '../shared/types.ts'
-import { broadcast, changed, log, rtOf, slug, state, storageOf, tracked } from './core.ts'
+import { broadcast, changed, log, rtOf, slug, state, storageOf, storageRoot, tracked } from './core.ts'
 import { phone } from './phone.ts'
 
 const SECRET_HOURS = 24
@@ -57,23 +57,44 @@ export function secretGive(o: { id?: string; value?: unknown; refuse?: boolean }
   const value = typeof o.value === 'string' ? o.value.replace(/\r?\n$/, '') : ''
   if (!value) throw new Error('empty: type it, or Refuse')
   if (value.length > SECRET_MAX) throw new Error(`longer than ${SECRET_MAX >> 10} KB`)
-  const dir = join(a.folder, DIR)
+  const path = writeSecret(a.folder, a.label, value)
+  log(`secret: ${a.label} for ${a.tab} in ${path}`) // the path, never the value
+  a.done({ path })
+  return { ok: true }
+}
+function writeSecret(folder: string, label: string, value: string) {
+  const dir = join(folder, DIR)
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
   } catch {}
   // S10: the agent writes its storage folder: a .laki-secrets of its own (a link to a folder it would rather read, or
   // where a file of yours would go) isn't written. ponytail: a swap between this check and the write; O_NOFOLLOW guards the file
-  if (!ownDir(a.folder, dir)) throw new Error(`${DIR} in the storage folder isn't a folder of its own (a link?): not written`)
-  const path = join(dir, `${slug(a.label) || 'secret'}-${randomBytes(3).toString('hex')}`)
+  if (!ownDir(folder, dir)) throw new Error(`${DIR} in the storage folder isn't a folder of its own (a link?): not written`)
+  const path = join(dir, `${slug(label) || 'secret'}-${randomBytes(3).toString('hex')}`)
   const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
   try {
     writeSync(fd, value)
   } finally {
     closeSync(fd)
   }
-  log(`secret: ${a.label} for ${a.tab} in ${path}`) // the path, never the value
-  a.done({ path })
-  return { ok: true }
+  return path
+}
+// a secret you pasted into a prompt box (its Pass as a secret, secretHint.tsx): into a 0600 file in the workspace's storage
+// folder's .laki-secrets (no workspace yet, a new one's prompt: the storage root's own), its path back for the prompt;
+// the value is never logged, in the view or sent back. The user's, a phone's (gates.ts); never an agent's
+export function secretKeep(o: { value?: unknown; label?: unknown; ws?: unknown }) {
+  const value = typeof o.value === 'string' ? o.value.trim() : ''
+  if (!value) throw new Error('empty: nothing to keep')
+  if (value.length > SECRET_MAX) throw new Error(`longer than ${SECRET_MAX >> 10} KB`)
+  const label = String(o.label ?? 'secret').replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 80) || 'secret'
+  const ws = o.ws ? state.workspaces.find(w => w.id === o.ws) : undefined
+  if (o.ws && !ws) throw new Error(`no workspace ${String(o.ws)}`)
+  const folder = ws ? (!ws.archived ? storageOf(ws) : undefined) : storageRoot()
+  if (!folder) throw new Error(`${ws?.name ?? ws?.id} has no storage folder (an SSH host's has none): leave it in the prompt or put it in a file yourself`)
+  mkdirSync(folder, { recursive: true, mode: 0o700 })
+  const path = writeSecret(folder, label, value)
+  log(`secret: ${label} kept from a prompt in ${path}`) // the path, never the value
+  return { path }
 }
 
 // a real folder (not a link) inside the storage folder, by its real path
@@ -88,9 +109,9 @@ function ownDir(folder: string, dir: string) {
 // hourly: each storage folder's secrets past SECRET_HOURS (tests pass now)
 export function secretsTidy(now = Date.now()) {
   let n = 0
-  for (const w of state.workspaces) {
-    const dir = w.storage && join(w.storage, DIR)
-    if (!dir || !existsSync(dir) || !ownDir(w.storage!, dir)) continue // S10: a link: never the files it points at
+  for (const top of [...state.workspaces.map(w => w.storage), storageRoot()]) {
+    const dir = top && join(top, DIR)
+    if (!dir || !existsSync(dir) || !ownDir(top!, dir)) continue // S10: a link: never the files it points at
     for (const f of readdirSync(dir))
       try {
         if (now - statSync(join(dir, f)).mtimeMs > SECRET_HOURS * 3600e3) rmSync(join(dir, f), { force: true }), n++

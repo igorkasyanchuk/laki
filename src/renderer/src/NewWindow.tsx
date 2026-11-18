@@ -6,6 +6,7 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { type ActionFile, aiOn, veiled, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, daemonBase, openExternal, reportView } from './api'
+import { setSecretHint } from './secretHint'
 import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
 import { type Img, type Inserts, PromptInput, VoiceBar, withImages } from './PromptInput'
@@ -47,6 +48,7 @@ function useView() {
   useEffect(() => void (view && paint(paintOf(view.settings))), [theme])
   userCss(view?.settings.customCss) // Appearance › Custom CSS, as the app's window
   setSendKey(view?.settings.sendKey) // Settings › Keys › Send with
+  setSecretHint(view?.settings.secretHint) // a pasted secret's line (secretHint.tsx)
   return view
 }
 

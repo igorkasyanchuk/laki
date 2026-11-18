@@ -147,6 +147,7 @@ export const FIND: [string, string, string?][] = [
   ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
   ['security', 'Trusted clients', 'client token app mcp script scopes rotate revoke log refused grok bot outside'],
   ['presets', 'Network', "sandbox network hosts domains allow list allowedDomains registry offline internet"],
+  ['presets', 'Warn about a pasted secret', 'paste token key password prompt box warn pass as a secret file mask leak'],
   ['presets', 'Hide secret-looking variables from agents', 'env environment variables token secret api key password npm github aws hide keep pass let through'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
@@ -369,6 +370,11 @@ export const HELP: Record<string, SettingHelp> = {
     what: "What a sandboxed agent's commands may reach: All (the agent's own default), Listed hosts (Claude Code: the project's package registries, GitHub, its model's host, this Mac and the hosts you allowed for the project), or Off (Codex).",
     when: 'Listed hosts for a repo you trust less: a command can\'t send what it read to a host you never allowed without asking.',
     cost: 'A command that needs another host asks first, or fails; Allow this domain on its card adds it for the project.',
+  },
+  'Warn about a pasted secret': {
+    what: "A token, key or password in a prompt box (GitHub's, AWS's, Slack's, OpenAI's, Anthropic's, a private key, a JWT, password=…) gets a line under the box: Send as it is, or Pass as a secret, which puts it in a file only you and the agent read and its path in the prompt.",
+    when: 'You paste a log or a config with a key in it: the agent works with it without the key going into its chat.',
+    cost: 'Checked in the window as you type; nothing is sent to look. ⏎ with the line showing waits for a second ⏎.',
   },
   'Hide secret-looking variables from agents': {
     what: "Agents don't get the variables Laki was started with whose names look like secrets (…_TOKEN, …_SECRET, …_KEY, AWS's, NPM_TOKEN, GITHUB_TOKEN…). An agent's own sign-in key, and what you set in Settings, a project or a profile, still go through.",

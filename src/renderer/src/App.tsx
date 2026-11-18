@@ -8,6 +8,8 @@ import { type NewLine, notesOf as newLines, type UpdateState } from '../../share
 import { version as appVersion } from '../../../package.json'
 import { Outbox } from './OutboxStrip'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeyReady, passkeys, passkeySetUp, passkeyUnlock } from './api'
+import { setSecretHint } from './secretHint'
+import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
@@ -1049,6 +1051,7 @@ export function App() {
   // L7: no https picture straight from the window: an extension's through the daemon's /img, GitHub's avatars by the switch
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
+  setSecretHint(view?.settings.secretHint) // a pasted secret's line in the prompt boxes (secretHint.tsx)
   setQuiet(!!view?.dnd) // U8: Do not disturb: api.ts notify sends nothing but an important ask's card
   // as it ends: one notification of what its digest card holds (not for a card a restart found waiting)
   useEffect(() => {
@@ -3073,7 +3076,7 @@ export function App() {
   const onePane = !group || tabsOf(group).length < 2
   const readerApi: ReaderApi = {
     dismiss: tab => call('failDismiss', { tab }),
-    draft: (tab, text) => api.call('tabDraft', { tab, text }),
+    draft: (tab, text) => api.call('tabDraft', { tab, text: text && maskSecrets(text) }), // a pasted secret kept masked (secretHint)
     setMode: (tab, mode) => call('tabMode', { tab, mode }),
     read: (tab, v) => api.call('chatRead', { tab, v }),
     keys: (tab, data) => void api.call('input', { tab, data }).catch(() => {}), // ←/→ between its questions

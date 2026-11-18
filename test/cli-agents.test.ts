@@ -409,6 +409,44 @@ test('laki secret: a masked card on the tab; the value only in a 0600 file in it
   assert.deepEqual(readdirSync(yours), ['old.txt'])
 })
 
+test("Pass as a secret: a pasted secret into a 0600 file in the workspace's storage, the prompt has its path; nobody reads it through Laki", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.resumeId && x.status === 'idle' && x
+  }, 'claude up')
+  const them = await until(async () => await rig.tab(other.id), 'the other tab')
+  const { secretLine, secretsIn } = await import('../src/shared/secrets.ts')
+  const value = ['ghp', 'Zq8fake0Not1Real2Token3xY4wV5uT6sR7'].join('_') // a GitHub token's shape, no real one
+  const typed = `deploy with ${value} please`
+  const [s] = secretsIn(typed)
+  assert.equal(s.kind, 'GitHub token')
+  await assert.rejects(rig.rpc('secretKeep', { value, label: s.kind, ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't keep a secret from a prompt box/)
+  await assert.rejects(rig.rpc('secretKeep', { value: ' ', ws: ws.id }), /empty/)
+  const { path } = await rig.rpc('secretKeep', { value, label: s.kind, ws: ws.id })
+  assert.match(path, /\/\.laki-secrets\/github-token-[0-9a-f]{6}$/)
+  assert.equal(readFileSync(path, 'utf8'), value)
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  const prompt = typed.slice(0, s.start) + secretLine(path, s.kind) + typed.slice(s.end)
+  assert.ok(prompt.includes(path) && !prompt.includes(value))
+  await rig.rpc('send', { target: ws.id, text: prompt })
+  await until(() => rig.rpc('screen', { target: tab.id }).then((x: any) => JSON.stringify(x).includes('never print it')), 'the prompt sent')
+  assert.ok(!JSON.stringify(await rig.rpc('screen', { target: tab.id })).includes(value))
+  assert.ok(!JSON.stringify(await rig.rpc('state')).includes(value), 'never in the view')
+  assert.ok(!rig.out.includes(value) && rig.out.includes('kept from a prompt'), 'never in the log')
+  // no workspace yet (a new one's prompt): the storage root's own
+  const root = await rig.rpc('secretKeep', { value, label: 'token' })
+  assert.match(root.path, /\/\.laki-secrets\/token-[0-9a-f]{6}$/)
+  // read through Laki by nobody: not its own agent, not another workspace's, not you
+  const rel = `.laki-secrets/${path.split('/').pop()}`
+  await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: rel, storage: true, from: { ws: ws.id, tab: tab.id } }), /a secret's file isn't read here/)
+  await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: rel, storage: true, from: { ws: other.id, tab: them.id } }))
+  await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: `./${rel}`, storage: true }), /a secret's file isn't read here/)
+})
+
 test('a name you gave a workspace stays: an agent renames it only when you asked (--asked); a page title never', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

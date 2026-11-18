@@ -1117,3 +1117,44 @@ test('wrapProfile: the worktree and its git folder writable, ~/.ssh unreadable, 
   assert.equal(ownBoxOn('grok', '--sandbox off'), false)
   assert.equal(ownBoxOn('opencode', '-s'), false) // it has none
 })
+
+test("secretsIn: a prompt box's pasted secrets by kind, the value's span alone; UUIDs, git hashes, pictures and words don't match", async () => {
+  const { maskSecret, maskSecrets, secretsIn } = await import('../src/shared/secrets.ts')
+  const f = (...p: string[]) => p.join('') // shapes made here: no real token, nothing a scanner takes for one
+  const kinds = (t: string) => secretsIn(t).map(s => [s.kind, t.slice(s.start, s.end)])
+  const gh = f('ghp_', 'Zq8fake0Not1Real2Token3xY4wV5uT6sR7')
+  const aws = f('AKIA', 'Q7FAKE2NOT3REAL4')
+  const slack = f('xoxb-', '1234567890-fakeNotReal')
+  const anth = f('sk-ant-', 'api03-Fake9Not8Real7Key6Here5')
+  const oai = f('sk-proj-', 'Fake9Not8Real7Key6Here5')
+  const pem = f('-----BEGIN RSA ', 'PRIVATE KEY-----\nMIIfake\n-----END RSA ', 'PRIVATE KEY-----')
+  const jwt = f('eyJ', 'hbGciOiJIUzI1NiJ9', '.', 'eyJzdWIiOiIxMjM0In0', '.', 'Zm9vYmFyYmF6cXV4')
+  assert.deepEqual(kinds(`use ${gh} now`), [['GitHub token', gh]])
+  assert.deepEqual(kinds(`id ${aws}`), [['AWS access key', aws]])
+  assert.deepEqual(kinds(slack), [['Slack token', slack]])
+  assert.deepEqual(kinds(anth), [['Anthropic key', anth]])
+  assert.deepEqual(kinds(oai), [['OpenAI key', oai]])
+  assert.deepEqual(kinds(`key:\n${pem}`), [['private key', pem]])
+  assert.deepEqual(kinds(`auth ${jwt}`), [['JWT', jwt]])
+  assert.deepEqual(kinds('password=Tr0ub-4dXq9z&next=1'), [['password', 'Tr0ub-4dXq9z']]) // & ends a pair's value
+  assert.deepEqual(kinds('db password: "hX9#kQ2!vL7p"'), [['password', 'hX9#kQ2!vL7p']])
+  assert.deepEqual(kinds('api_key=Q9x-7Lm2_Vb8'), [['secret in a variable', 'Q9x-7Lm2_Vb8']])
+  assert.deepEqual(kinds('curl -H "Authorization: Bearer Zq8fake0Not1Real2xY"'), [['Bearer token', 'Zq8fake0Not1Real2xY']]) // the value: "Bearer " stays
+  assert.deepEqual(kinds('https://me:Hx9-kQ2v7Lp@db.example.com/x'), [['password in a URL', 'Hx9-kQ2v7Lp']])
+  assert.deepEqual(kinds('https://x.dev/cb?token=Zq8f-0N1R2xY4w'), [['token in a URL', 'Zq8f-0N1R2xY4w']])
+  // not secrets
+  for (const t of [
+    'run 3f2c1a9e-4b7d-4e2a-9c1b-8d7e6f5a4b3c again', // a UUID
+    'commit 9fceb02d0ae598e95dc970b74767f19372d61af8', // a git hash
+    'password=changeme', // a word, not a key
+    'password: hunter2hunter2', // low entropy: letters and digits only one kind
+    'MAX_TOKENS=4096',
+    'see ?token=abc and ?page=2',
+    `![x](data:image/png;base64,${'iVBORw0KGgo'.repeat(20)}sk-${'A'.repeat(20)})`, // a pasted picture's bytes
+    'the sk- prefix and ghp_ tokens are GitHub style',
+  ])
+    assert.deepEqual(secretsIn(t), [], t)
+  assert.equal(maskSecret(gh), `ghp_…sR7`)
+  assert.equal(maskSecret('short1!'), '••••')
+  assert.equal(maskSecrets(`a ${gh} b ${aws}`), `a ghp_…sR7 b AKIA…AL4`)
+})

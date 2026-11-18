@@ -1248,6 +1248,11 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .prompt-file button:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
 .prompt-images .prompt-file { align-self: center; }
 .prompt-tools { display: flex; align-items: center; gap: var(--sp-2); }
+/* a pasted secret's line (secretHint.tsx): its kind, the value masked, Send as it is, Pass as a secret */
+.secret-hint { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); color: var(--waiting); }
+.secret-hint code { color: var(--fg); }
+.secret-hint.armed { color: var(--error); }
+.secret-hint-what { min-width: 0; }
 .form .prompt-tools label.ib { flex-direction: row; cursor: pointer; }
 
 /* themes (Settings → Appearance) */

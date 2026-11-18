@@ -166,6 +166,7 @@ export type AppSettings = Paint & {
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   hideSecrets?: boolean // shared/types.ts Settings': secret-looking variables kept from agents
   hideSecretsAsked?: boolean
+  secretHint?: boolean
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs
@@ -2778,6 +2779,9 @@ export function SettingsPage(p: {
               </p>
               <Switch className="switch-row" on={!!s.hideSecrets} onChange={on => set({ hideSecrets: on, hideSecretsAsked: true })}>
                 <Says title="Hide secret-looking variables from agents" hint="Names like …_TOKEN, …_SECRET, …_KEY from where Laki was started stay out of agents' environment; their own sign-in key and what you set here, in a project or a profile still go through" />
+              </Switch>
+              <Switch className="switch-row" on={s.secretHint !== false} onChange={on => set({ secretHint: on })}>
+                <Says title="Warn about a pasted secret" hint="A token, key or password in a prompt box: a line under it offers to pass it as a secret, a file only the agent reads; checked in this window, nothing sent to look" />
               </Switch>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>

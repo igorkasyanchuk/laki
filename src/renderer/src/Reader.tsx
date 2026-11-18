@@ -17,6 +17,7 @@ import { daemonBase, openExternal } from './api'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
+import { useSecretHint } from './secretHint'
 import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
 import { optLabel, ruleFrom } from '../../shared/ask'
@@ -147,6 +148,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     addEventListener('keydown', on)
     return () => removeEventListener('keydown', on)
   }, [steps, tab.id])
+  const hint = useSecretHint(text, setText, { ws: tab.workspace, send: () => send() })
   const send = () => {
     const t = text.trim()
     if (!t) return
@@ -373,6 +375,8 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           </div>
         </div>
       ) : (
+        <>
+        {hint.line}
         <form className="rd-box capsule" ref={fabOver} onSubmit={e => (e.preventDefault(), send())}>
           {tab.mode && (
             <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip={tab.modeUnknown ? `Claude's footer isn't on screen (a menu, a transcript view or a narrow pane hides it). Last seen: ${modeLabel(tab.mode)}` : 'Its permission mode: change it without restarting'} onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
@@ -395,7 +399,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
               if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))
               if (historyKey(e, !text)) return void (e.preventDefault(), history()) // your prompts
-              if (sendIs(e) && !e.nativeEvent.isComposing) (e.preventDefault(), send()) // Settings › Keys › Send with
+              if (sendIs(e) && !e.nativeEvent.isComposing) (e.preventDefault(), hint.guard(send)) // Settings › Keys › Send with; a pasted secret's line first
             }}
           />
           <button type="submit" className="primary" disabled={!text.trim()}>
@@ -404,6 +408,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           {histMenu}
           {at.menu}
         </form>
+        </>
       )}
       {big && (
         <Modal title={big.alt || 'Image'} onClose={() => closeTo(() => setBig(null))} loose>

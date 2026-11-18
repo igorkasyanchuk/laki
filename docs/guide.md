@@ -1940,6 +1940,12 @@ needs you: a card under it asks for that, with a masked field. What you type goe
 storage folder (hidden, deleted after 24 hours) and the agent gets only the file's path, so the value never enters
 its chat or the model's context. *Refuse* says no; after 15 minutes it's a no.
 
+Paste a token, key or password into a prompt box and a line under it says what it looks like (a GitHub token, an AWS
+access key, a private key, a JWT…), the value masked: *Pass as a secret* puts it in such a file and its path in the
+prompt instead; *Send as it is* sends it unchanged. ⏎ with the line showing waits for a second ⏎. It's checked in the
+window, nothing is sent to look, and a kept draft keeps it masked. Settings › Agents & profiles › *Warn about a pasted
+secret* turns it off.
+
 While Claude Code compacts a long chat, its tab and row say *Compacting…*.
 
 **Subagents and background tasks**: while a Claude Code chat has subagents at work or commands left running in the
