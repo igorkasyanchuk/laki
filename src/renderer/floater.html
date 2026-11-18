@@ -171,6 +171,12 @@
       #island button { font: inherit; color: #e8eaf0; background: #15171c; border: 1px solid #262a33; border-radius: 8px; padding: 5px 10px; cursor: pointer; text-align: left; }
       #island button:hover { border-color: #4a5060; }
       #island .i-opt.primary { border-color: var(--accent); }
+      /* a standing permission's choice: its rule whole on a line of its own (scrolls past 4 lines), a broad one amber */
+      .i-opt.choice { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
+      .choice-rule { font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5.6em; overflow-y: auto; }
+      .choice-plain { font-size: 11px; }
+      .i-opt[data-scope='broad'] { border-color: color-mix(in srgb, var(--waiting) 55%, #262a33) !important; }
+      .i-opt[data-scope='broad'] .choice-rule, .i-opt[data-scope='broad'] .choice-plain { color: var(--waiting); }
       #island button:disabled { opacity: 0.35; cursor: default; }
       .i-answer { white-space: pre-line; font-size: 13px; }
       .i-sub, .i-note { color: #9aa0ad; font-size: 11px; }

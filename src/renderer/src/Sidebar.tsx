@@ -19,7 +19,7 @@ import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
 import { usualText } from '../../shared/nextStep'
-import { bulkGroups } from '../../shared/ask'
+import { bulkGroups, bulkPick } from '../../shared/ask'
 import { fresh } from './motion'
 import { BLOCK, type Clash, portClashes } from '../../shared/isolation'
 
@@ -164,7 +164,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           failed.push(`${nameOf(t)} · ${t.name}`)
           continue
         }
-        const o = t.ask?.options.length ? (allow ? t.ask.options[0] : t.ask.options.at(-1)) : undefined
+        const o = cur.ask?.options.length ? bulkPick(cur.ask, allow) : undefined // never a standing permission's choice
+        if (cur.ask?.options.length && !o) {
+          failed.push(`${nameOf(t)} · ${t.name}`)
+          continue
+        }
         await api.call('answer', o ? { tab: t.id, n: o.n, label: o.label } : { tab: t.id, pick: allow ? 'first' : 'last' }).catch(() => failed.push(`${nameOf(t)} · ${t.name}`))
       }
       const word = allow ? 'Allowed' : 'Denied'

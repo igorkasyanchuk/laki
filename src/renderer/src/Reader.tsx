@@ -5,7 +5,7 @@
 // an answer, a laki-ui block drawn with the UI kit (UiBlock). The terminal stays attached under it: Terminal brings
 // it back as it was
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AskDiff } from './Diff'
+import { AskDiff, Choice, choiceProps } from './Diff'
 import { ProofList } from './Proof'
 import { Glyph } from './Glyph'
 import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } from './ui'
@@ -360,8 +360,8 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           {tab.ask.diff && <AskDiff key={tab.ask.what} diff={tab.ask.diff} />}
           <div className="rd-opts">
             {tab.ask.options.map(o => (
-              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} onClick={() => api.answer(tab.id, o.n, o.label)}>
-                {o.n}. {optLabel(tab.ask!, o)}
+              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} {...choiceProps(optLabel(tab.ask!, o), tab.preset)} onClick={() => api.answer(tab.id, o.n, o.label)}>
+                <Choice text={optLabel(tab.ask!, o)} agent={tab.preset} n={`${o.n}. `} />
               </button>
             ))}
             {api.alwaysAllow && ruleFrom(tab.ask) && (

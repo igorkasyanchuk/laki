@@ -2013,6 +2013,16 @@ html[data-kb] { --safe-b: 0px; }
 .ask-wrap { flex: none; border-top: 1px solid var(--line); background: var(--side); } .ask-wrap > .ask-bar { border-top: none; } .ask-wrap > .ask-diff { padding: var(--sp-3) var(--sp-4) 0; }
 .ask-bar button { flex: none; height: 26px; padding: 0 var(--sp-4); white-space: nowrap; touch-action: manipulation; }
 .narrow .ask-bar button { height: var(--h-l); }
+/* a standing permission's choice (Diff.tsx Choice, shared/ask.ts askScope): its words, then the rule it grants on a line of
+   its own in the mono font, whole and wrapping (never ellipsized; past 4 lines it scrolls in the button), a broad one in
+   the warning color with what it covers in words. Last so it wins over each list's one-line buttons */
+.need-opts button[data-scope], .ask-bar button[data-scope], .rd-opts button[data-scope] { height: auto; white-space: normal; text-overflow: clip; overflow: visible; padding-block: var(--sp-2); max-width: 100%; }
+.ask-bar button[data-scope] { flex: 0 1 auto; min-width: 0; }
+.choice { display: inline-flex; flex-direction: column; gap: var(--sp-1); min-width: 0; text-align: left; vertical-align: top; }
+.choice-rule { font: var(--fs-1)/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5.6em; overflow-y: auto; }
+.choice-plain { font-size: var(--fs-1); }
+button[data-scope='broad'] { border-color: color-mix(in srgb, var(--waiting) 55%, var(--line)); }
+button[data-scope='broad'] .choice-rule, button[data-scope='broad'] .choice-plain { color: var(--waiting); }
 
 /* Compare (Compare.tsx): a race's workspaces side by side */
 .compare { display: flex; gap: var(--sp-5); align-items: flex-start; overflow-x: auto; flex: 1; min-height: 0; }

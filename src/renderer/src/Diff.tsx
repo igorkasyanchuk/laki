@@ -6,7 +6,7 @@ import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
-import { diffCounts } from '../../shared/ask'
+import { askScope, diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 import type { Annotation, Annotations } from '../../shared/types'
 
@@ -363,6 +363,23 @@ export function AnnotRows({ as, add }: { as: Annot[]; add?: (a: Annot) => void }
 }
 
 // an approval's diff (Ask.diff, permDiff's ' ', '-', '+' lines): red and green, its first 8 lines, Expand for the rest
+// a menu choice on a button (Needs you, the Reader, the ask bar): one that grants a standing permission (askScope) has
+// its words on the first line and the rule it grants on its own in the mono font, whole and wrapping (past 4 lines it
+// scrolls in the button), a broad one in the warning color with what it covers in words. choiceProps: the button's
+// class, and its whole text as title and accessible name
+export function Choice({ text, n, agent }: { text: string; n?: ReactNode; agent?: string }) {
+  const s = askScope(text, agent)
+  if (!s) return <>{n}{text}</>
+  return (
+    <span className="choice">
+      <span className="choice-label">{n}{s.label}</span>
+      <span className="choice-rule mono">{s.rule}</span>
+      {s.plain && <span className="choice-plain">{s.plain}</span>}
+    </span>
+  )
+}
+export const choiceProps = (text: string, agent?: string) => (s => (s ? { 'aria-label': text, title: text, 'data-scope': s.broad ? 'broad' : 'exact' } : {}))(askScope(text, agent))
+
 export function AskDiff({ diff }: { diff: string }) {
   const [open, setOpen] = useState(false)
   const lines = diff.split('\n')

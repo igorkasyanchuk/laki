@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- A *don't ask again* choice shows the whole rule it grants on a line of its own (`npm init *`), in Needs you, the Reader, the ask bar, the cards on screen and notifications. A broad one (a wildcard, a folder, a whole tool) is amber and says what it covers: *every command that starts with npm init*. Allow all and the answer keys never pick it.
+
 ## 0.55.0 · Nov 18, 2026
 
 - @ in a prompt box offers folders too (with a slash), bolds what matched, stays out of `code` and emails, and keeps up in big repos; screen readers follow the highlighted file.

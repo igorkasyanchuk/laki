@@ -8,8 +8,8 @@
 // 1–9 answer and Enter opens.
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
-import { bulkOk } from '../../shared/ask'
-import { AskDiff } from './Diff'
+import { bulkOk, optLabel } from '../../shared/ask'
+import { AskDiff, Choice, choiceProps } from './Diff'
 import { ProofList } from './Proof'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
@@ -149,9 +149,8 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
           {(opts.length > 0 || allow) && (
             <div className="need-opts" onClick={stop}>
               {opts.map(o => (
-                <button key={o.n} className={o.n === t.ask?.at ? 'on' : ''} data-tip={o.label} onClick={() => api.answer(t, o.n, o.label)}>
-                  <span className="need-n">{o.n}</span>
-                  {o.label}
+                <button key={o.n} className={o.n === t.ask?.at ? 'on' : ''} {...choiceProps(optLabel(t.ask!, o), t.preset)} onClick={() => api.answer(t, o.n, o.label)}>
+                  <Choice text={optLabel(t.ask!, o)} agent={t.preset} n={<span className="need-n">{o.n}</span>} />
                 </button>
               ))}
               {allow && (

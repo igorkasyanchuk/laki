@@ -17,7 +17,7 @@ import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
-import { hotkeyAnswer } from '../shared/ask.ts'
+import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
 import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
@@ -922,7 +922,7 @@ async function hotAnswer(allow: boolean) {
   const w = v.workspaces.find(x => x.id === t.workspace)
   const line = `${t.ask!.tool ?? ''}${t.ask!.what ? `: ${t.ask!.what.split('\n')[0].slice(0, 160)}` : t.ask!.question ? `: ${t.ask!.question.split('\n')[0].slice(0, 160)}` : ''}`
   if (r !== 'allow') return card(hidden ? { title: 'An agent is waiting', body: 'Open Laki to answer this one' } : { tab: t.id, tone: 'ask', title: `${w?.name ?? t.workspace} · ${t.name}`, body: `Open Laki to answer this one (${r.slice(7)}).\n${line}` }, 4000)
-  const opt = allow ? t.ask!.options[0] : t.ask!.options.at(-1)!
+  const opt = bulkPick(t.ask!, allow)! // hotkeyAnswer's allow: a plain yes … no, never a standing permission
   addCard({ key: HOT, tab: t.id, ask: false, tone: 'ask', at, title: `${allow ? 'Allow' : 'Deny'}: ${w?.name ?? t.workspace} · ${t.name}`, body: `${line}\nEsc: don't`, actions: [] })
   try {
     globalShortcut.register('Escape', () => (hotDone(), dropCards(c => !mine(c))))
@@ -986,7 +986,7 @@ ipcMain.handle('conn', async e => {
 // Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
 // closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
 // collected Notification's events never come
-type NoteAction = { text: string; reply?: boolean; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
+type NoteAction = { text: string; scope?: string /* a standing permission's choice in full: the card draws its rule */; reply?: boolean; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
 const notes = new Set<Notification>()
 // card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
@@ -996,7 +996,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
   if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.reply === true || a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.reply === true || a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9).map(a => (a.scope === undefined || typeof a.scope === 'string' ? a : { ...a, scope: undefined }))
   if (card && typeof card === 'object') {
     if (sound !== 'none') execFile('afplay', [`/System/Library/Sounds/${named ? sound : 'Glass'}.aiff`], () => {})
     const t = typeof tab === 'string' ? tab : ''

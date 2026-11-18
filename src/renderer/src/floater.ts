@@ -8,7 +8,7 @@
 // under the mouse. #voice: Say it's prompt, dictated (macOS's), sent to an agent of the list or a new session.
 // The bar opens the other three (window.open): one renderer process for all four.
 import './floater.css'
-import { alwaysOf, permVerb } from '../../shared/ask'
+import { askScope, optLabel, permVerb } from '../../shared/ask'
 import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
@@ -19,6 +19,18 @@ import { voiceFix } from '../../shared/types'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
+// a standing permission's choice (askScope): its words, then the rule it grants on a line of its own, whole (scrolls
+// past 4 lines), a broad one in the warning color with what it covers in words; its whole text as title and name
+function scoped(b: HTMLElement, n: number, text: string, agent?: string) {
+  const s = askScope(text, agent)
+  if (!s) return
+  const span = (t: string, cls: string) => Object.assign(document.createElement('span'), { textContent: t, className: cls })
+  b.replaceChildren(span(`${n}  ${s.label}`, 'choice-label'), span(s.rule, 'choice-rule'), ...(s.plain ? [span(s.plain, 'choice-plain')] : []))
+  b.classList.add('choice')
+  if (s.broad) b.dataset.scope = 'broad'
+  b.title = text
+  b.setAttribute('aria-label', text)
+}
 export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[]; agent?: string; at?: number; ask?: Ask; answer?: string; took?: number }
 type Colors = Record<string, string>
 type Drop = { text?: string; paths: string[] } // Q9: what was dropped on a bubble: text or a link, files' and pictures' paths
@@ -413,13 +425,13 @@ function pinnedCard(f: Float, draft: string) {
   const btn = (text: string, cls: string, on: () => void) => Object.assign(el('button', text, cls) as HTMLButtonElement, { onclick: on })
   if (replyOf(f) === 'options') {
     const opts = el('div', '', 'i-opts pin-opts')
-    const always = a?.rule ? alwaysOf(a) : undefined
     if (!cut && whole(a))
       for (const o of a!.options) {
-        const b = btn(`${o.n}  ${o === always ? `Always: ${a!.rule}` : o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
+        const b = btn(`${o.n}  ${o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
           const r = await bridge?.answer(f.tab, o.n, o.label)
           if (r?.error) bad(r.error)
         })
+        scoped(b, o.n, optLabel(a!, o), f.agent)
         b.dataset.n = String(o.n)
         opts.append(b)
       }
@@ -534,12 +546,12 @@ function islandPage() {
       if (a?.tool) parts.push(el('div', permVerb(a.tool), 'i-q'), el('pre', a.what ?? '', 'i-what'), ...(a.diff ? [diffEl(a.diff)] : []), el('div', `${a.tool} · ${f.project} / ${f.name}`, 'i-sub'))
       else if (a?.question || f.last) parts.push(el('div', a?.question ?? f.last ?? '', 'i-q'))
       const opts = el('div', '', 'i-opts')
-      const always = a?.rule ? alwaysOf(a) : undefined
       for (const o of whole(a) ? (a?.options ?? []) : []) {
-        const b = btn(`${o.n}  ${o === always ? `Always: ${a!.rule}` : o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
+        const b = btn(`${o.n}  ${o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
           const r = await bridge?.answer(f.tab, o.n, o.label)
           if (r?.error) say(note, r.error)
         })
+        scoped(b, o.n, optLabel(a!, o), f.agent)
         b.dataset.n = String(o.n)
         opts.append(b)
       }

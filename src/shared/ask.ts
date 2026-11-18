@@ -129,13 +129,13 @@ export function permOf(pl: { tool_name?: unknown; tool_input?: unknown; permissi
     : s('description') || s('command') || s('file_path') || s('url') || short(i)
   return { tool: mcp ? mcp[1] : tool, what: cut(what), ...(r => r && { rule: r })(ruleOf(pl.permission_suggestions, root, home)), ...(d => d && { diff: d })(permDiff(tool, i, prior)) }
 }
-// the first suggestion that would stop the asking (a rule, a folder), not a mode switch: Bash's "npm init *" → npm init,
+// the first suggestion that would stop the asking (a rule, a folder), not a mode switch: Bash's "npm init:*" → npm init *,
 // WebFetch's "domain:example.com" → example.com, a folder as nearPath has it
 function ruleOf(sug: unknown, root?: string, home?: string) {
   if (!Array.isArray(sug)) return
   for (const x of sug as { type?: string; rules?: { toolName?: string; ruleContent?: string }[]; directories?: string[] }[]) {
     if (x?.type === 'addRules' && Array.isArray(x.rules) && x.rules[0]) {
-      const c = String(x.rules[0].ruleContent ?? '').replace(/^domain:/, '').replace(/(:\*|\s+\*)$/, '').trim()
+      const c = String(x.rules[0].ruleContent ?? '').replace(/^domain:/, '').replace(/:\*$/, ' *').trim() // its wildcard kept: the scope it grants, whole
       return cut(c || String(x.rules[0].toolName ?? '')) || undefined
     }
     if (x?.type === 'addDirectories' && typeof x.directories?.[0] === 'string') return cut(nearPath(x.directories[0], root, home))
@@ -145,6 +145,43 @@ function ruleOf(sug: unknown, root?: string, home?: string) {
 export const alwaysOf = (a?: Ask) => a?.options.find(o => /don['’]t ask again|always allow/i.test(o.label))
 // an option's words on a button (the ask bar's, the Reader's): the "don't ask again" one names its rule
 export const optLabel = (a: Ask, o: Ask['options'][number]) => (a.rule && o === alwaysOf(a) ? `Yes, don't ask again for ${a.rule}` : o.label)
+
+// a choice that grants a standing permission, split into its words (label) and the rule it grants (rule: the part after
+// "for" / "for:" / "access to"), whole, for drawing the rule on a line of its own; null when it grants none or its rule
+// can't be told apart ("for this command", "for this session"). broad: a wildcard, a folder or a whole tool; plain: what
+// it covers in words, only where that can be said safely. Per agent: claude's "Yes, and don't ask again for: npm init *",
+// "Yes, and always allow access to src/ from this project", "Yes, allow all edits during this session"; codex's "Yes,
+// and don't ask again for this command" (its command is the question above: no rule here); gemini's "Allow always …",
+// "Yes, always allow tool …"; an unknown agent: all of them
+export type Scope = { label: string; rule: string; broad?: true; plain?: string }
+const SCOPE_CLAUDE = [/^(.*?\bdon['’]t ask again for):?\s+(.+)$/i, /^(.*?\balways allow access to)\s+(.+)$/i, /^(.*?\ballow)\s+(all edits\b.*)$/i]
+const SCOPE_GEMINI = [/^(.*?\b(?:allow always|always allow)(?: for)?):?\s+(.+)$/i]
+const SCOPES: Record<string, RegExp[]> = { claude: SCOPE_CLAUDE, codex: [SCOPE_CLAUDE[0]], gemini: SCOPE_GEMINI }
+const NO_RULE = /^(this|these|that|the|its)\b|^(session|command|commands|files?|tools?)$/i // words, not a rule
+const TOOL_WORDS: Record<string, string> = { bash: 'every command', edit: 'every file edit', write: 'every file edit', multiedit: 'every file edit', notebookedit: 'every file edit', 'all edits': 'every file edit', read: 'every file read', webfetch: 'every web fetch', websearch: 'every web search' }
+const SAFE = /^[\w@.\/:=+~-]+(?: [\w@.\/:=+~-]+){0,5}$/ // a few plain words: no quotes, globs, pipes or substitutions
+export function askScope(choice: string, agent?: string): Scope | null {
+  const text = choice.replace(/\s*\((?:shift\+tab|esc|tab|[a-z])\)\s*$/i, '').trim() // its key's hint
+  const m = (SCOPES[agent ?? ''] ?? [...SCOPE_CLAUDE, ...SCOPE_GEMINI]).map(r => r.exec(text)).find(Boolean)
+  const rule = m?.[2].trim()
+  if (!m || !rule || NO_RULE.test(rule)) return null
+  const label = m[1].trim()
+  const first = rule.split(/\s+/)[0]
+  const path = /^(~|\.{0,2})\/|\/$/.test(first) || (first.includes('/') && !/\s/.test(rule))
+  const dir = path && !/\.\w{1,6}$/.test(first.replace(/[/*]+$/, '')) // no file extension: a folder
+  const tool = TOOL_WORDS[rule.toLowerCase().replace(/\s+(during|for) this session$/, '')]
+  const prefix = /^(.+?)(?::\*| \*)$/.exec(rule)?.[1] ?? /^(.+?) commands\b/.exec(rule)?.[1] // "npm init *", "npm test commands in …"
+  const broad = /[*?]/.test(rule) || dir || !!tool || !!prefix || /\ball (tools|edits|commands)\b/i.test(rule)
+  const plain =
+    tool ? tool
+    : prefix && SAFE.test(prefix) && !/[*?]/.test(prefix) ? (path ? `every file under ${prefix.replace(/\/+$/, '')}` : `every command that starts with ${prefix}`)
+    : dir && SAFE.test(first) ? `every file under ${first.replace(/[/*]+$/, '')}`
+    : /^\*\.([\w-]+(\.[\w-]+)+)$/.exec(rule)?.[1].replace(/^/, 'every subdomain of ')
+  return { label, rule, ...(broad && { broad: true as const }), ...(broad && plain && plain.length <= 80 && { plain }) }
+}
+// a choice that grants more than this one ask: a "don't ask again", "always", "for this session" one, its rule told
+// apart or not: never what one click for several (Allow all) or a global hotkey picks
+export const standing = (label: string) => !!askScope(label) || /don['’]t ask again|always allow|allow always|for this session|allow all\b/i.test(label)
 // what it wants to do, for a notification's title: "wants to run", "wants to edit"…
 export const permVerb = (tool: string) =>
   tool === 'Bash' ? 'wants to run'
@@ -177,15 +214,20 @@ const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$|[\s;&|)]))|\$\{?(HOME|TMPDIR)\b/ /
 const FILES = /^(Bash|Edit|Write|MultiEdit|NotebookEdit|Read)$/ // what a path in its text is written or read
 const YES = /^(yes|allow|approve|proceed|run)\b/i
 const NO = /^(no|deny|reject|cancel|don['’]t)\b/i
+// a plain yes … no menu: its first an allow of this one ask (never a standing permission: standing), its last a no
+const yesNo = (a: Ask) => a.options.length >= 2 && YES.test(a.options[0].label) && !standing(a.options[0].label) && NO.test(a.options.at(-1)!.label)
 // a permission ask (claude's PermissionRequest: its tool and what it touches, the exact text the confirm shows), its
 // first option an allow and its last a no (or no menu read: Allow / Deny), never a secret, one of several questions,
 // a risky command, or, unless the tab's sandbox is known on, one that touches a path outside the worktree
 export function bulkOk(t: { status?: string; ask?: Ask; secret?: unknown }, sandboxOn = false) {
   const a = t.ask
   if (t.status !== 'waiting' || t.secret || !a?.tool || !a.what?.trim() || a.what.endsWith('…') || a.steps) return false // cut (permOf's 300): its end unseen
-  if (a.options.length && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return false
+  if (a.options.length && !yesNo(a)) return false
   return !risky(a.what) && (sandboxOn || !FILES.test(a.tool) || !OUTSIDE.test(a.what))
 }
+// what Allow all / Deny all and the global hotkeys send: the first option (a plain yes: never a standing permission) or
+// the last (a no); none when the menu isn't a plain yes … no (then nothing is sent)
+export const bulkPick = (a: Ask, allow: boolean) => (yesNo(a) ? (allow ? a.options[0] : a.options.at(-1)) : undefined)
 // the confirm's lines: the same tool and the same text in several workspaces, one line
 export function bulkGroups<T extends { ask?: Ask }>(list: T[], name: (x: T) => string) {
   const m = new Map<string, { tool: string; what: string; names: string[] }>()
@@ -234,7 +276,7 @@ export function allowRuleOf(rules: AllowRule[] | undefined, t: { status?: string
 function ruleable(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }, menu = true) {
   const a = t.ask
   if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what || a.what.endsWith('…') || a.steps || !RULE_TOOLS.includes(a.tool)) return false
-  if (menu && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return false
+  if (menu && !yesNo(a)) return false
   const w = a.what.trim()
   return !(risky(w) || OUTSIDE.test(w) || (a.tool === 'Bash' ? CHAIN.test(w) : w.split('/').includes('..')))
 }
@@ -245,7 +287,7 @@ function ruleable(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: u
 export function spokenMode(t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }): 'auto' | 'enter' | 'laki' {
   const a = t.ask
   if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what?.trim() || a.what.endsWith('…') || a.steps) return 'laki'
-  if (!(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label)) || risky(a.what)) return 'laki'
+  if (!yesNo(a) || risky(a.what)) return 'laki'
   return ruleable(t) ? 'auto' : 'enter'
 }
 // Allow / Deny the newest ask by a global hotkey (main's hotAnswer): only what an auto-answer rule could take, a plain
@@ -259,7 +301,7 @@ export function hotkeyAnswer(t: { status?: string; ask?: Ask; secret?: unknown; 
   if (t.secret) return 'refuse:it asks for a secret'
   if (t.planAsk) return 'refuse:a plan to approve'
   if (a.steps) return 'refuse:several questions'
-  if (!a.tool || !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return 'refuse:a question'
+  if (!a.tool || !yesNo(a)) return 'refuse:a question'
   if (!a.what?.trim() || a.what.endsWith('…')) return "refuse:its command isn't all there"
   if (risky(a.what)) return 'refuse:a risky command'
   return ruleable(t) ? 'allow' : 'refuse:a chained command or a path outside the worktree'

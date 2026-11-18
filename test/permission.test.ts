@@ -14,7 +14,7 @@ import { priorOf } from '../src/shared/conn.ts'
 const fx = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', `permission-${name}.json`), 'utf8'))
 
 test('permOf: each tool in a line, cut at 300; the first rule or folder suggestion made readable', () => {
-  assert.deepEqual(permOf(fx('bash')), { tool: 'Bash', what: 'npm init -y', rule: 'npm init' })
+  assert.deepEqual(permOf(fx('bash')), { tool: 'Bash', what: 'npm init -y', rule: 'npm init *' }) // its wildcard kept: the scope it grants
   assert.deepEqual(permOf(fx('webfetch')), { tool: 'WebFetch', what: 'https://example.com', rule: 'example.com' })
   const edit = fx('edit')
   assert.deepEqual(permOf(edit, '/Users/me/projects/demo'), { tool: 'Edit', what: 'notes.txt', diff: '-hello\n+hello world' }) // in the worktree: from its folder; setMode isn't a rule; its change
@@ -28,7 +28,7 @@ test('permOf: each tool in a line, cut at 300; the first rule or folder suggesti
   assert.equal(permOf({ tool_name: 'WebSearch', tool_input: { query: 'laki app' } })!.what, 'laki app')
   assert.equal(permOf({ tool_name: 'Grep', tool_input: { pattern: 'TODO' } })!.what, 'TODO')
   assert.equal(permOf({ tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Delete test3?', options: [{ label: 'Yes' }] }, { question: 'Images?' }] } })!.what, 'Delete test3?') // its first question, not its JSON
-  assert.equal(permOf({ tool_name: 'Bash', permission_suggestions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }] }] })!.rule, 'npm test')
+  assert.equal(permOf({ tool_name: 'Bash', permission_suggestions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }] }] })!.rule, 'npm test *')
   assert.equal(permOf({}), undefined)
   assert.equal(permVerb('Bash'), 'wants to run')
   assert.equal(permVerb('github'), 'wants to use github')
@@ -97,7 +97,7 @@ test('a PermissionRequest: the ask names the tool, what and rule; laki hook prin
   }, 'the ask with its tool')
   assert.equal(asks.tool, 'Bash')
   assert.equal(asks.what, 'npm init -y')
-  assert.equal(asks.rule, 'npm init')
+  assert.equal(asks.rule, 'npm init *')
   assert.equal(alwaysOf(asks)?.label, 'Yes, and don’t ask again for: npm init *')
   await rig.rpc('answer', { tab: tab.id, n: 2, label: 'Yes, and don’t ask again for: npm init *' })
   await until(async () => /picked: Yes, and don’t ask again/.test(await rig.screen(tab.id)), 'picked the always option')

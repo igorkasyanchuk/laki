@@ -2,7 +2,7 @@ import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type AgentDid, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
-import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
+import { askScope, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
@@ -38,7 +38,7 @@ import { shortcutOf } from '../../shared/pwa'
 import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, inboxOf, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
-import { AskWrap, turnNext } from './Diff'
+import { AskWrap, Choice, choiceProps, turnNext } from './Diff'
 import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
@@ -1388,12 +1388,16 @@ export function App() {
           // one that doesn't fit is cut with … and gets none, as one with a bidi or invisible character (noteWhole), or a
           // permission ask whose command says nothing: a Yes would approve a command you can't see whole (its click shows
           // it in the tab)
-          const always = perm?.rule ? alwaysOf(perm) : undefined
-          const cut = !noteWhole(body) || (!!perm && !perm.what?.trim())
+          // a standing permission's choice (askScope): the button stays "Allow always" (a notification's has little room),
+          // the body names its rule in full, so the whole body must fit for any button to show
+          const scopes = new Map(t.ask?.options.map(o => [o, askScope(optLabel(t.ask!, o), t.preset)] as const).filter(x => x[1]))
+          const always = [...scopes.values()][0]
+          const told = always ? `${body}\nAllow always: ${always.rule}${always.plain ? ` (${always.plain})` : ''}` : body
+          const cut = !noteWhole(told) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
-            m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
+            m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: scopes.has(o) ? 'Allow always' : `${o.n}. ${o.label}`, n: o.n, label: o.label, ...(scopes.has(o) && { scope: optLabel(t.ask!, o) }) })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
           const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
@@ -4203,9 +4207,10 @@ export function App() {
             )}
             {tab.ask!.options.map(o => {
               const label = optLabel(tab.ask!, o)
+              const scoped = askScope(label, tab.preset) // a standing permission: never cut, its rule on a line of its own
               return (
-                <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
-                  {o.n}. {label.length > 48 ? `${label.slice(0, 46)}…` : label}
+                <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={scoped ? undefined : o.label} {...choiceProps(label, tab.preset)} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
+                  {scoped ? <Choice text={label} agent={tab.preset} n={`${o.n}. `} /> : `${o.n}. ${label.length > 48 ? `${label.slice(0, 46)}…` : label}`}
                 </button>
               )
             })}

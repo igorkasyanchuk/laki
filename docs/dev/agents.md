@@ -176,6 +176,15 @@ the label too; the bar comes back while the full review or a phone's panel cover
 `Notification` `actions`; main calls `answer` itself, `pick` first / last, so a closed window doesn't matter). `answer`
 needs the tab waiting and takes one at a time (a second after its Enter too). A waiting tab's output has its menu read
 again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't the ask the last pushed view gave (`askKey`, set in `changed`).
+A choice that grants a standing permission (`askScope(choice, agent)`: claude's *don't ask again for: npm init \**,
+*always allow access to src/*, *allow all edits*; codex's and gemini's equivalents) is drawn with its rule on its own
+line, whole, in the mono font (Diff.tsx `Choice`, `choiceProps`; ask.ts' and floater.ts' `scoped`): in Needs you, the
+Reader, the ask bar (never cut there), the cards on screen and the island; `broad` (a wildcard, a folder, a whole tool)
+in the warning color with `plain`'s words where they're safe. claude's hook's rule (`permOf`'s `rule`) keeps its
+wildcard (`npm init *`, not `npm init`). A notification's action stays *Allow always* (`NotifyAction.scope` carries the
+choice to the card); its body names the rule, and the body must fit whole for any action to show. `standing` marks
+such a choice: `bulkPick` (Allow all, Deny all, the global hotkeys) never sends one, and `yesNo` refuses a menu whose
+first choice is one.
 
 ### Sessions
 

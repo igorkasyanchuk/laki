@@ -41,6 +41,12 @@
       button.opt:hover { border-color: var(--accent); }
       button.opt.first { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
       button.opt:disabled { opacity: 0.4; cursor: default; }
+      /* a standing permission's choice: its rule whole on a line of its own (scrolls past 4 lines), a broad one amber */
+      button.opt.choice { display: flex; flex-direction: column; gap: 2px; white-space: normal; overflow: visible; }
+      .choice-rule { font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5.6em; overflow-y: auto; }
+      .choice-plain { font-size: 11px; }
+      button.opt[data-scope='broad'] { border-color: color-mix(in srgb, var(--waiting, #e0af68) 55%, var(--line)); }
+      button.opt[data-scope='broad'] .choice-rule, button.opt[data-scope='broad'] .choice-plain { color: var(--waiting, #e0af68); }
       .foot { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
       .foot .err { color: var(--waiting); }
       .open { margin-left: auto; font: inherit; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; }

@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type AllowRule, allowRuleOf, askOf, bulkGroups, bulkOk, hotkeyAnswer, risky, ruleFrom, rulePattern } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, standing } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -146,4 +146,51 @@ test("hotkeyAnswer: a global hotkey answers only a plain permission; a delete, a
   assert.equal(hotkeyAnswer({ status: 'waiting', ask: { ...ask('npm test').ask, steps: true } }), 'refuse:several questions')
   assert.equal(hotkeyAnswer(ask('npm test'), true), 'refuse:a private workspace in Recording mode')
   assert.equal(hotkeyAnswer({ status: 'running' }), 'refuse:nothing waits')
+})
+
+test("askScope: a standing permission's choice split into its words and the rule it grants, whole; broad ones told", () => {
+  // claude's menu: "for: npm init *" is every command that starts with npm init
+  assert.deepEqual(askScope('Yes, and don’t ask again for: npm init *', 'claude'), { label: 'Yes, and don’t ask again for', rule: 'npm init *', broad: true, plain: 'every command that starts with npm init' })
+  // a single exact command: not broad, no words added
+  assert.deepEqual(askScope("Yes, and don't ask again for npm test"), { label: "Yes, and don't ask again for", rule: 'npm test' })
+  assert.equal(askScope('Yes, and don’t ask again for: git status --short', 'claude')?.broad, undefined)
+  // a menu without a rule: none to split (codex names "this command": the command is the question above it)
+  assert.equal(askScope('Yes'), null)
+  assert.equal(askScope('No, and tell Claude what to do (esc)', 'claude'), null)
+  assert.equal(askScope('Yes, and don’t ask again for this command (a)', 'codex'), null)
+  assert.equal(askScope('Allow for this session', 'gemini'), null)
+  // a folder, a whole tool, a prefix of commands: broad, with words where they can be said safely
+  assert.deepEqual(askScope('Yes, and always allow access to src/ from this project', 'claude'), { label: 'Yes, and always allow access to', rule: 'src/ from this project', broad: true, plain: 'every file under src' })
+  assert.deepEqual(askScope('Yes, allow all edits during this session (shift+tab)', 'claude'), { label: 'Yes, allow', rule: 'all edits during this session', broad: true, plain: 'every file edit' })
+  assert.equal(askScope("Yes, and don't ask again for npm test commands in /Users/me/demo")?.plain, 'every command that starts with npm test')
+  assert.deepEqual(askScope("Yes, don't ask again for ~/projects/demo"), { label: "Yes, don't ask again for", rule: '~/projects/demo', broad: true, plain: 'every file under ~/projects/demo' })
+  assert.equal(askScope("Yes, don't ask again for src/app.ts")?.broad, undefined) // one file
+  assert.equal(askScope("Yes, don't ask again for Edit")?.plain, 'every file edit')
+  assert.equal(askScope("Yes, don't ask again for *.example.com")?.plain, 'every subdomain of example.com')
+  // a wildcard inside it: broad, but no words that could misstate it
+  assert.deepEqual(askScope("Yes, don't ask again for rm $(cat list) *"), { label: "Yes, don't ask again for", rule: 'rm $(cat list) *', broad: true })
+  // claude's hook's rule (permOf) on the menu's choice: the scope from it, whole, even when the menu's line was cut
+  const ask = { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'Yes, and don’t ask again for: npm in' }, { n: 3, label: 'No' }], at: 1, rule: 'npm init *' }
+  assert.equal(askScope(optLabel(ask, ask.options[1]), 'claude')?.rule, 'npm init *')
+  // a rule as long as permOf allows: whole, never cut
+  const long = `npm run ${'x'.repeat(250)} *`
+  assert.equal(askScope(`Yes, and don't ask again for ${long}`)?.rule, long)
+})
+
+test('Allow all and the global hotkeys never pick a standing permission: the plain yes, else nothing', () => {
+  const claude = [{ n: 1, label: 'Yes' }, { n: 2, label: 'Yes, and don’t ask again for: npm init *' }, { n: 3, label: 'No, and tell Claude what to do differently (esc)' }]
+  const t = { status: 'waiting', ask: { options: claude, at: 1, tool: 'Bash', what: 'npm init -y' } }
+  assert.equal(bulkOk(t), true)
+  assert.equal(bulkPick(t.ask, true)?.n, 1) // Allow all: the plain yes
+  assert.equal(bulkPick(t.ask, false)?.n, 3) // Deny all: the no
+  assert.equal(hotkeyAnswer(t), 'allow')
+  assert.equal(standing(claude[1].label), true)
+  assert.equal(standing(claude[0].label), false)
+  // a menu whose first choice is itself a standing one: never answered by one click for several, nor by a hotkey
+  for (const first of ['Yes, allow always', 'Yes, and don’t ask again for: npm init *', 'Yes, allow all edits during this session', 'Allow for this session']) {
+    const s = { status: 'waiting', ask: { options: [{ n: 1, label: first }, { n: 2, label: 'No (esc)' }], at: 1, tool: 'Bash', what: 'npm init -y' } }
+    assert.equal(bulkOk(s), false, first)
+    assert.equal(bulkPick(s.ask, true), undefined, first)
+    assert.match(hotkeyAnswer(s), /^refuse:/, first)
+  }
 })

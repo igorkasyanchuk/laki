@@ -6,7 +6,8 @@
 // ?window=inbox: the menu bar's Inbox (main's inboxOpen): the same cards under the tray, no ×, then New task… (the
 // quick bar with what's typed); Esc closes it, nothing waiting says so
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
-type Action = { text: string }
+import { askScope } from '../../shared/ask'
+type Action = { text: string; scope?: string } // scope: a standing permission's choice in full (askScope): its rule drawn whole
 type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string }
 type Bridge = {
   ask: {
@@ -42,6 +43,18 @@ function diffEl(diff: string) {
   return pre
 }
 
+// a standing permission's choice: its words, then the rule it grants on a line of its own, whole (scrolls past 4
+// lines), a broad one in the warning color with what it covers in words
+function scoped(b: HTMLElement, text?: string, agent?: string) {
+  const s = text ? askScope(text, agent) : null
+  if (!s || !text) return
+  b.replaceChildren(el('span', s.label, 'choice-label'), el('span', s.rule, 'choice-rule'), ...(s.plain ? [el('span', s.plain, 'choice-plain')] : []))
+  b.classList.add('choice')
+  if (s.broad) b.dataset.scope = 'broad'
+  b.title = text
+  b.setAttribute('aria-label', text)
+}
+
 function cardEl(c: Card) {
   const box = el('div', '', `card ${c.tone}${seen.has(id(c)) ? '' : ' new'}`)
   const x = el('button', '×', 'x')
@@ -62,6 +75,7 @@ function cardEl(c: Card) {
     c.actions.forEach((a, i) => {
       const b = el('button', a.text, `opt${i || c.tone === 'alert' ? '' : ' first'}`) as HTMLButtonElement // an alert's choices are all alike
       b.title = a.text
+      scoped(b, a.scope)
       b.onclick = () => {
         for (const o of opts.querySelectorAll('button')) o.disabled = true
         bridge?.act(c.key, i).finally(() => opts.querySelectorAll('button').forEach(o => (o.disabled = false)))
