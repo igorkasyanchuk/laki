@@ -3119,7 +3119,6 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }), ...(!want && { untitled: true }) } // untitled: ws-<tail>, named by its first prompt
     if (!proj.host) await copyIncludes(proj, ws) // before setup and the agent: they may read .env. ponytail: not on a host (setup can copy them from $LAKI_PROJECT_PATH)
   }
-  void excludeWs(ws, proj) // out of Time Machine and Spotlight, as Settings say: never in its way
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
@@ -3135,6 +3134,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
   for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)
+  void excludeWs(ws, proj) // out of Time Machine and Spotlight, as Settings say: never in its way; once it's one of the project's (spotMark counts its folder as Laki's)
   placeWs(ws, o.place)
   save()
   if (ws.prUrl) void scanPRs() // its PR's status now, not at the minute's scan
@@ -3768,11 +3768,11 @@ export async function wsRestore(ref: string) {
     })
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
-  void excludeWs(ws, proj)
   await archiveBack(ws).catch(e => wsLog(ws, `restore: its uncommitted files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${ws.id}`))
   ws.archived = false
   ws.archivedAt = undefined
   delete ws.soon
+  void excludeWs(ws, proj) // its folder is new: out of Time Machine again (excludable: not archived any more)
   ws.touchedAt = Date.now() // archive when idle: a full period from here, so an Undo stays undone
   if (ws.railPin && railTaken() > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()

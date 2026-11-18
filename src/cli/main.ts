@@ -384,8 +384,14 @@ async function main() {
         if (!recipe) return ''
         const o = recipe.make({ tokenFile: c.file, lakiBin, name: c.label, home: homedir() })
         // --write <dir>: its files saved there, by their names (only a folder you name; nothing else is written)
-        const wrote = typeof flags.write === 'string' && o.files?.length ? o.files.map(f => (mkdirSync(resolve(flags.write as string), { recursive: true }), writeFileSync(join(resolve(flags.write as string), basename(f.suggestedPath)), f.content, { mode: f.suggestedPath.endsWith('.sh') ? 0o755 : 0o644 }), join(resolve(flags.write as string), basename(f.suggestedPath)))) : []
-        return `\n\n${recipeText(recipe, o)}${wrote.length ? `\n\nwritten: ${wrote.join(', ')}` : ''}`
+        const to = typeof flags.write === 'string' ? resolve(flags.write) : undefined
+        let wrote = ''
+        try {
+          if (to && o.files?.length) mkdirSync(to, { recursive: true }), (wrote = `written: ${o.files.map(f => (writeFileSync(join(to, basename(f.suggestedPath)), f.content, { mode: f.suggestedPath.endsWith('.sh') ? 0o755 : 0o644 }), join(to, basename(f.suggestedPath)))).join(', ')}`)
+        } catch (e) {
+          wrote = `not written to ${to}: ${(e as Error).message}` // the client is made all the same: its token's file is above
+        }
+        return `\n\n${recipeText(recipe, o)}${wrote ? `\n\n${wrote}` : ''}`
       }
       if (sub === 'show') {
         if (!recipe) throw new Error(`usage: laki client show <name> --for <recipe> (${RECIPE_IDS.join(', ')})`)

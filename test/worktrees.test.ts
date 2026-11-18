@@ -1071,11 +1071,22 @@ test('Time Machine and Spotlight: a new worktree excluded once; off calls nothin
   const failed = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   assert.ok(existsSync(failed.path))
   await until(() => lines().includes(`addexclusion ${failed.path}`), 'tried')
-  // turned off: removeexclusion on each, the marker gone
+  // archived and restored: its folder is new, excluded again
   fake(0)
+  await rig.rpc('wsArchive', { id: ws.id })
+  await rig.rpc('wsRestore', { id: ws.id })
+  await until(() => lines().filter(l => l === `addexclusion ${ws.path}`).length === 2, 'the restored worktree excluded again')
+  // turned off: removeexclusion on each, the marker gone
   await rig.rpc('settingsSet', { tmExclude: false, spotlightExclude: false })
   await until(() => lines().includes(`removeexclusion ${ws.path}`), 'put back in')
   assert.ok(!existsSync(join(root, '.metadata_never_index')))
+  // Spotlight alone: a new worktree is Laki's own as the marker is put (no foreign folder, nothing skipped)
+  await rig.rpc('settingsSet', { spotlightExclude: true })
+  rmSync(join(root, '.metadata_never_index'), { force: true })
+  await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await until(() => existsSync(join(root, '.metadata_never_index')), 'the marker with a new worktree')
+  assert.equal((await rig.rpc('doctor')).backup.skipped, undefined)
+  await rig.rpc('settingsSet', { spotlightExclude: false })
   // a folder that isn't Laki's in the worktrees folder: no marker there, and the doctor says why
   mkdirSync(join(root, 'mine'))
   await rig.rpc('settingsSet', { spotlightExclude: true })

@@ -13,7 +13,7 @@ import { Glyph, rollup } from './Glyph'
 import { type CSSProperties, Fragment, type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { collapseOf, fitTabs, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
 import { placesOf } from '../../shared/types'
-import { WidgetStrip } from './Widgets'
+import { click as extClick, WidgetStrip } from './Widgets'
 import { api } from './api'
 import { fresh } from './motion'
 import { usualText } from '../../shared/nextStep'
@@ -260,7 +260,10 @@ export function TabBar({ app }: { app: AppCtx }) {
     ship: { node: () => <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />, item: () => ({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') }) },
     timer: { node: () => <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={later} />, item: () => ({ label: 'Send a message later…', icon: 'timer', hint: kh('later'), run: later }) },
   }
-  const outside: MenuItem[] = here.filter(x => !inBar.has(x.id) && BTN[x.id]?.item).map(x => BTN[x.id].item!())
+  // an extension's top bar button hidden or folded: in ⋯ as a phone has them (wsMore adds them itself when narrow)
+  const extOut = narrow ? [] : ownWidgets.filter(w => !inBar.has(`ext:${w.id}`) && here.some(x => x.id === `ext:${w.id}`))
+  const extItems: MenuItem[] = extOut.length ? [{ head: 'Extensions' }, ...extOut.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : []
+  const outside: MenuItem[] = [...here.filter(x => !inBar.has(x.id) && BTN[x.id]?.item).map(x => BTN[x.id].item!()), ...extItems]
   const full: MenuItem[] = ws ? [{ label: 'Full screen: just this tab', icon: 'maximize', hint: kh('full'), run: () => toggleFull(true) }] : [] // in ⋯, for the bar's room
   const extShown = new Set(groups.find(g => g.id === 'ext' && !folded.has('ext'))?.ids ?? [])
   const customize = (e: React.MouseEvent) => {
@@ -300,7 +303,7 @@ export function TabBar({ app }: { app: AppCtx }) {
       {ws && (
         <div className="actions capsule nodrag tool-end">
           {narrow && !page && <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} /> /* a phone has no ⌘K */}
-          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(page ? full : [...outside, ...(outside.length ? [null] : []), ...full, { label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }, null, { label: 'Customize toolbar…', icon: 'settings', run: () => setDialog('toolbar') }]), 'right')} />
+          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(page ? [...extItems, ...full] : [...outside, ...(outside.length ? [null] : []), ...full, { label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }, null, { label: 'Customize toolbar…', icon: 'settings', run: () => setDialog('toolbar') }]), 'right')} />
           {!page && (
             <RunButton
               running={devRunning}

@@ -1854,7 +1854,7 @@ export function SettingsPage(p: {
                     <button type="button" tabIndex={-1}>Button</button>
                   </div>
                 </div>
-                <Switch className="switch-row" on={s.pointerHand ?? !/Mac/.test(navigator.platform)} onChange={on => paint({ pointerHand: on })}>
+                <Switch className="switch-row" on={s.pointerHand ?? (!bridge || !/Mac/.test(navigator.platform))} /* as themes.ts applyTheme: the phone page's hand, off a Mac's */ onChange={on => paint({ pointerHand: on })}>
                   <Says title="Pointing hand over buttons" hint="Off: the arrow over buttons, tabs and rows, as macOS's own apps; links keep the hand" />
                 </Switch>
                 <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
