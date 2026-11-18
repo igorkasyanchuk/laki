@@ -7,7 +7,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
@@ -785,6 +785,77 @@ function CliField({ api, onSkill }: { api: CliApi; onSkill?: () => void }) {
   )
 }
 
+// B3: Uninstall Laki (daemon uninstall.ts): each piece Laki put outside its app as a row, looked at as it opens; the data
+// only when ticked. Uninstall (a second click confirms) removes them and stops the daemon; the app then asks to go to
+// the Trash (main's uninstalled). A failed row says why, with its command to copy
+export type UninstallApi = (o: { data?: boolean; worktrees?: boolean; run?: boolean; stop?: boolean }) => Promise<{ rows: UninstallRow[] }>
+const ROW_MARK: Record<UninstallRow['state'], string> = { todo: '○', done: '✓', failed: '✕', none: '–', kept: '–', later: '…' }
+function UninstallField({ api }: { api: UninstallApi }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<UninstallRow[] | null>(null)
+  const [data, setData] = useState(false)
+  const [trees, setTrees] = useState(false)
+  const [sure, setSure] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const look = (d: boolean, w: boolean) => api({ data: d, worktrees: w }).then(r => (setRows(r.rows), setErr('')), e => setErr((e as Error).message))
+  const done = rows?.some(r => r.state === 'done')
+  const go = () => (setBusy(true), api({ data, worktrees: trees, run: true, stop: true }).then(r => setRows(r.rows), e => setErr((e as Error).message)).finally(() => setBusy(false)))
+  if (!open)
+    return (
+      <div className="row cli-row">
+        <Says title="Uninstall Laki" hint="Removes what Laki put outside its app: the laki command, the agent skills, the background daemon; your repos and worktrees stay" />
+        <span className="grow" />
+        <button type="button" onClick={() => (setOpen(true), void look(false, false))}>
+          Uninstall Laki…
+        </button>
+      </div>
+    )
+  return (
+    <div className="setting-box uninstall">
+      <b>Uninstall Laki</b>
+      {!rows && <p className="muted small">{err || 'Looking…'}</p>}
+      {rows?.map(r => (
+        <div key={r.id} className={`row uninstall-row ${r.state}`}>
+          <span className="uninstall-mark" aria-label={r.state}>
+            {busy && r.state === 'todo' ? <span className="glyph spin" /> : ROW_MARK[r.state]}
+          </span>
+          {r.id === 'data' && !done ? (
+            <label className="grow">
+              <input type="checkbox" checked={data} disabled={busy} onChange={e => (setData(e.target.checked), setSure(false), void look(e.target.checked, trees))} /> Also delete my data <span className="muted small">{r.detail}</span>
+            </label>
+          ) : r.id === 'worktrees' && r.state !== 'none' && !done ? (
+            <label className="grow">
+              <input type="checkbox" checked={trees} disabled={busy} onChange={e => (setTrees(e.target.checked), setSure(false), void look(data, e.target.checked))} /> Also delete the worktrees <span className="muted small">{r.detail}</span>
+            </label>
+          ) : (
+            <span className="grow">
+              {r.label} <span className="muted small">{r.detail}</span>
+              {r.why && <span className={r.state === 'failed' ? 'warn small' : 'muted small'}> · {r.why}</span>}
+            </span>
+          )}
+          {r.cmd && (r.state === 'failed' || r.id === 'next') && (
+            <button type="button" className="link small" onClick={() => void navigator.clipboard.writeText(r.cmd!)}>
+              Copy command
+            </button>
+          )}
+        </div>
+      ))}
+      {rows && !done && (
+        <div className="row-buttons">
+          <button type="button" className="danger" disabled={busy} onClick={() => (sure ? void go() : setSure(true))}>
+            {busy ? 'Uninstalling…' : sure ? `Really uninstall${[data && 'my data', trees && 'the worktrees'].filter(Boolean).length ? ` and delete ${[data && 'my data', trees && 'the worktrees'].filter(Boolean).join(' and ')}` : ''}?` : 'Uninstall'}
+          </button>
+          <button type="button" disabled={busy} onClick={() => (setOpen(false), setSure(false), setRows(null))}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {err && <p className="field-err">{err}</p>}
+    </div>
+  )
+}
+
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
@@ -824,6 +895,7 @@ export function SettingsPage(p: {
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
+  uninstall?: UninstallApi // B3: General › Developer's Uninstall Laki
   storage?: () => Promise<{ dir: string; bytes: number; folders: number }> // General › Storage: its folder, size and folders (the daemon's storageInfo)
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
@@ -1641,6 +1713,7 @@ export function SettingsPage(p: {
               {p.cli && (
                 <Group title="Developer" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki screen…; the skill teaches agents the same">
                   <CliField api={p.cli} onSkill={() => openSec('skill')} />
+                  {p.uninstall && <UninstallField api={p.uninstall} />}
                 </Group>
               )}
               <Group title="Pages" hint="On unless you turn them off; a new install starts with Labs off">

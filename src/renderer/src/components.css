@@ -114,6 +114,16 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
 :where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
 
+/* B3: Uninstall Laki (Settings.tsx UninstallField): a row per piece, its mark by state */
+.uninstall { display: flex; flex-direction: column; gap: var(--sp-2); }
+.uninstall-row { align-items: center; gap: var(--sp-3); }
+.uninstall-mark { width: var(--sp-5); flex: none; text-align: center; color: var(--muted); }
+.uninstall-row.done .uninstall-mark { color: var(--done); }
+.uninstall-row.failed .uninstall-mark { color: var(--error); }
+.uninstall-row:is(.none, .kept) { opacity: 0.7; }
+.uninstall button.danger { color: var(--error); }
+.uninstall button.danger:hover { border-color: var(--error); }
+
 /* A9: the agents' CLIs (SettingsAgents.tsx AgentVersions): a row each, its version and its update */
 .agent-versions { display: flex; flex-direction: column; gap: var(--sp-2); }
 .agent-version { align-items: center; gap: var(--sp-2); }

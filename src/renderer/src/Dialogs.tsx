@@ -229,6 +229,7 @@ export function Pages({ app }: { app: AppCtx }) {
           }}
           webhookTest={w => api.call('webhookTest', w)}
           cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
+          uninstall={hasCap(view, 'uninstall') ? o => api.call('uninstall', o) : undefined}
           storage={() => api.call('storageInfo')}
           uiReset={() => api.call('uiReset')}
           simulator={p => api.call('sim', p)}

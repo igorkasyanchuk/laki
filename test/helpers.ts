@@ -115,6 +115,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       const d = daemon
       daemon = null
       rig.app = '' // that daemon's: a CLI's autostart gives none (S1)
+      if (d.exitCode !== null || d.signalCode !== null) return // it stopped by itself (laki uninstall's)
       const gone = new Promise(r => d.once('exit', r))
       d.kill('SIGTERM')
       await gone

@@ -10,7 +10,7 @@ import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
-import { helperBin } from '../shared/helper.ts'
+import { appOf, helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, DROP_IMG, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NOTE_TO, plainText, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
@@ -3009,6 +3009,24 @@ ipcMain.handle('copy-file', async (e, path: unknown) => {
   if (mac) await clipboard.write([new ClipboardItem({ 'electron application/osclipboard;format="public.file-url"': pathToFileURL(real).href })]) // what Finder's Copy puts there
   else await clipboard.writeText(real) // ponytail: off macOS, its path
   return 'file'
+})
+
+// B3: Laki was uninstalled (Settings' Uninstall Laki or laki uninstall: the daemon's uninstalled event, through the
+// window): no daemon again, and the app goes: to the Trash on a yes (a Homebrew install: brew's command to copy)
+ipcMain.on('uninstalled', async (e, cask: unknown) => {
+  if (!from(e) || quitting) return
+  quitting = true // the window's reconnect starts no daemon now (conn)
+  const bundle = mac && app.isPackaged ? appOf(process.execPath) : undefined // a dev run's is node_modules' Electron.app: never
+  const r = await dialog.showMessageBox({
+    type: 'info',
+    message: `${app.name} is uninstalled`,
+    detail: cask ? 'Its pieces are gone. To remove the app: brew uninstall --cask laki' : `Its pieces are gone.${bundle ? ' Move the app to the Trash to finish.' : ''}`,
+    buttons: cask ? ['Copy the command and quit', 'Quit'] : bundle ? ['Move to Trash and quit', 'Quit'] : ['Quit'],
+    defaultId: 0,
+  })
+  if (r.response === 0 && cask) clipboard.writeText('brew uninstall --cask laki')
+  else if (r.response === 0 && bundle) await shell.trashItem(bundle).catch(err => appLog(`uninstall: the app to the Trash: ${err}`))
+  app.quit()
 })
 
 // Quit Completely: the daemon too, so every agent stops (they resume when the app opens again)

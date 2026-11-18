@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
+const BOOL = new Set(['yes', 'data', 'worktrees', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -305,6 +305,26 @@ async function main() {
     }
     case 'stop':
       return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
+    case 'uninstall': {
+      // B3: the pieces Laki put outside its app, a line each; on a terminal it asks, --yes doesn't; then they're removed
+      // and the daemon stops (an open app quits with it)
+      type Row = { id: string; label: string; detail: string; state: string; why?: string; cmd?: string }
+      const MARK: Record<string, string> = { todo: '○', done: '✓', failed: '✕', none: '–', kept: '–', later: '…' }
+      const say = (rows: Row[]) => rows.map(r => `  ${MARK[r.state] ?? ' '} ${r.label.padEnd(18)} ${r.detail}${r.why ? ` (${r.why})` : ''}${r.cmd && r.state === 'failed' ? `\n      by hand: ${r.cmd}` : ''}`).join('\n')
+      const data = !!flags.data
+      const worktrees = !!flags.worktrees
+      const look = await rpc<{ rows: Row[] }>('uninstall', { data, worktrees, from: caller() })
+      let yes = !!flags.yes
+      if (!yes && !json && process.stdin.isTTY) {
+        console.log(`Uninstall Laki\n${say(look.rows)}\n`)
+        const rl = (await import('node:readline')).createInterface({ input: process.stdin, output: process.stdout })
+        yes = /^y(es)?$/i.test((await new Promise<string>(ok => rl.question(`Remove them${data ? ' and delete your data' : ''}${worktrees ? ' and the worktrees' : ''}? [y/N] `, ok))).trim())
+        rl.close()
+        if (!yes) return console.log('Nothing removed.')
+      } else if (!yes) return out(look, `Uninstall Laki\n${say(look.rows)}\n\nlaki uninstall --yes removes them${data ? ' and your data' : ' (--data: your data too)'}${worktrees ? ' and the worktrees' : ' (--worktrees: the worktrees Laki made too)'}`)
+      const r = await rpc<{ rows: Row[] }>('uninstall', { data, worktrees, run: true, stop: true, from: caller() })
+      return out(r, `Uninstalled\n${say(r.rows)}`)
+    }
     case 'serve':
       if (inTab()) throw new Error(NO_START) // S4: a daemon in this process
       return serve(rest)

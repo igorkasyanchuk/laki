@@ -201,7 +201,9 @@ const SKILL_MD = /((?:~|\/)[^\s"'`]*\/([^/\s"'`]+))\/SKILL\.md\b/
 const SKILLS_MAX = 50
 // claude: its Skill tool's calls ({ skill }), the message that loads one (its base directory) and a SKILL.md read with
 // Read; codex: a SKILL.md its shell read (codex loads a skill so). The main chat's only, not a subagent's
-function skillsIn(agent: string, j: any, m: Meter) {
+type SkillLine = { isSidechain?: boolean; type?: string; message?: { content?: unknown }; payload?: { type?: string; arguments?: unknown; input?: unknown; action?: unknown } }
+type SkillPart = { type?: string; name?: string; input?: { skill?: unknown; file_path?: unknown }; text?: unknown }
+function skillsIn(agent: string, j: SkillLine, m: Meter) {
   const seen = (m.skills ??= [])
   const add = (name: string, path?: string) => {
     if (!name || name.length > 120) return
@@ -212,7 +214,7 @@ function skillsIn(agent: string, j: any, m: Meter) {
   if (agent === 'claude') {
     if (j.isSidechain) return
     const c = j.message?.content
-    for (const x of typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []) {
+    for (const x of (typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []) as SkillPart[]) {
       if (j.type === 'assistant' && x?.type === 'tool_use') {
         if (x.name === 'Skill' && typeof x.input?.skill === 'string') add(x.input.skill.trim())
         else if (x.name === 'Read' && typeof x.input?.file_path === 'string') (f => f && add(f[2], f[1]))(SKILL_MD.exec(x.input.file_path))
@@ -226,7 +228,7 @@ function skillsIn(agent: string, j: any, m: Meter) {
     }
   } else {
     const p = j.payload
-    if (j.type !== 'response_item' || !['function_call', 'custom_tool_call', 'local_shell_call'].includes(p?.type)) return
+    if (!p || j.type !== 'response_item' || !['function_call', 'custom_tool_call', 'local_shell_call'].includes(p.type ?? '')) return
     const a = p.arguments ?? p.input ?? p.action ?? ''
     const f = SKILL_MD.exec(typeof a === 'string' ? a : JSON.stringify(a))
     if (f) add(f[2], f[1])

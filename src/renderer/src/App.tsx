@@ -1547,6 +1547,8 @@ export function App() {
         // Laki AI looked at a tab (lit where it's shown, else the window) or used the agent browser (the window); Laki in
         // the background (away: animations paused): none, not a late one when you're back
         if (viewRef.current?.settings?.aiGlow !== false && !document.documentElement.classList.contains('away')) setGlow({ tab: shownTabs.current.includes(m.tab) ? m.tab : undefined, n: Date.now() })
+      } else if (m.ev === 'uninstalled') {
+        bridge?.uninstalled?.(!!m.cask) // B3: the app goes with it (main asks: to the Trash)
       } else if (m.ev === 'browse' && bridge?.browse) {
         // the agent browser (laki browser): main drives a hidden window; its answer goes back to the daemon
         const { req: id, ev: _, ...r } = m // req: an event with an id would be taken for a reply

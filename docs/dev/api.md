@@ -128,6 +128,14 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `CLI_MARK` in it; `current`: its paths this install's; `onPath`; `other`: another laki first on PATH; `to`: where an
   install goes), `cliInstall` (the launcher, `LAKI_CLI`, in the first writable of `cliSpots` with no other `laki` there, a link too (never
   written through): `/opt/homebrew/bin`, `/usr/local/bin`, else `~/.local/bin`, made; none: refused; `LAKI_CLI_DIRS`: tests' own), `cliRemove` (only one with `CLI_MARK`);
+- Uninstall Laki (B3, uninstall.ts; Settings' `UninstallField`, `laki uninstall`): `uninstall` (`data`, `worktrees`: their
+  rows picked; `run`: removed; `stop`: the daemon too, now, after its answer: an `uninstalled` event (`cask`) first, which
+  the app's window hands to main: no daemon again, a dialog, the app to the Trash or brew's command copied, quit).
+  `{ rows: UninstallRow[] }`, in order cli, skills, daemon, worktrees, data, next; a launcher or skill is this Laki's
+  when it names `LAKI_HOME=<this data folder>` (else kept: another build's). The worktrees (each worktree workspace's
+  folder, then `git worktree prune` in its repo) and the data folder (but its `worktrees/` unless picked; Laki AI's
+  Keychain items) go in main.ts' `shutdown` (`wipe`), after the sessions end. The user's only, never remote;
+  `test/uninstall.test.ts`;
 - memory's compaction (`daemon/memory.ts`): `memoryCompact` (`project`: its learned memories, never the user's, to Laki
   AI's model through `ai.ts` `aiOnce` (OpenRouter's `aiComplete`, or `claude -p`/`codex exec` with no tools), back as
   `{memories: [{text, from}]}`; an answer that isn't one, empty or longer changes nothing; what changed meanwhile

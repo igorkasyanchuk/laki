@@ -125,6 +125,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki mcp [--all]                            Laki as an MCP server (stdio): claude mcp add laki -- laki mcp; its core
                                               tools listed, laki_more adds a group (--all, LAKI_MCP_ALL=1: every one)
   laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
+  laki uninstall [--yes] [--data] [--worktrees] [--json]
+                                              what Laki put outside its app (the laki command, agent skills, the daemon);
+                                              --yes removes them and stops the daemon; --data: your data too, --worktrees: the worktrees Laki made
   laki serve --tailscale [--pin | --funnel] | --domain [name] | --cloudflare --mail <you@x.com> | --cloudflare --pin | --cloudflare --open --hours <n ≤ 24>  [--hours n]
                                               headless: the daemon and remote access, until stopped (docs/headless.md);
                                               --domain: at <name>.<your named tunnel's domain> (laki.…), a stable address, with a PIN;
@@ -414,6 +417,15 @@ done, so a page that moved meanwhile isn't typed into.
   laki browser scroll --to bottom
   laki browser tabs new /admin
   laki browser screenshot`,
+  uninstall: `Lists what Laki put outside its app, a line each: the laki command on PATH, the agent skills in each
+agent's folder, the background daemon and the terminals it kept, the worktrees Laki made (only with --worktrees: their
+uncommitted changes go too), your data (only with --data). A launcher or skill that drives another Laki's data folder
+(a dev build) is kept. On a terminal it asks before it removes anything; --yes removes them without asking and stops
+the daemon (an open app quits). Your repos stay. Then move Laki to the Trash (a Homebrew install: brew uninstall
+--cask laki).
+
+  laki uninstall
+  laki uninstall --yes --data`,
   diff: `Prints the workspace's changes against its base (what ship would put in a PR).`,
   archive: `Archives the workspace: its worktree goes, its branch stays (laki restore brings it back). With uncommitted work it stops and exits 1: commit first (--force archives anyway, the uncommitted files kept for restore; local projects). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
 
