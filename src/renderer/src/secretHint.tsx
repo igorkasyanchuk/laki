@@ -12,7 +12,7 @@ export const setSecretHint = (v: boolean | undefined) => void (on = v !== false)
 const okayed = new Set<string>() // Send as it is: these exact texts, in memory only
 
 export function useSecretHint(text: string, setText: (t: string) => void, o: { ws?: string; send?: () => void } = {}) {
-  const spans = useMemo(() => (on && text.length < 200_000 ? secretsIn(text) : []), [text]) // ponytail: past 200 KB unchecked
+  const spans = useMemo(() => (on && text.length < 200_000 ? secretsIn(text) : []), [text, on]) // ponytail: past 200 KB unchecked; on: Settings' switch, set as the view comes
   const [armed, setArmed] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)

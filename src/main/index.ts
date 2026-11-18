@@ -1395,7 +1395,7 @@ systemPreferences.on('accent-color-changed', accentNow)
 // macOS's Show scroll bars (System Settings › Appearance): 'overlay' (a thumb only while scrolling, hovered or focused:
 // styles.css html[data-scrollbars]) unless Always; off a Mac always. A change goes to the app's windows
 const sysScroll = () => (mac && systemPreferences.getUserDefault('AppleShowScrollBars', 'string') !== 'Always' ? 'overlay' : 'always')
-ipcMain.handle('scrollbars', () => sysScroll())
+ipcMain.handle('scrollbars', e => (from(e, 'new', 'ai', 'tab', 'quick') ? sysScroll() : 'always')) // the app's pages only, as accent
 if (mac) systemPreferences.subscribeNotification('AppleShowScrollBarsSettingChanged', () => { for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('scrollbars', sysScroll()) })
 // Settings' Dock icon: the window's renderer draws it (a PNG data URL), kept in userData so the next start (an
 // update too) shows it at once, before the window loads. ponytail: the bundle's own still shows in Finder and in a

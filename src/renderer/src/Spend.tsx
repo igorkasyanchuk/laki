@@ -31,7 +31,7 @@ export function SpendSection({ load, title = 'Where it went' }: { load: () => Pr
   const [open, setOpen] = useState(false)
   const toggle = () => {
     setOpen(!open)
-    if (!open) void load().then(setS, (e: Error) => setErr(e.message)) // read anew each time it opens: the transcript grows
+    if (!open) setErr(''), void load().then(setS, (e: Error) => setErr(e.message)) // read anew each time it opens: the transcript grows; an old error goes
   }
   return (
     <section className="spend">

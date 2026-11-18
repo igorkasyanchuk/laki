@@ -90,7 +90,7 @@ export function secretKeep(o: { value?: unknown; label?: unknown; ws?: unknown }
   const ws = o.ws ? state.workspaces.find(w => w.id === o.ws) : undefined
   if (o.ws && !ws) throw new Error(`no workspace ${String(o.ws)}`)
   const folder = ws ? (!ws.archived ? storageOf(ws) : undefined) : storageRoot()
-  if (!folder) throw new Error(`${ws?.name ?? ws?.id} has no storage folder (an SSH host's has none): leave it in the prompt or put it in a file yourself`)
+  if (!folder) throw new Error(`${ws?.name ?? ws?.id} has no storage folder (${ws?.archived ? "it's archived" : "an SSH host's has none"}): leave it in the prompt or put it in a file yourself`)
   mkdirSync(folder, { recursive: true, mode: 0o700 })
   const path = writeSecret(folder, label, value)
   log(`secret: ${label} kept from a prompt in ${path}`) // the path, never the value

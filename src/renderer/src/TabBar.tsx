@@ -106,7 +106,7 @@ export function TabList({ app }: { app: AppCtx }) {
       type="button"
       className="tab-more nodrag"
       data-gi={groups.length}
-      aria-label={`${out.length} more tab${out.length === 1 ? '' : 's'}${waits ? `, ${waits} waiting` : outTabs.some(t => t.failed) ? ', 1 stopped' : outTabs.some(t => t.status === 'running') ? ', working' : ''}`}
+      aria-label={`${out.length} more tab${out.length === 1 ? '' : 's'}${waits ? `, ${waits} waiting` : outTabs.some(t => t.failed) ? `, ${outTabs.filter(t => t.failed).length} stopped` : outTabs.some(t => t.status === 'running') ? ', working' : ''}`}
       aria-haspopup="menu"
       onClick={e => openMenu(e, out.map(g => (ts => ({ label: ts.map(t => t.name).join(' · '), sub: ts[0]?.kind === 'agent' ? ts[0].preset : undefined, mark: <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />, run: () => selectGroup(g) }) as MenuItem)(tabsOf(g).map(byId).filter((t): t is TabView => !!t))), 'right')}
     >
