@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { describe, describeHours, inHours, nextRun, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
+import { describe, describeHours, inHours, minutesOn, nextRun, parseCron, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
 import { fresh, until } from './helpers.ts'
 
 const SUN = new Date(2026, 9, 4, 10, 0).getTime() // Sunday 4 October 2026, 10:00
@@ -433,4 +433,90 @@ test('T5: keep 2 of 6 runs: the older ones archived (oldest first), a dirty and 
   const r = await rig.rpc('scheduleRun', { id: e.id })
   await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws).archived, 'the empty run archived')
   await until(async () => /archived: it changed nothing$/.test((await rig.rpc('state')).runs.find((x: any) => x.id === r.id).what), 'said so')
+})
+
+// cron expressions: parsed when the English doesn't read (parseWhen), kept whole, the next run day by day
+const cron = (t: string) => {
+  const r = parseWhen(t)
+  if ('error' in r) throw new Error(r.error)
+  assert.ok(r.cron, `${t}: a cron rule`)
+  return r
+}
+const at = (y: number, mo: number, d: number, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime()
+test('cron: each field form parses (numbers, lists, ranges, steps, names, 7 as Sunday, @ shortcuts)', () => {
+  const c = cron('5,35 9-11/2 1,15 jan-mar,dec mon-fri').cron!
+  assert.deepEqual([c.minute, c.hour, c.day, c.month, c.weekday], [[5, 35], [9, 11], [1, 15], [1, 2, 3, 12], [1, 2, 3, 4, 5]])
+  assert.deepEqual(cron('0 12 * * 7').cron!.weekday, [0])
+  assert.deepEqual(cron('0 12 * * 5-7').cron!.weekday, [0, 5, 6])
+  assert.deepEqual(cron('10/20 * * * *').cron!.minute, [10, 30, 50])
+  assert.deepEqual(cron('@hourly').cron!.minute, [0])
+  assert.equal(cron('@daily').cron!.expr, '0 0 * * *')
+  assert.equal(cron('@weekly').cron!.expr, '0 0 * * 0')
+  assert.equal(cron('@monthly').cron!.expr, '0 0 1 * *')
+  // an English rule reads as before
+  const en = parseWhen('weekdays at 9am') as Rule
+  assert.equal(en.cron, undefined)
+  assert.equal(describe(en), 'Weekdays at 09:00')
+})
+test('cron: */20 9-17 * * 1-5 from a Friday 17:50 runs Monday 9:00; quarter starts; the words', () => {
+  const r = cron('*/20 9-17 * * 1-5')
+  assert.equal(nextRun(r, at(2026, 11, 20, 17, 50)), at(2026, 11, 23, 9, 0)) // Fri 20 Nov 2026
+  assert.equal(nextRun(r, at(2026, 11, 23, 9, 0)), at(2026, 11, 23, 9, 20))
+  assert.equal(describe(r), 'Weekdays every 20 min from 09:00 to 17:40')
+  const q = cron('30 7 1 */3 *')
+  assert.deepEqual(q.cron!.month, [1, 4, 7, 10])
+  let t = at(2026, 2, 10)
+  const runs: number[] = []
+  for (let i = 0; i < 4; i++) runs.push((t = nextRun(q, t)!))
+  assert.deepEqual(runs, [at(2026, 4, 1, 7, 30), at(2026, 7, 1, 7, 30), at(2026, 10, 1, 7, 30), at(2027, 1, 1, 7, 30)])
+  assert.equal(describe(q), 'Day 1 of Jan, Apr, Jul, Oct at 07:30')
+})
+test("cron: day of month and day of week both set run on either (cron's OR); one * : the other alone", () => {
+  const r = cron('0 9 13 * fri')
+  // Nov 2026: Fri 6, Fri 13, Fri 20; the 13th a Friday too, once
+  const runs: number[] = []
+  for (let t = at(2026, 11, 1), i = 0; i < 4; i++) runs.push((t = nextRun(r, t)!))
+  assert.deepEqual(runs, [at(2026, 11, 6, 9), at(2026, 11, 13, 9), at(2026, 11, 20, 9), at(2026, 11, 27, 9)])
+  assert.deepEqual(minutesOn(r, at(2026, 12, 13)), [540]) // a Sunday, the 13th
+  assert.deepEqual(minutesOn(cron('0 9 13 * *'), at(2026, 11, 6)), []) // a Friday, not the 13th
+  assert.equal(describe(r), 'Day 13 or Fri at 09:00')
+})
+test('cron: a DST start day runs a skipped hour once after the gap; an end day runs a repeated hour once', () => {
+  const tz = process.env.TZ
+  process.env.TZ = 'America/New_York'
+  try {
+    const r = cron('30 2 * * *')
+    const start = nextRun(r, at(2026, 3, 8, 0, 0))! // 8 Mar 2026: 2:00 → 3:00
+    assert.equal(new Date(start).getHours(), 3)
+    assert.equal(nextRun(r, start), at(2026, 3, 9, 2, 30))
+    const e = cron('30 1 * * *')
+    const first = nextRun(e, at(2026, 11, 1, 0, 0))! // 1 Nov 2026: 1:00-2:00 twice
+    assert.equal(nextRun(e, first), at(2026, 11, 2, 1, 30))
+    // every 20 min through the end night: no time twice in a row, none missing
+    const every = cron('*/20 * * * *')
+    const seen: number[] = []
+    for (let t = at(2026, 11, 1, 0, 30), i = 0; i < 10; i++) seen.push((t = nextRun(every, t)!))
+    assert.ok(seen.every((x, i) => !i || x > seen[i - 1]))
+  } finally {
+    if (tz === undefined) delete process.env.TZ
+    else process.env.TZ = tz
+  }
+})
+test('cron: what it refuses names the field', () => {
+  const err = (t: string) => ((r => ('error' in r ? r.error : ''))(parseCron(t)))
+  assert.match(err('0 0 9 * * *'), /seconds/)
+  assert.match(err('0 9 ? * mon'), /day of month field/)
+  assert.match(err('0 9 L * *'), /day of month field/)
+  assert.match(err('0 9 * * 5#2'), /day of week field/)
+  assert.match(err('0 9 15W * *'), /day of month field/)
+  assert.match(err('61 9 * * *'), /minute field/)
+  assert.match(err('0 24 * * *'), /hour field/)
+  assert.match(err('0 9 * 13 *'), /month field/)
+  assert.match(err('0 9 * * foo'), /day of week field/)
+  assert.match(err('* * * * *'), /every 5 minutes/)
+  assert.match(err('0 0 31 2 *'), /never runs/)
+  assert.match(err('@yearly'), /@hourly/)
+  // through parseWhen: a cron-looking line says cron's error, words say the English one
+  assert.match((parseWhen('0 9 ? * mon') as { error: string }).error, /day of month/)
+  assert.match((parseWhen('sometime soon') as { error: string }).error, /time/i)
 })

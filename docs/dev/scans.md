@@ -260,7 +260,9 @@ as it's archived, or the PR seen merged) with a storage folder of their own (`st
 
 `schedule.ts` `scheduleSet`, `scheduleTick` (every 30 s), `runSchedule`; the rule comes from `shared/when.ts` `parseWhen`
 (a line of English to days of the week and minutes after midnight, in the Mac's time zone; `once` for
-`once`/`tomorrow`), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
+`once`/`tomorrow`; a cron expression when the words don't read, `@…` always: `parseCron`, kept whole as the rule's
+`cron` (its fields as sets, `anyDay`/`anyWeekday` for cron's day-of-month OR day-of-week), `nextRun` day by day for 5
+years at most, `describe` in words, `minutesOn` the Calendar's day), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
 dates (only braces of date tokens, any of them in any order; `MM` right after an hour is the minutes) in the name and
 prompt with the run's time; `fillTemplate` stamps a template's text the same way before its vars (a typed prompt isn't),
 and App's `runAction` an action's. A task with `widget` (`action`: one of its actions, the prompt its `$WIDGET_ARG`; none: a fetch; `widgetUseCheck` as it's

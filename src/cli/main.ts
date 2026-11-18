@@ -815,7 +815,8 @@ async function main() {
         return out(v.runs ?? [], (v.runs ?? []).map((r: ScheduleRun) => `${at(r.at)}  ${glyph(r)}  ${r.name}  ${r.what}${r.state && r.state !== 'running' ? `  → ${r.state}${r.said ? `: ${r.said}` : ''}${r.pr ? ` (PR #${r.pr.number})` : ''}` : ''}`).join('\n') || 'no runs yet')
       }
       if (sub === 'add') {
-        if (!flags.when && !flags.on) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>, or on an event: --on ci.failed')
+        if (flags.at !== undefined && flags.when === undefined) flags.when = flags.at // --at: a cron expression (or words), the same field
+        if (!flags.when && !flags.on) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" (or --at "*/20 9-17 * * 1-5") <prompt>, or on an event: --on ci.failed')
         const str = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined)
         const trigger = str('on') && { event: str('on'), ...(str('branch') && { branch: str('branch') }), ...(str('label') && { label: str('label') }), ...(str('by') && { by: str('by') }) } // T4
         const keepRuns = str('keep-runs')

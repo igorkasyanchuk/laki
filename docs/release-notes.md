@@ -19,6 +19,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - `laki mcp` serves resources (a workspace's diff and live plan, a project's memory) and your prompt templates as MCP prompts, behind the same rules as its tools.
 - Trusted clients have ready-made setups: `laki client add "Claude Desktop" --for mcp` (also raycast, launchd, shortcuts, script) gives the narrowest scopes and prints the config to paste, naming the token's file, never the token. *Copy config for…* in Settings › Security does the same.
 - A wrapper sandbox for agents without one of their own (OpenCode, or Gemini and Grok with theirs off) on a Mac: it writes only in its worktree, git's folder, temp folders and its own settings, and can't read your keys. A new profile of those agents suggests it; a refused write offers *Restart without the wrapper*.
+- A scheduled task's *When* takes a cron expression too (`*/20 9-17 * * 1-5`, `@daily`), read back in words with its next three runs; `laki schedule add … --at "…"`.
 - Remote access on an iPhone in landscape keeps text at its size: Safari no longer enlarges it.
 - Worktrees stay out of Time Machine and Spotlight on a Mac (Settings › General › Storage; on for new installs). Settings › Resources › Disk says how much that keeps out of your backups.
 

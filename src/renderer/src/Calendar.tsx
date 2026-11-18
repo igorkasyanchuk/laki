@@ -4,7 +4,7 @@
 // opens its workspace or goes. App.tsx passes a CalendarApi.
 import { type FormEvent, useMemo, useState } from 'react'
 import type { Reminder, Schedule, ScheduleRun } from '../../shared/types'
-import { describe, parseWhen, partsOf, type Rule, stamp, whenOf } from '../../shared/when'
+import { describe, minutesOn, parseWhen, type Rule, stamp, whenOf } from '../../shared/when'
 import { Modal } from './panels'
 import { Icon, IconButton, type IconName, load, keep, Page, act } from './ui'
 import { runIcon, runLine } from './runs'
@@ -51,7 +51,7 @@ export function occurrences(s: Schedule, from: number, to: number): Item[] {
 const timesOf = (rule: Rule, from: number, to: number) => {
   const out: number[][] = []
   for (let d = dayOf(from); d < to; d = addDays(d, 1)) {
-    const mins = [...new Set(partsOf(rule).flatMap(p => (p.days.includes(new Date(d).getDay()) ? p.times : [])))].sort((a, b) => a - b) // a time two parts share: once
+    const mins = minutesOn(rule, d) // a time two parts share: once; a cron rule's days as cron has them
     const ats = mins.map(m => new Date(new Date(d).getFullYear(), new Date(d).getMonth(), new Date(d).getDate(), Math.floor(m / 60), m % 60).getTime()).filter(t => t >= from && t < to) // as nextRun: a DST day's clock
     if (ats.length) out.push(ats)
   }

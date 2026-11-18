@@ -76,7 +76,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" | --on ci.failed|pr.opened|pr.review|issue.opened|push [--branch b] [--label l] [--by others|me|any] [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] [--keep-runs 5] [--keep-empty] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" | --at "*/20 9-17 * * 1-5" | --on ci.failed|pr.opened|pr.review|issue.opened|push [--branch b] [--label l] [--by others|me|any] [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] [--keep-runs 5] [--keep-empty] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date; --only-if: run only when there's something
                                               to do (a skip is logged); {{check}}: what it found
@@ -428,6 +428,7 @@ lock) is tried again 5 minutes on; an agent at its plan limit starts as it reset
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
   laki schedule add shop --when "fridays at 5pm" --base release/2.0 "Backport this week's fixes"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
+  laki schedule add shop --at "*/20 9-17 * * 1-5" "Check the deploy queue"   # cron: minute hour day month weekday
   laki schedule add shop --when "weekdays at 7am" --only-if prs:failing "Fix the failing PRs: {{check}}"
   laki schedule add shop --on ci.failed --branch main "CI failed on main: {{event.url}}. Find why and open a PR with the fix"
   laki schedule log`,
