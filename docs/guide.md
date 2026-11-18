@@ -389,6 +389,12 @@ selected workspace's PR is in the status bar.
   *Log* shows each run's list before and after. Settings › *Global memory* › *On its own* (on unless you turn it off;
   it sends every project's learned list to Laki AI's model) does it every 7 days and as a list fills up, and sets how
   often (or only when full).
+- **Notes and memory in the repo**: a switch on the project page's *Notes* and *Memory* tabs, *Keep notes and memory
+  in the repo*, keeps them in `.laki/notes.md` (Markdown) and `.laki/memory.md` (one line each, newest first, easy to
+  review in a PR) instead of Laki's own folder. Commit them, and teammates and your other Macs get the same notes and
+  memory through git, and every agent on the team starts with them. Each Mac turns it on by itself; switching moves
+  nothing, and what Laki kept comes back when you turn it off. A worktree's agent reads its own branch's file and adds
+  what it learns there, so a memory found on a branch arrives with its merge.
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
   laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours (not in an agent's tab)

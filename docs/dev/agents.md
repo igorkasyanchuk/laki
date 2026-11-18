@@ -289,6 +289,14 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
   for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
 
+B6: a project with `inRepo` (this Mac's state; projectSet's `inRepo`, the user's only) keeps its notes and memory in its
+repo: `.laki/notes.md` and `.laki/memory.md` (core's `notesOf`, `memoryOf`, `notesSet`, `memorySet`, `memoryParse` and
+`memoryText`: `- <date> · <id> · [learned · ]<text>`, newest first; a line written by hand is the user's, its id a hash
+of its text). The view's project `notes` and `memory` are the checkout's files then (`p.notes`, `p.memory` kept as they
+were: switching moves nothing). `memoryRoot`: an agent's workspace's own folder for its start (`memoryNote`'s `root`),
+`memoryAdd` and `memoryRm` (their `tab`), else the checkout; memory.ts' compaction and Laki AI read and write it too.
+`test/repo-memory.test.ts`.
+
 Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
 the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would

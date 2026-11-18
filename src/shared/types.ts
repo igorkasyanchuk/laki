@@ -198,6 +198,7 @@ export type Project = {
   seps?: Sep[] // the sidebar's named lines between its workspaces
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
   notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
+  inRepo?: boolean // B6: its notes and memory in its repo (.laki/notes.md, .laki/memory.md: core's notesOf, memoryOf), this Mac's choice; notes and memory here stay as they were meanwhile
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
   memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start

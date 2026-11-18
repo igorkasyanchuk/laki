@@ -9,6 +9,7 @@ import { describe } from '../../shared/when'
 import { Markdown } from './MarkdownView'
 import { NotesView } from './panels'
 import { at, soon, WHERE } from './Schedules'
+import { Says } from './SettingsKit'
 import { ProjectSection } from './SettingsProject'
 import { ask, Icon, IconButton, keep, load, Page, Switch } from './ui'
 
@@ -21,7 +22,7 @@ export const PROJECT_TABS = [
 ] as const
 export type ProjectTab = (typeof PROJECT_TABS)[number][0]
 export type ProjectApi = {
-  save(o: { notes?: string; memory?: Memory[] }): Promise<unknown>
+  save(o: { notes?: string; memory?: Memory[]; inRepo?: boolean }): Promise<unknown>
   saveSettings(o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }): unknown
   file(id: string): Promise<ProjectConfig>
   global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean } // Settings' own, which go with the project's (flows: Workflows on)
@@ -54,9 +55,15 @@ export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClos
             ))}
           </div>
         </div>
-        {tab === 'notes' && <NotesView key={p.id} notes={p.notes ?? ''} onSave={notes => api.save({ notes })} />}
+        {(tab === 'notes' || tab === 'memory') && !p.host && p.git !== false && (
+          // B6: this Mac keeps them in the repo (.laki/), shared through git, or in Laki; switching moves nothing
+          <Switch className="switch-row pp-repo" on={!!p.inRepo} onChange={on => void api.save({ inRepo: on }).catch(() => {})}>
+            <Says title="Keep notes and memory in the repo" hint={p.inRepo ? 'In .laki/notes.md and .laki/memory.md: commit them, and teammates and your other Macs get them through git; an agent in a worktree reads its own branch\'s. What Laki kept before comes back when you turn this off' : 'Off: in Laki, on this Mac only. On: in .laki/notes.md and .laki/memory.md, shared through git (each Mac turns it on; nothing is moved)'} />
+          </Switch>
+        )}
+        {tab === 'notes' && <NotesView key={`${p.id}:${!!p.inRepo}`} notes={p.notes ?? ''} onSave={notes => api.save({ notes })} />}
         {tab === 'tasks' && <Tasks schedules={schedules} api={api} />}
-        {tab === 'memory' && <MemoryList key={p.id} memory={p.memory ?? []} save={memory => api.save({ memory })} compact={api.compact} last={p.compacted} />}
+        {tab === 'memory' && <MemoryList key={`${p.id}:${!!p.inRepo}`} memory={p.memory ?? []} save={memory => api.save({ memory })} compact={api.compact} last={p.compacted} />}
         {tab === 'specs' && api.specs && <Specs key={p.id} specs={api.specs} />}
         {tab === 'settings' && (
           <div className="settings-main form pp-settings">

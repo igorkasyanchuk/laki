@@ -537,9 +537,63 @@ const TOOLS_NOTE = `
 // global ones; one argument: Linux takes 128 KB at most); control characters dropped (a NUL fails the spawn, TOML
 // refuses DEL)
 const MEMORY_SAYS = 2000
+// ---------- B6: a project's notes and memory in its repo (its page's Notes and Memory: In the repo), .laki/notes.md and
+// .laki/memory.md, so git shares them with teammates and your other Macs; each Mac opts in (p.inRepo, this Mac's
+// state). Switching moves nothing: Laki's own (p.notes, p.memory) stay as they were and come back when it's off. An
+// agent reads, and adds to, its workspace's file (its branch's: a memory learned on a branch arrives with its merge);
+// the app reads and writes the project's checkout's. On this Mac's projects only
+export const REPO_NOTES = join('.laki', 'notes.md')
+export const REPO_MEMORY = join('.laki', 'memory.md')
+export const inRepo = (p?: Project) => !!p?.inRepo && !p.host && !p.kind
+const repoRead = (f: string) => {
+  try {
+    return readFileSync(f, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+const MEMORY_HEAD = "# Project memory\n\nLaki's memory of this project, shared through git: one line each, newest first. Lines marked\n`learned` an agent saved (notes, not rules); the rest are the team's own. Laki rewrites this file as it changes.\n"
+// .laki/memory.md's lines (newest first) as Laki's list (newest last): `- <date> · <id> · [learned · ]<text>`; a line
+// written by hand (`- text`) is the team's, its id from its text, dated as the file is
+export function memoryParse(text: string, mtime = 0): Memory[] {
+  const out: Memory[] = []
+  for (const line of text.split('\n').reverse()) {
+    const m = /^[-*] (?:(\d{4}-\d{2}-\d{2}) · )?(?:([\w-]{1,40}) · )?(?:(learned) · )?(.*\S.*)$/.exec(line.trim())
+    if (!m) continue
+    const id = m[2] ?? createHash('sha1').update(m[4].trim()).digest('hex').slice(0, 6)
+    if (out.some(x => x.id === id)) continue
+    out.push({ id, text: m[4].trim(), at: (m[1] && Date.parse(`${m[1]}T12:00:00Z`)) || mtime, ...(m[3] && { auto: true }) })
+  }
+  return out
+}
+export const memoryText = (l: Memory[]) => `${MEMORY_HEAD}\n${[...l].reverse().map(m => `- ${new Date(m.at || Date.now()).toISOString().slice(0, 10)} · ${m.id} · ${m.auto ? 'learned · ' : ''}${m.text.replace(/\s*\n\s*/g, ' ').trim()}`).join('\n')}\n`
+// where an agent's workspace keeps them: its own folder when it's this project's on this Mac, else the checkout
+export const memoryRoot = (p: Project, ws?: Workspace) => (ws && ws.project === p.id && !ws.host && existsSync(ws.path) ? ws.path : p.path)
+export function memoryOf(p: Project | undefined, root?: string): Memory[] | undefined {
+  if (!p || !inRepo(p)) return p?.memory
+  const f = join(root ?? p.path, REPO_MEMORY)
+  const t = repoRead(f)
+  return t === undefined ? undefined : (l => (l.length ? l : undefined))(memoryParse(t, statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0))
+}
+export function memorySet(p: Project, l: Memory[] | undefined, root?: string) {
+  if (!inRepo(p)) return void (p.memory = l?.length ? l : undefined)
+  const f = join(root ?? p.path, REPO_MEMORY)
+  if (!l?.length && !existsSync(f)) return
+  mkdirSync(dirname(f), { recursive: true })
+  writeFileSync(f, memoryText(l ?? []))
+}
+export const notesOf = (p: Project) => (inRepo(p) ? repoRead(join(p.path, REPO_NOTES))?.trim() || undefined : p.notes)
+function notesSet(p: Project, text: string) {
+  if (!inRepo(p)) return void (p.notes = text.trim() ? text.slice(0, 100000) : undefined)
+  const f = join(p.path, REPO_NOTES)
+  if (!text.trim() && !existsSync(f)) return
+  mkdirSync(dirname(f), { recursive: true })
+  writeFileSync(f, text.trim() ? `${text.slice(0, 100000).replace(/\s+$/, '')}\n` : '')
+}
+
 const MEMORY_NOTE = 40000
 const MEMORY_GLOBAL = 20000
-export function memoryNote(p?: Project) {
+export function memoryNote(p?: Project, root?: string) {
   const day = (t: number) => new Date(t).toISOString().slice(0, 10)
   const item = (m: Memory) => {
     const t = m.text.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '').trim()
@@ -557,7 +611,7 @@ export function memoryNote(p?: Project) {
   const global = fit((Array.isArray(state.settings?.memory) ? state.settings.memory : []).filter(m => m && typeof m.text === 'string' && Number.isFinite(m.at) && !m.auto).slice(-MEMORY_MAX), MEMORY_GLOBAL) // an imported file's: only well-formed ones
   const told = global.length ? `Global memory: the user's own rules for every session in every project, newest last (follow these):\n${global.join('\n')}` : ''
   if (!p) return told
-  const all = p.memory ?? []
+  const all = memoryOf(p, root) ?? []
   const mine = fit(all.filter(m => !m.auto).slice(-MEMORY_MAX), MEMORY_NOTE * 0.6)
   const learned = fit(all.filter(m => m.auto).slice(-MEMORY_MAX), MEMORY_NOTE * 0.4)
   return [
@@ -581,12 +635,13 @@ export const byTab = (id?: string) => {
 }
 export function memoryAdd(o: { project: string; text: string; auto?: boolean; tab?: string }) {
   const p = findProject(o.project)
+  const root = memoryRoot(p, state.workspaces.find(w => w.id === state.tabs.find(t => t.id === o.tab)?.workspace)) // B6: in the repo, its tab's own branch's
   const text = String(o.text ?? '').trim()
   if (!text) throw new Error('what to remember?')
   const auto = o.auto !== false
   if (text.length > (auto ? MEMORY_AUTO_LEN : 20000)) throw new Error(auto ? `a memory is ${MEMORY_AUTO_LEN} characters at most: the gist, in a line or two` : 'a memory is 20,000 characters at most')
   const by = byTab(o.tab)
-  const list = p.memory ?? []
+  const list = memoryOf(p, root) ?? []
   let m = list.find(x => !!x.auto === auto && x.text.trim().toLowerCase() === text.toLowerCase())
   if (m) (m.at = Date.now()), list.splice(list.indexOf(m), 1), list.push(m)
   else {
@@ -594,20 +649,21 @@ export function memoryAdd(o: { project: string; text: string; auto?: boolean; ta
     list.push((m = { id: randomUUID().slice(0, 6), text, at: Date.now(), ...(auto && { auto: true }), ...(by && { by }) }))
   }
   let extra = list.filter(x => x.auto).length - MEMORY_MAX
-  p.memory = list.filter(x => !(x.auto && extra-- > 0))
+  memorySet(p, list.filter(x => !(x.auto && extra-- > 0)), root)
   save()
   changed()
   return m
 }
 
 // one an agent learned, gone (laki memory rm): the user's own are theirs to delete, in the app
-export function memoryRm(o: { project: string; id: string }) {
+export function memoryRm(o: { project: string; id: string; tab?: string }) {
   const p = findProject(o.project)
-  const m = p.memory?.find(x => x.id === o.id)
+  const root = memoryRoot(p, state.workspaces.find(w => w.id === state.tabs.find(t => t.id === o.tab)?.workspace))
+  const list = memoryOf(p, root) ?? []
+  const m = list.find(x => x.id === o.id)
   if (!m) throw new Error(`no memory ${o.id} in ${p.name}`)
   if (!m.auto) throw new Error("that one is the user's: they delete it in Laki (the project's Memory)")
-  p.memory = p.memory!.filter(x => x !== m)
-  if (!p.memory.length) p.memory = undefined
+  memorySet(p, list.filter(x => x !== m), root)
   save()
   changed()
   return { ok: true }
@@ -783,7 +839,7 @@ export function view(): View {
   return {
     ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
     ...(agentCliMod.outdated.length && { agentUpdates: agentCliMod.outdated }), // A9: a dot on Settings
-    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }), ...(!p.host && onGitHub(p.path) && { github: true }) }))(cfgWait(p)))),
+    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }), ...(!p.host && onGitHub(p.path) && { github: true }), ...(inRepo(p) && { memory: memoryOf(p), notes: notesOf(p) }) }))(cfgWait(p)))), // B6: in the repo: its checkout's files
     ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
@@ -1203,7 +1259,7 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; inRepo?: boolean }) {
   const p = findProject(ref)
   // F14: its auto-answer rules, the whole list as Settings has it (main.ts refuses it to agents and remote access);
   // each one Laki takes (rulePattern: no risky or chained command, no path out of the worktree), else refused whole
@@ -1229,7 +1285,12 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   // its name in Laki; '' (the ⋯'s Rename, Settings' Name emptied): its folder's again, a host's with the host; Terminals' and Browsers' keep theirs
   if (typeof o.name === 'string' && (o.name.trim() || !p.kind)) p.name = Array.from(o.name.trim()).slice(0, 80).join('') || (p.host ? `${basename(p.path)} (${p.host})` : basename(p.path))
-  if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
+  // B6: in the repo or in Laki (this Mac's choice; nothing moves either way), before what's written goes there
+  if (o.inRepo !== undefined) {
+    if (o.inRepo === true && (p.host || p.kind || p.git === false)) throw new Error(`${p.name}: notes and memory go in a repo on this Mac only`)
+    p.inRepo = o.inRepo === true || undefined
+  }
+  if (typeof o.notes === 'string') notesSet(p, o.notes)
   if (Array.isArray(o.memory)) {
     // the whole list, as the page has it: each with an id and some text; the user's MEMORY_MAX at most (refused past it,
     // unless it had more before: a list from before the limit can still be trimmed), agents' the newest MEMORY_MAX
@@ -1238,10 +1299,10 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       .filter((x, i) => typeof x?.id === 'string' && /^[\w-]{1,40}$/.test(x.id) && typeof x.text === 'string' && x.text.trim() && o.memory!.findIndex(y => y?.id === x.id) === i)
       .map(x => ({ id: x.id, text: x.text.slice(0, 20000), at: ok(x.at) ? x.at : Date.now(), ...(ok(x.edited) && { edited: x.edited }), ...(x.auto === true && { auto: true }), ...(typeof x.by === 'string' && x.by.trim() && { by: x.by.slice(0, 80) }) }))
     const mine = (l: Memory[]) => l.filter(x => !x.auto).length
-    if (mine(m) > MEMORY_MAX && mine(m) > mine(p.memory ?? [])) throw new Error(`${p.name} keeps ${MEMORY_MAX} memories of yours: delete one first`)
+    if (mine(m) > MEMORY_MAX && mine(m) > mine(memoryOf(p) ?? [])) throw new Error(`${p.name} keeps ${MEMORY_MAX} memories of yours: delete one first`)
     let extra = m.length - mine(m) - MEMORY_MAX
     m = m.filter(x => !(x.auto && extra-- > 0)) // the oldest learned ones go
-    p.memory = m.length ? m : undefined
+    memorySet(p, m)
   }
   if (Array.isArray(o.seps)) {
     const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(typeof x.preset === 'string' && x.preset.trim() ? { preset: Array.from(x.preset.trim()).slice(0, 80).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}), ...(SEP_WHERE.includes(x.where as SepWhere) ? { where: x.where } : {}), ...sepWords(x) }))
@@ -1713,7 +1774,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   // what it's told at the start: Laki (its preset's switch) and progress; a host has no laki CLI
-  const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && memoryNote(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
+  const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && (w => (p => memoryNote(p, p && memoryRoot(p, w)))(state.projects.find(p => p.id === w?.project)))(state.workspaces.find(w => w.id === tab.workspace)), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
   // its permission mode and fast mode: the tab's (the new-workspace page's; '' and false: none over the profile's), else
   // its profile's; no mode when the profile's flags set one
   const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)

@@ -3089,6 +3089,7 @@ button.board-name:hover { background: none; }
 /* a project's page (Project.tsx): from the top, its path and tabs, then the tab; Settings' project section as it is */
 .page-body > .project-page { margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-5); }
 .pp-head { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-4); }
+.project-page .pp-repo { margin: var(--sp-3) 0; } /* B6: notes and memory in the repo */
 .settings-main.form.pp-settings { padding: 0; overflow: visible; max-width: none; }
 .pp-settings > .set-title { display: none; } /* the page's title says it */
 .mem-new, .mem { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-5) var(--sp-5); border: 1px solid var(--line); border-radius: calc(var(--radius) + var(--r-s)); background: var(--panel); }

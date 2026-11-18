@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { aiOn, COMPACT_DAYS, type CompactLogLine, type CompactRun, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX } from '../shared/types.ts'
 import { aiOnce, hasKey } from './ai.ts'
-import { changed, findProject, save, state } from './core.ts'
+import { changed, findProject, memoryOf, memorySet, save, state } from './core.ts'
 import { dir } from './dir.ts'
 
 const logPath = join(dir, 'memory-compact.jsonl')
@@ -47,7 +47,7 @@ export async function memoryCompact(o: { project: string; why?: CompactRun['why'
   if (!aiOn(state.settings)) throw new Error('Laki AI is off: it does the compacting (Settings › AI)')
   const p = findProject(o.project)
   if (going.has(p.id)) throw new Error(`${p.name}'s memory is being compacted`)
-  const given = (p.memory ?? []).filter(m => m.auto)
+  const given = (memoryOf(p) ?? []).filter(m => m.auto)
   const run: CompactRun = { at: Date.now(), why: o.why ?? 'you', ok: false, before: given.length, after: given.length }
   if (given.length < 2) return { ...run, ok: true }
   going.add(p.id)
@@ -58,7 +58,7 @@ export async function memoryCompact(o: { project: string; why?: CompactRun['why'
     // what changed meanwhile stays (learned since, pinned as yours, edited): only the ones as it was given are replaced
     const now = findProject(p.id)
     const was = new Map(given.map(m => [m.id, m.text]))
-    now.memory = [...(now.memory ?? []).filter(m => !(m.auto && was.get(m.id) === m.text)), ...made].sort((a, b) => a.at - b.at)
+    memorySet(now, [...(memoryOf(now) ?? []).filter(m => !(m.auto && was.get(m.id) === m.text)), ...made].sort((a, b) => a.at - b.at)) // B6: where it lives (the repo's checkout)
     Object.assign(run, { ok: true, after: made.length })
   } catch (e) {
     run.error = (e as Error).message
@@ -97,7 +97,7 @@ export async function memoryTick(now = Date.now()) {
   const days = s.memoryCompact?.days ?? COMPACT_DAYS
   const done: string[] = []
   for (const p of state.projects) {
-    const learned = (p.memory ?? []).filter(m => m.auto)
+    const learned = (memoryOf(p) ?? []).filter(m => m.auto)
     if (learned.length < 2 || going.has(p.id)) continue
     const last = p.compacted?.at ?? Math.min(...learned.map(m => m.at))
     const full = learned.length >= MEMORY_MAX && (p.compacted?.after ?? 0) < MEMORY_MAX // full again since; a run that left it full (failed, or no shorter): its days then

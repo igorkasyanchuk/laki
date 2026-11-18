@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'n
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { type AgentContext, type AgentRule, type AgentServer, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
-import { findProject, memoryNote, openPath, state, heldFrom, presets } from './core.ts'
+import { findProject, memoryNote, memoryOf, openPath, state, heldFrom, presets } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
 import { redact } from './share.ts'
 
@@ -211,11 +211,12 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
   const path = proj && !proj.kind ? proj.path : undefined // a project's folder (Terminals' and Browsers' are none)
   const mem = (l: Memory[] | undefined, auto: boolean) => (Array.isArray(l) ? l.filter(m => m && typeof m.text === 'string' && !!m.auto === auto).length : 0)
   const note = memoryNote(proj)
+  const list = memoryOf(proj) // B6: the repo's, when it's there
   return {
     agent,
     ...(proj && { project: proj.id, path: tilde(proj.path) }),
     rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
-    memory: { global: mem(state.settings?.memory, false), mine: mem(proj?.memory, false), learned: mem(proj?.memory, true), bytes: Buffer.byteLength(note) },
+    memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
     servers: agent === 'claude' ? claudeServers(path) : codexServers(path),
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
   }

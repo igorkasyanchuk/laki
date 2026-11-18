@@ -583,7 +583,7 @@ async function main() {
       }
       if (sub === 'rm') {
         if (!words[0]) throw new Error('usage: laki memory rm <project>|. <id>')
-        return out(await rpc('memoryRm', { project, id: words[0] }), `forgot ${words[0]}`)
+        return out(await rpc('memoryRm', { project, id: words[0], tab: process.env.LAKI_TAB }), `forgot ${words[0]}`)
       }
       const p = v.projects.find(x => x.id === project || x.name === project)
       if (!p) throw new Error(`no project ${project}`)

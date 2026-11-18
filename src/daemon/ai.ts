@@ -16,7 +16,7 @@ import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
 import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, modelCheck, presets, prs, sessions, state } from './core.ts'
+import { broadcast, cliArgv, memoryOf, modelCheck, presets, prs, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 import { execGroup, own } from './resources.ts'
@@ -1374,7 +1374,7 @@ function whatOf(a: AiAct) {
     const x = widgetsView().find(x => x.id === a.id)
     return x && `the extension ${cut(x.name)}`
   }
-  const x = state.projects.find(x => x.id === a.project)?.memory?.find(m => m.id === a.id)
+  const x = memoryOf(state.projects.find(x => x.id === a.project))?.find(m => m.id === a.id)
   return x && `the memory ${cut(x.text)}`
 }
 
