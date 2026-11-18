@@ -313,7 +313,7 @@ export type Workspace = {
   touchedAt?: number // settings.archiveIdle's: the last look it saw, or when it was restored (ms)
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
-  storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab, removed with it unless settings.keepStorage)
+  storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab; kept in <storage>/.kept as it's deleted, unless settings.keepStorage is false: core's rmStorage)
   flow?: string // the workflow run that made it (its mark in the sidebar)
   codespace?: string // a cloud workspace's GitHub Codespace (settings.cloud): its name, '' while gh makes it; host: Laki's ssh name for it, path: the repo there
   csState?: string // its state as gh says it (Available, Shutdown, Starting…), Creating while it's made, Failed when that failed
@@ -710,7 +710,7 @@ export type Settings = {
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size (0.9–1.5, renderer's PAGE_ZOOMS; unset: 1)
   storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
-  keepStorage?: boolean // a deleted workspace's storage folder stays (unset: removed with it)
+  keepStorage?: boolean // C5: a deleted workspace's storage folder kept in <storage>/.kept (unset: kept; false: removed with it)
   storageDays?: number // a file in a workspace's storage folder not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tmExclude?: boolean // Settings › General: new and restored worktrees out of Time Machine (tmutil addexclusion; daemon/backup.ts); a new Mac install's on
   spotlightExclude?: boolean // and the folder of Laki's worktrees out of Spotlight (.metadata_never_index, only where the folder is Laki's own)
@@ -1318,6 +1318,9 @@ export type Digest = { since: number; until: number; rows: DigestRow[] }
 // A9: an agent's CLI in Settings' Versions (daemon agentCli.ts): where it is (none: not installed), its version, the newest
 // (npm's), how it was installed and its update's command; running: its agent tabs live now (they keep their version
 // until restarted); update: its last update's tab, running, done (exit 0) or failed
+// C5: a deleted workspace's kept artifacts (artifacts.ts keptList): its folder in <storage>/.kept, who it was, its files
+// (newest first, 200 at most), how many and their size
+export type KeptArts = { dir: string; path: string; id: string; name: string; project?: string; branch?: string; deleted: number; files: { path: string; size: number }[]; n: number; bytes: number }
 // B3: Uninstall Laki's rows (daemon uninstall.ts): todo (a look), done, failed (why, and cmd: what does it by hand),
 // none (nothing there), kept (another Laki's, or data not picked), later (as the daemon stops: Quit Laki)
 export type UninstallRow = { id: 'cli' | 'skills' | 'daemon' | 'worktrees' | 'data' | 'next'; label: string; detail: string; state: 'todo' | 'done' | 'failed' | 'none' | 'kept' | 'later'; why?: string; cmd?: string }

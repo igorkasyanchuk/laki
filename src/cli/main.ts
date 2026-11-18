@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['yes', 'data', 'worktrees', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
+const BOOL = new Set(['yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -558,7 +558,8 @@ async function main() {
           process.exit(1)
         }
       }
-      const r = await rpc(m, { id: rest[0], ...(cmd === 'archive' && { ifClean: !flags.force, force: !!flags.force, from: caller() }), ...(cmd === 'rm' && { from: caller() }) }, 120000)
+      if (flags['keep-artifacts'] && flags['delete-artifacts']) throw new Error('--keep-artifacts or --delete-artifacts, not both')
+      const r = await rpc(m, { id: rest[0], ...(cmd === 'archive' && { ifClean: !flags.force, force: !!flags.force, from: caller() }), ...(cmd === 'rm' && { from: caller(), ...(flags['delete-artifacts'] && { dropArtifacts: true }) }) }, 120000) // C5: rm keeps its artifacts (--keep-artifacts, the default) unless --delete-artifacts
       if (r?.held) held('archive', r)
       if (cmd === 'archive' && r?.dirty) {
         out(r, `Not archived: ${r.dirty} uncommitted path${r.dirty === 1 ? '' : 's'}${r.ignored?.length ? ` (ignored files of its own: ${r.ignored.slice(0, 5).join(', ')})` : ''}${r.subs?.length ? ` (submodules: ${r.subs.join(', ')})` : ''}.\nCommit them first, or laki archive ${rest[0]} --force (you, not an agent): Restore brings uncommitted files back, not ignored ones`)

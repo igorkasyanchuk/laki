@@ -3553,13 +3553,13 @@ function dropWs(ws: Workspace) {
 }
 
 // wsRm kills its tabs, runs teardown and removes the worktree; the branch stays.
-export async function wsRm(ref: string) {
+export async function wsRm(ref: string, o: { dropArtifacts?: boolean } = {}) { // dropArtifacts (C5): Also delete its artifacts
   const ws = findWs(ref)
   // first: one left there is billed (a failure leaves the workspace, to try again); '': none for dropWs to delete
   if (ws.codespace) await cs.remove(ws.codespace).then(() => (ws.codespace = ''))
   await teardown(ws)
   dropWs(ws)
-  rmStorage(ws)
+  rmStorage(ws, o.dropArtifacts === true)
   save()
   changed()
 }
@@ -3645,11 +3645,13 @@ export const soonSay: { fn?: (ws: Workspace) => void } = {} // main.ts': the not
 const DAY = 86400e3
 const TRASH_DAYS = 30 // Linux's trash folder (Laki's own): what's in it this long goes, as workflows' trash
 const trashRoot = () => (process.platform === 'darwin' ? join(homedir(), '.Trash') : join(dir, 'trash'))
-export const storageFull = (ws: Workspace) => !!ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id) && (() => { try { return readdirSync(ws.storage!).some(f => f !== 'proof' && f !== 'chats') } catch { return false } })() // the Proof card's folder and the chats kept (keepChats): Laki's own record, not yours; they go with the rest
+export const storageFull = (ws: Workspace) => !!ws.storage && basename(ws.storage).includes(ws.id) && (() => { try { return readdirSync(ws.storage!).some(f => f !== 'proof' && f !== 'chats') } catch { return false } })() // the Proof card's folder and the chats kept (keepChats): Laki's own record, not yours; they go with the rest
+// C5: lost when the workspace is deleted: settings.keepStorage false (unset: its storage goes to the kept artifacts)
+const storageLost = (ws: Workspace) => state.settings?.keepStorage === false && storageFull(ws)
 const repoOf = (ws: Workspace) => (ws.host ? '' : (state.projects.find(p => p.id === ws.project)?.path ?? ''))
 // what deleting it would lose for good, in words: none, nothing of its own
 export async function hasSaved(ws: Workspace) {
-  return [(await archiveHas(repoOf(ws), ws.id)) && 'its uncommitted changes', storageFull(ws) && 'its storage folder'].filter((x): x is string => !!x)
+  return [(await archiveHas(repoOf(ws), ws.id)) && 'its uncommitted changes', storageLost(ws) && 'its storage folder'].filter((x): x is string => !!x)
 }
 // Disk's Tidy: a workspace's storage folder alone to the trash (<name>-<time>/<folder>), as trashSaved puts it
 export function storageTrash(ws: Workspace, now = Date.now()) {
@@ -3665,7 +3667,7 @@ async function trashSaved(ws: Workspace, now: number) {
   const to = join(trashRoot(), name)
   mkdirSync(to, { recursive: true, mode: 0o700 })
   if (await archiveHas(repoOf(ws), ws.id)) writeFileSync(join(to, 'changes.patch'), await archivePatch(repoOf(ws), ws.id), { mode: 0o600 })
-  if (storageFull(ws)) moveFile(ws.storage!, join(to, basename(ws.storage!))) // across volumes too
+  if (storageLost(ws)) moveFile(ws.storage!, join(to, basename(ws.storage!))) // across volumes too
   return to
 }
 function trashTidy(now: number) {
@@ -3714,7 +3716,7 @@ async function tidyNow(now: number, over?: number) {
         continue // never deleted with them lost
       }
     dropWs(ws)
-    if (!trashed) rmStorage(ws)
+    rmStorage(ws) // kept (C5), or gone; one in the trash already isn't there
     n++
     log(`deleted ${ws.id} (${ws.name ?? ws.branch}): archived over ${days} days${trashed ? `; ${what.join(' and ')} in ${trashed}` : ''}`)
   }
@@ -3732,9 +3734,27 @@ export function archivedKeep(o: { ws?: unknown }) {
   return { ok: true }
 }
 
-// a deleted workspace's storage folder goes with it (settings.keepStorage: stays); only one Laki named, <…>-<id>
-function rmStorage(ws: Workspace) {
-  if (ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id)) void rm(ws.storage, { recursive: true, force: true }).catch(e => log(`storage ${ws.storage}: ${e.message}`))
+// C5: a deleted workspace's storage folder, only one Laki named (<…>-<id>): kept, unless drop (the delete's Also delete
+// its artifacts) or settings.keepStorage false, in <storage>/.kept/<its folder> with who it was (KEPT_META): Artifacts
+// of deleted workspaces (artifacts.ts keptList); its kept chats go (Laki's copy of the agent's), its proof stays. One
+// with nothing of its own goes; one that can't be moved too (said in the log)
+export const keptRoot = () => join(storageRoot(), '.kept')
+export const KEPT_META = '.laki-kept.json'
+function rmStorage(ws: Workspace, drop = false) {
+  if (!ws.storage || !basename(ws.storage).includes(ws.id)) return
+  if (!drop && state.settings?.keepStorage !== false && storageFull(ws))
+    try {
+      let to = join(keptRoot(), basename(ws.storage))
+      if (existsSync(to)) to = `${to}-${Date.now()}` // deleted before (restored, deleted again)
+      mkdirSync(keptRoot(), { recursive: true, mode: 0o700 })
+      moveFile(ws.storage, to)
+      rmSync(join(to, 'chats'), { recursive: true, force: true })
+      writeFileSync(join(to, KEPT_META), JSON.stringify({ id: ws.id, name: ws.name ?? ws.id, project: ws.project, ...(ws.branch && { branch: ws.branch }), deleted: Date.now() }), { mode: 0o600 })
+      return log(`${ws.id}: its artifacts kept in ${to}`)
+    } catch (e) {
+      log(`${ws.id}: its artifacts couldn't be kept (${(e as Error).message}): deleted`)
+    }
+  void rm(ws.storage, { recursive: true, force: true }).catch(e => log(`storage ${ws.storage}: ${e.message}`))
 }
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.

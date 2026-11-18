@@ -148,7 +148,7 @@ export type AppSettings = Paint & {
   pageZoom?: number // Settings', Help's and the list pages' size (App's --page-zoom), one of PAGE_ZOOMS (unset: 1)
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
   storageDir?: string // workspaces' storage folders, one per workspace inside (unset: <data>/storage)
-  keepStorage?: boolean // a deleted workspace's storage folder stays
+  keepStorage?: boolean // C5: a deleted workspace's artifacts kept (unset: kept; false: deleted with it)
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   finishedRows?: boolean // Needs you's finished turns as rows
@@ -1659,8 +1659,8 @@ export function SettingsPage(p: {
                     </select>
                     <Says title="Delete files after" hint="A file in a workspace's storage folder that hasn't changed for this long goes, checked hourly (only the folders Laki made, never others in the folder above)" />
                   </label>
-                  <Switch className="switch-row" on={!!s.keepStorage} onChange={v => set({ keepStorage: v })}>
-                    <Says title="Keep a deleted workspace's storage" hint="Off: deleting a workspace deletes its storage folder too (archiving keeps it)" />
+                  <Switch className="switch-row" on={s.keepStorage !== false} onChange={v => set({ keepStorage: v })}>
+                    <Says title="Keep a deleted workspace's artifacts" hint="On: deleting a workspace (or an archive's age) keeps its storage folder's files in Settings › Resources › Artifacts of deleted workspaces, unless you tick Also delete when you delete it. Off: they go with it" />
                   </Switch>
                   {/Mac/.test(navigator.userAgent) && (
                     <>

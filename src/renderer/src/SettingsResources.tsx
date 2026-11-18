@@ -1,6 +1,6 @@
 // Settings › Resources: Laki and each tab by memory and CPU, with their processes, and when idle agents sleep.
 // Settings.tsx re-exports it.
-import { type DiskTidyWhat, type DiskUsage, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
+import { type DiskTidyWhat, type DiskUsage, type KeptArts, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
 import { BUDGET_DEFAULT } from '../../shared/browserBudget'
 import { Icon, Switch, act, ask } from './ui'
@@ -21,7 +21,9 @@ export type ResourcesApi = {
   widgetName: (id: string) => string
   disk?: (again?: boolean) => Promise<DiskUsage> // Disk (diskUsage): measured as it opens, kept 10 minutes
   tidy?: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }>
+  kept?: KeptApi // C5: Artifacts of deleted workspaces
 }
+export type KeptApi = { list: () => Promise<KeptArts[]>; rm: (dir?: string) => Promise<unknown>; open: (dir: string, file?: string) => Promise<unknown>; start: (k: KeptArts, file: string) => void }
 
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
 const KIND: Record<string, string> = { main: 'Laki: the app (windows, menus, notifications)', renderer: 'a window: what it draws and runs', 'gpu-process': 'GPU: drawing every window and the bubbles', network: 'network', audio: 'audio', storage: 'storage', daemon: 'the daemon: sessions, hooks, scans, the API' }
@@ -261,6 +263,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget,
         </Group>
       )}
       {api.disk && api.tidy && <Disk load={api.disk} tidy={api.tidy} />}
+      {api.kept && <KeptArtifacts api={api.kept} />}
       <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host. After a restart, one unused this long stays asleep until you open it.">
         <label>
           Sleep idle agents after
@@ -349,6 +352,82 @@ function Disk({ load, tidy }: { load: (again?: boolean) => Promise<DiskUsage>; t
           {err && <p className="muted small">{err}</p>}
         </>
       )}
+    </Group>
+  )
+}
+
+const sz = (b: number) => (b < 1 << 20 ? `${Math.max(1, Math.round(b / 1024))} KB` : gb(b))
+// C5: Artifacts of deleted workspaces: what deleting a workspace kept (its storage folder's files), newest first, each
+// folder with who it was, its size, Show in Finder and Delete; a file opens in its app, or starts a workspace with its
+// path in the prompt (its project's, the new-workspace page). Delete all, asked first
+function KeptArtifacts({ api }: { api: KeptApi }) {
+  const [list, setList] = useState<KeptArts[] | null>(null)
+  const [err, setErr] = useState('')
+  const [open, setOpen] = useState<string | null>(null)
+  const get = () => api.list().then(setList, e => setErr(String(e?.message ?? e)))
+  useEffect(() => void get(), [])
+  const fail = (e: unknown) => setErr(String((e as Error)?.message ?? e))
+  const total = (list ?? []).reduce((n, k) => n + k.bytes, 0)
+  const rm = async (k?: KeptArts) => {
+    if (!(await ask(k ? `Delete ${k.name}'s artifacts?` : 'Delete every kept artifact?', { text: k ? `${k.n} file${k.n === 1 ? '' : 's'}, ${sz(k.bytes)}: they can't be brought back.` : `${list?.length} deleted workspaces' files, ${sz(total)}: they can't be brought back.`, ok: 'Delete', danger: true }))) return
+    await api.rm(k?.dir).then(get, fail)
+  }
+  return (
+    <Group title="Artifacts of deleted workspaces" hint="The screenshots, reports and files agents made, kept when their workspace was deleted (Settings › General › Storage: Keep a deleted workspace's artifacts). They don't age out with the storage folders' files">
+      {!list ? (
+        <p className="muted small">{err || 'Looking…'}</p>
+      ) : !list.length ? (
+        <p className="muted small">None kept.</p>
+      ) : (
+        <>
+          <p className="muted small">
+            {list.length} workspace{list.length === 1 ? '' : 's'} · {sz(total)}{' '}
+            <button type="button" className="link" onClick={() => void rm()}>
+              Delete all
+            </button>
+          </p>
+          <div className="disk-list kept-list">
+            {list.map(k => (
+              <div key={k.dir}>
+                <div className="disk-row disk-project kept-head" {...act(() => setOpen(o => (o === k.dir ? null : k.dir)))} aria-expanded={open === k.dir}>
+                  <span className="res-name">
+                    <span>
+                      <Icon name={open === k.dir ? 'chevron' : 'chevronRight'} size={12} /> <b>{k.name}</b>
+                      <span className="muted small">
+                        {' '}
+                        · deleted {new Date(k.deleted).toLocaleDateString()} · {k.n} file{k.n === 1 ? '' : 's'}
+                        {k.branch ? ` · ${k.branch}` : ''}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="num">{sz(k.bytes)}</span>
+                  <button type="button" className="link small" onClick={e => (e.stopPropagation(), void api.open(k.dir).catch(fail))}>
+                    Show in Finder
+                  </button>
+                  <button type="button" className="link small" onClick={e => (e.stopPropagation(), void rm(k))}>
+                    Delete
+                  </button>
+                </div>
+                {open === k.dir &&
+                  k.files.map(f => (
+                    <div key={f.path} className="disk-row kept-file">
+                      <span className="res-name mono small">{f.path}</span>
+                      <span className="num">{sz(f.size)}</span>
+                      <button type="button" className="link small" onClick={() => void api.open(k.dir, f.path).catch(fail)}>
+                        Open
+                      </button>
+                      <button type="button" className="link small" data-tip="A new workspace with this file's path in its prompt" onClick={() => api.start(k, f.path)}>
+                        Start a workspace with this
+                      </button>
+                    </div>
+                  ))}
+                {open === k.dir && k.n > k.files.length && <p className="muted small">and {k.n - k.files.length} more: Show in Finder</p>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {err && list && <p className="muted small">{err}</p>}
     </Group>
   )
 }

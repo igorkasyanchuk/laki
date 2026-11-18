@@ -1,12 +1,12 @@
 // a workspace's storage folder: its artifacts, and the links agents publish, kept there in one hidden file, LINKS
 // (.url files an agent or an older Laki left are moved into it). core.ts imports it, and its users import it directly.
 
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { readdir, readFile, rm, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { writeAtomic } from '../shared/conn.ts'
-import { type Link, type Tab } from '../shared/types.ts'
-import { changed, findWs, type Runtime, state, wsLog } from './core.ts'
+import { type KeptArts, type Link, type Tab } from '../shared/types.ts'
+import { changed, findWs, KEPT_META, keptRoot, openPath, type Runtime, state, wsLog } from './core.ts'
 
 // the status bar's Artifacts: the files in each live workspace's storage folder (hidden ones, and hidden folders, not
 // walked), with the port scan; one scan at a time, one asked for meanwhile runs after it (a link just removed would be
@@ -181,4 +181,40 @@ export async function artifactList(ref: string) {
   if (!ws.storage) return []
   const list = await Promise.all((await walkFiles(ws.storage)).map(path => stat(join(ws.storage!, path)).then(st => ({ path, size: st.size, at: st.mtimeMs }), () => null)))
   return list.filter(x => !!x).sort((a, b) => b.at - a.at).slice(0, 500) // the links: the view's (links), not files
+}
+
+// C5: Artifacts of deleted workspaces (Settings › Resources): each kept folder (core's rmStorage: <storage>/.kept/<its
+// folder>) with who it was, its files (newest first, 200 at most) and its size
+const keptDir = (dir: unknown) => {
+  if (typeof dir !== 'string' || !/^[^/\\]+$/.test(dir) || dir.startsWith('.') || !existsSync(join(keptRoot(), dir))) throw new Error(`no kept artifacts ${String(dir)}`)
+  return join(keptRoot(), dir)
+}
+export async function keptList(): Promise<KeptArts[]> {
+  const names = await readdir(keptRoot()).catch(() => [] as string[])
+  const out = await Promise.all(
+    names.filter(n => !n.startsWith('.')).map(async dir => {
+      const at = join(keptRoot(), dir)
+      const meta = await readFile(join(at, KEPT_META), 'utf8').then(t => JSON.parse(t) as Partial<KeptArts>, () => ({}) as Partial<KeptArts>)
+      const files = (await Promise.all((await walkFiles(at)).map(path => stat(join(at, path)).then(st => ({ path, size: st.size, at: st.mtimeMs }), () => null)))).filter(x => !!x)
+      const st = await stat(at).catch(() => null)
+      return { dir, path: at, id: String(meta.id ?? dir), name: String(meta.name ?? dir), ...(typeof meta.project === 'string' && { project: meta.project }), ...(typeof meta.branch === 'string' && { branch: meta.branch }), deleted: Number(meta.deleted) || st?.mtimeMs || 0, files: files.sort((a, b) => b.at - a.at).slice(0, 200).map(({ path, size }) => ({ path, size })), n: files.length, bytes: files.reduce((k, f) => k + f.size, 0) }
+    }),
+  )
+  return out.filter(k => k.n > 0).sort((a, b) => b.deleted - a.deleted)
+}
+// one kept folder deleted, or all of them (Delete all)
+export async function keptRm(p: { dir?: unknown; all?: unknown }) {
+  if (p.all === true) await rm(keptRoot(), { recursive: true, force: true })
+  else await rm(keptDir(p.dir), { recursive: true, force: true })
+  changed()
+  return { ok: true }
+}
+// one's folder in Finder, or a file of it in its app (a file that would run: shown in Finder, openPath's L11)
+export async function keptOpen(p: { dir?: unknown; file?: unknown }) {
+  const at = keptDir(p.dir)
+  if (p.file === undefined) return openPath(at, 'finder', undefined, undefined, false)
+  if (typeof p.file !== 'string' || !p.file || p.file.split(/[/\\]/).some(x => x === '..' || x === '') || p.file.startsWith('/')) throw new Error('which file? one of its, by its path')
+  const f = join(at, p.file)
+  if (!existsSync(f) || !realpathSync(f).startsWith(`${realpathSync(at)}/`)) throw new Error(`no ${p.file} in it`)
+  return openPath(f, 'default')
 }

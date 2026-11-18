@@ -2579,8 +2579,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   An artifact you have open (an HTML page, Markdown, a picture) updates by itself when its file is written again.
   Settings › General › Storage shows how much the folder holds (*Show in Finder*) and *Delete files after*: a file
   that hasn't changed for 7, 30, 60, 90 or 180 days or a year goes, checked hourly, or never (the default); only the
-  workspaces' own folders, never anything else in the storage folder. Archiving keeps it; deleting the workspace (or removing its
-  project) deletes it too, unless *Keep a deleted workspace's storage* is on. None for Terminals, Browsers and SSH hosts.
+  workspaces' own folders, never anything else in the storage folder. Archiving keeps it. Deleting the workspace (or removing its
+  project, or an archive deleted by its age) keeps it too: the folder moves under *Artifacts of deleted workspaces* (Settings ›
+  Resources, by the workspace's name, project, branch and when it went; open a file, *Show in Finder*, *Start a workspace
+  with this* gives a new one the file's path, *Delete*, *Delete all*). The Delete dialog's *Also delete its N artifacts*
+  deletes them with it, as does `laki rm --delete-artifacts`; with *Keep a deleted workspace's artifacts* off (Settings ›
+  General › Storage) they're always deleted. None for Terminals, Browsers and SSH hosts.
   An HTML or Markdown file opens in a viewer over the app (*Open HTML and Markdown artifacts*: *In Laki*, the default, or
   *In the browser*): HTML sandboxed, its scripts run and the CSS and pictures beside it load, it can’t read Laki or your files; Markdown
   rendered; with *Open in the browser* and *Show in Finder*. *In the browser*, and every *Open in the browser*

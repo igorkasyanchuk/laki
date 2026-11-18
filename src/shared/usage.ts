@@ -30,7 +30,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                     app first); started now, so not with --at or --after-limit
             [--at <when>]           the workspace now, its agent later: tomorrow 9am, in 2h, 2026-10-20 14:30
             [--after-limit]         its agent once the plan limit resets (claude, codex)
-  laki rm <ws> [--force] | archive <ws> [--force] | restore <ws> | fork <ws>
+  laki rm <ws> [--force] [--keep-artifacts | --delete-artifacts] | archive <ws> [--force] | restore <ws> | fork <ws>
   laki rename <ws|.> <name> [--asked]         name a workspace (in a tab, . is its own); one you named: an agent only with --asked
   laki pr <ws|.> <url|number> | --detach      attach a GitHub PR to a workspace | detach its PR (only related, kept off)
   laki pr <ws|.> --draft | --ready            its PR back to a draft (it went ready too early) | ready for review
@@ -430,6 +430,13 @@ the daemon (an open app quits). Your repos stay. Then move Laki to the Trash (a 
   archive: `Archives the workspace: its worktree goes, its branch stays (laki restore brings it back). With uncommitted work it stops and exits 1: commit first (--force archives anyway, the uncommitted files kept for restore; local projects). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
 
   laki archive a1b2`,
+  rm: `Deletes the workspace: its tabs stop, a worktree is removed (its branch stays). With uncommitted work or commits on no
+remote it stops and exits 1 (--force deletes it anyway). Its artifacts (its storage folder's files) are kept in
+Settings › Resources › Artifacts of deleted workspaces (--keep-artifacts, the default); --delete-artifacts deletes them
+with it.
+
+  laki rm a1b2
+  laki rm a1b2 --force --delete-artifacts`,
   run: `Starts the project's run script (a dev server, on $PORT) in a tab of its own, or test, lint, format or deploy
 (the project's scripts) in theirs, or setup (the setup script: a worktree made with --no-setup, or again). A repo's
 .laki.json runs nothing until the user trusts it in the app: it says so.

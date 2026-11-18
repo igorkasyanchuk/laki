@@ -119,7 +119,7 @@ test('cli: help, usage errors, open', async t => {
   assert.match(h.out, /^  laki widget new <name>/)
   assert.doesNotMatch(h.out, /laki widget dev/)
   h = await rig.cli('help', 'archive') // an alternative on another command's line
-  assert.match(h.out, /^  laki rm <ws> \[--force\] \| archive <ws>/)
+  assert.match(h.out, /^  laki rm <ws> \[--force\] \[--keep-artifacts \| --delete-artifacts\] \| archive <ws>/)
   h = await rig.cli('help', 'stop')
   assert.equal(h.out.trim().split('\n').length, 1, 'not the lines whose words say "stop it"')
   h = await rig.cli('send', 'nope', '--', '--help') // after --: text to send, not a help request

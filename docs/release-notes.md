@@ -5,6 +5,12 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Deleting a workspace keeps the screenshots and reports its agents made: Settings › Resources › *Artifacts of deleted workspaces* opens them, starts a new workspace with one, or deletes them. Tick *Also delete its artifacts* in the Delete dialog to drop them with it. [Try it](laki://settings/resources)
+- Settings › Versions shows each agent CLI's version and the newest; *Update* (or *Update all*) runs the update in a terminal tab, and Settings gets a dot when one is out of date.
+- Drag a file from the side panel, the Review tab, Artifacts or a turn's files straight to Finder or any app. Agents' browser does more: hover, keys, scroll, select, check, drag, back and forward, and tabs.
+- The skills a chat loaded: the status bar's context meter lists them, the Reader marks each; a click opens its SKILL.md.
+- A project can keep its notes and memory in the repo (`.laki/notes.md`, `.laki/memory.md`), shared with your team through git: the project page's *Keep notes and memory in the repo*.
+- Uninstall Laki: Settings › General › Developer (or `laki uninstall`) removes the laki command, its agent skills and the daemon, and your data if you tick it, then moves the app to the Trash.
 - Toasts stack as macOS's notifications do, the newest (or an error, or an Undo) in front; point at them to see them all and *Close all*. Moving toward a submenu across other items no longer closes it.
 - Density: Settings › Appearance › *Density* makes the space and controls Compact or Roomy.
 - Laki follows macOS's cursor habits: the arrow over buttons, tabs and rows, the hand over links (*Pointing hand over buttons* brings it back). Scrollbars show only while you scroll, point at or work in a list, unless macOS is set to always show them.

@@ -114,6 +114,11 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
 :where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
 
+/* C5: Artifacts of deleted workspaces (SettingsResources.tsx KeptArtifacts): a folder's row opens its files */
+.kept-list .kept-head { cursor: var(--cur-act); gap: var(--sp-3); }
+.kept-list .kept-head:hover { background: var(--hover); }
+.kept-list .kept-file { gap: var(--sp-3); padding-left: var(--sp-5); }
+
 /* B3: Uninstall Laki (Settings.tsx UninstallField): a row per piece, its mark by state */
 .uninstall { display: flex; flex-direction: column; gap: var(--sp-2); }
 .uninstall-row { align-items: center; gap: var(--sp-3); }

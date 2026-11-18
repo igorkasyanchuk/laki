@@ -1,7 +1,7 @@
 // The laki CLI from an agent's tab: Laki's plugin, what agents are told, project memory, what an agent may start.
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { connect, fresh, until } from './helpers.ts'
@@ -105,10 +105,12 @@ test('agents are told about Laki (a preset can say no); a storage folder per wor
   delete rig.env.LAKI_WORKSPACE
   assert.match((await rig.cli('pr', '.', '42')).err, /only in a Laki tab/)
   rig.env.LAKI_WORKSPACE = ws.id
-  // deleted: its folder too; kept with keepStorage
+  // deleted: its folder moves to storage/.kept (C5); deleted with keepStorage off
   writeFileSync(join(dir, 'shot.png'), 'x')
   await rig.rpc('wsRm', { id: ws.id })
   await until(() => !existsSync(dir), 'gone with the workspace')
+  assert.ok(existsSync(join(rig.data, 'storage', '.kept', basename(dir), 'shot.png')), 'kept')
+  await rig.rpc('settingsSet', { keepStorage: false })
   // a folder that's there already is never a workspace's: another name, so a delete can't take it
   const mine = join(rig.data, 'storage', 'taken')
   mkdirSync(mine, { recursive: true })
@@ -118,12 +120,7 @@ test('agents are told about Laki (a preset can say no); a storage folder per wor
   await rig.rpc('wsRm', { id: ws2.id })
   await until(() => !existsSync(dir2), 'its own gone')
   assert.ok(existsSync(mine), 'the folder that was there stays')
-  await rig.rpc('settingsSet', { keepStorage: true })
-  const ws3 = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'more' })
-  const dir3 = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws3.id).storage, 'its storage')
-  await rig.rpc('wsRm', { id: ws3.id })
-  await new Promise(r => setTimeout(r, 200))
-  assert.ok(existsSync(dir3), 'kept')
+  assert.ok(!existsSync(join(rig.data, 'storage', '.kept', basename(dir2))), 'not kept with the setting off')
 })
 
 test('project memory: yours and what agents learned, 50 each, given to claude at its start; laki memory', async t => {

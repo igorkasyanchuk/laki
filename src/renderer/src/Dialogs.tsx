@@ -8,7 +8,7 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type ChatHit, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
+import { type ChatHit, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
@@ -247,6 +247,7 @@ export function Pages({ app }: { app: AppCtx }) {
             // main's (the bubbles, an agent browser), else the page's own frames (laki-stop: the video, a widget, the preview)
             stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
+            ...(hasCap(view, 'kept.artifacts') && { kept: { list: () => api.call<KeptArts[]>('keptList'), rm: dir => api.call('keptRm', dir ? { dir } : { all: true }), open: (dir, file) => api.call('keptOpen', { dir, file }), start: (k, file) => (setDialog(null), newWs(view.projects.some(p => p.id === k.project) ? k.project : undefined, { prompt: `${k.path}/${file} ` })) } }),
             ...(hasCap(view, 'disk.usage') && { disk: (again?: boolean) => api.call<DiskUsage>('diskUsage', { again }), tidy: (what: DiskTidyWhat, days: number, dry: boolean) => api.call<{ goes: string[] }>('diskTidy', { what, days, dry }) }),
           }}
           remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), log: remoteLog, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), keep: () => api.call('remoteKeep'), copy, open: openExternal }}

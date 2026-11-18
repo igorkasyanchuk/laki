@@ -1791,7 +1791,7 @@ export function App() {
     const pr = w.pr
     const merged = pr?.state === 'MERGED'
     const open = !!pr && !merged && pr.state !== 'CLOSED'
-    const keptArts = archive || !!view?.settings?.keepStorage
+    const keptArts = archive || view?.settings?.keepStorage !== false // C5: kept, unless Also delete its artifacts (below)
     const facts: Fact[] = [{ label: 'Project', icon: 'folder', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
     if (w.kind === 'worktree') facts.push({ label: 'Branch', icon: 'gitBranch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
     facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
@@ -1802,19 +1802,22 @@ export function App() {
     if (pr?.author) facts.push({ label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` })
     facts.push({ label: 'Tabs', icon: 'terminal', tone: busy.length ? 'warn' : undefined, value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
     if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
-    if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${keptArts ? ' (kept)' : ': deleted'}` })
+    if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${archive ? ' (kept)' : keptArts ? ' (kept in Artifacts of deleted workspaces, unless you tick below)' : ': deleted'}` })
     facts.push({ label: 'Created', icon: 'clock', value: ago(w.created) })
     const verdict = rmVerdict({ archive, kept: archive && !w.host && w.codespace === undefined, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, subs: pk.subs?.length, ignored: pk.ignored?.length, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
     return { facts, verdict }
   }
   const rmWs = async (w: WorkspaceView) => {
-    if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, ...(await rmFacts(w)), ok: 'Delete', danger: true }))) return
-    if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
+    // C5: its artifacts are kept (Settings › Resources › Artifacts of deleted workspaces) unless this is ticked
+    const drop = w.artifacts && view?.settings?.keepStorage !== false ? { label: `Also delete its ${w.artifacts === 1 ? 'artifact' : `${w.artifacts} artifacts`}`, on: false } : undefined
+    const { facts, verdict } = await rmFacts(w)
+    if ((await choose(`Delete ${wsName(w)}?`, `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, [{ label: 'Cancel' }, { label: 'Delete', primary: true, danger: true }], drop, undefined, facts, verdict)) !== 1) return
+    if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id, ...(drop?.on && { dropArtifacts: true }) }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
   // a terminal closes as a tab does: asked only while something runs in it (an agent, a command, a server) or it keeps artifacts
   const closeTerm = async (w: WorkspaceView) => {
-    const busy = w.ports.length > 0 || (!!w.artifacts && !view?.settings?.keepStorage) || (view?.tabs ?? []).some(t => t.workspace === w.id && t.status !== 'exited' && (t.kind === 'agent' || t.status === 'running' || !!t.runs))
+    const busy = w.ports.length > 0 || (!!w.artifacts && view?.settings?.keepStorage === false) || (view?.tabs ?? []).some(t => t.workspace === w.id && t.status !== 'exited' && (t.kind === 'agent' || t.status === 'running' || !!t.runs))
     if (busy && !(await ask(`Close ${wsName(w)}?`, { text: 'What runs in it stops.', ...(await rmFacts(w)), ok: 'Close', danger: true }))) return
     if (!(await busyWith([w.id], 'closing', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return
     done(`Closed ${wsName(w)}`)

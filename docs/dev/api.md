@@ -80,7 +80,9 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
   third: before it), `RowDrop` `into`, from `data-head`; a workspace's menu › *Move to group* (App's `groupItems`):
   first in one, or *Out of its group* (before the first), a submenu; groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it; none set: with no template, never the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `important`: its agents' asks and finishes as cards on screen, `pinned`: the sidebar's Pinned, above the projects; `railPin`: the rail's quick access, the time
 pinned (their order), refused past `RAIL_PINS`, 5), `projectFile` (the repo's `.laki.json`), `branches` (`main`: origin's
-HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`/`wsRm` (`dropArtifacts`: its storage
+deleted, not kept)/`wsArchive`/`wsRestore`/`wsFork`; `keptList` (C5: deleted workspaces' kept artifacts, `KeptArts`,
+newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`);
 - `wsNew` in a folder (or `local`) whose own workspace is there: an agent other than none, or a prompt, makes `another`
   beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
   mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the

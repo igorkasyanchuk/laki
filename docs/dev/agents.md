@@ -287,7 +287,10 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
 - `LAKI_STORAGE_FOLDER` (`storageOf`; `STORAGE_NOTE`, the start note's and the laki skill's words: files, and a
   link for each thing an agent publishes, kept in its `LINKS`, `.laki-links.json`; a `.url` file it saves is moved in, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
-  for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
+  for Terminals, Browsers and hosts. `wsRm` and `projectRm` (and `archivedTidy`) move it to `<storage>/.kept/<name>-<id>`
+  (C5, `rmStorage`: only a `…<id>` folder; its `chats/` dropped; `.laki-kept.json` its id, name, project, branch and
+  when; hidden, so the storage tidy skips it), deleted instead with `wsRm`'s `dropArtifacts` or `settings.keepStorage`
+  false (unset: on); archive keeps it in place. artifacts.ts' `keptList`, `keptOpen`, `keptRm` are Settings › Resources'.
 
 B6: a project with `inRepo` (this Mac's state; projectSet's `inRepo`, the user's only) keeps its notes and memory in its
 repo: `.laki/notes.md` and `.laki/memory.md` (core's `notesOf`, `memoryOf`, `notesSet`, `memorySet`, `memoryParse` and
