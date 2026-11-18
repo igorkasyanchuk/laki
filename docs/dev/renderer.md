@@ -569,7 +569,12 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   hold mode needs a native helper. `npm run test:ui`'s `talk-pill` opens it (`smoke`: no microphone). Tested in
   `test/talk.test.ts`.
 - **Route by first words** (Q5, `settings.voice.route`, unset on; `aiWord`): shared/talk.ts `routeOf` (pure, tested
-  in `test/talk.test.ts`): the words before the first comma, colon, spaced dash or pause (…, a sentence's end), 4 at
+  in `test/talk.test.ts`). Q5b first, the talk pill's only (`note`, `todo`: `voice.routeNote`, `routeTodo`, unset on;
+  the Say it window passes them off): `NOTE_WORD` (note, нотатка, замітка) and `TODO_IN` / `TODO_AT` (to-do, todo,
+  справа, зробити; `in|for|on|в|у|для <project>` then a colon or comma) at the very start → `@note` / `@todo` (its
+  project, else `last`); main's `voiceNote` (the note `settings.voiceNote`, else `noteNew` Voice; a paragraph block
+  `voice-<ms>` and its Markdown line, `noteSave`) and `voiceTodo` (`todoAdd`), each leaving `talkTakeBack` for the
+  pill's Undo. Then the words before the first comma, colon, spaced dash or pause (…, a sentence's end), 4 at
   most (a new task's project 4 more), after the word fixes (`voiceFix`: the Say it window's macOS dictation; the
   cloud's voiceText has them in): Laki AI's word (`aiWord`, else Laki; while it's on) → `@ai` (main's `aiAsked`:
   `aiAsk` in the background); `new task [in <project>]` → a new workspace there (`newWsWin(prompt, project)`: the

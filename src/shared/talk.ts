@@ -19,6 +19,9 @@ export function talkDefault(list: TalkTo[], last?: string): string {
 
 // Laki AI as a target (its name said first, the talk key set to Laki AI, Tab to it)
 export const AI_TO = '@ai'
+// Q5b: the note named Voice and a project's Backlog (Board's To-dos) as targets: their words said first
+export const NOTE_TO = '@note'
+export const TODO_TO = '@todo'
 
 // Tab (⇧Tab: back): the next target, the list's agents then a new task, then Laki AI while it's on, round
 export function talkNext(list: TalkTo[], cur: string, back = false, ai = false): string {
@@ -27,8 +30,8 @@ export function talkNext(list: TalkTo[], cur: string, back = false, ai = false):
   return all[(i + (back ? all.length - 1 : 1)) % all.length]
 }
 
-// its name on the pill: Laki AI, the workspace's, else a new task
-export const talkName = (list: TalkTo[], tab: string) => (tab === AI_TO ? 'Laki AI' : list.find(f => f.tab === tab)?.name ?? 'new task')
+// its name on the pill: Laki AI, the note, a Backlog (its project's name), the workspace's, else a new task
+export const talkName = (list: TalkTo[], tab: string, project?: string) => (tab === AI_TO ? 'Laki AI' : tab === NOTE_TO ? 'Notes › Voice' : tab === TODO_TO ? `Backlog${project ? ` · ${project}` : ''}` : list.find(f => f.tab === tab)?.name ?? 'new task')
 
 // Q10: what's said to Laki AI asks for the screen with it ("take a screenshot", "look at my screen", скріншот, на екрані):
 // the screen under the pill goes to Laki AI's model with it, so only when it's asked for in so many words: never
@@ -52,7 +55,7 @@ export const talkTime = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math
 // agent tabs given (never a shell); nothing here runs a command. The word fixes (Settings › Voice) go first: the
 // cloud's voiceText has them in already, a dictation typed by macOS doesn't
 export type RouteTab = TalkTo & { project?: string; alias?: string }
-export type RouteTo = { kind: 'tab'; tab: string } | { kind: 'ai' } | { kind: 'new'; project?: string } | { kind: 'default' }
+export type RouteTo = { kind: 'tab'; tab: string } | { kind: 'ai' } | { kind: 'new'; project?: string } | { kind: 'note' } | { kind: 'todo'; project?: string } | { kind: 'default' }
 export type Route = { target: RouteTo; rest: string; how: string }
 const LAT: Record<string, string> = { а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie', ё: 'e', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'iu', я: 'ia' }
 // lower case, marks off, Cyrillic in Latin letters (cheap: a table), - _ . / @ as spaces
@@ -86,9 +89,25 @@ const exact = (heard: string, name: string) => heard.replace(/ /g, '') === name.
 const LAKI_HEARD = /^(?:lucky|lucki|lacky|lackey|lakey|lakki|lakie)$/
 const aiSaid = (head: string, word?: string) => (h => near(h, norm(word || 'Laki')) || (!word && LAKI_HEARD.test(h.replace(/ /g, ''))))(head.replace(/ (?:a i|ai|ei ai|eiai|ai i)$/, ''))
 const NEW = /^(?:a |the )?new (?:task|session|workspace)(?: (?:in|for|on) (.+))?$/
-export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: string; name: string }[]; aiOn?: boolean; aiWord?: string; fixes?: string; fix?: (t: string, fixes?: string) => { text: string } }): Route {
+// Q5b: a note or a To-do, by its word at the very start (any case; English and Ukrainian), then a colon, comma, dash or
+// a space: "Note: check prod limits", "Нотатка …", "To-do in Shop: update deps" (its project as said, then a colon or a
+// comma), "Todo …", "Справа: …". The word isn't saved; one only inside a sentence routes nothing
+const NOTE_WORD = /^\s*(?:note|нотатка|замітка)(?:\s*[:,–—-]\s*|\s+|$)/iu
+const TODO_WORD = '(?:to[- ]?do|справа|зробити)'
+const TODO_IN = new RegExp(`^\\s*${TODO_WORD}\\s+(?:in|for|on|в|у|для)\\s+([^:,\\n]{1,60}?)\\s*[:,]\\s*`, 'iu')
+const TODO_AT = new RegExp(`^\\s*${TODO_WORD}(?:\\s*[:,–—-]\\s*|\\s+|$)`, 'iu')
+export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: string; name: string }[]; aiOn?: boolean; aiWord?: string; fixes?: string; fix?: (t: string, fixes?: string) => { text: string }; note?: boolean; todo?: boolean; last?: string }): Route {
   const said = (o.fix ? o.fix(text, o.fixes).text : text).trim()
   const none: Route = { target: { kind: 'default' }, rest: said, how: '' }
+  const noted = o.note !== false && NOTE_WORD.exec(said) // note, todo: Settings › Voice turns each off; last: the project last sent to
+  if (noted) return { target: { kind: 'note' }, rest: said.slice(noted[0].length).trim(), how: 'Notes › Voice' }
+  if (o.todo !== false) {
+    const inP = TODO_IN.exec(said)
+    const p = inP && (o.projects.find(p => exact(norm(inP[1]), norm(p.name))) ?? o.projects.find(p => near(norm(inP[1]), norm(p.name))))
+    const m = p ? inP : TODO_AT.exec(said) // a project it can't place: the words stay in the text, the last project's
+    const pid = p ? p.id : o.projects.some(x => x.id === o.last) ? o.last : o.projects[0]?.id
+    if (m) return { target: { kind: 'todo', ...(pid && { project: pid }) }, rest: said.slice(m[0].length).trim(), how: talkName([], TODO_TO, o.projects.find(x => x.id === pid)?.name) }
+  }
   const m = /^(.{1,80}?)\s*(?:[,:;]|\s[-–—]\s|…|\.{3}|[.!?](?=\s|$))\s*([\s\S]*)$/u.exec(said)
   if (!m) return none
   const head = norm(m[1].replace(/^(?:hey|ok|okay)\s+/i, ''))

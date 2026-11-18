@@ -2637,7 +2637,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   button" goes to that workspace's agent (its name as you say it, a letter or two off is fine), "@pay: retry" to the
   agent named pay, "New task in Shop: add a dark mode" to a new task in that project, and *Laki AI's name* (Laki
   unless you set another) to Laki AI. It shows where it goes for a moment first (Tab picks another, Esc stops it),
-  then sends the rest; with no name first it goes where it would have. Never a terminal.
+  then sends the rest; with no name first it goes where it would have. Never a terminal. In the talk key's pill two
+  words more, each its own switch: "Note: check prod limits" (or *Нотатка*) adds a line with the time to the note named
+  *Voice* (made the first time), and "To-do in Shop: update deps" (*Todo*, *Справа*) adds it to that project's Backlog,
+  or the last project you talked to; only at the very start, the word not kept. The pill says *Goes to Notes › Voice*
+  or *Backlog · Shop* first; *Undo* takes the line or the item out again.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

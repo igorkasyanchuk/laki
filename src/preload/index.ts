@@ -146,7 +146,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
-    talkSend: (tab: string, text: string, project?: string): Promise<{ error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project), // Q10: shot: the screen went with it to Laki AI
+    talkSend: (tab: string, text: string, project?: string): Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project), // Q10: shot: the screen went with it to Laki AI
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
     // the on-device engine (Laki Speech, main's): start, its lines, stop (keep: its final text), Cloud's cleanup of that text
     talkListen: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-listen'),

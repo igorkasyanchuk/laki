@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
-import { AI_TO, talkDefault, talkShot } from '../shared/talk.ts'
+import { AI_TO, NOTE_TO, TODO_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
@@ -1510,7 +1510,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
 type FloatOpts = { hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
-type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string }
+type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string; note?: boolean; todo?: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
@@ -1709,7 +1709,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ...(o.noAnswers === true && { noAnswers: true }),
     ...(o.hide === true && { hide: true }),
     ...(o.aiShow === true && { aiShow: true }),
-    ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined } }),
+    ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined, note: o.route.note !== false, todo: o.route.todo !== false } }),
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
@@ -2278,6 +2278,7 @@ let talkW: BrowserWindow | null = null
 let talkTo = new Set<string>() // the agents the pill offered
 let talkLast = '' // the one you last sent to (talkDefault's second choice)
 let talkUndo: { tab: string; text: string } | null = null // a send that's still in its queue: Undo takes it back
+let talkTakeBack: (() => Promise<unknown>) | null = null // Q5b: a note's line or a Backlog's item just added: Undo removes it
 const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string; pid?: string; alias?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }), ...(f.pid && { project: f.pid }), ...(f.alias && { alias: f.alias }), ...(f.status === 'waiting' && f.ask && { ask: { options: f.ask.options.slice(0, 9), tool: f.ask.tool, what: f.ask.what?.slice(0, 300), question: f.ask.question?.slice(0, 300), steps: f.ask.steps } }), ...(f.held && { held: true }) })) // ask: what a spoken yes or no would answer
 let talkProject = '' // Q5: the project of the last talk or Say it sent: a route into another one shows a little longer
 const routeFor = () => floats.route && { ...floats.route, aiOn: floats.ai, last: talkProject, lastTab: talkLast }
@@ -2290,7 +2291,7 @@ function talk() {
   pin(w, url)
   guardFloat('talk', w)
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null), listen?.kill(), (listen = null)))
+  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null), (talkTakeBack = null), listen?.kill(), (listen = null)))
   w.webContents.on('did-finish-load', () => {
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
@@ -2315,6 +2316,8 @@ ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unkn
   const pid = typeof project === 'string' && floats.route?.projects.some(p => p.id === project) ? project : undefined
   if (!tab) return (talkProject = pid ?? talkProject), newWsWin(text.trim(), pid), { new: true }
   if (tab === AI_TO) return aiTalk(text.trim())
+  if (tab === NOTE_TO) return voiceNote(text.trim())
+  if (tab === TODO_TO) return voiceTodo(text.trim(), pid)
   if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
   talkProject = ((floats.talk ?? floats.items) as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
   const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true, agent: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message })) // agent: never a shell
@@ -2323,8 +2326,42 @@ ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unkn
   talkUndo = r?.queued ? { tab, text: text.trim() } : null
   return { queued: !!r?.queued }
 })
+// Q5b: "Note: …" said first: a line with the local time added to the note named Voice (made on first use; its id
+// kept as settings.voiceNote, so a rename keeps it), through the notes' own calls as the app's; Undo takes the line out
+async function voiceNote(text: string): Promise<{ kept?: boolean; error?: string }> {
+  type N = { id: string; blocks: { id?: string }[]; md: string }
+  try {
+    const id0 = (await rpc<View>('state')).settings?.voiceNote
+    const n = (id0 ? await rpc<N>('noteGet', { id: id0 }).catch(() => null) : null) ?? (await rpc<N>('noteNew', { title: 'Voice' }).then(async m => (await rpc('settingsSet', { voiceNote: m.id }), m)))
+    if (!n) return { error: "the note wasn't made" }
+    const id = n.id
+    const line = `${new Date().toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${text}`
+    const bid = `voice-${Date.now().toString(36)}`
+    await rpc('noteSave', { id, blocks: [...n.blocks, { id: bid, type: 'paragraph', content: [{ type: 'text', text: line, styles: {} }] }], md: n.md ? `${n.md}\n\n${line}` : line })
+    talkTakeBack = async () => {
+      const now = await rpc<N>('noteGet', { id })
+      const i = now.md.lastIndexOf(line)
+      await rpc('noteSave', { id, blocks: now.blocks.filter(b => b.id !== bid), md: i < 0 ? now.md : `${now.md.slice(0, i)}${now.md.slice(i + line.length)}`.replace(/\n{3,}/g, '\n\n').trim() })
+    }
+    return { kept: true }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+}
+// Q5b: "To-do [in <project>]: …": an item in that project's Backlog (the Board's To-dos), else the last one talked to;
+// Undo removes it
+async function voiceTodo(text: string, pid?: string): Promise<{ kept?: boolean; error?: string }> {
+  const ps = floats.route?.projects ?? []
+  const project = pid ?? (ps.some(p => p.id === talkProject) ? talkProject : ps[0]?.id)
+  if (!project) return { error: 'which project? Say “To-do in <project>: …”' }
+  return rpc<{ id: string }>('todoAdd', { project, text }).then(
+    t => ((talkProject = project), (talkTakeBack = () => rpc('todoRm', { id: t.id })), { kept: true }),
+    (err: Error) => ({ error: err.message }),
+  )
+}
 // Undo: only a send still in its queue (typed into a terminal, it can't be taken back)
 ipcMain.handle('talk-undo', async e => {
+  if (fromTalk(e) && talkTakeBack) return (f => ((talkTakeBack = null), f().then(() => ({}), (err: Error) => ({ error: err.message }))))(talkTakeBack)
   if (!fromTalk(e) || !talkUndo) return { error: 'nothing to take back' }
   const { tab, text } = talkUndo
   talkUndo = null

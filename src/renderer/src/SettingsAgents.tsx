@@ -360,6 +360,16 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
           </Switch>
         </div>
         {v.route !== false && (
+          <div className="setting-box">
+            <Switch className="switch-row" on={v.routeNote !== false} onChange={on => onChange({ ...v, routeNote: on })}>
+              <Says title="Note: …" hint="In the talk key's pill: “Note: check prod limits” adds a line with the time to the note named Voice (Нотатка: … too)" />
+            </Switch>
+            <Switch className="switch-row" on={v.routeTodo !== false} onChange={on => onChange({ ...v, routeTodo: on })}>
+              <Says title="To-do: …" hint="“To-do in Shop: update deps” adds it to that project's Backlog; without a project, the last one you talked to (Справа: … too)" />
+            </Switch>
+          </div>
+        )}
+        {v.route !== false && (
           <label>
             Laki AI's name, said first
             <input value={v.aiWord ?? ''} placeholder="Laki" maxLength={40} onChange={e => onChange({ ...v, aiWord: e.target.value.trim() || undefined })} />

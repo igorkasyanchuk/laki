@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { handOff } from '../src/renderer/src/tell.ts'
-import { spokenAnswer } from '../src/shared/talk.ts'
+import { routeOf, spokenAnswer, talkName, TODO_TO } from '../src/shared/talk.ts'
 import { spokenMode } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 
@@ -62,4 +62,26 @@ test('spokenMode: a plain command answers by itself, a chained one waits for ⏎
   assert.equal(spokenMode({ ...ask('npm test'), secret: { id: 's', label: 'Token' } }), 'laki')
   assert.equal(spokenMode(ask('npm test…')), 'laki') // cut: its end unseen
   assert.equal(spokenMode({ ...ask('npm test'), status: 'running' }), 'laki')
+})
+
+// Q5b: a note or a To-do by its first word (routeOf, the talk key's pill)
+test('Q5b: Note: and To-do: route by their first word, the word not saved; mid-sentence never; Ukrainian too', () => {
+  const projects = [{ id: 'shop', name: 'Shop' }, { id: 'api', name: 'API server' }]
+  const r = (t: string, o: { note?: boolean; todo?: boolean } = {}) => routeOf(t, { tabs: [], projects, last: 'api', ...o })
+  assert.deepEqual(r('Note: check prod limits'), { target: { kind: 'note' }, rest: 'check prod limits', how: 'Notes › Voice' })
+  assert.equal(r('note check prod limits').rest, 'check prod limits')
+  assert.deepEqual(r('to-do in shop: update deps'), { target: { kind: 'todo', project: 'shop' }, rest: 'update deps', how: 'Backlog · Shop' })
+  assert.deepEqual(r('Todo update deps').target, { kind: 'todo', project: 'api' }) // no project said: the last one
+  assert.equal(r('I should note this down').target.kind, 'default')
+  assert.equal(r('Notebook first, then the tests').target.kind, 'default')
+  assert.equal(r('please add a to-do: x').target.kind, 'default')
+  assert.deepEqual(r('Нотатка: перевірити ліміти'), { target: { kind: 'note' }, rest: 'перевірити ліміти', how: 'Notes › Voice' })
+  assert.deepEqual(r('замітка купити каву').target, { kind: 'note' })
+  assert.deepEqual(r('Справа в Shop: оновити залежності'), { target: { kind: 'todo', project: 'shop' }, rest: 'оновити залежності', how: 'Backlog · Shop' })
+  // a project it can't place: the words stay, the last project's Backlog
+  assert.deepEqual(r('to-do in nowhere: x'), { target: { kind: 'todo', project: 'api' }, rest: 'in nowhere: x', how: 'Backlog · API server' })
+  // each turned off in Settings › Voice: the usual routing
+  assert.equal(r('Note: check prod limits', { note: false }).target.kind, 'default')
+  assert.equal(r('to-do in shop: update deps', { todo: false }).target.kind, 'default')
+  assert.equal(talkName([], TODO_TO, 'Shop'), 'Backlog · Shop')
 })
