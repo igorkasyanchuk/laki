@@ -8,14 +8,20 @@
 //     the live plan, and core hears hooks: running as a prompt starts, waiting with a PermissionRequest, Stop as the
 //     prompt's answer comes (turn ends: Done check, kept turns), interrupted when it was cancelled
 // Client capabilities: none (no fs, no terminal), so the agent uses its own tools; an agent request is -32601.
-// ponytail: one session per start (no session/load: a restart starts a new chat); no auth methods run (sign in with the
-// agent itself first); Laki's permission modes and sandbox flags aren't applied to it
+// C6: a restart (the daemon's, Enter on an ended tab, Send again) loads its chat (session/load, when the agent offers it):
+// its history replays into the Reader; the tab's model and effort (the new-workspace page's, its profile's) are set as a
+// session starts (configOptions' model and thought_level, else the older set_model); a start that needs a sign-in marks
+// the tab signed out (signin.ts: Cursor's login), what's typed meanwhile kept for after.
+// ponytail: no auth methods run through ACP itself (the agent's own login, in a terminal); Laki's permission modes and
+// sandbox flags aren't applied to it
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import type { Pty, PtyOpts } from './session.ts'
 import type { Said } from './share.ts'
 import type { PlanItem } from '../shared/todos.ts'
-import { changed, hook, rtOf, state } from './core.ts'
+import type { AgentModel } from '../shared/types.ts'
+import { changed, hook, presetOf, rtOf, save, state } from './core.ts'
+import { acpSignedOut, acpWaiting } from './signin.ts'
 import { toolGate } from './widgetEvents.ts'
 
 export const ACP_VERSION = 1
@@ -25,9 +31,27 @@ const SAID_MAX = 400
 type Option = { optionId: string; name: string; kind?: string }
 // what Laki reads of the protocol's messages (the rest it passes over)
 type ToolCall = { toolCallId?: string; title?: string; kind?: string; status?: string; rawInput?: unknown }
-type Update = ToolCall & { sessionUpdate?: string; content?: { type?: string; text?: string }; entries?: { content?: string; status?: string }[] }
+type Update = ToolCall & { sessionUpdate?: string; content?: { type?: string; text?: string }; entries?: { content?: string; status?: string }[]; configOptions?: ConfigOption[]; currentModeId?: string }
+type Choice = { value?: string; name?: string; description?: string }
+type ConfigOption = { id?: string; name?: string; category?: string; type?: string; currentValue?: string; options?: (Choice & { group?: string; options?: Choice[] })[] }
+type Models = { availableModels?: { modelId?: string; name?: string; description?: string }[]; currentModelId?: string }
 type Params = { update?: Update; toolCall?: ToolCall; options?: Partial<Option>[] }
-type Result = { protocolVersion?: number; agentInfo?: { name?: string; title?: string }; authMethods?: { id?: string; name?: string }[]; sessionId?: string; stopReason?: string }
+type Result = { protocolVersion?: number; agentInfo?: { name?: string; title?: string }; agentCapabilities?: { loadSession?: boolean }; authMethods?: { id?: string; name?: string }[]; sessionId?: string; stopReason?: string; configOptions?: ConfigOption[]; models?: Models }
+
+// C6: the models an ACP agent offers (session/new's or session/load's answer, accounts.ts agentModels' too): a select of
+// category model in configOptions (thought_level's values: every model's efforts), else the older models list
+const flat = (o?: ConfigOption['options']) => (Array.isArray(o) ? o : []).flatMap(x => (Array.isArray(x?.options) ? x.options : [x]))
+export function acpModels(r?: Result): AgentModel[] {
+  const opts = Array.isArray(r?.configOptions) ? r.configOptions : []
+  const pick = opts.find(o => o?.category === 'model')
+  const think = opts.find(o => o?.category === 'thought_level')
+  const efforts = think ? flat(think.options).flatMap(c => (typeof c?.value === 'string' ? [c.value] : [])) : undefined
+  const one = (id: unknown, name?: string, sub?: string, cur?: string): AgentModel[] => (typeof id === 'string' && id ? [{ id, name: String(name ?? id), ...(sub && { sub: String(sub) }), ...(efforts && { efforts }), ...(id === cur && { def: true }) }] : [])
+  if (pick) return flat(pick.options).flatMap(c => one(c?.value, c?.name, c?.description, pick.currentValue))
+  return (Array.isArray(r?.models?.availableModels) ? r.models.availableModels : []).flatMap(m => one(m?.modelId, m?.name, m?.description, r?.models?.currentModelId))
+}
+// a start's error that asks for a sign-in: ACP's auth_required (-32000), or its words
+const authNeeded = (e: Error & { code?: number }) => e.code === -32000 || /auth|log ?in|sign ?in|unauthori[sz]ed/i.test(e.message)
 type Msg = { jsonrpc?: string; id?: number | string; method?: string; params?: Params; result?: unknown; error?: { code: number; message: string } }
 
 const chats = new Map<string, { said: Said[]; v: number }>() // by tab: the Reader's (its last start's)
@@ -52,12 +76,15 @@ export class AcpPty implements Pty {
   private chat = { said: [] as Said[], v: 0 }
   private err = '' // its stderr's end: said if it ends badly
   private dead = false // its start failed: what's typed after is said not sent
+  private loading = false // its chat replays (session/load): no hooks, no turn
+  private resume: boolean
 
   private tab: string
   private first?: string // its start's prompt
-  constructor(tab: string, o: PtyOpts, first?: string) {
+  constructor(tab: string, o: PtyOpts, first?: string, resume = false) {
     this.tab = tab
     this.first = first
+    this.resume = resume
     for (const id of chats.keys()) if (!state.tabs.some(t => t.id === id)) chats.delete(id) // closed tabs'
     chats.set(tab, this.chat)
     this.child = spawn(o.file, o.args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true })
@@ -134,15 +161,40 @@ export class AcpPty implements Pty {
     try {
       const init = await this.call('initialize', { protocolVersion: ACP_VERSION, clientCapabilities: NONE, clientInfo: { name: 'laki', title: 'Laki', version: '1' } })
       if (init?.protocolVersion !== ACP_VERSION) throw new Error(`it speaks ACP ${init?.protocolVersion ?? '?'}; Laki speaks ${ACP_VERSION}`)
-      const s = await this.call('session/new', { cwd: (state.workspaces.find(w => w.id === state.tabs.find(t => t.id === this.tab)?.workspace)?.path ?? process.cwd()), mcpServers: [] }).catch((e: Error & { code?: number }) => {
-        throw e.code === -32000 ? new Error(`it needs a sign-in (${(init?.authMethods ?? []).map(m => m.name ?? m.id).join(', ') || 'its own'}): sign in with the agent itself, then start the tab again`) : e
-      })
+      const t = state.tabs.find(x => x.id === this.tab)
+      const cwd = state.workspaces.find(w => w.id === t?.workspace)?.path ?? process.cwd()
+      let s: Result | undefined
+      // its chat, loaded: the agent replays it as updates (the Reader's), then answers
+      if (this.resume && t?.resumeId && init.agentCapabilities?.loadSession) {
+        const id = t.resumeId
+        this.loading = true
+        s = await this.call('session/load', { sessionId: id, cwd, mcpServers: [] }).then(
+          r => ({ ...r, sessionId: id }),
+          (e: Error & { code?: number }) => {
+            if (authNeeded(e)) throw e
+            return void this.print(`\x1b[90mIts chat didn't load (${e.message}): a new one\x1b[0m\r\n`)
+          },
+        ).finally(() => (this.loading = false))
+      }
+      s ??= await this.call('session/new', { cwd, mcpServers: [] })
       this.session = String(s?.sessionId ?? '')
       if (!this.session) throw new Error('no session')
+      if (t && init.agentCapabilities?.loadSession && t.resumeId !== this.session) ((t.resumeId = this.session), save()) // a chat it can load: kept for restarts (and sleep)
+      if (rtOf(this.tab).signedOut) ((rtOf(this.tab).signedOut = undefined), changed()) // in
+      await this.choose(s)
       const who = init.agentInfo?.title ?? init.agentInfo?.name
       this.print(`\x1b[90m${who ? `${who}, ` : ''}ACP ${ACP_VERSION}: ready\x1b[0m\r\n`)
       if (this.first?.trim()) this.prompt(this.first)
+      else if (this.next.length) this.prompt(this.next.shift()!) // typed while it started (Send again's message)
     } catch (e) {
+      // signed out: the band (signin.ts), its first prompt kept for after
+      if (authNeeded(e as Error) && acpSignedOut(this.tab, this.first ?? this.next[0])) {
+        this.print(`\r\nSigned out: Sign in (below), then your message goes\r\n`)
+        this.dead = true
+        this.next = []
+        rtOf(this.tab).status = 'idle'
+        return changed()
+      }
       this.print(`\r\n${(e as Error).message}\r\n`)
       this.dead = true
       this.next = []
@@ -170,8 +222,31 @@ export class AcpPty implements Pty {
     if (m.id !== undefined) this.send({ id: m.id, error: { code: -32601, message: `Method not found: ${m.method}` } }) // fs/*, terminal/*: not offered
   }
 
+  // the tab's model and effort, else its profile's: set on the session as it starts (one it doesn't have: said, not fatal)
+  private async choose(r?: Result) {
+    const t = state.tabs.find(x => x.id === this.tab)
+    const pr = t && presetOf(t)
+    const model = t?.model || pr?.model?.trim()
+    const effort = t?.effort || pr?.effort
+    const opts = Array.isArray(r?.configOptions) ? r.configOptions : []
+    const set = (cat: string, v?: string) => (o => (v && o?.id && o.currentValue !== v ? this.call('session/set_config_option', { sessionId: this.session, configId: o.id, value: v }) : undefined))(opts.find(o => o?.category === cat))
+    try {
+      if (opts.some(o => o?.category === 'model')) await set('model', model)
+      else if (model && r?.models && r.models.currentModelId !== model) await this.call('session/set_model', { sessionId: this.session, modelId: model })
+      await set('thought_level', effort)
+    } catch (e) {
+      this.print(`\x1b[90m${[model, effort].filter(Boolean).join(' · ')}: ${(e as Error).message}\x1b[0m\r\n`)
+    }
+  }
+
   private update(u: Update) {
     switch (u.sessionUpdate) {
+      case 'user_message_chunk': {
+        // a loaded chat's: what you said
+        const t = u.content?.type === 'text' ? String(u.content.text ?? '') : ''
+        if (t) this.said('you', t, true)
+        return
+      }
       case 'agent_message_chunk': {
         const t = u.content?.type === 'text' ? String(u.content.text ?? '') : ''
         if (!t) return
@@ -182,7 +257,7 @@ export class AcpPty implements Pty {
         const t = String(u.title ?? u.kind ?? 'a tool')
         this.said('tool', t)
         this.print(`\r\n• ${t}\r\n`)
-        return hook({ tab: this.tab, state: 'running' })
+        return this.loading ? undefined : hook({ tab: this.tab, state: 'running' })
       }
       case 'tool_call_update':
         if (u.status === 'failed') (l => l?.who === 'tool' && ((l.fail = (l.fail ?? 0) + 1), this.chat.v++))(this.chat.said.at(-1))
@@ -229,7 +304,7 @@ export class AcpPty implements Pty {
   }
 
   private async prompt(text: string) {
-    if (this.dead) return this.print(`\r\nNot sent: the agent didn't start (above). Start the tab again\r\n`)
+    if (this.dead) return acpWaiting(this.tab, text) ? this.print(`\r\nKept: it goes once you're signed in\r\n`) : this.print(`\r\nNot sent: the agent didn't start (above). Start the tab again\r\n`)
     if (!this.session || this.busy) return void this.next.push(text)
     this.busy = true
     this.said('you', text)

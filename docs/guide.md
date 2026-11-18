@@ -2544,6 +2544,17 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   waits as before. ⌘K's *Switch Claude Code to …* and the plan limits' popup (*Use*) change the
   default too. The ring in the status bar shows each agent's default account; its popup lists them all. Removing one
   removes its folder and Claude's Keychain item for it; its chats stay.
+- **Signed out**: a turn that fails because Claude Code or Codex is signed out (*Not logged in · Please run /login*, an
+  expired token) shows a band over the tab's box, *Claude Code is signed out · your message sends once you're in*, and
+  the notification says *Signed out*. *Sign in* opens the agent's own login for that tab's account in a terminal tab
+  (`claude auth login`, `codex login`); the band then says *Finish signing in* with *Open again* and *Send again*. Once
+  the login takes, there or anywhere else (another terminal, another tab on the same account), every tab waiting on
+  that account restarts with its chat and sends its message: *Signed in · sending your message*. With *Auto fallback*
+  on, the next numbered account takes the tab and the message first. × hides the band (the message isn't sent).
+- **Cursor**: *Add a profile for…* › *Cursor* (there already when `cursor-agent` is installed) adds Cursor's agent CLI,
+  `cursor-agent acp`, spoken to over the Agent Client Protocol: its tabs open in the Reader. The new-workspace page's
+  model and effort menus list the models Cursor offers; its chats come back after a restart or sleep; signed out, its
+  tab shows the same band, whose *Sign in* runs `cursor-agent login`. Not installed: *Install in a terminal*.
   The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`, `$LAKI_STORAGE_FOLDER`) put a variable in at the
   cursor: the line goes through the shell, so they work there. Every tab also gets `LAKI_APP=true` (a program or
   skill can tell it runs in Laki), and an agent's `FORCE_HYPERLINK=1` (Claude Code's links show as their text, a click

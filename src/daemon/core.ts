@@ -37,6 +37,8 @@ import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { AcpPty } from './acp.ts'
+import { CURSOR } from '../shared/install.ts'
+import { type SignedOut, signedOutView, turnSignedOut } from './signin.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
 import { appBinOk, appOf, helperBin, launcherOurs } from '../shared/helper.ts'
 import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
@@ -101,13 +103,13 @@ export const firstLine = (e: unknown) => String((e as { stderr?: string }).stder
 let found: Preset[] | undefined
 export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
 // a new install's (settings.sandboxNew) start claude and codex in their sandbox, claude's network to its list (netList)
-export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }))).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= [...AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }) as Preset), ...(onPath('cursor-agent') ? [{ ...CURSOR }] : [])]).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
 export const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -830,7 +832,7 @@ export function view(): View {
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
-    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...((o => o && { signedOut: o })(signedOutView(r))), ...(r.failed && status === 'idle' && !r.signedOut && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -2044,7 +2046,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   if (tab.preset === 'acp' && ws.host) throw new Error('ACP agents run on this Mac, not an SSH host')
   const viaHost = !!state.settings?.ptyHost && ptyTakes() && tab.preset !== 'acp' // R6: its terminal in the pty host, where it outlives this daemon
   const ptyId = `${tab.id}.${randomBytes(6).toString('hex')}`
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : tab.preset === 'acp' ? { pty: p => new AcpPty(tab.id, p, o.resume ? undefined : o.prompt) } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : tab.preset === 'acp' ? { pty: p => new AcpPty(tab.id, p, o.resume ? undefined : o.prompt, !!o.resume) } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
   // R6: in the pty host, its start's keys are kept (pty.json, 0600) for the daemon that finds it there after this one
   if (s.pty instanceof HostPty) {
     const id = s.pty.id
@@ -2239,8 +2241,9 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
   const cmd = pr?.agent === 'command' ? pr.cmd || 'true' : o.cmd
   const preset = pr ? (pr.agent === 'command' ? (pr.acp ? 'acp' : 'custom') : pr.agent) : o.preset || (cmd ? 'custom' : 'shell') // acp: an ACP agent's (acp.ts)
   const kind = o.kind ?? (preset === 'shell' && !cmd ? 'shell' : 'agent')
-  const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
-  const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
+  const models = (isAgent(preset) || preset === 'acp') && kind === 'agent' // C6: an ACP agent's too, set over ACP (acp.ts)
+  const model = models ? o.model?.trim() || undefined : undefined // a shell or a command has no model
+  const effort = models ? o.effort || undefined : undefined
   const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
   const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
   const sandbox = isAgent(preset) && kind === 'agent' && typeof o.sandbox === 'boolean' ? o.sandbox : undefined // likewise
@@ -4037,7 +4040,7 @@ function bringBack(s: Session, cmd: string, run: boolean) {
   whenPrompt(s, () => typeInto(s, cmd, run), s.lastOutput) // its note isn't the prompt
 }
 // a new shell's prompt is up: it printed since `from` (its start), then 500 ms quiet (10 s at most)
-function whenPrompt(s: Session, then: () => void, from = s.born) {
+export function whenPrompt(s: Session, then: () => void, from = s.born) {
   const wait = setInterval(() => {
     if (s.exited || sessions.get(s.tab) !== s) return clearInterval(wait)
     if ((s.lastOutput === from || Date.now() - s.lastOutput < 500) && Date.now() - from < 10000) return // the prompt, then quiet
@@ -4268,15 +4271,18 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       // a model the installed claude is too old for (the API's claude_code_version_too_old): kept, said in words
       const refused = p.state === 'failed' && tab.preset === 'claude' ? modelRefused(tab.model || presetOf(tab)?.model?.trim(), `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`) : undefined
       if (refused) r.last = refused
-      // an API error's end (overloaded, a 500, the connection): not a limit, a refused model or your Esc
-      r.failed = p.state === 'failed' && !r.limit && !refused && !r.escAt ? failLine(err, last) : undefined
+      // A2: signed out (a failed turn's words; codex's, its screen's last lines too: its notify says no error): the band, the message kept
+      const said = `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`
+      const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || tab.preset === 'codex') && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said)
+      // an API error's end (overloaded, a 500, the connection): not a limit, a refused model, signed out or your Esc
+      r.failed = p.state === 'failed' && !r.limit && !refused && !out && !r.escAt ? failLine(err, last) : undefined
       if (r.failed) continueLater(tab, r)
       else if (p.state !== 'failed') r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
       if (!viewed(tab.id)) r.done = true
       const checking = !r.limit && p.state !== 'failed' && !!checkHooks.will?.(tab)
       const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(checking && { checking }), ...(bell && { bell }) })
-      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : (r.last ?? ''), bell)
+      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out ? 'signedout' : 'done', text: out ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
+      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out ? 'is signed out' : (r.last ?? ''), bell)
       if (!r.limit && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)

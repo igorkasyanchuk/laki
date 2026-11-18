@@ -16,3 +16,10 @@ export const tabAgent = (t: { preset?: string }, presets: { name: string; agent?
   (a => ((AGENTS as readonly string[]).includes(a ?? '') ? (a as Agent) : undefined))(presets.find(p => p.name === t.preset)?.agent ?? t.preset)
 // its command wasn't found: the tab ended with the shell's 127
 export const notInstalled = (t: { kind?: string; status?: string; code?: number | null }) => t.kind === 'agent' && t.status === 'exited' && t.code === 127
+
+// C6: Cursor's agent CLI, a ready-made profile: a command that speaks ACP (daemon/acp.ts), not one of AGENTS (no
+// terminal, no hooks: ACP's own turns). Settings › Agents & profiles' Add a profile for… › Cursor, and a fresh install's
+// list when cursor-agent is on PATH
+export const CURSOR = { name: 'cursor', agent: 'command' as const, cmd: 'cursor-agent acp', acp: true }
+export const CURSOR_INSTALL = { cmd: 'curl https://cursor.com/install -fsS | bash', docs: 'https://cursor.com/docs/cli/overview' }
+export const isCursor = (p?: { cmd?: string; acp?: boolean }) => !!p?.acp && /^\s*(?:\S*\/)?cursor-agent(?:\s|$)/.test(p.cmd ?? '')

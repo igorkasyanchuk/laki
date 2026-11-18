@@ -613,8 +613,12 @@ the Session an `AcpPty` for a pty, so the rest of Laki goes as for any agent:
 - what's typed (`send`, the Reader's box, a queue's `deliver`, its start's prompt) is a prompt: Enter sends
   `session/prompt`, one at a time (one typed meanwhile waits for it); its start: `initialize` with no client
   capabilities (`fs` and `terminal` false, said outright: Gemini CLI 0.4 refuses an `initialize` without `fs`), then
-  `session/new` in the workspace's folder, no MCP servers. A `-32000` (sign-in needed) is said with its auth methods:
-  none is run;
+  `session/new` in the workspace's folder, no MCP servers (C6: `session/load` of `tab.resumeId` instead on a restart, when
+  the agent says `loadSession`: its chat replays as `user_message_chunk`s and message chunks, no hooks meanwhile;
+  `resumeId` kept only for such an agent, so `tabSleep` takes it). Then the tab's model and effort (else its profile's):
+  `session/set_config_option` on configOptions' `model` and `thought_level`, else the older `session/set_model`; one it
+  refuses is said, not fatal. A `-32000` (or words of a sign-in) marks the tab signed out when its login is known
+  (Cursor's: `signin.ts` `acpSignedOut`), the prompt kept (`acpWaiting`); else said, none run;
 - `session/update`: message chunks to the Reader (`acpChat`, `chatRead`'s shapes: you, agent, tool) and the mirror as
   plain text; a tool call a tool line (`failed` counts on it); a plan the live plan (`r.plan`, whole each time);
 - `session/request_permission`: an extension's gate first (`toolGate`: its no picks a reject option), then a numbered
@@ -627,6 +631,30 @@ the Session an `AcpPty` for a pty, so the rest of Laki goes as for any agent:
   offer (`fs/*`, `terminal/*`) gets `-32601`.
 
 `sweepRunning` leaves its turns alone (its prompt's answer ends them). The renderer shows such a tab in the Reader only
-(`inReader`; no Terminal | Reader switch). ponytail: one session per start (no `session/load`: a restart starts a new
-chat); Laki's permission modes and sandbox aren't applied (its settings say so); tried with the fake in
-`test/fakes/acp-agent` and Gemini CLI 0.4.1's `--experimental-acp` handshake.
+(`inReader`; no Terminal | Reader switch). Laki's permission modes and sandbox aren't applied (its settings say so);
+tried with the fakes in `test/fakes/acp-agent`, `test/fakes/cursor-agent` and Gemini CLI 0.4.1's `--experimental-acp` handshake.
+
+**Cursor** (C6, `shared/install.ts` `CURSOR`, `isCursor`): a ready-made profile, `cursor-agent acp` with `acp: true`, in
+a fresh install's list when `cursor-agent` is on PATH (core's `presets`) and in Settings' *Add a profile for…*. Its
+models (`accounts.ts` `agentModels` with `agent: 'acp'`: `acpAsk` runs its command, `initialize` and a `session/new` in
+the home folder, `acp.ts` `acpModels` reads the model select and `thought_level`'s efforts, kept a day, 5 minutes after
+none) fill the new-workspace page's model and effort menus (panels.tsx `acpPro`); `tabSpec` takes a model and effort
+for an `acp` tab (the efforts it said: `effortsSaid.acp`). Its skills go to `~/.cursor/skills` (skill.ts `AGENTS`; its
+MCP server: `~/.cursor/mcp.json`'s `mcpServers`, shown to paste). Not installed: the tab's 127, *Install in a terminal*
+(`CURSOR_INSTALL`).
+
+### Signed out (A2, C6: `daemon/signin.ts`)
+
+A claude or codex turn that ends signed out (`signedOutIn`: *Not logged in · Please run /login*, an expired or revoked
+token, `authentication_error`, codex's *re-run codex login*, a rejected refresh token; on a failed turn's error and
+answer, a short claude answer, codex's every end with its screen's last 6 lines) isn't an API error (`r.failed` stays
+unset, no auto continue): `turnSignedOut` first tries Auto fallback (the next account in `limitFallback` takes the tab,
+`tabAccount`, and its message), else sets `r.signedOut` with the message (`r.asked`) and the account's credentials'
+fingerprint (`credOf`: claude's Keychain item or file, codex's `auth.json`). The turn event's kind is `signedout` (the
+notification: *Signed out: sign in to …*). `signIn` (the band's buttons, the user's only): `open` runs the agent's own
+login for that account (`loginCmd`: `claude auth login` with its `CLAUDE_CONFIG_DIR`, `codex login` with `CODEX_HOME`;
+Cursor's `cursor-agent login`) as a script tab in the *sign in* Terminals workspace; `send` restarts as if in; `dismiss`.
+`signTick` (every 5 s while a tab waits; `LAKI_SIGNIN_MS`, tests'): the login tab ended with 0, or the account's
+credentials changed from the fingerprint (a login elsewhere), and every tab waiting on that agent and account restarts
+(`resume`) and gets its message (`whenPrompt`; an ACP tab's waits in its pty for the session). The view's `signedOut`
+(`SignedOutView`: out, opened, in; `in` for 8 s then gone) draws panels.tsx `SignInStrip` in the tab's foot.

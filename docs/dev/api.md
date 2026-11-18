@@ -82,7 +82,7 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
 pinned (their order), refused past `RAIL_PINS`, 5), `projectFile` (the repo's `.laki.json`), `branches` (`main`: origin's
 HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`/`wsRm` (`dropArtifacts`: its storage
 deleted, not kept)/`wsArchive`/`wsRestore`/`wsFork`; `keptList` (C5: deleted workspaces' kept artifacts, `KeptArts`,
-newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`);
+newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`); `signIn` (A2, C6: a signed-out tab's band: `act` open, its login in a script tab; send, restart and send its message; dismiss; the user's only; the view's `tab.signedOut`; the `turn` event's kind `signedout`);
 - `wsNew` in a folder (or `local`) whose own workspace is there: an agent other than none, or a prompt, makes `another`
   beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
   mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the

@@ -103,7 +103,7 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })
   const states = (s: { state: string }[]) => s.map(x => x.state)
-  assert.deepEqual(states(await rig.rpc('skills')), Array(20).fill('missing')) // laki's, laki-widget's, laki-orchestrate's, then laki-specs'
+  assert.deepEqual(states(await rig.rpc('skills')), Array(24).fill('missing')) // laki's, laki-widget's, laki-orchestrate's, then laki-specs'
   assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: true })).slice(0, 2)), ['installed', 'missing'])
   const at = join(rig.home, '.claude/skills/laki')
   assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)
@@ -122,12 +122,15 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   // the others' folders, and how each adds Laki's MCP server (opencode: lines for its config)
   const all = await rig.rpc('skillSet', { agent: 'opencode', on: true })
   assert.ok(existsSync(join(rig.home, '.config/opencode/skills/laki/SKILL.md')))
-  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)).slice(0, 6), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki', '/.claude/skills/laki-widget'])
+  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)).slice(0, 7), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki', '/.cursor/skills/laki', '/.claude/skills/laki-widget'])
   const mcp = Object.fromEntries(all.filter((x: { skill: string }) => x.skill === 'laki').map((x: { agent: string; mcp: string }) => [x.agent, x.mcp]))
   assert.match(mcp.gemini, /^gemini mcp add -s user laki '\/usr\/bin\/env' /)
   assert.match(mcp.grok, /^grok mcp add -s user laki -- '\/usr\/bin\/env' /)
   assert.equal(JSON.parse(mcp.opencode).mcp.laki.command.at(-1), 'mcp')
   assert.equal(all[4].mcpIn, '~/.config/opencode/opencode.json')
+  // C6: Cursor's: ~/.cursor/mcp.json's mcpServers
+  assert.equal(all[5].mcpIn, '~/.cursor/mcp.json')
+  assert.equal(JSON.parse(mcp.cursor).mcpServers.laki.args.at(-1), 'mcp')
   await rig.rpc('skillSet', { agent: 'opencode', on: false })
   // the widget creator: a skill of its own, its own launcher, no MCP
   const wid = (await rig.rpc('skillSet', { agent: 'claude', on: true, skill: 'laki-widget' })).find((x: { skill: string; agent: string }) => x.skill === 'laki-widget' && x.agent === 'claude')

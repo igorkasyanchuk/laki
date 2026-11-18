@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Signed out mid-turn? The tab says so in a band with *Sign in*, which runs Claude Code's or Codex's own login for that tab's account; once you're in (there or anywhere), your message goes by itself.
+- Cursor is a ready-made agent: *Add a profile for…* › *Cursor* (there already when `cursor-agent` is installed). Its models and effort are in the new-workspace menus, its chats come back after a restart, and *Sign in* runs its login.
 - Deleting a workspace keeps the screenshots and reports its agents made: Settings › Resources › *Artifacts of deleted workspaces* opens them, starts a new workspace with one, or deletes them. Tick *Also delete its artifacts* in the Delete dialog to drop them with it. [Try it](laki://settings/resources)
 - Settings › Versions shows each agent CLI's version and the newest; *Update* (or *Update all*) runs the update in a terminal tab, and Settings gets a dot when one is out of date.
 - Drag a file from the side panel, the Review tab, Artifacts or a turn's files straight to Finder or any app. Agents' browser does more: hover, keys, scroll, select, check, drag, back and forward, and tabs.

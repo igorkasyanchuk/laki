@@ -271,7 +271,7 @@ export const isLive = (t: Tab) => asleep.has(t.id) || !!(sessions.get(t.id) && !
 // why a tab can't sleep even when asked: a chat it can resume, here, idle with nothing waiting for it
 function cantSleep(t: Tab) {
   const r = rt.get(t.id)
-  if ((t.preset !== 'claude' && t.preset !== 'codex') || !t.resumeId) return `${t.name} can't resume a chat: claude and codex can, once they have one`
+  if ((t.preset !== 'claude' && t.preset !== 'codex' && t.preset !== 'acp') || !t.resumeId) return `${t.name} can't resume a chat: claude, codex and an ACP agent that loads its chats (Cursor) can, once they have one` // acp: resumeId only when it loads (acp.ts)
   if (state.workspaces.find(w => w.id === t.workspace)?.host) return `${t.name} runs on an SSH host: its memory is there`
   if (r?.status !== 'idle' || r.limit || t.queue?.length) return `${t.name} is busy: it can sleep once its turn ends${r?.limit ? ' and its usage limit resets' : ''}`
 }

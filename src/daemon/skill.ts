@@ -20,6 +20,7 @@ const AGENTS = {
   gemini: { name: 'Gemini', home: '.gemini', add: 'gemini mcp add -s user laki' },
   grok: { name: 'Grok', home: '.grok', add: 'grok mcp add -s user laki --' },
   opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
+  cursor: { name: 'Cursor', home: '.cursor', add: '' }, // C6: cursor-agent reads ~/.cursor/skills; its MCP servers are ~/.cursor/mcp.json's (no mcp add)
 }
 export type SkillAgent = keyof typeof AGENTS
 // the skills, each installed on its own: laki (drive Laki), laki-widget (make widgets), laki-orchestrate (several
@@ -35,7 +36,8 @@ export type SkillInfo = { agent: SkillAgent; skill: SkillName; name: string; pat
 const skillDir = (a: SkillAgent, k: SkillName) => join(homedir(), AGENTS[a].home, 'skills', k)
 const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp']
 const mcpCmd = (a: SkillAgent) =>
-  AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
+  AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : a === 'cursor' ? JSON.stringify({ mcpServers: { laki: { command: mcpArgv()[0], args: mcpArgv().slice(1) } } }, null, 2) : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
+const MCP_FILE: Partial<Record<SkillAgent, string>> = { opencode: 'opencode.json', cursor: 'mcp.json' }
 
 // A2: the agents Laki tells at their start (core's agentCmd: --append-system-prompt, developer_instructions), so their
 // skill needn't load for Progress on tabs; the others' description still names $LAKI_PROGRESS
@@ -570,7 +572,7 @@ function info(a: SkillAgent, k: SkillName): SkillInfo {
   const launcher = existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : ''
   const foreign = state === 'outdated' && /\bLAKI_HOME=/.test(launcher) && !launcher.includes(` ${q(`LAKI_HOME=${dir}`)} `)
   const mcp = k === 'laki' ? mcpCmd(a) : ''
-  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, ...(foreign && { foreign }), mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
+  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, ...(foreign && { foreign }), mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, MCP_FILE[a] ?? 'opencode.json') }) }
 }
 
 // laki's rows first, one per agent, then laki-widget's

@@ -4,6 +4,8 @@ const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
 // --version: $HOME/claude-version's, else 2.1.200 (not logged: tests count its runs)
 if (args[0] === '--version') return void process.stdout.write(`${(() => { try { return fs.readFileSync(`${process.env.HOME}/claude-version`, 'utf8').trim() } catch { return '2.1.200' } })()} (Claude Code)\n`)
+// auth login (A2's Sign in): signs in as the real one would, its Keychain item ($HOME/keychain: the fake security's), then ends
+if (args[0] === 'auth' && args[1] === 'login') return void (fs.writeFileSync(`${process.env.HOME}/keychain`, JSON.stringify({ claudeAiOauth: { accessToken: `fake-access-${Date.now()}` } })), process.stdout.write('Login successful.\n'))
 // --mcp-config: a file's path (S13: never the JSON itself, ps shows argv); its mode and what it holds, logged
 const mcpCfg = () => { const v = args[args.indexOf('--mcp-config') + 1]; return JSON.parse(v.startsWith('{') ? v : fs.readFileSync(v, 'utf8')) }
 const mcp = args.includes('--mcp-config') ? (() => { const v = args[args.indexOf('--mcp-config') + 1]; try { return { mode: v.startsWith('{') ? null : fs.statSync(v).mode & 0o777, path: v, cfg: mcpCfg() } } catch { return null } })() : undefined
@@ -121,7 +123,7 @@ const QUIZ = ['Red', 'Green', 'Blue']
 let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
-  hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode|apierror|continue)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
+  hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode|apierror|continue|needlogin)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
   statusLine()
   // "todo a;b;c": its to-do list (TodoWrite) as its turn starts, the first under way; "todo! …": every one done
   if (text.startsWith('todo')) hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_input: { todos: text.replace(/^todo!? /, '').split(';').map((content, i) => ({ content, status: text.startsWith('todo!') ? 'completed' : i ? 'pending' : 'in_progress' })) } })
@@ -165,6 +167,8 @@ const turn = text => {
   }
   if (text.startsWith('run ')) process.stdout.write(require('child_process').spawnSync('/bin/sh', ['-c', text.slice(4)], { encoding: 'utf8' }).stdout.replace(/\n/g, '\r\n')) // its Bash tool: a child of this process
   if (text.startsWith('apierror') || (text === 'continue' && process.env.FAKE_CONTINUE_FAILS)) return void ((busy = false), process.stdout.write('API Error: 529 Overloaded\r\n> '), hook('StopFailure', { error: 'server_error', error_details: 'API Error: 529 Overloaded\nmore detail' }))
+  // "needlogin": signed out (A2) until it's signed in ($HOME/keychain), as the real one says it
+  if (text.startsWith('needlogin') && !fs.existsSync(`${process.env.HOME}/keychain`)) return void ((busy = false), process.stdout.write('Not logged in · Please run /login\r\n> '), hook('StopFailure', { error: 'authentication_failed', error_details: 'Not logged in · Please run /login' }))
   if (text.startsWith('limit')) return void ((busy = false), process.stdout.write("You've hit your usage limit. Try again in 2 hours.\r\n> "), hook('StopFailure', { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." })) // a usage limit: StopFailure
   const ms = Number(process.env.FAKE_TURN_MS || 300)
   // scripted (the demo): its tool lines spread over the turn, then its summary: the last frame known by the turn's end

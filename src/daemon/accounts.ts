@@ -9,12 +9,13 @@ import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } 
 import { readJson } from '../shared/conn.ts'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Tab } from '../shared/types.ts'
+import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Preset, type Tab } from '../shared/types.ts'
 import { changed, presetNamed, q, save, state } from './core.ts'
 import { dir } from './dir.ts'
 import { isLive } from './resources.ts'
 import { claudeCred, geminiSigned, keychainService, type Who } from './usage.ts'
 import { older, tooOld } from './limits.ts'
+import { ACP_VERSION, acpModels } from './acp.ts'
 
 export const ENV: Record<AccountAgent, string> = { claude: 'CLAUDE_CONFIG_DIR', codex: 'CODEX_HOME' }
 // the agent's own folder: what a session without an account's env uses
@@ -173,6 +174,7 @@ const modelsSeen = new Map<string, { at: number; list: Promise<AgentModel[]>; sh
 export const effortsSaid = new Map<string, Set<string>>() // by agent: every effort its models named (core's modelCheck takes them too: codex's max, ultra)
 export function agentModels(o: { agent?: string; preset?: string }): Promise<AgentModel[]> {
   const agent = o.agent
+  if (agent === 'command' || agent === 'acp') return acpAsk(presetNamed(o.preset))
   if (agent !== 'claude' && agent !== 'codex') return Promise.resolve([])
   const pre = presetNamed(o.preset)
   const acct = pre?.account ?? accountUsed(agent)
@@ -198,6 +200,22 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
     .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e))) // its retry from the answer (an ask takes up to 20 s)
   modelsSeen.set(key, seen)
   return agent === 'claude' ? seen.list.then(l => claudeHas().then(() => l.filter(m => !needsNewer(m.id)))) : seen.list // one the installed claude is too old for: out (modelNeeds)
+}
+
+// C6: an ACP profile's models (Cursor's): its initialize and a session/new in the home folder, the models that answer
+// offers (acp.ts acpModels), kept as claude's and codex's are. ponytail: the session it opens stays in the agent's history
+function acpAsk(pre?: Preset): Promise<AgentModel[]> {
+  if (!pre?.acp || !pre.cmd) return Promise.resolve([])
+  const key = `acp:${pre.cmd}:${JSON.stringify(pre.env ?? {})}`
+  const had = modelsSeen.get(key)
+  if (had && Date.now() - had.at < (had.short ? MODELS_RETRY : MODELS_KEPT)) return had.list
+  const env = { ...process.env, ...state.settings?.env, ...pre.env } as NodeJS.ProcessEnv
+  const seen: { at: number; list: Promise<AgentModel[]>; short?: boolean } = { at: Date.now(), list: Promise.resolve([]) }
+  seen.list = asked(process.env.SHELL || '/bin/sh', ['-lc', pre.cmd], env, [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: ACP_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'laki', version: '1' } } }, { jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: homedir(), mcpServers: [] } }], m => (m?.id === 2 ? (m.error ? [] : acpModels(m.result)) : undefined))
+    .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get('acp') ?? effortsSaid.set('acp', new Set()).get('acp')!).add(e))), l))
+    .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e)))
+  modelsSeen.set(key, seen)
+  return seen.list
 }
 
 // ---------- models the installed claude is too old for: the API refuses one (claude_code_version_too_old) and names the

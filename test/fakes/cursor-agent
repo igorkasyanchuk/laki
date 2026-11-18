@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+// fake cursor-agent (C6): `login` signs in ($HOME/.cursor-fake/auth, exit 0); `acp` speaks ACP v1 on stdio: initialize
+// (loadSession), session/new (auth_required, -32000, until signed in; configOptions: a model select and thought_level),
+// session/set_config_option, session/load (replays the chat: user_message_chunk, agent_message_chunk), session/prompt
+// (answers with its model and effort, the chat kept in $HOME/.cursor-fake/<session>.json). Every message it gets goes to
+// $FAKE_ACP_LOG, a JSON line each
+const fs = require('fs'), path = require('path')
+const home = path.join(process.env.HOME, '.cursor-fake')
+const args = process.argv.slice(2)
+fs.mkdirSync(home, { recursive: true })
+if (args[0] === 'login') return void (fs.writeFileSync(path.join(home, 'auth'), 'fake-token'), process.stdout.write('Logged in\n'))
+if (args[0] !== 'acp') return void (process.stderr.write(`cursor-agent ${args.join(' ')}?\n`), (process.exitCode = 2))
+const log = m => fs.appendFileSync(process.env.FAKE_ACP_LOG || '/dev/null', JSON.stringify({ bin: 'cursor-agent', ...m }) + '\n')
+const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n')
+const update = (sessionId, update) => out({ method: 'session/update', params: { sessionId, update } })
+const chatOf = id => { try { return JSON.parse(fs.readFileSync(path.join(home, `${id}.json`), 'utf8')) } catch { return { model: 'auto', effort: 'medium', said: [] } } }
+const keep = (id, c) => fs.writeFileSync(path.join(home, `${id}.json`), JSON.stringify(c))
+const options = c => [
+  { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: c.model, options: [{ value: 'auto', name: 'Auto' }, { value: 'composer-2', name: 'Composer 2', description: 'fast' }, { value: 'gpt-5', name: 'GPT-5' }] },
+  { id: 'reasoning', name: 'Reasoning', category: 'thought_level', type: 'select', currentValue: c.effort, options: [{ value: 'low', name: 'Low' }, { value: 'medium', name: 'Medium' }, { value: 'high', name: 'High' }] },
+]
+require('readline').createInterface({ input: process.stdin }).on('line', line => {
+  const m = JSON.parse(line)
+  log(m)
+  const signed = fs.existsSync(path.join(home, 'auth'))
+  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true }, agentInfo: { name: 'cursor-agent', title: 'Cursor' }, authMethods: [{ id: 'cursor_login', name: 'Cursor login' }] } })
+  if ((m.method === 'session/new' || m.method === 'session/load') && !signed) return out({ id: m.id, error: { code: -32000, message: 'Authentication required' } })
+  if (m.method === 'session/new') {
+    const id = `cur-${Date.now().toString(36)}`
+    keep(id, chatOf(id))
+    return out({ id: m.id, result: { sessionId: id, configOptions: options(chatOf(id)) } })
+  }
+  if (m.method === 'session/load') {
+    const c = chatOf(m.params.sessionId)
+    for (const s of c.said) update(m.params.sessionId, { sessionUpdate: s.who === 'you' ? 'user_message_chunk' : 'agent_message_chunk', content: { type: 'text', text: s.text } })
+    return out({ id: m.id, result: { configOptions: options(c) } })
+  }
+  if (m.method === 'session/set_config_option') {
+    const c = chatOf(m.params.sessionId)
+    if (m.params.configId === 'model') c.model = m.params.value
+    if (m.params.configId === 'reasoning') c.effort = m.params.value
+    keep(m.params.sessionId, c)
+    return out({ id: m.id, result: { configOptions: options(c) } })
+  }
+  if (m.method === 'session/prompt') {
+    const id = m.params.sessionId
+    const c = chatOf(id)
+    const text = m.params.prompt.map(b => b.text).join('')
+    const answer = `cursor ${c.model}/${c.effort}: ${text}`
+    c.said.push({ who: 'you', text }, { who: 'agent', text: answer })
+    keep(id, c)
+    update(id, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: answer } })
+    return out({ id: m.id, result: { stopReason: 'end_turn' } })
+  }
+  if (m.id !== undefined && m.method) out({ id: m.id, error: { code: -32601, message: `Method not found: ${m.method}` } })
+})

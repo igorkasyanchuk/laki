@@ -16,8 +16,8 @@ import type { ReviewApi, Talk } from './FullReview'
 import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
-import { notInstalled, tabAgent } from '../../shared/install'
-import { type Artifact, CopyDiagnostics, VIEWED, Loading, SnapSkeleton, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
+import { isCursor, notInstalled, tabAgent } from '../../shared/install'
+import { type Artifact, CopyDiagnostics, VIEWED, Loading, SnapSkeleton, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, InstallStrip, SignInStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
 import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
@@ -1427,7 +1427,7 @@ export function App() {
           const cut = !noteWhole(told) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: scopes.has(o) ? 'Allow always' : `${o.n}. ${o.label}`, n: o.n, label: o.label, ...(scopes.has(o) && { scope: optLabel(t.ask!, o) }) })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
-          const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
+          const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' || m.kind === 'signedout' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
@@ -4117,7 +4117,8 @@ export function App() {
                             onInstall={cmd => void call<{ id: string }>('tabNew', { ws: t.workspace, kind: 'shell' }).then(sh => call('send', { target: sh.id, text: cmd, enter: false })).catch(fail)}
                             onAgain={() => void call('input', { tab: t.id, data: '\r' }).catch(fail)}
                           />
-                        ))(tabAgent(t, view?.presets))}
+                        ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' && isCursor(view?.presets.find(x => x.name === t.profile)) ? ('cursor' as const) : undefined))}
+                        <SignInStrip tab={t} onAct={act => void call('signIn', { tab: t.id, act }).catch(fail)} />
                         {!hookHid.includes(t.id) && <HookStrip tab={t} onCopy={copy} onHide={() => setHookHid(h => [...h, t.id])} />}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
                         <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />

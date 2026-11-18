@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { INSTALL } from '../../shared/install'
+import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
 import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
@@ -795,6 +795,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const prof = view.presets.find(x => x.name === p.preset)
   const [start, setStart] = useState<number | 'limit'>() // the Start chip's: now each time the page opens
   const starts = prof?.agent // what the preset starts: its model and effort flags
+  const acpPro = prof?.agent === 'command' && !!prof.acp // C6: an ACP profile (Cursor's): its models and effort, set over ACP
   // its permission mode ('': ask first) and fast mode: picked here, else the profile's (none when its flags set the mode);
   // sent only when it isn't the profile's, so an edit of the profile applies at the next start
   const ownPerm = permInArgs(starts, prof?.args)
@@ -856,7 +857,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
       const prompt = withImages(filled, images) || undefined
-      const own = isAgent(starts) && !fan // a race's agents keep their own models
+      const own = (isAgent(starts) || acpPro) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
       await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, sandbox: own ? boxSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
     } catch {
@@ -869,10 +870,11 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   // agent and profile (its account); not said yet or can't: the fixed list. Above the early return below: a fresh
   // install opens this page with no project, then the sample's arrives (test/hooks.test.ts)
   const [told, setTold] = useState<Record<string, AgentModel[]>>({})
-  const toldKey = `${ag}:${p.preset}`
+  const mk = ag ?? (acpPro ? 'acp' : undefined) // whose models: an agent's, or an ACP profile's
+  const toldKey = `${mk}:${p.preset}`
   useEffect(() => {
-    if ((ag !== 'claude' && ag !== 'codex') || told[toldKey]) return
-    void api.call<AgentModel[]>('agentModels', { agent: ag, preset: p.preset }).then(l => setTold(x => ({ ...x, [toldKey]: l })), () => setTold(x => ({ ...x, [toldKey]: [] })))
+    if ((mk !== 'claude' && mk !== 'codex' && mk !== 'acp') || told[toldKey]) return
+    void api.call<AgentModel[]>('agentModels', { agent: mk, preset: p.preset }).then(l => setTold(x => ({ ...x, [toldKey]: l })), () => setTold(x => ({ ...x, [toldKey]: [] })))
   }, [toldKey])
   if (!view.projects.length)
     return (
@@ -883,7 +885,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const prompting = view.presets.some(x => x.name === p.preset && x.agent !== 'command')
   const sep = proj?.seps?.find(s => s.id === p.place)
   const canName = !p.local && !plain
-  const canModel = isAgent(starts) && !racing // a race's agents keep their own
+  const canModel = (isAgent(starts) || acpPro) && !racing // a race's agents keep their own
   const canRace = !p.local && !plain && !inCs && isAgent(starts) && racers.length > 0
   const canSkip = !p.local && !plain && !!proj?.hasSetup // a worktree of a project with a setup script
   // the project and its groups in one menu: a group's items under its project
@@ -935,13 +937,13 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const effortsOf = (m?: string) => (x => (x?.efforts ?? (ag && EFFORTS[ag])) || undefined)(said?.find(y => y.id === m?.trim()))
   const efforts = effortsOf(typed)
   // the effort last picked for a model comes back with it (settings.modelEfforts, by agent:model; '' its default model)
-  const effortKey = (m?: string) => `${ag}:${m?.trim() ?? ''}`
+  const effortKey = (m?: string) => `${mk}:${m?.trim() ?? ''}`
   const pickModel = (m?: string) => {
-    const e = ag ? view.settings.modelEfforts?.[effortKey(m)] : undefined
+    const e = mk ? view.settings.modelEfforts?.[effortKey(m)] : undefined
     const ok = effortsOf(m) // one the new model doesn't take goes
     set({ model: m, effort: e !== undefined && (e === '' || ok?.includes(e)) ? e : p.effort && ok?.includes(p.effort) ? p.effort : undefined })
   }
-  const pickEffort = (x: string) => (set({ effort: x }), ag && void api.call('settingsSet', { modelEfforts: { ...view.settings.modelEfforts, [effortKey(p.model)]: x } }).catch(() => {}))
+  const pickEffort = (x: string) => (set({ effort: x }), mk && void api.call('settingsSet', { modelEfforts: { ...view.settings.modelEfforts, [effortKey(p.model)]: x } }).catch(() => {}))
   const modelRow = canModel && (ownModel || (!!typed && !models.includes(typed))) // the menu has the rest: one picker, not two
   const modelMenu = (e: MouseEvent) =>
     openMenu(
@@ -949,7 +951,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       [
         { filter: 'Type to filter…' },
         { head: 'Model' },
-        { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : 'the agent'} picks`, hint: !typed ? ON : undefined, run: () => pickModel(undefined) },
+        { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : (prof?.name ?? 'the agent')} picks`, hint: !typed ? ON : undefined, run: () => pickModel(undefined) },
         ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => (x => ({ label: m, mono: true, sub: x ? [x.name, x.sub].filter(Boolean).join(' · ') : MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1] ?? (x?.def ? 'default' : undefined), tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => pickModel(m) }) as MenuItem)(said?.find(y => y.id === m))),
         { label: 'Another model by name…', icon: 'pencil', foot: true, run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
       ],
@@ -2416,15 +2418,53 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 
 // Hooks not heard (the daemon's hookTick): this agent sends Laki none, so asks and ends are read off its screen; the
 // likely why (hookHealth.ts), Details (a file:line, the args, the command) to copy; Dismiss: this tab, until a reload
-// R12: a tab whose agent isn't installed (the shell's "command not found"): how to get it, and a way on
-export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
-  const i = INSTALL[agent]
+// A2, C6: its agent is signed out (the daemon's signin.ts): a band over its box. Sign in runs the agent's own login for
+// the tab's account in a terminal tab; then Finish signing in (Open again, Send again), then Signed in · sending your message
+export function SignInStrip({ tab, onAct }: { tab: TabView; onAct: (act: 'open' | 'send' | 'dismiss') => void }) {
+  const o = tab.signedOut
+  if (!o) return null
+  const who = `${o.agent}${o.account ? ` (${o.account})` : ''}`
+  const goes = o.waiting ? ' · your message sends once you’re in' : ''
   return (
-    <div className="queue-strip show-strip hook-strip" data-dock="bottom" role="region" aria-label={`${AGENT_NAMES[agent]} isn't installed`}>
+    <div className={`queue-strip show-strip signin-strip ${o.step}`} data-dock="bottom" role="region" aria-label={`${o.agent} is signed out`}>
+      <div className="queue-head">
+        <Icon name={o.step === 'in' ? 'check' : 'lock'} size={13} />
+        <span className="queue-what">{o.step === 'in' ? `Signed in${o.waiting ? ' · sending your message' : ''}` : o.step === 'opened' ? `Finish signing in to ${who} in its terminal tab${goes}` : `${who} is signed out${goes}`}</span>
+        {o.step === 'out' && (
+          <button type="button" className="primary" onClick={() => onAct('open')} data-tip={`${o.agent}'s own login, in a terminal tab`}>
+            Sign in
+          </button>
+        )}
+        {o.step === 'opened' && (
+          <>
+            <button type="button" onClick={() => onAct('open')} data-tip="Its login again, in a new terminal tab">
+              Open again
+            </button>
+            <button type="button" onClick={() => onAct('send')} data-tip="Signed in somewhere else? Restarts the tab and sends your message">
+              Send again
+            </button>
+          </>
+        )}
+        {o.step !== 'in' && (
+          <button type="button" className="ib" aria-label="Dismiss" data-tip="Hide this; your message isn't sent" onClick={() => onAct('dismiss')}>
+            <Icon name="x" size={12} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// R12: a tab whose agent isn't installed (the shell's "command not found"): how to get it, and a way on (C6: Cursor's too)
+export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent | 'cursor'; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
+  const i = agent === 'cursor' ? CURSOR_INSTALL : INSTALL[agent]
+  const name = agent === 'cursor' ? 'Cursor' : AGENT_NAMES[agent]
+  return (
+    <div className="queue-strip show-strip hook-strip" data-dock="bottom" role="region" aria-label={`${name} isn't installed`}>
       <div className="queue-head">
         <Icon name="alertCircle" size={13} />
         <span className="queue-what">
-          {AGENT_NAMES[agent]} isn't installed, or isn't on the PATH your login shell gives.
+          {name} isn't installed, or isn't on the PATH your login shell gives.
         </span>
         {i.cmd && (
           <button type="button" onClick={() => onInstall(i.cmd!)} data-tip="A terminal tab with the command typed, for you to run">
