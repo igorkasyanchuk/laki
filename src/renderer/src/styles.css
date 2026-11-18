@@ -783,7 +783,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
 .tabbar > .ib, .tab-list > .ib { align-self: center; margin-left: 2px; }
 /* the tabs over the terminals (TabList): the room they have, as many as fit at --tab-min, the rest behind +n */
-.tab-list { display: flex; align-items: flex-end; gap: 1px; flex: 1 1 0; min-width: 0; align-self: stretch; overflow: clip; }
+.tab-list { display: flex; align-items: inherit; gap: 1px; flex: 1 1 0; min-width: 0; align-self: stretch; overflow: clip; } /* the bar's: its bottom line (flex-end), or the middle where a design or look centers its tabs */
 .tabbar .tab-list > .tab { flex: 0 1 auto; min-width: 0; } /* a short name keeps its own width: fitTabs' count leaves each about --tab-min when they shrink */
 .tab-list > .tab.review-tab { flex: none; }
 .tab-more { align-self: center; flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); height: var(--h-s); padding: 0 var(--sp-3); margin-left: var(--sp-1); border: 1px solid var(--line); border-radius: var(--r-pill); background: none; color: var(--muted); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
