@@ -344,7 +344,9 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
-  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. T8, a notched
+  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. `:root` has `-webkit-text-size-adjust: 100%` and `text-size-adjust` (the shared tab's
+  page and the offline page too; test/css.test.ts): iOS Safari never inflates text in landscape, while Page zoom and the browser's
+  zoom still work (no `user-scalable=no` or `maximum-scale`). T8, a notched
   phone (index.html's `viewport-fit=cover`): `:root`'s `--safe-t/r/b/l` are `env(safe-area-inset-*)` (0 on a Mac); the
   narrow block pads what touches an edge with them (the main area's top and sides, the status bar's and the sidebar
   foot's bottom inside the bar, the sidebar's top and left, toasts, overlays, the widget sheet, `.splash`: the lock

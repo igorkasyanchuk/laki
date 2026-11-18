@@ -344,7 +344,7 @@ export function sharePage(o: { id: string; title: string; sub: string; body: str
 :root { --bg: #f6f7fb; --panel: #fff; --line: #e4e7ef; --fg: #161a26; --muted: #687087; --accent: #4f6bed; --accent-2: #8b5cf6; --you: #eef1ff; --you-line: #d9e0ff; --code: #f2f4f9; --live: #22c55e; --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -12px rgba(16, 24, 40, .12); --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, monospace; --ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color-scheme: light dark }
 @media (prefers-color-scheme: dark) { :root { --bg: #0b0d12; --panel: #13161e; --line: #232836; --fg: #e3e6ef; --muted: #8a92a6; --accent: #8ea2ff; --accent-2: #b794f6; --you: #171c2e; --you-line: #262f4d; --code: #181c26; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -16px rgba(0, 0, 0, .6) } }
 * { box-sizing: border-box }
-html { scroll-behavior: smooth }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100% }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15.5px/1.65 var(--ui); -webkit-font-smoothing: antialiased }
 header { position: sticky; top: 0; z-index: 2; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent) }
 .bar { max-width: 820px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 14px; align-items: center }

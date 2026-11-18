@@ -147,3 +147,11 @@ test('every control with the arrow (--cur-act) has a hover state', () => {
   const missing = acts.filter(s => !s.includes(':hover') && !NO_HOVER[s] && !hovers.some(h => h.includes(`${s}:hover`) || h.includes(`${s}:is(:hover`) || h.includes(`${s}:not(`) && h.includes(':hover')) && !tagHover(s))
   assert.deepEqual(missing, [])
 })
+
+// iOS Safari inflates text in landscape unless the root says not to; the prefixed one is the one it reads
+test('the root rule keeps text at its size on a phone (text-size-adjust, both forms)', () => {
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+  const root = /^:root \{([^}]*)\}/m.exec(css)?.[1] ?? ''
+  assert.match(root, /(^|\s)-webkit-text-size-adjust: 100%;/)
+  assert.match(root, /(^|\s)text-size-adjust: 100%;/)
+})

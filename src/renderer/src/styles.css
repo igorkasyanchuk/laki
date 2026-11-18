@@ -1,4 +1,6 @@
 :root {
+  -webkit-text-size-adjust: 100%; /* iOS Safari reads this one: no text inflated in landscape (the user's zoom stays) */
+  text-size-adjust: 100%;
   --bg: #0e1014;
   --side: #12151b;
   --panel: #161a21;
