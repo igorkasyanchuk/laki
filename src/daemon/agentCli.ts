@@ -7,7 +7,8 @@ import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { AGENT_NAMES, type AgentCli, type Tab } from '../shared/types.ts'
-import { changed, log, quickNew, run, save, sessions, spawnTab, state } from './core.ts'
+import { isCursor } from '../shared/install.ts'
+import { changed, log, presetOf, quickNew, run, save, sessions, spawnTab, state } from './core.ts'
 import { inRig } from './dir.ts'
 
 // each CLI: its command, the npm package that carries it (its newest version; an npm install's update), its own
@@ -85,7 +86,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
     const t = u && state.tabs.find(x => x.id === u.tab)
     const s = t && sessions.get(t.id)
     const update = u && t ? { tab: t.id, ws: u.ws, state: !s || !s.exited ? 'running' : s.exitCode === 0 ? 'done' : 'failed', ...(s?.exited && { code: s.exitCode ?? undefined }) } as AgentCli['update'] : undefined
-    const running = state.tabs.filter(x => x.kind === 'agent' && (x.preset === f.c.id || state.settings?.presets?.find(pr => pr.name === x.preset)?.agent === f.c.id) && sessions.get(x.id) && !sessions.get(x.id)!.exited).length
+    const running = state.tabs.filter(x => x.kind === 'agent' && (f.c.id === 'cursor' ? x.preset === 'acp' && isCursor(presetOf(x) ?? { cmd: x.cmd, acp: true }) : x.preset === f.c.id) && sessions.get(x.id) && !sessions.get(x.id)!.exited).length
     const nv = newest.v[f.c.id]
     return { id: f.c.id, name: f.c.name, ...(f.path && { path: f.path, version: f.version, how: f.how, cmd: f.cmd }), ...(nv && { newest: nv }), ...(running && { running }), ...(update && { update }) } as AgentCli
   })

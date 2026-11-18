@@ -130,7 +130,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `CLI_MARK` in it; `current`: its paths this install's; `onPath`; `other`: another laki first on PATH; `to`: where an
   install goes), `cliInstall` (the launcher, `LAKI_CLI`, in the first writable of `cliSpots` with no other `laki` there, a link too (never
   written through): `/opt/homebrew/bin`, `/usr/local/bin`, else `~/.local/bin`, made; none: refused; `LAKI_CLI_DIRS`: tests' own), `cliRemove` (only one with `CLI_MARK`);
-- Uninstall Laki (B3, uninstall.ts; Settings' `UninstallField`, `laki uninstall`): `uninstall` (`data`, `worktrees`: their
+- Uninstall Laki (B3, uninstall.ts; Settings' `UninstallField`, `laki uninstall`): `uninstall` (`data`, `worktrees` (Laki's own, never an imported one): their
   rows picked; `run`: removed; `stop`: the daemon too, now, after its answer: an `uninstalled` event (`cask`) first, which
   the app's window hands to main: no daemon again, a dialog, the app to the Trash or brew's command copied, quit).
   `{ rows: UninstallRow[] }`, in order cli, skills, daemon, worktrees, data, next; a launcher or skill is this Laki's

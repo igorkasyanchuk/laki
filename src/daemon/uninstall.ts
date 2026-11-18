@@ -64,14 +64,14 @@ export function uninstall(p: { data?: boolean; worktrees?: boolean; run?: boolea
   const agents = state.tabs.filter(t => t.kind === 'agent').length
   rows.push({ id: 'daemon', label: 'Background daemon', detail: `and the terminals it kept${agents ? ` (${agents} agent tab${agents === 1 ? '' : 's'} end)` : ''}`, state: p.run ? (p.stop ? 'done' : 'later') : 'todo' })
   // the worktrees Laki made (live and archived workspaces'), on this Mac
-  const trees = state.workspaces.filter(w => w.kind === 'worktree' && !w.host && existsSync(w.path)).map(w => w.path)
+  const trees = state.workspaces.filter(w => w.kind === 'worktree' && !w.host && !w.imported && existsSync(w.path)).map(w => w.path) // an imported one is yours (Laki never removes it)
   rows.push({ id: 'worktrees', label: 'Worktrees', detail: trees.length ? `${trees.length} worktree${trees.length === 1 ? '' : 's'} Laki made: their uncommitted changes go too` : 'none', state: !trees.length ? 'none' : !p.worktrees ? 'kept' : p.run ? (p.stop ? 'done' : 'later') : 'todo' })
   const storage = typeof state.settings?.storageDir === 'string' && state.settings.storageDir.trim() ? state.settings.storageDir.trim() : ''
   rows.push({ id: 'data', label: 'My data', detail: `${tilde(dir)} (projects, notes, settings, kept chats${storage ? '' : ', artifacts'})${keychainOn() ? " and Laki AI's keys in the Keychain" : ''}${storage ? `; artifacts in ${storage} stay` : ''}${!p.worktrees && existsSync(join(dir, 'worktrees')) ? `; ${tilde(join(dir, 'worktrees'))} stays` : ''}`, state: !p.data ? 'kept' : p.run ? (p.stop ? 'done' : 'later') : 'todo' })
   const cask = CASKS.some(c => existsSync(c))
   rows.push({ id: 'next', label: 'Then', detail: cask ? 'brew uninstall --cask laki (it was installed with Homebrew)' : 'Quit Laki and move it to the Trash', state: 'todo', ...(cask && { cmd: 'brew uninstall --cask laki' }) })
   if (p.run) {
-    const repos = [...new Set(state.workspaces.filter(w => w.kind === 'worktree' && !w.host).map(w => state.projects.find(x => x.id === w.project)?.path).filter((x): x is string => !!x))]
+    const repos = [...new Set(state.workspaces.filter(w => w.kind === 'worktree' && !w.host && !w.imported).map(w => state.projects.find(x => x.id === w.project)?.path).filter((x): x is string => !!x))]
     wiping = { data: !!p.data, worktrees: p.worktrees ? trees : [], repos }
     log(`uninstall: ${rows.map(r => `${r.id} ${r.state}`).join(', ')}`)
     if (p.stop && stopNow) setTimeout(() => (broadcast({ ev: 'uninstalled', cask }), setTimeout(stopNow, 300)), 200) // after the answer; an open app quits (main's uninstalled)

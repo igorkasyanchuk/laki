@@ -299,7 +299,7 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
   link for each thing an agent publishes, kept in its `LINKS`, `.laki-links.json`; a `.url` file it saves is moved in, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
   for Terminals, Browsers and hosts. `wsRm` and `projectRm` (and `archivedTidy`) move it to `<storage>/.kept/<name>-<id>`
-  (C5, `rmStorage`: only a `…<id>` folder; its `chats/` dropped; `.laki-kept.json` its id, name, project, branch and
+  (C5, `rmStorage`: only a `…<id>` folder; its `chats/` and `.laki-secrets/` dropped; `.laki-kept.json` its id, name, project, branch and
   when; hidden, so the storage tidy skips it), deleted instead with `wsRm`'s `dropArtifacts` or `settings.keepStorage`
   false (unset: on); archive keeps it in place. artifacts.ts' `keptList`, `keptOpen`, `keptRm` are Settings › Resources'.
 
@@ -659,11 +659,11 @@ MCP server: `~/.cursor/mcp.json`'s `mcpServers`, shown to paste). Not installed:
 
 A claude or codex turn that ends signed out (`signedOutIn`: *Not logged in · Please run /login*, an expired or revoked
 token, `authentication_error`, codex's *re-run codex login*, a rejected refresh token; on a failed turn's error and
-answer, a short claude answer, codex's every end with its screen's last 6 lines) isn't an API error (`r.failed` stays
+answer, a short claude answer, a codex end with no answer with its screen's last 6 lines: an answer may talk of tokens and logins) isn't an API error (`r.failed` stays
 unset, no auto continue, no Done check, its queue waits; an SSH host's tab: an API error as before): `turnSignedOut` first tries Auto fallback (the next account in `limitFallback` not left signed out in the last 10 minutes takes the tab,
 `tabAccount`, and its message), else sets `r.signedOut` with the message (`r.asked`) and the account's credentials'
 fingerprint (`credOf`: claude's Keychain item or file, codex's `auth.json`). The turn event's kind is `signedout` (the
-notification: *Signed out: sign in to …*). `signIn` (the band's buttons, the user's only): `open` runs the agent's own
+notification: *Signed out: sign in to …*; a fallback's end is `done`, told as *Signed out on …: it goes on on …*). A tab signed out already that fails again keeps its newest message. `signIn` (the band's buttons, the user's only): `open` runs the agent's own
 login for that account (`loginCmd`: `claude auth login` with its `CLAUDE_CONFIG_DIR`, `codex login` with `CODEX_HOME`;
 Cursor's `cursor-agent login`) as a script tab in the *sign in* Terminals workspace; `send` restarts as if in; `dismiss`.
 `signTick` (every 5 s while a tab waits; `LAKI_SIGNIN_MS`, tests'): the login tab ended with 0, or the account's

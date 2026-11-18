@@ -14,7 +14,8 @@ import { phone } from './phone.ts'
 
 const SECRET_HOURS = 24
 const SECRET_MAX = 64 << 10
-const DIR = '.laki-secrets'
+export const SECRETS_DIR = '.laki-secrets'
+const DIR = SECRETS_DIR
 const asks = new Map<string, { tab: string; folder: string; label: string; done: (r: { path?: string; refused?: string }) => void }>()
 
 export function secretAsk(o: { label?: unknown; from?: { tab?: string } }) {

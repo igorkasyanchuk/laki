@@ -55,7 +55,10 @@ export function turnSignedOut(tab: Tab, text: string, strict = false): boolean {
     fell.set(tab.id, { at: Date.now(), ids: tried })
     return true
   }
-  if (r.signedOut?.step === 'out' || r.signedOut?.step === 'opened') return true // told already: the same account still
+  if (r.signedOut?.step === 'out' || r.signedOut?.step === 'opened') {
+    if (msg) ((r.signedOut.text = msg), changed()) // told already (the same account still): its newest message is the one sent once in
+    return true
+  }
   r.signedOut = { agent, step: 'out', account, text: msg, at: Date.now() }
   void credOf(agent, account).then(m => r.signedOut && r.signedOut.mark === undefined && (r.signedOut.mark = m))
   wsLog({ id: tab.workspace }, `${tab.name}: ${NAMES[agent]} is signed out${account && accountNamed(account) ? ` (${accountNamed(account)!.name})` : ''}`)

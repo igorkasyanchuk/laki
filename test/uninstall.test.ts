@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, running, seen, until } from './helpers.ts'
@@ -44,6 +45,10 @@ test("B3: Uninstall Laki: the laki command and this Laki's skills removed, anoth
   // a worktree: said, kept unless picked
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'tree' })
+  // one of yours, imported: never Laki's to remove
+  const mine = join(rig.home, 'my-tree')
+  execFileSync('git', ['-C', rig.repo, 'worktree', 'add', '-q', '-b', 'mine', mine])
+  await rig.rpc('worktreeImport', { project: p.id, paths: [realpathSync(mine)] })
   const trees = by((await rig.rpc('uninstall', {})).rows, 'worktrees')
   assert.deepEqual([trees.state, trees.detail], ['kept', '1 worktree Laki made: their uncommitted changes go too'])
   assert.match(by((await rig.rpc('uninstall', { data: true })).rows, 'data').detail, /data\/worktrees stays/)
@@ -55,6 +60,7 @@ test("B3: Uninstall Laki: the laki command and this Laki's skills removed, anoth
   await until(() => !existsSync(join(rig.home, 'data/state.json')), 'the data folder goes')
   assert.deepEqual(readdirSync(join(rig.home, 'data')), ['worktrees'], 'all but the worktrees')
   assert.ok(existsSync(ws.path), 'the worktree stays')
+  assert.ok(existsSync(mine), 'yours stays')
   assert.ok(existsSync(join(rig.home, 'repo')), 'repos stay')
 })
 

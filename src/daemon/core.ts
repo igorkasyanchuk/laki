@@ -37,6 +37,7 @@ import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { AcpPty } from './acp.ts'
+import { SECRETS_DIR } from './secrets.ts'
 import { CURSOR } from '../shared/install.ts'
 import { type SignedOut, signedOutView, turnSignedOut } from './signin.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
@@ -1392,7 +1393,7 @@ export async function storageInfo() {
   const kb = await run('du', ['-sk', root], { timeout: 20000 }).then(r => Number(r.stdout.split(/\s/)[0]) || 0, () => 0)
   let folders = 0
   try {
-    folders = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory()).length
+    folders = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('.')).length // not .kept (C5)
   } catch {}
   return { dir: root, bytes: kb * 1024, folders, days: state.settings?.storageDays ?? STORAGE_DAYS }
 }
@@ -3753,6 +3754,7 @@ function rmStorage(ws: Workspace, drop = false) {
       mkdirSync(keptRoot(), { recursive: true, mode: 0o700 })
       moveFile(ws.storage, to)
       rmSync(join(to, 'chats'), { recursive: true, force: true })
+      rmSync(join(to, SECRETS_DIR), { recursive: true, force: true }) // laki secret's tokens: never kept (secretsTidy doesn't look in .kept)
       writeFileSync(join(to, KEPT_META), JSON.stringify({ id: ws.id, name: ws.name ?? ws.id, project: ws.project, ...(ws.branch && { branch: ws.branch }), deleted: Date.now() }), { mode: 0o600 })
       return log(`${ws.id}: its artifacts kept in ${to}`)
     } catch (e) {
@@ -4278,9 +4280,10 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       // a model the installed claude is too old for (the API's claude_code_version_too_old): kept, said in words
       const refused = p.state === 'failed' && tab.preset === 'claude' ? modelRefused(tab.model || presetOf(tab)?.model?.trim(), `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`) : undefined
       if (refused) r.last = refused
-      // A2: signed out (a failed turn's words; codex's, its screen's last lines too: its notify says no error): the band, the message kept
+      // A2: signed out (a failed turn's words; codex's with no answer, its screen's last lines too: its notify says no error; an
+      // answer of its own may well talk of tokens and logins): the band, the message kept
       const said = `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`
-      const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || tab.preset === 'codex') && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said, p.state !== 'failed' && tab.preset === 'claude')
+      const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || (tab.preset === 'codex' && !last)) && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said, p.state !== 'failed' && tab.preset === 'claude')
       // an API error's end (overloaded, a 500, the connection): not a limit, a refused model, signed out or your Esc
       r.failed = p.state === 'failed' && !r.limit && !refused && !out && !r.escAt ? failLine(err, last) : undefined
       if (r.failed) continueLater(tab, r)
@@ -4288,8 +4291,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (!viewed(tab.id)) r.done = true
       const checking = !r.limit && !out && p.state !== 'failed' && !!checkHooks.will?.(tab)
       const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out ? 'signedout' : 'done', text: out ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : goalEnd && goalEnd !== 'cleared' ? `Goal ${GOAL_SAYS[goalEnd]}: ${goalOf(tab)?.text ?? ''}` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
-      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out ? 'is signed out' : goalEnd && goalEnd !== 'cleared' ? `goal ${GOAL_SAYS[goalEnd]}` : (r.last ?? ''), bell)
+      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out && r.signedOut ? 'signedout' : 'done', text: out && r.signedOut ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : out ? (r.last ?? '') : goalEnd && goalEnd !== 'cleared' ? `Goal ${GOAL_SAYS[goalEnd]}: ${goalOf(tab)?.text ?? ''}` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
+      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out && r.signedOut ? 'is signed out' : out ? (r.last ?? '') : goalEnd && goalEnd !== 'cleared' ? `goal ${GOAL_SAYS[goalEnd]}` : (r.last ?? ''), bell)
       if (!r.limit && !out && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
       if (r.limit || out || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
