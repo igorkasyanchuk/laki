@@ -515,7 +515,14 @@ window: it can run the agent browser). Tabs on screen in a focused window get no
 ### MCP
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's
-protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
+protocol version; `tools/list`, `tools/call`, `ping`, `resources/list`, `resources/templates/list`, `resources/read`,
+`prompts/list`, `prompts/get`; notifications get no answer, other methods -32601). Resources: `laki://ws/<id>/diff` (the
+`laki_diff` tool's `diff`, cut at 200 KB with a note), `laki://ws/<id>/plan` (its tabs' plans from `state` as a Markdown
+checklist, `planMd`), `laki://project/<id>/memory` (the `laki_memory` tool's): listed for `$LAKI_WORKSPACE`'s own in a tab,
+every live one otherwise (a trusted client's `state` keeps to its projects); read through those same calls, so their gates
+hold (Recording mode's `hiddenNo`: `diff` is in `RECORDED` with `turnList` and `turnDiff`). Prompts: `templatesFor`
+(Settings' and the caller's project's), `promptArgs` (prompt, then each `{{name}}` that isn't a date), `prompts/get` fills
+with `templated` as the new-workspace page does, one user message; read-only, no subscriptions (`test/cli-more.test.ts`). Each tool is
 one or two `rpc` calls (`shared/tools.ts` `tools(rpc)`: Laki AI passes the daemon's own); none deletes, archives or ships.
 `laki_wait` (A5) is `laki wait`'s `waitTabs` (`state` every 3 s until no named agent tab runs or has a queue), capped at
 4.5 minutes a call, under a client's MCP_TOOL_TIMEOUT (5): `timedOut` and *still running* past it. The CLI's own (A4):

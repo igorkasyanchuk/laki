@@ -77,7 +77,9 @@ Laki's window (it says so): wait for it; don't retry in a loop.
 
 Over MCP (\`laki mcp\`) the core tools are listed (state, new workspace, send, screen, wait, diff, alert, progress,
 limits); call \`laki_more\` with a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) first
-to get that group's tools: a \`laki_*\` tool named below that you don't have is in one of them.
+to get that group's tools: a \`laki_*\` tool named below that you don't have is in one of them. Its resources are your
+workspace's diff and plan and its project's memory (\`laki://ws/<id>/diff\`, \`…/plan\`, \`laki://project/<id>/memory\`); its
+prompts are the user's prompt templates (read-only), each variable an argument.
 
 ## Start work
 

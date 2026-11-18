@@ -484,6 +484,8 @@ one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
 agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, archives or ships. It lists its core tools
 and laki_more, which adds a group (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings) to the
 list (a client that keeps its first list can still call any tool by its name). --all (or LAKI_MCP_ALL=1) lists every one.
+Resources: laki://ws/<id>/diff and …/plan, laki://project/<id>/memory (in a Laki tab, its own workspace's; else every one).
+Prompts: your prompt templates, each {{variable}} an argument, filled as the new-workspace page fills them.
 
   claude mcp add laki -- laki mcp
   claude mcp add laki -- laki mcp --all`,

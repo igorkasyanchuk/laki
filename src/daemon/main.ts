@@ -496,7 +496,7 @@ const api = {
   hook: ({ key: _, ...p }) => core.hook(p), // hookWho's first
   worktreeList: p => core.worktreeList(p.project),
   worktreeImport: p => core.worktreeImport(p),
-  diff: p => (p.since === true ? reviewDiff(p) : filesMod.diff(p.ws, p.uncommitted === true, typeof p.since === 'string' ? p.since : undefined)), // uncommitted: against HEAD (Changes' and Review's Uncommitted); since true: from your last review's mark (R11), a sha: only what changed after that commit of the branch (Changes' Since)
+  diff: p => (turnsSeen(p), p.since === true ? reviewDiff(p) : filesMod.diff(p.ws, p.uncommitted === true, typeof p.since === 'string' ? p.since : undefined)), // uncommitted: against HEAD (Changes' and Review's Uncommitted); since true: from your last review's mark (R11), a sha: only what changed after that commit of the branch (Changes' Since)
   reviewMark: p => reviewMark(p), // R11: Since I reviewed's mark, the user's
   baseBranches: p => filesMod.baseBranches(p.ws), // Changes' base menu
   wsBase: p => filesMod.wsBase(p),
@@ -1041,8 +1041,9 @@ const termAnswer = (p: any) => void [...termAsks.values()].find(a => a.msg.req =
 // the CLI's own question while its call waits (not a method of api: it reads the socket, as appPair does)
 const termHeld = async (sock: Socket) => (who => !!who?.term && termAsks.has(who.term.key))(await core.peerWho(sock.remotePort ?? 0).catch(() => undefined))
 // S7: what Recording mode keeps from an agent in another workspace: the state's private rows, a private workspace's
-// kept turns (their prompts, their diffs). ponytail: its diff, files and screen go by their own gates (crossAsk)
-const RECORDED = new Set(['state', 'turnList', 'turnDiff'])
+// kept turns (their prompts, their diffs) and its diff (laki diff, MCP's laki_diff and laki://ws/<id>/diff). ponytail: its
+// files and screen go by their own gates (crossAsk)
+const RECORDED = new Set(['state', 'turnList', 'turnDiff', 'diff'])
 // a workspace Recording mode hides is none to a caller outside it (an agent of another workspace; a trusted client, with
 // none of its own: clientHidden), in a missing one's words
 const hiddenNo = (me: string | undefined, ws: Workspace | undefined, ref: string) => {

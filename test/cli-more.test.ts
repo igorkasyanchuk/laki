@@ -480,3 +480,59 @@ test('#34.5: laki widget log: -n, -f and the other options only before the messa
   const lines = (await rig.rpc('widgetLogs', { id: 'y', src: 'cli' })).lines.map((l: any) => `${l.level} ${l.text}`)
   assert.deepEqual(lines, ['info tail -n 5 and -f done', 'info the --level is high -- ok', 'warn disk full'])
 })
+
+test('laki mcp: resources (a diff, a plan, memory) and prompts (the templates); an agent reads as its tools do', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'mine' })
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'theirs' })
+  writeFileSync(join(ws.path, 'hello.txt'), 'hello from mine\n')
+  writeFileSync(join(other.path, 'other.txt'), 'theirs only\n')
+  await rig.rpc('memoryAdd', { project: p.id, text: 'run npm test before a commit' })
+  await rig.rpc('settingsSet', { templates: [{ name: 'Fix it', text: 'Fix {{prompt}} on {{branch}} by {{YYYY-MM-DD}}' }] })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const said = join(rig.home, 'tab-token')
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run printenv LAKI_TAB_TOKEN > ${said}` })
+  const token = (await until(() => existsSync(said) && readFileSync(said, 'utf8').trim(), 'its token', 60000)) as string // its agent's own: laki mcp with it is that agent
+  delete rig.env.LAKI_TAB
+  delete rig.env.LAKI_WORKSPACE
+  const req = (id: number, method: string, params?: object) => ({ jsonrpc: '2.0', id, method, ...(params && { params }) })
+  // yours (no tab): every live workspace's, the templates as prompts
+  const { by } = await mcp(rig, [
+    req(1, 'initialize'),
+    req(2, 'resources/list'),
+    req(3, 'resources/read', { uri: `laki://ws/${ws.id}/diff` }),
+    req(4, 'resources/read', { uri: `laki://project/${p.id}/memory` }),
+    req(5, 'resources/read', { uri: `laki://ws/${ws.id}/plan` }),
+    req(6, 'resources/templates/list'),
+    req(7, 'prompts/list'),
+    req(8, 'prompts/get', { name: 'Fix it', arguments: { prompt: 'the flaky test', branch: 'main' } }),
+    req(9, 'resources/read', { uri: 'laki://ws/../etc/diff' }),
+  ])
+  assert.deepEqual(Object.keys(by[1].result.capabilities).sort(), ['prompts', 'resources', 'tools'])
+  const uris = by[2].result.resources.map((r: any) => r.uri)
+  for (const u of [`laki://ws/${ws.id}/diff`, `laki://ws/${ws.id}/plan`, `laki://ws/${other.id}/diff`, `laki://project/${p.id}/memory`]) assert.ok(uris.includes(u), u)
+  assert.ok(by[2].result.resources.every((r: any) => r.name && r.description && r.mimeType))
+  assert.match(by[3].result.contents[0].text, /\+hello from mine/)
+  assert.equal(by[3].result.contents[0].mimeType, 'text/x-diff')
+  assert.match(by[4].result.contents[0].text, /- run npm test before a commit/)
+  assert.match(by[5].result.contents[0].text, /No plan yet/)
+  assert.deepEqual(by[6].result.resourceTemplates.map((x: any) => x.uriTemplate), ['laki://ws/{id}/diff', 'laki://ws/{id}/plan', 'laki://project/{id}/memory'])
+  const fix = by[7].result.prompts.find((x: any) => x.name === 'Fix it')
+  assert.deepEqual(fix.arguments.map((a: any) => a.name), ['prompt', 'branch']) // a date is stamped, not asked
+  assert.deepEqual(by[8].result.messages, [{ role: 'user', content: { type: 'text', text: `Fix the flaky test on main by ${new Date().toISOString().slice(0, 10)}` } }])
+  assert.match(by[9].error.message, /no resource/)
+  // an agent's tab: its own workspace listed; Recording mode keeps a private one's diff from it, the tool's way
+  await rig.rpc('wsSet', { id: other.id, private: true })
+  await rig.rpc('settingsSet', { recording: true })
+  rig.env.LAKI_WORKSPACE = ws.id
+  rig.env.LAKI_TAB = tab
+  rig.env.LAKI_TAB_TOKEN = token
+  const a = await mcp(rig, [req(1, 'resources/list'), req(2, 'resources/read', { uri: `laki://ws/${other.id}/diff` }), tool(3, 'laki_diff', { ws: other.id }), req(4, 'resources/read', { uri: `laki://ws/${ws.id}/diff` }), req(5, 'prompts/list')])
+  assert.deepEqual(a.by[1].result.resources.map((r: any) => r.uri).sort(), [`laki://project/${p.id}/memory`, `laki://ws/${ws.id}/diff`, `laki://ws/${ws.id}/plan`])
+  assert.match(a.by[2].error.message, new RegExp(`no workspace ${other.id}`))
+  assert.deepEqual([a.by[3].result.isError, a.by[3].result.content[0].text], [true, a.by[2].error.message]) // refused as the tool is
+  assert.match(a.by[4].result.contents[0].text, /\+hello from mine/)
+  assert.ok(a.by[5].result.prompts.some((x: any) => x.name === 'Fix it'), 'the templates: read-only, an agent sees them too')
+})
