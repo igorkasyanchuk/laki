@@ -3,7 +3,7 @@
 // each page opened, a selector of its own waited for, no Boundary, no console error, a screenshot). The screenshots end
 // in dist/ui-smoke; the demo daemon is stopped and the temp folder removed, pass or fail. LAKI_DEMO_RICH=1: the rich
 // world, and the README's stills instead of the walk (main's uiSmoke readme), copied to docs/img. LAKI_UI_THEME=<theme id>:
-// the walk in that theme (laki, laki-light), not the system's.
+// the walk in that theme (laki, laki-light), not the system's. LAKI_SHEET: scripts/ui-sheet.ts' (npm run test:sheet).
 import { execFileSync, spawn } from 'node:child_process'
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 if (!existsSync(join(root, 'out/main/index.js'))) throw new Error('no build in out/: npm run build first')
 const home = mkdtempSync('/tmp/laki-ui-')
-const shots = join(root, 'dist/ui-smoke')
+const shots = join(root, process.env.LAKI_SHEET ? 'dist/ui-sheet' : 'dist/ui-smoke') // LAKI_SHEET: scripts/ui-sheet.ts' run
 const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home, LAKI_HOME: join(home, 'data'), ...(process.env.LAKI_DEMO_RICH && { LAKI_OVERLAP_MS: '2000' }) }).filter(([k]) => !k.startsWith('CLAUDE') && !k.startsWith('ELECTRON_')))
 const node = (...a: string[]) => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', ...a], { cwd: root, env, encoding: 'utf8' })
 let code = 1
@@ -45,13 +45,13 @@ try {
   if (process.env.LAKI_UI_THEME) await rpc('settingsSet', { theme: process.env.LAKI_UI_THEME, themeAuto: false }) // LAKI_UI_THEME=laki-light: the walk in that theme (a look's check in each)
   const app = spawn(createRequire(import.meta.url)('electron') as string, [ // Electron's binary itself: .bin/electron is a node script, and a version manager's node shim can't find node under the temp HOME
     join(root, 'out/main/index.js'), `--user-data-dir=${join(home, 'userdata')}`, `--laki-smoke=${join(home, 'shots')}`], { cwd: root, env, stdio: 'ignore' })
-  const timer = setTimeout(() => app.kill(), 120_000) // E3: the flows too
+  const timer = setTimeout(() => app.kill(), process.env.LAKI_SHEET ? 1_800_000 : 120_000) // E3: the flows too; the sheet's every look
   code = await new Promise<number>(ok => app.on('exit', c => ok(c ?? 1)))
   clearTimeout(timer)
   const result = join(home, 'shots/result.json')
   if (existsSync(result)) {
     const steps = JSON.parse(readFileSync(result, 'utf8')) as { name: string; ok: boolean; ms: number; why?: string }[]
-    for (const s of steps) console.log(`${s.ok ? 'ok  ' : 'FAIL'} ${s.name.padEnd(18)} ${String(s.ms).padStart(5)} ms${s.why ? `  ${s.why}` : ''}`)
+    if (!process.env.LAKI_SHEET) for (const s of steps) console.log(`${s.ok ? 'ok  ' : 'FAIL'} ${s.name.padEnd(18)} ${String(s.ms).padStart(5)} ms${s.why ? `  ${s.why}` : ''}`)
     rmSync(shots, { recursive: true, force: true })
     cpSync(join(home, 'shots'), shots, { recursive: true })
     // M1: the rich world's stills are the README's (docs/img/<name>.png), only when every step passed
@@ -59,11 +59,16 @@ try {
     else if (process.env.LAKI_DEMO_RICH) for (const f of readdirSync(shots).filter(f => /^\d+-readme-(?!setup|done)/.test(f))) cpSync(join(shots, f), join(root, 'docs/img', f.replace(/^\d+-readme-/, '')))
     console.log(firstLoad())
     console.log(`screenshots: ${shots}`)
-  } else console.log('the window never finished: no result.json (120 s at most)')
+  } else console.log(`the window never finished: no result.json (${process.env.LAKI_SHEET ? 30 * 60 : 120} s at most)`)
 } finally {
+  let pid = 0
   try {
+    pid = (JSON.parse(readFileSync(join(home, 'data/daemon.json'), 'utf8')) as { pid: number }).pid
     execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'bin/laki.js', 'stop'], { cwd: root, env, stdio: 'ignore' })
   } catch {}
+  // its last writes (pty.json) come as it exits: the folder goes once it's gone (5 s at most), or it comes back
+  const alive = () => { try { return !!pid && process.kill(pid, 0) } catch { return false } }
+  for (const end = Date.now() + 5000; alive() && Date.now() < end; ) await new Promise(r => setTimeout(r, 100))
   rmSync(home, { recursive: true, force: true })
 }
 process.exit(code)

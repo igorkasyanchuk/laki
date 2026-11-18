@@ -96,7 +96,8 @@ if (session.startsWith('gone-')) {
 }
 process.stdin.setRawMode(true) // before its banner and its first hooks (execSync blocks): a prompt sent once "fake claude" shows stays raw, its Enter a \r
 process.stdout.write('\x1b[?2004h') // bracketed paste on, like the real one
-process.stdout.write(`fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
+const script = require('./script.cjs')() // FAKE_SCRIPT: the demo's words, not the echo
+process.stdout.write(script ? '╭──────────────────────────────╮\r\n│ ✻ Welcome to Claude Code!    │\r\n╰──────────────────────────────╯\r\n\r\n' : `fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
 hook('SessionStart', { session_id: session })
 // its status line (settings' statusLine: Laki's script): the real one's JSON (fixtures/statusline.json, this chat's id)
 // on stdin as it starts and at each prompt; what it printed goes to FAKE_LOG
@@ -109,6 +110,7 @@ const statusLine = () => {
   fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'statusline', tab: process.env.LAKI_TAB, out }) + '\n')
 }
 statusLine()
+let turns = 0 // turns started: the scripted lines' own
 let busy = false // a turn under way: Esc interrupts it (no Stop hook, like the real one)
 let slow = false // a slow turn: a line typed meanwhile waits in it (the real one reads it then), no turn of its own
 let ticker // a tick turn's redraws
@@ -164,17 +166,23 @@ const turn = text => {
   if (text.startsWith('run ')) process.stdout.write(require('child_process').spawnSync('/bin/sh', ['-c', text.slice(4)], { encoding: 'utf8' }).stdout.replace(/\n/g, '\r\n')) // its Bash tool: a child of this process
   if (text.startsWith('apierror') || (text === 'continue' && process.env.FAKE_CONTINUE_FAILS)) return void ((busy = false), process.stdout.write('API Error: 529 Overloaded\r\n> '), hook('StopFailure', { error: 'server_error', error_details: 'API Error: 529 Overloaded\nmore detail' }))
   if (text.startsWith('limit')) return void ((busy = false), process.stdout.write("You've hit your usage limit. Try again in 2 hours.\r\n> "), hook('StopFailure', { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." })) // a usage limit: StopFailure
+  const ms = Number(process.env.FAKE_TURN_MS || 300)
+  // scripted (the demo): its tool lines spread over the turn, then its summary: the last frame known by the turn's end
+  const lines = script?.lines ?? []
+  const me = ++turns // a turn sent while one runs (the Done check's): only the newest prints its lines
+  lines.forEach((l, i) => setTimeout(() => busy && me === turns && process.stdout.write(`${l.replaceAll('\n', '\r\n')}\r\n`), (ms * (i + 1)) / (lines.length + 1)))
   setTimeout(() => {
     if (!busy) return
     busy = false
-    process.stdout.write(`answer: ${text}\r\n> `)
-    hook('Stop', { last_assistant_message: `answer: ${text}` })
+    const said = script ? script.summary || 'Done.' : `answer: ${text}`
+    process.stdout.write(script ? `⏺ ${said}\r\n\r\n> ` : `answer: ${text}\r\n> `)
+    hook('Stop', { last_assistant_message: said })
     // a report through the terminal (OSC 7501), after Stop is heard: its compare, 2 s on, finds the tab idle however busy the Mac
     if (text.startsWith('osc ')) process.stdout.write(text.slice(4).replaceAll('\\e', '\x1b').replaceAll('\\a', '\x07'))
-  }, Number(process.env.FAKE_TURN_MS || 300))
+  }, ms)
 }
-const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume', '--model', '--plugin-dir', '--append-system-prompt'].includes(args[i - 1]))
-if (positional.length) turn(positional.at(-1))
+const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume', '--model', '--plugin-dir', '--append-system-prompt', ...(script ? ['--add-dir'] : [])].includes(args[i - 1])) // scripted: --add-dir's folder no prompt (as ever otherwise: tests lean on that turn)
+if (positional.length) script && process.stdout.write(`> ${positional.at(-1)}\r\n\r\n`), turn(positional.at(-1))
 else process.stdout.write('> ')
 let line = ''
 // the footer's permission mode, redrawn on the last row; shift-tab cycles it as the real one does (bypass only if it was

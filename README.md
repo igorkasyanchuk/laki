@@ -19,7 +19,7 @@ once, and ⌘J jumps to the next.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/needs-you-dark.png">
-  <img src="docs/img/needs-you-light.png" alt="Needs you: two agents asking to run a command, each with Yes, Yes and don't ask again, and No as buttons; Allow all (2) above them" width="900">
+  <img src="docs/img/needs-you-light.png" alt="Needs you: one agent waiting, two asking to run a command with Yes, Yes and don't ask again, and No as buttons, two finished with a line on what they did; Allow all (2) above them" width="900">
 </picture>
 
 ### Done means checked
@@ -29,7 +29,7 @@ to the agent with its output. Collision radar flags two worktrees changing the s
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/check-radar-dark.png">
-  <img src="docs/img/check-radar-light.png" alt="A workspace whose test failed after the agent's turn: lint passed, test failed, sent back to claude (try 1 of 3); its sidebar row shows the radar's conflict mark" width="900">
+  <img src="docs/img/check-radar-light.png" alt="A workspace whose test failed after the agent's turn: its edits and test run in the terminal, lint passed, test failed, sent back to claude (try 2 of 3); its sidebar row shows the radar's conflict mark" width="900">
 </picture>
 
 ### Close the window, answer from your phone
@@ -39,7 +39,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/phone-dark.png">
-  <img src="docs/img/phone-light.png" alt="Laki on a phone-sized screen: Needs you with two agents' questions and their answer buttons" width="300">
+  <img src="docs/img/phone-light.png" alt="Laki on a phone-sized screen: Needs you with two agents' questions and their answer buttons, and two finished ones with Changes and Seen" width="300">
 </picture>
 
 ## What is different

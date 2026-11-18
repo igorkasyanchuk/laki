@@ -17,6 +17,7 @@ npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --tes
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
 npm run test:changed              # the tests for what changed against origin/main and isn't committed, each with why (a changed test, an import of a changed file directly or through one source file, a test named for it), then run as test:one runs them; none: test:fast (scripts/test-changed.ts; more args go to node --test)
 npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~25 s, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
+npm run test:sheet                # a contact sheet: test:ui's pages in every look × dark and light (LAKI_SHEET_THEMES=all: every theme), 1440×900 and the phone's, into dist/ui-sheet/index.html with each page's layout facts (scripts/ui-sheet.ts; npm run build first): ~2.5 min, 197 pictures
 npm run test:report               # .test-history.jsonl (npm test and test:one add a line per file: time, pass or fail, its failed tests, SLOW, the load; the newest 5,000, gitignored): the 10 slowest files by median of the last 20 runs (over 60 s flagged), the flaky ones (passed and failed on one sha, or failed in under a third of the last 20); --json (scripts/test-report.ts; npm test ends with its slowest file and any likely flaky one)
 npm run test:cov                  # the tests with node's coverage of src/daemon and src/shared (daemons too), the 10 least covered (scripts/cov.ts; not a gate)
 npm run size                      # the window's first load (index.html's scripts, stylesheets and static imports) against package.json's lakiSize, 3% allowed (scripts/size.ts; npm run build first; dmg runs it); -- --write sets it on purpose
@@ -33,6 +34,9 @@ npm run dev                       # Electron + renderer dev server on :5199
   - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_HOME` and `HOME`, its own daemon, and the
     fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), `caffeinate` (records its starts and stops), a shell `tsh`,
     `ssh` (every host is this machine) and `da-probe` (counts terminal query replies). No network.
+  - The fakes echo their arguments and prompts; tests lean on that. `FAKE_SCRIPT=<file>` (only `scripts/demo.ts` sets it,
+    for the README's stills) makes claude and codex talk like the real ones instead (`test/fakes/script.cjs`: per
+    workspace, tool lines and a summary); the hooks and menus stay the same. No test may depend on it (`test/agents.test.ts`).
   - `test/cloudflared` is a fake that's off PATH: a test links it into `$HOME/bin` (first on PATH) to install it.
   - Never let a test touch the real `~/.laki` (or `~/.laki-electron`), `~/.claude` or `~/.codex`. The rig also
     sets `LAKI_PAGE` to a folder of the test's own, so remote access never serves the build.

@@ -91,6 +91,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const answer = async (button: string) => (await waitFor(() => hasText('.ask-box button', button), `the dialog's ${button}`), await clickText('.ask-box button', button))
   const named = async (n: string) => (await rpc<View>('state')).workspaces.find(x => x.name === n || x.id === n)!
   const row = (id: string) => `[data-row="ws:${id}"]`
+  // a fake claude's tab up: its banner (the demo's scripted one, test/fakes/script.cjs, or the echo)
+  const claudeUp = (id: string) => waitFor(async () => /fake claude|Welcome to Claude Code/.test(await rpc<string>('screen', { target: id, lines: 10 })), 'its claude started', 15000)
   const fakeLog = () => (f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))(join(process.env.HOME ?? '', 'fake.log'))
   const ws: Record<string, View['workspaces'][number]> = {}
   let before = 0 // the quick bar's step: workspaces before it sends
@@ -237,7 +239,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       const ids = ['fix-cart-total', 'checkout-flow'].map(n => v.workspaces.find(x => x.name === n || x.id === n)!.id)
       // a claude tab of its own in each (the demo's have prompts of their own going in), started before it's asked
       const agents = await Promise.all(ids.map(id => rpc<{ id: string }>('tabNew', { ws: id, preset: 'claude' }).then(t => t.id)))
-      for (const id of agents) await waitFor(async () => (await rpc<string>('screen', { target: id, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      for (const id of agents) await claudeUp(id)
       for (const id of agents) await rpc('send', { target: id, text: 'perm bash :: npm test' })
       await waitFor(() => hasText('.needs-allow-all', 'Allow all (2)'), 'Allow all (2) in Needs you')
       await click('.needs-allow-all')()
@@ -250,7 +252,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       const v = await rpc<View>('state')
       const id = v.workspaces.find(x => x.name === 'checkout-flow' || x.id === 'checkout-flow')!.id
       const t = (await rpc<{ id: string }>('tabNew', { ws: id, preset: 'claude' })).id
-      await waitFor(async () => (await rpc<string>('screen', { target: t, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      await claudeUp(t)
       await rpc('send', { target: t, text: 'perm bash :: npm run lint' })
       await waitFor(async () => floats.items.some(x => x.tab === t && x.status === 'waiting'), 'its bubble waiting')
       setFront(false)
@@ -363,7 +365,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const readme: typeof steps = []
   // the main panel's left edges (--pane-x): the terminal's text, the tab bar's first tab's icon, the check's icon and its
   // rows' marks start within 1px of one another (the words after an icon on --pane-x2)
-  const aligned = () => js<boolean>("(() => { const x = s => document.querySelector(s)?.getBoundingClientRect().left; const term = x('.check-strip')?.closest('.pane, .term-wrap, .main') ? x('.xterm-screen') : undefined; const at = [x('.tab-list > :first-child :is(.icon-svg, .glyph)'), x('.check-strip .queue-head > :first-child'), x('.check-strip .check-mark')]; return term !== undefined && at.every(v => v !== undefined && Math.abs(v - term) <= 1) })()")
+  const aligned = () => js<boolean>("(() => { const x = s => document.querySelector(s)?.getBoundingClientRect().left; const term = document.querySelector('.check-strip') ? x('.pane.active .xterm-screen') ?? x('.xterm-screen') : undefined; const at = [x('.tab-list > :first-child :is(.icon-svg, .glyph)'), x('.check-strip .queue-head > :first-child'), x('.check-strip .check-mark')]; return term !== undefined && at.every(v => v !== undefined && Math.abs(v - term) <= 1) })()")
+  // a still shows none of the demo's insides: the fakes, the temp folder (the page's words, and the terminals of the two
+  // workspaces the stills show: canvas, not in its words)
+  const leftovers = async () => {
+    const tabs = (await rpc<View>('state')).tabs.filter(t => t.workspace === ws.cart?.id || t.workspace === ws.co?.id)
+    const texts = [await js<string>('document.body.innerText'), ...(await Promise.all(tabs.map(t => rpc<string>('screen', { target: t.id, lines: 40 }).catch(() => ''))))]
+    return texts.map(x => x.match(/fake|\/private\/tmp|laki-ui-/i)?.[0]).find(Boolean)
+  }
   const size = (wd: number, h: number) => (w.isMaximized() && w.unmaximize(), w.setMinimumSize(Math.min(wd, 700), 400), w.setSize(wd, h), nap(600))
   if (process.env.LAKI_DEMO_RICH) {
     readme.push(['readme-setup', async () => {
@@ -377,29 +386,67 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       // two agents ask to run a command: Needs you's cards
       const v = await rpc<View>('state')
       const askers = await Promise.all(['rate-limiter', 'onboarding-screens'].map(async n => (await rpc<{ id: string }>('tabNew', { ws: (await named(n)).id, preset: 'claude' })).id))
-      for (const id of askers) await waitFor(async () => (await rpc<string>('screen', { target: id, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      for (const id of askers) await claudeUp(id)
       for (const id of askers) await rpc('send', { target: id, text: 'perm bash :: npm test' })
       // fix-cart-total's agent finishes a turn: its Done check runs
       const tab = v.tabs.find(t => t.workspace === ws.cart.id && t.kind === 'agent')!
       await rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'fix the cart total rounding' } })
       await nap(300)
-      await rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done: totals round to cents.' } })
+      await rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Totals round to cents now, so 0.1 + 0.2 shows as 0.30. Added a test for it.' } })
       await click(row(ws.co.id))()
       await click('.onboard-bar button')() // Get started's bar: hidden, as most have it by then
     }, () => hasText('.needs-allow-all', 'Allow all (2)')])
     for (const [theme, look] of [['laki', 'dark'], ['laki-light', 'light']]) {
-      readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await nap(800)), '.needs-cards'])
+      readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(800)), '.needs-cards']) // Needs you from its head (the row's click scrolls; a still's sticky head isn't redrawn)
       // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock)
       readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))")) && (await aligned())])
-      readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844)), '.app.narrow'])
+      readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(300)), '.app.narrow'])
     }
     readme.push(['readme-done', () => size(1440, 900), async () => true])
   }
-  const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
+  // test:sheet (scripts/ui-sheet.ts' LAKI_SHEET, JSON: { looks, themes }): the walk's pages in each look and theme at
+  // 1440×900, then the phone's (390×844) for PHONE's, each named <look>-<theme>-<page> with its layout facts; no flows.
+  // ponytail: PHONE by hand, the pages a phone gets to from the remote page's rail
+  const sheet: typeof steps = []
+  if (process.env.LAKI_SHEET) {
+    const { looks, themes } = JSON.parse(process.env.LAKI_SHEET) as { looks: string[]; themes: string[] }
+    const PAGES = ['projects', 'reader', 'review', 'new-workspace', 'settings', 'board', 'schedule', 'ai', 'workflows', 'palette']
+    const PHONE = ['projects', 'reader', 'settings', 'board']
+    const back = async () => (await key('Escape')(), (ws.cart ??= await named('fix-cart-total')), await click(row(ws.cart.id))(), await click('.reader-switch button:first-child')())
+    // every wide one first: a phone's row click hides the sidebar and the rail, which a wide page then lacks
+    for (const [wd, h, pages] of [[1440, 900, PAGES], [390, 844, PHONE]] as const)
+      for (const look of looks)
+        for (const theme of themes)
+          for (const n of pages) {
+            const [, go, sel] = steps.find(x => x[0] === n)!
+            const first = n === pages[0]
+            sheet.push([`${look}-${theme}-${wd < 500 ? 'phone-' : ''}${n}`, async () => {
+              if (first) await rpc('settingsSet', { design: look, theme, themeAuto: false }), await size(wd, h)
+              if (n === 'projects') return back()
+              return go?.()
+            }, n === 'projects' ? (wd < 500 ? '.app.narrow' : '.sidebar .ws') : sel])
+          }
+  }
+  // the sheet's layout facts, a report: text cut short where it doesn't fit (text-overflow: clip, its own words wider
+  // than its box; a scroller's not), and what reaches past the window's sides unclipped; 20 of each at most
+  const facts = () => js<{ clipped: string[]; over: string[] }>(`(() => {
+    const name = e => e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).slice(0, 2).join('.') : '')
+    const clipped = [], over = []
+    const shut = e => { for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) if (getComputedStyle(a).overflowX !== 'visible') return true; return false } // clipped on the way: not seen past the side
+    for (const e of document.querySelectorAll('body *')) {
+      if (!e.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue
+      const cs = getComputedStyle(e), r = e.getBoundingClientRect()
+      const words = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())
+      if (words && cs.textOverflow === 'clip' && !/auto|scroll/.test(cs.overflowX) && e.scrollWidth > e.clientWidth + 1) clipped.push(name(e))
+      if (r.width && (r.right > innerWidth + 1 || r.left < -1) && !shut(e)) over.push(name(e))
+    }
+    return { clipped: [...new Set(clipped)].slice(0, 20), over: [...new Set(over)].slice(0, 20) }
+  })()`)
+  const out: { name: string; ok: boolean; ms: number; why?: string; facts?: { clipped: string[]; over: string[] } }[] = []
   // E8: the page's start to its first sidebar row painted (main.tsx' mark): what a lazy page saves shows here
   const first = await js<number>("performance.getEntriesByName('laki-sidebar')[0]?.startTime ?? -1").catch(() => -1)
   out.push({ name: 'first-row', ok: first >= 0, ms: Math.round(first), ...(first < 0 && { why: 'no laki-sidebar mark' }) })
-  for (const [i, [name, go, sel]] of (readme.length ? readme : steps).entries()) {
+  for (const [i, [name, go, sel]] of (sheet.length ? sheet : readme.length ? readme : steps).entries()) {
     const at = Date.now()
     const seen = errors.length
     let why: string | undefined
@@ -410,14 +457,15 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
       else if (!(await ok())) why = typeof sel === 'string' ? `no ${sel} after 8 s` : 'not done after 8 s'
       else if (errors.length > seen) why = `console: ${errors.slice(seen).join(' | ').slice(0, 300)}`
+      else if (/^readme-(needs|check|phone)/.test(name)) why = await leftovers().then(bad => bad && `it shows "${bad}"`)
     } catch (e) {
       why = (e as Error).message
     }
     await new Promise(r => setTimeout(r, 250)) // drawn
-    writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
-    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }) })
+    writeFileSync(join(dir, sheet.length ? `${name}.png` : `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
+    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }), ...(sheet.length && { facts: await facts().catch(() => undefined) }) })
     writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
-    if (name === 'palette' || name === 'get-started' || name === 'ship-sheet') await key('Escape')()
+    if (/(^|-)(palette|get-started|ship-sheet)$/.test(name)) await key('Escape')()
   }
   writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2))
   app.exit(out.every(s => s.ok) ? 0 : 1)

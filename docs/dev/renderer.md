@@ -1347,3 +1347,18 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   the last position to the submenu's near edge's corners (its side: left where it flipped) waits, run when the pointer
   leaves it or rests 300 ms, dropped as it enters the submenu. Touch and the keys never wait; macOS's own menus aren't
   Laki's. Tested in `test/units-more.test.ts`.
+
+## The README's stills and the contact sheet
+
+`LAKI_DEMO_RICH=1 npm run test:ui` takes the README's six stills (main's `uiSmoke` readme steps) in a demo world whose
+fake agents talk like the real ones: `scripts/demo.ts` writes `scripts.json` (per workspace: tool lines and the summary
+its finished card shows) and sets `FAKE_SCRIPT` to it (`test/fakes/script.cjs`; not `LAKI_…`, which the daemon keeps
+from tabs). Each still fails when its words, or the screens of the two workspaces it shows (a canvas: not in its words),
+have `fake`, `/private/tmp` or `laki-ui-` (`leftovers`). A row's click scrolls the sidebar; the stills scroll it back,
+since a capture doesn't advance the sticky heads' scroll timeline (`ph-stuck`), and the cards would pass over a clear head.
+
+`npm run test:sheet` (`scripts/ui-sheet.ts`, after `npm run build`): the same walk with `LAKI_SHEET` (`{ looks, themes }`):
+its pages in every look × the dark and light defaults (`LAKI_SHEET_THEMES=all`: every theme), at 1440×900 and then the
+phone's 390×844 for `PHONE`'s pages; no flows. `dist/ui-sheet/<look>-<theme>-<page>.png` and `index.html`: looks as
+columns, pages as rows, lazy thumbnails, a click for full size, arrows to step, a filter by page, and each picture's
+layout facts (`facts`: words cut short under `text-overflow: clip`, boxes past the window's sides), a report, not a gate.

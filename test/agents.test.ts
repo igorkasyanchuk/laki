@@ -288,3 +288,22 @@ test("usual: after 5 turns a running claude tab's view carries the median of the
   await hook('idle', 'Stop', base + 6 * 600_000 + 1000)
   assert.equal((await rig.tab(ws.id)).usual, undefined, 'idle: none')
 })
+
+// the fakes echo their arguments and the prompt unless FAKE_SCRIPT (the demo's, for the README's stills) is set:
+// then the real one's look and the file's summary, the same hooks. No other test may lean on the scripted mode
+test('the fakes echo; FAKE_SCRIPT is the demo only', async t => {
+  const plain = await fresh(t)
+  const p = await plain.rpc('projectAdd', { path: plain.repo })
+  const ws = await plain.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'say hi' })
+  await until(async () => (await plain.tab(ws.id)).last === 'answer: say hi', 'its echo')
+  assert.match(await plain.screen((await plain.tab(ws.id)).id), /fake claude/)
+  const file = join(plain.home, 'scripts.json')
+  writeFileSync(file, JSON.stringify({ '*': { lines: ['⏺ Read(src/cart.js)'], summary: 'Totals round to cents.' } }))
+  const demo = await fresh(t, { env: { FAKE_SCRIPT: file } })
+  const q = await demo.rpc('projectAdd', { path: demo.repo })
+  const w = await demo.rpc('wsNew', { project: q.id, preset: 'claude', prompt: 'say hi' })
+  await until(async () => (await demo.tab(w.id)).last === 'Totals round to cents.', 'its summary')
+  const screen = await demo.screen((await demo.tab(w.id)).id)
+  assert.match(screen, /Welcome to Claude Code[\s\S]*> say hi[\s\S]*Read\(src\/cart\.js\)[\s\S]*⏺ Totals round to cents\./)
+  assert.doesNotMatch(screen, /fake|answer:/)
+})

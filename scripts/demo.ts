@@ -22,6 +22,7 @@ Object.assign(process.env, {
   SHELL: join(root, 'test/fakes/tsh'),
   FAKE_LOG: join(home, 'fake.log'),
   FAKE_TURN_MS: '4000',
+  FAKE_SCRIPT: join(home, 'scripts.json'),
   FAKE_GH: join(home, 'gh'),
   LAKI_DEV_ORIGIN: origins,
   GIT_AUTHOR_NAME: 'demo',
@@ -30,6 +31,21 @@ Object.assign(process.env, {
   GIT_COMMITTER_EMAIL: 'demo@example.invalid',
 })
 for (const k of Object.keys(process.env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_')) delete process.env[k]
+// what each workspace's agent says (test/fakes/script.cjs): the real one's look, a summary for its finished card, no
+// echo of its arguments or the temp folder's path
+const script = (summary: string, ...lines: string[]) => ({ summary, lines })
+writeFileSync(
+  join(home, 'scripts.json'),
+  JSON.stringify({
+    'fix-cart-total': script('Totals round to cents now, so 0.1 + 0.2 shows as 0.30. Added a test for it.', '⏺ Read(src/cart.js)\n  ⎿  Read 6 lines', '⏺ Update(src/cart.js)\n  ⎿  Updated src/cart.js with 2 additions and 1 removal', '⏺ Write(src/cart.test.js)\n  ⎿  Wrote 2 lines', '⏺ Bash(npm test)\n  ⎿  ✔ 4 tests passed'),
+    'checkout-flow': script('The checkout is one page now: address, delivery and payment.', '⏺ Read(src/checkout.js)\n  ⎿  Read 31 lines', '⏺ Update(src/checkout.js)\n  ⎿  Updated src/checkout.js with 18 additions and 9 removals'),
+    'rate-limiter': script('Added a rate limiter to the public API: 60 requests a minute per key.', '⏺ Read(server.js)\n  ⎿  Read 48 lines', '⏺ Write(src/limit.js)\n  ⎿  Wrote 38 lines', '⏺ Update(server.js)\n  ⎿  Updated server.js with 3 additions', '⏺ Bash(npm test)\n  ⎿  ✔ 12 tests passed'),
+    'webhook-retries': script('Failed webhooks retry five times, waiting 1, 2, 4, 8 and 16 seconds.', '• Explored\n  └ Read webhooks.js', '• Edited webhooks.js (+31 -4)', '• Ran npm test\n  └ 9 passed'),
+    'onboarding-screens': script('Built the three onboarding screens: Welcome, Permissions and Ready.', '⏺ Read(App.tsx)\n  ⎿  Read 22 lines', '⏺ Write(screens/Welcome.tsx)\n  ⎿  Wrote 64 lines', '⏺ Write(screens/Permissions.tsx)\n  ⎿  Wrote 71 lines', '⏺ Update(App.tsx)\n  ⎿  Updated App.tsx with 9 additions and 2 removals'),
+    'push-notifications': script('Push notifications are in, behind a switch in Settings.', '• Explored\n  └ Read App.tsx', '• Edited notify.ts (+56 -0)'),
+    '*': script('Done.'),
+  }),
+)
 const { appToken, ensureDaemon, rpc } = await import('../src/shared/conn.ts')
 
 const git = (...a: string[]) => execFileSync('git', a, { cwd: repo })
