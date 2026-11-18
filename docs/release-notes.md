@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.55.0 · Nov 18, 2026
 
 - @ in a prompt box offers folders too (with a slash), bolds what matched, stays out of `code` and emails, and keeps up in big repos; screen readers follow the highlighted file.
 - Diffs in two columns have a key (⇧⌘D, Settings › Keys), stay one column when there's under 900px of room (the button says why), and a selection copies only the side it began on.
