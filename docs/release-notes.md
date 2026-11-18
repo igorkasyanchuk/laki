@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - A *don't ask again* choice shows the whole rule it grants on a line of its own (`npm init *`), in Needs you, the Reader, the ask bar, the cards on screen and notifications. A broad one (a wildcard, a folder, a whole tool) is amber and says what it covers: *every command that starts with npm init*. Allow all and the answer keys never pick it.
+- Trusted clients have ready-made setups: `laki client add "Claude Desktop" --for mcp` (also raycast, launchd, shortcuts, script) gives the narrowest scopes and prints the config to paste, naming the token's file, never the token. *Copy config for…* in Settings › Security does the same.
 - Worktrees stay out of Time Machine and Spotlight on a Mac (Settings › General › Storage; on for new installs). Settings › Resources › Disk says how much that keeps out of your backups.
 
 ## 0.55.0 · Nov 18, 2026

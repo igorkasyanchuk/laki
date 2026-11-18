@@ -2918,6 +2918,17 @@ terminal: an agent, any Laki tab, remote access and another client can't make or
 LAKI_CLIENT_TOKEN_FILE=~/.laki/clients/grok-bot.token laki new myrepo --group Implementation --prompt "fix the flaky test"
 ```
 
+Ready-made setups (`laki client recipes`): `laki client add <name> --for <recipe>` gives the client that recipe's scopes
+(unless `--scopes` says), then prints what to paste where, with this Mac's paths: the token's file, never the token.
+`laki client show <name> --for <recipe>` prints it again for one you have; `--write <dir>` saves its files there.
+Settings › Security › Trusted clients' *Copy config for…* copies the same.
+
+- `mcp`: an MCP client's config entry (`laki mcp` with `LAKI_CLIENT_TOKEN_FILE`); create, send.
+- `raycast`: a Raycast script command that starts a new task (a project, what to do); create.
+- `launchd`: a LaunchAgent plist and a script of yours it runs daily at 9; create.
+- `shortcuts`: the line for a Shortcuts *Run Shell Script* action, its input the prompt; create.
+- `script`: a status script (`laki agents --json`); reads only.
+
 `LAKI_CLIENT_TOKEN` (the token itself) works too; the file wins when both are set. In a Laki tab the tab's own token wins
 (a client token there says nothing more: the CLI notes it once), and the daemon does the same for a client's token used by
 a process in a tab: that tab's call, so an agent that reads the file is still an agent. A revoked or unknown token fails

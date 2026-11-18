@@ -681,6 +681,13 @@ such an app with a capability of its own: a token that names it and says what it
   (`FROM`, `AGENT_NO`, `REMOTE_NO`, `ANSWER_NO`, no client's: the user's) gives `lines` (newest first) and `unknown`;
   `clientList` adds `today` (calls today). `laki client log <name> [--refused]`. Settings › Security's *Show its
   workspaces* is the sidebar's filter `Find.client` (its unarchived workspaces picked: the picked rows' bar archives them).
+- **Recipes.** `src/shared/clientRecipes.ts` (pure): `RECIPES` by id (`mcp`, `raycast`, `launchd`, `shortcuts`, `script`),
+  each a title, its `scopes` (create and send at most; `script` none) and `make({ tokenFile, lakiBin, name, home? })` →
+  `{ files?, snippet, steps }`, paths shell-quoted (`shq`) or XML-escaped, the token's file only. The CLI's `--for` (an
+  unknown id: `recipeOf` names them) sends the recipe's scopes to `clientAdd` when `--scopes` isn't given, then prints
+  `recipeText` with `laki` as found on PATH; `laki client show <name> --for <id>` reads `clientList`'s `file`; `--write
+  <dir>` saves the files there (nothing else is written). Settings › Security's *Copy config for…* builds the same with
+  `cliState`'s launcher (`test/clients.test.ts`).
 - **Expiry, use, limits (T9, T11).** A token lasts `EXPIRE_DAYS` (90) from its making or rotate (`clientAdd`/`clientRotate`'s
   `expires`: `30d`, a number of days, or `never`, which the card then offers as *Allow, never expires*: only that pick
   makes it so; `clientAnswer`'s `never`). One past its `expires` (a record from before: `at` + 90 days) is refused in

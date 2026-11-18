@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api'
 import { Group } from './SettingsKit'
 import { ask, IconButton } from './ui'
+import { RECIPE_IDS, RECIPES } from '../../shared/clientRecipes'
 
 type Row = { id: string; label: string; scopes: string[]; projects?: string[]; at: number; lastAt?: number; calls?: number; today?: number; daysLeft?: number; unused?: boolean; file: string }
 type Did = { at: number; method: string; target?: string; ok: boolean; why?: string; n?: number }
@@ -21,6 +22,10 @@ export function TrustedClients({ showWorkspaces, copy }: { showWorkspaces: (labe
   const [name, setName] = useState('')
   const load = () => void api.call<Row[]>('clientList').then(setRows, (e: Error) => setErr(e.message))
   useEffect(load, [])
+  // Copy config for…: a recipe's snippet (shared/clientRecipes.ts) with its token's file and the laki launcher's path
+  const [bin, setBin] = useState('laki')
+  useEffect(() => void api.call<{ path?: string; to: string }>('cliState').then(c => setBin(c.path ?? c.to), () => {}), [])
+  const copyFor = (c: Row, id: string) => id && copy(RECIPES[id].make({ tokenFile: c.file, lakiBin: bin, name: c.label }).snippet)
   useEffect(() => {
     setLog(null)
     void api.call<Log>('clientLog', { id: open ?? undefined, refused }).then(setLog, (e: Error) => setErr(e.message))
@@ -62,6 +67,12 @@ export function TrustedClients({ showWorkspaces, copy }: { showWorkspaces: (labe
                 <td className="small">{when(c.lastAt)}</td>
                 <td className="small">{c.today ?? 0}</td>
                 <td className="row">
+                  <select className="sm" value="" aria-label={`Copy config for ${c.label}`} onChange={e => copyFor(c, e.target.value)}>
+                    <option value="">Copy config for…</option>
+                    {RECIPE_IDS.map(id => (
+                      <option key={id} value={id}>{RECIPES[id].title}</option>
+                    ))}
+                  </select>
                   <button className="ghost sm" onClick={() => showWorkspaces(c.label)}>Show its workspaces</button>
                   <button className="ghost sm" onClick={() => rotate(c)}>Rotate</button>
                   <button className="ghost sm danger" onClick={() => void revoke(c)}>Revoke</button>

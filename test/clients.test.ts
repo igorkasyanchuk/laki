@@ -433,3 +433,32 @@ test("T12: each client's log: a refusal with its reason, 20 reads one line of 20
   } catch {} // grep: none found
   assert.equal(kept, '', 'the token kept nowhere')
 })
+
+test('client recipes: each names the token file, never the token; mcp is JSON; scopes stay narrow; an unknown --for lists them', async t => {
+  const { RECIPES, RECIPE_IDS, recipeOf, recipeText } = await import('../src/shared/clientRecipes.ts')
+  const token = `lakic_${'ab'.repeat(32)}`
+  const ctx = { tokenFile: "/Users/me/.laki/clients/it's-me.token", lakiBin: '/Users/me/.local/bin/laki', name: "Grok's Bot", home: '/Users/me' }
+  assert.deepEqual([...RECIPE_IDS].sort(), ['launchd', 'mcp', 'raycast', 'script', 'shortcuts'])
+  for (const id of RECIPE_IDS) {
+    const r = RECIPES[id]
+    const o = r.make(ctx)
+    const all = [o.snippet, ...o.steps, ...(o.files ?? []).map(f => f.content), recipeText(r, o)].join('\n')
+    assert.ok(all.includes(ctx.tokenFile) || all.includes(ctx.tokenFile.replace(/'/g, `'\\''`)), `${id}: names the token's file`)
+    assert.ok(!all.includes(token) && !all.includes('lakic_'), `${id}: never a token`)
+    for (const s of ['cmd', 'yolo', 'remove', 'ship']) assert.ok(!(r.scopes as string[]).includes(s), `${id}: no ${s}`)
+  }
+  assert.deepEqual(RECIPES.script.scopes, []) // a status script: reads only
+  const mcp = JSON.parse(RECIPES.mcp.make(ctx).snippet)
+  assert.deepEqual(mcp.mcpServers.laki, { command: ctx.lakiBin, args: ['mcp'], env: { LAKI_CLIENT_TOKEN_FILE: ctx.tokenFile } })
+  assert.match(RECIPES.launchd.make(ctx).snippet, /<string>\/Users\/me\/.laki\/clients\/it's-me.token<\/string>/) // XML, the ' as is
+  assert.match(RECIPES.raycast.make(ctx).snippet, /LAKI_CLIENT_TOKEN_FILE='\/Users\/me\/.laki\/clients\/it'\\''s-me.token'/) // shell-quoted
+  assert.throws(() => recipeOf('nope'), /one of: mcp, raycast, launchd, shortcuts, script/)
+  // the CLI: --for an unknown recipe says the known ones before anything is asked
+  const rig = await fresh(t)
+  const bad = await rig.cli('client', 'add', 'x', '--for', 'nope')
+  assert.notEqual(bad.code, 0)
+  assert.match(bad.err, /--for nope\? one of: mcp, raycast, launchd, shortcuts, script/)
+  const list = await rig.cli('client', 'recipes')
+  assert.match(list.out, /^mcp\s+An MCP client/m)
+  assert.match(list.out, /^script\s+.*\(reads only\)$/m)
+})

@@ -1,7 +1,8 @@
 // laki: the command line for the daemon. `laki hook <state>` is hook.ts: it never fails or blocks the agent for more
 // than a second.
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc, rpcAny } from '../shared/conn.ts'
@@ -10,6 +11,7 @@ import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usag
 import { appOf } from '../shared/helper.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
+import { RECIPE_IDS, RECIPES, recipeOf, recipeText } from '../shared/clientRecipes.ts'
 import { completion } from './completion.ts'
 import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, filesFinder, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -29,7 +31,7 @@ const opens: string[] = [] // laki show's --open <folder|file|url>, again and ag
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
-const VALUED = new Set(['scopes', 'projects', 'expires', 'limits', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const VALUED = new Set(['scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
 const BOOL = new Set(['refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
@@ -357,6 +359,7 @@ async function main() {
       // T1: trusted clients (daemon/clients.ts): an app outside Laki with a token of its own; add and rotate ask in the window
       const [sub = 'ls'] = rest
       const name = rest.slice(1).join(' ')
+      if (sub === 'recipes') return out(RECIPE_IDS.map(id => ({ id, title: RECIPES[id].title, scopes: RECIPES[id].scopes })), RECIPE_IDS.map(id => `${id.padEnd(10)}${RECIPES[id].title} (${RECIPES[id].scopes.join(', ') || 'reads only'})`).join('\n'))
       if (sub === 'ls') {
         type Row = { id: string; label: string; scopes: string[]; projects?: string[]; file: string; lastAt?: number; calls?: number; daysLeft?: number; unused?: boolean; limits: { wsPerHour: number; agentsAtOnce: number; sendsPerMinute: number }; use: { wsHour: number; agents: number; sendsMinute: number } }
         const l = await rpc<Row[]>('clientList', { from: caller() })
@@ -373,9 +376,26 @@ async function main() {
         return out(r, text.join('\n') || `${name} hasn't called yet`)
       }
       if (sub === 'revoke') return out(await rpc('clientRm', { id: name, from: caller() }), `revoked ${name}: its token no longer works`)
+      // a recipe's snippet and steps (shared/clientRecipes.ts) with this install's paths: the token's file, never the token
+      const recipe = flags.for !== undefined ? recipeOf(flags.for) : undefined
+      const lakiBin = (process.env.PATH ?? '').split(':').filter(Boolean).map(d => join(d, 'laki')).find(f => existsSync(f)) ?? resolve(process.argv[1] ?? 'laki')
+      const told = (c: { label: string; file: string }) => {
+        if (!recipe) return ''
+        const o = recipe.make({ tokenFile: c.file, lakiBin, name: c.label, home: homedir() })
+        // --write <dir>: its files saved there, by their names (only a folder you name; nothing else is written)
+        const wrote = typeof flags.write === 'string' && o.files?.length ? o.files.map(f => (mkdirSync(resolve(flags.write as string), { recursive: true }), writeFileSync(join(resolve(flags.write as string), basename(f.suggestedPath)), f.content, { mode: f.suggestedPath.endsWith('.sh') ? 0o755 : 0o644 }), join(resolve(flags.write as string), basename(f.suggestedPath)))) : []
+        return `\n\n${recipeText(recipe, o)}${wrote.length ? `\n\nwritten: ${wrote.join(', ')}` : ''}`
+      }
+      if (sub === 'show') {
+        if (!recipe) throw new Error(`usage: laki client show <name> --for <recipe> (${RECIPE_IDS.join(', ')})`)
+        const c = (await rpc<{ id: string; label: string; file: string }[]>('clientList', { from: caller() })).find(x => x.id === name.toLowerCase() || x.label.toLowerCase() === name.toLowerCase())
+        if (!c) throw new Error(`no client ${name}: laki client ls`)
+        return out({ ...c, recipe: flags.for }, told(c).trimStart())
+      }
+      if (sub !== 'add' && sub !== 'rotate') throw new Error(`laki client ${sub}? ls, add, rotate, revoke, log, show, recipes`)
       process.stderr.write("Allow it in Laki's window…\n")
-      const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes, projects: flags.projects, expires: flags.expires, limits: flags.limits, from: caller() }, 90000)
-      return out(c, `${c.label} (${c.id}): ${c.scopes.join(', ') || 'reads only'}${c.projects ? `, in ${c.projects.join(', ')} only` : ''}\nits token: ${c.file} (0600: give the app this path, never the token)\n  LAKI_CLIENT_TOKEN_FILE=${c.file} laki ls`)
+      const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes ?? (sub === 'add' ? recipe?.scopes : undefined), projects: flags.projects, expires: flags.expires, limits: flags.limits, from: caller() }, 90000)
+      return out(c, `${c.label} (${c.id}): ${c.scopes.join(', ') || 'reads only'}${c.projects ? `, in ${c.projects.join(', ')} only` : ''}\nits token: ${c.file} (0600: give the app this path, never the token)\n  LAKI_CLIENT_TOKEN_FILE=${c.file} laki ls${told(c)}`)
     }
     case 'limits': {
       const list: AgentUsage[] = await rpc('limits', { agent: typeof flags.agent === 'string' ? flags.agent : undefined, from: caller() }, 30000)
