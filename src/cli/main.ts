@@ -12,6 +12,7 @@ import { appOf } from '../shared/helper.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
 import { RECIPE_IDS, RECIPES, recipeOf, recipeText } from '../shared/clientRecipes.ts'
+import type { Spend } from '../shared/spend.ts'
 import { completion } from './completion.ts'
 import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, filesFinder, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -396,6 +397,24 @@ async function main() {
       process.stderr.write("Allow it in Laki's window…\n")
       const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes ?? (sub === 'add' ? recipe?.scopes : undefined), projects: flags.projects, expires: flags.expires, limits: flags.limits, from: caller() }, 90000)
       return out(c, `${c.label} (${c.id}): ${c.scopes.join(', ') || 'reads only'}${c.projects ? `, in ${c.projects.join(', ')} only` : ''}\nits token: ${c.file} (0600: give the app this path, never the token)\n  LAKI_CLIENT_TOKEN_FILE=${c.file} laki ls${told(c)}`)
+    }
+    case 'spend': {
+      // where a workspace's tokens went (shared/spend.ts): input by source, output by kind, the hints; estimates
+      if (!rest[0]) throw new Error('usage: laki spend <ws> [--json]')
+      const r = await rpc<Spend & { tabs: number }>('wsSpend', { ws: rest[0], from: caller() })
+      const k = (x: number) => (x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `${Math.round(x / 1e3)}k` : String(x))
+      const row = (share: number, what: string) => `  ${`${Math.round(share * 100)}%`.padStart(4)}  ${'█'.repeat(Math.max(1, Math.round(share * 20)))}  ${what}`
+      const text = !r.tabs
+        ? `${rest[0]}: no claude or codex transcript to read`
+        : [
+            `${rest[0]}: where its tokens went (estimates${r.exact ? ', totals from the transcripts' : ', by size: no usage in the transcript'}; ${r.turns} turns, ${r.tabs} tab${r.tabs === 1 ? '' : 's'})`,
+            `input ${k(r.input.total)} tokens`,
+            ...r.input.parts.filter(p => p.share >= 0.01).map(p => row(p.share, `${p.label}${p.kind === 'file' && p.reads ? ` (read ${p.reads}×)` : p.kind === 'command' && p.reads ? ` (${p.reads} runs, ~${p.lines} lines each)` : ''}`)),
+            `output ${k(r.output.total)} tokens`,
+            ...r.output.parts.map(p => row(p.share, p.kind)),
+            ...(r.hints.length ? ['', ...r.hints.map(h => `• ${h}`)] : []),
+          ].join('\n')
+      return out(r, text)
     }
     case 'limits': {
       const list: AgentUsage[] = await rpc('limits', { agent: typeof flags.agent === 'string' ? flags.agent : undefined, from: caller() }, 30000)

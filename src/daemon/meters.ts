@@ -8,7 +8,8 @@ import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
 import { type ChatHit, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
-import { changed, chatFile, keptChat, keptOnly, presetOf, state } from './core.ts'
+import { changed, chatFile, findWs, keptChat, keptOnly, presetOf, state } from './core.ts'
+import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
 import { dir } from './dir.ts'
 import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, num, type Said, transcriptOf } from './share.ts'
 export type { McpCall }
@@ -474,4 +475,37 @@ function saidIn(agent: string, line: string, tools: boolean): { who: 'you' | 'ag
   if (agent === 'claude' && j.type === 'user' && Array.isArray(content)) for (const x of content) x?.type === 'tool_result' && out.push({ who: 'tool', text: text(x.content), at, id })
   if (agent === 'codex' && j.type === 'response_item' && /_output$/.test(String(j.payload?.type))) out.push({ who: 'tool', text: text(j.payload?.output), at })
   return out.filter(s => s.text)
+}
+
+// ---------- where a workspace's tokens went (shared/spend.ts): its claude and codex tabs' transcripts as entries, kept by
+// file and size (a transcript read again only once it grew), then one breakdown over them all. wsSpend: the user's, an
+// agent's for its own workspace (main.ts' agentNo); laki spend, Info's and the Proof card's Where it went
+const spendKept = new Map<string, { size: number; entries: SpendEntry[] }>()
+const SPEND_READ = 64 << 20 // ponytail: a transcript's last 64 MB; its start left out past that (a cut line is skipped)
+export function wsSpend(p: { ws?: unknown }): Spend & { tabs: number } {
+  const ws = findWs(String(p?.ws ?? ''))
+  const entries: SpendEntry[] = []
+  let tabs = 0
+  for (const t of state.tabs.filter(t => t.workspace === ws.id && (t.preset === 'claude' || t.preset === 'codex'))) {
+    const f = !ws.host && t.resumeId ? chatFile(t)?.file : undefined
+    const size = f ? (statSync(f, { throwIfNoEntry: false })?.size ?? 0) : 0
+    if (!f || !size) continue
+    let kept = spendKept.get(f)
+    if (kept?.size !== size) {
+      const fd = openSync(f, 'r')
+      const buf = Buffer.alloc(Math.min(size, SPEND_READ))
+      try {
+        readSync(fd, buf, 0, buf.length, size - buf.length)
+      } finally {
+        closeSync(fd)
+      }
+      kept = { size, entries: spendEntries(t.preset!, buf.toString('utf8'), ws.path) }
+      spendKept.delete(f)
+      spendKept.set(f, kept)
+      if (spendKept.size > 40) spendKept.delete(spendKept.keys().next().value!)
+    }
+    entries.push(...kept.entries)
+    tabs++
+  }
+  return { ...spendBreakdown(entries), tabs }
 }

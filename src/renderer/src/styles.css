@@ -4080,3 +4080,16 @@ button.proof-line:not(:disabled):hover .mono { text-decoration: underline; }
 .ext-term { display: block; position: relative; height: 100%; background: var(--term-bg); }
 /* K1: an extension's terminal, in its term element's slot */
 .ext-term { display: block; position: relative; height: 100%; background: var(--term-bg); }
+
+/* Where it went (Spend.tsx): a workspace's tokens by source, a bar each with its share; the hints under them */
+.spend { display: flex; flex-direction: column; gap: var(--sp-2); }
+.spend-head { align-self: flex-start; }
+.spend-body { display: flex; flex-direction: column; gap: var(--sp-3); }
+.spend-h { font-weight: 600; }
+.spend-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.spend-bars li { display: grid; grid-template-columns: 3.2em 5em minmax(0, 1fr); align-items: center; gap: var(--sp-3); }
+.spend-pct { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spend-bar { height: var(--sp-3); border-radius: var(--r-pill); background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
+.spend-bar > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.spend-what { overflow-wrap: anywhere; }
+.spend-hints { margin: 0; padding-left: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-2); color: var(--waiting); }

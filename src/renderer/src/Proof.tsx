@@ -2,6 +2,7 @@
 // opens the output Laki kept), the Preview's pictures (before and after), git's facts on what the turn touched. Never
 // the agent's words. Under the Reader's last turn and on Needs you's finish card, for that tab's turn only
 import type { Proof } from '../../shared/types'
+import { SpendSection, type SpendView } from './Spend'
 import { Icon } from './ui'
 
 const TOUCHED = [
@@ -11,7 +12,8 @@ const TOUCHED = [
   ['lockfiles', 'lockfiles'],
 ] as const
 
-export function ProofList({ p, open }: { p: Proof; open: (path: string) => void }) {
+// spend: its workspace's Where it went (wsSpend), its cost's line: read when clicked
+export function ProofList({ p, open, spend }: { p: Proof; open: (path: string) => void; spend?: () => Promise<SpendView> }) {
   const touched = TOUCHED.filter(([k]) => p.facts[k]).map(([, w]) => w)
   return (
     <div className="proof small" onClick={e => e.stopPropagation()}>
@@ -40,6 +42,7 @@ export function ProofList({ p, open }: { p: Proof; open: (path: string) => void 
         <Icon name="file" size={12} />
         {p.facts.files} file{p.facts.files === 1 ? '' : 's'} changed{touched.length ? `, with ${touched.join(', ')}` : ''}
       </div>
+      {spend && <SpendSection load={spend} title="Where its tokens went" />}
     </div>
   )
 }

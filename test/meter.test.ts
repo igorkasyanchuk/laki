@@ -175,3 +175,79 @@ test("meter: claude waiting out an API error (its api_error line) until it answe
   meterOf('claude', said('m9', 'claude-sonnet-4-5', { input_tokens: 1, output_tokens: 1 }), m, now)
   assert.equal(m.retry, undefined) // it answered
 })
+
+// where a task's tokens went (shared/spend.ts): a claude transcript as entries, then its breakdown
+const spendChat = (o: { usage?: boolean } = {}) => {
+  const u = (input: number, output: number, read = 0) => (o.usage === false ? {} : { usage: { input_tokens: input, output_tokens: output, cache_read_input_tokens: read, cache_creation_input_tokens: 0 } })
+  let s = line({ type: 'user', timestamp: at(1), message: { role: 'user', content: 'fix the cart total' } })
+  const big = 'x'.repeat(20000)
+  for (let i = 0; i < 6; i++) {
+    s += line({ type: 'assistant', timestamp: at(1), message: { id: `m${i}`, model: 'claude-sonnet-4-5-20250929', role: 'assistant', content: [{ type: 'tool_use', id: `r${i}`, name: 'Read', input: { file_path: '/w/src/cart.ts' } }], ...u(100 + i, 50, 8000 + i * 5000) } })
+    s += line({ type: 'user', timestamp: at(1), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `r${i}`, content: big }] } })
+  }
+  s += line({ type: 'assistant', timestamp: at(1), message: { id: 'b', model: 'claude-sonnet-4-5-20250929', role: 'assistant', content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'cd /w && npm test -- --reporter dot' } }], ...u(100, 40, 40000) } })
+  s += line({ type: 'user', timestamp: at(1), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'b1', content: 'ok\nok\nok' }] } })
+  s += line({ type: 'assistant', timestamp: at(1), message: { id: 'e', model: 'claude-sonnet-4-5-20250929', role: 'assistant', content: [{ type: 'tool_use', id: 'e1', name: 'Edit', input: { file_path: '/w/src/cart.ts', old_string: 'a', new_string: 'b'.repeat(400) } }], ...u(100, 300, 41000) } })
+  s += line({ type: 'assistant', timestamp: at(1), message: { id: 'e', model: 'claude-sonnet-4-5-20250929', role: 'assistant', content: [{ type: 'text', text: 'Fixed the total.' }], ...u(100, 320, 41000) } }) // the same answer's next block: its usage so far
+  return s
+}
+
+test('spend: a file read six times found with its share and its hint; totals as the meter has them; paths from the worktree', async () => {
+  const { spendBreakdown, spendEntries } = await import('../src/shared/spend.ts')
+  const jsonl = spendChat()
+  const r = spendBreakdown(spendEntries('claude', jsonl, '/w'))
+  assert.equal(r.exact, true)
+  assert.equal(r.estimate, true)
+  const cart = r.input.parts.find(p => p.kind === 'file' && p.label === 'src/cart.ts')!
+  assert.equal(cart.reads, 6)
+  assert.ok(cart.share > 0.5, `its share: ${cart.share}`)
+  assert.match(r.hints.join('\n'), /^src\/cart\.ts was read 6 times, 100% of file reads: consider excluding it in the project rules or asking for line ranges$/m)
+  assert.ok(r.input.parts.some(p => p.kind === 'command' && p.label === 'npm test' && p.reads === 1)) // its head, past cd … &&
+  assert.ok(r.input.parts.some(p => p.kind === 'system'), 'the first request less the message: the system prompt and rules')
+  assert.deepEqual(r.output.parts.map(p => p.kind).sort(), ['edits', 'messages', 'tools'])
+  // the meter's tokens: input and output together, within rounding
+  const m = meterOf('claude', jsonl, meterNew(), now)
+  assert.ok(Math.abs(r.input.total + r.output.total - m.tokens) <= 2, `${r.input.total + r.output.total} vs ${m.tokens}`)
+  assert.ok(Math.abs(r.input.parts.reduce((s, p) => s + p.tokens, 0) - r.input.total) <= r.input.parts.length, 'the parts add up')
+})
+
+test('spend: a transcript without usage still gives shares by size; a loud command and a long carried chat get their hints', async () => {
+  const { spendBreakdown, spendEntries } = await import('../src/shared/spend.ts')
+  const r = spendBreakdown(spendEntries('claude', spendChat({ usage: false }), '/w'))
+  assert.equal(r.exact, false)
+  assert.ok(r.input.total > 0)
+  assert.ok(Math.abs(r.input.parts.reduce((s, p) => s + p.share, 0) - 1) < 0.01, 'shares of the whole')
+  assert.ok(r.input.parts.find(p => p.label === 'src/cart.ts')!.share > 0.9)
+  assert.ok(!r.input.parts.some(p => p.kind === 'carried' || p.kind === 'system'), 'no usage: nothing to tell those by')
+  // a command whose output is most of the input, over turns that carry a long conversation
+  type E = import('../src/shared/spend.ts').SpendEntry
+  const loud: E[] = [{ kind: 'user', chars: 40 }, { kind: 'request', input: 2000, output: 100 }]
+  for (let k = 1; k <= 6; k++) loud.push({ kind: 'tool', source: 'command', key: 'npm test', chars: 16000, lines: 4000 }, { kind: 'request', input: 2000 + k * 4000, output: 50 })
+  assert.deepEqual(spendBreakdown(loud).hints.map(h => h.replace(/\d+%/, 'n%')), ['npm test printed 4,000 lines each run, n% of the input: use a quieter reporter'])
+  const long: E[] = []
+  for (let t = 0; t < 8; t++) long.push({ kind: 'user', chars: 40 }, { kind: 'request', input: 2000 + t * 30000, output: 100 }, { kind: 'tool', source: 'file', key: `f${t}.ts`, chars: 400 }, { kind: 'request', input: 2100 + t * 30000, output: 50 })
+  assert.deepEqual(spendBreakdown(long).hints.map(h => h.replace(/\d+%/, 'n%')), ['The conversation carried into each turn is n% of the input over 8 turns: compact earlier'])
+  assert.deepEqual(spendBreakdown(long.slice(0, 16)).hints, [], 'four turns: not a long task yet')
+  // nothing over a line: no hint
+  assert.deepEqual(spendBreakdown([{ kind: 'user', chars: 10 }, { kind: 'request', input: 1000, output: 10 }, { kind: 'tool', source: 'file', key: 'a.ts', chars: 400 }]).hints, [])
+  // codex: its token_count totals and its shell's file reads
+  const cx = line({ type: 'event_msg', timestamp: at(0), payload: { type: 'user_message', message: 'go' } }) + line({ type: 'response_item', timestamp: at(0), payload: { type: 'function_call', name: 'shell', call_id: 'c1', arguments: JSON.stringify({ command: ['bash', '-lc', "sed -n '1,200p' src/app.ts"] }) } }) + line({ type: 'response_item', timestamp: at(0), payload: { type: 'function_call_output', call_id: 'c1', output: JSON.stringify({ output: 'y'.repeat(4000) }) } }) + tokenCount({ input_tokens: 5000, cached_input_tokens: 1000, output_tokens: 200, total_tokens: 5200 }, { total_tokens: 5200 })
+  const c = spendBreakdown(spendEntries('codex', cx))
+  assert.equal(c.input.total + c.output.total, meterOf('codex', cx, meterNew(), now).tokens)
+  assert.ok(c.input.parts.some(p => p.kind === 'file' && p.label === 'src/app.ts'))
+})
+
+test("spend: wsSpend reads a workspace's transcripts; an agent can't read another workspace's", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'two' })
+  const tab = (await until(() => rig.tab(one.id))).id
+  await until(() => rig.tab(two.id))
+  const r = await rig.rpc('wsSpend', { ws: one.id })
+  assert.equal(r.estimate, true)
+  assert.equal(typeof r.tabs, 'number')
+  const from = { ws: one.id, tab }
+  assert.equal((await rig.rpc('wsSpend', { ws: one.id, from })).estimate, true, 'its own')
+  await assert.rejects(rig.rpc('wsSpend', { ws: two.id, from }), /an agent can read its own workspace's spend only/)
+})

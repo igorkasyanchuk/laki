@@ -38,6 +38,7 @@ import { shortcutOf } from '../../shared/pwa'
 import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, inboxOf, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
+import type { SpendView } from './Spend'
 import { AskWrap, Choice, choiceProps, turnNext } from './Diff'
 import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
@@ -3091,6 +3092,7 @@ export function App() {
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
     proof: t => (p => (p?.tab === t.id ? p : undefined))(view?.workspaces.find(w => w.id === t.workspace)?.proof), // the Proof card: its last checked turn's
     openProof: (t, path) => openFile({ ws: t.workspace, path, storage: true }),
+    spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
     answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
@@ -4184,6 +4186,7 @@ export function App() {
                 sees={(['claude', 'codex'] as const).filter(a => !ws.host && view.tabs.some(t => t.workspace === ws.id && tabAgent(t, view.presets) === a))}
                 onSees={a => setDialog({ sees: a, in: ws.project })}
                 agentLog={hasCap(view, 'agent.log') ? () => call<AgentDid[]>('agentLog', { ws: ws.id }) : undefined}
+                spend={hasCap(view, 'ws.spend') && !ws.host ? () => call<SpendView>('wsSpend', { ws: ws.id }) : undefined}
                 tabName={id => view.tabs.find(t => t.id === id)?.name ?? id}
                 onStorage={bridge?.openPath && ws.storage ? () => void bridge!.openPath!(ws.storage!).then(r => r === 'missing' && toast('Nothing kept yet: its folder is made with its first tab')) : undefined}
                 />

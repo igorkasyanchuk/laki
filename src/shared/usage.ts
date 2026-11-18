@@ -128,6 +128,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               its link opens once, its PIN prints on a terminal only (else laki remote)
   laki remote [stop|log]                      remote access's link and PIN now | stop it | what was done over it
   laki agent log <ws> [--json]                what its agents did through Laki, newest first (refused ones marked); not from an agent's tab
+  laki spend <ws> [--json]                    where a workspace's tokens went: file reads, command output, the carried conversation; hints (estimates)
   laki client [ls]                            trusted clients: apps outside Laki (an MCP server, a script) with a token of their own
   laki client add|rotate <name> [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50] [--for <recipe>] [--write <dir>]   a new one, or a new token (scopes, projects, limits; 90 days unless said) for one: asked in Laki's window; --for: a recipe's scopes, then its config and steps
   laki client recipes                         ready-made setups (mcp, raycast, launchd, shortcuts, script), each with its scopes
@@ -307,6 +308,7 @@ Laki. In an agent's tab, only its own workspace's events.
 
   laki events --json --type turn.done | while read -r e; do echo "$e" | jq -r .ws.name; done
   laki events --ws fix-login --type turn.done --once --timeout 600 && say "fix-login is done"`,
+  spend: `Where a workspace's tokens went, from its claude and codex tabs' transcripts: input by what entered the context (file reads by path and how often, command output by command, searches, MCP results, the conversation carried into each turn, the system prompt and rules) and output by kind (edits, messages, thinking). Every number is an estimate: the transcript's usage gives the totals, spread by content size. Up to three hints, each with its number (a file read again and again, a command that prints too much, a conversation to compact). An agent may read its own workspace's only.\n\nExample:\n  laki spend fix-cart --json`,
   limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
   client: `Trusted clients: an app outside Laki (a desktop app's MCP server, a script, a launchd job) that drives it with
 a token of its own, where a call from no tab and no terminal is refused ("couldn't tell who's calling"). From your own

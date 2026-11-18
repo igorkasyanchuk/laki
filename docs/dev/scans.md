@@ -554,3 +554,17 @@ on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `
 along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and tooltip lines, the status bar's `.sb-ctx` (the focused tab's,
 `.usage-bar`), `UsageButton`'s `today` (*Today*, *≈ API price*); `Usage.tsx` `level` (amber past 70, red past 90),
 `ctxText`, `usageText`. Tested in `test/meter.test.ts`.
+
+Where it went (`wsSpend { ws }`, API 197, cap `ws.spend`): `meters.ts` reads each claude and codex tab's transcript of the
+workspace whole (its last 64 MB, `SPEND_READ`), kept by file and size (`spendKept`, 40 files), as `shared/spend.ts`
+`spendEntries` (claude: your messages, each `tool_use` and its `tool_result` classed by tool: Read a file by its path from
+the worktree, Bash a command by `cmdHead`, Grep/Glob/Web* searches, `mcp__<server>__…`, an answer's `usage` by its id, the
+last one counting; codex: `user_message`, `function_call`/`_output` (a `sed -n`, `cat`, `head` of a file: that file's read;
+`rg`/`find`: a search), `token_count`'s totals as the meter counts them) and one `spendBreakdown`: input total and output
+total from the usage (`exact`), the system prompt and rules (the first request less its message, times the requests), the
+conversation carried into each later turn (its first request less its message and the system's, times its requests), the
+rest spread over what entered the context by size (4 characters a token); no usage: sizes alone. Files and commands past
+the 8 biggest fold into one line each. Hints, fixed rules: a file read 3+ times over 15% of file reads, a command over 25%
+of the input, the carried conversation over 50% past 5 turns. The user's, a phone's (REMOTE_OK, ANSWER), an agent's for
+its own workspace only (`AGENT_OWN`, `agentNo`). `laki spend <ws> [--json]`; Info's *Where it went* and the Proof card's
+*Where its tokens went* (`Spend.tsx` `SpendSection`, read on a click).

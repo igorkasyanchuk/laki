@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff, Choice, choiceProps } from './Diff'
 import { ProofList } from './Proof'
+import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } from './ui'
 import { Modal } from './panels'
@@ -29,7 +30,7 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[]; kept?: boolean }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined; openProof?: (tab: TabView, path: string) => void; turnChips?: (tab: TabView, marks: TurnMark[]) => React.ReactNode } // turnChips (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
+export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[]; kept?: boolean }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined; openProof?: (tab: TabView, path: string) => void; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView, marks: TurnMark[]) => React.ReactNode } // turnChips (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex' || t.preset === 'acp') // acp: an ACP agent's (Labs), the Reader only
@@ -321,7 +322,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           )}
           {rows}
           {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
-          {tab.status !== 'running' && api.openProof && (p => p && <div className="rd-proof"><ProofList p={p} open={path => api.openProof!(tab, path)} /></div>)(api.proof?.(tab))}
+          {tab.status !== 'running' && api.openProof && (p => p && <div className="rd-proof"><ProofList p={p} open={path => api.openProof!(tab, path)} spend={api.spend && (() => api.spend!(tab))} /></div>)(api.proof?.(tab))}
           {late.length > 0 && <div className="rd-marks">{api.turnChips!(tab, late)}</div>}
           {tab.status === 'running' && (
             <div className="rd-working muted">

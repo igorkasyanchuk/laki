@@ -6,6 +6,7 @@ import { type AgentDid, jobOf, MERGE_METHODS, type MergeMethod, type PRLabel, ty
 import { Folded } from './MarkdownView'
 import { prName, prNo, shortPath } from './text'
 import { type Tunnel } from './Tunnel'
+import { SpendSection, type SpendView } from './Spend'
 import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
 export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip' | 'cancelled'; url?: string; took?: number } // took: seconds (an older daemon: none)
@@ -546,6 +547,7 @@ export function InfoTab(p: {
   sees?: ('claude' | 'codex')[] // F6: its agents' What it sees (their rules and MCP servers)
   onSees?: (agent: 'claude' | 'codex') => void
   agentLog?: () => Promise<AgentDid[]> // What its agents did (agentLog), newest first
+  spend?: () => Promise<SpendView> // Where it went (wsSpend): its tokens by source
   tabName?: (id: string) => string
 }) {
   const { w } = p
@@ -654,6 +656,7 @@ export function InfoTab(p: {
         </section>
 
         <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} onLabel={p.onLabel} />
+        {p.spend && <SpendSection key={`spend:${w.id}`} load={p.spend} />}
         {p.agentLog && <AgentLog key={w.id} load={p.agentLog} tabName={p.tabName} />}
       </div>
   )
