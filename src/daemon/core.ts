@@ -2193,7 +2193,8 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
   if (perm && !perms?.some(p => p[0] === perm)) throw new Error(perms ? `permission mode ${perm}? ${perms.map(p => p[0]).join(', ')}` : `${agent} has no permission modes here`)
   if (fast && !FAST[agent as Agent]) throw new Error(`${agent} has no fast mode`)
   if (model && !/^(?!-)[\w.:/@[\]-]{1,120}$/.test(model)) throw new Error(`model ${model}? a name like opus, or provider/model`) // not a flag either
-  if (effort && !EFFORTS[agent as Agent]?.includes(effort) && !effortsSaid.get(agent)?.has(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
+  // an ACP agent's effort: its own to refuse (acp.ts choose says so)
+  if (effort && agent !== 'acp' && !EFFORTS[agent as Agent]?.includes(effort) && !effortsSaid.get(agent)?.has(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
 // opencode starts on its last used model, saying nothing, when it doesn't know the one asked for (an orchestrator's
@@ -4279,7 +4280,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (refused) r.last = refused
       // A2: signed out (a failed turn's words; codex's, its screen's last lines too: its notify says no error): the band, the message kept
       const said = `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`
-      const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || tab.preset === 'codex') && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said)
+      const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || tab.preset === 'codex') && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said, p.state !== 'failed' && tab.preset === 'claude')
       // an API error's end (overloaded, a 500, the connection): not a limit, a refused model, signed out or your Esc
       r.failed = p.state === 'failed' && !r.limit && !refused && !out && !r.escAt ? failLine(err, last) : undefined
       if (r.failed) continueLater(tab, r)

@@ -21,7 +21,9 @@ const NAMES = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor' }
 
 // words of a failed turn that mean signed out (its error, its last answer; codex's screen)
 const OUT = /not logged in|please run \/login|run \/login|invalid api key|oauth token (?:has )?(?:expired|been revoked)|token (?:has )?(?:expired|been revoked)|authentication_(?:error|failed)|401 unauthorized|unauthorized:? .*(?:token|auth)|please (?:re-?)?authenticate|codex login|sign in again|log in again|refresh token (?:was )?(?:expired|revoked|invalid|rejected)/i
-export const signedOutIn = (text: string) => OUT.test(text)
+// a turn that didn't fail (claude's short answer): only claude's own refusal lines, never words an answer may use
+const SAID = /not logged in · please run \/login|invalid api key · please run \/login|oauth token has expired/i
+export const signedOutIn = (text: string, strict = false) => (strict ? SAID : OUT).test(text)
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 16)
 // the account's credentials, as a fingerprint ('': none): claude's Keychain item or file, codex's auth.json
@@ -39,13 +41,19 @@ async function credOf(agent: 'claude' | 'codex', account?: string): Promise<stri
 
 // a claude or codex turn that ended: signed out? (core's hook, at a failed turn's end and codex's every end) Auto
 // fallback first; else the band, with the message it failed on
-export function turnSignedOut(tab: Tab, text: string): boolean {
+export function turnSignedOut(tab: Tab, text: string, strict = false): boolean {
   const agent = tab.preset
-  if ((agent !== 'claude' && agent !== 'codex') || !signedOutIn(text)) return false
+  if ((agent !== 'claude' && agent !== 'codex') || !signedOutIn(text, strict)) return false
   const r = rtOf(tab.id)
   const account = accountFor(tab, presetOf(tab)?.account)
   const msg = r.asked?.trim() || undefined
-  if (fallBack(tab, agent, account, msg)) return true
+  // the accounts it went on from lately: not again (two signed out would hand it back and forth)
+  const was = fell.get(tab.id)
+  const tried = [...(was && Date.now() - was.at < 10 * 60_000 ? was.ids : []), account ?? '']
+  if (fallBack(tab, agent, account, msg, tried)) {
+    fell.set(tab.id, { at: Date.now(), ids: tried })
+    return true
+  }
   if (r.signedOut?.step === 'out' || r.signedOut?.step === 'opened') return true // told already: the same account still
   r.signedOut = { agent, step: 'out', account, text: msg, at: Date.now() }
   void credOf(agent, account).then(m => r.signedOut && r.signedOut.mark === undefined && (r.signedOut.mark = m))
@@ -67,12 +75,14 @@ export function acpSignedOut(tab: string, text?: string): boolean {
 // a message typed into an ACP tab that waits for its sign-in: it goes once it's in
 export const acpWaiting = (tab: string, text: string) => (r => !!r?.signedOut && ((r.signedOut.text = text.trim() || r.signedOut.text), changed(), true))(rt.get(tab))
 
-// Auto fallback (settings.limitFallback): the next account in the agent's list after this one takes it and the message
-function fallBack(tab: Tab, agent: 'claude' | 'codex', here: string | undefined, msg?: string): boolean {
+// Auto fallback (settings.limitFallback): the next account in the agent's list after this one, not one it left signed
+// out lately (tried), takes it and the message
+const fell = new Map<string, { at: number; ids: string[] }>() // by tab. ponytail: a closed tab's stays (a few ids)
+function fallBack(tab: Tab, agent: 'claude' | 'codex', here: string | undefined, msg: string | undefined, tried: string[]): boolean {
   const order = (x => (Array.isArray(x) ? x.filter((id): id is string => typeof id === 'string') : []))(state.settings?.limitFallback?.[agent])
   const ids = accountIds(agent)
   const from = order.indexOf(here ?? '')
-  const next = [...order.slice(from + 1), ...order.slice(0, Math.max(from, 0))].find(id => id !== here && ids.includes(id))
+  const next = [...order.slice(from + 1), ...order.slice(0, Math.max(from, 0))].find(id => id !== here && ids.includes(id) && !tried.includes(id))
   if (!next || state.workspaces.find(w => w.id === tab.workspace)?.host) return false
   try {
     tabAccount({ tab: tab.id, account: next })

@@ -13,6 +13,9 @@ test('A2: the words that mean signed out (claude, codex), and ones that don\'t',
     assert.ok(signedOutIn(s), s)
   for (const s of ['API Error: 529 Overloaded', "You've hit your usage limit. Try again in 2 hours.", 'Added a login page with a form', 'Done: tests pass'])
     assert.ok(!signedOutIn(s), s)
+  // a turn that didn't fail: only claude's own lines
+  assert.ok(signedOutIn('Not logged in · Please run /login', true))
+  assert.ok(!signedOutIn('You will need to sign in again after the token rotates', true))
 })
 
 test('A2: signed out: the band keeps the message; Sign in runs claude auth login in a terminal tab, then the message goes; a sign-in elsewhere is noticed too', async t => {
@@ -71,8 +74,6 @@ test('C6: Cursor: a ready-made ACP profile, its models and effort before the fir
   assert.deepEqual(models, [], 'signed out: none said (asked again later)')
 
   // signed out: the band, the prompt kept; Sign in runs cursor-agent login, then the tab starts again and sends it
-  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'cursor', prompt: 'add a footer', model: 'composer-2', effort: 'high' }).catch((e: Error) => e)
-  assert.match(String(ws), /effort high\?|takes no effort/, 'an effort it never said: refused')
   const ws2 = await rig.rpc('wsNew', { project: p.id, preset: 'cursor', prompt: 'add a footer', model: 'composer-2' })
   const tab = (await until(() => rig.tab(ws2.id))).id
   assert.equal((await rig.tab(ws2.id)).preset, 'acp')

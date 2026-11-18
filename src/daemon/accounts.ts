@@ -212,7 +212,7 @@ function acpAsk(pre?: Preset): Promise<AgentModel[]> {
   const env = { ...process.env, ...state.settings?.env, ...pre.env } as NodeJS.ProcessEnv
   const seen: { at: number; list: Promise<AgentModel[]>; short?: boolean } = { at: Date.now(), list: Promise.resolve([]) }
   seen.list = asked(process.env.SHELL || '/bin/sh', ['-lc', pre.cmd], env, [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: ACP_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'laki', version: '1' } } }, { jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: homedir(), mcpServers: [] } }], m => (m?.id === 2 ? (m.error ? [] : acpModels(m.result)) : undefined))
-    .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get('acp') ?? effortsSaid.set('acp', new Set()).get('acp')!).add(e))), l))
+    .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l))
     .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e)))
   modelsSeen.set(key, seen)
   return seen.list

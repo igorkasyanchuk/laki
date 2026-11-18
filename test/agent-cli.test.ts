@@ -46,7 +46,7 @@ test('A9: Settings › Versions: each CLI, the newest from the registry, a dot i
   const by = (id: string) => list.find((a: any) => a.id === id)
   assert.deepEqual([by('claude').version, by('claude').newest, by('claude').how, by('claude').cmd], ['2.1.200', '2.2.0', 'its installer', 'claude update'])
   assert.deepEqual([by('gemini').version, by('gemini').newest, by('gemini').how, by('gemini').cmd], ['0.8.1', '0.9.0', 'npm', 'npm install -g @google/gemini-cli@latest'])
-  assert.equal(by('cursor').path, undefined, 'not installed: no path')
+  assert.match(by('cursor').path, /fakes\/cursor-agent$/, 'C6: the fake on PATH')
   assert.ok(asked.includes('/@google/gemini-cli/latest'))
   assert.deepEqual((await rig.rpc('state')).agentUpdates, ['Claude Code', 'Gemini'], 'the dot: newer ones out')
 

@@ -650,7 +650,7 @@ a fresh install's list when `cursor-agent` is on PATH (core's `presets`) and in 
 models (`accounts.ts` `agentModels` with `agent: 'acp'`: `acpAsk` runs its command, `initialize` and a `session/new` in
 the home folder, `acp.ts` `acpModels` reads the model select and `thought_level`'s efforts, kept a day, 5 minutes after
 none) fill the new-workspace page's model and effort menus (panels.tsx `acpPro`); `tabSpec` takes a model and effort
-for an `acp` tab (the efforts it said: `effortsSaid.acp`). Its skills go to `~/.cursor/skills` (skill.ts `AGENTS`; its
+for an `acp` tab (its effort unchecked: the agent's own to refuse, said on the tab). Its skills go to `~/.cursor/skills` (skill.ts `AGENTS`; its
 MCP server: `~/.cursor/mcp.json`'s `mcpServers`, shown to paste). Not installed: the tab's 127, *Install in a terminal*
 (`CURSOR_INSTALL`).
 

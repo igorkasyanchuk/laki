@@ -593,7 +593,7 @@ test('the agent browser: ops and urls checked, an answer, a screenshot, failures
     asked.push(m)
     c.notify('browseDone', { id: m.req, ...reply(m) })
   })
-  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'scroll' }), /browser: scroll\? one of open, screenshot, click, fill, text/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'zoom' }), /browser: zoom\? one of open, screenshot, click, fill, text/)
   for (const [u, want] of [
     ['/x', `http://localhost:${ws.port}/x`],
     ['localhost:3000/y', 'http://localhost:3000/y'],
