@@ -82,14 +82,20 @@ export function TabList({ app }: { app: AppCtx }) {
   const fit = app.tabsAt === 'top'
   const box = useRef<HTMLDivElement>(null)
   const [room, setRoom] = useState({ w: 0, min: 120 })
-  useLayoutEffect(() => {
+  const measure = () => {
     const el = box.current
-    if (!fit || !el) return
+    if (!el) return
     const min = parseFloat(getComputedStyle(el).getPropertyValue('--tab-min')) || 120
-    const ro = new ResizeObserver(() => setRoom({ w: el.clientWidth - [...el.querySelectorAll<HTMLElement>(':scope > .review-tab, :scope > .newtab-btn')].reduce((s, x) => s + x.offsetWidth, 0), min }))
-    ro.observe(el)
+    const w = el.clientWidth - [...el.querySelectorAll<HTMLElement>(':scope > .review-tab, :scope > .newtab-btn')].reduce((s, x) => s + x.offsetWidth, 0)
+    setRoom(r => (r.w === w && r.min === min ? r : { w, min }))
+  }
+  useLayoutEffect(() => {
+    if (!fit || !box.current) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(box.current)
     return () => ro.disconnect()
   }, [fit])
+  useLayoutEffect(() => void (fit && measure()), [fit, !!reviewTab, ws?.id]) // the Review tab come or gone: the list's own size the same
   const sel = groups.indexOf(group!)
   const { shown, hidden } = fit && room.w ? fitTabs(groups.map(() => room.min), room.w, sel, room.min) : { shown: groups.map((_, i) => i), hidden: [] as number[] }
   const out = hidden.map(i => groups[i])
@@ -225,10 +231,11 @@ export function TabBar({ app }: { app: AppCtx }) {
   const { onePane, readSwitch, devRunning, devTab, editorName, editScripts, inReader, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setRead, setReveal, setSharing, setSideOpen, setWsId, settings, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
   const bar = useRef<HTMLDivElement>(null)
   const [barW, setBarW] = useState(0)
+  const [tabMin, setTabMin] = useState(120) // styles.css --tab-min, as TabList reads it
   useLayoutEffect(() => {
     const el = bar.current
     if (!el) return
-    const ro = new ResizeObserver(() => setBarW(el.clientWidth))
+    const ro = new ResizeObserver(() => (setBarW(el.clientWidth), setTabMin(parseFloat(getComputedStyle(el).getPropertyValue('--tab-min')) || 120)))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -236,8 +243,8 @@ export function TabBar({ app }: { app: AppCtx }) {
   const { shown } = toolbarOf(settings.toolbar, [...TOOLBAR_ITEMS, ...here.filter(x => x.group === 'ext')], settings.toolbarSeen)
   const on = shown.filter(id => here.some(x => x.id === id))
   const groups = TOOLBAR_GROUPS.map(g => ({ ...g, ids: on.filter(id => here.find(x => x.id === id)!.group === g.id) })).filter(g => g.ids.length)
-  // room for the buttons: the bar less three tabs' least (--tab-min), ⋯ and Run, and Terminal | Reader where it shows
-  const folded = new Set(narrow || !barW ? [] : collapseOf(groups.map(g => ({ id: g.id, n: g.ids.filter(id => id !== 'reader').length })), barW - 3 * 120 - 150 - (on.includes('reader') ? 130 : 0)))
+  // room for the buttons: the bar less three tabs' least (--tab-min), ⋯ and Run (150), and Terminal | Reader (130) where it shows
+  const folded = new Set(narrow || !barW ? [] : collapseOf(groups.map(g => ({ id: g.id, n: g.ids.filter(id => id !== 'reader').length })), barW - 3 * tabMin - 150 - (on.includes('reader') ? 130 : 0)))
   const inBar = new Set(groups.filter(g => !folded.has(g.id)).flatMap(g => g.ids))
   const page = !ws || ws.browser !== undefined || project?.kind === 'shells'
   const later = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)

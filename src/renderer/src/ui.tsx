@@ -1183,7 +1183,7 @@ export function Toasts({ toasts, drop, Busy }: { toasts: Toast[]; drop: (id?: nu
   return (
     <div className={`toasts${stacked ? ' stacked' : ''}`} role="status" aria-live="polite" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={e => !e.currentTarget.contains(e.relatedTarget as Node) && hide()}>
       {list.map((t, i) => (
-        <div key={t.id} className={`toast ${t.undo ? 'has-undo' : ''} ${t.ok || t.busy ? 'ok' : ''} ${t.err ? 'err' : ''}${stacked && i === 0 ? ' front' : ''}`} style={{ '--i': Math.min(i, 3) } as CSSProperties} inert={stacked && i > 0 ? true : undefined}>
+        <div key={t.id} className={`toast ${t.undo ? 'has-undo' : ''} ${t.ok || t.busy ? 'ok' : ''} ${t.err ? 'err' : ''}${stacked && i === 0 ? ' front' : ''}`} style={{ '--i': Math.min(i, 3) } as CSSProperties} inert={stacked && i > 0 ? true : undefined} role={t.err ? 'alert' : undefined /* an error interrupts, as before the stack */}>
           {t.ok && <Icon name="check" size={14} />}
           {t.busy && Busy}
           <span>{t.text}</span>

@@ -89,7 +89,8 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
   const pvId = useId()
   const wide = useSyncExternalStore(wideOn, wideNow)
   const cur = step ? undefined : (list[i] as PaletteItem | undefined)
-  const pv = useMemo(() => (wide && cur && view ? previewOf(cur, view) : null), [wide, cur, view]) // the highlighted one's only
+  // the highlighted one's only; its buttons those the item can run (Open always: a Needs you row has no Changes of its own)
+  const pv = useMemo(() => (p => p && { ...p, acts: p.acts.filter(a => a === 'open' || !!cur?.acts?.[a]) })(wide && cur && view ? previewOf(cur, view) : null), [wide, cur, view])
   useEffect(() => void ref.current?.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }), [i, steps.length])
   const pick = (x?: PaletteItem) => {
     if (!x) return
@@ -211,7 +212,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   // Needs you: every other tab of needsYou, in its order
   for (const t of needsSorted(needing, staleMin)) {
     const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
-    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
+    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, acts: { changes: () => (selectTab(t.id), showPanel('changes')), ship: () => (selectTab(t.id), setDialog('ship')) }, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
   }
   if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
   for (const w of order) items.push({ kind: 'ws', ws: w.id, acts: { changes: () => (setWsId(w.id), showPanel('changes')), ship: () => (setWsId(w.id), setDialog('ship')) }, more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })

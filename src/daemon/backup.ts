@@ -38,22 +38,19 @@ export async function tmSet(path: string, on: boolean, log: (s: string) => void)
 // holds it. Returns why it was skipped, else undefined
 export function spotlightSet(root: string, on: boolean, o: { theirs: string[]; project: string }): string | undefined {
   const marker = `${root}${sep}${MARKER}`
-  if (!on) {
-    if (existsSync(marker)) rmSync(marker, { force: true })
-    return
+  try {
+    return on ? mark(root, marker, o) : void (existsSync(marker) && rmSync(marker, { force: true }))
+  } catch (e) {
+    return (e as Error).message // a folder it may not write (read-only, its permissions): said, never thrown
   }
+}
+function mark(root: string, marker: string, o: { theirs: string[]; project: string }): string | undefined {
   if (!existsSync(root)) return 'no worktrees folder yet'
   const r = real(root)
   const p = real(o.project)
   if (inside(r, p) || inside(p, r)) return `${root} is the project's folder or holds it`
   const ours = new Set(o.theirs.map(real))
-  let names: string[] = []
-  try {
-    names = readdirSync(root)
-  } catch (e) {
-    return (e as Error).message
-  }
-  const foreign = names.filter(n => n !== MARKER && n !== '.DS_Store' && n !== '.spare' && !ours.has(real(`${root}${sep}${n}`)))
+  const foreign = readdirSync(root).filter(n => n !== MARKER && n !== '.DS_Store' && n !== '.spare' && !ours.has(real(`${root}${sep}${n}`)))
   if (foreign.length) return `${root} has other things in it too (${foreign.slice(0, 3).join(', ')}${foreign.length > 3 ? '…' : ''}): not marked`
   if (!existsSync(marker)) writeFileSync(marker, '')
 }

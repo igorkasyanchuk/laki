@@ -48,7 +48,7 @@ export const RECIPES: Record<string, Recipe> = {
     scopes: ['create'],
     make: c => {
       const id = slug(c.name)
-      const home = c.home ?? '~'
+      const home = c.home ?? '~' // unknown (the window's Copy config): ~ for you to read, $HOME for launchd (it expands no ~)
       const script = `${home}/bin/laki-${id}.sh`
       const plist = `${home}/Library/LaunchAgents/sh.laki.${id}.plist`
       const content = `<?xml version="1.0" encoding="UTF-8"?>
@@ -56,7 +56,7 @@ export const RECIPES: Record<string, Recipe> = {
 <plist version="1.0">
 <dict>
   <key>Label</key><string>sh.laki.${xml(id)}</string>
-  <key>ProgramArguments</key><array><string>/bin/sh</string><string>${xml(script)}</string></array>
+  <key>ProgramArguments</key><array><string>/bin/sh</string><string>-c</string><string>${xml(c.home ? `exec ${shq(script)}` : `exec "$HOME/bin/laki-${id}.sh"`)}</string></array>
   <key>EnvironmentVariables</key>
   <dict>
     <key>LAKI_CLIENT_TOKEN_FILE</key><string>${xml(c.tokenFile)}</string>

@@ -2,7 +2,7 @@
 // the box names its kind, the value masked, with Send as it is (this exact text, in memory only) and Pass as a secret
 // (the daemon's secretKeep: a 0600 file, its path in the prompt instead). Never blocks a send: ⏎ with it showing arms it,
 // ⏎ again sends. Settings › Privacy's Secret warning (settings.secretHint) turns it off. PromptInput's and the Reader's box
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { maskSecret, secretLine, secretsIn } from '../../shared/secrets'
 import { api } from './api'
 import { Icon } from './ui'
@@ -19,20 +19,25 @@ export function useSecretHint(text: string, setText: (t: string) => void, o: { w
   const shown = spans.length > 0 && !okayed.has(text)
   // a send by ⏎: the first with a secret in shows the line as armed, the second sends as it is
   const guard = (send: () => void) => (!shown || armed === text ? send() : setArmed(text))
+  const now = useRef(text)
+  now.current = text
+  // each value into its file, then replaced in the box as it is by then (words typed meanwhile kept); one that failed
+  // stays, the ones before it are replaced
   const pass = async () => {
     setBusy(true)
     setErr('')
+    const got: [string, string][] = []
     try {
-      let t = text
-      for (const s of [...spans].reverse()) {
-        const { path } = await api.call<{ path: string }>('secretKeep', { value: t.slice(s.start, s.end), label: s.kind, ws: o.ws })
-        t = t.slice(0, s.start) + secretLine(path, s.kind) + t.slice(s.end)
+      for (const s of spans) {
+        const value = text.slice(s.start, s.end)
+        const { path } = await api.call<{ path: string }>('secretKeep', { value, label: s.kind, ws: o.ws })
+        got.push([value, secretLine(path, s.kind)])
       }
-      setText(t)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
       setBusy(false)
+      if (got.length) setText(got.reduce((t, [value, line]) => t.replace(value, () => line), now.current))
     }
   }
   const s = spans[0]

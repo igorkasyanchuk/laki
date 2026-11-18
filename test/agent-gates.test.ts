@@ -111,6 +111,9 @@ test('S7: Recording mode: an agent gets no private workspace, its tabs or a priv
   // its kept turns neither (their prompts, their diffs); its own workspace's are its to read, all of them yours
   await assert.rejects(rig.rpc('turnList', { ws: two.id, from }), /no workspace/)
   await assert.rejects(rig.rpc('turnDiff', { ws: two.id, from }), /no workspace/)
+  // nor its diff, by its id or by a prefix of it (findWs takes one)
+  await assert.rejects(rig.rpc('diff', { ws: two.id, from }), /no workspace/)
+  await assert.rejects(rig.rpc('diff', { ws: two.id.slice(0, -2), from }), /no workspace/)
   assert.deepEqual(await rig.rpc('turnList', { ws: one.id, from }), [])
   assert.deepEqual(await rig.rpc('turnList', { ws: two.id }), [])
 })

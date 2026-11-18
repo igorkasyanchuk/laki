@@ -451,6 +451,10 @@ test('client recipes: each names the token file, never the token; mcp is JSON; s
   const mcp = JSON.parse(RECIPES.mcp.make(ctx).snippet)
   assert.deepEqual(mcp.mcpServers.laki, { command: ctx.lakiBin, args: ['mcp'], env: { LAKI_CLIENT_TOKEN_FILE: ctx.tokenFile } })
   assert.match(RECIPES.launchd.make(ctx).snippet, /<string>\/Users\/me\/.laki\/clients\/it's-me.token<\/string>/) // XML, the ' as is
+  // its job runs the script by a path launchd can open: never ~ (launchd expands none); no home known (the window's): $HOME
+  assert.match(RECIPES.launchd.make(ctx).snippet, /<string>-c<\/string><string>exec '\/Users\/me\/bin\/laki-grok-s-bot\.sh'<\/string>/)
+  assert.match(RECIPES.launchd.make({ ...ctx, home: undefined }).snippet, /<string>exec &quot;\$HOME\/bin\/laki-grok-s-bot\.sh&quot;<\/string>/)
+  assert.doesNotMatch(RECIPES.launchd.make({ ...ctx, home: undefined }).snippet, /<string>[^<]*~/)
   assert.match(RECIPES.raycast.make(ctx).snippet, /LAKI_CLIENT_TOKEN_FILE='\/Users\/me\/.laki\/clients\/it'\\''s-me.token'/) // shell-quoted
   assert.throws(() => recipeOf('nope'), /one of: mcp, raycast, launchd, shortcuts, script/)
   // the CLI: --for an unknown recipe says the known ones before anything is asked

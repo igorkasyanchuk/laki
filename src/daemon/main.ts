@@ -1053,8 +1053,13 @@ const hiddenNo = (me: string | undefined, ws: Workspace | undefined, ref: string
 }
 const turnsSeen = (p: any) => {
   const me = core.agentCaller(p?.from)
-  const ws = core.state.workspaces.find(w => w.id === (p?.ws ?? core.state.tabs.find(t => t.id === p?.tab)?.workspace))
-  if (me) hiddenNo(me, ws, ws?.id ?? '')
+  if (!me) return
+  // resolved as the method resolves it (findWs, findTab: an id's unique prefix too), else a prefix would pass unseen
+  let ws: Workspace | undefined
+  try {
+    ws = p?.ws !== undefined ? core.findWs(String(p.ws)) : core.findWs(core.findTab(String(p?.tab ?? '')).workspace)
+  } catch {} // none: the method's own error says so
+  hiddenNo(me, ws, String(p?.ws ?? p?.tab ?? ''))
 }
 // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
 const takesFrom = (method: string) => FROM.has(method) || (RECORDED.has(method) && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))

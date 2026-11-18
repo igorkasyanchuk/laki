@@ -480,7 +480,8 @@ function saidIn(agent: string, line: string, tools: boolean): { who: 'you' | 'ag
 // ---------- where a workspace's tokens went (shared/spend.ts): its claude and codex tabs' transcripts as entries, kept by
 // file and size (a transcript read again only once it grew), then one breakdown over them all. wsSpend: the user's, an
 // agent's for its own workspace (main.ts' agentNo); laki spend, Info's and the Proof card's Where it went
-const spendKept = new Map<string, { size: number; entries: SpendEntry[] }>()
+const spendKept = new Map<string, { size: number; at: number; entries: SpendEntry[] }>()
+const SPEND_AGAIN = 30_000 // a transcript that grew (an agent at work) read again at most this often: an estimate needn't be live
 const SPEND_READ = 64 << 20 // ponytail: a transcript's last 64 MB; its start left out past that (a cut line is skipped)
 export function wsSpend(p: { ws?: unknown }): Spend & { tabs: number } {
   const ws = findWs(String(p?.ws ?? ''))
@@ -491,7 +492,7 @@ export function wsSpend(p: { ws?: unknown }): Spend & { tabs: number } {
     const size = f ? (statSync(f, { throwIfNoEntry: false })?.size ?? 0) : 0
     if (!f || !size) continue
     let kept = spendKept.get(f)
-    if (kept?.size !== size) {
+    if (kept?.size !== size && !(kept && Date.now() - kept.at < SPEND_AGAIN)) {
       const fd = openSync(f, 'r')
       const buf = Buffer.alloc(Math.min(size, SPEND_READ))
       try {
@@ -499,7 +500,7 @@ export function wsSpend(p: { ws?: unknown }): Spend & { tabs: number } {
       } finally {
         closeSync(fd)
       }
-      kept = { size, entries: spendEntries(t.preset!, buf.toString('utf8'), ws.path) }
+      kept = { size, at: Date.now(), entries: spendEntries(t.preset!, buf.toString('utf8'), ws.path) }
       spendKept.delete(f)
       spendKept.set(f, kept)
       if (spendKept.size > 40) spendKept.delete(spendKept.keys().next().value!)
