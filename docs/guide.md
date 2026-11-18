@@ -319,7 +319,9 @@ selected workspace's PR is in the status bar.
   every agent waiting for you, the oldest first, then the ones done while you looked away, the newest first. A waiting
   one's card shows what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a
   click answers it there. A done one's shows its answer's first line and diff size, *Changes* (the side panel's
-  Changes) and *Seen* (clears its ●). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
+  Changes) and *Seen* (clears its ●); it's one line by default (its workspace, its last words, how long ago; *Changes* and
+  *Seen* on hover or focus), a click or Space opens it into its card, and a failed Done check, a plan limit, a sandbox's
+  stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone keeps cards). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
   dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
   tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
   take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
@@ -583,7 +585,10 @@ selected workspace's PR is in the status bar.
 - When Claude Code asks for permission, Laki shows what it wants to do: the tool and its command, file or address,
   on the ask bar, in the notification (*fix-login · claude wants to run* and the command), on the floating bubbles'
   card and in phone pushes (tokens in it masked; *Titles only* sends none of it). Its *don't ask again* choice reads
-  *Yes, don't ask again for npm test* on the bar and *Always: npm test* in the notification. A command too long for
+  *Yes, don't ask again for* with the rule it grants on a line of its own, whole (`npm init *`, never cut), on the bar,
+  in the Reader, Needs you, the cards on screen and the floating bubbles; a broad one (a wildcard, a folder, a whole
+  tool) is amber and says what it covers (*every command that starts with npm init*). In the notification its button is
+  *Allow always* and the body names the rule. *Allow all*, *Deny all* and the answer keys never pick such a choice. A command too long for
   the notification (over 200 characters) is cut there with … and gets no buttons, as does one with an invisible or
   right-to-left character in it (the floating bubbles' card and reply window too): you answer it in the tab, where it
   shows as it is.
@@ -1130,7 +1135,12 @@ something to send to the agent now. Its ⋯ has *Not this workspace's PR*: it mo
 (another branch's) gives way to the branch's own PR, once there is one; the branch's own is kept off until you attach
 it again. Under it, *What its agents did*: each change its agents made through Laki (a workspace started, a message
 sent, a PR drafted), newest first, and each thing they tried and Laki refused, marked *refused* with why on hover; names
-and ids only, never a prompt or a file's text. `laki agent log <ws>` prints the same.
+and ids only, never a prompt or a file's text. `laki agent log <ws>` prints the same. *Where it went* (read as you
+open it): its Claude Code and Codex tabs' tokens by what entered the context (each file read and how often, each
+command's output, searches, MCP results, the conversation carried into each turn, the system prompt and rules) and by
+what the agents wrote, with a hint when one file is read again and again, a command prints too much or the carried
+conversation is most of it; estimates from the transcripts. The Proof card has it as *Where its tokens went*;
+`laki spend <ws>` prints it.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
 1 to 30 minutes), and a couple of seconds after an agent's turn ends (its workspace's, at most every 20 seconds), so a
@@ -2296,7 +2306,10 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   keeps them on top), *Motion* (*Low* by default: menus, dialogs and ⌘K
   scale in and fade out, a new row or tab grows in, buttons give when pressed, a workspace that needs you breathes, a
   finished one ticks once; *High*: pages and lists come in too; *Off*: nothing moves, spinners stand still, as with the
-  system's *Reduce motion*), *Vertical text* (how sideways labels read: the
+  system's *Reduce motion*), *Density* (Compact, Regular or Roomy: the space and the controls' heights; the phone page
+  is never Compact), *Pointing hand over buttons* (off on a Mac: the arrow over buttons, tabs and rows, as macOS's own
+  apps, the hand over links; on a Mac, scroll bars show only while you scroll, point at or work in a list, unless
+  System Settings › Appearance › *Show scroll bars* is *Always*), *Vertical text* (how sideways labels read: the
   Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
   rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *High contrast mode* (off by default:
   hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
@@ -2448,7 +2461,13 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   the hosts you allowed for the project; others are asked about) or *Off* (Codex: no network). Each agent has what its
   sandbox can do: *Off* isn't Claude Code's, *Listed hosts* isn't Codex's. When the sandbox refuses a host, its card in
   Needs you offers *Allow this domain in this project*; agents started from then on reach it. `laki preset set <name>
-  --net all|list|off` does the same. *Sandbox* starts the agent in its own sandbox: its commands
+  --net all|list|off` does the same. *Wrapper sandbox (macOS)*, for an agent with no sandbox of its own on (OpenCode;
+  Gemini CLI and Grok with theirs off; Claude Code or Codex with *Sandbox* off), starts it under macOS's
+  `sandbox-exec`: it writes only in its worktree, git's folder, the temp folders, its storage folder and its own
+  settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `gh`'s config, your keychains or other agents' settings (its
+  network stays as it is). A new Gemini, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
+  in Needs you with *Restart without the wrapper* (the profile keeps it). `laki preset set <name> --wrap` (`--no-wrap`)
+  does the same. Apple marks `sandbox-exec` deprecated. *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
   the files that say where git finds them), not elsewhere on the Mac; in a workspace on the repo itself (not a
   worktree), `git commit` runs outside it. In a Codex tab, so do a rebase, `git stash` and a commit of some files only
@@ -2879,6 +2898,11 @@ as Laki AI's own backends do. Its tools: `laki_state`
 `presets`), `laki_new_tab` (another agent in a workspace; `beside` a tab: a split in its tab), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`, with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`, and with Workflows on `laki_workflows`, `laki_workflow_write` (saved for you to read: until you save it in the app, only *Start* in its editor runs one an agent wrote; not a schedule, an event, Run again, the CLI or an agent) and `laki_workflow_run`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
 agent asks you.
+
+Besides its tools it serves resources: a workspace's diff (`laki://ws/<id>/diff`, cut at 200 KB), its agents' plan,
+live (`laki://ws/<id>/plan`), and a project's memory (`laki://project/<id>/memory`); an agent's own workspace and
+project, every live one for a client of yours, read through the same gates as `laki_diff` and `laki_memory`. Its
+prompts are your prompt templates (Settings' and the project's), each `{{variable}}` an argument, read-only.
 
 Laki knows an agent by where its process runs (the tab it's in, or a shell tab that runs it), not by its environment,
 the daemon's token or the Origin it sends, so an agent can't pass for you; a call Laki can't place is refused (*couldn't

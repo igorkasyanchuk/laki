@@ -5,11 +5,11 @@ short version.
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR (a fork's: from origin's or upstream's), with the
-  agent's model, effort, permission mode (auto, accept edits, plan, bypass), fast mode and sandbox picked under the prompt (a model the installed Claude Code is too old for leaves the menus, with a warning on one you typed). Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
-- **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it), A turn running longer than you set (off by default) tells you once, with *Stop*.
+  agent's model, effort, permission mode (auto, accept edits, plan, bypass), fast mode and sandbox picked under the prompt (a model the installed Claude Code is too old for leaves the menus, with a warning on one you typed). Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*. On a Mac, worktrees stay out of Time Machine and Spotlight.
+- **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Allow always* with the rule it grants named whole: a broad one, a wildcard, a folder or a whole tool, amber and in words, never picked by Allow all; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it), A turn running longer than you set (off by default) tells you once, with *Stop*.
   a Dock and menu bar count (a click on the menu bar icon can open an Inbox: what waits on you with its choices, what's at work, New task…), floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
-  from its card, the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
+  from its card (a finished turn is one line, a click opens its card), the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
@@ -31,7 +31,7 @@ on an event, the last one or a sample (`laki flow run --event`), questions answe
 time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
-  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
@@ -39,7 +39,7 @@ time and AI money per run (`budget: 60 min, $5`).
   *New session* line; a prompt stopped before an answer: *Edit and resend*; Claude Code waiting out a rate limit says so;
   ←/→ between the questions of one ask; ⏎ or ⌘⏎ sends (Settings › Keys). Any ⌘K command can get its own key there.
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
-  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
+  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path; a token or key you paste into a prompt box is flagged, masked, and *Pass as a secret* puts it in such a file instead. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
   *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*),
   and the status bar's *n running* lists the workspace's, finished ones too;
@@ -48,7 +48,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits (Gemini CLI's quota per model too).
+  beside each plan's limits (Gemini CLI's quota per model too). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Recording mode**: mark workspaces or projects *Private*; Recording mode (⌘K, the menu bar) hides them everywhere,
   notifications and phone pushes too, while they keep running.
@@ -129,8 +129,9 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 104 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
-  accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), and your own CSS for
-  the rest; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
+  accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), Density (Compact, Regular, Roomy), macOS's arrow over buttons and scroll bars
+  that show as you scroll, and your own CSS for the rest; the tab bar's buttons in groups you pick and order
+  (*Customize toolbar…*), tabs past its room behind *+n*; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
 - **Extensions** (`laki ext`, or `laki widget`: the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often: any you make from a starter, with Laki AI on the extension's own page, an agent's
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and at the start of the status bar (an icon, a label,
@@ -149,5 +150,5 @@ time and AI money per run (`budget: 60 min, $5`).
   opens a workspace in your editor, finds sessions by name or the last few and runs one command in several at one Yes;
   it tells you where a setting is, with a link that opens it;
   on OpenRouter, claude -p / codex exec or your own OpenAI-compatible endpoint (a local server too), every ask's cost logged (shown or hidden).
-- **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server: its core tools, more a group at a time) drives it all, agents included, with tab completion (`laki completion zsh|bash|fish`). Menus can be macOS's own (Settings › Layout).
-- **Trusted clients**: an app outside Laki (a desktop app's MCP server, a script) drives it with a token of its own (`laki client add "Grok Bot"`, allowed in Laki's window): a name on what it starts, scopes (new workspaces and messages to agents unless you add more), revoked at once.
+- **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything (a preview of the highlighted item beside the list), ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server: its core tools, more a group at a time; a workspace's diff and plan and a project's memory as resources, your templates as prompts) drives it all, agents included, with tab completion (`laki completion zsh|bash|fish`). Menus can be macOS's own (Settings › Layout).
+- **Trusted clients**: an app outside Laki (a desktop app's MCP server, a script) drives it with a token of its own (`laki client add "Grok Bot"`, allowed in Laki's window): a name on what it starts, scopes (new workspaces and messages to agents unless you add more), revoked at once. Ready-made setups (`--for mcp`, `raycast`, `launchd`, `shortcuts`, `script`): the narrowest scopes and the config to paste, naming the token's file.
