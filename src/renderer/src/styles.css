@@ -142,6 +142,9 @@ button:hover { background: var(--hover); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 button.on { border-color: var(--accent); color: var(--accent-ink); }
 button:disabled { opacity: 0.5; cursor: default; }
+select, input[type='checkbox'], input[type='radio'] { cursor: var(--cur-act); } /* controls too: the hand with Pointing hand over buttons */
+:is(select, input[type='checkbox'], input[type='radio']):disabled { cursor: default; }
+:is(input[type='checkbox'], input[type='radio']):hover { filter: brightness(1.15); } /* with the arrow, a hover says it's clickable */
 .icon-svg { vertical-align: -0.125em; } /* an icon before words in a box that isn't flex (+ Add…, Build with AI): centred on the text, not sat on its baseline; flex rows ignore it */
 button.icon { background: none; border: none; font-size: var(--fs-4); line-height: 1; padding: var(--sp-1) var(--sp-3); color: var(--muted); }
 button.icon:hover { color: var(--fg); background: var(--hover); }
