@@ -103,6 +103,17 @@ their own (`varsOf`). Settings' chips under an action or a template list them.
 
 ### Turns
 
+**Goals (A1).** A claude or codex chat's `/goal` comes from its transcript (`share.ts` `goalIn`, in `meterOf`): claude's
+`goal_status` attachments (a `sentinel` as it's set, `met: true` with it as it's cleared; `met` or `failed` at each
+check), codex's `thread_goal_updated` events (`goal.status`: active, paused, budget_limited, usage_limited, blocked,
+complete; `goal: null` cleared), kept as `Meter.goal` and given as the view's `tab.goal` (`Goal`, `GOAL_SAYS`). A turn
+end while it's `working` (`goalOf` reads the transcript on at once) is held (core's `goalHold`): the tab stays running,
+no `turn` event, phone push, `turnEnds` (Done check, workflows) or next step; `goalTick` (every 2 s, `LAKI_GOAL_MS`)
+lets the newest held end go once the goal stops, its words `Goal reached: …` (`r.goalEnd`). An Esc or a failure ends
+the hold; your next prompt (`UserPromptSubmit`) drops it and a reached or failed goal (`goalSeen`). The band
+(panels.tsx `GoalStrip`) types `/goal pause`, `/goal resume` (codex) and `/goal clear` through `send`. ponytail: read
+with the meters (off when both the context meter and costs are off); Grok's goals aren't read.
+
 `daemon/turns.ts` (main.ts imports it; core's `turnStarts`, claude's UserPromptSubmit, and `turnEnds`), core keeping
 what the view shows on the tab's runtime:
 - each turn's changes (`settings.turnChanges`, on unless false): the worktree as a tree through an index of its own,

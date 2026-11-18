@@ -2544,6 +2544,12 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   waits as before. ⌘K's *Switch Claude Code to …* and the plan limits' popup (*Use*) change the
   default too. The ring in the status bar shows each agent's default account; its popup lists them all. Removing one
   removes its folder and Claude's Keychain item for it; its chats stay.
+- **Goals**: give Claude Code or Codex a `/goal` and the tab shows it in a thin band under the pane: *Goal · working*
+  (or *paused*, *out of budget*, *at a usage limit*, *blocked*, *reached*) and its words, with *Pause* and *Resume*
+  (Codex) and *Clear*, each typing the agent's own `/goal …` command. While the goal keeps the agent going turn after
+  turn, the tab stays *running*: no *done* notification, Done check or next-step chip at each turn's end, only one when
+  the goal stops, saying *Goal reached* (or *paused*, *out of budget*). The tab and its sidebar row show a small target,
+  the goal's words on hover. A reached goal's band goes with your next prompt.
 - **Signed out**: a turn that fails because Claude Code or Codex is signed out (*Not logged in · Please run /login*, an
   expired token) shows a band over the tab's box, *Claude Code is signed out · your message sends once you're in*, and
   the notification says *Signed out*. *Sign in* opens the agent's own login for that tab's account in a terminal tab

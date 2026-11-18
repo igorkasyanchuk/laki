@@ -4,7 +4,7 @@ import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
 import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText } from './ui'
-import { type TabView, HOME_ACCOUNT, creatorOf } from '../../shared/types'
+import { type TabView, GOAL_SAYS, HOME_ACCOUNT, creatorOf } from '../../shared/types'
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
 import { timeLeft } from './Tunnel'
@@ -154,6 +154,11 @@ export function TabList({ app }: { app: AppCtx }) {
                 <Icon name="bell" size={11} />
               </span>
             )}
+            {(t => t && ( // A1: its /goal at work
+              <span className={`ws-mark ws-goal ${t.goal!.state}`} data-tip={`Goal · ${GOAL_SAYS[t.goal!.state]}: ${t.goal!.text}`}>
+                <Icon name="target" size={11} />
+              </span>
+            ))(ts.find(t => t.goal && t.goal.state !== 'reached' && t.goal.state !== 'failed'))}
             {ts.some(t => t.muted) && (
               <span className="ws-mark">
                 <Icon name="bellOff" size={11} />

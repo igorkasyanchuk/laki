@@ -1,7 +1,7 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
-import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -2418,6 +2418,36 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 
 // Hooks not heard (the daemon's hookTick): this agent sends Laki none, so asks and ends are read off its screen; the
 // likely why (hookHealth.ts), Details (a file:line, the args, the command) to copy; Dismiss: this tab, until a reload
+// A1: the tab's /goal (claude's, codex's): its words and state, the buttons typing the agent's own /goal commands
+// (codex: pause, resume, clear; claude has Clear only)
+export function GoalStrip({ tab, onCmd }: { tab: TabView; onCmd: (cmd: string) => void }) {
+  const g = tab.goal
+  if (!g) return null
+  const codex = tab.preset === 'codex'
+  return (
+    <div className={`queue-strip show-strip goal-strip ${g.state}`} data-dock="bottom" role="region" aria-label="Its goal">
+      <div className="queue-head">
+        <Icon name="target" size={13} />
+        <span className="goal-state">Goal · {GOAL_SAYS[g.state]}</span>
+        <span className="queue-what" data-tip={g.text}>{g.text}</span>
+        {codex && g.state === 'working' && (
+          <button type="button" onClick={() => onCmd('/goal pause')} data-tip="Types /goal pause: it stops after this turn">
+            Pause
+          </button>
+        )}
+        {codex && (g.state === 'paused' || g.state === 'budget' || g.state === 'limit' || g.state === 'blocked') && (
+          <button type="button" onClick={() => onCmd('/goal resume')} data-tip="Types /goal resume">
+            Resume
+          </button>
+        )}
+        <button type="button" onClick={() => onCmd('/goal clear')} data-tip="Types /goal clear: the goal goes">
+          Clear
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // A2, C6: its agent is signed out (the daemon's signin.ts): a band over its box. Sign in runs the agent's own login for
 // the tab's account in a terminal tab; then Finish signing in (Open again, Send again), then Signed in · sending your message
 export function SignInStrip({ tab, onAct }: { tab: TabView; onAct: (act: 'open' | 'send' | 'dismiss') => void }) {

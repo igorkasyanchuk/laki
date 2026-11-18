@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
-import { costOf, type Retry, type SecretFound, type UsageWindow } from '../shared/types.ts'
+import { costOf, type Goal, type GoalState, type Retry, type SecretFound, type UsageWindow } from '../shared/types.ts'
 import { codexRateWindows } from './usage.ts'
 import { SECRETS } from '../shared/secrets.ts'
 
@@ -193,7 +193,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 // and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry; skills?: SkillUse[] } // skills (B7): the skills the chat loaded, in that order (skillsIn); retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry; skills?: SkillUse[]; goal?: Goal } // goal (A1): its /goal, the last said (goalIn); skills (B7): the skills the chat loaded, in that order (skillsIn); retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
 // B7: a skill the chat loaded: its name, its folder once the transcript says it (claude's "Base directory for this
 // skill:" line, or the SKILL.md a tool read)
 export type SkillUse = { name: string; path?: string }
@@ -234,6 +234,23 @@ function skillsIn(agent: string, j: SkillLine, m: Meter) {
     if (f) add(f[2], f[1])
   }
 }
+// A1: a /goal's state from its transcript: claude's goal_status attachments (a sentinel as it's set or cleared, met or
+// not at each check, failed when it can't be), codex's thread_goal_updated (its status; none: cleared)
+const CODEX_GOAL: Record<string, GoalState> = { active: 'working', paused: 'paused', budgetlimited: 'budget', usagelimited: 'limit', blocked: 'blocked', complete: 'reached', completed: 'reached' }
+type GoalLine = { type?: string; isSidechain?: boolean; timestamp?: string; attachment?: { type?: string; met?: boolean; failed?: boolean; sentinel?: boolean; condition?: unknown }; payload?: { type?: string; goal?: { objective?: unknown; status?: unknown } | null; objective?: unknown; status?: unknown } }
+function goalIn(agent: string, j: GoalLine, m: Meter, now: number) {
+  const at = Date.parse(j.timestamp ?? '') || now
+  if (agent === 'claude') {
+    const a = j.attachment
+    if (j.type !== 'attachment' || a?.type !== 'goal_status' || j.isSidechain) return
+    const text = String(a.condition ?? '').trim().slice(0, 300)
+    m.goal = a.met ? (a.sentinel ? undefined : { text, state: 'reached', at }) : { text, state: a.failed ? 'failed' : 'working', at }
+  } else if (j.type === 'event_msg' && j.payload?.type === 'thread_goal_updated') {
+    const p = j.payload
+    const g = 'goal' in p ? p.goal : p.objective !== undefined ? p : undefined
+    m.goal = g ? { text: String(g.objective ?? '').trim().slice(0, 300), state: CODEX_GOAL[String(g.status ?? 'active').toLowerCase().replace(/_/g, '')] ?? 'working', at } : undefined
+  }
+}
 export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
@@ -251,7 +268,8 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
   }
   for (const line of jsonl.split('\n')) {
     const skill = line.includes('SKILL.md') || line.includes('"Skill"') || line.includes('Base directory for this skill')
-    if (!skill && !line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' ? !line.includes('"api_error"') : !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
+    const goal = line.includes(agent === 'claude' ? '"goal_status"' : '"thread_goal_updated"')
+    if (!skill && !goal && !line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' ? !line.includes('"api_error"') : !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
     let j: any
     try {
       j = JSON.parse(line)
@@ -260,6 +278,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     }
     const at = dayOf(Date.parse(j.timestamp) || now)
     if (skill) skillsIn(agent, j, m)
+    if (goal) goalIn(agent, j, m, now)
     if (agent === 'claude') {
       if (j.type === 'system' && j.subtype === 'api_error' && !j.isSidechain) {
         const at = Date.parse(j.timestamp) || now

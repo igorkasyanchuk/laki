@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -47,7 +47,7 @@ import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } f
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
-import { bgLeft, chatRead, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, broken, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -109,7 +109,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { goalEnd?: GoalState | 'cleared' /* A1: the goal that stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -4196,6 +4196,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         else r.autoContinued = false
         titleFrom(tab, pl.prompt) // claude's, gemini's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
+        goalHeld.delete(tab.id) // A1: a prompt of yours: a turn of its own
+        goalSeen(tab)
         if (Date.now() - (keysAt.get(tab.id) ?? 0) < 5000 && !typedBy.has(tab.id) && !tab.flow) promptKeep(pl.prompt, tab.workspace) // typed there by you just now
         if (pl.hook_event_name === 'UserPromptSubmit')
           for (const f of turnStarts)
@@ -4248,6 +4250,10 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     case 'idle':
     case 'done': // codex notify: {"type":"agent-turn-complete","thread-id":…,"last-assistant-message":…}
     case 'failed': {
+      // A1: a goal still at work: this end isn't the tab's (it goes on by itself): held, nothing told, until the goal stops
+      if (p.state !== 'failed' && !r.goalEnd && goalHold(tab, r, p)) break
+      const goalEnd = r.goalEnd
+      r.goalEnd = undefined
       const took = r.turnFrom !== undefined ? now - r.turnFrom - (r.waited ?? 0) - (r.waitFrom !== undefined ? now - r.waitFrom : 0) : undefined
       r.turnFrom = r.waitFrom = r.waited = undefined
       r.status = 'idle'
@@ -4281,8 +4287,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (!viewed(tab.id)) r.done = true
       const checking = !r.limit && p.state !== 'failed' && !!checkHooks.will?.(tab)
       const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out ? 'signedout' : 'done', text: out ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
-      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out ? 'is signed out' : (r.last ?? ''), bell)
+      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out ? 'signedout' : 'done', text: out ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : goalEnd && goalEnd !== 'cleared' ? `Goal ${GOAL_SAYS[goalEnd]}: ${goalOf(tab)?.text ?? ''}` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
+      if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out ? 'is signed out' : goalEnd && goalEnd !== 'cleared' ? `goal ${GOAL_SAYS[goalEnd]}` : (r.last ?? ''), bell)
       if (!r.limit && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
@@ -4306,6 +4312,37 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       break
   }
   changed()
+}
+
+// A1: a claude or codex tab's /goal at work keeps it running across its turns: a turn's end is held (no done, Done
+// check, next step or notification) until the goal stops (reached, paused, out of budget…: its transcript says, looked
+// at every 2 s), then that end is told as the goal's (Goal reached…). An end otherwise (Esc, a failure) lets it go
+const goalHeld = new Map<string, Parameters<typeof turn>[0]>()
+let goalTimer: NodeJS.Timeout | undefined
+function goalHold(tab: Tab, r: Runtime, p: Parameters<typeof turn>[0]) {
+  if (goalOf(tab)?.state !== 'working') return false
+  goalHeld.set(tab.id, p)
+  r.status = 'running'
+  r.done = false
+  goalTimer ??= setInterval(goalTick, Number(process.env.LAKI_GOAL_MS) || 2000)
+  changed()
+  return true
+}
+export function goalTick() {
+  for (const [id, p] of goalHeld) {
+    const tab = state.tabs.find(t => t.id === id)
+    const r = rt.get(id)
+    if (!tab || r?.status !== 'running') {
+      goalHeld.delete(id) // closed, or ended otherwise (Esc, a failure)
+      continue
+    }
+    const g = goalOf(tab)
+    if (g?.state === 'working') continue
+    goalHeld.delete(id)
+    r.goalEnd = g?.state ?? 'cleared'
+    turn(p)
+  }
+  if (!goalHeld.size && goalTimer) (clearInterval(goalTimer), (goalTimer = undefined))
 }
 
 // a Stop's background_tasks (claude's): any agent's still going

@@ -5,6 +5,7 @@ import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
+import { GOAL_SAYS } from '../../shared/types'
 import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
@@ -290,6 +291,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <Icon name="bell" size={11} />
           </span>
         )}
+        {(t => t && ( // A1: an agent's /goal at work: its first words on hover
+          <span className={`ws-mark ws-goal ${t.goal!.state}`} data-tip={`Goal · ${GOAL_SAYS[t.goal!.state]}: ${t.goal!.text}`}>
+            <Icon name="target" size={11} />
+          </span>
+        ))(wt.find(t => t.goal && t.goal.state !== 'reached' && t.goal.state !== 'failed'))}
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />

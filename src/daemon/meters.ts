@@ -196,6 +196,19 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   return true
 }
 
+// A1: its /goal as its transcript says now (read on at once); a claude or codex tab's
+export function goalOf(tab: Tab) {
+  if (tab.preset !== 'claude' && tab.preset !== 'codex') return
+  meterRead(tab, true)
+  const r = meters.get(tab.id)
+  return r?.file?.endsWith(`${tab.resumeId}.jsonl`) ? r.m.goal : undefined
+}
+// a reached or failed goal leaves the banner as you send the next prompt (a working or paused one stays)
+export function goalSeen(tab: Tab) {
+  const m = meters.get(tab.id)?.m
+  if (m?.goal && (m.goal.state === 'reached' || m.goal.state === 'failed')) m.goal = undefined
+}
+
 // W2: what a tab's chat cost so far at API prices (its meter, read on now: look, its transcript looked for at once), the
 // workflows' agent turns; undefined: unknown (not claude or codex, a host's, no transcript yet, no price for its model)
 export function chatCost(tab: Tab, look = false): number | undefined {
@@ -297,7 +310,7 @@ export async function skillOpen(p: { tab?: unknown; name?: unknown }) {
   await openPath(f, 'editor', ws?.project)
   return { path: f }
 }
-export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background' | 'retry' | 'skills'> {
+export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background' | 'retry' | 'skills' | 'goal'> {
   const r = meters.get(t.id)
   const m = r?.file?.endsWith(`${t.resumeId}.jsonl`) ? r.m : undefined // another chat's (a /clear): until this one's is read
   const s = (x => (x?.session === t.resumeId ? x : undefined))(statusOn() ? lines.get(t.id) : undefined) // its status line's, this chat's
@@ -309,7 +322,7 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const used = live ?? m?.used
   const bg = m && r!.bg
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
-  return { ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  return { ...(m?.goal && { goal: m.goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to
