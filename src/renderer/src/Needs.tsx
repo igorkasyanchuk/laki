@@ -158,9 +158,8 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
   // a plan limit, a sandbox's stop or an API error stay cards. A click or Space opens it into its card
   const id = `${t.id}:${t.needAt ?? ''}`
   const [, grow] = useState(0)
-  const failedCheck = w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)
   const swipe = useSwipe(() => api.seenUndo?.(t))
-  const plain = !waiting && !t.failed && !t.limit && !t.boxed && !failedCheck
+  const plain = !waiting && !failedNeed({ t, w })
   if (plain && (api.phone ? !shown : api.rows && !opened.has(id))) {
     const expand = () => (api.phone ? show?.() : (opened.add(id), grow(n => n + 1)))
     return (

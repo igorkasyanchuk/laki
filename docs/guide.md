@@ -935,7 +935,7 @@ run fails, saying so.
   examples sit under *When* (a click fills it in); then the form says how it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
   A cron expression works too, when the words don't read: `*/20 9-17 * * 1-5` (minute, hour, day of the month, month,
   day of the week: numbers, lists, ranges, steps, `jan`–`dec`, `sun`–`sat`, 7 is Sunday), or `@hourly`, `@daily`,
-  `@weekly`, `@monthly`; a day of the month and a day of the week both set run on either, as cron does. No seconds, `?`,
+  `@weekly`, `@monthly`; a day of the month and a day of the week both set run on either, as cron does (one starting with `*`, `*/2` too: both hold). No seconds, `?`,
   `L`, `W` or `#` (the form says which field). `laki schedule add <project> --at "*/20 9-17 * * 1-5" "…"`.
 - Dates in the name or the prompt: `{{DD-MM-YY}}`, `{{YYYY-MM-DD}}`, `{{HH:mm}}`, `{{ddd D MMM}}` (`Nightly deps
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or

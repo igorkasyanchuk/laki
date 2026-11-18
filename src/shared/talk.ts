@@ -98,10 +98,11 @@ const NEW = /^(?:a |the )?new (?:task|session|workspace)(?: (?:in|for|on) (.+))?
 const goesOn = (words: string) => `(?:(?:${words})|[ву]\\s+(?:тому|тім))(?![\\p{L}])`
 const NOTE_ON = goesOn('that|this|these|those|the|how|it|to|down|of|on|in|about|which|what|when|where|why|here|there')
 const TODO_ON = goesOn('that|this|these|those|the|it|so|list|lists|with') // "in", "for": a project's (TODO_IN, or the words kept)
-const NOTE_WORD = new RegExp(`^\\s*(?:note|нотатка|замітка)(?:\\s*[:,–—-]\\s*|\\s+(?!${NOTE_ON})|$)`, 'iu')
+const SEP = '(?:\\s*[:,–—]\\s*|\\s+-\\s*|-\\s+)' // a colon, a comma, a dash; a hyphen only with a space by it ("Note-taking…": a word)
+const NOTE_WORD = new RegExp(`^\\s*(?:note|нотатка|замітка)(?:${SEP}|\\s+(?!${NOTE_ON})|$)`, 'iu')
 const TODO_WORD = '(?:to[- ]?do|справа|зробити)'
 const TODO_IN = new RegExp(`^\\s*${TODO_WORD}\\s+(?:in|for|on|в|у|для)\\s+([^:,\\n]{1,60}?)\\s*[:,]\\s*`, 'iu')
-const TODO_AT = new RegExp(`^\\s*(?:${TODO_WORD}\\s*[:,–—-]\\s*|(?:todo|to-do|справа|зробити)(?:\\s+(?!${TODO_ON})|$))`, 'iu')
+const TODO_AT = new RegExp(`^\\s*(?:${TODO_WORD}${SEP}|(?:todo|to-do|справа|зробити)(?:\\s+(?!${TODO_ON})|$))`, 'iu')
 export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: string; name: string }[]; aiOn?: boolean; aiWord?: string; fixes?: string; fix?: (t: string, fixes?: string) => { text: string }; note?: boolean; todo?: boolean; last?: string }): Route {
   const said = (o.fix ? o.fix(text, o.fixes).text : text).trim()
   const none: Route = { target: { kind: 'default' }, rest: said, how: '' }

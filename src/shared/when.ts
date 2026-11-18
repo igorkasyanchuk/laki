@@ -68,10 +68,10 @@ const andsOf = (b: string) => {
 }
 // English first, then a cron expression; an error in the words of the one it looks like
 export function parseWhen(text: string, now = Date.now()): Rule | { error: string } {
-  if (/^\s*@/.test(text)) return parseCron(text) // @hourly…: cron's, never words
+  if (/^\s*@/.test(text)) return parseCron(text, now) // @hourly…: cron's, never words
   const en = parseEnglish(text, now)
   if (!('error' in en)) return en
-  const c = parseCron(text)
+  const c = parseCron(text, now)
   return 'error' in c && !looksCron(text) ? en : c
 }
 function parseEnglish(text: string, now: number): Rule | { error: string } {
@@ -252,7 +252,7 @@ export function minutesOn(r: Rule, day: number): number[] {
 // ---------- cron: minute hour day-of-month month day-of-week, as cron has them: numbers, lists (1,15), ranges (9-17),
 // steps (*/20, 0-30/10, 5/15), names (jan-dec, sun-sat; 7 is Sunday too), @hourly @daily @weekly @monthly. Not seconds,
 // ? or L, W and #: an error names the field. Day-of-month and day-of-week both set: either one (cron's OR); one of
-// them * : the other. In the Mac's time zone, a DST day as the English rules have it (nextRun's)
+// them starting with * (*/2 too, as Vixie cron has it): both hold. In the Mac's time zone, a DST day as the English rules have it (nextRun's)
 const CRON_FIELDS: { name: string; min: number; max: number; names?: readonly string[]; from?: number }[] = [
   { name: 'minute', min: 0, max: 59 },
   { name: 'hour', min: 0, max: 23 },
@@ -262,7 +262,7 @@ const CRON_FIELDS: { name: string; min: number; max: number; names?: readonly st
 ]
 const AT_CRON: Record<string, string> = { '@hourly': '0 * * * *', '@daily': '0 0 * * *', '@midnight': '0 0 * * *', '@weekly': '0 0 * * 0', '@monthly': '0 0 1 * *' }
 const looksCron = (t: string) => /^@\w+$/.test(t.trim()) || (/^[\d*]/.test(t.trim()) && t.trim().split(/\s+/).length >= 5 && /^[\w*,\-/?#\s]+$/.test(t.trim()))
-export function parseCron(text: string): Rule | { error: string } {
+export function parseCron(text: string, now = Date.now()): Rule | { error: string } {
   const raw = text.trim().toLowerCase()
   const expr = AT_CRON[raw] ?? raw
   if (raw.startsWith('@') && !AT_CRON[raw]) return { error: `${raw}? @hourly, @daily, @weekly or @monthly` }
@@ -295,8 +295,8 @@ export function parseCron(text: string): Rule | { error: string } {
   const gaps = times.map((t, i) => (i ? t - times[i - 1] : t + 1440 - times.at(-1)!))
   if (times.length > 1 && Math.min(...gaps) < MIN_EVERY) return { error: `At most every ${MIN_EVERY} minutes` }
   const cron: Cron = { expr: parts.join(' '), minute, hour, day, month, weekday, anyDay: parts[2].startsWith('*'), anyWeekday: parts[4].startsWith('*') }
-  if (cronNext(cron, Date.now()) === undefined) return { error: 'It never runs (no such day in 5 years)' }
-  const days = cron.anyDay && !cron.anyWeekday ? weekday : ALL // the weekdays it may run on (with a day of the month, all of them)
+  if (cronNext(cron, now) === undefined) return { error: 'It never runs (no such day in 5 years)' }
+  const days = day.length === 31 && (cron.anyDay || cron.anyWeekday) ? weekday : ALL // the weekdays it may run on (with a day of the month, all of them)
   return { days, times, cron }
 }
 // does it run on this day (cron's rule for day-of-month and day-of-week)
@@ -304,7 +304,7 @@ function cronDay(c: Cron, d: Date) {
   if (!c.month.includes(d.getMonth() + 1)) return false
   const dom = c.day.includes(d.getDate())
   const dow = c.weekday.includes(d.getDay())
-  return c.anyDay && c.anyWeekday ? true : c.anyDay ? dow : c.anyWeekday ? dom : dom || dow
+  return c.anyDay || c.anyWeekday ? dom && dow : dom || dow
 }
 // day by day (a day that isn't one is skipped whole), its times in order, as nextRun builds a day's: 5 years at most
 function cronNext(c: Cron, after: number): number | undefined {
@@ -326,8 +326,9 @@ function cronWords(c: Cron): string {
   const k = c.weekday.join()
   const wd = k === '0,1,2,3,4,5,6' ? '' : k === '1,2,3,4,5' ? 'Weekdays' : k === '0,6' ? 'Weekends' : list(c.weekday, n => DAY_LABEL[n])
   const months = c.month.length === 12 ? '' : list(c.month, n => MONTHS[n - 1])
-  const dom = c.anyDay ? '' : `Day ${list(c.day, String)}`
-  const days = [dom && wd && !c.anyWeekday ? `${dom} or ${wd}` : dom || (!c.anyWeekday ? wd : '') || (c.anyDay && c.anyWeekday ? 'Every day' : ''), months && `${dom ? 'of' : 'in'} ${months}`].filter(Boolean).join(' ') || 'Every day'
+  const dom = c.day.length === 31 ? '' : `Day ${list(c.day, String)}`
+  const on = c.anyDay || c.anyWeekday ? [dom, wd].filter(Boolean).join(', ') : dom && wd ? `${dom} or ${wd}` : '' // cronDay's AND, else its OR (one of them every day: every day)
+  const days = [on || 'Every day', months && `${dom && !wd ? 'of' : 'in'} ${months}`].join(' ').trim()
   const t = c.hour.flatMap(h => c.minute.map(m => h * 60 + m))
   const step = t.length > 3 ? t[1] - t[0] : 0
   if (step > 0 && t.every((x, i) => !i || x - t[i - 1] === step)) return `${days} every ${step % 60 ? `${step} min` : step === 60 ? 'hour' : `${step / 60} hours`} from ${hhmm(t[0])} to ${hhmm(t.at(-1)!)}`

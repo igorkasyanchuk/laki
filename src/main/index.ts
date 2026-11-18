@@ -1446,7 +1446,7 @@ function trayMenu() {
       { label: 'New Task…', click: () => quickWin() }, // the quick bar (Q1), over the app you're in
       { label: 'Recording Mode', type: 'checkbox', checked: recording, click: () => void rpc('settingsSet', { recording: !recording }).catch(() => {}) }, // private workspaces hidden
       // U8: Quiet (the daemon's dndSet, as the app): no notifications, sounds, cards or pushes but asks and laki alert's
-      quietOn() ? { label: `End Quiet (until ${hhmm(quietUntil)})`, click: () => quietSet({ off: true }) } : { label: 'Quiet', submenu: quietChoices().map(c => ({ label: c.label.replace(/\b[a-z]/g, ch => ch.toUpperCase()), click: () => quietSet(c.o) })) },
+      quietOn() ? { label: `End Quiet (until ${hhmm(quietUntil)})`, click: () => quietSet({ off: true }) } : { label: 'Quiet', submenu: quietChoices().map((c, i) => ({ label: c.label.replace(/\b[a-z]/g, ch => ch.toUpperCase()), click: () => quietSet(quietChoices()[i].o) /* as it's clicked: a menu built at 8:50 and clicked at 9:05 means tomorrow's 9:00 */ })) },
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
       { label: 'Show and Tell…', ...(keys.tell && { accelerator: keys.tell, registerAccelerator: false }), click: () => tellShot() }, // Q7: a part of the screen, then say what to do with it

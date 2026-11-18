@@ -480,6 +480,15 @@ test("cron: day of month and day of week both set run on either (cron's OR); one
   assert.deepEqual(minutesOn(r, at(2026, 12, 13)), [540]) // a Sunday, the 13th
   assert.deepEqual(minutesOn(cron('0 9 13 * *'), at(2026, 11, 6)), []) // a Friday, not the 13th
   assert.equal(describe(r), 'Day 13 or Fri at 09:00')
+  // a step in either field starts with *, as Vixie cron reads it: both hold (not every day)
+  const odd = cron('0 9 */2 * *')
+  assert.deepEqual([1, 2, 3].map(d => minutesOn(odd, at(2026, 11, d)).length), [1, 0, 1])
+  assert.equal(nextRun(odd, at(2026, 11, 1, 10)), at(2026, 11, 3, 9))
+  const alt = cron('0 9 * * */2') // Sun, Tue, Thu, Sat
+  assert.deepEqual(alt.days, [0, 2, 4, 6])
+  assert.deepEqual([1, 2, 3].map(d => minutesOn(alt, at(2026, 11, d)).length), [1, 0, 1]) // Sun 1, Mon 2, Tue 3
+  assert.equal(describe(alt), 'Sun, Tue, Thu, Sat at 09:00')
+  assert.equal(describe(cron('0 9 1-31 * mon')), 'Every day at 09:00') // cron's OR with every day of the month
 })
 test('cron: a DST start day runs a skipped hour once after the gap; an end day runs a repeated hour once', () => {
   const tz = process.env.TZ

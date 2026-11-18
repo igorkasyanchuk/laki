@@ -139,7 +139,8 @@ test('Q5b: Note: and To-do: route by their first word, the word not saved; mid-s
   assert.equal(r('Notebook first, then the tests').target.kind, 'default')
   assert.equal(r('please add a to-do: x').target.kind, 'default')
   // a sentence that only starts with the word: how it goes on says so
-  for (const t of ['Note that the build is red, fix it', 'note how the cache works', 'To do this, open the file', 'to do: x'.replace(':', ''), 'Todo list is long', 'Справа в тому, що тести падають']) assert.equal(r(t).target.kind, 'default', t)
+  for (const t of ['Note that the build is red, fix it', 'note how the cache works', 'To do this, open the file', 'to do: x'.replace(':', ''), 'Todo list is long', 'Справа в тому, що тести падають', 'Note-taking is broken in Shop', 'Todo-list app is slow']) assert.equal(r(t).target.kind, 'default', t)
+  assert.deepEqual([r('Note - check limits').target.kind, r('Note - check limits').rest, r('todo - ship it').target.kind], ['note', 'check limits', 'todo'], 'a dash with a space by it')
   assert.deepEqual(r('To do: update deps').target, { kind: 'todo', project: 'api' }, 'two words with a colon')
   assert.deepEqual(r('Нотатка: перевірити ліміти'), { target: { kind: 'note' }, rest: 'перевірити ліміти', how: 'Notes › Voice' })
   assert.deepEqual(r('замітка купити каву').target, { kind: 'note' })
