@@ -244,6 +244,10 @@ const marked = (spans: WordSpans, add: boolean) => spans.map(([t, on], i) => (on
 // T18: two columns or one, every diff's (laki.diffSplit), its key (Settings › Keys' diffSplit: keydown.ts' event), and
 // one column whatever was picked while its room (the element room is given) is under 900px: the toggle says why
 const SPLIT_MIN = 900
+// one choice for every diff on screen (the Review tab's and the side panel's at once): set here, told to each
+const splitSubs = new Set<(on: boolean) => void>()
+const splitSet = (on: boolean) => (localStore('laki.diffSplit', on ? 'split' : 'unified'), splitSubs.forEach(f => f(on)))
+let splitKey = false
 export function useSplit() {
   const [picked, setPicked] = useState(() => localStore('laki.diffSplit') === 'split')
   const [el, room] = useState<HTMLElement | null>(null)
@@ -254,13 +258,13 @@ export function useSplit() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [el])
-  const pick = (on: boolean) => (setPicked(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
   useEffect(() => {
-    const flip = () => setPicked(p => (localStore('laki.diffSplit', p ? 'unified' : 'split'), !p))
-    addEventListener('laki-diff-split', flip)
-    return () => removeEventListener('laki-diff-split', flip)
+    // the key's event, flipped once whatever the number of diffs listening
+    if (!splitKey) (splitKey = true), addEventListener('laki-diff-split', () => splitSet(localStore('laki.diffSplit') !== 'split'))
+    splitSubs.add(setPicked)
+    return () => void splitSubs.delete(setPicked)
   }, [])
-  return { split: picked && wide, picked, wide, pick, room }
+  return { split: picked && wide, picked, wide, pick: splitSet, room }
 }
 export function SplitToggle({ s }: { s: ReturnType<typeof useSplit> }) {
   const title = s.picked && !s.wide ? 'One column here: two need 900px of room' : s.picked ? 'One column: the changes in one' : 'Two columns: before and after side by side'

@@ -87,7 +87,7 @@ test('D2: remote access started again when cloudflared ends (a quick one: a new 
   const on = await rig.rpc('remoteStart', { hours: 2, mail: 'me@x.dev' })
   const { port } = rig.info()
   assert.equal(on.url, `https://fake-${port}.trycloudflare.com`)
-  assert.deepEqual(saved(rig.data), { mail: 'me@x.dev', until: on.until, url: on.url }) // no token, no PIN
+  assert.deepEqual(saved(rig.data), { start: { hours: 2, mail: 'me@x.dev' }, mail: 'me@x.dev', until: on.until, url: on.url }) // no token, no PIN; start: T10's Turn on again
   const app = await connect(rig)
 
   // killed: down a moment, then back at a new address with a new link, its time as it was
@@ -574,4 +574,52 @@ test("T10: remote access turns itself off without a device: a device's call and 
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', local: true })
   const tab = (await until(() => rig.tab(ws.id), 'its claude')).id
   await assert.rejects(rig.rpc('settingsSet', { remoteIdleOff: 'never', from: { ws: ws.id, tab } }), /can't change/)
+})
+
+test("T10: the push's Keep, tapped, starts its clock over; after a restart, the notice's Turn on again still turns it on", async t => {
+  const posts: { url?: string; body: string }[] = []
+  const queue: string[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', d => (body += d))
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.startsWith('/topic-r1/json?poll=1')) return void res.writeHead(200).end(queue.splice(0).join('\n'))
+      posts.push({ url: req.url, body })
+      res.writeHead(200).end()
+    })
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const rig = await fresh(t)
+  await named(rig)
+  const st = async () => (await rig.rpc('state')).remote
+  await rig.rpc('settingsSet', { webhook: { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/topic`, format: 'ntfy', answer: true, replyTopic: 'r1' }, remoteIdleOff: 4 / 3600 }) // 4 s
+  await rig.rpc('remoteStart', { hours: 1, host: '' })
+  const was = (await st()).idleOffAt
+  await rig.rpc('remoteTick') // 4 s is inside the 10 minutes before: the push with Keep now
+  const parse = (b: string) => {
+    try {
+      return JSON.parse(b)
+    } catch {
+      return undefined
+    }
+  }
+  const push = await until(() => posts.map(x => parse(x.body)).find(j => j?.actions?.some((a: { label: string }) => /Keep/.test(a.label))), 'the push with Keep')
+  await new Promise(r => setTimeout(r, 1500))
+  await rig.rpc('phoneTick') // a poll before the tap: the Keep it waits for stays (not pruned as a tab's ask would be)
+  queue.push(JSON.stringify({ event: 'message', id: 'k1', message: push.actions[0].body }))
+  await rig.rpc('phoneTick')
+  await until(async () => (await st())?.idleOffAt > was + 1000, 'its clock started over by the tap')
+  // a daemon restart: what it was started with is kept, so the notice's Turn on again starts it again
+  await rig.stop()
+  await rig.start()
+  await until(async () => !!(await st()), 'back after the restart')
+  const app = await connect(rig)
+  await new Promise(r => setTimeout(r, 4200))
+  await rig.rpc('remoteTick')
+  await until(async () => (await st()) === undefined, 'off without a device')
+  const notice: any = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Remote access is off'), 'the notice')
+  await app.call('alertAnswer', { id: notice.id, choice: 'Turn on again' })
+  await until(async () => !!(await st()), 'on again')
+  await rig.rpc('remoteStop')
 })

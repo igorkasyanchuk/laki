@@ -43,7 +43,8 @@ APP_PID=
 # preflight); the pty host, which laki stop doesn't always end in time, by its socket, its terminals with it
 # ponytail: a data folder whose pty.sock path is too long for a socket (proto.ts' sockPath) has it in the temp folder
 reap() {
-  kill $APP_PID 2> /dev/null
+  set +e # a trap under set -e stops at its first failing command: kill with no APP_PID yet, laki stop with no daemon
+  [ -n "$APP_PID" ] && kill $APP_PID 2> /dev/null
   laki stop > /dev/null 2>&1
   for p in $(lsof -t "$LAKI_HOME/pty.sock" 2> /dev/null); do pkill -P "$p" 2> /dev/null; kill "$p" 2> /dev/null; done
   true

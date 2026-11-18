@@ -2634,6 +2634,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   state.tabs = state.tabs.filter(x => x !== t)
   stopShares({ tab: id })
   statusGone(id)
+  rmSync(join(dir, 'net', `${id}.json`), { force: true }) // its sandbox's settings file (netFile)
   save()
   changed()
 }

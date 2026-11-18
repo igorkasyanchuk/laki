@@ -3916,7 +3916,7 @@ export function App() {
               {ws.broken.remote ? ` Repair it on ${ws.host}: Laki only finds it there.` : ws.broken.kind === 'gone' ? ` Recreate checks out ${ws.branch} there again.` : ' Relink runs git worktree repair.'}
             </span>
             {!ws.broken.remote &&
-              (([how, label]) => <button onClick={() => void api.call<{ lost?: string }>('wsRepair', { ws: ws.id, how }).then(r => toast(r.lost ? `Recreated. Lost: ${r.lost}` : 'Relinked'), fail)}>{label}</button>)(ws.broken.kind === 'gone' ? ['recreate', 'Recreate'] : ['relink', 'Relink'])}
+              (([how, label]) => <button onClick={() => void api.call<{ lost?: string }>('wsRepair', { ws: ws.id, how }).then(r => toast(how === 'relink' ? 'Relinked' : r.lost ? `Recreated. Lost: ${r.lost}` : 'Recreated'), fail)}>{label}</button>)(ws.broken.kind === 'gone' ? ['recreate', 'Recreate'] : ['relink', 'Relink'])}
             {!ws.broken.remote && (
               <button className="ghost" onClick={() => void api.call<{ kept?: string }>('wsRepair', { ws: ws.id, how: 'forget' }).then(r => toast(r.kept ? `Archived. Its folder stays at ${r.kept}` : 'Archived. Its branch stays'), fail)}>
                 Archive, keep the branch

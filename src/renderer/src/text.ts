@@ -718,7 +718,13 @@ export function findFiles(q: string, files: string[], max = 60, budgetMs = Infin
 export const fuzzyFiles = (paths: string[], query: string, max = 8, budgetMs = 50) =>
   findFiles(query, paths, max, budgetMs).map(f => ({ path: f.path, ranges: f.hits.reduce<[number, number][]>((r, h) => ((l => (l && l[1] === h ? (l[1] = h + 1) : r.push([h, h + 1])))(r.at(-1)), r), []) }))
 // the folders above some files, each with its slash (src/, src/ui/): a box's @ offers them too
-export const foldersOf = (paths: string[]) => [...new Set(paths.flatMap(p => p.split('/').slice(0, -1).map((_, i, a) => `${a.slice(0, i + 1).join('/')}/`)))]
+// kept per list (a box's files stay one array between keys): 20,000 paths aren't split again at each one
+const folders = new WeakMap<readonly string[], string[]>()
+export function foldersOf(paths: readonly string[]) {
+  let f = folders.get(paths)
+  if (!f) folders.set(paths, (f = [...new Set(paths.flatMap(p => p.split('/').slice(0, -1).map((_, i, a) => `${a.slice(0, i + 1).join('/')}/`)))]))
+  return f
+}
 
 // @ in Reader's box: one of your workspaces or projects by its id (the one it's in left out; Terminals and Browsers
 // have none). As it's sent, a line for each @id in the text tells the agent what it is and how to reach it: context,

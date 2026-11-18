@@ -629,7 +629,7 @@ const hex = () => randomBytes(32).toString('hex')
 function keepRemote() {
   const r = remote
   if (!r) return
-  state.remote = { ...(r.serve && { serve: true }), mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }), ...(stable(r) && { e2e: r.e2e.toString('base64') }) } // S14: a stable address's page reconnects after a restart with the secret it has
+  state.remote = { ...(r.serve && { serve: true }), ...(r.start && { start: r.start }), mail: r.mail, ...(r.open && { open: true }), ...(r.pin && { pin: true }), ...(r.via && { via: r.via, ...(r.funnel && { funnel: true }) }), ...(r.host && { host: r.host, named: r.named }), ...(r.until && { until: r.until }), ...(r.used && r.access && { access: r.access }), ...((r.url ?? r.was) && { url: r.url ?? r.was }), ...(stable(r) && { e2e: r.e2e.toString('base64') }) } // S14: a stable address's page reconnects after a restart with the secret it has
   save()
 }
 const forget = () => state.remote && (delete state.remote, save())
@@ -789,6 +789,7 @@ export function remoteBack(now = Date.now()) {
   const r: RemoteRun = { e2e: typeof s.e2e === 'string' && Buffer.from(s.e2e, 'base64').length === 32 ? Buffer.from(s.e2e, 'base64') : e2eSecret(), mail: ts || s.pin || s.open ? '' : mail, until: typeof s.until === 'number' ? s.until : undefined, token: hex(), access: typeof s.access === 'string' ? s.access : '', used: typeof s.access === 'string', tries: 0, was: typeof s.url === 'string' ? s.url : undefined, down: 'starting again after a restart', ...(s.open && { open: true }), ...(ts && { via: 'tailscale' as const, funnel: !!s.funnel }), ...(s.host && { host: s.host, named: s.named }) }
   if (s.pin || s.host) Object.assign(r, { pin: newPin(), left: triesOf() })
   if (s.serve) r.serve = true
+  if (s.start && typeof s.start === 'object' && typeof s.start.hours === 'number') r.start = s.start // Turn on again's (remoteStart checks it all again)
   remote = r
   remoteSeen(now) // a restart starts its clock again
   log('remote access: starting again after a restart')

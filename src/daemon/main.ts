@@ -968,10 +968,11 @@ function clientLimit(method: string, p: ClientCall, c: clientsMod.Client) {
     u.sends.push(now)
     return
   }
-  const agents = method === 'wsFan' && Array.isArray(p.presets) ? p.presets.length : method === 'tabNew' ? ((pr => (pr && pr.agent !== 'command' ? 1 : 0))(core.presetNamed(String(p.preset ?? '')))) : method === 'wsNew' ? (p.preset === 'none' || p.preset === 'shell' ? 0 : 1) : 0
+  const agents = method === 'wsFan' && Array.isArray(p.presets) ? p.presets.length : method === 'tabNew' ? ((name, pr) => (pr ? pr.agent !== 'command' : isAgent(name)) ? 1 : 0)(String(p.preset ?? ''), core.presetNamed(String(p.preset ?? ''))) /* an agent's own name starts it too (tabSpec) */ : method === 'wsNew' ? (p.preset === 'none' || p.preset === 'shell' ? 0 : 1) : 0
   if (!agents && method !== 'wsNew') return
   const count = Math.max(1, agents)
-  if (u.ws.length + count > lim.wsPerHour) over(`${lim.wsPerHour} workspaces an hour${count > 1 ? ` (this one asks for ${count})` : ''}: next at ${at(u.ws[Math.max(0, u.ws.length + count - lim.wsPerHour - 1)] + 3600_000)}`)
+  if (count > lim.wsPerHour) over(`${lim.wsPerHour} workspaces an hour (this one asks for ${count})`)
+  if (u.ws.length + count > lim.wsPerHour) over(`${lim.wsPerHour} workspaces an hour${count > 1 ? ` (this one asks for ${count})` : ''}: next at ${at(u.ws[u.ws.length + count - lim.wsPerHour - 1] + 3600_000)}`)
   const mine = new Set(core.state.workspaces.filter(w => w.client === c.label && !w.archived).map(w => w.id))
   const live = core.state.tabs.filter(t => mine.has(t.workspace) && t.kind === 'agent' && ['running', 'waiting'].includes(core.tabStatus(t.id))).length
   if (agents && live + agents > lim.agentsAtOnce) over(`${lim.agentsAtOnce} agents at once (${live} running or waiting${agents > 1 ? `, this one asks for ${agents}` : ''}): one frees as an agent's turn ends or its workspace is archived`)

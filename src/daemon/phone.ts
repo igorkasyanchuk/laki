@@ -72,9 +72,10 @@ function tapKey() {
 const awaiting = new Map<string, { tab?: string; flow?: string; keep?: boolean; key: string; until: number }>()
 // a push's nonce: its buttons, only with Answer from the phone where taps can come back (answerOk)
 const nonceFor = (w: Webhook) => (w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'telegram' || w.format === 'webpush' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined)
-// still asking what it pushed: a tab's menu on screen, a run's wait (workflow.ts' waitKey)
-const stillAsks = (a: { tab?: string; flow?: string; key: string }) =>
-  a.flow ? flowHooks.waitKey?.(a.flow) === a.key : !!a.tab && state.tabs.some(t => t.id === a.tab) && rtOf(a.tab).status === 'waiting'
+// still asking what it pushed: a tab's menu on screen, a run's wait (workflow.ts' waitKey); remote access's Keep until
+// its until (15 minutes)
+const stillAsks = (a: { tab?: string; flow?: string; keep?: boolean; key: string }) =>
+  !!a.keep || (a.flow ? flowHooks.waitKey?.(a.flow) === a.key : !!a.tab && state.tabs.some(t => t.id === a.tab) && rtOf(a.tab).status === 'waiting')
 let tapCursor = '' // replies()'s: Telegram's next update, ntfy's last message (a unix time at first)
 let tapStop: (() => void) | undefined // ticks.ts' phoneTick, while any ask waits for a tap
 let tapping = false

@@ -138,10 +138,10 @@ frame) moves `lastRemoteAt`; `remoteStart` and `remoteBack` start it. `remoteTic
 `idleLimit`: `settings.remoteIdleOff` hours (unset 12; `open` to anyone with the link: 2 at most; `never` only for one
 email or Tailscale, else 12; `laki serve`'s run, `serve` (kept in `state.remote`), none: its only door). Ten minutes
 before (at once for a limit that short), `remoteHooks.warn` (main.ts): `phoneRemoteIdle` (a push, with *Keep* where
-taps come back: `awaiting`'s `keep`, `remoteKeepHook`) and `remoteIdle` to the app's windows (a toast with *Keep*). At the
+taps come back: `awaiting`'s `keep`, which `stillAsks` holds until its 15 minutes, `remoteKeepHook`) and `remoteIdle` to the app's windows (a toast with *Keep*). At the
 limit: logged, `remoteStop(why)` as Stop does (its token, origin and tunnel end; paired devices stay), then
 `remoteHooks.off`: a notice *Remote access is off* with *Turn on again* (`remoteStart` with the run's own `start`
-options). `remoteKeep` (the user's, a device's: FROM, AGENT_NO, REMOTE_OK) starts the clock over; the view's
+options, kept in `state.remote` so a restart's run has them too). `remoteKeep` (the user's, a device's: FROM, AGENT_NO, REMOTE_OK) starts the clock over; the view's
 `idleOffAt` is Settings' countdown. `remoteIdleOff` is in REMOTE_KEYS (`remote.*`): never an agent's or a phone's.
 
 D8, kept reachable: `remoteAwake` (the view's changed() asks it) holds core's `keepAwake` with the reason `remote` (one

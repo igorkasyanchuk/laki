@@ -22,6 +22,7 @@ H=$T/smoke # pack-smoke's own HOME and LAKI_HOME (never ~/.laki)
 cp package.json package-lock.json docs/release-notes.md "$T/"
 undo() {
   local code=$?
+  set +e # errexit would stop the trap at its first failing command (a pkill that finds no terminal), before the files are put back
   if [ -f "$H/data/daemon.json" ]; then # a smoke that failed before its own trap ran: its daemon, by the pid it wrote
     pid=$(node -p "require('$H/data/daemon.json').pid" 2> /dev/null || true)
     # only the bundle's own daemon (a stale file's pid may be another process's now)

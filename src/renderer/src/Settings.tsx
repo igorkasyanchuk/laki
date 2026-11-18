@@ -2852,7 +2852,7 @@ export function SettingsPage(p: {
                         )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
                         <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
-                        {s.hideSecrets && pr.agent !== 'command' && (
+                        {s.hideSecrets && ( // a command profile's tabs are held back too, with no sign-in key of their own (shared/env.ts)
                           <label className="switch-row">
                             <Says title="Let through" hint="Secret-looking variables this profile's agent still gets, by name" />
                             <input key={(pr.envAllow ?? []).join(',')} defaultValue={(pr.envAllow ?? []).join(', ')} placeholder="NPM_TOKEN, GH_TOKEN" aria-label="Variables to let through" onBlur={e => setPreset(i, { envAllow: (v => (v.length ? v : undefined))(e.target.value.split(/[\s,]+/).filter(Boolean)) })} />

@@ -12,7 +12,7 @@ import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../
 import { type Blame, type Broken, type Stat, type Workspace } from '../shared/types.ts'
 import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, log, noNested, q, run, save, state, within, wsLog } from './core.ts'
 import { dir } from './dir.ts'
-import { away, broken, hostUp, sshIn } from './hosts.ts'
+import { away, broken, hostUp, live, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
 
 // ---------- the worktree as a tree
@@ -459,7 +459,7 @@ export async function mergeClean(w: Workspace): Promise<boolean | undefined> {
 // T13: a live worktree whose folder or link broke under Laki: gone (no folder), unlinked (its .git names no record of
 // the repo's, or that record doesn't name it back), moved (its .git names the repo at another place: the repo moved).
 // brokenScan, at scanStats' start: every live worktree, no git call (an SSH host's or a codespace's by one sh there, a
-// minute apart: gone, or no .git), kept in hosts.ts' broken for the view; the other scans skip them (away)
+// minute apart, only while it's connected: gone, or no .git), kept in hosts.ts' broken for the view; the other scans skip them (away)
 const realOr = (p: string) => {
   try {
     return realpathSync(p)
@@ -491,7 +491,7 @@ export function brokenOf(w: Workspace): Broken | undefined {
 const remoteAt = new Map<string, number>()
 async function brokenRemote(w: Workspace): Promise<Broken | undefined> {
   if (w.codespace !== undefined && w.codespace !== '' && w.csState !== 'Available') return broken.get(w.id) // asleep: as it was
-  if (Date.now() - (remoteAt.get(w.id) ?? 0) < 60_000) return broken.get(w.id)
+  if (Date.now() - (remoteAt.get(w.id) ?? 0) < 60_000 || !live.has(w.host!)) return broken.get(w.id) // a host not connected: never dialed for this
   remoteAt.set(w.id, Date.now())
   const out = await exec({ host: w.host, path: '/' }, 'sh', ['-c', 'test -d "$1" || echo gone; test -e "$1/.git" || echo unlinked', 'sh', w.path]).then(r => r.stdout, () => undefined)
   if (out === undefined) return broken.get(w.id) // the host didn't answer: not known
