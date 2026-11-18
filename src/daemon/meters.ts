@@ -2,13 +2,14 @@
 // imports it, and its users import it directly.
 
 import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
 import { type ChatHit, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
-import { changed, chatFile, findWs, keptChat, keptOnly, presetOf, state } from './core.ts'
+import { changed, chatFile, findWs, keptChat, keptOnly, openPath, presetOf, state } from './core.ts'
 import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
 import { dir } from './dir.ts'
 import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, num, type Said, transcriptOf } from './share.ts'
@@ -282,7 +283,21 @@ function claudeBig(tab: Tab) {
   }
   return false
 }
-export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background' | 'retry'> {
+// B7: a skill the tab's chat loaded, its SKILL.md in your editor (the context meter's menu): by its name, from the
+// folder the transcript said, else the workspace's .claude/skills or .codex/skills, else the agent's own skills folder
+export async function skillOpen(p: { tab?: unknown; name?: unknown }) {
+  const t = state.tabs.find(x => x.id === p.tab)
+  const s = t && meters.get(t.id)?.m.skills?.find(x => x.name === p.name)
+  if (!t || !s) throw new Error('not a skill its chat loaded')
+  const ws = state.workspaces.find(w => w.id === t.workspace)
+  const short = s.name.split(':').pop()!
+  const dirs = [s.path?.replace(/^~(?=\/)/, homedir()), ws && join(ws.path, `.${t.preset}`, 'skills', short), join(accountNamed(t.account)?.dir ?? homeDir(t.preset as 'claude' | 'codex'), 'skills', short)]
+  const f = dirs.flatMap(d => (d ? [join(d, 'SKILL.md')] : [])).find(f => statSync(f, { throwIfNoEntry: false })?.isFile())
+  if (!f) throw new Error(`${s.name}'s SKILL.md isn't where its chat said${s.path ? ` (${s.path})` : ''}`)
+  await openPath(f, 'editor', ws?.project)
+  return { path: f }
+}
+export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background' | 'retry' | 'skills'> {
   const r = meters.get(t.id)
   const m = r?.file?.endsWith(`${t.resumeId}.jsonl`) ? r.m : undefined // another chat's (a /clear): until this one's is read
   const s = (x => (x?.session === t.resumeId ? x : undefined))(statusOn() ? lines.get(t.id) : undefined) // its status line's, this chat's
@@ -294,7 +309,7 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const used = live ?? m?.used
   const bg = m && r!.bg
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
-  return { ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  return { ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to

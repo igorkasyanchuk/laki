@@ -40,7 +40,7 @@ const args = (a: unknown) => {
 function toolLine(name: string, input: unknown) {
   const i = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
   const patch = typeof input === 'string' && [...input.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map(m => m[1]) // codex's apply_patch
-  const what = patch && patch.length ? patch.join(', ') : (i.command ?? i.cmd ?? i.file_path ?? i.path ?? i.pattern ?? i.url ?? i.query ?? i.description ?? (typeof input === 'string' ? input : ''))
+  const what = patch && patch.length ? patch.join(', ') : (i.command ?? i.cmd ?? i.skill ?? i.file_path ?? i.path ?? i.pattern ?? i.url ?? i.query ?? i.description ?? (typeof input === 'string' ? input : ''))
   const s = (Array.isArray(what) ? what.join(' ') : String(what)).replace(/\s+/g, ' ').trim()
   return `${name}${s ? `: ${s.length > 160 ? `${s.slice(0, 159)}…` : s}` : ''}`
 }
@@ -193,7 +193,45 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 // and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry; skills?: SkillUse[] } // skills (B7): the skills the chat loaded, in that order (skillsIn); retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+// B7: a skill the chat loaded: its name, its folder once the transcript says it (claude's "Base directory for this
+// skill:" line, or the SKILL.md a tool read)
+export type SkillUse = { name: string; path?: string }
+const SKILL_MD = /((?:~|\/)[^\s"'`]*\/([^/\s"'`]+))\/SKILL\.md\b/
+const SKILLS_MAX = 50
+// claude: its Skill tool's calls ({ skill }), the message that loads one (its base directory) and a SKILL.md read with
+// Read; codex: a SKILL.md its shell read (codex loads a skill so). The main chat's only, not a subagent's
+function skillsIn(agent: string, j: any, m: Meter) {
+  const seen = (m.skills ??= [])
+  const add = (name: string, path?: string) => {
+    if (!name || name.length > 120) return
+    const had = seen.find(x => x.name === name)
+    if (had) return void (path && !had.path && (had.path = path))
+    if (seen.length < SKILLS_MAX) seen.push({ name, ...(path && { path }) })
+  }
+  if (agent === 'claude') {
+    if (j.isSidechain) return
+    const c = j.message?.content
+    for (const x of typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []) {
+      if (j.type === 'assistant' && x?.type === 'tool_use') {
+        if (x.name === 'Skill' && typeof x.input?.skill === 'string') add(x.input.skill.trim())
+        else if (x.name === 'Read' && typeof x.input?.file_path === 'string') (f => f && add(f[2], f[1]))(SKILL_MD.exec(x.input.file_path))
+      } else if (j.type === 'user' && x?.type === 'text' && typeof x.text === 'string') {
+        const d = /^Base directory for this skill: (\S[^\n]*)/m.exec(x.text)?.[1]?.trim()
+        if (!d) continue
+        const base = d.replace(/\/+$/, '').split('/').pop()!
+        const named = seen.findLast(s => !s.path && (s.name === base || s.name.endsWith(`:${base}`)))
+        named ? (named.path = d) : add(base, d)
+      }
+    }
+  } else {
+    const p = j.payload
+    if (j.type !== 'response_item' || !['function_call', 'custom_tool_call', 'local_shell_call'].includes(p?.type)) return
+    const a = p.arguments ?? p.input ?? p.action ?? ''
+    const f = SKILL_MD.exec(typeof a === 'string' ? a : JSON.stringify(a))
+    if (f) add(f[2], f[1])
+  }
+}
 export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
@@ -210,7 +248,8 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     x.cost += by * s.cost
   }
   for (const line of jsonl.split('\n')) {
-    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' ? !line.includes('"api_error"') : !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
+    const skill = line.includes('SKILL.md') || line.includes('"Skill"') || line.includes('Base directory for this skill')
+    if (!skill && !line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' ? !line.includes('"api_error"') : !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
     let j: any
     try {
       j = JSON.parse(line)
@@ -218,6 +257,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       continue
     }
     const at = dayOf(Date.parse(j.timestamp) || now)
+    if (skill) skillsIn(agent, j, m)
     if (agent === 'claude') {
       if (j.type === 'system' && j.subtype === 'api_error' && !j.isSidechain) {
         const at = Date.parse(j.timestamp) || now

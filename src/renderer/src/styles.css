@@ -2980,7 +2980,9 @@ button.board-name:hover { background: none; }
 .tab > .usage-ring { flex: none; } /* contextMeter 'ring': the status bar's ring on its tab */
 .tab-ctx { position: absolute; left: 0; bottom: 0; height: 2px; pointer-events: none; } /* the context meter on a tab (App's tabList): a line along its bottom edge, as long as its context is full */
 .tab-ctx { background: color-mix(in srgb, var(--accent) 70%, transparent); } /* amber and red: looks.css' .usage-bar's */
-.status .sb-ctx { display: inline-flex; align-items: center; gap: var(--sp-3); flex: none; font-variant-numeric: tabular-nums; }
+.status .sb-ctx { display: inline-flex; align-items: center; gap: var(--sp-3); flex: none; font-variant-numeric: tabular-nums; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: var(--cur-act); }
+.status .sb-ctx .sb-skills { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--muted); } /* B7: how many skills its chat loaded */
+.status .sb-ctx:hover { color: var(--fg); }
 .status .sb-ctx .usage-bar { width: 34px; height: 4px; background: color-mix(in srgb, var(--fg) 18%, transparent); } /* a track that shows on any fill */
 .status .sb-ctx .usage-bar.low i { background: var(--done); } /* the meter's thresholds: green, amber past 70%, red past 90% (Usage.tsx level) */
 .tab-pct { flex: none; padding: 0 var(--sp-3); border-radius: var(--r-l); font: 600 var(--fs-1)/15px var(--mono); color: var(--fg); background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent) var(--p), color-mix(in srgb, var(--line) 70%, transparent) var(--p)); font-variant-numeric: tabular-nums; }
@@ -3168,7 +3170,8 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-fold { max-height: 10lh; overflow: hidden; mask-image: linear-gradient(to bottom, #000 55%, transparent); } /* Reader's long message, folded */
 .rd-more { display: block; margin-top: 4px; font-size: var(--fs-2); }
 .rd-agent { overflow-wrap: anywhere; } .rd-agent .md { padding: 0; max-width: none; } .rd-agent .md > :first-child { margin-top: 0; } .rd-agent .md > :last-child { margin-bottom: 0; }
-.rd-tool { font-size: var(--fs-2); color: var(--muted); } .rd-tool summary { cursor: var(--cur-act); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rd-tool { font-size: var(--fs-2); color: var(--muted); }
+.rd-tool .rd-skill { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--fg); } /* B7: a turn that loaded a skill */ .rd-tool summary { cursor: var(--cur-act); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rd-tool pre { margin: 4px 0 0; padding: var(--sp-3) var(--sp-4); max-height: 240px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m); font: var(--fs-1)/1.45 var(--mono); white-space: pre-wrap; }
 .rd-working { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-3); }
 .rd-tool.fail summary { color: var(--error); }

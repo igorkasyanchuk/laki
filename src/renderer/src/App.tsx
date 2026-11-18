@@ -3723,12 +3723,26 @@ export function App() {
             <>
               {ctxOn && tab?.context && (
                 // the focused tab's context: how full, so you compact or start a new chat in time
-                <span className="sb-ctx" role="img" aria-label={`${tab.name}'s context: ${ctxPct(tab.context)}%, ${levelWord(ctxPct(tab.context))}`} data-tip={`${tab.name}'s context (${levelWord(ctxPct(tab.context))}): ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
+                // B7: a click lists the skills its chat loaded, in that order; one opens its SKILL.md
+                <button
+                  type="button"
+                  className="sb-ctx"
+                  aria-label={`${tab.name}'s context: ${ctxPct(tab.context)}%, ${levelWord(ctxPct(tab.context))}${tab.skills?.length ? `, ${tab.skills.length} skill${tab.skills.length === 1 ? '' : 's'} loaded` : ''}`}
+                  data-tip={`${tab.name}'s context (${levelWord(ctxPct(tab.context))}): ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''}${tab.skills?.length ? ` · skills loaded: ${tab.skills.map(s => s.name).join(', ')}` : ''} · /compact or a new chat before it fills · click: the skills it loaded`}
+                  onClick={e =>
+                    openMenu(e, [
+                      { head: `Context · ${ctxText(tab.context!)}` },
+                      { head: tab.skills?.length ? `Skills loaded (${tab.skills.length})` : 'No skills loaded yet' },
+                      ...(tab.skills ?? []).map(s => ({ label: s.name, icon: 'bookOpen' as const, hint: s.path ? shortPath(s.path) : undefined, tip: 'Opens its SKILL.md in your editor', run: () => void call('skillOpen', { tab: tab.id, name: s.name }).catch(fail) })),
+                    ])
+                  }
+                >
                   <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
                     <i style={{ width: `${ctxPct(tab.context)}%` }} />
                   </span>
                   <Num value={`${ctxPct(tab.context)}%`} />
-                </span>
+                  {!!tab.skills?.length && <span className="sb-skills" aria-hidden><Icon name="bookOpen" size={12} />{tab.skills.length}</span>}
+                </button>
               )}
               {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton key={tab.id} tab={tab} api={turnApi(ws.id)} onMenu={openMenu} /> /* F1: the focused agent's kept turns */}
               <BgButton tabs={view.tabs.filter(t => t.workspace === ws.id && t.preset === 'claude')} api={{ bgOutput: readerApi.bgOutput!, send: readerApi.send }} />

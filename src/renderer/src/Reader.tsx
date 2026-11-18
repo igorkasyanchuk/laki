@@ -253,6 +253,11 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         <summary>
           {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}
           {x.fail ? ` · ${x.fail} failed` : ''} · {x.text.split('\n').at(-1)}
+          {[...x.text.matchAll(/^Skill: (.+)$/gm)].map(m => (
+            <span key={m[1]} className="rd-skill" data-tip={`It loaded the ${m[1]} skill`}>
+              skill · {m[1]}
+            </span>
+          ))}
           {(a => a.length > 0 && <span className="rd-allowed" data-tip={a.map(r => `${r.tool} ${r.what}: allowed by the project's rule ${r.rule}`).join('\n')}> · {a.length} allowed by rule</span>)((tab.allowed ?? []).filter(r => x.text.includes(r.what)))}
         </summary>
         <pre>{linkify(x.text)}</pre>

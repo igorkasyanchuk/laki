@@ -32,6 +32,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
   with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+- **Skills loaded**: a click on the status bar's context meter lists the skills a Claude Code or Codex chat loaded, in order; one opens its SKILL.md.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).

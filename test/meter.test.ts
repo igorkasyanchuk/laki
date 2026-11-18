@@ -251,3 +251,29 @@ test("spend: wsSpend reads a workspace's transcripts; an agent can't read anothe
   assert.equal((await rig.rpc('wsSpend', { ws: one.id, from })).estimate, true, 'its own')
   await assert.rejects(rig.rpc('wsSpend', { ws: two.id, from }), /an agent can read its own workspace's spend only/)
 })
+
+test('B7: the skills a chat loaded, in that order: claude\'s Skill calls and base directories, a SKILL.md read; codex\'s shell', () => {
+  const l = (o: object) => `${JSON.stringify({ timestamp: '2026-11-18T10:00:00Z', ...o })}\n`
+  const tool = (name: string, input: object, extra = {}) => l({ type: 'assistant', message: { content: [{ type: 'tool_use', id: name, name, input }] }, ...extra })
+  const m = meterOf(
+    'claude',
+    tool('Skill', { skill: 'release-notes' }) +
+      l({ type: 'user', isMeta: true, message: { content: [{ type: 'text', text: 'Base directory for this skill: /repo/.claude/skills/release-notes\n\n# Release notes' }] } }) +
+      tool('Skill', { skill: 'caveman:caveman' }) +
+      l({ type: 'user', message: { content: 'Base directory for this skill: /plugins/caveman/skills/caveman\n\nbody' } }) +
+      tool('Read', { file_path: '/Users/me/.claude/skills/laki/SKILL.md' }) +
+      tool('Skill', { skill: 'release-notes' }) + // again: once
+      tool('Skill', { skill: 'sub' }, { isSidechain: true }) + // a subagent's: not the chat's
+      l({ type: 'user', message: { content: 'Base directory for this skill: /Users/me/.claude/skills/specdrop' } }), // typed as /specdrop: no Skill call
+    meterNew(),
+  )
+  assert.deepEqual(m.skills, [
+    { name: 'release-notes', path: '/repo/.claude/skills/release-notes' },
+    { name: 'caveman:caveman', path: '/plugins/caveman/skills/caveman' },
+    { name: 'laki', path: '/Users/me/.claude/skills/laki' },
+    { name: 'specdrop', path: '/Users/me/.claude/skills/specdrop' },
+  ])
+  const c = meterOf('codex', l({ type: 'response_item', payload: { type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['bash', '-lc', 'cat ~/.codex/skills/laki/SKILL.md'] }) } }), meterNew())
+  assert.deepEqual(c.skills, [{ name: 'laki', path: '~/.codex/skills/laki' }])
+  assert.equal(meterOf('claude', tool('Bash', { command: 'ls' }), meterNew()).skills, undefined, 'none: no list')
+})

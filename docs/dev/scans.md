@@ -548,7 +548,12 @@ sidechain's; `<synthetic>` skipped); the window `WINDOW` (200K), 1M for a `[1m]`
 `last_token_usage.total_tokens` of `model_context_window`, its `total_token_usage` growing (`total`: a smaller one is
 counted anew). Tokens: input, output, cache writes and reads; cost by `shared/types.ts` `PRICES` (`costOf`, the first
 regex on the model; `priced`: some had one, else tokens only). `meterView`: `TabView.context` `{ used, max }`, `usage`
-`{ tokens, cost? }`. Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
+`{ tokens, cost? }`, `skills` (B7: share.ts `skillsIn`, the lines that name `Skill`, `SKILL.md` or *Base directory for
+this skill*: claude's Skill calls (`input.skill`), the message that loads one (its folder; a `/skill` typed has only
+that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's, by name in the order loaded, 50 at
+most). The status bar's `.sb-ctx` is a button: its menu lists them, a pick calls `skillOpen` (`tab`, `name`: the
+folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<name>`, else the agent's own; its SKILL.md
+in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
 per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
 (`todayView`: tokens, cost, the 5 workspaces that used most). The renderer (`settings.contextMeter`, `settings.costs`,

@@ -68,7 +68,10 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
   Settings › Layout › *Context meter*), and a bar in the status bar, fill as
   its chat's context does (amber past 70%, red past 90%), so you `/compact` or start fresh in time; its tooltip has
-  the tokens the chat used and ≈ what they'd cost at API prices.
+  the tokens the chat used and ≈ what they'd cost at API prices. A click on the status bar's lists the skills the
+  chat loaded, in the order it loaded them (a Skill call, a `/skill`, a SKILL.md it read), and one opens its
+  SKILL.md in your editor: you see whether the agent used your project's skill or skipped it. The Reader marks the
+  step that loaded one (*skill · name*).
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
