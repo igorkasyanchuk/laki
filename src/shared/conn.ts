@@ -27,7 +27,10 @@ export function daemonInfo(): DaemonInfo | null {
   try {
     return JSON.parse(readFileSync(join(dataDir(), 'daemon.json'), 'utf8'))
   } catch {
-    return null
+    // a tab in the macOS wrapper sandbox (shared/wrap.ts) can't read daemon.json (the daemon's own token): its port is
+    // in its env, its tab's token is its key (post's LAKI_TAB_TOKEN). Never outside a tab
+    const port = Number(process.env.LAKI_DAEMON_PORT)
+    return inTab() && process.env.LAKI_TAB_TOKEN && Number.isInteger(port) && port > 0 ? { port, token: '', pid: 0 } : null
   }
 }
 

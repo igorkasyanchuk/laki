@@ -472,3 +472,40 @@ test("an agent's models: none said, or a failure, asked again after a while; a l
   assert.equal((await rig.rpc('agentModels', { agent: 'codex' }))[0].id, 'gpt-x') // a list: a day
   assert.equal(asks(), 3)
 })
+
+// the macOS wrapper sandbox (shared/wrap.ts): a fake sandbox-exec first on PATH, recording its arguments, then running
+// what it was given
+test('wrapper sandbox: a wrapped gemini starts through sandbox-exec; a missing one stops the tab and says why; an agent cannot turn it off', { skip: process.platform !== 'darwin' }, async t => {
+  const rig = await fresh(t)
+  const args = join(rig.home, 'sandbox-exec.args')
+  writeFileSync(join(rig.home, 'bin', 'sandbox-exec'), `#!/bin/sh\nprintf '%s\\0' "$@" > '${args}'\nwhile [ $# -gt 0 ]; do case "$1" in -p|-D|-f) shift 2;; *) break;; esac; done\nexec "$@"\n`, { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true } })
+  assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'gem-box').wrap, 'macos')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini, through the wrapper')
+  assert.ok(run.args.includes('hello'))
+  const said = readFileSync(args, 'utf8').split('\0')
+  assert.equal(said[0], '-p')
+  assert.match(said[1], /^\(version 1\)\n\(allow default\)/)
+  assert.ok(!said[1].includes(rig.home), 'no path in the profile')
+  assert.ok(said.some(x => x.endsWith(`=${realpathSync(ws.path)}`) && /^P\d+=/.test(x)), 'its worktree, realpath-ed, a parameter')
+  assert.deepEqual(said.slice(-4, -1), ['/bin/sh', '-c', said.at(-2)!]) // the agent's line, run by sh
+  // not with its own sandbox on, nor around claude's; an agent's call can't change it
+  await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { args: '-s' } }), /agent's own sandbox on/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'cl-box', add: true, set: { agent: 'claude', sandbox: true, wrap: true } }), /one or the other/)
+  const tab = (await until(() => rig.tab(ws.id))).id
+  await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { wrap: false }, from: { ws: ws.id, tab } }), /an agent can't change a profile's wrapper sandbox/)
+  assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'gem-box').wrap, 'macos')
+})
+
+test('wrapper sandbox: no sandbox-exec on this Mac: the tab does not start, and says why', { skip: process.platform !== 'darwin' }, async t => {
+  const rig = await fresh(t, { env: { LAKI_TEST_NO_SANDBOX_EXEC: '1' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true } })
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello', name: 'boxless' }), /sandbox-exec .* isn't on this Mac/)
+  await sleep(500)
+  assert.ok(!rig.fakeLog().some(l => l.bin === 'gemini'), 'never without the sandbox')
+  const ws = (await rig.rpc('state')).workspaces.find((w: { id: string; name?: string }) => w.id === 'boxless' || w.name === 'boxless')
+  assert.ok(ws, 'the workspace is made')
+})

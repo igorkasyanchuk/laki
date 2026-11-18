@@ -7,7 +7,7 @@ import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_pro
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
-import { homedir, release, userInfo } from 'node:os'
+import { homedir, release, tmpdir, userInfo } from 'node:os'
 import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -54,6 +54,7 @@ import { managedView, policy, policyAgent, policySettings, policyTick } from './
 import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 import { spotlightSet, tmSet } from './backup.ts'
+import { ownBoxOn, wrapProfile, wrapRefused } from '../shared/wrap.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
 export const run = promisify(execFile)
@@ -1764,8 +1765,64 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // S12: the values emptied for the agent itself (sh, bash, zsh: an assignment before a command takes effect after its
   // words are expanded, and an alias still expands): its children don't inherit its prompt and note. ponytail: fish
   // sets it first (its args would be empty), and a host's shell is unknown: those keep them
-  const clear = h === localHooks && n && !/(^|\/)fish$/.test(shell) ? `${Object.keys(env).filter(k => k.startsWith('LAKI_ARG_')).map(k => `${k}=`).join(' ')} ` : ''
+  const clear = h === localHooks && n && (!/(^|\/)fish$/.test(shell) || wrapped(tab)) ? `${Object.keys(env).filter(k => k.startsWith('LAKI_ARG_')).map(k => `${k}=`).join(' ')} ` : '' // the wrapper's line runs in sh
+  if (h === localHooks && wrapped(tab)) return wrapCmd(tab, `${clear}${line}`, env)
   return { cmd: `${clear}${line}`, env }
+}
+
+// ---------- the macOS wrapper sandbox (a profile's wrap, shared/wrap.ts): the agent's command under sandbox-exec, its
+// profile made for this tab's worktree, every path realpath-ed and passed as a -D parameter (the line names env vars
+// only: "$LAKI_SB_…", never a path or the profile). Not on an SSH host, never with the agent's own sandbox on (sandboxed,
+// ownBoxOn: one can't nest), not for a tab restarted without it (tab.wrap false: tabUnbox)
+export function wrapped(tab: Tab) {
+  const pr = presetOf(tab)
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  return process.platform === 'darwin' && tab.kind === 'agent' && pr?.wrap === 'macos' && tab.wrap !== false && isAgent(tab.preset ?? '') && !!ws && !ws.host && !sandboxed(tab) && !ownBoxOn(tab.preset!, pr.args, pr.env)
+}
+// sandbox-exec as PATH has it (/usr/bin/sandbox-exec; a test's fake first)
+export const sandboxBin = () => (inRig() && process.env.LAKI_TEST_NO_SANDBOX_EXEC === '1' ? undefined : (process.env.PATH ?? '').split(':').filter(Boolean).map(d => join(d, 'sandbox-exec')).find(f => existsSync(f))) // a test's Mac without it
+export const WRAP_MISSING = "macOS's sandbox-exec (/usr/bin/sandbox-exec) isn't on this Mac: the profile's wrapper sandbox can't start, so the agent doesn't (turn it off in its profile to run it without)"
+// a path as the sandbox sees it: its realpath, or its nearest folder's and the rest (one not made yet)
+function realOf(p: string): string {
+  try {
+    return realpathSync(p)
+  } catch {
+    const up = dirname(p)
+    return up === p ? p : join(realOf(up), basename(p))
+  }
+}
+function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: string; env: Record<string, string> } {
+  const bin = sandboxBin()
+  if (!bin) throw new Error(WRAP_MISSING)
+  const ws = state.workspaces.find(w => w.id === tab.workspace)!
+  const account = isAccountAgent(tab.preset ?? '') ? Object.values(accountEnv(accountFor(tab, presetOf(tab)?.account)))[0] : undefined // another of your accounts: its folder, in Laki's data folder
+  const { text, params } = wrapProfile({
+    agent: tab.preset as Agent,
+    worktree: realOf(ws.path),
+    home: realOf(homedir()),
+    gitDirs: gitWrites(ws.path, tab.preset === 'codex').map(realOf),
+    tmp: [realOf('/tmp'), dirname(realOf(tmpdir()))],
+    write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
+    denyRead: DATA_SECRETS.filter(n => !n.includes('*')).map(n => realOf(join(dir, n))),
+    allowRead: account ? [realOf(account)] : [],
+    net: presetOf(tab)?.net, // ponytail: not applied yet: the network stays as it is
+  })
+  const out: Record<string, string> = { ...env, LAKI_SB_PROFILE: text, LAKI_SB_CMD: line, ...(daemonPort && { LAKI_DAEMON_PORT: String(daemonPort) }) }
+  const ds: string[] = []
+  for (let i = 1; i < params.length; i += 2) (out[`LAKI_SB_D${ds.length}`] = params[i]), ds.push(`-D "$LAKI_SB_D${ds.length}"`)
+  return { cmd: `${q(bin)} -p "$LAKI_SB_PROFILE" ${ds.join(' ')} /bin/sh -c "$LAKI_SB_CMD"`, env: out }
+}
+// a write the wrapper refused, as the tab printed it (Operation not permitted for a path out of where it works): the
+// tab's boxed, its card's Restart without the wrapper
+function wrapSeen(tab: Tab, data: string) {
+  if (!/not permitted/i.test(data) || !wrapped(tab)) return
+  const path = wrapRefused(data)
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  if (!path || !ws || path.startsWith(`${realOf(ws.path)}/`) || path.startsWith(`${ws.path}/`)) return
+  const r = rtOf(tab.id)
+  if (r.boxed?.cmd === path) return
+  r.boxed = { cmd: path, why: `The wrapper sandbox refused ${path}: it writes only in its worktree, its git folder, temp folders and its own config`, wrap: true }
+  changed()
 }
 
 // codex's sandbox: workspace-write, unless its mode or its profile's flags pick a sandbox already (read-only is
@@ -1848,8 +1905,9 @@ const uncovered = (t: Tab) => t.preset === 'claude' && ungated.has(t.id) && tool
 // switch only (its profile keeps its sandbox; a closed tab reopened keeps the tab's); the user's alone (gates.ts)
 export function tabUnbox(p: { tab?: unknown }) {
   const tab = findTab(String(p.tab ?? ''))
-  if (tab.kind !== 'agent' || !sandboxed(tab)) throw new Error(`${tab.name} isn't in a sandbox`)
-  tab.sandbox = false
+  if (tab.kind !== 'agent' || (!sandboxed(tab) && !wrapped(tab))) throw new Error(`${tab.name} isn't in a sandbox`)
+  if (wrapped(tab)) tab.wrap = false // the wrapper's: its own sandbox (if any) stays as it was
+  else tab.sandbox = false
   rtOf(tab.id).boxed = undefined
   save()
   if (!asleep.has(tab.id)) spawnTab(tab, { resume: true }) // asleep: it starts so as it wakes
@@ -1903,6 +1961,14 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   else if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
   else if (tab.kind === 'shell') args = ['-l']
   else {
+    if (tab.kind === 'agent' && o.cmd === undefined && wrapped(tab) && !sandboxBin()) {
+      // its wrapper sandbox can't start: neither does it (never without the sandbox it was set up with)
+      wsLog(ws, `${tab.name}: not started: ${WRAP_MISSING}`)
+      try {
+        alertShow({ title: 'Not started', text: `${tab.name}: ${WRAP_MISSING}`, to: tab.id, from: { tab: tab.id } }, 'notice')
+      } catch {}
+      throw new Error(WRAP_MISSING)
+    }
     const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, o.prompt, !!o.resume) : undefined
     argEnv = a?.env
     args = [tab.preset === 'acp' ? '-lc' : '-lic', wait + (o.cmd ?? a?.cmd ?? (tab.cmd || 'true'))] // an ACP agent's stdout is its protocol: no interactive shell's
@@ -1946,7 +2012,9 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // a waiting tab's ask is read off its screen: what it prints (the menu drawn late, moved, answered from the keyboard)
   // is read again 300 ms later, and a view goes out only when the ask isn't the one the last view gave
   let asking: ReturnType<typeof setTimeout> | undefined
-  s.onOutput = () => {
+  const wrapOn = wrapped(tab)
+  s.onOutput = data => {
+    if (wrapOn) wrapSeen(tab, data)
     if (r.status !== 'waiting' || asking) return
     asking = setTimeout(() => {
       asking = undefined
@@ -2530,6 +2598,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
     else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
     else if (k === 'net') next.net = String(v)
+    else if (k === 'wrap') v === false ? delete next.wrap : (next.wrap = 'macos') // the macOS wrapper sandbox (shared/wrap.ts)
     else if (k === 'envAllow' && Array.isArray(v)) next.envAllow = [...new Set(v.map(String).filter(e => ENV_KEY.test(e)))].slice(0, 100)
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
@@ -2545,6 +2614,10 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.fast && !FAST[pr.agent as Agent]) delete pr.fast
   if (pr.sandbox && !SANDBOX[pr.agent as Agent]) delete pr.sandbox
   if (pr.sandbox && sandboxOff(pr.agent, pr.perm, pr.args)) throw new Error(SANDBOX_NO)
+  if (pr.wrap && process.platform !== 'darwin') throw new Error("the wrapper sandbox is macOS's (sandbox-exec)")
+  if (pr.wrap && pr.agent === 'command') throw new Error("the wrapper sandbox is for an agent's profile")
+  if (pr.wrap && pr.sandbox && SANDBOX[pr.agent as Agent]) throw new Error("the wrapper and the agent's own sandbox: one or the other (sandbox-exec can't run inside another)")
+  if (pr.wrap && ownBoxOn(pr.agent, pr.args, pr.env)) throw new Error("its flags turn the agent's own sandbox on: the wrapper can't run around it")
   if (pr.net !== undefined && !NET_OK[pr.agent as Agent]) delete pr.net // no sandbox, no network of its own
   if (pr.net !== undefined && !NET_OK[pr.agent as Agent]!.includes(pr.net)) throw new Error(NET_NO[pr.agent as Agent]?.[pr.net] ?? `net: ${NET_OK[pr.agent as Agent]!.join(', ')}`)
   return settingsSet({ presets: i >= 0 ? list.map((x, j) => (j === i ? pr : x)) : [...list, pr], ...(def && pr.name !== name && { agent: pr.name }) }).presets!

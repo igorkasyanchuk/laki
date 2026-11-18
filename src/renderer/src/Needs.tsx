@@ -194,10 +194,10 @@ function Boxed({ t, unbox, netAllow }: { t: TabView; unbox: (t: TabView) => void
   return (
     <div className="need-boxed" onClick={e => e.stopPropagation()}>
       <span className="muted small" title={b.why}>
-        The sandbox stopped {b.host ? <code>{b.host}</code> : b.cmd ? <code>{b.cmd}</code> : 'a command'}
+        {b.wrap ? 'The wrapper sandbox refused' : 'The sandbox stopped'} {b.host ? <code>{b.host}</code> : b.cmd ? <code>{b.cmd}</code> : 'a command'}
       </span>
       {b.host && netAllow && <button onClick={() => netAllow(t, b.host!)}>Allow this domain in this project</button>}
-      <button onClick={() => unbox(t)}>Restart without sandbox</button>
+      <button onClick={() => unbox(t)}>{b.wrap ? 'Restart without the wrapper' : 'Restart without sandbox'}</button>
     </div>
   )
 }

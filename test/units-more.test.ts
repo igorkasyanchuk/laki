@@ -1089,3 +1089,31 @@ test('triggerAt (T17): @ at a word start, not in an email or inside code; a spac
   assert.deepEqual(triggerAt('`a` then @b', 11), { ch: '@', q: 'b', from: 9 }, 'after code: again')
   assert.equal(triggerAt('@ ', 2), null, 'a space after it')
 })
+
+test('wrapProfile: the worktree and its git folder writable, ~/.ssh unreadable, every path a parameter (a quote or a parenthesis never in the text)', async () => {
+  const { wrapProfile, wrapRefused, ownBoxOn } = await import('../src/shared/wrap.ts')
+  const odd = '/Users/me/wt "x") (allow file-write* (subpath "/"))'
+  const { text, params } = wrapProfile({ agent: 'gemini', worktree: odd, home: '/Users/me', gitDirs: ['/Users/me/repo/.git/worktrees/wt'], tmp: ['/private/tmp'], denyRead: ['/Users/me/.laki/daemon.json'] })
+  const value = (path: string) => params.find(x => x.endsWith(`=${path}`))!.split('=')[0]
+  const writes = text.slice(text.indexOf('(allow file-write*'), text.indexOf('(deny file-read*'))
+  const reads = text.slice(text.indexOf('(deny file-read*'))
+  for (const p of [odd, '/Users/me/repo/.git/worktrees/wt', '/private/tmp', '/Users/me/.gemini']) assert.match(writes, new RegExp(`\\(param "${value(p)}"\\)`), p)
+  for (const p of ['/Users/me/.ssh', '/Users/me/.aws', '/Users/me/.gnupg', '/Users/me/.config/gh', '/Users/me/Library/Keychains', '/Users/me/.codex', '/Users/me/.grok']) assert.match(reads, new RegExp(`\\(subpath \\(param "${value(p)}"\\)\\)`), p)
+  assert.match(reads, new RegExp(`\\(literal \\(param "${value('/Users/me/.laki/daemon.json')}"\\)\\)`)) // a file: literal
+  assert.ok(!reads.includes(`"${value('/Users/me/.gemini')}"`), 'its own folder is its to read')
+  assert.ok(!text.includes('/Users/me'), 'no path in the text: each is -D NAME=path')
+  assert.equal(params[params.findIndex(x => x.endsWith(`=${odd}`)) - 1], '-D') // the path as given, whole
+  assert.ok(params.filter((_, i) => i % 2).every(x => /^P\d+=/.test(x)))
+  assert.match(text, /^\(version 1\)\n\(allow default\)\n\(deny file-write\*\)/)
+  // what it printed: the refused path
+  assert.equal(wrapRefused('touch: /Users/me/.zshrc: Operation not permitted\r\n'), '/Users/me/.zshrc')
+  assert.equal(wrapRefused("Error: EPERM: operation not permitted, open '/Users/me/.npm/_cacache/x'"), '/Users/me/.npm/_cacache/x')
+  assert.equal(wrapRefused('all good'), undefined)
+  // an agent's own sandbox on by its flags or env: no wrapper around it
+  assert.equal(ownBoxOn('gemini', '-s'), true)
+  assert.equal(ownBoxOn('gemini', '--sandbox=false'), false)
+  assert.equal(ownBoxOn('gemini', '', { GEMINI_SANDBOX: 'sandbox-exec' }), true)
+  assert.equal(ownBoxOn('grok', '--sandbox workspace'), true)
+  assert.equal(ownBoxOn('grok', '--sandbox off'), false)
+  assert.equal(ownBoxOn('opencode', '-s'), false) // it has none
+})

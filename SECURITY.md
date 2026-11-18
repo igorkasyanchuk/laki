@@ -143,6 +143,13 @@ project's test script is, which the agent can edit.
   sign-in key, what you set in Settings, a project or a profile, and a profile's *Let through*. Terminals you open,
   setup scripts and Run actions get the whole environment. An agent can't turn it off or let a name through.
 
+- The macOS wrapper sandbox (a profile's *Wrapper sandbox*) runs an agent that has no sandbox of its own, or has it
+  off, under Apple's `sandbox-exec`: it writes only in its worktree, the git folder its commits write, temp folders, its
+  storage folder and its own settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh`, your keychains,
+  other agents' settings or Laki's secret files. Every path goes in as a parameter, never into the profile's text. It
+  doesn't limit the network yet, and Apple marks `sandbox-exec` deprecated: a later macOS may drop it, and then the tab
+  doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone.
+
 - An agent's sandbox network (a profile's *Network*) is the agent's own: Claude Code's *Listed hosts* is its
   `sandbox.network.allowedDomains`, which pre-allows those hosts and still asks about others (a Yes there lets one
   through for that session); Codex's is on or off only. Neither limits what the agent itself sends to its model, nor

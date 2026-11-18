@@ -103,7 +103,7 @@ export function netList(has: (file: string) => boolean, agent: string, own: read
 export const SANDBOX_DENIED = /Operation not permitted|Read-only file system|blocked by (the )?sandbox|Connection to \S+ blocked/i
 // the host claude's sandbox names as it refuses a connection ("Connection to <host> blocked…", in the command's result)
 const NET_BLOCKED = /Connection to ([^\s:/]+)(?::\d+)? blocked/i
-export type Boxed = { cmd: string; why: string; host?: string }
+export type Boxed = { cmd: string; why: string; host?: string; wrap?: true } // wrap: the macOS wrapper sandbox refused it (a write outside where it works)
 export function sandboxStop(pl: { hook_event_name?: unknown; tool_name?: unknown; tool_input?: { command?: unknown; dangerouslyDisableSandbox?: unknown }; error?: unknown; tool_response?: unknown }): Boxed | undefined {
   if (pl.tool_name !== 'Bash') return
   const cmd = String(pl.tool_input?.command ?? '').trim().split('\n')[0].slice(0, 200)
@@ -502,6 +502,7 @@ export type Tab = {
   perm?: string // how freely it acts (PERMS' id; '': the agent's own; unset: its profile's), kept for restarts
   fast?: boolean // fast mode (FAST; unset: its profile's), kept for restarts
   sandbox?: boolean // the agent's own sandbox (SANDBOX; unset: its profile's), kept for restarts
+  wrap?: false // restarted without its profile's wrapper sandbox (tabUnbox), kept for restarts
   bgTold?: string[] // the background tasks a restart's note named (core's bgGone): their ends never come, so not named again
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
@@ -540,7 +541,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not

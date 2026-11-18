@@ -353,6 +353,9 @@ function StorageUse({ api, dir }: { api: () => Promise<{ dir: string; bytes: num
     </div>
   )
 }
+// a new profile of an agent Laki turns no sandbox on for (gemini, grok, opencode), on a Mac: the wrapper sandbox
+// suggested on (shared/wrap.ts); off for every profile you had
+const wrapNew = (agent: string) => (/Mac/.test(navigator.userAgent) && ['gemini', 'grok', 'opencode'].includes(agent) ? { wrap: 'macos' as const } : {})
 const UI_SIZES = [9, 10, 11, 12, 13, 14, 15, 16] // Appearance › Interface › Text size, px
 // Settings and Help's own size (Appearance), over the terminal font's: ⌘± step through these while one is open
 export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
@@ -2882,6 +2885,12 @@ export function SettingsPage(p: {
                             </Switch>
                           ))(sandboxOff(pr.agent, pr.perm, pr.args))
                         )}
+                        {pr.agent !== 'command' && /Mac/.test(navigator.userAgent) && !(SANDBOX[pr.agent as Agent] && pr.sandbox) && (
+                          // the macOS wrapper sandbox (shared/wrap.ts): only where its own sandbox is off or none
+                          <Switch className="switch-row" on={pr.wrap === 'macos'} onChange={on => setPreset(i, { wrap: on ? 'macos' : undefined })}>
+                            <Says title="Wrapper sandbox (macOS)" hint="Runs it under sandbox-exec: it writes only in its worktree, git's folder, temp folders and its own settings, and can't read ~/.ssh, ~/.aws, your keychains or other agents' settings. Apple marks sandbox-exec deprecated" />
+                          </Switch>
+                        )}
                         {pr.sandbox && NET_OK[pr.agent as Agent] && !sandboxOff(pr.agent, pr.perm, pr.args) && (
                           // its sandbox's network: what this agent's sandbox can do, the rest shown off with why
                           <label className="switch-row">
@@ -2910,14 +2919,14 @@ export function SettingsPage(p: {
                     ),
                   )}
                   <div className="row">
-                    <button onClick={() => setPresets([...presets, { name: freeProfile(agent === 'command' ? 'command' : agent), agent }])}>
+                    <button onClick={() => setPresets([...presets, { name: freeProfile(agent === 'command' ? 'command' : agent), agent, ...wrapNew(agent) }])}>
                       <Icon name="plus" /> Add {agent === 'command' ? 'command' : `${AGENT_NAMES[agent]} profile`}
                     </button>
                   </div>
                 </Group>
               ))}
               <div className="row">
-                <select value="" aria-label="Add a profile for another agent" onChange={e => e.target.value && setPresets([...presets, { name: freeProfile(e.target.value), agent: e.target.value as Preset['agent'] }])}>
+                <select value="" aria-label="Add a profile for another agent" onChange={e => e.target.value && setPresets([...presets, { name: freeProfile(e.target.value), agent: e.target.value as Preset['agent'], ...wrapNew(e.target.value) }])}>
                   <option value="">Add a profile for…</option>
                   {[...AGENTS, 'command' as const]
                     .filter(a => !presets.some(x => x.agent === a) && !isAccountAgent(a))

@@ -406,6 +406,21 @@ or its `PermissionRequest` to run one again with `dangerouslyDisableSandbox`) is
 waiting or idle, until its next prompt): its Needs you card says so and offers *Restart without sandbox*, which asks
 first, then `tabUnbox` (the user's: AGENT_NO, REMOTE_NO) sets the tab's `sandbox: false` (its profile keeps its own) and
 starts it again, its chat resumed. ponytail: codex's denials reach no hook, so it gets no card.
+The macOS wrapper sandbox (a profile's `wrap: 'macos'`, `shared/wrap.ts`; Settings' *Wrapper sandbox (macOS)*, `laki
+preset set <name> --wrap|--no-wrap`): for an agent whose own sandbox is off or that has none (wrap.ts' header lists each
+agent's, from its docs: OpenCode has none; Gemini's `-s` and Grok's `--sandbox` are theirs, off unless a profile's flags or
+env turn them on, `ownBoxOn`). core's `wrapped(tab)` (a Mac, this Mac's workspace, not `sandboxed`, not `ownBoxOn`, the tab's
+`wrap` not false) makes `agentCmd` return `wrapCmd`: `<sandbox-exec> -p "$LAKI_SB_PROFILE" -D "$LAKI_SB_D0" … /bin/sh -c
+"$LAKI_SB_CMD"`, the profile and every path in the tab's env, never in the line. `wrapProfile`: allow default, deny writes
+but the worktree, `gitWrites`' folders, /tmp and $TMPDIR's folder, the agent's own (`AGENT_WRITES`), its storage folder, its
+account's folder, claude's status line folder; deny reads of `SECRET_HOME`, every other agent's folders and Laki's data
+folder's `DATA_SECRETS` (its account's folder allowed back); each path `realOf` (realpath, or its nearest folder's) and a
+`-D P<n>=<path>`. The network as it is (`net` not applied yet). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
+tab's token, daemon.json unread (conn.ts `daemonInfo`). No sandbox-exec (`sandboxBin` on PATH; a test's
+`LAKI_TEST_NO_SANDBOX_EXEC`): the tab doesn't start, a notice and the workspace's log say why. A write it refuses
+(`wrapRefused` in the tab's output: *Operation not permitted* for a path out of the worktree) is `boxed` with `wrap: true`:
+the card's *Restart without the wrapper* (`tabUnbox`: the tab's `wrap: false`). An agent's `presetSave` can't touch `wrap`
+(main.ts' `agentNo`); `presetSave` refuses it with the agent's own sandbox on (`test/presets.test.ts`, `test/units-more.test.ts`).
 `settings.hideSecrets` (Settings › Agents & profiles; a new install's on, `load`, a test's daemon only with
 `LAKI_TEST_LEAN=1`; one from before is asked once by a notice, main.ts, `hideSecretsAsked`): an agent tab's environment
 (`childEnv`, not shells, setup or Run) is `shared/env.ts` `envSplit` over `plainEnv()`: `SECRET_ENV`'s names held but

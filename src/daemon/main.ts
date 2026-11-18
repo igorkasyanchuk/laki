@@ -1268,6 +1268,7 @@ function agentNo(method: string, p: any) {
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'net' in p.set) notAgent(p, "change a profile's network (what its sandbox lets it reach)")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'envAllow' in p.set) notAgent(p, "let secret-looking variables through to agents")
+  else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'wrap' in p.set) notAgent(p, "change a profile's wrapper sandbox")
   else if (method === 'projectSet' && p.allow !== undefined) notAgent(p, "change a project's auto-answer rules (what Laki allows for every agent: the user's, in Settings)")
   else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
