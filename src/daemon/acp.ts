@@ -140,7 +140,7 @@ export class AcpPty implements Pty {
       this.session = String(s?.sessionId ?? '')
       if (!this.session) throw new Error('no session')
       const who = init.agentInfo?.title ?? init.agentInfo?.name
-      this.print(`\x1b[2m${who ? `${who}, ` : ''}ACP ${ACP_VERSION}: ready\x1b[0m\r\n`)
+      this.print(`\x1b[90m${who ? `${who}, ` : ''}ACP ${ACP_VERSION}: ready\x1b[0m\r\n`)
       if (this.first?.trim()) this.prompt(this.first)
     } catch (e) {
       this.print(`\r\n${(e as Error).message}\r\n`)

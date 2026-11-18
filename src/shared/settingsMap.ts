@@ -97,6 +97,8 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Corners', 'radius rounded square'],
   ['appearance', 'Pages size', 'zoom text font size small bigger larger readable page settings help scheduled tasks workflows specs brainstorms'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
+  ['appearance', 'Density', 'compact roomy regular spacing space padding dense tight loose bigger smaller rows height'],
+  ['appearance', 'Pointing hand over buttons', 'cursor pointer hand arrow mouse buttons links'],
   ['appearance', 'Customize toolbar', 'toolbar buttons tab bar hide show order reorder customize ship timer preview editor share'],
   ['appearance', 'Motion', 'motion animations animation movement reduce high low none off effects transitions breathe'],
   ['appearance', 'Vertical text', 'sideways rotated direction text up down bottom top reverse board columns strip lanes writing'],

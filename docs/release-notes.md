@@ -5,6 +5,9 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Density: Settings › Appearance › *Density* makes the space and controls Compact or Roomy.
+- Laki follows macOS's cursor habits: the arrow over buttons, tabs and rows, the hand over links (*Pointing hand over buttons* brings it back). Scrollbars show only while you scroll, point at or work in a list, unless macOS is set to always show them.
+- The picked segment (Terminal | Reader, Settings' choices, the side panel's tabs) slides to the next. The terminal, the Done check and the tab bar start on one left edge; Frosted's status bar draws its two groups without a second outline, its context meter with a track; Laki's own grey lines in a terminal no longer sit on a dark patch.
 - Needs you shows a finished turn as one line (Changes and Seen on hover; a click opens its card), so asks stand out; Settings › Layout › Sidebar › *Finished turns as rows* turns it off. Project names stick to the sidebar's top as you scroll their workspaces.
 - Long names are cut at their dashes and dots (`fix…total`) and keep at least 10 characters in a row: the next-step chip shows just its icon when it needs the room.
 - The tab bar's buttons sit in groups, fold into ⋯ when the bar is narrow, and can be picked and ordered: right click the bar › *Customize toolbar…* (or View › Customize Toolbar…). Tabs that don't fit go behind a *+n* button that shows the most urgent of them. [Try it](laki://toolbar)

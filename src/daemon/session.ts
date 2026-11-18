@@ -146,7 +146,7 @@ export class Session {
       this.exitCode = exitCode
       this.program.clear()
       clearTimeout(this.settle)
-      this.output(this.note || `\r\n\x1b[2m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
+      this.output(this.note || `\r\n\x1b[90m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
       for (const c of this.clients.keys()) c.send({ ev: 'exit', tab: this.tab, code: exitCode })
       this.onExit(exitCode)
     })

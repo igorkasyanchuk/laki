@@ -1121,8 +1121,8 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual); vertText: --vt, the writing-mode of every sideways label
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; vertText?: 'down' | 'up'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'sideClear', 'translucent', 'motion', 'vertText', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; density?: 'compact' | 'regular' | 'roomy'; pointerHand?: boolean; vertText?: 'down' | 'up'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'sideClear', 'translucent', 'motion', 'vertText', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark', 'density', 'pointerHand'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1313,6 +1313,12 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   st.colorScheme = ''
   root.dataset.look = o.design === 'frosted' ? 'frosted' : t.look ?? '' // Design's Frosted: its shapes over any theme's, the theme's colors kept
   root.dataset.motion = o.motion ?? 'low'
+  // Density: space and heights (styles.css --density); the phone page never Compact (its touch targets stay big)
+  const page = !(globalThis as { laki?: unknown }).laki
+  const d = o.density === 'roomy' ? 1.18 : o.density === 'compact' && !page ? 0.82 : 1
+  if (d !== 1) st.setProperty('--density', String(d))
+  // a control's cursor: the arrow on a Mac (its own apps'), the hand elsewhere and on the phone page; Pointing hand over buttons
+  if (!(o.pointerHand ?? (page || !/Mac/.test(navigator.platform)))) st.setProperty('--cur-act', 'default')
   root.classList.toggle('opaque', OPAQUE_LOOKS.has(root.dataset.look)) // V8: its floats solid
   root.classList.toggle('light', !!t.light) // a light theme (Grain's soft-light)
   if (o.vertText) st.setProperty('--vt', o.vertText === 'up' ? 'sideways-lr' : 'vertical-rl') // Vertical text: each sideways label's writing-mode (unset: its own, styles.css' var(--vt, …) fallbacks)

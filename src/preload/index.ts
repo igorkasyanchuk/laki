@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('laki', {
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   restartDaemon: (hung?: boolean): Promise<boolean> => ipcRenderer.invoke('daemon-restart', hung === true), // the stale bar's Restart when the daemon refuses this app (another Laki's); hung: the hung bar's (SIGKILL when it doesn't stop)
   onDaemonHung: (cb: (hung: boolean) => void) => ipcRenderer.on('daemon-hung', (_e, hung: boolean) => cb(hung === true)), // main's pings: 3 missed in a row, or answered again
+  scrollbars: (): Promise<'overlay' | 'always'> => ipcRenderer.invoke('scrollbars'), // macOS's Show scroll bars: overlay unless Always
+  onScrollbars: (cb: (s: 'overlay' | 'always') => void) => void ipcRenderer.on('scrollbars', (_e, s: 'overlay' | 'always') => cb(s)),
   accent: (): Promise<string | null> => ipcRenderer.invoke('accent'), // V9: macOS's accent color, #rrggbb (null off a Mac)
   onAccent: (cb: (c: string | null) => void) => void ipcRenderer.on('accent', (_e, c: string | null) => cb(c)), // as it changes
   glass: (on: boolean, light?: boolean, float?: boolean, side?: boolean) => ipcRenderer.send('glass', on, light, float, side), // the window's blur behind see-through backgrounds

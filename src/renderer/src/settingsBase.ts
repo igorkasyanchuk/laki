@@ -96,3 +96,8 @@ export const railSorted = <T extends { key: string }>(xs: T[], order: string[] =
   const at = (k: string) => (i => (i < 0 ? order.length + RAIL_ITEMS.findIndex(x => x.key === k) : i))(order.indexOf(k))
   return [...xs].sort((a, b) => at(a.key) - at(b.key))
 }
+
+// Settings › Appearance › Density: space and control heights (styles.css --density, themes.ts applyTheme)
+export const DENSITIES: [NonNullable<AppSettings['density']>, string][] = [['compact', 'Compact'], ['regular', 'Regular'], ['roomy', 'Roomy']]
+// the toolbar's buttons as data (toolbar.ts)
+export { TOOLBAR_ITEMS, TOOLBAR_GROUPS } from './toolbar'

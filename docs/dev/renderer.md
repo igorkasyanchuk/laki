@@ -1297,3 +1297,39 @@ non-activating panel under `tray.getBounds()`, hidden on blur and on Esc (a clic
 it again: `inboxHid`). ask.ts in that mode: no ×, no Close all, "Nothing waits on you", then New task… (`inbox-new`: the
 quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-size`, `ask-close`), each checked by
 `inboxSender` (its window, and `from(e, 'inbox')`: guards.ts `pageIs`); a choice goes through `answer`, as a card's.
+
+## Density, cursors, scrollbars, edges
+
+- **Density** (Settings › Appearance, `settings.density`, themes.ts `applyTheme`: `--density` on the document, Compact
+  0.82, Roomy 1.18; the phone page never Compact): `--sp-1…6` and `--h-s/m/l` are `round(nearest, calc(var(--…-base) *
+  var(--density)), 1px)` on `:root`, a sidebar row's `--ws-h` and a project head's `--ph-h` too; type, hairlines,
+  corners and icons never (`test/css.test.ts`: no `--fs-*` times `--density`). The 40px tab bar keeps its height (the
+  traffic lights). A look sets a `-base` if it changes one.
+- **Cursors** (`--cur-act`): controls take it (`cursor: var(--cur-act)`), links (`a[href]`, `.link`, `.md a`) the hand.
+  themes.ts sets it to `default` on a Mac in the app (macOS's habit) unless *Pointing hand over buttons*
+  (`settings.pointerHand`); elsewhere and on the phone page the hand. A control with the arrow needs a hover state:
+  `test/css.test.ts` checks every `--cur-act` selector has a `:hover` (its own, an `:is(…):hover` list's, its element's
+  base one) or a reason in `NO_HOVER`. The UI kit's base CSS (`shared/widget.ts`) uses `var(--cur-act, pointer)`.
+- **Overlay scrollbars** (`html[data-scrollbars='overlay']`: main's `scrollbars` IPC, macOS's `AppleShowScrollBars`
+  unless Always, `AppleShowScrollBarsSettingChanged` sends it again; off a Mac and on the phone page the thumb always
+  shows): `--sb`, a registered non-inherited color, is a scroller's own on `:hover`, `:focus-within` or `data-scrolling`
+  (main.tsx: one passive capture scroll listener, removed 900 ms after the last scroll, a `WeakMap` of timers); its thumb
+  takes it (`--sb: inherit`) and fades through a `:where(*)` transition (none overridden: no specificity), out after 600
+  ms. The terminal's own (`.xterm-viewport`) is untouched. ponytail: the 8px gutter stays (Chromium draws a custom
+  scrollbar in its own room).
+- **The selection slides** (`slide.ts`, `.slid`): `.seg`, the Terminal | Reader switch and the side panel's tabs draw
+  their pick's underline or fill as the group's `::before` at `--ind-x/y/w/h`, set by one MutationObserver (class and
+  aria changes on a group's items) right after React's commit; a group slides only from its first change on, from the
+  old pick (`data-still` for its first placing), and a resize places them again without moving. Motion: Off, the
+  catch-all.
+- **Edges** (`--pane-x`, the terminal's text's inset: 10px, 18px in a lineless Design or Roomy padding, 4px Tiny or a
+  phone, set on `.app`; `--pane-x2` = it + `--pane-icon` (14px) + `--sp-3`, where words after a strip's leading icon
+  start; `--pane-r` the strips' right): `.term`'s left inset, the queue and Done check strips' head and rows
+  (`.check-mark` is `--pane-icon` wide), the turn strip and the ask bar. `npm run test:ui`'s README step checks the
+  terminal's text, the tab bar's first icon and the check's icon and marks start within 1px.
+- **Laki's own lines in a terminal** (`[process exited]`, *waiting for the setup script*, …) are bright black (SGR 90),
+  not dim (SGR 2): xterm's WebGL renderer draws a dim glyph over an opaque cell, a dark patch on a gradient or glass
+  panel (an agent's own dim text still can).
+- **Frosted's status bar** (looks.css): no outline or fill of its own, its two groups the capsules (one level), an empty
+  `.sb-foot` (the rail has the buttons) not drawn; the context meter's track `--fg` 18%, its fill green, amber past 70%,
+  red past 90%.

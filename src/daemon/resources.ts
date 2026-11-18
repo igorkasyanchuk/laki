@@ -300,7 +300,7 @@ export async function sleepTick(now = Date.now()) {
 }
 function toSleep(id: string, s: Session) {
   asleep.add(id)
-  s.end('\r\n\x1b[2m[asleep: ended to free memory · look at it, type or send it a message to resume it]\x1b[0m\r\n')
+  s.end('\r\n\x1b[90m[asleep: ended to free memory · look at it, type or send it a message to resume it]\x1b[0m\r\n')
 }
 
 // Resources' Sleep: now, looked at or not (a dev server it started goes with it: your call)

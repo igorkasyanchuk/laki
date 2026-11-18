@@ -361,6 +361,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   // M1: the rich demo world (LAKI_DEMO_RICH): the README's stills instead of the walk, each in Laki's two themes (dark,
   // then light): Needs you with its answer buttons, a workspace's Done check and Collision radar, the phone's view
   const readme: typeof steps = []
+  // the main panel's left edges (--pane-x): the terminal's text, the tab bar's first tab's icon, the check's icon and its
+  // rows' marks start within 1px of one another (the words after an icon on --pane-x2)
+  const aligned = () => js<boolean>("(() => { const x = s => document.querySelector(s)?.getBoundingClientRect().left; const term = x('.check-strip')?.closest('.pane, .term-wrap, .main') ? x('.xterm-screen') : undefined; const at = [x('.tab-list > :first-child :is(.icon-svg, .glyph)'), x('.check-strip .queue-head > :first-child'), x('.check-strip .check-mark')]; return term !== undefined && at.every(v => v !== undefined && Math.abs(v - term) <= 1) })()")
   const size = (wd: number, h: number) => (w.isMaximized() && w.unmaximize(), w.setMinimumSize(Math.min(wd, 700), 400), w.setSize(wd, h), nap(600))
   if (process.env.LAKI_DEMO_RICH) {
     readme.push(['readme-setup', async () => {
@@ -387,7 +390,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     for (const [theme, look] of [['laki', 'dark'], ['laki-light', 'light']]) {
       readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await nap(800)), '.needs-cards'])
       // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock)
-      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))"))])
+      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))")) && (await aligned())])
       readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844)), '.app.narrow'])
     }
     readme.push(['readme-done', () => size(1440, 900), async () => true])
@@ -1341,6 +1344,11 @@ const accentNow = () => {
 }
 if (mac) systemPreferences.subscribeNotification('AppleColorPreferencesChangedNotification', accentNow) // macOS posts this one; Electron's accent-color-changed is Windows'
 systemPreferences.on('accent-color-changed', accentNow)
+// macOS's Show scroll bars (System Settings › Appearance): 'overlay' (a thumb only while scrolling, hovered or focused:
+// styles.css html[data-scrollbars]) unless Always; off a Mac always. A change goes to the app's windows
+const sysScroll = () => (mac && systemPreferences.getUserDefault('AppleShowScrollBars', 'string') !== 'Always' ? 'overlay' : 'always')
+ipcMain.handle('scrollbars', () => sysScroll())
+if (mac) systemPreferences.subscribeNotification('AppleShowScrollBarsSettingChanged', () => { for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('scrollbars', sysScroll()) })
 // Settings' Dock icon: the window's renderer draws it (a PNG data URL), kept in userData so the next start (an
 // update too) shows it at once, before the window loads. ponytail: the bundle's own still shows in Finder and in a
 // pinned Dock tile while Laki isn't running (changing the bundle would break its signature)

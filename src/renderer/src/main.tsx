@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { FloatNotices } from './Shown'
 import { Boundary } from './ui'
 import { exits } from './motion'
+import { slideStart } from './slide'
 import { pwaStart } from './pwa'
 import './styles.css'
 import './fonts.css'
@@ -14,6 +15,25 @@ import './looks.css'
 // E8: when the first sidebar row is painted, as performance's laki-sidebar mark (test:ui prints it)
 new MutationObserver((_, o) => document.querySelector('.sidebar .ws') && (o.disconnect(), requestAnimationFrame(() => performance.mark('laki-sidebar')))).observe(document, { childList: true, subtree: true })
 exits(document.body) // V7: what floats fades out as it closes
+slideStart() // the picked segment's fill slides to the next (slide.ts)
+// overlay scrollbars (macOS's Show scroll bars unless Always; off a Mac and on the phone page none: the thumb always):
+// a scroller scrolled has data-scrolling until 900 ms after its last scroll event, one passive listener for all
+const sb = (globalThis as { laki?: { scrollbars?: () => Promise<string>; onScrollbars?: (cb: (s: string) => void) => void } }).laki
+const setSb = (s: string) => (document.documentElement.dataset.scrollbars = s)
+void sb?.scrollbars?.().then(setSb, () => {})
+sb?.onScrollbars?.(setSb)
+const scrolling = new WeakMap<Element, ReturnType<typeof setTimeout>>()
+addEventListener(
+  'scroll',
+  e => {
+    const el = e.target instanceof Element ? e.target : document.scrollingElement
+    if (!el || el.classList.contains('xterm-viewport')) return // the terminal's own (xterm measures it once)
+    if (!el.hasAttribute('data-scrolling')) el.setAttribute('data-scrolling', '')
+    clearTimeout(scrolling.get(el))
+    scrolling.set(el, setTimeout(() => el.removeAttribute('data-scrolling'), 900))
+  },
+  { capture: true, passive: true },
+)
 if (!new URLSearchParams(location.search).get('window')) void pwaStart() // M4: remote access's page as an app
 // typing: macOS hides the pointer until it moves, but :hover stays where it rests (a resize handle's accent line
 // alone, between the sidebar and the terminal): hover lines hide from a key until the mouse moves (styles.css data-typing)

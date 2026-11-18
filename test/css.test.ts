@@ -101,3 +101,49 @@ test('concentric corners: the inner pieces of capsules, menus, ⌘K, dialogs and
   }
   assert.match(css, /--r-in: max\(var\(--r-xs\), calc\(var\(--r-out\) - var\(--pad\)\)\)/)
 })
+
+// Density scales space and control heights only: type, hairlines and corners stay
+test('no rule multiplies a type size (--fs-*) by --density', () => {
+  for (const f of ['styles.css', 'components.css', 'looks.css', 'plans.css']) {
+    const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    for (const decl of css.split(/[;{}]/)) assert.ok(!(/var\(--fs-\d/.test(decl) && /--density/.test(decl)), `${f}: ${decl.trim()}`)
+  }
+})
+
+// the arrow over controls (--cur-act, macOS's habit): with no hand to say a thing is clickable, each control that sets
+// it has a :hover of its own, an element's base one (button:hover), or a reason it needs none
+const NO_HOVER: Record<string, string> = {
+  '.sim-screen img': "the simulator's screen: a click is a tap on it",
+  'input.color-pick': "a native color well: macOS's own look",
+  ".cal-when > input[type='datetime-local']": "a native date field: macOS's own look",
+  '.sp-viewed input': 'a native checkbox',
+  '.ach-toast': 'a toast that fades by itself; a click opens Achievements',
+  '.cmap': "a picture's map: the pointer's position is what's picked",
+}
+test('every control with the arrow (--cur-act) has a hover state', () => {
+  const split = (sel: string) => {
+    const out: string[] = []
+    let depth = 0, cur = ''
+    for (const c of sel) {
+      if (c === '(') depth++
+      if (c === ')') depth--
+      if (c === ',' && !depth) out.push(cur.trim()), (cur = '')
+      else cur += c
+    }
+    return [...out, cur.trim()].filter(Boolean)
+  }
+  const sels: string[] = []
+  const acts: string[] = []
+  for (const f of ['styles.css', 'components.css', 'plans.css']) {
+    const root = postcss.parse(readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8'))
+    root.walkRules(r => {
+      const parts = split(r.selector)
+      sels.push(...parts)
+      if (r.nodes.some(n => n.type === 'decl' && n.prop === 'cursor' && n.value.includes('--cur-act'))) acts.push(...parts)
+    })
+  }
+  const hovers = sels.filter(s => s.includes(':hover')).flatMap(h => (m => (m ? split(m[1]).map(x => `${x}:hover${m[2]}`) : [h]))(/^:is\((.*)\):hover(.*)$/.exec(h)))
+  const tagHover = (s: string) => (t => !!t && hovers.some(h => h === `${t}:hover` || h.startsWith(`${t}:hover`) || h.startsWith(`${t}:not(`)))(/(?:^|[\s>+~])([a-z]+)(?:[.[:][^\s>+~]*)?$/.exec(s)?.[1])
+  const missing = acts.filter(s => !s.includes(':hover') && !NO_HOVER[s] && !hovers.some(h => h.includes(`${s}:hover`) || h.includes(`${s}:is(:hover`) || h.includes(`${s}:not(`) && h.includes(':hover')) && !tagHover(s))
+  assert.deepEqual(missing, [])
+})

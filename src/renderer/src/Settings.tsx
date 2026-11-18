@@ -32,7 +32,7 @@ import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, 
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
-import { designTraits, DESIGNS, FONT_SIZE, fontStack, PAGE_ZOOMS, RAIL_ITEMS, type RailHas, railSorted, ROW_MARKS, rowMarkOn, rowMarkSet, rowMarkUsed, SCROLL, termLook } from './settingsBase'
+import { DENSITIES, designTraits, DESIGNS, FONT_SIZE, fontStack, PAGE_ZOOMS, RAIL_ITEMS, type RailHas, railSorted, ROW_MARKS, rowMarkOn, rowMarkSet, rowMarkUsed, SCROLL, termLook } from './settingsBase'
 export * from './settingsBase'
 export * from './SettingsKit'
 export * from './SettingsAgents'
@@ -151,6 +151,8 @@ export type AppSettings = Paint & {
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   finishedRows?: boolean // Needs you's finished turns as rows
+  density?: 'compact' | 'regular' | 'roomy' // space and control heights (themes.ts)
+  pointerHand?: boolean // the pointing hand over buttons (unset: on off a Mac)
   toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
   toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
@@ -1836,6 +1838,25 @@ export function SettingsPage(p: {
                 <button type="button" className="link small" data-tip="Which buttons the tab bar shows, and in what order (also its right click, View › Customize Toolbar…)" onClick={() => openExternal('laki://toolbar')}>
                   Customize toolbar…
                 </button>
+                <div className="field">
+                  <span>Density</span>
+                  <div className="seg" role="radiogroup" aria-label="Density">
+                    {DENSITIES.map(([v, name]) => (
+                      <button key={v} type="button" role="radio" aria-checked={(s.density ?? 'regular') === v} className={(s.density ?? 'regular') === v ? 'on' : ''} onClick={() => paint({ density: v })}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="density-preview" aria-hidden="true">
+                    <span className="ws">
+                      <Icon name="agent" size={12} /> fix-cart-total
+                    </span>
+                    <button type="button" tabIndex={-1}>Button</button>
+                  </div>
+                </div>
+                <Switch className="switch-row" on={s.pointerHand ?? !/Mac/.test(navigator.platform)} onChange={on => paint({ pointerHand: on })}>
+                  <Says title="Pointing hand over buttons" hint="Off: the arrow over buttons, tabs and rows, as macOS's own apps; links keep the hand" />
+                </Switch>
                 <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
                   Motion
                   <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>

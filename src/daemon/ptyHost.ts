@@ -98,7 +98,7 @@ export class HostPty {
     else if (m.ev === 'data') for (const f of this.data) f(m.d)
     else if (m.ev === 'exit') {
       if (!open.delete(this.id)) return
-      if (m.error) for (const f of this.data) f(`\r\n\x1b[2m[${m.error}]\x1b[0m\r\n`)
+      if (m.error) for (const f of this.data) f(`\r\n\x1b[90m[${m.error}]\x1b[0m\r\n`)
       for (const f of this.exits) f({ exitCode: Number(m.code) || 0 })
       post({ op: 'forget', id: this.id })
     }

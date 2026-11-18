@@ -1602,7 +1602,7 @@ export function projectArchive(o: { project: string; on: boolean }) {
     try {
       sleepNow(t.id)
     } catch {
-      sessions.get(t.id)!.end('\r\n\x1b[2m[ended: its project was archived]\x1b[0m\r\n')
+      sessions.get(t.id)!.end('\r\n\x1b[90m[ended: its project was archived]\x1b[0m\r\n')
     }
   }
   p.archived = Date.now()
@@ -1947,7 +1947,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     }
   }
   const marker = setupMarker(ws)
-  const wait = tab.kind === 'agent' && existsSync(marker) ? `printf '\\033[2mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ` : ''
+  const wait = tab.kind === 'agent' && existsSync(marker) ? `printf '\\033[90mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ` : ''
   let file = shell
   let args: string[]
   // what its hooks carry, new each start: an SSH host's escape codes (hostTab), a local one's laki hook (LAKI_HOOK,
@@ -2043,8 +2043,8 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
       if (tab.resumeId && code !== 0 && !o.adopt && Date.now() - born < RESUME_FAIL && CHAT_GONE.test(s.screenText(8))) {
         tab.resumeId = undefined
         save()
-        s.output('\x1b[2m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')
-      } else s.output(tab.script === 'deploy' ? '\x1b[2m[Run ▾ › Deploy runs it again]\x1b[0m\r\n' : '\x1b[2m[press Enter to start it again]\x1b[0m\r\n')
+        s.output('\x1b[90m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')
+      } else s.output(tab.script === 'deploy' ? '\x1b[90m[Run ▾ › Deploy runs it again]\x1b[0m\r\n' : '\x1b[90m[press Enter to start it again]\x1b[0m\r\n')
     })
   }
   changed()
@@ -3950,7 +3950,7 @@ export function rerun(pid: number, args: string): { cmd: string; run?: boolean }
 
 // types what a shell ran back into it once its prompt is up (it printed, then quiet for half a second; 10 s at most)
 function bringBack(s: Session, cmd: string, run: boolean) {
-  s.output(`\x1b[2m[${run ? 'Laki restarted · resuming it' : 'Laki restarted · this was running here: ⏎ runs it again'}]\x1b[0m\r\n`)
+  s.output(`\x1b[90m[${run ? 'Laki restarted · resuming it' : 'Laki restarted · this was running here: ⏎ runs it again'}]\x1b[0m\r\n`)
   whenPrompt(s, () => typeInto(s, cmd, run), s.lastOutput) // its note isn't the prompt
 }
 // a new shell's prompt is up: it printed since `from` (its start), then 500 ms quiet (10 s at most)
