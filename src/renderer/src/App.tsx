@@ -17,6 +17,7 @@ import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type Labe
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { isCursor, notInstalled, tabAgent } from '../../shared/install'
+import { Backdrop } from './Backdrop'
 import { type Artifact, CopyDiagnostics, VIEWED, Loading, SnapSkeleton, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, GoalStrip, HookStrip, InstallStrip, SignInStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
 import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
@@ -4133,6 +4134,8 @@ export function App() {
                 startDrag={(e, id) => start(e, id, false)}
               />
             ) : (
+              <div className="empty-wrap">
+              {!(ws && ws.browser !== undefined) && <Backdrop kind={settings.backdrop} motion={settings.motion} />}
               <div className="empty">
                 {ws ? (
                   ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} project={view.projects.find(p => p.id === ws.project)?.name} actions={newTabActions.filter(x => x.label !== 'Command…')} later={ws.pending && { title: `${ws.pending.agent} ${pendingWords(ws.pending, true).replace(/^S/, 's')}`, prompt: ws.pending.prompt, failed: ws.pending.failed, onStart: () => laterNow(ws), onChange: () => void laterChange(ws), onCancel: () => void laterCancel(ws) }} />
@@ -4148,6 +4151,7 @@ export function App() {
                     <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} onRun={welcomeRun} onSample={hasCap(view, 'sample') ? welcomeSample : undefined} />
                   )
                 )}
+              </div>
               </div>
             )}
             {browsed.flatMap(id => {

@@ -102,6 +102,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Pointing hand over buttons', 'cursor pointer hand arrow mouse buttons links'],
   ['appearance', 'Customize toolbar', 'toolbar buttons tab bar hide show order reorder customize ship timer preview editor share'],
   ['appearance', 'Motion', 'motion animations animation movement reduce high low none off effects transitions breathe'],
+  ['appearance', 'Empty page background', 'backdrop background dots net stars particles constellation effect empty page welcome hover animated'],
   ['appearance', 'Vertical text', 'sideways rotated direction text up down bottom top reverse board columns strip lanes writing'],
   ['appearance', 'High contrast mode', 'contrast accessibility readable legible stronger muted lines text hard to see'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],

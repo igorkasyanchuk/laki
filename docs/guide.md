@@ -2345,7 +2345,10 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   as macOS's own apps, the hand over links; on a Mac, scroll bars show only while you scroll, point at or work in a list, unless
   System Settings › Appearance › *Show scroll bars* is *Always*), *Vertical text* (how sideways labels read: the
   Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
-  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *High contrast mode* (off by default:
+  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *Empty page background* (behind a workspace with
+  no tabs, Welcome and *No workspace selected*: *Dots* by default, a *Net* or *Stars*, which stir as the pointer passes:
+  dots swell and take the accent, the net's knots move aside and reach for it, stars shift with it; Motion *High* lets
+  them drift on their own too, *None* keeps them still; or *None*), *High contrast mode* (off by default:
   hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
   three rows as you set them; its font, any on this Mac; its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,

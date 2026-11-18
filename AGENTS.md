@@ -273,6 +273,7 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab, floated simulator and quick bar windows (`?window=new`, `ai`, `tab`, `sim`, `quick`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/shared/browserBudget.ts` | the memory budget's step: which hidden Browsers page goes (`unloadStep`, main measures and guards) |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
+| `src/renderer/src/Backdrop.tsx` | an empty pane's background (Settings › Appearance › Empty page background, `settings.backdrop`): dots, a net or stars on a canvas under `.empty` (App's `.empty-wrap`), stirred by the pointer, the page's cards cut out; Motion high animates it, low only as the pointer moves, none draws it once |
 | `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |
 | `src/daemon/acp.ts` | ACP agents (Labs): a command profile with `acp`, spoken to over the Agent Client Protocol v1 on its stdio; `AcpPty` is its Session's pty (prompts, permission menus, Stop), its words the Reader's (`acpChat`), its turns hooks (`docs/dev/agents.md`) |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |

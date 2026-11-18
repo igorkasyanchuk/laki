@@ -18,6 +18,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
+import { BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
@@ -155,6 +156,7 @@ export type AppSettings = Paint & {
   finishedRows?: boolean // Needs you's finished turns as rows
   density?: 'compact' | 'regular' | 'roomy' // space and control heights (themes.ts)
   pointerHand?: boolean // the pointing hand over buttons (unset: on)
+  backdrop?: BackdropKind // an empty pane's background (Backdrop.tsx; unset: dots)
   toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
   toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
@@ -1964,6 +1966,16 @@ export function SettingsPage(p: {
                   Vertical text
                   <select value={s.vertText ?? ''} onChange={e => paint({ vertText: (e.target.value || undefined) as AppSettings['vertText'] })}>
                     {VERT.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label data-tip="Behind a workspace with no tabs, Welcome and No workspace selected: dots, a net or stars that stir as the pointer passes. Motion High: they drift on their own too; None: still">
+                  Empty page background
+                  <select value={s.backdrop ?? 'dots'} onChange={e => set({ backdrop: e.target.value as BackdropKind })}>
+                    {BACKDROPS.map(([v, name]) => (
                       <option key={v} value={v}>
                         {name}
                       </option>
