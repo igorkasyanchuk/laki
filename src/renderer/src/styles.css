@@ -143,6 +143,7 @@ button.primary { background: var(--accent); color: var(--accent-fg); border-colo
 button.on { border-color: var(--accent); color: var(--accent-ink); }
 button:disabled { opacity: 0.5; cursor: default; }
 select, input[type='checkbox'], input[type='radio'] { cursor: var(--cur-act); } /* controls too: the hand with Pointing hand over buttons */
+input[type='checkbox'], input[type='radio'] { accent-color: var(--accent); } /* ticked: the accent, as a switch that's on */
 :is(select, input[type='checkbox'], input[type='radio']):disabled { cursor: default; }
 :is(input[type='checkbox'], input[type='radio']):hover { filter: brightness(1.15); } /* with the arrow, a hover says it's clickable */
 .icon-svg { vertical-align: -0.125em; } /* an icon before words in a box that isn't flex (+ Add…, Build with AI): centred on the text, not sat on its baseline; flex rows ignore it */
@@ -807,6 +808,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .tb-list li { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-in); }
 .tb-list li:hover, .tb-list li.dragging { background: var(--hover); }
 .tb-list label { flex: 1; display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.tb-list input { flex: none; width: auto; margin: 0; } /* its box, not the row's width (inputs' own 100%) */
 .tb-grip { display: inline-flex; color: var(--muted); cursor: grab; }
 .tabbar > .reader-switch { align-self: center; } /* the bar keeps its tabs on its bottom line (flex-end); the switch sits with the buttons, not under them (Classic, Inset) */
 .actions { display: flex; gap: 1px; align-self: center; }
@@ -1513,9 +1515,9 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .toggle:hover { background: none; color: var(--fg); }
 .toggle.on { color: var(--fg); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: var(--r-m); background: var(--line); transition: background 0.15s; }
-.toggle.on .toggle-track { background: var(--neutral-strong); } /* V1: on is neutral, not the accent */
+.toggle.on .toggle-track { background: var(--accent); } /* on: the accent, as the UI kit's (k-toggle); off a neutral track */
 .toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: translate var(--t-spring) var(--spring); }
-.toggle.on .toggle-knob { translate: 10px 0; background: var(--bg); } /* V14: moved, never laid out again */
+.toggle.on .toggle-knob { translate: 10px 0; background: var(--accent-fg); } /* V14: moved, never laid out again; the accent's own text color: clear on it */
 .info .toggle { font-size: var(--fs-2); }
 .info .row { flex-wrap: wrap; }
 

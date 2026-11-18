@@ -1164,8 +1164,8 @@ The accent is attention (V1): an agent waiting for you (Needs you's head and car
 a row's *Answer*) and a view's one `button.primary`. The Laki pair's `waiting` is its accent (Laki Light's a shade
 darker, for AA on its raised color) and its `sel` a neutral. What's picked or on is `--neutral-strong` (styles.css'
 `:root`, the text toward the background): a tab, a side panel tab, a preview tab and a `.seg` segment all underlined
-in it (one idiom; a tab's own color over it), a switch's track, a Settings subgroup's mark; a selected row's fill is
-`--sel-fill`. Project heads are sentence case, 12px/600, in the text's color (*Accent* in Settings › Appearance still
+in it (one idiom; a tab's own color over it), a Settings subgroup's mark; a selected row's fill is `--sel-fill`. A
+switch that's on and a ticked box take the accent (as the UI kit's `k-toggle`): on must read at a glance. Project heads are sentence case, 12px/600, in the text's color (*Accent* in Settings › Appearance still
 picks it; a project's color is its bar). Rows are quiet: done, limit and ended marks muted (Needs you shows what's
 done), a step that isn't waiting on you (`t-go`: Merge, Ship) neutral. Status marks (Glyph.tsx `MARKS`) are the icon
 pack's shapes, not a font's characters: ◆ the pack's square on its corner and ● filled, ○ ✖ ✓ ◷ as lines; the PR's
