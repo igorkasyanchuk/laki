@@ -1064,3 +1064,22 @@ export function midCut(name: string, max: number): string {
   const tail = Math.max(3, Math.floor(room * 0.4))
   return `${cps.slice(0, room - tail).join('')}…${cps.slice(n - tail).join('')}`
 }
+
+// in-window toasts' order, the front first (ui.tsx Toasts): errors, then those with an action that would be lost (Undo
+// with its deadline), then the rest; the newest first within each
+export function stackOrder<T extends { at: number; err?: boolean; undo?: unknown }>(toasts: T[]): T[] {
+  const rank = (t: T) => (t.err ? 0 : t.undo ? 1 : 2)
+  return [...toasts].sort((a, b) => rank(a) - rank(b) || b.at - a.at)
+}
+
+// a submenu's safe triangle (ui.tsx Menu): cur inside the triangle from prev to the submenu's near edge's two corners
+// (side: the submenu's side of its menu, right, or left where it flipped by the window's edge); a flat rect: none
+export function inAim(prev: [number, number], cur: [number, number], rect: { left: number; right: number; top: number; bottom: number }, side: 'left' | 'right'): boolean {
+  if (!(rect.right - rect.left > 0 && rect.bottom - rect.top > 0)) return false
+  const x = side === 'right' ? rect.left : rect.right
+  const [a, b, c] = [prev, [x, rect.top], [x, rect.bottom]] as const
+  const cross = (p: readonly number[], q: readonly number[], r: readonly number[]) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+  const d1 = cross(a, b, cur), d2 = cross(b, c, cur), d3 = cross(c, a, cur)
+  const neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0
+  return !(neg && pos) && !(cur[0] === prev[0] && cur[1] === prev[1])
+}

@@ -4,7 +4,7 @@ import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExterna
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { menuKeys, midCut, snap } from './text'
+import { inAim, menuKeys, midCut, snap, stackOrder } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 
@@ -804,7 +804,7 @@ const isAct = (it: MenuItem): it is Act => !!it && 'label' in it
 
 
 // beside: a submenu's, the item it opens from (no backdrop of its own; onBack: ← or Esc closes only it)
-function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; beside?: DOMRect; onBack?: () => void; onEnter?: () => void; onClose: () => void }) {
+function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClose, onBox }: { onBox?: (el: HTMLDivElement | null) => void; anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; beside?: DOMRect; onBack?: () => void; onEnter?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   const filter = all.find(it => !!it && 'filter' in it) as Extract<MenuItem, { filter: string }> | undefined
   const [q, setQ] = useState('')
@@ -838,6 +838,34 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
   const hover = (it: Act, el: Element) => {
     clearTimeout(wait.current)
     if (subOf?.it !== it && (subOf || it.items)) wait.current = window.setTimeout(() => (it.items ? open(it, el) : setSubOf(null)), subOf ? 250 : 120)
+  }
+  // the safe triangle (text.ts inAim): with a submenu open, the mouse on its way there over the items between doesn't
+  // move the highlight or close it; what it would have done waits till it leaves the triangle or rests 300 ms. Its
+  // positions from this menu's own pointermoves (capture: before an item's); a touch skips it; the keys never wait
+  const subBox = useRef<HTMLDivElement | null>(null)
+  const aim = useRef<{ prev?: [number, number]; cur?: [number, number]; pending?: () => void; t?: number }>({})
+  useEffect(() => () => clearTimeout(aim.current.t), [])
+  const aiming = (p: [number, number]) => {
+    const a = aim.current
+    const el = subBox.current
+    const from = a.cur && (a.cur[0] !== p[0] || a.cur[1] !== p[1]) ? a.cur : a.prev
+    if (!subOf || !el || !from || !box.current) return false
+    const r = el.getBoundingClientRect()
+    return inAim(from, p, r, r.left >= box.current.getBoundingClientRect().right - 2 ? 'right' : 'left')
+  }
+  const guard = (e: { clientX: number; clientY: number; pointerType: string }, f: () => void) => {
+    const a = aim.current
+    if (e.pointerType === 'touch' || !aiming([e.clientX, e.clientY])) return void ((a.pending = undefined), clearTimeout(a.t), f())
+    a.pending = f
+    clearTimeout(a.t)
+    a.t = window.setTimeout(() => (f => ((aim.current.pending = undefined), f?.()))(aim.current.pending), 300)
+  }
+  const track = (e: { clientX: number; clientY: number; pointerType: string }) => {
+    const a = aim.current
+    if (e.pointerType === 'touch') return
+    a.prev = a.cur
+    a.cur = [e.clientX, e.clientY]
+    if (a.pending && !aiming(a.cur)) (f => ((a.pending = undefined), clearTimeout(a.t), f()))(a.pending)
   }
   const pick = (a: Act, el?: Element | null, first = true, meta = false) => {
     if (a.items) return el && open(a, el, first) // a key's: its first item picked
@@ -895,7 +923,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
   }, [anchor])
   const pos = align === 'left' ? { left: anchor.left } : { right: window.innerWidth - anchor.right }
   const menu = (
-      <div className={`menu ${filter || all.some(it => isAct(it) && it.sub) ? 'rich' : ''}`} role="menu" ref={box} style={{ top: anchor.bottom + 4, ...pos }} onPointerEnter={onEnter}>
+      <div className={`menu ${filter || all.some(it => isAct(it) && it.sub) ? 'rich' : ''}`} role="menu" ref={el => ((box.current = el), onBox?.(el))} style={{ top: anchor.bottom + 4, ...pos }} onPointerEnter={onEnter} onPointerMoveCapture={track}>
         {filter && <input className="menu-filter" value={q} placeholder={filter.filter} aria-label="Filter" spellCheck={false} autoFocus={!matchMedia('(pointer: coarse)').matches /* no keyboard popping up on a phone */} onChange={e => (setQ(e.target.value), setSel(-2))} />}
         <div className="menu-list">
           {items.map((it, i) =>
@@ -938,7 +966,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         {foot.length > 0 && <div className="menu-foot">{foot.map(item)}</div>}
       </div>
   )
-  const sub = subOf && <Menu key={subOf.it.label} anchor={subOf.anchor} beside={subOf.at} items={subOf.it.items!} align="left" first={subOf.first} onBack={() => setSubOf(null)} onEnter={() => clearTimeout(wait.current)} onClose={onClose} />
+  const sub = subOf && <Menu key={subOf.it.label} anchor={subOf.anchor} beside={subOf.at} items={subOf.it.items!} align="left" first={subOf.first} onBack={() => setSubOf(null)} onEnter={() => (clearTimeout(wait.current), clearTimeout(aim.current.t), (aim.current.pending = undefined))} onBox={el => (subBox.current = el)} onClose={onClose} />
   if (beside) return (
     <>
       {menu}
@@ -963,8 +991,8 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         className={`menu-item ${it.off ? 'off' : ''} ${it.danger ? 'danger' : ''} ${it.good ? 'good' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
         data-tip={it.tip}
         onClick={e => pick(it, e.currentTarget, e.detail === 0, e.metaKey)}
-        onPointerEnter={e => hover(it, e.currentTarget)}
-        onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
+        onPointerEnter={e => (el => guard(e, () => hover(it, el)))(e.currentTarget)}
+        onPointerMove={e => guard(e, () => setSel(acts.indexOf(it)))} // the one under the mouse is ⏎'s, as in a native menu
       >
         <span className="menu-icon">{it.mark ?? (it.icon && <Icon name={it.icon} />)}</span>
         <span className={`menu-text${long ? ' keep' : ''}`}>
@@ -1136,3 +1164,42 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined')
     { passive: true },
   )
 if (typeof document !== 'undefined') document.documentElement?.addEventListener?.('pointerleave', () => (lit?.removeAttribute('data-lit'), (lit = null))) // out of the window: none lit
+
+// in-window toasts (App's toast): a column at the bottom right, the front first (text.ts stackOrder: errors, then an
+// Undo's, then the newest). More than two: stacked as macOS stacks notifications, the front whole, the next two
+// behind it (smaller, lower, fainter), the rest kept but hidden and out of the keyboard's reach; the mouse on it or
+// the keyboard in it opens the column, with Close all, and it closes 600 ms after. Each keeps its own timer (App's).
+// A polite live region: each is read once as it comes. Motion: Off, the plain column
+export type Toast = { id: number; at: number; text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean; err?: boolean }
+export function Toasts({ toasts, drop, Busy }: { toasts: Toast[]; drop: (id?: number) => void; Busy: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const shut = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const show = () => (clearTimeout(shut.current), setOpen(true))
+  const hide = () => (clearTimeout(shut.current), (shut.current = setTimeout(() => setOpen(false), 600)))
+  useEffect(() => () => clearTimeout(shut.current), [])
+  const list = stackOrder(toasts)
+  const stacked = list.length > 2 && !open && document.documentElement.dataset.motion !== 'none'
+  if (!list.length) return null
+  return (
+    <div className={`toasts${stacked ? ' stacked' : ''}`} role="status" aria-live="polite" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={e => !e.currentTarget.contains(e.relatedTarget as Node) && hide()}>
+      {list.map((t, i) => (
+        <div key={t.id} className={`toast ${t.undo ? 'has-undo' : ''} ${t.ok || t.busy ? 'ok' : ''} ${t.err ? 'err' : ''}${stacked && i === 0 ? ' front' : ''}`} style={{ '--i': Math.min(i, 3) } as CSSProperties} inert={stacked && i > 0 ? true : undefined}>
+          {t.ok && <Icon name="check" size={14} />}
+          {t.busy && Busy}
+          <span>{t.text}</span>
+          {t.undo && (
+            <button className="toast-undo" onClick={() => (drop(t.id), t.undo!())}>
+              {t.label ?? 'Undo'}
+            </button>
+          )}
+          {stacked && i === 0 && <span className="toast-count" aria-hidden="true">+{list.length - 1}</span>}
+        </div>
+      ))}
+      {open && list.length > 1 && (
+        <button type="button" className="toasts-close" onClick={() => (drop(), setOpen(false))}>
+          Close all
+        </button>
+      )}
+    </div>
+  )
+}

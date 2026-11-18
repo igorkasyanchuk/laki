@@ -58,7 +58,7 @@ import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, Usage
 import { BgButton } from './BgTasks'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
-import { MidText, Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { MidText, Num, type Toast, Toasts, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -569,7 +569,11 @@ export function App() {
   const { notices, answer: answerNotice } = useNotices() // laki notice's cards, in the same corner
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
-  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean; err?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
+  const [notes, setNotes] = useState<Toast[]>([]) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one (ui.tsx Toasts: several stack)
+  const noteN = useRef(0)
+  const note = notes.length > 0
+  // a busy one (an action running) or none: the busy one goes, a new one comes with no timer of its own
+  const setNote = (n: Omit<Toast, 'id' | 'at'> | null) => setNotes(l => [...l.filter(x => !x.busy), ...(n ? [{ ...n, id: ++noteN.current, at: Date.now() }] : [])])
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
@@ -1140,7 +1144,6 @@ export function App() {
     } catch {}
   }, [floatKey])
 
-  const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
   const archivedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // the sidebar's foot, in one row: its words dropped one by one from the right (data-bare: how many) until it fits;
@@ -1167,9 +1170,9 @@ export function App() {
   }, [])
   // err: an error's (V2: the red edge only for those)
   const toast = (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean) => {
-    clearTimeout(noteTimer.current) // an older toast's timer would cut this one short
-    setNote({ text, undo, label, ok, err })
-    noteTimer.current = setTimeout(() => setNote(null), undo ? 8000 : 6000)
+    const id = ++noteN.current
+    setNotes(l => [...l.filter(x => !x.busy && x.text !== text), { id, at: Date.now(), text, undo, label, ok, err }]) // the same words again: once, its timer anew
+    setTimeout(() => setNotes(l => l.filter(x => x.id !== id)), undo ? 8000 : 6000) // each its own
   }
   const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
   const fail = (e: unknown) => toast((e as Error).message, undefined, undefined, false, true)
@@ -2470,7 +2473,6 @@ export function App() {
     if (m.confirm && !(await ask(m.confirm, { text: `${w.name} · ${m.title}`, ok: m.title }))) return
     const arg = m.ask ? await askText(m.ask, { text: `${w.name} · ${m.title}`, ok: m.title }) : ''
     if (arg === null) return
-    clearTimeout(noteTimer.current)
     setNote({ text: `${m.title}…`, busy: true })
     type R = { ok: boolean; out?: string; error?: string; insert?: string; open?: string; send?: string; files?: ActionFile[] } & WidgetSay
     const r = await api.call<R>('widgetAction', { id: w.id, action: m.action, arg, ws: w.scope === 'workspace' ? ctx.ws : undefined, ctx }).catch((e): R => ({ ok: false, error: String(e?.message ?? e) }))
@@ -2509,7 +2511,6 @@ export function App() {
 
     action: (id, action, arg, label, ws) => {
       const what = label || action
-      clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
       return api.call<{ ok: boolean; out?: string; error?: string; fail?: WidgetFail; open?: string; send?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
         r => (!r.ok ? (toast(`${what} failed: ${r.fail?.hint ?? r.error}`), false as const) : (r.open && widgetApi.open(r.open), r.send && (w => w && void widgetDo(inWs(w, ws ?? null), { do: 'send', prompt: r.send! }, what))(view?.widgets?.find(x => x.id === id)), r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : r.open || r.send ? setNote(null) : done(r.out || `${what}: done`))), // #26: its link opened after it; send: to the agent, asked first
@@ -4287,18 +4288,7 @@ export function App() {
         </button>
       )}
       {!bridge && <Outbox name={id => view.tabs.find(t => t.id === id)?.name ?? 'a tab'} />}
-      {note && (
-        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''} ${note.err ? 'err' : ''}`} role={note.err ? 'alert' : 'status'}>
-          {note.ok && <Icon name="check" size={14} />}
-          {note.busy && <Glyph s="running" />}
-          <span>{note.text}</span>
-          {note.undo && (
-            <button className="toast-undo" onClick={() => (setNote(null), note.undo!())}>
-              {note.label ?? 'Undo'}
-            </button>
-          )}
-        </div>
-      )}
+      <Toasts toasts={notes} drop={id => setNotes(l => (id === undefined ? [] : l.filter(x => x.id !== id)))} Busy={<Glyph s="running" />} />
       <Dialogs app={app} />
     </div>
   )

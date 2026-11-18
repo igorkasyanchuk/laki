@@ -1333,3 +1333,17 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Frosted's status bar** (looks.css): no outline or fill of its own, its two groups the capsules (one level), an empty
   `.sb-foot` (the rail has the buttons) not drawn; the context meter's track `--fg` 18%, its fill green, amber past 70%,
   red past 90%.
+
+## Toasts and submenus
+
+- **Toasts** (ui.tsx `Toasts`, App's `notes`): a list, each with its own timer (6 s, 8 s with an action); the same
+  words again replace the older one, a busy one (an action running) goes as the next comes. `text.ts` `stackOrder`:
+  errors first, then an Undo's (a deadline), then the rest, the newest first within each. Past two, `.stacked`: the
+  front whole with `+n`, two behind it (`--i`: smaller, lower by `--sp-3`, fainter), the rest hidden; all but the front
+  `inert`. The mouse on it or the keyboard in it opens the column with *Close all*, closing 600 ms after it leaves. A
+  polite live region (each read once as it comes); Motion: Off, the plain column. Tested in `test/units-more.test.ts`.
+- **A submenu's safe triangle** (ui.tsx `Menu`, `text.ts` `inAim`): with a submenu open, the menu's pointermoves
+  (capture) keep the last two positions; an item's hover or highlight while the pointer is inside the triangle from
+  the last position to the submenu's near edge's corners (its side: left where it flipped) waits, run when the pointer
+  leaves it or rests 300 ms, dropped as it enters the submenu. Touch and the keys never wait; macOS's own menus aren't
+  Laki's. Tested in `test/units-more.test.ts`.

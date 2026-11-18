@@ -2663,6 +2663,16 @@ html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the 
 .toast.ok { display: flex; align-items: center; gap: var(--sp-4); animation: toast-in 0.18s ease-out; }
 .toast.ok > svg { flex: none; color: var(--done); }
 .toast.err { border-color: var(--error); } /* V2: an error's red edge; a plain toast is neutral */
+/* the toasts (ui.tsx Toasts): a column at the bottom right, the front one nearest the corner; stacked past two (the
+   front whole, two behind it smaller, lower and fainter, the rest hidden) until the mouse or the keyboard is on it */
+.toasts { position: fixed; bottom: 36px; right: var(--sp-6); z-index: var(--z-toast); display: flex; flex-direction: column-reverse; align-items: flex-end; gap: var(--sp-3); max-width: 480px; }
+.toasts > .toast { position: relative; inset: auto; transition: translate var(--t-mid) var(--spring-soft), scale var(--t-mid) var(--spring-soft), opacity var(--t-mid) var(--ease-out); }
+.toasts.stacked { display: grid; padding-bottom: calc(var(--sp-3) * 2); }
+.toasts.stacked > .toast { grid-area: 1 / 1; align-self: end; justify-self: end; translate: 0 calc(var(--sp-3) * var(--i)); scale: calc(1 - 0.04 * var(--i)); opacity: calc(1 - 0.3 * var(--i)); z-index: calc(4 - var(--i)); }
+.toasts.stacked > .toast:nth-child(n + 4) { visibility: hidden; }
+.toast-count { flex: none; padding: 0 var(--sp-3); border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 12%, transparent); color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.toasts > .toast.front { display: flex; align-items: center; gap: var(--sp-4); }
+.toasts-close { align-self: flex-end; font-size: var(--fs-1); padding: var(--sp-1) var(--sp-4); border-radius: var(--r-pill); }
 .ws.going .ws-name { opacity: 0.55; }
 .ws-going { flex: none; font-size: var(--fs-1); color: var(--muted); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }

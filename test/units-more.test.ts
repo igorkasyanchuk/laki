@@ -1239,3 +1239,27 @@ test('toolbarOf: the default when unset; hidden ones for ⋯; an unknown id drop
   assert.deepEqual(collapseOf(gs, 140), ['workspace'])
   assert.deepEqual(collapseOf(gs, 0), ['workspace', 'open', 'view'])
 })
+
+test('stackOrder: the toasts\' front first: errors, then an Undo\'s, then the rest; the newest first within each', async () => {
+  const { stackOrder } = await import('../src/renderer/src/text.ts')
+  const t = (id: string, at: number, o: { err?: boolean; undo?: () => void } = {}) => ({ id, at, ...o })
+  const undo = () => {}
+  const order = stackOrder([t('old', 1), t('undo-old', 2, { undo }), t('err', 3, { err: true }), t('new', 5), t('undo-new', 4, { undo }), t('err-new', 6, { err: true })]).map(x => x.id)
+  assert.deepEqual(order, ['err-new', 'err', 'undo-new', 'undo-old', 'new', 'old'])
+  assert.deepEqual(stackOrder([]), [])
+})
+
+test("inAim: a submenu's safe triangle: toward it inside, straight down outside, the flipped side, a flat rect never", async () => {
+  const { inAim } = await import('../src/renderer/src/text.ts')
+  const sub = { left: 200, right: 360, top: 0, bottom: 300 }
+  assert.equal(inAim([100, 50], [130, 55], sub, 'right'), true, 'toward it, slanting')
+  assert.equal(inAim([100, 50], [100, 80], sub, 'right'), false, 'straight down')
+  assert.equal(inAim([100, 50], [90, 50], sub, 'right'), false, 'away from it')
+  assert.equal(inAim([100, 50], [100, 50], sub, 'right'), false, "the pointer didn't move")
+  // flipped: the submenu on the left of its menu
+  const left = { left: 0, right: 150, top: 0, bottom: 300 }
+  assert.equal(inAim([250, 120], [220, 140], left, 'left'), true)
+  assert.equal(inAim([250, 120], [280, 140], left, 'left'), false)
+  assert.equal(inAim([100, 50], [130, 55], { left: 200, right: 200, top: 0, bottom: 300 }, 'right'), false, 'no width')
+  assert.equal(inAim([100, 50], [130, 55], { left: 200, right: 360, top: 10, bottom: 10 }, 'right'), false, 'no height')
+})

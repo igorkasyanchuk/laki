@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Toasts stack as macOS's notifications do, the newest (or an error, or an Undo) in front; point at them to see them all and *Close all*. Moving toward a submenu across other items no longer closes it.
 - Density: Settings › Appearance › *Density* makes the space and controls Compact or Roomy.
 - Laki follows macOS's cursor habits: the arrow over buttons, tabs and rows, the hand over links (*Pointing hand over buttons* brings it back). Scrollbars show only while you scroll, point at or work in a list, unless macOS is set to always show them.
 - The picked segment (Terminal | Reader, Settings' choices, the side panel's tabs) slides to the next. The terminal, the Done check and the tab bar start on one left edge; Frosted's status bar draws its two groups without a second outline, its context meter with a track; Laki's own grey lines in a terminal no longer sit on a dark patch.
