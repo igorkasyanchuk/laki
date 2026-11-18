@@ -60,22 +60,29 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     type Knot = { hx: number; hy: number; x: number; y: number; vx: number; vy: number }
     type Star = { x: number; y: number; z: number; ph: number; sp: number }
     type Fly = { hx: number; hy: number; x: number; y: number; a: number; ph: number; sp: number }
-    let knots: Knot[] = []
-    let stars: Star[] = []
-    let flies: Fly[] = []
+    const knots: Knot[] = []
+    const stars: Star[] = []
+    const flies: Fly[] = []
     const n = (per: number, lo: number, hi: number) => Math.round(clamp((w * h) / per, lo, hi)) // by the area: a small tile (Settings') gets a few
-    const seed = () => {
+    // as many as the area takes: the ones there kept (moved with the size; stars are in fractions of it), so a resize (a
+    // sidebar dragged) never reshuffles them, a few added or dropped
+    const fill = <T,>(a: T[], want: number, make: () => T) => {
+      a.length = Math.min(a.length, want)
+      while (a.length < want) a.push(make())
+    }
+    const seed = (sx: number, sy: number) => {
       const r = Math.random
+      for (const k of [...knots, ...flies]) ((k.hx *= sx), (k.hy *= sy), (k.x *= sx), (k.y *= sy))
       if (kind === 'net')
-        knots = Array.from({ length: n(16000, 8, 90) }, () => {
+        fill(knots, n(16000, 8, 90), () => {
           const x = r() * w
           const y = r() * h
           const a = r() * Math.PI * 2
           return { hx: x, hy: y, x, y, vx: Math.cos(a) * 0.12, vy: Math.sin(a) * 0.12 }
         })
-      if (kind === 'stars' || kind === 'dust') stars = Array.from({ length: kind === 'dust' ? n(650, 40, 1800) : n(2600, 16, 420) }, () => ({ x: r(), y: r(), z: 0.2 + r() * 0.8, ph: r() * Math.PI * 2, sp: 0.5 + r() }))
+      if (kind === 'stars' || kind === 'dust') fill(stars, kind === 'dust' ? n(650, 40, 1800) : n(2600, 16, 420), () => ({ x: r(), y: r(), z: 0.2 + r() * 0.8, ph: r() * Math.PI * 2, sp: 0.5 + r() }))
       if (kind === 'fireflies')
-        flies = Array.from({ length: n(24000, 5, 48) }, () => {
+        fill(flies, n(24000, 5, 48), () => {
           const x = r() * w
           const y = r() * h
           return { hx: x, hy: y, x, y, a: r() * Math.PI * 2, ph: r() * Math.PI * 2, sp: 0.6 + r() * 0.8 }
@@ -85,12 +92,13 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
       const r = box.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
       if (Math.round(r.width) === Math.round(w) && Math.round(r.height) === Math.round(h) && cv.width === Math.round(w * dpr)) return false
+      const [ow, oh] = [w, h]
       w = r.width
       h = r.height
       cv.width = Math.round(w * dpr)
       cv.height = Math.round(h * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      seed()
+      seed(ow ? w / ow : 1, oh ? h / oh : 1)
       return true
     }
     // what the page draws see-through (a card with a fill, a blur or a border): cut out of the canvas, so the stars
@@ -105,8 +113,8 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
         if (el === cv) continue
         const r = el.getBoundingClientRect()
         if (r.width < 16 || r.height < 16 || r.right < o.left || r.left > o.right || r.bottom < o.top || r.top > o.bottom || r.width * r.height > o.width * o.height * 0.9) continue
+        if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue // its own or a parent's: a menu fading out
         const st = getComputedStyle(el)
-        if (st.visibility === 'hidden' || st.opacity === '0') continue
         if (clear(st.backgroundColor) && st.backdropFilter === 'none' && (st.borderTopStyle === 'none' || !parseFloat(st.borderTopWidth))) continue
         holes.push({ x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height, r: parseFloat(st.borderTopLeftRadius) || 0 })
       }
@@ -288,10 +296,10 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
           f.a += (Math.random() - 0.5) * 0.3 * dt
           f.hx += Math.cos(f.a) * 0.35 * dt
           f.hy += Math.sin(f.a) * 0.35 * dt
-          if (f.hx < -20) f.hx = w + 20
-          if (f.hx > w + 20) f.hx = -20
-          if (f.hy < -20) f.hy = h + 20
-          if (f.hy > h + 20) f.hy = -20
+          // off an edge: in again at the other, where it's drawn too (not flown across the page to it)
+          const wrap = (v: number, max: number) => (v < -20 ? max + 20 : v > max + 20 ? -20 : v)
+          const [hx, hy] = [wrap(f.hx, w), wrap(f.hy, h)]
+          ;((f.x += hx - f.hx), (f.y += hy - f.hy), (f.hx = hx), (f.hy = hy))
         }
         const k = near(f.hx, f.hy, 260)
         const tx = f.hx + (p.x - f.hx) * 0.45 * k
@@ -312,12 +320,9 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     let raf = 0
     let seen = false // the cards to cut out: looked at again on the next frame
     let last = 0
-    const frame = (t: number) => {
-      raf = 0
-      if (ambient && t - last < 33 && last) return void (raf = requestAnimationFrame(frame)) // 30 fps is plenty
-      const dt = last ? Math.min(3, (t - last) / 16.7) : 1
-      last = t
-      if (seen) ((seen = false), look())
+    // drifting on its own: Motion High, and not while the window is away (html.away: its CSS animations pause too)
+    const drifts = () => ambient && !document.documentElement.classList.contains('away')
+    const paint = (t: number, dt: number) => {
       p.on += (p.want - p.on) * 0.12
       if (Math.abs(p.want - p.on) < 0.01) p.on = p.want
       p.sx += ((p.on ? p.x : w / 2) - p.sx) * 0.08
@@ -333,7 +338,16 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
         ctx.fill()
         ctx.globalCompositeOperation = 'source-over'
       }
-      if (!still && (ambient || moving || p.on !== p.want)) raf = requestAnimationFrame(frame)
+      return moving
+    }
+    const frame = (t: number) => {
+      raf = 0
+      if (ambient && t - last < 33 && last) return void (raf = requestAnimationFrame(frame)) // 30 fps is plenty
+      const dt = last ? Math.min(3, (t - last) / 16.7) : 1
+      last = t
+      if (seen) ((seen = false), look())
+      const moving = paint(t, dt)
+      if (!still && (moving || drifts() || p.on !== p.want)) raf = requestAnimationFrame(frame)
       else last = 0
     }
     const kick = () => (raf ||= requestAnimationFrame(frame))
@@ -352,11 +366,17 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     p.sx = w / 2
     p.sy = h / 2
     kick()
-    const ro = new ResizeObserver(() => (fit(), again()))
+    // a new size clears the canvas: drawn again at once, before this frame shows (a frame's wait blinks as a sidebar drags)
+    const ro = new ResizeObserver(() => {
+      if (fit()) ((seen = false), look(), paint(performance.now(), 0))
+      again()
+    })
     ro.observe(box)
-    // the page's cards: as they change (another workspace's, Welcome's checks, the form's fields) and after they've
-    // grown in (motion); a scroll anywhere in it (capture: scroll doesn't bubble)
-    const mc = new MutationObserver(again)
+    // the page's cards: as they change (another workspace's, Welcome's checks, the form's fields: once typing pauses, not
+    // a look over the whole page per key) and after they've grown in (motion); a scroll anywhere in it (capture: scroll
+    // doesn't bubble)
+    let typed = 0
+    const mc = new MutationObserver(() => (clearTimeout(typed), (typed = window.setTimeout(again, 120))))
     mc.observe(box, { childList: true, subtree: true })
     box.addEventListener('scroll', again, { capture: true, passive: true })
     const settle = window.setTimeout(again, 450)
@@ -371,6 +391,7 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
       mo.disconnect()
       mc.disconnect()
       clearTimeout(settle)
+      clearTimeout(typed)
       box.removeEventListener('scroll', again, { capture: true })
       box.removeEventListener('pointermove', move)
       box.removeEventListener('pointerleave', leave)

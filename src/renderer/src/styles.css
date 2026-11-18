@@ -600,7 +600,8 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .ws { --ws-bar: color-mix(in srgb, var(--tab-c, transparent) 70%, transparent); display: flex; align-items: center; gap: var(--sp-3); height: round(nearest, calc(var(--ws-h, 28px) * var(--density)), 1px); margin: var(--ws-gap, 1px) 8px; padding: 0 var(--sp-4) 0 var(--sp-4); border-radius: var(--r-control); cursor: var(--cur-act); border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
-.ws.sel { --ws-bar: var(--tab-c, var(--accent)); background-color: color-mix(in srgb, var(--accent) 14%, var(--sel-fill)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); } /* the one you're in: an accent tint and edge, its bar in its own color (else the accent); a look's own wins. Away (html.away) the accent is grey */
+.ws.sel { --ws-bar: var(--tab-c, var(--accent)); background-color: color-mix(in srgb, var(--accent) 14%, var(--sel-fill)); } /* the one you're in: an accent tint and edge, its bar in its own color (else the accent); a look's own wins. Away (html.away) the accent is grey */
+:where(.sidebar:not([data-style='cards'])) .ws.sel { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); } /* its edge (a card has its own border): no stronger than .ws.sel, so a look's own shadow wins */
 .ws.needs .ws-name { font-weight: 600; }
 .ws-new { color: var(--muted); }
 .ws-new:hover { color: var(--fg); }
@@ -3026,7 +3027,7 @@ button.board-name:hover { background: none; }
 .ws-pill.t-done { color: var(--done); } .ws-pill.t-error { color: var(--error); } .ws-pill.t-running { color: var(--running); } .ws-pill.t-merged { color: var(--tc-purple); }
 .ws-state.g-waiting { color: var(--waiting); } .ws-state.g-running { color: var(--running); } .ws-state.g-done { color: var(--done); } .ws-state.g-limit { color: var(--error); }
 .sidebar[data-style='cards'] .ws { margin: 4px 8px; padding: var(--sp-4) var(--sp-4); border: 1px solid var(--line); background-color: color-mix(in srgb, var(--panel) 70%, transparent); }
-.sidebar[data-style='cards'] .ws.sel { background-color: color-mix(in srgb, var(--accent) 12%, var(--sel)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: none; }
+.sidebar[data-style='cards'] .ws.sel { background-color: color-mix(in srgb, var(--accent) 12%, var(--sel)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .ws-last { flex-basis: 100%; padding-left: var(--sp-6); margin-top: 3px; font-size: var(--fs-2); line-height: 1.35; color: var(--fg); opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
 .side-styles { margin-bottom: 8px; }
 /* Settings › Appearance: the floating bubbles' styles, each a live preview (floater.css) */
@@ -3772,7 +3773,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .fr-reply { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-3); margin-top: 10px; padding-bottom: 56px; } /* room for the floating Laki AI button: scrolled down, Comment is clear of it */
 .fr-reply textarea { resize: vertical; min-height: 64px; font: inherit; }
 /* the sidebar's picked workspaces (⌘-click, ⇧-click) and their bar over the list: archive, mute, move, delete at once */
-.sidebar .ws.ws-picked { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.sidebar .ws.ws-picked { background-color: color-mix(in srgb, var(--accent) 10%, transparent); outline: 1px dashed color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: -1px; } /* dashed: never mistaken for the one you're in (.ws.sel's tint, solid edge and bar), which keeps them when picked too */
 .pick-bar { flex: none; display: flex; align-items: center; gap: var(--sp-1); margin: 4px 8px; padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--r-l); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: var(--fs-2); }
 /* Laki AI: what you sent while it answered, over the composer (Ai.tsx: the next ask as it ends) */
 .ai-queue { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0 0 6px; }

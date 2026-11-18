@@ -2389,4 +2389,4 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 [data-look='cathedral'] .seg button.on { background: linear-gradient(160deg, #ef5a6e, #a01f35); color: #fff6e0; }
 [data-look='chalk'] .seg button.on { border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); }
 [data-look='gazette'] .seg button.on { background: var(--fg); color: var(--bg); }
-[data-look='classic'] .seg button.on { box-shadow: var(--sink); background: repeating-conic-gradient(#c0c0c0 0 25%, #ffffff 0 50%) 0 0 / 2px 2px; font-weight: 700; }
+[data-look='classic'] .seg button.on { box-shadow: var(--sink); background: repeating-conic-gradient(#c0c0c0 0 25%, #ffffff 0 50%) 0 0 / 2px 2px; } /* not bold: its width kept */
