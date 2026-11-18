@@ -109,6 +109,13 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
   built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
+  - ⌘K's preview (`palettePreview.ts` `previewOf`, pure, the highlighted item's only, from the view: no daemon call as the
+    arrows move): a workspace's or tab's agents (status, time running), plan (`planCount`, `planNow`), PR, diff, One next
+    step, its focused agent's `last`; a command's words (Settings › Keys' `KEYS` label, else its label after the colon),
+    key and `on` (the workspace an item of `if (ws)` acts on). At `(min-width: 720px)` (`useSyncExternalStore` on
+    `matchMedia`) `.palette-body.two`: the list at 45%, `PreviewPane` beside it; ⇥ from the box focuses its buttons
+    (an item's `acts`: Changes, Ship; *All actions* is the old ⇥ list), Esc back; the box is `aria-describedby` it, not
+    live. Recording mode's private workspaces: `null`. Tested in `test/units-more.test.ts`.
   - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` as it opens, the file's diff from `diff` (uncommitted) on a
     click (`diffByFile`), `gated` around `ship`; after an Open PR, the sheet's Merge when green and Send CI failures as
     `wsSet` (no second ask: the box was it). ⌘↵ is Open PR. In a short window each column scrolls (`.ship-cols`' one

@@ -735,7 +735,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog === 'palette' && <Palette items={paletteItems(app)} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
+      {dialog === 'palette' && <Palette items={paletteItems(app)} view={view} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
       <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (
         <ShipSheet

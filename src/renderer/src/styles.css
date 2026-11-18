@@ -1109,6 +1109,24 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .palette-crumb .ghost { padding: var(--sp-1) var(--sp-2); }
 .palette-foot { margin-top: 6px; padding-top: var(--sp-3); border-top: 1px solid var(--line); font-size: var(--fs-1); text-align: right; }
 .palette-item .ph { flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2); }
+/* ⌘K at 720px and wider (Palette.tsx): the list at 45%, the highlighted one's preview beside it (palettePreview.ts), in
+   the same surface, its corner the modal's --r-in; narrower (a phone's) one column, no preview */
+.palette-body { display: flex; flex-direction: column; min-height: 0; }
+.palette-body.two { display: grid; grid-template-columns: 45% minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--sp-3); }
+.modal.wide:has(> .palette-body.two) { width: min(960px, calc(100vw - var(--sp-6) * 2)); }
+.palette-pane { min-width: 0; overflow-y: auto; margin-top: var(--sp-3); padding: var(--sp-4); border-radius: var(--r-in); background: var(--hover); }
+.pv-in { display: flex; flex-direction: column; gap: var(--sp-3); }
+.pv-title { font-weight: 600; overflow-wrap: anywhere; }
+.pv-sub { font-size: var(--fs-2); overflow-wrap: anywhere; }
+.pv-rows { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-2) var(--sp-4); margin: 0; font-size: var(--fs-2); }
+.pv-rows > div { display: contents; }
+.pv-rows dd { margin: 0; overflow-wrap: anywhere; }
+.pv-rows .pv-bad dd { color: var(--error); }
+.pv-rows .pv-ask dd { color: var(--waiting); }
+.pv-rows .pv-ok dd { color: var(--done); }
+.pv-tail { margin: 0; padding: var(--sp-3); border-radius: var(--r-s); background: var(--bg); font: var(--fs-1) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9lh; overflow: hidden; }
+.pv-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+@media (prefers-reduced-motion: no-preference) { .pv-in { animation: v-fade-in var(--t-fast) var(--ease-out); } } /* each item's: it fades in as the highlight moves; Motion: Off, the catch-all */
 .toast { position: fixed; bottom: 36px; right: 16px; color: var(--fg); padding: var(--sp-4) var(--sp-5); max-width: 480px; z-index: var(--z-toast); white-space: pre-wrap; }
 .xterm .xterm-viewport { background: transparent !important; } /* .term-wrap paints --term-bg, padding included: a see-through one twice would make the padding a lighter frame */
 

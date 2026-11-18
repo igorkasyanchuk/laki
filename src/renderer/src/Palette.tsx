@@ -1,12 +1,13 @@
 // ⌘K: the palette (Palette) and what App puts in it (paletteItems: built as it shows, from what appCtx.ts says it reads)
 import type { AppCtx } from './appCtx'
 import { type IconName, type MenuItem, Icon, ON, ProjectMark, act } from './ui'
-import { type ReactNode, useState, useMemo, useRef, useEffect } from 'react'
+import { type ReactNode, useState, useMemo, useRef, useEffect, useId, useSyncExternalStore } from 'react'
+import { type Preview, type PreviewAct, previewOf } from './palettePreview'
 import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
 import { Glyph, rollup } from './Glyph'
 import { copyDiagnostics, Modal } from './panels'
 import { type Action, wsName } from './appCtx'
-import { aiOn, HOME_ACCOUNT, AGENT_NAMES } from '../../shared/types'
+import { aiOn, HOME_ACCOUNT, AGENT_NAMES, type View } from '../../shared/types'
 const LAB_PAGES = [['calendar', 'Calendar', 'calendar'], ['desk', 'My Desk', 'desk'], ['notes', 'Notes', 'note'], ['todoList', 'To-dos', 'listChecks'], ['specs', 'Specs & Brainstorms', 'spec'], ['workflows', 'Workflows', 'flow']] as const
 import { cmdMap, keyShow } from '../../shared/keys'
 import { hasCap } from '../../shared/caps'
@@ -14,7 +15,7 @@ import { LAYOUT_PRESETS } from '../../shared/layout'
 import { api, bridge, openExternal } from './api'
 import { tabGlyph, prNum, appIcon, SCRIPT_ICONS } from './appCtx'
 
-export type PaletteItem = { id?: string; label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void; kind?: PalKind; more?: () => MenuItem[]; find?: string[] } // mark: before the hint (its project's); kind: its group (text.ts paletteGroups; none: an action); more: ⇥'s actions (its ⋯ menu); find: links a pasted one matches (a workspace's PRs)
+export type PaletteItem = { id?: string; label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void; kind?: PalKind; more?: () => MenuItem[]; find?: string[]; ws?: string; tab?: string; on?: string; acts?: Partial<Record<PreviewAct, () => void>> } // ws, tab: what its preview shows (palettePreview.ts), on: the workspace an action acts on, acts: its preview's buttons; mark: before the hint (its project's); kind: its group (text.ts paletteGroups; none: an action); more: ⇥'s actions (its ⋯ menu); find: links a pasted one matches (a workspace's PRs)
 
 export { fuzzy } from './text' // the palette's matching
 
@@ -31,7 +32,49 @@ const recent = (): string[] => {
 // menu, the same items), filtered as you type; Esc or ⇧⇥ goes back, a submenu goes in with ⇥ or ⏎
 type Step = { title: string; items: MenuItem[]; q: string; i: number } // an actions list, and where the one under it was
 const acts = (xs: MenuItem[]) => xs.filter((m): m is Extract<MenuItem, { label: string }> => !!m && 'label' in m)
-export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onClose: () => void; forName?: string }) {
+// two columns at 720px and wider (the list, the highlighted item's preview); narrower, a phone's: one
+const WIDE = '(min-width: 720px)'
+const wideNow = () => matchMedia(WIDE).matches
+const wideOn = (f: () => void) => (m => (m.addEventListener('change', f), () => m.removeEventListener('change', f)))(matchMedia(WIDE))
+const ACT_WORDS: Record<PreviewAct, string> = { open: 'Open', changes: 'Changes', ship: 'Ship' }
+// the preview: Preview's rows, the last lines its agent said, its buttons (⇥ from the box comes here, Esc goes back);
+// described-by the box, not live: read when asked, not on every arrow press
+function PreviewPane({ pv, id, run, act, more, back }: { pv: Preview | null; id: string; run: string; act: (a: PreviewAct) => void; more?: () => void; back: () => void }) {
+  return (
+    <div id={id} className="palette-preview" role="region" aria-label="Preview" onKeyDown={e => e.key === 'Escape' && (e.preventDefault(), back())}>
+      {pv && (
+        <div key={pv.title} className="pv-in">
+          <div className="pv-title">{pv.title}</div>
+          {pv.sub && <div className="pv-sub muted">{pv.sub}</div>}
+          {pv.rows.length > 0 && (
+            <dl className="pv-rows">
+              {pv.rows.map((r, n) => (
+                <div key={`${r.label}-${n}`} className={r.tone ? `pv-${r.tone}` : undefined}>
+                  <dt className="muted">{r.label}</dt>
+                  <dd>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {pv.tail && <pre className="pv-tail">{pv.tail.join('\n')}</pre>}
+          <div className="pv-acts">
+            {pv.acts.map(a => (
+              <button key={a} type="button" className={a === 'open' ? 'primary' : undefined} onClick={() => act(a)}>
+                {a === 'open' ? run : ACT_WORDS[a]}
+              </button>
+            ))}
+            {more && (
+              <button type="button" onClick={more}>
+                All actions
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+export function Palette({ items, onClose, forName, view }: { items: PaletteItem[]; onClose: () => void; forName?: string; view?: View | null }) {
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
   const [steps, setSteps] = useState<Step[]>([])
@@ -41,6 +84,12 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
   const shown = step ? acts(step.items).filter(m => fuzzy(q, `${m.label} ${m.sub ?? ''}`) > 0) : []
   const list: (PaletteItem | (typeof shown)[number])[] = step ? shown : groups.flatMap(g => g.items)
   const ref = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLInputElement>(null)
+  const pane = useRef<HTMLDivElement>(null)
+  const pvId = useId()
+  const wide = useSyncExternalStore(wideOn, wideNow)
+  const cur = step ? undefined : (list[i] as PaletteItem | undefined)
+  const pv = useMemo(() => (wide && cur && view ? previewOf(cur, view) : null), [wide, cur, view]) // the highlighted one's only
   useEffect(() => void ref.current?.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }), [i, steps.length])
   const pick = (x?: PaletteItem) => {
     if (!x) return
@@ -86,8 +135,10 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
         </div>
       )}
       <input
+        ref={box}
         className="palette-input"
         value={q}
+        aria-describedby={pv ? pvId : undefined}
         autoFocus
         placeholder={step ? `What to do with ${step.title}…` : 'Workspace, tab or action…'}
         onChange={e => {
@@ -99,12 +150,14 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
           else if (e.key === 'ArrowUp') setI(n => Math.max(n - 1, 0))
           else if (e.key === 'Enter') step ? runAct(list[i] as (typeof shown)[number]) : pick(list[i] as PaletteItem)
           else if (e.key === 'Tab' && e.shiftKey) back()
+          else if (e.key === 'Tab' && pv) pane.current?.querySelector<HTMLButtonElement>('button')?.focus() // the preview's buttons (All actions: ⇥'s list)
           else if (e.key === 'Tab') step ? runAct(list[i] as (typeof shown)[number], true) : (x => x?.more && into(x.label, x.more()))(list[i] as PaletteItem)
           else if (e.key === 'Escape' && step) back()
           else return
           e.preventDefault()
         }}
       />
+      <div className={`palette-body${wide && !step ? ' two' : ''}`}>
       <div className="palette-list" ref={ref}>
         {step
           ? shown.map(m => row(m, n++))
@@ -116,6 +169,19 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
             ))}
         {!list.length && <div className="muted pad">Nothing matches.</div>}
       </div>
+      {wide && !step && (
+        <div ref={pane} className="palette-pane">
+          <PreviewPane
+            pv={pv}
+            id={pvId}
+            run={cur && !cur.ws && !cur.tab ? 'Run' : 'Open'}
+            act={a => (a === 'open' ? pick(cur) : cur?.acts?.[a] && (onClose(), cur.acts[a]!()))}
+            more={cur?.more && (() => (into(cur.label, cur.more!()), box.current?.focus()))}
+            back={() => box.current?.focus()}
+          />
+        </div>
+      )}
+      </div>
       <div className="palette-foot muted">{step ? '⏎ run · ⇧⇥ or esc back' : '⏎ open · ⇥ actions · esc close'}</div>
     </Modal>
   )
@@ -126,11 +192,11 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   const { accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editLayout, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
   const items: PaletteItem[] = []
   const cmds = cmdMap(settings.cmdKeys)
-  const a = (x: Action & { id?: string }) => items.push({ ...x, hint: (x.id && cmds[x.id] && keyShow(cmds[x.id])) || (x.hint ?? 'action') }) // id: a key can be given it (Settings › Keys)
+  const a = (x: Action & { id?: string; on?: string }) => items.push({ ...x, hint: (x.id && cmds[x.id] && keyShow(cmds[x.id])) || (x.hint ?? 'action') }) // id: a key can be given it (Settings › Keys)
   // For <workspace>: its next step, only the ones that apply
   if (ws) {
     const wt = view!.tabs.filter(t => t.workspace === ws.id)
-    const f = (x: Action) => items.push({ ...x, kind: 'for' })
+    const f = (x: Action) => items.push({ ...x, kind: 'for', on: wsName(ws) })
     const asks = wt.find(t => t.status === 'waiting')
     if (asks) f({ label: `Answer ${asks.name}: ${asks.ask?.question || asks.ask?.options.map(o => o.label).join(' / ') || 'it waits for you'}`, icon: 'bell', run: () => selectTab(asks) })
     const failed = wt.find(t => t.failed)
@@ -145,13 +211,13 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   // Needs you: every other tab of needsYou, in its order
   for (const t of needsSorted(needing, staleMin)) {
     const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
-    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
+    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
   }
   if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
-  for (const w of order) items.push({ kind: 'ws', more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })
+  for (const w of order) items.push({ kind: 'ws', ws: w.id, acts: { changes: () => (setWsId(w.id), showPanel('changes')), ship: () => (setWsId(w.id), setDialog('ship')) }, more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })
   for (const t of view?.tabs ?? []) {
     const w = live.find(w => w.id === t.workspace)
-    if (w) items.push({ kind: 'tab', more: () => tabMenu([t.id]), label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
+    if (w) items.push({ kind: 'tab', tab: t.id, acts: { changes: () => (selectTab(t.id), showPanel('changes')), ship: () => (selectTab(t.id), setDialog('ship')) }, more: () => tabMenu([t.id]), label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
   }
   a({ label: 'Next tab that needs you', icon: 'bell', hint: kh('next'), run: nextNeed })
   a({ label: 'Search chats', icon: 'search', hint: kh('chatSearch'), run: () => setDialog('chats') })
@@ -234,33 +300,34 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ id: 'notify', label: `Turn macOS notifications ${settings.notify === false ? 'on' : 'off'}`, icon: 'bell', run: () => call('settingsSet', { notify: settings.notify === false }).catch(() => {}) })
   a({ id: 'recording', label: `Recording mode ${settings.recording ? 'off: show private workspaces' : 'on: hide private workspaces'}`, icon: 'lock', run: () => call('settingsSet', { recording: !settings.recording }).catch(() => {}) })
   if (ws) {
-    newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
-    for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
-    a({ id: 'openPort', label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
-    a({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
-    if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
-    if (git) a({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })
-    a({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })
-    if (tab?.kind === 'agent') a({ label: tab.bell ? 'Bell off: no one-time notification' : 'Tell me when this one finishes', icon: tab.bell ? 'bellOff' : 'bell', run: () => void call('tabBell', { id: tab.id, on: !tab.bell }).catch(fail) }) // T16
-    if (tab) a({ id: 'copyTab', label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
-    if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { id: 'floatTab', label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { id: 'floatTab', label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
-    a({ id: 'run', label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
-    if (devRunning) a({ id: 'stopRun', label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
-    for (const k of ws.scripts ?? []) a({ id: `script-${k}`, label: `Run the ${k} script`, icon: SCRIPT_ICONS[k], run: () => runScript(ws, k) })
-    if (ws.kind === 'worktree') a({ id: 'ship', label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
-    wsActions.forEach(a)
-    if (canOverlap(ws)) a({ id: 'overlaps', label: 'Check overlaps…', icon: 'gitCompare', run: () => checkOverlaps(ws) })
-    if (tab && !tab.share) a({ id: 'share', label: 'Share live view…', icon: 'globe', run: () => setSharing(tab.id) })
+    const aw = (x: Action & { id?: string }) => a({ ...x, on: wsName(ws) }) // its preview says what it acts on
+    newTabActions.forEach(x => aw({ ...x, label: `New tab: ${x.label}` }))
+    for (const x of targets) aw({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
+    aw({ id: 'openPort', label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
+    aw({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
+    if (git) aw({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
+    if (git) aw({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })
+    aw({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })
+    if (tab?.kind === 'agent') aw({ label: tab.bell ? 'Bell off: no one-time notification' : 'Tell me when this one finishes', icon: tab.bell ? 'bellOff' : 'bell', run: () => void call('tabBell', { id: tab.id, on: !tab.bell }).catch(fail) }) // T16
+    if (tab) aw({ id: 'copyTab', label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
+    if (tab && bridge?.floatTab) aw(floated.includes(tab.id) ? { id: 'floatTab', label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { id: 'floatTab', label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
+    aw({ id: 'run', label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
+    if (devRunning) aw({ id: 'stopRun', label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
+    for (const k of ws.scripts ?? []) aw({ id: `script-${k}`, label: `Run the ${k} script`, icon: SCRIPT_ICONS[k], run: () => runScript(ws, k) })
+    if (ws.kind === 'worktree') aw({ id: 'ship', label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
+    wsActions.forEach(aw)
+    if (canOverlap(ws)) aw({ id: 'overlaps', label: 'Check overlaps…', icon: 'gitCompare', run: () => checkOverlaps(ws) })
+    if (tab && !tab.share) aw({ id: 'share', label: 'Share live view…', icon: 'globe', run: () => setSharing(tab.id) })
     const layouts = layoutMenu()
     for (const p of LAYOUT_PRESETS) {
       const m = layouts.find((x): x is Extract<MenuItem, { run: () => void }> => !!x && 'label' in x && x.label === p.name && !!x.run)
-      if (m) a({ id: `layout-${p.id}`, label: `Layout: ${p.name}`, icon: m.icon ?? 'layers', run: m.run })
+      if (m) aw({ id: `layout-${p.id}`, label: `Layout: ${p.name}`, icon: m.icon ?? 'layers', run: m.run })
     }
-    if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: kh('closeTab'), run: closePreview })
-    if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : kh('closeTab'), run: () => closeTabs([tab]) })
-    if (ws.pr) a({ id: 'openPR', label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
-    for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
-    if (project && !project.kind) a({ id: 'projectSettings', label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
+    if (previewed) aw({ label: 'Close the file preview', icon: 'x', hint: kh('closeTab'), run: closePreview })
+    if (tab) aw({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : kh('closeTab'), run: () => closeTabs([tab]) })
+    if (ws.pr) aw({ id: 'openPR', label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
+    for (const p of ws.ports) aw({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
+    if (project && !project.kind) aw({ id: 'projectSettings', label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
   }
   for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
   // the default account for new sessions (Settings › Agents & profiles)

@@ -1274,7 +1274,10 @@ workspace in front needs (*For <workspace>*: answer its agent, *Fix CI*, *Resolv
 *Ship* when it has changes and no PR, *Review changes* when its agent is done), then *Needs you* (every other tab
 waiting or done), *Recent*, *Workspaces* (each with what it's at, in words), *Tabs* and *Actions*. Typing matches
 everything, under the same headings. ⇥ on a workspace or a tab lists its own actions (its ⋯ menu) right there, filtered
-as you type; Esc or ⇧⇥ goes back.
+as you type; Esc or ⇧⇥ goes back. In a window 720px wide or more, a preview beside the list shows the highlighted
+item: a workspace's agents and how long each has run, its plan, PR, diff and next step, and what its agent said last;
+an action's words, key and the workspace it acts on. There ⇥ goes to its buttons (*Open*, *Changes*, *Ship*, *All
+actions*) and Esc back to the box. A private workspace in Recording mode shows none.
 
 **Status**
 

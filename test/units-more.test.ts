@@ -1158,3 +1158,41 @@ test("secretsIn: a prompt box's pasted secrets by kind, the value's span alone; 
   assert.equal(maskSecret('short1!'), '••••')
   assert.equal(maskSecrets(`a ${gh} b ${aws}`), `a ghp_…sR7 b AKIA…AL4`)
 })
+
+test("previewOf: ⌘K's preview of a workspace (agents, plan, PR, diff, next step, its last line), a command's key, none for a hidden one", async () => {
+  const { previewOf } = await import('../src/renderer/src/palettePreview.ts')
+  const now = 1_000_000
+  const view: any = {
+    settings: { cmdKeys: { board: '⌘⇧B' } },
+    projects: [{ id: 'p', name: 'shop', git: true }, { id: 'q', name: 'secret', private: true }],
+    workspaces: [
+      { id: 'w', project: 'p', name: 'cart', kind: 'worktree', branch: 'cart', pr: { number: 12, state: 'OPEN', url: 'u', checks: 'fail' }, stat: { add: 9, del: 2, files: 3, dirty: 0 } },
+      { id: 'h', project: 'q', name: 'hidden', kind: 'worktree' },
+    ],
+    tabs: [
+      { id: 't', workspace: 'w', kind: 'agent', name: 'claude', status: 'running', runAt: now - 125e3, last: 'one\ntwo', plan: { items: [{ text: 'a', state: 'done' }, { text: 'write tests', state: 'now' }, { text: 'c', state: 'todo' }] } },
+      { id: 'u', workspace: 'h', kind: 'agent', name: 'codex', status: 'idle' },
+    ],
+  }
+  const p = previewOf({ kind: 'ws', label: 'cart', ws: 'w' }, view, now)!
+  assert.equal(p.title, 'cart')
+  assert.equal(p.sub, 'shop · cart')
+  const row = (l: string) => p.rows.find(r => r.label === l)
+  assert.deepEqual(row('claude'), { label: 'claude', value: 'working · 2 min', tone: undefined })
+  assert.equal(row('Plan')!.value, '1/3 · write tests')
+  assert.deepEqual(row('PR'), { label: 'PR', value: '#12 · open · checks fail', tone: 'bad' })
+  assert.equal(row('Diff')!.value, '+9 −2 in 3 files')
+  assert.ok(row('Next'), 'its one next step')
+  assert.deepEqual(p.tail, ['one', 'two'])
+  assert.deepEqual(p.acts, ['open', 'changes']) // a PR: no Ship
+  assert.equal(previewOf({ kind: 'tab', label: 'cart / claude', tab: 't' }, view, now)!.title, 'cart / claude')
+  // a command: Settings › Keys' key, its words, what it acts on
+  const c = previewOf({ id: 'board', label: 'Board: every workspace by where it is, and to-dos', hint: '⌘⇧B', on: 'cart' }, view)!
+  assert.equal(c.title, 'Board')
+  assert.equal(c.sub, 'every workspace by where it is, and to-dos')
+  assert.deepEqual(c.rows, [{ label: 'Key', value: '⌘⇧B' }, { label: 'On', value: 'cart' }])
+  // Recording mode: a private project's workspace shows nothing; off, it does
+  assert.equal(previewOf({ kind: 'ws', label: 'hidden', ws: 'h' }, { ...view, settings: { recording: true } }), null)
+  assert.ok(previewOf({ kind: 'ws', label: 'hidden', ws: 'h' }, view))
+  assert.equal(previewOf({ kind: 'ws', label: 'gone', ws: 'nope' }, view), null)
+})
