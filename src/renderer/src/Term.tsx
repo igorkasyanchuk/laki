@@ -106,8 +106,8 @@ export function Term({
     const at = abs || uri
     const kind = peekOf(at)
     const read = kind === 'md' || kind === 'text' ? props.current.text : props.current.image
-    // a file's picture, Markdown or text needs a reader; a web picture, https (the daemon's /img)
-    if ((path && !abs) || !kind || (abs ? !read : kind === 'md' || kind === 'text' || !/^https:/i.test(at))) return false
+    // a file's picture, Markdown or text needs a reader; a web link, only GitHub's card
+    if ((path && !abs) || !kind || (abs ? !read : kind !== 'gh')) return false
     clearTimeout(hideT.current)
     if (peekAt.current === at) return true
     clearTimeout(showT.current)

@@ -424,7 +424,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   hover): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
-  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click anywhere on an image's, a Markdown's or a text's card (not its own links and buttons), or its ⤢ (`.lp-open`), opens it larger: Term's `big` (`kind`: the picture, the Markdown drawn, the text), panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.
+  ones only); a web picture's link shows no card (`peekOf`: files only, and GitHub's cards); a click anywhere on an image's, a Markdown's or a text's card (not its own links and buttons), or its ⤢ (`.lp-open`), opens it larger: Term's `big` (`kind`: the picture, the Markdown drawn, the text), panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.
   Any other file's path (`CODE`: one with a folder, or a bare name with `:line`; not a picture's) is a link too: ⌘-click
   (⌃ unless an app has the mouse; a plain click would open it as you select it) is `onCode`, App's `openCode`: a file of the workspace in the preview at its line,
   or `openIn` `editor` (`settings.fileClick`, ⌥ the other; `codeTo` for the hover's words); any other path `openPath`'s. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,

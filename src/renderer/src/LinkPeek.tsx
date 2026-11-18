@@ -1,6 +1,6 @@
 // A link's hover card in a terminal (Term: 400 ms on a link, gone as the pointer leaves the link and the card): a
 // GitHub PR's or issue's (the daemon's ghCard: gh, kept a minute; a click opens it on GitHub), an image's (Term's
-// `image`: a file of the workspace or its storage folder, a pasted one; an https one through the daemon's /img; a click on
+// `image`: a file of the workspace or its storage folder, a pasted one; a web picture's link shows nothing; a click on
 // it, or its ⤢, opens it larger: Term's modal, which outlives the card), or a Markdown file's, drawn (Term's `text`: a
 // file of the workspace or its storage folder; the card scrolls, ⌘-click on the link opens it), or a plain text one's
 // (JSON pretty-printed, a log, CSV, YAML…: as text, never run or drawn as HTML). A click anywhere on an image's, a
@@ -12,15 +12,14 @@ import { type GhCard, GH_LINK } from '../../shared/types'
 import { api, openExternal } from './api'
 import { ago } from './Info'
 import { Icon, IconButton } from './ui'
-import { imgVia } from './Widgets'
 import { Markdown } from './MarkdownView'
 
 export const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
-// what a hovered link shows: a GitHub card, an image, or nothing
 export const MD = /\.(md|markdown)$/i
 // plain text that reads as it is (no .env: secrets on a hover)
 export const TEXT = /\.(txt|log|json|jsonc|jsonl|ndjson|csv|tsv|ya?ml|toml|ini|cfg|conf|xml|diff|patch)$/i
-export const peekOf = (uri: string) => (u => (GH_LINK.test(uri) ? 'gh' : IMAGE.test(u) ? 'img' : /^[a-z]+:/i.test(uri) ? undefined : MD.test(u) ? 'md' : TEXT.test(u) ? 'text' : undefined))(uri.split(/[?#]/)[0]) // md, text: a file's only
+// what a hovered link shows: a GitHub card, a file's picture, Markdown or text, or nothing (a web picture: nothing)
+export const peekOf = (uri: string) => (u => (GH_LINK.test(uri) ? 'gh' : /^[a-z]+:/i.test(uri) ? undefined : IMAGE.test(u) ? 'img' : MD.test(u) ? 'md' : TEXT.test(u) ? 'text' : undefined))(uri.split(/[?#]/)[0])
 // a text file as shown: JSON pretty-printed when it parses, else as it is
 export const textShown = (src: string, name: string) => {
   if (/\.json$/i.test(name))
@@ -47,7 +46,6 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
     setNone(false)
     const fail = (e: unknown) => live && setErr(String((e as Error)?.message ?? e))
     if (kind === 'gh') api.call<GhCard>('ghCard', { url: peek.uri }).then(c => live && setCard(c), fail)
-    else if (/^https:/i.test(peek.uri)) (via => (via ? setSrc(via) : fail('Web pictures need the daemon')))(imgVia(peek.uri))
     else
       (peek.read?.() ?? Promise.reject(new Error('Not a file of this workspace'))).then(s => live && (typeof s === 'string' && (s || kind !== 'img') ? setSrc(s) : s === null ? setNone(true) : fail(kind !== 'img' ? 'Not shown: not text' : 'Not shown: over 10 MB')), fail)
     return () => void (live = false)

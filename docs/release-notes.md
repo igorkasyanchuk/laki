@@ -8,7 +8,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Toasts stack as macOS's notifications do, the newest (or an error, or an Undo) in front; point at them to see them all and *Close all*. Moving toward a submenu across other items no longer closes it.
 - Density: Settings › Appearance › *Density* makes the space and controls Compact or Roomy.
 - Laki follows macOS's cursor habits: the arrow over buttons, tabs and rows, the hand over links (*Pointing hand over buttons* brings it back). Scrollbars show only while you scroll, point at or work in a list, unless macOS is set to always show them.
-- The picked segment (Terminal | Reader, Settings' choices, the side panel's tabs) slides to the next. The terminal, the Done check and the tab bar start on one left edge; Frosted's status bar draws its two groups without a second outline, its context meter with a track; Laki's own grey lines in a terminal no longer sit on a dark patch.
+- The picked segment (Terminal | Reader, the side panel's tabs) slides to the next; segmented choices (All | Specs | Brainstorms, Branch | Uncommitted) show their pick as a solid fill. The terminal, the Done check and the tab bar start on one left edge; Frosted's status bar draws its two groups without a second outline, its context meter with a track; Laki's own grey lines in a terminal no longer sit on a dark patch.
 - Needs you shows a finished turn as one line (Changes and Seen on hover; a click opens its card), so asks stand out; Settings › Layout › Sidebar › *Finished turns as rows* turns it off. Project names stick to the sidebar's top as you scroll their workspaces.
 - Long names are cut at their dashes and dots (`fix…total`) and keep at least 10 characters in a row: the next-step chip shows just its icon when it needs the room.
 - The tab bar's buttons sit in groups, fold into ⋯ when the bar is narrow, and can be picked and ordered: right click the bar › *Customize toolbar…* (or View › Customize Toolbar…). Tabs that don't fit go behind a *+n* button that shows the most urgent of them. [Try it](laki://toolbar)
@@ -27,6 +27,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - The talk key can take what's selected in the app you're in along with your words: Settings › Voice › Talk key › *Include the selected text*. The pill shows *+ selection · 3 lines*; × leaves it out. Never from a password manager; secrets masked.
 - Do not disturb is now *Quiet*, and it's in the menu bar's menu (its mark gets a slash), `laki quiet 1h` and Settings › Notifications with a default length. As it ends, one notification sums it up (*2 agents are waiting, 3 finished, 1 check failed*) and opens Needs you; nothing when nothing happened.
 - Worktrees stay out of Time Machine and Spotlight on a Mac (Settings › General › Storage; on for new installs). Settings › Resources › Disk says how much that keeps out of your backups.
+- A link to a picture on the web shows no hover card any more; a picture's path in a terminal still does
 
 ## 0.55.0 · Nov 18, 2026
 

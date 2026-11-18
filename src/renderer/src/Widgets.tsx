@@ -68,7 +68,6 @@ const URL_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset', 'action', 'for
 // /img (App sets how, imgKey); none set: dropped
 let viaDaemon: ((url: string) => string) | undefined
 export const imagesVia = (f?: (url: string) => string) => void (viaDaemon = f)
-export const imgVia = (url: string) => viaDaemon?.(url) // an https picture's address through the daemon (LinkPeek's)
 export function clean(html: string): DocumentFragment {
   const t = document.createElement('template')
   t.innerHTML = html

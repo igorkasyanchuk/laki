@@ -1,9 +1,9 @@
-// The selection slides (styles.css .slid): in a segmented group (.seg, the Terminal | Reader switch, the side panel's
-// tabs) the picked item's fill or underline is the group's ::before, moved under the new pick with the spring when it
+// The selection slides (styles.css .slid): in the Terminal | Reader switch and the side panel's tabs (a segmented .seg
+// group's pick is a fill of its own, standing still) the picked item's fill or underline is the group's ::before, moved under the new pick with the spring when it
 // changes. One MutationObserver for the window (class and aria changes on a group's items, read only there); a group
 // is drawn so only from its first change on, starting where the old pick was, so nothing slides as a page first draws
 // or as a group's items come. An item come or gone, a change of its size (Density, the zoom) or the window's puts them back without moving. Motion: Off / Reduce motion: styles.css' catch-all
-const GROUP = '.seg, .reader-switch, .sp-tabs'
+const GROUP = '.reader-switch, .sp-tabs'
 const PICKED = ':scope > :is(.on, [aria-checked="true"], [aria-pressed="true"], [aria-selected="true"])'
 
 function place(g: HTMLElement, el: Element | null | undefined, still: boolean) {
@@ -18,7 +18,7 @@ function place(g: HTMLElement, el: Element | null | undefined, still: boolean) {
   if (still) void g.offsetWidth, g.removeAttribute('data-still') // drawn there at once, then free to move
 }
 
-// a look that fills the pick its own way (looks.css' .seg button.on: Frosted's accent, a gradient): its fill is the mark,
+// a look that fills the pick its own way (looks.css: Frosted's accent, a gradient): its fill is the mark,
 // an underline sliding over it would be a second one, so that group doesn't slide. Read as the look ends it: the
 // transition skipped, else the new pick reads as it was a frame ago. The default's pick has none (an underline). ponytail:
 // a sibling not under the mouse as the look's plain button (one under it may show its hover)

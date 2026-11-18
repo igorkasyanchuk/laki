@@ -1022,14 +1022,14 @@ button.danger:focus-visible { outline: 2px solid var(--error); outline-offset: 2
 .seg button { border-radius: 0; margin-left: var(--seg-overlap, -1px); }
 .seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.seg button.on { background: none; color: var(--fg); box-shadow: inset 0 -2px 0 var(--neutral-strong); position: relative; } /* V1: underlined, as the tabs */
+.seg button.on { background: color-mix(in srgb, var(--fg) 12%, var(--panel)); color: var(--fg); position: relative; } /* filled, as the Terminal | Reader switch's (a look's own fill wins) */
 /* the selection slides (slide.ts .slid, from a group's first change): the picked item's underline or fill is the
    group's ::before, moved with the spring; the item keeps its text color, its focus ring its own */
-:is(.seg, .reader-switch, .sp-tabs).slid { position: relative; }
-:is(.seg, .reader-switch, .sp-tabs).slid::before { content: ''; position: absolute; left: 0; top: 0; width: var(--ind-w); height: var(--ind-h); translate: var(--ind-x) var(--ind-y); pointer-events: none; transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring); }
-:is(.seg, .reader-switch, .sp-tabs)[data-still]::before { transition: none; }
-:is(.seg, .sp-tabs).slid::before { z-index: 2; box-shadow: inset 0 -2px 0 var(--neutral-strong); }
-:is(.seg, .sp-tabs).slid > button.on { box-shadow: none; }
+:is(.reader-switch, .sp-tabs).slid { position: relative; }
+:is(.reader-switch, .sp-tabs).slid::before { content: ''; position: absolute; left: 0; top: 0; width: var(--ind-w); height: var(--ind-h); translate: var(--ind-x) var(--ind-y); pointer-events: none; transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring); }
+:is(.reader-switch, .sp-tabs)[data-still]::before { transition: none; }
+.sp-tabs.slid::before { z-index: 2; box-shadow: inset 0 -2px 0 var(--neutral-strong); }
+.sp-tabs.slid > button.on { box-shadow: none; }
 .reader-switch.slid::before { z-index: 0; border-radius: var(--r-in); background: color-mix(in srgb, var(--fg) 12%, transparent); }
 .reader-switch.slid > button { position: relative; z-index: 1; }
 .reader-switch.capsule.slid button.on { background: none; }
