@@ -355,13 +355,26 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   (20,000 at most, read once a minute) and, once something's typed, their folders with a slash (`foldersOf`), ranked
   by `findFiles` (the name before the path; 50 ms a key at most, `fuzzyFiles`' budget), the matched letters bold; the
   pick is `@path` as plain text. The listbox's rows have ids, the box `aria-activedescendant` and `aria-controls`.
-- **Names cut in the middle** (T6): ui.tsx `MidText` (text.ts `midCut`: the end on a dash, space, dot, slash or
-  underscore when that leaves it at most half, by code point) for sidebar rows, tab titles and the status bar's branch:
+- **Names cut in the middle** (T6): ui.tsx `MidText` (text.ts `midCut`: whole segments first, a head ending before a
+  dash, space, dot, slash, underscore or camelCase step and a tail starting after one, the pair showing the most when
+  that's 60% of the room, else 60/40; never under 3 a side; by code point) for sidebar rows, Needs you's card heads,
+  tab titles and the status bar's branch. Its `floor` (a workspace row's: 10 characters, or the whole of a shorter name)
+  sets `data-tight` on the row (`[data-floor]`) when the name has fewer, a frame later: the One next step chip shows
+  its icon alone (`STEP_ICON`, its word as `aria-label`), back once there's room for 8 characters more; marks stay.
   the cut over the whole name (transparent, so a screen reader reads it whole; its title too) in one grid cell, so the
   box is as wide as the whole name until its room is less; one ResizeObserver for every MidText (a box resized or its
   name changed is measured, nothing else). Needs you's head never cuts its title: under 280px (a container query,
   `needs-head`) Allow all and Deny all become an icon with the count; a card's agent name is whole, and under 170px
   (`need`) goes to a line of its own; the workspace's name is cut first.
+- **Needs you's finished turns as rows** (`Needs.tsx` `NeedCard`, `settings.finishedRows`, on unless false, never on a
+  phone): one line, `.need-row`: the done mark, the workspace (`MidText`), its last line muted, how long ago; Changes and
+  Seen in the same grid cell, shown on `:hover`/`:focus-within` (the height kept). A click or Space opens its card
+  (`opened`, by tab and `needAt`, until it leaves); Enter opens the tab as a card's does. An ask, an API error, a plan
+  limit, a sandbox's stop or a failed Done check stay cards.
+- **Sticky project heads** (`.side-scroll .project-head`): each project is a section (`.project`), its head
+  `position: sticky` (`--z-sticky`); while stuck (a scroll-driven animation, `view-timeline: --ph` on the section,
+  `exit-crossing`) it gets the sidebar's color blurred and a line under it, at rest none (a look's picture or glass
+  sidebar shows no band). Collapsing a stuck one scrolls its section's top into view (`stuckFold`).
 - **The AI button's corner** (T7, App.tsx `FabCorner`): `--fab-r`, what's right of the terminals, and `--fab-b`, how far
   up from the main area's bottom the top of what's docked under it reaches (`data-dock="bottom"`: each pane's strips,
   `.queue-strip` and the turn strip, and the ask bar); the button sits 16px over it (34px at least), a spring on

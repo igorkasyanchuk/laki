@@ -150,6 +150,7 @@ export type AppSettings = Paint & {
   keepStorage?: boolean // a deleted workspace's storage folder stays
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
+  finishedRows?: boolean // Needs you's finished turns as rows
   toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
   toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
@@ -2071,6 +2072,9 @@ export function SettingsPage(p: {
               )}
               <Group title="Sidebar" hint="How the sidebar's rows and project names look; each choice is over the theme's. The preview changes as you do">
               <SidePreview sl={s.sideLook} pl={s.projectLook} style={s.sideStyle} />
+              <Switch className="switch-row" on={s.finishedRows !== false} onChange={on => set({ finishedRows: on })}>
+                <Says title="Finished turns as rows" hint="In Needs you, a finished turn is one line (its workspace, its last words, Changes and Seen on hover); a click opens its card. Asks stay cards" />
+              </Switch>
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
                   {SIDE_STYLES.map(([k, name, what]) => (

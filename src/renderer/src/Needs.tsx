@@ -14,7 +14,7 @@ import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
-import { Elapsed, Icon, Num } from './ui'
+import { Elapsed, Icon, MidText, Num } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
@@ -36,7 +36,12 @@ export type NeedsApi = {
   openProof?: (t: TabView, path: string) => void // the Proof card's file (a script's output, a picture): its storage folder's
   spend?: (t: TabView) => Promise<SpendView> // its workspace's Where it went (wsSpend), on the Proof card
   turnChips?: (t: TabView) => React.ReactNode // P5: its last turn's chips from turn place extensions
+  rows?: boolean // Finished turns as rows (settings.finishedRows, on unless false; never a phone's: no hover there)
 }
+
+// a finished turn's row a click or Space opened into its card: kept so until it leaves the list (its tab and when it
+// began needing you). ponytail: never pruned, a few strings a day
+const opened = new Set<string>()
 
 const EARLIER = 'laki.needsEarlier' // '1': the Earlier row unfolded
 const unfolded = () => {
@@ -125,11 +130,38 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
   const last = t.failed ?? t.last?.trim().split('\n').find(l => l.trim())?.trim()
   const stat = w.stat && (w.stat.add > 0 || w.stat.del > 0) ? w.stat : undefined
   const changed = w.stat ? w.stat.files > 0 || w.stat.dirty > 0 : t.kind === 'agent' && !t.runs // no scan yet: a shell (or an agent typed in one) has none to show
+  // a finished turn as a row (asks stay cards: they weigh most): its mark, workspace, the first words of its last line,
+  // how long ago; Changes and Seen where the words were on hover or focus, the row's height kept. A failed Done check,
+  // a plan limit, a sandbox's stop or an API error stay cards. A click or Space opens it into its card
+  const id = `${t.id}:${t.needAt ?? ''}`
+  const [, grow] = useState(0)
+  const failedCheck = w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)
+  if (api.rows && !waiting && !t.failed && !t.limit && !t.boxed && !failedCheck && !opened.has(id)) {
+    const expand = () => (opened.add(id), grow(n => n + 1))
+    return (
+      <div className="need need-done need-row" data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. Space shows more`} onClick={expand} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))}>
+        <Glyph s="done" />
+        <b className="need-ws">
+          <MidText text={api.name(w)} />
+        </b>
+        <span className="need-row-mid">
+          <span className="need-row-last">{last ?? t.name}</span>
+          <span className="need-row-acts" onClick={stop}>
+            {!!w.branch && changed && <button type="button" onClick={() => api.review(t)}>Changes</button>}
+            <button type="button" onClick={() => api.seen(t)}>Seen</button>
+          </span>
+        </span>
+        {t.needAt && <Elapsed since={t.needAt} />}
+      </div>
+    )
+  }
   return (
     <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : 'done'} />
-        <b className="need-ws">{api.name(w)}</b>
+        <b className="need-ws">
+          <MidText text={api.name(w)} />
+        </b>
         <span className="need-tab">{t.name}</span>
         {t.needAt && <Elapsed since={t.needAt} />}
         <button type="button" className="need-chev" aria-expanded={open} aria-label={open ? 'Hide detail' : 'Show detail'} onClick={e => (e.stopPropagation(), setOpen(!open))}>

@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Needs you shows a finished turn as one line (Changes and Seen on hover; a click opens its card), so asks stand out; Settings › Layout › Sidebar › *Finished turns as rows* turns it off. Project names stick to the sidebar's top as you scroll their workspaces.
+- Long names are cut at their dashes and dots (`fix…total`) and keep at least 10 characters in a row: the next-step chip shows just its icon when it needs the room.
 - The tab bar's buttons sit in groups, fold into ⋯ when the bar is narrow, and can be picked and ordered: right click the bar › *Customize toolbar…* (or View › Customize Toolbar…). Tabs that don't fit go behind a *+n* button that shows the most urgent of them. [Try it](laki://toolbar)
 - ⌘K shows a preview beside the list in a wide window: a workspace's agents, plan, PR, diff and next step, or what an action does and its key. ⇥ goes to its buttons (Open, Changes, Ship).
 - Paste a token or key into a prompt box and a line under it says so, masked: *Pass as a secret* puts it in a file only you and the agent read and its path in the prompt. Checked in the window; ⏎ twice sends it as it is.

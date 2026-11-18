@@ -60,7 +60,7 @@ import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
 import { MidText, Num, morph, rowsMorph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
-import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
+import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { settle } from './motion'
 import { onKey } from './keydown'
@@ -89,7 +89,6 @@ const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
 // E8: loaded as they first show (the Review tab, the floating AI chat): not in the window's first load
 const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.FullReview })))
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
-const STEP_ICON: Record<StepId, IconName> = { continue: 'run', answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)

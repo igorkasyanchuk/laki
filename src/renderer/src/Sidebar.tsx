@@ -6,7 +6,7 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
 import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText } from './ui'
-import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
+import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
@@ -150,6 +150,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
+    rows: settings.finishedRows !== false && !narrow, // a phone keeps cards: no hover there
     openProof: (t, path) => (setDialog(null), selectTab(t), app.openFile({ ws: t.workspace, path, storage: true }), narrow && setSideOpen(false)),
     spend: hasCap(view, 'ws.spend') ? t => api.call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: t => (last => (last?.length ? <TurnChips marks={last} widgets={view.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at } })} /> : null))(t.marks?.filter(m => m.at === t.marks!.at(-1)!.at)),
@@ -220,7 +221,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     const simple = settings.simpleRow === true // B4: a name and one next-step chip (or the turn's time); the other marks on hover and in the peek card
     return (
-      <div
+      <div data-floor
         key={w.id}
         className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${fresh(w.id) ? 'v-new' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
@@ -243,14 +244,14 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : w.pending && !wt.length ? 'idle' /* its agent comes later: not ended */ : rollup(wt)} />}
         {marksAt === 'start' && yes}
-        <MidText className="ws-name" text={wsName(w)} />
+        <MidText className="ws-name" text={wsName(w)} floor={{ chars: 10, extra: 8 }} />
         {marksAt === 'name' && yes}
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), doStep(w, st, e)))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
+        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} aria-label={STEP_CHIP[st.id] ?? st.label} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), doStep(w, st, e)))}><Icon name={STEP_ICON[st.id]} size={11} /><span className="ws-step-w">{STEP_CHIP[st.id] ?? st.label}</span></span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {(settings.timers || simple) && (simple ? <span className="ws-keep"><TurnTime tabs={wt} /></span> : <TurnTime tabs={wt} />)}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -597,6 +598,8 @@ function treeKey(e: ReactKey<HTMLElement>) {
 
 export function Sidebar({ app }: { app: AppCtx }) {
   const tree = useRef<HTMLDivElement>(null)
+  // a stuck head's collapse: its section's top back in view (not the rows after it)
+  const stuckFold = (head: Element) => (sec => sec && tree.current && sec.getBoundingClientRect().top < tree.current.getBoundingClientRect().top && sec.scrollIntoView({ block: 'start' }))(head.closest('.project'))
   // its one tab stop: kept where the keys left it while the focus is in it, else the selected row (or the first)
   useLayoutEffect(() => {
     const t = tree.current
@@ -695,7 +698,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
           const shut = !hits && folded.includes(p.id)
           const sum = shut ? busiest(mine) : 'idle'
           return (
-          <div key={p.id} className={`project ${rows.at('project', p.id)}`} data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
+          <div key={p.id} className={`project ${rows.at('project', p.id)}`} /* a section: its head sticks over its rows */ data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
             <div
               className={`project-head ${p.color && p.color !== 'none' ? 'tinted' : ''}`}
               role="treeitem"
@@ -706,7 +709,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
               style={colorVar(p.color)}
               data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · ${p.kind ? `click to ${shut ? 'expand' : 'collapse'}` : `click for its page (notes, tasks, memory, settings) · the arrow ${shut ? 'expands' : 'collapses'} it`} · drag to move`}
               onPointerDown={e => rows.start(e, 'project', p.id)}
-              onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && (p.kind || (e.target as Element).closest('.project-chev') ? fold(p.id) : setDialog({ project: p.id }))}
+              onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && (p.kind || (e.target as Element).closest('.project-chev') ? (stuckFold(e.currentTarget), fold(p.id)) : setDialog({ project: p.id }))}
               onContextMenu={e => openMenu(e, projectActions(p))}
             >
               <span className="project-chev">

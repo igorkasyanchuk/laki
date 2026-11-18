@@ -1047,14 +1047,25 @@ test('envSplit: each pattern held, the harmless ones and the allow list passed, 
   assert.ok(AGENT_KEY_ENV.claude.includes('ANTHROPIC_API_KEY'))
 })
 
-test('midCut: a long name cut in the middle, both ends kept, the end on a dash; short ones as they are; emoji and wide characters by code point', () => {
-  assert.equal(midCut('fix-checkout-total', 11), 'fix-c…total')
+test('midCut: a long name cut in the middle at its separators, else 60/40, never under 3 a side; short ones as they are; emoji and wide characters by code point', () => {
+  assert.equal(midCut('fix-checkout-total', 11), 'fix…total', 'whole segments')
   assert.equal(midCut('fix-checkout-total', 18), 'fix-checkout-total', 'one that fits')
   assert.equal(midCut('fix-checkout-total', Infinity), 'fix-checkout-total')
-  assert.equal(midCut('check-radar-dark-mode', 12), 'check-r…mode', 'the end after a dash')
-  assert.equal(midCut('abcdefghijklmnop', 8), 'abcd…nop', 'no dash: half and half')
-  for (const n of [5, 8, 12]) assert.equal([...midCut('check-radar-dark-mode', n)].length, n)
-  assert.equal(midCut('🚀rocket-launch-🚀🚀', 9), '🚀rocke…🚀🚀', 'an emoji is one')
+  assert.equal(midCut('dark-mode', 9), 'dark-mode')
+  assert.equal(midCut('fix-cart-total-now', 15), 'fix…total-now', 'the most whole segments that fit')
+  assert.equal(midCut('fix-cart-total', 12), 'fix…total', 'the closest separator cut')
+  assert.equal(midCut('check-radar-dark-mode', 12), 'check…mode')
+  assert.equal(midCut('fixCartTotal', 10), 'fix…Total', 'a camelCase step')
+  assert.match(midCut('onboarding-screens', 12), /^onboard.*….{3,}$/, 'onboarding at the head')
+  assert.equal(midCut('abcdefghijklmnopqrst', 11), 'abcdef…qrst', 'no separator: 60/40')
+  assert.equal(midCut('abcdefghijklmnop', 8), 'abcd…nop')
+  for (const name of ['check-radar-dark-mode', 'onboarding-screens', 'fix-cart-total', 'abcdefghijklmnop', 'a-b-c-d-e-f-g-h-i'])
+    for (let n = 7; n < 30; n++) {
+      const c = midCut(name, n)
+      assert.ok([...c].length <= n, `${name} at ${n}: ${c}`)
+      if (c !== name) assert.ok(c.split('…').every(side => [...side].length >= 3), `${name} at ${n}: ${c}`)
+    }
+  assert.equal(midCut('🚀rocket-launch-🚀🚀', 9), '🚀rock…-🚀🚀', 'an emoji is one')
   assert.equal(midCut('日本語の名前がとても長い', 6), '日本語…長い')
   assert.equal(midCut('dark-mode', 3), 'da…', 'too little room: the start')
 })

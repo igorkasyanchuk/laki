@@ -181,7 +181,10 @@ export function IconButton({ icon, title, onClick, on, className = '', label, ti
 // reader reads; one that fits is shown as it is
 const fits = new WeakMap<Element, () => void>()
 let midRo: ResizeObserver | undefined
-export function MidText({ text, className = '' }: { text: string; className?: string }) {
+// floor: at least that many characters (or all of a shorter name): its row (the closest [data-floor]) gets data-tight
+// when the name has fewer, for the row to give room (a workspace row's One next step chip: its icon alone); it's let go
+// once there's room for `extra` characters more (the chip's word back), so it doesn't flip back and forth
+export function MidText({ text, className = '', floor }: { text: string; className?: string; floor?: { chars: number; extra: number } }) {
   const box = useRef<HTMLSpanElement>(null)
   const whole = useRef<HTMLSpanElement>(null)
   const cut = useRef<HTMLSpanElement>(null)
@@ -196,7 +199,13 @@ export function MidText({ text, className = '' }: { text: string; className?: st
     const fit = () => {
       const w = el.clientWidth
       const fw = whole.current!.offsetWidth
-      setMax(!fw || fw <= w + 0.5 ? Infinity : Math.max(2, Math.floor(([...text].length * w) / fw) - 1))
+      const len = [...text].length
+      setMax(!fw || fw <= w + 0.5 ? Infinity : Math.max(2, Math.floor((len * w) / fw) - 1))
+      const row = floor && fw ? el.closest<HTMLElement>('[data-floor]') : null
+      if (!row || !floor) return
+      const room = Math.floor((len * w) / fw) // characters it has room for
+      const need = Math.min(floor.chars, len)
+      if (row.hasAttribute('data-tight') ? room >= need + floor.extra : room < need) requestAnimationFrame(() => row.toggleAttribute('data-tight', room < need)) // next frame: not inside the observer's own (a loop warning)
     }
     fit()
     midRo ??= new ResizeObserver(es => es.forEach(e => fits.get(e.target)?.()))

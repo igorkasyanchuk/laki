@@ -12,7 +12,7 @@ import type { Edit, PanelApi, PanelTab } from './SidePanel'
 import type { IconName, MenuItem, useRowDrag } from './ui'
 import type { Achievement } from '../../shared/achievements'
 import type { AppInfo, RowMark, SkillInfo, WidgetsApi } from './Settings'
-import type { Step } from '../../shared/nextStep'
+import type { Step, StepId } from '../../shared/nextStep'
 import type { Inserted, Inserts } from './PromptInput'
 import type { SayModal } from '../../shared/widget'
 import type { WorkflowItem } from '../../shared/workflow'
@@ -404,3 +404,5 @@ export type AppBase = {
 
 // and what the parts App builds first give the ones after: the menus (menusOf), the Layout menu (layoutOf)
 export type AppCtx = AppBase & ReturnType<typeof menusOf> & ReturnType<typeof layoutOf> & ReturnType<typeof sideOf>
+
+export const STEP_ICON: Record<StepId, IconName> = { continue: 'run', answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button

@@ -1036,16 +1036,31 @@ export function marksOf(spans: { top: number; h: number; kind: MapKind | 'both' 
   return out
 }
 
-// a name too long for its room, cut in the middle so both ends stay readable ("fix-c…total"): max characters in all,
-// the … one of them; the end starts after a dash, a space, a dot, a slash or an underscore when one leaves it at most
-// half; counted by code point (an emoji is one). One that fits comes back as it is
+// a name too long for its room, cut in the middle so both ends stay readable ("fix-cart…total"): max characters at
+// most, the … one of them; at its separators when whole segments show most of it, else 60/40, never under 3 a side;
+// counted by code point (an emoji is one). One that fits comes back as it is
 export function midCut(name: string, max: number): string {
   const cps = [...name]
-  if (!(max < cps.length)) return name
+  const n = cps.length
+  if (!(max < n)) return name
   if (max < 4) return `${cps.slice(0, Math.max(1, max - 1)).join('')}…`
   const room = max - 1
-  const half = Math.floor(room / 2)
-  let tail = half
-  for (let i = cps.length - 2; i > 0 && cps.length - i <= half; i--) if (/[-\s._/]/.test(cps[i - 1])) tail = cps.length - i // the longest end on a boundary
-  return `${cps.slice(0, room - tail).join('')}…${cps.slice(cps.length - tail).join('')}`
+  if (max < 7) return `${cps.slice(0, room - Math.floor(room / 2)).join('')}…${cps.slice(n - Math.floor(room / 2)).join('')}` // no room for 3 and 3
+  // whole segments first: a head that ends before a separator (- _ / . or a space) or a camelCase step, a tail that
+  // starts after one, each 3 or more; the pair that shows the most, the longer head on a tie, when it shows 60% of the room
+  const sep = (c: string) => /[-\s._/]/.test(c)
+  const camel = (i: number) => /\p{Ll}/u.test(cps[i - 1]) && /\p{Lu}/u.test(cps[i])
+  const heads: number[] = []
+  const tails: number[] = []
+  for (let i = 3; i <= n - 3; i++) {
+    if (sep(cps[i]) || camel(i)) heads.push(i)
+    if (sep(cps[i - 1]) || camel(i)) tails.push(i)
+  }
+  let best: [number, number] | undefined
+  const shows = (h: number, t: number) => h + n - t
+  for (const h of heads) for (const t of tails) if (t >= h && shows(h, t) <= room && (!best || shows(h, t) > shows(...best) || (shows(h, t) === shows(...best) && h > best[0]))) best = [h, t]
+  if (best && shows(...best) >= room * 0.6) return `${cps.slice(0, best[0]).join('')}…${cps.slice(best[1]).join('')}`
+  // none: 60/40, the head longer, never under 3 a side
+  const tail = Math.max(3, Math.floor(room * 0.4))
+  return `${cps.slice(0, room - tail).join('')}…${cps.slice(n - tail).join('')}`
 }
