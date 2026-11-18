@@ -379,7 +379,7 @@ export type AppBase = {
   termWhere: (p: Project) => string
   timers: Timer[]
   tint: (w: WorkspaceView) => string | undefined
-  toast: (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean) => void // err: an error's red edge
+  toast: (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean, ms?: number) => void // err: an error's red edge; ms: how long it stays (unset: 8 s with an Undo, else 6)
   todosOn: boolean
   toggleArtifacts: () => void
   toggleFull: (on?: boolean) => void | undefined

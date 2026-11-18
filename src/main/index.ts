@@ -345,6 +345,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await size(1000, 800)
     }, async () => (await has('.tab-list > .tab-more')) && (await has('.tab-list > .tab.sel'))],
     ['tab-overflow-off', () => size(1440, 900), '.tab-list'],
+    // the phone (390×844): its bottom bar (five columns, each a finger's size, one lit, at the very bottom), nothing wider
+    // than the screen; Projects opens the drawer over the whole width (the main area inert) with Needs you's counts, Esc
+    // closes it; More's sheet has the rest and Quiet, Esc closes it
+    ['phone-bar', async () => (await size(390, 844), await waitFor(() => has('.app.narrow .phone-bar'), 'the bottom bar')), () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.phone-bar .pb-item')]; const r = document.querySelector('.phone-bar').getBoundingClientRect(); return bs.length === 5 && bs.every(b => (x => x.width >= 44 && x.height >= 44)(b.getBoundingClientRect())) && document.querySelectorAll('.phone-bar [aria-current=page]').length === 1 && Math.abs(r.bottom - innerHeight) < 1 && document.scrollingElement.scrollWidth <= innerWidth })()")],
+    ['phone-drawer', click('.phone-bar .pb-item'), () => js<boolean>("(() => { const s = document.querySelector('.sidebar')?.getBoundingClientRect(); return !!s && Math.abs(s.width - innerWidth) < 1 && document.querySelector('main.main').inert && (!document.querySelector('.needs-list') || /to answer|failed|finished/.test(document.querySelector('.needs-counts')?.textContent ?? '')) })()")],
+    ['phone-drawer-esc', key('Escape'), async () => !(await has('.sidebar')) && !(await js<boolean>("document.querySelector('main.main').inert"))],
+    ['phone-more', click('.phone-bar .pb-item:last-child'), async () => (await hasText('.phone-sheet .ps-row', 'Settings')) && (await has('.phone-sheet .ps-quiet button'))],
+    ['phone-more-esc', key('Escape'), async () => !(await has('.phone-sheet'))],
     // T8: the phone's layout with a notched phone's insets (set as styles.css' --safe-*, as env() would): its bottom
     // bar's buttons end 34px over the bottom, clear of the home indicator; then back to the desktop's
     ['phone-safe', async () => {
@@ -352,7 +360,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('.app.narrow'), 'the phone layout')
       await js("(s => [['t', 47], ['r', 0], ['b', 34], ['l', 0]].forEach(([k, v]) => s.setProperty(`--safe-${k}`, `${v}px`)))(document.documentElement.style)")
       await nap(300)
-    }, () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.status button, .side-foot button')].filter(b => b.getBoundingClientRect().height > 0); return bs.length > 0 && bs.every(b => b.getBoundingClientRect().bottom <= innerHeight - 34) })()")],
+    }, () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.status button, .side-foot button, .phone-bar button')].filter(b => b.getBoundingClientRect().height > 0); return bs.length > 0 && bs.every(b => b.getBoundingClientRect().bottom <= innerHeight - 34) })()")],
     ['phone-safe-off', async () => (await js("['t', 'r', 'b', 'l'].forEach(k => document.documentElement.style.removeProperty(`--safe-${k}`))"), await size(1440, 900)), () => js<boolean>("!document.querySelector('.app.narrow')")],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
@@ -400,7 +408,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(800)), '.needs-cards']) // Needs you from its head (the row's click scrolls; a still's sticky head isn't redrawn)
       // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock)
       readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))")) && (await aligned())])
-      readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(300)), '.app.narrow'])
+      readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844), await waitFor(() => has('.phone-bar'), 'the bottom bar'), (await has('.sidebar')) || (await click('.phone-bar .pb-item')()), await waitFor(() => has('.side-scroll'), 'the drawer'), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(1500)), '.app.narrow']) // the drawer (Projects on the bottom bar), Needs you at its top, its cards settled
     }
     readme.push(['readme-done', () => size(1440, 900), async () => true])
   }

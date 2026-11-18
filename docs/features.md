@@ -141,6 +141,8 @@ time and AI money per run (`budget: 60 min, $5`).
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
   Drawn with the UI kit (60 JSON elements: stats, lists, tables, charts, boards, calendars, chats, PRs, logs, diffs, pipelines, switches, forms; Settings › Extensions › *UI kit*, with its typography, colors and 330+ icons); edit an extension's files right in Laki; its data from a fetch, a file, a URL or an agent with your MCP servers (*sum up Slack since yesterday*, every hour); `laki widget new` starts one from a starter, `laki widget dev` reloads yours as you save, `laki widget check` says what's wrong; one can be per workspace (its branch, its server, its PR), answer events (a turn done, a PR's checks failing), stream, take `laki widget push`, or give your agents tools (asked first). With Laki AI, its page makes one from a sentence, on sample data beside its settings, with Undo and *Try it live*. The SDK: [extensions.md](extensions.md).
+- **On a phone**: a bottom bar (Projects, your pages, More), the workspaces as a drawer you swipe in, and Needs you with
+  asks first and finished turns as rows a swipe marks seen.
 - **Drop on the menu bar icon**: text, files or pictures dropped on Laki's mark open the quick bar with them, quoted,
   as paths or as pictures; nothing goes until ⏎.
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new

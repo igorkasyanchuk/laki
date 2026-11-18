@@ -6,7 +6,7 @@
 // isn't a shell's), Seen clears its ●; Earlier's Seen all clears them all. Each card's chevron shows or hides that
 // detail (open but for a stale one); anywhere else on a card opens the tab, whatever its state. With a card focused,
 // 1–9 answer and Enter opens.
-import { useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
 import { bulkOk, optLabel } from '../../shared/ask'
 import { AskDiff, Choice, choiceProps } from './Diff'
@@ -14,7 +14,7 @@ import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
-import { Elapsed, Icon, MidText, Num } from './ui'
+import { ask, Elapsed, Icon, MidText, Num } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
@@ -36,7 +36,20 @@ export type NeedsApi = {
   openProof?: (t: TabView, path: string) => void // the Proof card's file (a script's output, a picture): its storage folder's
   spend?: (t: TabView) => Promise<SpendView> // its workspace's Where it went (wsSpend), on the Proof card
   turnChips?: (t: TabView) => React.ReactNode // P5: its last turn's chips from turn place extensions
-  rows?: boolean // Finished turns as rows (settings.finishedRows, on unless false; never a phone's: no hover there)
+  rows?: boolean // Finished turns as rows (settings.finishedRows, on unless false; a phone's always, below)
+  // a phone (App's narrow): asks, then failures, then finished turns, each finished one a row a tap opens (one at a
+  // time) and a swipe marks seen (seenUndo: its 4 s Undo); the head counts them, with Mark all finished as seen
+  phone?: boolean
+  seenUndo?: (t: TabView) => void
+}
+
+// a phone's order and groups: asks (waiting), failures (a turn ended on an error, a limit, a sandbox's stop, a failed
+// Done check), then the finished ones
+export const failedNeed = ({ t, w }: Need) => t.status !== 'waiting' && (!!t.failed || !!t.limit || !!t.boxed || (w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)))
+export function phoneGroups(items: Need[]) {
+  const asks = items.filter(x => x.t.status === 'waiting')
+  const fails = items.filter(failedNeed)
+  return { asks, fails, done: items.filter(x => !asks.includes(x) && !fails.includes(x)) }
 }
 
 // a finished turn's row a click or Space opened into its card: kept so until it leaves the list (its tab and when it
@@ -52,9 +65,14 @@ const unfolded = () => {
   }
 }
 
-export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_AFTER }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi; next?: string; staleAfter?: number }) {
+export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = STALE_AFTER }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi; next?: string; staleAfter?: number }) {
   const [early, setEarly] = useState(unfolded)
-  if (!items.length) return null
+  const [one, setOne] = useState('') // a phone's finished row tapped open (its tab and since when)
+  if (!given.length) return null
+  const g = phoneGroups(given)
+  const items = api.phone ? [...g.asks, ...g.fails, ...g.done] : given
+  const counts = [g.asks.length && `${g.asks.length} to answer`, g.fails.length && `${g.fails.length} failed`, g.done.length && `${g.done.length} finished`].filter(Boolean).join(' · ')
+  const allSeen = async () => (g.done.length <= 3 || (await ask(`Mark ${g.done.length} finished turns as seen?`, { text: 'They leave Needs you; each stays in its workspace.', ok: 'Mark as seen' }))) && api.seenAll(g.done.map(x => x.t))
   const now = Date.now()
   const stale = items.filter(x => isStale(x.t, staleAfter, now))
   const fresh = items.filter(x => !stale.includes(x))
@@ -68,7 +86,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
   // unless its sandbox is on), two or more
   const many = items.map(x => x.t).filter(t => bulkOk(t, t.sandbox === true && t.perm !== 'bypassPermissions'))
   // the key: a new wait or finish, or one going stale, starts the card over (its detail open or not)
-  const card = (x: Need, old = false) => <NeedCard key={`${x.t.id}@${x.t.needAt ?? 0}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} stale={old} />
+  const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
   return (
     <div className="project needs-list" role="group" aria-label="Needs you">
       <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
@@ -79,7 +97,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
           <Icon name="inbox" size={12} />
         </span>
         <span className="project-name">Needs you</span>
-        <span className="project-count"><Num value={items.length} /></span>
+        {api.phone ? <span className="needs-counts">{counts}</span> : <span className="project-count"><Num value={items.length} /></span>}
         {many.length > 1 && api.bulk && (
           <span className="needs-bulk" onClick={e => e.stopPropagation()}>
             <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} aria-label={`Allow all (${many.length})`} title={`Allow all (${many.length})`} onClick={() => api.bulk!(many, true)}>
@@ -96,6 +114,11 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
       {!shut && (
         <div className="needs-cards">
           {fresh.map(x => card(x))}
+          {api.phone && g.done.length > 1 && (
+            <button type="button" className="needs-all-seen" onClick={() => void allSeen()}>
+              Mark all finished as seen
+            </button>
+          )}
           {stale.length > 0 && (
             <div className="need-earlier">
               <button type="button" className="need-earlier-head" aria-expanded={early} onClick={foldEarly} data-tip={`Done more than ${staleAfter} minutes ago · click to ${early ? 'collapse' : 'expand'}`}>
@@ -114,7 +137,7 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
   )
 }
 
-function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: boolean; stale: boolean }) {
+function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsApi; next: boolean; stale: boolean; shown?: boolean; show?: () => void }) {
   const [open, setOpen] = useState(!stale) // detail open for what needs you, a stale finish one line
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
@@ -136,10 +159,12 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
   const id = `${t.id}:${t.needAt ?? ''}`
   const [, grow] = useState(0)
   const failedCheck = w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)
-  if (api.rows && !waiting && !t.failed && !t.limit && !t.boxed && !failedCheck && !opened.has(id)) {
-    const expand = () => (opened.add(id), grow(n => n + 1))
+  const swipe = useSwipe(() => api.seenUndo?.(t))
+  const plain = !waiting && !t.failed && !t.limit && !t.boxed && !failedCheck
+  if (plain && (api.phone ? !shown : api.rows && !opened.has(id))) {
+    const expand = () => (api.phone ? show?.() : (opened.add(id), grow(n => n + 1)))
     return (
-      <div className="need need-done need-row" data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. Space shows more`} onClick={expand} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))}>
+      <div className="need need-done need-row" data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. ${api.phone ? 'Tap shows more, a swipe marks it seen' : 'Space shows more'}`} onClick={() => swipe.moved() || expand()} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))} {...(api.phone && api.seenUndo && swipe.props)}>
         <Glyph s="done" />
         <b className="need-ws">
           <MidText text={api.name(w)} />
@@ -156,7 +181,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
     )
   }
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : 'done'} />
         <b className="need-ws">
@@ -232,4 +257,41 @@ function Boxed({ t, unbox, netAllow }: { t: TabView; unbox: (t: TabView) => void
       <button onClick={() => unbox(t)}>{b.wrap ? 'Restart without the wrapper' : 'Restart without sandbox'}</button>
     </div>
   )
+}
+
+// a finished row's swipe (a phone's: touch or pen): it follows the finger once the move is mostly sideways (10px
+// settles it); let go past 40% of its width, gone (onSwipe: marked seen, with Undo), else it springs back
+// (styles.css .need-row: no spring with reduced motion). moved(): a swipe's release, not a tap
+function useSwipe(onSwipe: () => void) {
+  const s = useRef<{ x: number; y: number; id: number; lock?: 'x' | 'y'; dx: number; w: number } | null>(null)
+  const was = useRef(false)
+  const [dx, setDx] = useState(0)
+  const [gone, setGone] = useState(false)
+  const end = () => {
+    const p = s.current
+    s.current = null
+    if (!p || p.lock !== 'x') return setDx(0)
+    was.current = true
+    if (Math.abs(p.dx) >= p.w * 0.4) return void (setGone(true), setDx(Math.sign(p.dx) * p.w), onSwipe())
+    setDx(0)
+  }
+  return {
+    moved: () => (m => ((was.current = false), m))(was.current),
+    props: {
+      style: dx ? { transform: `translateX(${dx}px)` } : undefined,
+      'data-swiping': s.current?.lock === 'x' ? '' : undefined,
+      'data-gone': gone ? '' : undefined,
+      onPointerDown: (e: PointerEvent) => void (e.pointerType !== 'mouse' && !gone && (s.current = { x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, w: e.currentTarget.getBoundingClientRect().width || 1 })),
+      onPointerMove: (e: PointerEvent) => {
+        const p = s.current
+        if (!p || e.pointerId !== p.id) return
+        const [x, y] = [e.clientX - p.x, e.clientY - p.y]
+        if (!p.lock && Math.hypot(x, y) >= 10) p.lock = Math.abs(x) > Math.abs(y) ? 'x' : 'y'
+        if (p.lock === 'y') return void (s.current = null)
+        if (p.lock === 'x') (p.dx = x), setDx(x)
+      },
+      onPointerUp: end,
+      onPointerCancel: () => ((s.current = null), setDx(0)),
+    },
+  }
 }

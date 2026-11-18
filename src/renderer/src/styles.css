@@ -1808,6 +1808,15 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .need-row:is(:hover, :focus-within) .need-row-last { visibility: hidden; }
 .need-row .elapsed { flex: none; color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
 .narrow .need-last { -webkit-line-clamp: 1; } /* a phone keeps the cards, their words on one line */
+/* a phone's Needs you (Needs.tsx phone): the head counts them, Mark all finished as seen under the rows; a finished row a
+   finger's height, a sideways swipe pulls it (past 40%: seen, with Undo), let go short of that it springs back */
+.needs-counts { margin-left: var(--sp-2); color: var(--muted); font-size: var(--fs-1); font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.needs-all-seen { align-self: stretch; min-height: 44px; font-size: var(--fs-2); color: var(--muted); background: none; border: 1px dashed var(--line); border-radius: var(--r-in, var(--r-l)); }
+.narrow .need.need-row { min-height: 44px; touch-action: pan-y; }
+.narrow .need-row:is(:hover, :focus-within) .need-row-acts { visibility: hidden; } /* no hover on a phone: a tap opens the card with them */
+.narrow .need-row:is(:hover, :focus-within) .need-row-last { visibility: visible; }
+.need-row[data-gone] { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .narrow .need-row:not([data-swiping]) { transition: transform var(--t-mid) var(--ease-pop), opacity var(--t-mid) var(--ease-out); } }
 .ws-step.t-ask { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 45%, transparent); }
 .ws-step.t-bad { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
 .ws-step.t-go { color: var(--fg); } /* V1: a step that's yours to take but not waiting on you: neutral */
@@ -2057,8 +2066,46 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 
 /* a phone (App.tsx .narrow, ≤640px): one pane at a time; the sidebar, panels and pages over it */
 .narrow { height: var(--vh, 100dvh); }
-.narrow .sidebar { position: fixed; z-index: var(--z-ask); top: 0; bottom: 0; left: 0; width: min(300px, 85vw) !important; box-shadow: 8px 0 30px rgba(0, 0, 0, 0.45); }
+.narrow .sidebar { position: fixed; z-index: var(--z-ask); top: 0; bottom: 0; left: 0; width: min(360px, 85vw) !important; box-shadow: 8px 0 30px rgba(0, 0, 0, 0.45); touch-action: pan-y; }
 .side-backdrop { position: fixed; inset: 0; z-index: calc(var(--z-ask) - 1); background: rgba(0, 0, 0, 0.45); }
+/* nothing wider than the phone: one row too wide would widen the page, and Safari would pan it, fixed bars with it */
+.app.narrow { overflow: clip; }
+.narrow .sp-tools { overflow-x: auto; scrollbar-width: none; }
+/* the drawer held upright (≤480px): the whole width, the main area hidden as well as inert (App's main inert) */
+@media (max-width: 480px) {
+  .narrow .sidebar { width: 100vw !important; box-shadow: none; }
+  .app.narrow:not(.side-closed) > .main { visibility: hidden; }
+}
+@media (prefers-reduced-motion: no-preference) { .narrow .sidebar { animation: drawer-in var(--t-mid) var(--ease-out); } }
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+.drawer-edge { position: fixed; top: 0; bottom: 0; left: 0; width: 20px; z-index: var(--z-sticky); touch-action: none; } /* a swipe from here opens the drawer (Phone.tsx) */
+/* a phone's bottom bar (Phone.tsx): five columns, an icon over its label, 49px and the safe area under it; the drawer,
+   its scrim, the status bar and toasts end above it. Gone while the keyboard is up (main.tsx' html[data-kb]) or a dialog covers the page */
+.phone-bar { display: none; }
+.app.phone-bar-on { --pbar: calc(49px + var(--safe-b)); padding-bottom: var(--pbar); box-sizing: border-box; }
+:is(html[data-kb] .app.phone-bar-on, .app.phone-bar-on:has(.overlay)) { --pbar: 0px; }
+:is(html[data-kb] .app.phone-bar-on, .app.phone-bar-on:has(.overlay)) > .phone-bar { display: none; }
+.app.phone-bar-on > .phone-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-ask); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: var(--pbar); padding-bottom: var(--safe-b); box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); } /* solid (the drawer's), a hairline over it: --side or a blur shows the window's glass behind it */
+.app.phone-bar-on :is(.sidebar, .side-backdrop) { bottom: var(--pbar); }
+.app.phone-bar-on .status { height: 26px; padding-bottom: 0; }
+.app.phone-bar-on .side-foot { height: var(--h-m); padding-bottom: 0; }
+.app.phone-bar-on :is(.toast, .toasts) { bottom: calc(var(--pbar) + var(--sp-4)); }
+.pb-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-1); min-width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--muted); }
+.pb-item.on { color: var(--accent-ink); }
+.pb-icon { position: relative; display: flex; }
+.pb-label { font-size: var(--fs-1); line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-badge { min-width: 1.6em; height: 1.6em; padding: 0 0.4em; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-1); line-height: 1; border-radius: var(--r-pill); background: var(--waiting); color: var(--bg); }
+.pb-icon > .pb-badge { position: absolute; top: calc(-1 * var(--sp-2)); left: 60%; }
+.phone-sheet-back { position: fixed; inset: 0; z-index: var(--z-pop); display: flex; align-items: flex-end; background: rgba(0, 0, 0, 0.45); }
+.phone-sheet { width: 100%; max-height: 70dvh; overflow-y: auto; padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + var(--safe-b)); box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); border-radius: var(--r-xl) var(--r-xl) 0 0; }
+@media (prefers-reduced-motion: no-preference) { .phone-sheet { animation: sheet-up var(--t-mid) var(--ease-out); } }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+html.away :is(.narrow .sidebar, .phone-sheet) { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
+.ps-row { display: flex; align-items: center; gap: var(--sp-4); width: 100%; min-height: 44px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-l); background: none; color: var(--fg); font-size: var(--fs-4); text-align: left; }
+.ps-row.on { color: var(--accent-ink); background: var(--sel-fill); }
+.ps-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-quiet { display: flex; align-items: center; gap: var(--sp-3); min-height: 44px; margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-4) 0; border-top: 1px solid var(--line); font-size: var(--fs-4); }
+.ps-quiet button { min-height: 36px; padding: 0 var(--sp-4); border-radius: var(--r-pill); }
 .narrow .ws, .narrow .project-head { height: 40px; font-size: var(--fs-4); }
 .narrow .project-head { font-size: var(--fs-2); }
 .narrow .tabbar { overflow-x: auto; scrollbar-width: none; padding: 0 var(--sp-2); scroll-padding-left: 36px; }

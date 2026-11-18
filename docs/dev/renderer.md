@@ -352,7 +352,21 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
-  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. `:root` has `-webkit-text-size-adjust: 100%` and `text-size-adjust` (the shared tab's
+  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. The drawer:
+  `drawer`, its own state (closed as it starts; 481–640px, `SMALL` not matching, as left in `laki.drawer`),
+  `setSideOpen` routes there while narrow; `main` is `inert` under it, and ≤480px (`SMALL`) the drawer is 100vw and the
+  main area `visibility: hidden` (no tab reported in view meanwhile: `drawerOver`). Phone.tsx: `useDrawerSwipe` (pointer
+  events, not a mouse's; `.drawer-edge`, a 20px strip at the left, to open; the sidebar or its scrim to close; the
+  direction settled at 10px, 60px to act), `PhoneBar` (App's `phoneItems`: Projects with `needing`'s count, the rail's
+  pages in `railOrder` then the hidden ones, AI, Settings; `BAR_FIT` 4 shown and More's sheet, with Quiet's choices:
+  tray.ts `quietChoices`); the bar's `--pbar` (49px + `--safe-b`) pads `.app` and ends the drawer, scrim, status bar
+  and toasts above it; `html[data-kb]` or an `.overlay` in the app hides it. The histNav arrows and the foot's Schedule,
+  Board, AI and Settings aren't drawn on a phone (the bar has them). `.app.narrow` clips: a row wider than the phone
+  (the side panel's tools now scroll) would widen the layout viewport and take fixed bars off screen. Needs.tsx'
+  `phone`: `phoneGroups` (asks, `failedNeed`, the rest), the head's counts, finished ones always rows, `one` open at a
+  time, `useSwipe` (40% of its width: `seenUndo`, App's toast with a 4 s Undo; else it springs back, no spring with
+  reduced motion), *Mark all finished as seen* under them (`ask` past 3). test:ui's `phone-bar`, `phone-drawer`,
+  `phone-more`. `:root` has `-webkit-text-size-adjust: 100%` and `text-size-adjust` (the shared tab's
   page and the offline page too; test/css.test.ts): iOS Safari never inflates text in landscape, while Page zoom and the browser's
   zoom still work (no `user-scalable=no` or `maximum-scale`). T8, a notched
   phone (index.html's `viewport-fit=cover`): `:root`'s `--safe-t/r/b/l` are `env(safe-area-inset-*)` (0 on a Mac); the

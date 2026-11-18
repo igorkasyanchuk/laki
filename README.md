@@ -39,7 +39,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/phone-dark.png">
-  <img src="docs/img/phone-light.png" alt="Laki on a phone-sized screen: Needs you with two agents' questions and their answer buttons, and two finished ones with Changes and Seen" width="300">
+  <img src="docs/img/phone-light.png" alt="Laki on a phone-sized screen: Needs you with two agents' questions and their answer buttons, two finished ones as rows, and the bottom bar" width="300">
 </picture>
 
 ## What is different

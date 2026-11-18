@@ -150,7 +150,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
-    rows: settings.finishedRows !== false && !narrow, // a phone keeps cards: no hover there
+    rows: settings.finishedRows !== false && !narrow, // a phone: rows of its own (phone)
+    phone: narrow,
+    seenUndo: t => (needsApi.seen(t), toast(`${wsName(live.find(w => w.id === t.workspace) ?? { id: t.workspace })}: marked as seen`, () => void markUnread(t.id), 'Undo', true, false, 4000)),
     openProof: (t, path) => (setDialog(null), selectTab(t), app.openFile({ ws: t.workspace, path, storage: true }), narrow && setSideOpen(false)),
     spend: hasCap(view, 'ws.spend') ? t => api.call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: t => (last => (last?.length ? <TurnChips marks={last} widgets={view.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at } })} /> : null))(t.marks?.filter(m => m.at === t.marks!.at(-1)!.at)),
@@ -607,7 +609,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
     const stop = t.querySelector<HTMLElement>(`.ws.sel${ITEM}`) ?? t.querySelector<HTMLElement>(ITEM)
     if (stop) rove(t, stop)
   })
-  const { addMenu, busiest, dialog, find, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
+  const { addMenu, busiest, dialog, find, narrow, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
   // behind a rail page or a strip: hidden but laid out where it was (styles.css [data-away]), its width given back by a
   // margin so the main area lies over it; it comes back as it was, its scroll too
   const away = listOff || !!strip
@@ -615,7 +617,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
     <aside className="sidebar" hidden={!sideOpen} data-away={away ? '' : undefined} data-style={sideStyle} style={{ width: sideW, ...(away && { marginRight: -sideW }), ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
       <div className="side-head drag">
         <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} keyId="sidebar" onClick={() => setSideOpen(false)} />
-        {!railBar && histNav}
+        {!railBar && !narrow && histNav /* a phone: its bottom bar instead, the room for the rest */}
         <span className="spacer" />
         {rail && railKind !== 'projects' && !find && <IconButton icon="chevronsLeft" title="Fold the list to a strip · right click: a strip on the right" onClick={() => setStrip(railKind, 'left')} onContextMenu={e => (e.preventDefault(), setStrip(railKind, 'right'))} />}
         <ToolGroup label="Sidebar" id="side">

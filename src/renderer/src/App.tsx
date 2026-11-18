@@ -46,6 +46,7 @@ import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
 import { Term, xterms, type SelectionUse } from './Term'
+import { type BarItem, PhoneBar, useDrawerSwipe } from './Phone'
 import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
@@ -427,6 +428,7 @@ const media = (q: string) => {
   return { on: (f: () => void) => (m.addEventListener('change', f), () => m.removeEventListener('change', f)), now: () => m.matches }
 }
 const NARROW = media('(max-width: 640px)') // under the app window's minWidth (700): phones and narrow browsers only
+const SMALL = media('(max-width: 480px)') // a phone held upright: the drawer takes the whole width
 const TOUCH = media('(pointer: coarse)')
 const LESS = media(LESS_CLEAR) // macOS's Reduce transparency and Increase contrast: applyTheme reads them, App repaints
 const MORE = media(MORE_CONTRAST)
@@ -596,10 +598,25 @@ export function App() {
   viewRef.current = view
   const narrow = useSyncExternalStore(NARROW.on, NARROW.now) // a phone: one pane at a time, the sidebar and panels over it
   const sideKey: RailKind = narrow ? 'projects' : railKind // a phone's drawer: one, whatever a row's kind
-  const sideOpen = sideOpens[sideKey] ?? sideOpens.projects ?? true
+  // a phone's drawer: its own state, closed as it starts; between 481 and 640px wide (a phone on its side, a narrow
+  // window) as it was left on this device (laki.drawer)
+  const small = useSyncExternalStore(SMALL.on, SMALL.now)
+  const [drawer, setDrawer] = useState(() => !SMALL.now() && load<boolean>('laki.drawer', false) === true)
+  useEffect(() => void (narrow && !small && localStorage.setItem('laki.drawer', JSON.stringify(drawer))), [drawer])
+  const sideOpen = narrow ? drawer : (sideOpens[sideKey] ?? sideOpens.projects ?? true)
   const keyNow = useRef(sideKey)
   keyNow.current = sideKey // the kind in sight when it's called: a timer's ring is an older render's
-  const setSideOpen = (v: boolean | ((o: boolean) => boolean)) => setSideOpens(m => (k => ({ ...m, [k]: typeof v === 'function' ? v(m[k] ?? m.projects ?? true) : v }))(keyNow.current))
+  const narrowNow = useRef(narrow)
+  narrowNow.current = narrow
+  const setSideOpen = (v: boolean | ((o: boolean) => boolean)) => (narrowNow.current ? setDrawer(v) : setSideOpens(m => (k => ({ ...m, [k]: typeof v === 'function' ? v(m[k] ?? m.projects ?? true) : v }))(keyNow.current)))
+  useDrawerSwipe(narrow, sideOpen, setSideOpen)
+  useEffect(() => {
+    if (!narrow || !sideOpen) return
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.menu, .overlay, .phone-sheet') && (e.preventDefault(), e.stopPropagation(), setSideOpen(false)) // a menu's or a sheet's Esc is theirs
+    window.addEventListener('keydown', f, true)
+    return () => window.removeEventListener('keydown', f, true)
+  }, [narrow, sideOpen])
+
   const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
   // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
   // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
@@ -1176,10 +1193,10 @@ export function App() {
     return () => ro.disconnect()
   }, [])
   // err: an error's (V2: the red edge only for those)
-  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean) => {
+  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean, ms?: number) => {
     const id = ++noteN.current
     setNotes(l => [...l.filter(x => !x.busy && x.text !== text), { id, at: Date.now(), text, undo, label, ok, err }]) // the same words again: once, its timer anew
-    setTimeout(() => setNotes(l => l.filter(x => x.id !== id)), undo ? 8000 : 6000) // each its own
+    setTimeout(() => setNotes(l => l.filter(x => x.id !== id)), ms ?? (undo ? 8000 : 6000)) // each its own
   }
   const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
   const fail = (e: unknown) => toast((e as Error).message, undefined, undefined, false, true)
@@ -1607,15 +1624,16 @@ export function App() {
 
   // tell the daemon what's on screen: it clears ● there and doesn't set it
   const current = useRef<string | null>(null)
-  current.current = tab?.id ?? null
+  const drawerOver = narrow && small && sideOpen // a phone's drawer over the whole width: no tab in sight
+  current.current = drawerOver ? null : (tab?.id ?? null)
   const shownTabs = useRef<string[]>([])
-  shownTabs.current = visible
+  shownTabs.current = drawerOver ? [] : visible
   // the workspace whose per-workspace extensions show (scope workspace: Widgets.tsx inWs), and fetch: none under a page
   // over every workspace (Board, Schedule, the AI page…), nor a terminal's, a browser's or one on an SSH host; the Desk's
   // tiles: the one selected last (laki.ws), named on each
   const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'achievements' || dialog === 'calendar' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
   const wsHere = !covered && ws && !ws.archived && !ws.host && !project?.kind ? ws.id : null
-  useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse, ws: wsHere })), [tab?.id, visible.join(), wsHere])
+  useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse, ws: wsHere })), [tab?.id, visible.join(), wsHere, drawerOver])
 
   // a folder dropped on the window becomes a project (git or not), then a new workspace in it
   useEffect(() => {
@@ -3608,6 +3626,16 @@ export function App() {
   const kindPage = ([k, label, icon]: (typeof RAIL)[number]): RailRun => (({ n, busy }) => ({ key: k, icon, label, on: railKind === k && !onPage, tip: `${label}${busy ? ' · at work' : ''}`, run: () => railTo(k), n }))(railSays(k))
   const aiPage: RailRun = { key: 'ai', icon: 'ai', label: 'AI', on: dialog === 'ai', tip: AI_TIP, run: toAi }
   const railMore = [...railSorted(railPages.filter(railOk), settings.railOrder).filter(x => railHide.includes(x.key) || over.includes(x.key)), ...(aiOn(settings) && railHide.includes('ai') ? [aiPage] : [])].map(x => ('kind' in x ? kindPage(x.kind) : x))
+  // a phone's bottom bar (Phone.tsx): Projects (the drawer; a page over it gives way), the rail's pages in its order
+  // (the ones put into More last), AI, Settings; its first four, the rest in More
+  const phoneItems: BarItem[] = !narrow
+    ? []
+    : [
+        { key: 'projects', icon: RAIL[0][2], label: RAIL[0][1], on: !dialog, n: needing.length, run: () => (dialog ? (setDialog(null), setSideOpen(true)) : setSideOpen(o => !o)) },
+        ...[...railShown, ...railSorted(railPages.filter(railOk), settings.railOrder).filter(x => railHide.includes(x.key))].flatMap(x => ('kind' in x ? [] : [x])),
+        ...(aiOn(settings) ? [aiPage] : []),
+        { key: 'settings', icon: 'gear', label: 'Settings', on: settingsOf(dialog), run: toSettings },
+      ]
   // a right click on the rail: put that button into More (or back), or the whole list in Settings
   const railMenu = (e: React.MouseEvent) => {
     const key = (e.target as Element).closest<HTMLElement>('[data-rail]')?.dataset.rail
@@ -3657,7 +3685,7 @@ export function App() {
   // or first in the wide status bar (bar: without AI and Settings, which go at its end); words: their labels
   const footButtons = (words: boolean, bar = false) => (
     <>
-          {!rail && ( // the rail layout has them on its rail
+          {!rail && !narrow && ( // the rail layout has them on its rail, a phone on its bottom bar
             <>
               <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={words ? 'Schedule' : undefined} onClick={toSchedules} />
               <IconButton icon="board" title={BOARD_TIP} label={words ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
@@ -3675,7 +3703,7 @@ export function App() {
             ...(settings.timerButton !== false && timers.length + watches.length === 0 ? [{ label: 'Timer', icon: 'timer', tip: 'A countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)', items: startMenu() } as MenuItem] : []),
           ])}
           <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
-          {!rail && !bar && (
+          {!rail && !bar && !narrow && (
             <>
               <span className="spacer" />
               <IconButton icon="gear" title={kt('Settings', 'settings')} keyId="settings" label={words ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
@@ -3894,13 +3922,14 @@ export function App() {
   const { wsMenu, tabMenu, fileMenu, applyLayout, peekCard } = app
   keys.current = (e, force, fixed) => onKey(app, e, force, fixed)
   return (
-    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} data-glow={settings.edgeGlow === true && !narrow && waitsElsewhere(view, tab?.id, front) ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
+    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow phone-bar-on' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} data-glow={settings.edgeGlow === true && !narrow && waitsElsewhere(view, tab?.id, front) ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}
       {sideOpen && !listOff && !strip && (narrow ? <div role="presentation" className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (looks.css --f-gap) */} />)}
 
-      <main className={`main ${wsTint ? 'ws-tint' : ''}`} style={wsTint ? ({ '--ws': `var(--tc-${wsTint})` } as CSSProperties) : undefined /* Extras › Tint with the workspace's color: styles.css' --ws */}>
+      {narrow && !sideOpen && <div className="drawer-edge" aria-hidden="true" /> /* a swipe from the left edge opens the drawer (Phone.tsx) */}
+      <main inert={narrow && sideOpen /* a phone's drawer over it */} className={`main ${wsTint ? 'ws-tint' : ''}`} style={wsTint ? ({ '--ws': `var(--tc-${wsTint})` } as CSSProperties) : undefined /* Extras › Tint with the workspace's color: styles.css' --ws */}>
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
@@ -4277,6 +4306,7 @@ export function App() {
       </main>
       {strip === 'right' && stripBar}
       {wideBar && statusBar}
+      {narrow && <PhoneBar items={phoneItems} quiet={{ until: view.dnd?.until, set: o => void call('dndSet', o).catch(() => {}) }} />}
 
       {menu}
       <Tips />

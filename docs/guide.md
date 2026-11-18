@@ -77,8 +77,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Stop all agents**: ⌘K › *Stop all agents* (File menu too; give it a key in Settings › Keys) names the turns under
   way, asks once and interrupts each (Esc; nothing is closed). A queue it held shows *Resume queue*.
 - **Quiet** (was Do not disturb): the menu bar's menu › *Quiet › For 30 Minutes / For 1 Hour / Until Tomorrow 9:00*, ⌘K ›
-  *Quiet for 30 minutes…*, `laki quiet 30m` (no length: Settings › Notifications' default, an hour unless set), or
-  Start in Settings › Notifications. After midnight, until 9:00 that morning. No notifications, sounds, cards or phone
+  *Quiet for 30 minutes…*, `laki quiet 30m` (no length: Settings › Notifications' default, an hour unless set), a
+  phone's *More* › *Quiet*, or Start in Settings › Notifications. After midnight, until 9:00 that morning. No notifications, sounds, cards or phone
   pushes meanwhile; asks still show in Needs you, an important workspace's ask still comes, and `laki alert` still shows.
   The menu bar's mark gets a slash (its tooltip says until when) and the status bar a moon; either ends it early (*End
   Quiet*, `laki quiet off`). As it ends, one notification (*While it was quiet: 2 agents are waiting, 3 finished, 1
@@ -325,7 +325,7 @@ selected workspace's PR is in the status bar.
   click answers it there. A done one's shows its answer's first line and diff size, *Changes* (the side panel's
   Changes) and *Seen* (clears its ●); it's one line by default (its workspace, its last words, how long ago; *Changes* and
   *Seen* on hover or focus), a click or Space opens it into its card, and a failed Done check, a plan limit, a sandbox's
-  stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone keeps cards). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
+  stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone always has rows). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
   dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
   tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
   take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
@@ -801,9 +801,15 @@ email address only, unless you leave the email out on purpose (below).
   must be on for your tailnet). Open the link on your phone or another computer: this Mac can't open its own Tailscale
   address, and Laki warns when no other device of your tailnet is online. It needs Tailscale connected here and HTTPS certificates on for the tailnet (its admin console › DNS); the Mac app's
   own `tailscale` is used when none is on your PATH. On a server with no screen: [headless.md](headless.md).
-- On a phone the app has its own layout: the sidebar slides over, one pane at a time (split tabs show as
-  separate tabs), the panels and Settings take the whole screen, and a row of keys a phone keyboard lacks
-  (⌨ to show it, Esc, Tab, ⇧Tab, ⌃C, arrows, Enter) sits above the status bar. A terminal takes the size of the
+- On a phone the app has its own layout: one pane at a time (split tabs show as separate tabs), the panels and
+  Settings take the whole screen, and a row of keys a phone keyboard lacks (⌨ to show it, Esc, Tab, ⇧Tab, ⌃C,
+  arrows, Enter) sits above the status bar. A bar at the bottom has *Projects* (the workspaces, with the Needs you
+  count), the next three of the rail's pages and *More* (the rest, AI, Settings and *Quiet*); it hides while the
+  keyboard is up. The workspaces slide in as a drawer: *Projects*, the sidebar button or a swipe from the left edge
+  opens it, a swipe back, Esc or picking a workspace or page closes it. Held upright it takes the whole screen;
+  on its side (or in a narrow window) it's 360px wide over the rest, and stays as you left it. Its *Needs you* puts
+  asks first, then failures, then finished turns, each finished one a single row: a tap opens it (one at a time),
+  a sideways swipe marks it seen (*Undo* for 4 s), and *Mark all finished as seen* clears them (asking first past 3). A terminal takes the size of the
   last screen that typed in it or came to the front, so coming back to the Mac gives it the Mac's size again.
 - It stops on its own when the time is up, or when you stop it. Each start makes a new key, so an old link never
   works again.
