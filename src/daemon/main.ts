@@ -22,6 +22,7 @@ import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as agentCliMod from './agentCli.ts'
 import { dir, inRig } from './dir.ts'
 import * as scheduleMod from './schedule.ts'
 import * as hostsMod from './hosts.ts'
@@ -555,7 +556,8 @@ const api = {
   accountSet: p => accountSet(p),
   accountRm: p => accountRm(p),
   accountLogin: p => core.accountLogin(p),
-  agentUpdate: p => core.agentUpdate(p), // Update Claude Code, from the new-workspace page's warning
+  agentUpdate: p => agentCliMod.agentUpdate(p), // A9: Settings' Versions (and the new-workspace page's warning on a model too new for claude): its update in a tab
+  agentVersions: p => agentCliMod.agentVersions(p), // A9: each agent CLI's version, the newest, how it updates
   tabAccount: p => core.tabAccount(p),
   resources: () => resourcesMod.resources(),
   shareStart: p => remoteMod.shareStart(p), // a tab's read-only page, for anyone with its link
@@ -780,7 +782,7 @@ const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSa
 // S5: OPEN: what any caller may call, as it is (reads of the view and of a workspace's own facts, the ticks tests move,
 // a connection's own view and size, the hook: hookWho's). Every method of api is in FROM, CALLER or OPEN, checked as
 // the daemon loads (below api): a new one is classified, never open by default
-const OPEN = new Set(['clientWho', 'voiceModels', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss', 'hookList', 'storageInfo', 'apps', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowHistory', 'flowStop', 'flowGet', 'flowForget'])
+const OPEN = new Set(['agentVersions', 'clientWho', 'voiceModels', 'ping', 'state', 'agentModels', 'memoryRm', 'projectFile', 'branches', 'csMachines', 'wsPeek', 'overlapCheck', 'wsStat', 'doctor', 'hooksSeen', 'unread', 'seen', 'showDone', 'browse', 'timer', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss', 'hookList', 'storageInfo', 'apps', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress', 'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files', 'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame', 'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck', 'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash', 'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations', 'widgetMock', 'planList', 'planNew', 'planGet', 'planSave', 'planFile', 'planUpload', 'planWrite', 'flowList', 'flowTrash', 'flowHistory', 'flowStop', 'flowGet', 'flowForget'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.peerWho>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
@@ -1205,6 +1207,7 @@ const sendOk = (p: any) => {
 }
 const WS_SET = new Set(['id', 'name', 'color', 'pinned', 'railPin', 'from', 'asked'])
 const ANSWER: Record<string, true | ((p: any) => string)> = {
+  agentVersions: true,
   reviewMark: true, // R11: a review sent from the phone marks it too
   agentLog: true, // what its agents did, read from the phone too
   wsSpend: true, // where a workspace's tokens went, read from the phone too
@@ -2106,6 +2109,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick(), { idle: 'pause' }) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())
   ticks.register('aiTick', 600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
+  ticks.register('agentVersionsTick', 6 * 3600e3, () => void agentCliMod.agentVersionsTick(), { idle: 'slow' }) // A9: the agent CLIs' newest (a dot on Settings)
+  setTimeout(() => void agentCliMod.agentVersionsTick(), 60e3).unref()
   inboundStart() // issue.labeled's poll, the webhook server (inbound.ts)
   ticks.register('tidy', 3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), noteTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), noteTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)

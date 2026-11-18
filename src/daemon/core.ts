@@ -25,6 +25,7 @@ import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir, inRig } from './dir.ts'
 import { clientName } from './clients.ts'
+import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
@@ -781,6 +782,7 @@ export function view(): View {
   const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
   return {
     ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
+    ...(agentCliMod.outdated.length && { agentUpdates: agentCliMod.outdated }), // A9: a dot on Settings
     projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }), ...(!p.host && onGitHub(p.path) && { github: true }) }))(cfgWait(p)))),
     ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
@@ -5076,20 +5078,6 @@ export async function accountLogin(p: { id: string; agent: string }) {
   const t = tabsOf(ws.id)[0]
   const s = t && sessions.get(t.id)
   if (s) whenPrompt(s, () => typeInto(s, loginCmd(p.id, agent), true))
-  return ws
-}
-
-// Update Claude Code (the new-workspace page's warning on a model too new for it): a new terminal typing claude's own
-// update, as you'd run it; the warning goes as the version is looked at again (accounts.ts claudeHas)
-export async function agentUpdate(p: { agent: string }) {
-  if (p.agent !== 'claude') throw new Error('only Claude Code updates from here')
-  const ws = await quickNew({ kind: 'shells' })
-  ws.name = 'update Claude Code'
-  save()
-  changed()
-  const t = tabsOf(ws.id)[0]
-  const s = t && sessions.get(t.id)
-  if (s) whenPrompt(s, () => typeInto(s, 'claude update', true))
   return ws
 }
 

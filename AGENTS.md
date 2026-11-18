@@ -204,6 +204,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
+| `src/daemon/agentCli.ts` | A9: the agents' CLIs: each one's version and npm's newest, how it was installed (`howOf`), its update in a `script` tab (`agentUpdate`), `outdated` (the view's `agentUpdates`) |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page; it re-exports the six below, so `widgets.X` reaches them |

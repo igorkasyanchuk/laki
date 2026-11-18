@@ -25,8 +25,22 @@ A model the installed claude is too old for: a failed claude turn's error with `
 (limits.ts `tooOld`: the highest version it names is needed, the next the one it has; the tab's model, else the one
 it names) is kept in `state.modelNeeds` (`modelRefused`, the turn's `last` in words); `claudeHas` (`claude --version`,
 every 10 minutes) drops what an update can run; `agentModels` leaves those out, the view's `modelNeeds` and `claudeHas`
-warn on the new-workspace page (panels.tsx `.nw-warn`, its *Update Claude Code*: core's `agentUpdate`, a Terminals
-workspace typing `claude update`; agent-refused, not remote). Tested in `test/fallback.test.ts`.
+warn on the new-workspace page (panels.tsx `.nw-warn`, its *Update Claude Code*: agentCli.ts' `agentUpdate`, below;
+agent-refused, not remote). Tested in `test/fallback.test.ts`.
+
+**The agents' CLIs** (A9, `src/daemon/agentCli.ts`, Settings › Agents & profiles › *Versions*: SettingsAgents.tsx
+`AgentVersions`, behind the `agent.versions` cap). `CLIS`: claude, codex, gemini, grok, opencode and cursor
+(`cursor-agent`), each with its npm package and its own updater. `agentVersions` finds each on the daemon's PATH, runs
+`--version` (8 s), and reads how it was installed off its real path (`howOf`): a global `node_modules` (npm, bun or pnpm:
+the package and `npm install -g <pkg>@latest`…), Homebrew's `Cellar` or `Caskroom` (`brew upgrade [--cask] <name>`),
+else its installer (`claude update`, `opencode upgrade`, `cursor-agent update`; none known: no Update). The newest:
+npm's registry (`<pkg>/latest`, its package or the CLI's known one), kept 6 hours (`fresh` looks now; offline keeps the
+last); `LAKI_NPM_REGISTRY` is tests' fake, and the rig without it asks nothing. `outdated` (a CLI with a newer version
+out, not updating) is the view's `agentUpdates`: the rail's Settings has a dot and says which. `agentVersionsTick`
+(6 h, and a minute after start). `agentUpdate` runs the command as a `script` tab (it stays when it ends, with its exit
+code: a shell's would close) named `update <name>` in the Terminals workspace `update agents` (made once); one at a time
+per CLI. The row says running, done (and, with tabs of it running, that they keep their version until restarted) or
+failed with the exit code and Retry; *Show* opens the tab (Settings' `openTab`). `test/agent-cli.test.ts`.
 `accountLogin` opens a Terminals workspace `sign in: <name>` and types the agent's login there once its prompt is up
 (`whenPrompt`, `loginCmd`). `accountView`: claude's email from the folder's `.claude.json` (home: `~/.claude.json`),
 signed in when `usage.ts` `claudeCred(dir)` finds a token: the Keychain item `Claude Code-credentials-<sha256(dir)[:8]>`

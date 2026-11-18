@@ -453,6 +453,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   `settings.bgRefresh === false`: no `prTick`, `prSoon` or branch-move scans (only `prRefresh`); `settings.copyIgnored` /
   `copyUntracked`: `copyIncludes` takes every ignored (`--exclude-standard`) / untracked file too, copied awaited (a
   relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
+- the agents' CLIs (A9, agentCli.ts): `agentVersions` (`fresh`: npm's newest now; each one's `AgentCli`), `agentUpdate`
+  (`agent`: its update in a `script` tab of `update agents`; the user's only, not remote);
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`, `pin`, `open`, `via`, `funnel`, `host`: My domain;
   resolves once there's a link), `remoteStop`, `remoteTick` (`now`: tests move the clock), `remoteCheck` (D8: the self-check now, its `RemoteCheck`), `screenLock` (D9: `locked`, main's powerMonitor; the app's only), `remoteLog` (D9: the activity log, `n` newest first; the app's only), `remotePair` (Add a device: a
   new link for 10 minutes), `remoteDeviceRm` (`id`, or `all`: Revoke, Forget devices; the app's only, never remote's), `remoteDeviceSet`

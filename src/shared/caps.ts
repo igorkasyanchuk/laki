@@ -20,7 +20,7 @@ export const oldName = (method: string): string => (Object.hasOwn(RPC_NAMES, met
 export const sendAs = (method: string, caps: readonly string[]) => (caps.includes(`ns:${method.split('.')[0]}`) ? method : oldName(method))
 
 // the behaviors the renderer asks about, and the API number each came with: what an older daemon is judged by
-export const CAP_SINCE: Record<string, number> = { 'secret.keep': 198, 'ws.spend': 197, 'archive.dirty': 12, layouts: 60, 'ws.peek': 94, 'project.terminal': 107, 'hooks.seen': 146, sample: 160, 'ship.sheet': 161, 'pr.revert': 179, 'diff.since': 179, 'merge.queue': 180, 'chat.search': 181, 'agent.log': 183, 'touch.id': 184, 'note.restore': 185, 'disk.usage': 186, 'widget.term': 187, 'widget.ui': 188, 'widget.order': 189, 'widget.store': 190, 'kit.term': 191 }
+export const CAP_SINCE: Record<string, number> = { 'agent.versions': 199, 'secret.keep': 198, 'ws.spend': 197, 'archive.dirty': 12, layouts: 60, 'ws.peek': 94, 'project.terminal': 107, 'hooks.seen': 146, sample: 160, 'ship.sheet': 161, 'pr.revert': 179, 'diff.since': 179, 'merge.queue': 180, 'chat.search': 181, 'agent.log': 183, 'touch.id': 184, 'note.restore': 185, 'disk.usage': 186, 'widget.term': 187, 'widget.ui': 188, 'widget.order': 189, 'widget.store': 190, 'kit.term': 191 }
 // this build's: each one above, and ns:<namespace> for each namespace RPC_NAMES has
 export const CAPS = [...Object.keys(CAP_SINCE), ...new Set(Object.keys(RPC_NAMES).map(m => `ns:${m.split('.')[0]}`))]
 

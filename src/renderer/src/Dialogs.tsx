@@ -206,6 +206,8 @@ export function Pages({ app }: { app: AppCtx }) {
           accounts={layoutsOn ? accountsApi : undefined}
           hooks={hasCap(view, 'hooks.seen') ? () => api.call('hooksSeen') : undefined}
           typeIn={(cmd, project) => void termType(cmd, project)}
+          versions={hasCap(view, 'agent.versions')}
+          openTab={tab => (t => t && (setDialog(null), selectTab(t)))(view.tabs.find(x => x.id === tab))}
           clients={{
             // T12: the sidebar's filter on its workspaces, each picked (the picked rows' bar archives them)
             show: label => (setDialog(null), app.setFind({ q: '', client: label }), app.setPicked(view.workspaces.filter(w => w.client === label && !w.archived).map(w => w.id))),

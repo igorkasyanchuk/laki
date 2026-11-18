@@ -29,7 +29,7 @@ import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import type { AllowRule } from '../../shared/ask'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
-import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
+import { type AccountsApi, AccountsBlock, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
@@ -832,6 +832,8 @@ export function SettingsPage(p: {
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   hooks?: () => Promise<Record<string, HookSeen>> // Agents & profiles: each agent's last hook (the daemon's hooksSeen)
   typeIn?: (cmd: string, project?: string) => void // F6's What it sees: the agent's CLI command typed in a terminal (App's termType)
+  openTab?: (tab: string) => void // a tab Settings made (an agent CLI's update): shown, Settings closed
+  versions?: boolean // A9: the daemon lists the agents' CLIs (agent.versions)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
   onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
   achievements?: AchievementsApi // App's: the count, on or off, the page
@@ -2827,6 +2829,9 @@ export function SettingsPage(p: {
                 that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use (their tabs still start). Flags go
                 after the command, before the prompt, through the shell (so the variables work); env goes on top of the project's.
               </p>
+              {p.versions && <Group title="Versions" hint="Each agent's CLI on this Mac: its version and the newest out. Update runs its own update (npm, Homebrew or its installer) in a terminal tab you can watch; tabs already running keep their version until restarted">
+                <AgentVersions openTab={p.openTab} />
+              </Group>}
               <Switch className="switch-row" on={!!s.hideSecrets} onChange={on => set({ hideSecrets: on, hideSecretsAsked: true })}>
                 <Says title="Hide secret-looking variables from agents" hint="Names like …_TOKEN, …_SECRET, …_KEY from where Laki was started stay out of agents' environment; their own sign-in key and what you set here, in a project or a profile still go through" />
               </Switch>

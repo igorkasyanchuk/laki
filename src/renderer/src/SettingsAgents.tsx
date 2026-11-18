@@ -1,6 +1,6 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
+import { type Account, type AccountAgent, type AccountView, type AgentCli, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { heardText, micTest, TEST_MS, useLevel } from './voice'
 import { SILENCES } from '../../shared/talk'
@@ -869,6 +869,80 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// A9: Settings › Agents & profiles' Versions: each agent CLI installed, its version and the newest (npm's), how it was
+// installed; Update (or several picked: Update selected) runs its update in a terminal tab (Show opens it); a failed one
+// says its exit code and has Retry. Looked at as it opens, again every 3 s while one updates
+const olderThan = (a: string, b: string) => {
+  const n = (v: string) => v.split(/[.+-]/).slice(0, 3).map(x => Number(x) || 0)
+  const [x, y] = [n(a), n(b)]
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i]
+  return false
+}
+export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) {
+  const [list, setList] = useState<AgentCli[] | null>(null)
+  const [err, setErr] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
+  const [looking, setLooking] = useState(false)
+  const load = (fresh?: boolean) => (fresh && setLooking(true), api.call<AgentCli[]>('agentVersions', { fresh }).then(setList, e => setErr(String((e as Error).message))).finally(() => setLooking(false)))
+  useEffect(() => void load(), [])
+  const busy = !!list?.some(a => a.update?.state === 'running')
+  useEffect(() => {
+    if (!busy) return
+    const t = setInterval(() => void load(), 3000)
+    return () => clearInterval(t)
+  }, [busy])
+  const update = (ids: string[]) => (setErr(''), Promise.all(ids.map(id => api.call('agentUpdate', { agent: id }).catch(e => setErr(String((e as Error).message))))).then(() => (setPicked([]), load())))
+  const out = (a: AgentCli) => !!(a.version && a.newest && olderThan(a.version, a.newest))
+  const can = (a: AgentCli) => !!a.path && !!a.cmd && a.update?.state !== 'running'
+  if (!list) return <p className="muted small">{err || 'Looking at the installed agents…'}</p>
+  return (
+    <div className="agent-versions">
+      {list.map(a => {
+        const u = a.update
+        return (
+          <div key={a.id} className={`row agent-version ${a.path ? '' : 'off'}`}>
+            <input type="checkbox" aria-label={`Pick ${a.name}`} disabled={!can(a)} checked={picked.includes(a.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, a.id] : p.filter(x => x !== a.id)))} />
+            <span className="grow">
+              <b>{a.name}</b>{' '}
+              {!a.path ? (
+                <span className="muted small">not installed</span>
+              ) : (
+                <span className="small" data-tip={`${a.path}${a.cmd ? ` · updates with: ${a.cmd}` : ''}`}>
+                  <span className="mono">{a.version ?? '?'}</span>
+                  {out(a) ? <span className="warn"> → <span className="mono">{a.newest}</span> is out</span> : a.newest ? <span className="muted"> · up to date</span> : <span className="muted"> · newest not known</span>}
+                  <span className="muted"> · {a.how}</span>
+                </span>
+              )}
+              {u?.state === 'running' && <span className="muted small"> · updating…</span>}
+              {u?.state === 'done' && <span className="ok small"> · updated{a.running ? `: ${a.running === 1 ? 'the tab' : `the ${a.running} tabs`} running it keep their version until restarted` : ''}</span>}
+              {u?.state === 'failed' && <span className="warn small"> · the update failed{u.code !== undefined ? ` (exit ${u.code})` : ''}</span>}
+            </span>
+            {u && openTab && (
+              <button type="button" className="link small" onClick={() => openTab(u.tab)}>
+                Show
+              </button>
+            )}
+            {a.path && (
+              <button type="button" disabled={!can(a)} data-tip={a.cmd ? `Runs ${a.cmd} in a terminal tab you can watch` : "Laki doesn't know how it was installed: update it the way you installed it"} onClick={() => void update([a.id])}>
+                {u?.state === 'failed' ? 'Retry' : 'Update'}
+              </button>
+            )}
+          </div>
+        )
+      })}
+      <div className="row-buttons">
+        <button type="button" className="primary" disabled={!picked.length} onClick={() => void update(picked)}>
+          Update selected{picked.length ? ` (${picked.length})` : ''}
+        </button>
+        <button type="button" disabled={looking} onClick={() => void load(true)}>
+          {looking ? 'Looking…' : 'Look again'}
+        </button>
+      </div>
+      {err && <p className="warn small">{err}</p>}
     </div>
   )
 }

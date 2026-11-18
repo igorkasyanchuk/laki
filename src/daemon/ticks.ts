@@ -41,6 +41,7 @@
 //   ghHour         1 h    keep   Laki's own gh calls in its log
 //   logTick        1 h    keep   daemon.log past 10 MB moved to daemon.log.1 (conn.ts rotateLog)
 //   tidy           1 h    keep   old pasted images, storage files, archived workspaces, trash
+//   agentVersionsTick 6 h slow   the agent CLIs' newest versions, npm's registry (agentCli.ts: a dot on Settings)
 // Not here: one-shot waits (core.ts whenPrompt, workflow.ts esc), each a few seconds.
 export type Idle = 'pause' | 'slow' | 'keep'
 type Loop = { name: string; ms: number; idle: Idle; timer: NodeJS.Timeout; n: number }

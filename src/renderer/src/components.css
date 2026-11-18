@@ -114,6 +114,12 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
 :where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
 
+/* A9: the agents' CLIs (SettingsAgents.tsx AgentVersions): a row each, its version and its update */
+.agent-versions { display: flex; flex-direction: column; gap: var(--sp-2); }
+.agent-version { align-items: center; gap: var(--sp-2); }
+.agent-version.off { opacity: 0.6; }
+.agent-version .ok { color: var(--done); }
+
 /* F6: What it sees (SettingsAgents.tsx WhatItSees): its rule files and MCP servers, a row each */
 .sees-box > summary { cursor: var(--cur-act); padding: var(--sp-2) 0; color: var(--muted); }
 .sees { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-4); }
