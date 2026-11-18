@@ -230,7 +230,7 @@ export function QuickWindow() {
       void bridge?.onTell?.(t => {
         // the drawing replaces the picture it was drawn on; a new picture goes after the ones already there
         setImages(x => (y => ((tellAt.current = y.length), y))(t.edited ? x.filter((_, i) => i !== tellAt.current) : x))
-        setShot(s => ({ n: (s?.n ?? 0) + 1, png: t.png, ...(t.edited && { quiet: true }) })) // PromptInput: as if pasted, then the mic (not again for a drawing)
+        setShot(s => ({ n: (s?.n ?? 0) + 1, png: t.png, ...((t.edited || t.quiet) && { quiet: true }) })) // PromptInput: as if pasted, then the mic (not again for a drawing, nor for a picture dropped on the menu bar's item: Q12's quiet)
         if (t.note) setText(x => [x.trim(), t.note!.trim()].filter(Boolean).join('\n'))
         setTell(x => ({ png: t.png, mic: t.mic ?? x?.mic ?? 'granted', dictation: t.dictation ?? x?.dictation ?? false }))
         setErr(!t.edited && cloudVoice() && t.mic === 'denied' ? 'mic' : '')

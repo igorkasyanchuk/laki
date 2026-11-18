@@ -22,6 +22,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - The talk key takes two words more: “Note: …” adds a line to the note named Voice, “To-do in Shop: …” adds it to that project's Backlog (Settings › Voice turns each off; Undo on the pill).
 - A scheduled task's *When* takes a cron expression too (`*/20 9-17 * * 1-5`, `@daily`), read back in words with its next three runs; `laki schedule add … --at "…"`.
 - Remote access on an iPhone in landscape keeps text at its size: Safari no longer enlarges it.
+- Drop text, files or pictures on Laki's menu bar icon: the quick bar opens with them (a project's file by its path, a small text file by its text, a picture as a picture), and nothing goes until ⏎.
 - The talk key can take what's selected in the app you're in along with your words: Settings › Voice › Talk key › *Include the selected text*. The pill shows *+ selection · 3 lines*; × leaves it out. Never from a password manager; secrets masked.
 - Do not disturb is now *Quiet*, and it's in the menu bar's menu (its mark gets a slash), `laki quiet 1h` and Settings › Notifications with a default length. As it ends, one notification sums it up (*2 agents are waiting, 3 finished, 1 check failed*) and opens Needs you; nothing when nothing happened.
 - Worktrees stay out of Time Machine and Spotlight on a Mac (Settings › General › Storage; on for new installs). Settings › Resources › Disk says how much that keeps out of your backups.

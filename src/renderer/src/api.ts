@@ -57,7 +57,7 @@ type Bridge = {
   speechLocales?(): Promise<{ locales?: string[]; none?: true; error?: string }> // the talk key's on-device engine's languages (none: not in this build)
   fnWatch?(on: boolean): void // hold Fn: main watches Fn for this page (voice.ts; Chromium drops Fn's key events on macOS)
   onFn?(cb: (down: boolean) => void): void
-  onTell?(cb: (t: { png: string; mic?: string; dictation?: boolean; note?: string; edited?: boolean }) => void): void // the quick bar's: show and tell's picture (and the editor's, edited)
+  onTell?(cb: (t: { png: string; mic?: string; dictation?: boolean; note?: string; edited?: boolean; quiet?: boolean }) => void): void // the quick bar's: show and tell's picture (and the editor's, edited)
   quickAnnotate?(png: string): void // its E: the picture in the editor first, back here
   privacyPane?(which: 'microphone' | 'screen'): void // System Settings › Privacy & Security's pane
   quickHeight?(h: number): void // its window as tall as the page

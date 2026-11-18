@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { handOff } from '../src/renderer/src/tell.ts'
-import { routeOf, SEL_MAX, selectionOf, selLabel, selSkip, spokenAnswer, talkName, TODO_TO, withSelection } from '../src/shared/talk.ts'
+import { DROP_TEXT_MAX, dropPayload, plainText, routeOf, SEL_MAX, selectionOf, selLabel, selSkip, spokenAnswer, talkName, TODO_TO, withSelection } from '../src/shared/talk.ts'
 import { spokenMode } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 
@@ -47,6 +47,39 @@ test('Q11 the selection: masked, cut in the middle past 4,000, quoted for an age
   // never copied from a password manager or Keychain Access; an unknown app (no bundle id) neither
   for (const id of ['com.1password.1password', 'com.agilebits.onepassword7', 'com.bitwarden.desktop', 'com.apple.keychainaccess', 'com.apple.Passwords', '']) assert.equal(selSkip(id), true, id)
   for (const id of ['com.apple.Safari', 'com.apple.Terminal', 'com.apple.mail', 'com.1passwordish.app']) assert.equal(selSkip(id), false, id)
+})
+
+test('Q12 dropPayload: a drop on the menu bar item: text quoted and masked, pictures, a project file by its path, a small text file by its text, the rest refused', () => {
+  const projects = ['/Users/me/shop', '/Users/me/shop/packages/api/']
+  // text: quoted, masked, capped
+  const key = `ghp_${'x1Y2'.repeat(6)}`
+  assert.deepEqual(dropPayload({ text: `deploy with ${key}\nthen check`, projects }), { prompt: `> deploy with ••••\n> then check`, images: [], refused: [] })
+  assert.ok(dropPayload({ text: 'a'.repeat(10_000), projects }).prompt.length <= SEL_MAX + 200)
+  assert.deepEqual(dropPayload({ text: '  ', projects }), { prompt: '', images: [], refused: [] })
+  const r = dropPayload({
+    projects,
+    files: [
+      { path: '/Users/me/Desktop/bug.PNG', size: 9e6 }, // a picture, whatever its size: main draws it to a PNG
+      { path: '/Users/me/shop/src/cart.ts', size: 900, text: 'x' }, // in a project: its path there
+      { path: '/Users/me/shop/packages/api/server.ts', size: 10 }, // the deepest project's
+      { path: '/Users/me/shop/docs', size: 0, dir: true }, // a folder inside one: its path too
+      { path: '/Users/me/notes/todo.md', size: 40, text: 'TOKEN=abcd1234efgh\n```js\nx\n```' }, // outside, plain text: fenced, masked
+      { path: '/Users/me/notes/big.log', size: DROP_TEXT_MAX + 1, text: 'x' }, // outside, too big
+      { path: '/Users/me/Downloads/app.zip', size: 300 }, // outside, not text
+      { path: '/Users/me/Downloads', size: 0, dir: true }, // a folder outside
+      { path: '/Users/me/shopping/list.bin', size: 5 }, // a name that starts like a project's, not in it
+    ],
+  })
+  assert.deepEqual(r.images, ['/Users/me/Desktop/bug.PNG'])
+  assert.deepEqual(r.refused, ['/Users/me/notes/big.log', '/Users/me/Downloads/app.zip', '/Users/me/Downloads', '/Users/me/shopping/list.bin'])
+  const parts = r.prompt.split('\n\n')
+  assert.deepEqual(parts.slice(0, 3), ['src/cart.ts', 'server.ts', 'docs'])
+  assert.ok(parts[3].startsWith('todo.md:\n```text\nTOKEN=••••\n'), parts[3])
+  assert.equal(parts.slice(3).join('\n\n').split('```').length, 3, "the file's own fence is broken, so ours holds")
+  // plain text: UTF-8, no NUL; a binary or UTF-16 is not
+  assert.equal(plainText(new TextEncoder().encode('héllo ✓')), 'héllo ✓')
+  assert.equal(plainText(Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0x00])), undefined)
+  assert.equal(plainText(Uint8Array.from([0xff, 0xfe, 0x41])), undefined)
 })
 
 test('Q7: a screenshot and a transcript reach an agent tab and a new workspace through the daemon', async t => {

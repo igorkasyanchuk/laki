@@ -228,7 +228,15 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     badge, `settings.trayState` (*Show state*, on unless off): blocked (a plan limit not yet reset, a turn ended on an
     error) over waiting (`needsTab`) over working (an agent tab running), muted and archived aside; its title the count
     and ! when blocked, its tooltip in words (`trayTip`); a change swaps the cached image, nothing animates; off: the
-    filled mark always; `test/tray.test.ts` draws the four to PNGs); the count as its title, a menu of those tabs, waiting first
+    filled mark always; `test/tray.test.ts` draws the four to PNGs; U8's quiet slashes it, Q12's drop frames it);
+    Q12, drops on it (macOS only, `trayDrops`: Linux's tray has none): `drag-enter` the drop picture, `drag-leave` and
+    `drag-end` back; `drop-text` and `drop-files` go to `dropIn`: each file stat'ed (a plain-text one under
+    `DROP_TEXT_MAX` read, `plainText`), shared/talk.ts `dropPayload` with the projects' paths (the deepest first): text
+    quoted (`selectionOf`), a picture's path to draw (`nativeImage`, 2,400 px wide at most, a PNG), a project's file by
+    its relative path, an outside plain-text one fenced and masked, the rest refused (`DROP_NO` in a notification).
+    Then `quickWin(prompt)`, and the pictures as `quick-tell` with `quiet` (as if pasted, no mic: NewWindow's `onTell`)
+    once its page is up (`dropPngs`, `tellSend`). None while `touchOpen` (Touch ID's prompt) or an ask's card shows
+    (`dropBusy`); no new IPC; the count as its title, a menu of those tabs, waiting first
     with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`), the screenshots and *Open Laki* (the global hotkey as its `accelerator`, `registerAccelerator: false`; the `hotkey` IPC builds the menu again); `settings.menuBar === false` destroys it: Settings › General › *Menu bar icon*). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also

@@ -1326,6 +1326,12 @@ Settings › General › *Menu bar click* (macOS): *Menu* (the menu above) or *I
 with every agent waiting on you, oldest first, its question and its choices (1–9 picks one, *Open tab* goes there),
 then what's at work, and a *New task…* box (the quick bar with what you typed); it closes as you click elsewhere or
 press Esc. A right click still opens the menu. Private workspaces stay out of it in Recording mode.
+**Drop on the menu bar icon** (macOS): drag text, files or pictures onto Laki's mark (it gets a frame while you hold
+them over it) and let go: the quick bar opens with them, and nothing goes until you press ⏎. Text comes quoted (4,000
+characters at most, secrets masked); a picture comes in as a picture; a file inside one of your projects as its path
+there; a plain-text file outside them (under 100 KB) as its text. Anything else (a folder outside, a binary, a big
+file): a notification says it can't go to an agent: copy it into the project first. While Touch ID asks or an agent's
+Allow card is up, drops do nothing.
 Settings › General › *Menu bar icon* hides the mark. Its *Show state* (on) shapes the mark by how things stand: its outline when nothing runs, a dot under it while an agent works, filled when one needs you, a bar under it (and ! beside the count) when one is blocked by a plan limit or an error; hover it for the same in words. With *Turn timers* on (Settings › Layout), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes

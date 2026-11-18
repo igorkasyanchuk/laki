@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
-import { AI_TO, NOTE_TO, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
+import { AI_TO, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NOTE_TO, plainText, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
@@ -1344,12 +1344,16 @@ ipcMain.handle('menu-popup', (e, model: unknown, x: unknown, y: unknown) => {
 // process, appPeer), which the window's call carries. null: no Touch ID here, cancelled, or failed
 const touchCan = () => mac && systemPreferences.canPromptTouchID()
 ipcMain.handle('touch-id', async e => fromApp(e) && !!win && e.sender === win.webContents && touchCan() && !!(await rpc<{ caps?: string[] }>('ping', { caps: true }).catch(() => undefined))?.caps?.includes('touch.id')) // and a daemon that holds the calls (API 184)
+let touchOpen = false // its prompt is up: a drop on the menu bar's item waits (Q12)
 ipcMain.handle('confirm', async (e, what: unknown) => {
   if (!confirmAsk(sender(e), !!win && e.sender === win.webContents, what, devOrigin) || !touchCan()) return null
   try {
+    touchOpen = true
     await systemPreferences.promptTouchID(CONFIRM[what as ConfirmWhat])
   } catch {
     return null
+  } finally {
+    touchOpen = false
   }
   return (await rpc<{ ticket: string }>('ticketMint', { what }).catch(() => null))?.ticket ?? null
 })
@@ -1421,6 +1425,7 @@ let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
 let barWas = -1 // U15: the Dock's progress bar as last set
 let recording = false // the last badge's: Recording mode is on (settings.recording), its item ticked
+let trayNow: TrayState | undefined // the last badge's state (its picture), for a drop's highlight and back
 let quietUntil = 0 // U8: the last badge's: quiet until (ms), its picture slashed, End Quiet in the menu
 const quietOn = () => quietUntil > Date.now()
 const quietSet = (o: object) => void rpc('dndSet', o).catch(() => {})
@@ -1491,10 +1496,12 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
   const num = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : 0)
   quietUntil = num(st?.quiet) // sent with Show state off too (no state then)
   const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked), quiet: quietUntil } : undefined
+  trayNow = info?.state
   if (!tray) {
     tray = new Tray(trayIcon(info?.state))
     tray.on('click', () => barInbox && inboxOpen())
     tray.on('right-click', () => barInbox && trayBuilt && tray?.popUpContextMenu(trayBuilt))
+    if (mac) trayDrops(tray)
   }
   tray.setImage(trayIcon(info?.state, quietOn())) // a state change swaps the picture (the same one: its cached image, nothing redrawn)
   tray.setTitle(info ? trayTitle(info) : count, { fontType: 'monospacedDigit' })
@@ -2060,7 +2067,7 @@ function quickWin(prompt?: string) {
   const w = (quickW = panelWin({ window: 'quick', ...(prompt && { prompt }) }, 640, 132, { minWidth: 440, minHeight: 112, resizable: false }, 0.16))
   guardFloat('quick', w)
   w.webContents.on('did-navigate', () => quickW === w && (quickReady = false)) // a reload: it listens again as it's up
-  w.on('closed', () => quickW === w && ((quickW = null), (quickReady = false), (tellPng = null)))
+  w.on('closed', () => quickW === w && ((quickW = null), (quickReady = false), (tellPng = null), (dropPngs = [])))
 }
 // Q7: show and tell (its global key, the menu bar's and the bubbles' item): a part of the screen (the bubbles out of it,
 // as any shot), then the quick bar with the picture in it and the mic on (the page's: cloud voice, or macOS dictation
@@ -2076,10 +2083,53 @@ function tellShot() {
 }
 async function tellSend() {
   const w = quickW
+  if (w && !w.isDestroyed() && quickReady) for (const png of dropPngs.splice(0)) w.webContents.send('quick-tell', { png, mic: 'granted', dictation: false, quiet: true }) // Q12's: as if pasted, no mic
   if (!tellPng || !w || w.isDestroyed() || !quickReady) return
   const png = tellPng
   tellPng = null
   w.webContents.send('quick-tell', { png, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', dictation: !smoke && (await dictationOn()) }) // ui-smoke: no real dictation on your Mac
+}
+// Q12: drops on the menu bar's item (macOS; Linux's tray has no drops): while something's dragged over it, the mark
+// framed (tray.ts' drop picture); dropped, the quick bar opens with it (talk.ts dropPayload: text quoted, a file in a
+// project as its path there, a plain-text one outside as its text, pictures as pictures), nothing sent until ⏎. A file
+// it can't take: a notification says so. None while Touch ID asks or an agent's Allow card is up (no drop lands on a
+// prompt by mistake)
+const dropBusy = () => touchOpen || (!!cardWin && !cardWin.isDestroyed() && cardWin.isVisible() && cards.some(c => c.ask))
+let dropPngs: string[] = [] // pictures for the quick bar, until its page is up
+function trayDrops(t: Tray) {
+  const lit = (on: boolean) => t.setImage(trayIcon(trayNow, quietOn(), on && !dropBusy()))
+  t.on('drag-enter', () => lit(true))
+  t.on('drag-leave', () => lit(false))
+  t.on('drag-end', () => lit(false))
+  t.on('drop-text', (_e, text) => void dropIn({ text }))
+  t.on('drop-files', (_e, files) => void dropIn({ files }))
+}
+async function dropIn(d: { text?: string; files?: string[] }) {
+  tray?.setImage(trayIcon(trayNow, quietOn()))
+  if (dropBusy()) return
+  const projects = ((await rpc<View>('state').catch(() => null))?.projects ?? []).filter(p => !p.kind && p.path).map(p => p.path)
+  const files = (d.files ?? []).slice(0, 20).flatMap((path): DropFile[] => {
+    try {
+      const st = statSync(path)
+      if (st.isDirectory()) return [{ path, size: 0, dir: true }]
+      const text = st.size <= DROP_TEXT_MAX ? plainText(readFileSync(path)) : undefined
+      return [{ path, size: st.size, ...(text !== undefined && { text }) }]
+    } catch {
+      return []
+    }
+  })
+  const r = dropPayload({ text: typeof d.text === 'string' ? d.text : undefined, files, projects })
+  const pngs = r.images.flatMap(p => {
+    let img = nativeImage.createFromPath(p)
+    if (img.isEmpty()) return (r.refused.push(p), [])
+    if (img.getSize().width > 2400) img = img.resize({ width: 2400 })
+    return [img.toPNG().toString('base64')]
+  })
+  if (r.refused.length) new Notification({ title: "Laki didn't take it", body: `${DROP_NO[0].toUpperCase()}${DROP_NO.slice(1)}: ${r.refused.map(f => basename(f)).join(', ')}` }).show()
+  if (!r.prompt && !pngs.length) return
+  dropPngs.push(...pngs)
+  quickWin(r.prompt || undefined)
+  void tellSend()
 }
 ipcMain.on('quick-tell-ready', e => {
   if (!quickW || e.sender !== quickW.webContents || !from(e, 'quick')) return
