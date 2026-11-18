@@ -39,8 +39,8 @@
   --sp-1: round(nearest, calc(var(--sp-1-base) * var(--density)), 1px); --sp-2: round(nearest, calc(var(--sp-2-base) * var(--density)), 1px);
   --sp-3: round(nearest, calc(var(--sp-3-base) * var(--density)), 1px); --sp-4: round(nearest, calc(var(--sp-4-base) * var(--density)), 1px);
   --sp-5: round(nearest, calc(var(--sp-5-base) * var(--density)), 1px); --sp-6: round(nearest, calc(var(--sp-6-base) * var(--density)), 1px);
-  /* a control's cursor (themes.ts: the arrow on a Mac, as its own apps; the hand elsewhere, or Pointing hand over
-     buttons); a link's is always the hand (a, .link) */
+  /* a control's cursor (themes.ts: the hand; the arrow, as macOS's own apps, with Pointing hand over buttons off); a
+     link's is always the hand (a, .link) */
   --cur-act: pointer;
   --safe-t: env(safe-area-inset-top, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); /* T8: a notched phone's (viewport-fit=cover); 0 on a Mac */
   --fab-room: 72px; /* T7: room a page keeps at its bottom for the AI button */

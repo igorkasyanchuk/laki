@@ -726,7 +726,7 @@ export type Settings = {
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   density?: 'compact' | 'regular' | 'roomy' // Appearance's Density: space and control heights (renderer's themes.ts, styles.css --density); unset: regular
-  pointerHand?: boolean // Appearance's Pointing hand over buttons (--cur-act); unset: off on a Mac, on elsewhere
+  pointerHand?: boolean // Appearance's Pointing hand over buttons (--cur-act); unset: on
   finishedRows?: boolean // Needs you: a finished turn as a compact row (Needs.tsx), on unless false
   toolbar?: string[] | null // the tab bar's buttons shown, in order (renderer's toolbar.ts ids; unset: its default); ⋯ and Run always
   toolbarSeen?: string[] | null // every id there was as it was set: one new since shows at its default place

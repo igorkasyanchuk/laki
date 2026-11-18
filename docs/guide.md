@@ -2341,8 +2341,8 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   scale in and fade out, a new row or tab grows in, buttons give when pressed, a workspace that needs you breathes, a
   finished one ticks once; *High*: pages and lists come in too; *Off*: nothing moves, spinners stand still, as with the
   system's *Reduce motion*), *Density* (Compact, Regular or Roomy: the space and the controls' heights; the phone page
-  is never Compact), *Pointing hand over buttons* (off on a Mac: the arrow over buttons, tabs and rows, as macOS's own
-  apps, the hand over links; on a Mac, scroll bars show only while you scroll, point at or work in a list, unless
+  is never Compact), *Pointing hand over buttons* (on unless you turn it off; off: the arrow over buttons, tabs and rows,
+  as macOS's own apps, the hand over links; on a Mac, scroll bars show only while you scroll, point at or work in a list, unless
   System Settings › Appearance › *Show scroll bars* is *Always*), *Vertical text* (how sideways labels read: the
   Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
   rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *High contrast mode* (off by default:

@@ -1364,8 +1364,8 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   corners and icons never (`test/css.test.ts`: no `--fs-*` times `--density`). The 40px tab bar keeps its height (the
   traffic lights). A look sets a `-base` if it changes one.
 - **Cursors** (`--cur-act`): controls take it (`cursor: var(--cur-act)`), links (`a[href]`, `.link`, `.md a`) the hand.
-  themes.ts sets it to `default` on a Mac in the app (macOS's habit) unless *Pointing hand over buttons*
-  (`settings.pointerHand`); elsewhere and on the phone page the hand. A control with the arrow needs a hover state:
+  The hand unless *Pointing hand over buttons* is off (`settings.pointerHand` false: themes.ts sets it to `default`,
+  macOS's habit). A control with the arrow needs a hover state:
   `test/css.test.ts` checks every `--cur-act` selector has a `:hover` (its own, an `:is(…):hover` list's, its element's
   base one) or a reason in `NO_HOVER`. The UI kit's base CSS (`shared/widget.ts`) uses `var(--cur-act, pointer)`.
 - **Overlay scrollbars** (`html[data-scrollbars='overlay']`: main's `scrollbars` IPC, macOS's `AppleShowScrollBars`

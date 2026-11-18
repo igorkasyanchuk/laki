@@ -1317,8 +1317,8 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   const page = !(globalThis as { laki?: unknown }).laki
   const d = o.density === 'roomy' ? 1.18 : o.density === 'compact' && !page ? 0.82 : 1
   if (d !== 1) st.setProperty('--density', String(d))
-  // a control's cursor: the arrow on a Mac (its own apps'), the hand elsewhere and on the phone page; Pointing hand over buttons
-  if (!(o.pointerHand ?? (page || !/Mac/.test(navigator.platform)))) st.setProperty('--cur-act', 'default')
+  // a control's cursor: the hand, unless Pointing hand over buttons is off (the arrow, as macOS's own apps)
+  if (o.pointerHand === false) st.setProperty('--cur-act', 'default')
   root.classList.toggle('opaque', OPAQUE_LOOKS.has(root.dataset.look)) // V8: its floats solid
   root.classList.toggle('light', !!t.light) // a light theme (Grain's soft-light)
   if (o.vertText) st.setProperty('--vt', o.vertText === 'up' ? 'sideways-lr' : 'vertical-rl') // Vertical text: each sideways label's writing-mode (unset: its own, styles.css' var(--vt, …) fallbacks)

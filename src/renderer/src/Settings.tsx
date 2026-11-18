@@ -154,7 +154,7 @@ export type AppSettings = Paint & {
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   finishedRows?: boolean // Needs you's finished turns as rows
   density?: 'compact' | 'regular' | 'roomy' // space and control heights (themes.ts)
-  pointerHand?: boolean // the pointing hand over buttons (unset: on off a Mac)
+  pointerHand?: boolean // the pointing hand over buttons (unset: on)
   toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
   toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
@@ -1947,7 +1947,7 @@ export function SettingsPage(p: {
                     <button type="button" tabIndex={-1}>Button</button>
                   </div>
                 </div>
-                <Switch className="switch-row" on={s.pointerHand ?? (!bridge || !/Mac/.test(navigator.platform))} /* as themes.ts applyTheme: the phone page's hand, off a Mac's */ onChange={on => paint({ pointerHand: on })}>
+                <Switch className="switch-row" on={s.pointerHand !== false} /* as themes.ts applyTheme */ onChange={on => paint({ pointerHand: on })}>
                   <Says title="Pointing hand over buttons" hint="Off: the arrow over buttons, tabs and rows, as macOS's own apps; links keep the hand" />
                 </Switch>
                 <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">

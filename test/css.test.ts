@@ -110,7 +110,7 @@ test('no rule multiplies a type size (--fs-*) by --density', () => {
   }
 })
 
-// the arrow over controls (--cur-act, macOS's habit): with no hand to say a thing is clickable, each control that sets
+// the arrow over controls (--cur-act with Pointing hand over buttons off, macOS's habit): with no hand to say a thing is clickable, each control that sets
 // it has a :hover of its own, an element's base one (button:hover), or a reason it needs none
 const NO_HOVER: Record<string, string> = {
   '.sim-screen img': "the simulator's screen: a click is a tap on it",
