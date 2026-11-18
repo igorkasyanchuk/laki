@@ -74,7 +74,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
   else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
-  else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
+  else if (!textOnly && (args[0] === 'update' || args[0] === 'browser') && a === '--off') flags.off = true // laki update's and browser check's: no value
+  else if (!textOnly && args[0] === 'browser' && a === '--to') flags.to = argv[++i] ?? '' // laki browser scroll's (top, bottom)
   else if (!textOnly && args[0] === 'ship' && ['--title', '--body', '--files', '--draft'].includes(a)) a === '--draft' ? (flags.draft = true) : a === '--files' ? shipFiles.push(...(argv[++i] ?? '').split(',').filter(Boolean)) : (flags[k] = argv[++i] ?? '') // laki ship's only
   else if (!textOnly && args[0] === 'limits' && a === '--agent') flags.agent = argv[++i] ?? '' // laki limits' only
   else if (!textOnly && args[0] === 'events' && ['--ws', '--type', '--once'].includes(a)) a === '--ws' ? wsRefs.push(argv[++i] ?? '') : a === '--once' ? (flags.once = true) : (flags.type = argv[++i] ?? '') // laki events' only
@@ -500,14 +501,26 @@ async function main() {
       return specs.length ? out({ ...ws, tabs: more }, [line(ws), ...more.map(x => `  + ${x.name} (${x.id})`)].join('\n')) : out(ws, line(ws))
     }
     case 'browser': {
-      // laki browser [ws] open [url] | screenshot | click <selector> | fill <selector> <text> | text; in a tab, its workspace
-      const ops = ['open', 'screenshot', 'click', 'fill', 'text']
+      // laki browser [ws] <op> …: open, screenshot, click, fill, text, hover, press, scroll, select, check, drag, back,
+      // forward, reload, tabs; in a tab, its workspace
+      const ops = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs']
       const [ws, op, ...more] = ops.includes(rest[0]) && process.env.LAKI_WORKSPACE ? [process.env.LAKI_WORKSPACE, ...rest] : rest
-      if (!ws || !ops.includes(op)) throw new Error('usage: laki browser [ws] open [url|/path] | screenshot | click <selector> | fill <selector> <text> | text [--expect-url <url|/path>]')
-      const p = op === 'open' ? { url: more[0] } : op === 'click' ? { selector: more.join(' ') } : op === 'fill' ? { selector: more[0], text: more.slice(1).join(' ') } : {}
+      if (!ws || !ops.includes(op)) throw new Error(`usage: laki browser [ws] ${ops.join(' | ')} … [--expect-url <url|/path>] (laki help browser)`)
+      const by = typeof flags.by === 'string' ? Number(flags.by) : undefined
+      if (by !== undefined && !Number.isFinite(by)) throw new Error('laki browser scroll --by: a number of pixels (negative goes up)')
+      const p =
+        op === 'open' ? { url: more[0] }
+        : op === 'click' || op === 'hover' || op === 'check' ? { selector: more.join(' '), ...(op === 'check' && flags.off && { off: true }) }
+        : op === 'fill' || op === 'select' ? { selector: more[0], text: more.slice(1).join(' ') }
+        : op === 'press' ? { key: more.join(' ') }
+        : op === 'drag' ? { selector: more[0], to: more[1] }
+        : op === 'scroll' ? { selector: more.join(' ') || undefined, px: by, edge: typeof flags.to === 'string' ? flags.to : undefined }
+        : op === 'tabs' ? { act: more[0] ?? 'list', ...(more[0] === 'new' ? { url: more[1] } : more[1] !== undefined && { n: Number(more[1]) }) }
+        : {}
       const expect = typeof flags['expect-url'] === 'string' ? flags['expect-url'] : undefined // refused, nothing done, when the page isn't that
       const r = await rpc('browse', { ws, op, ...p, expect }, 45000)
-      return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : browseSays(r)) // what it caused: read it before a screenshot
+      const tabsSay = (t: { n: number; url: string; title: string; current?: boolean }[]) => t.map(x => `${x.current ? '*' : ' '} ${x.n}  ${x.url || '(blank)'}${x.title ? `  ${x.title}` : ''}`).join('\n')
+      return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : op === 'tabs' ? tabsSay(r.tabs) : browseSays(r)) // what it caused: read it before a screenshot
     }
     case 'rm':
     case 'archive':

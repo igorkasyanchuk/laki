@@ -1056,6 +1056,14 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   // the agent browser: only localhost, and only with the app's window
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'open', url: 'https://example.com' }), /localhost only/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click' }), /a CSS selector/)
+  for (const op of ['hover', 'select', 'check', 'drag']) await assert.rejects(rig.rpc('browse', { ws: ws.id, op }), /a CSS selector/, op)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'drag', selector: '.card' }), /a second CSS selector/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'press' }), /which key/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'press', key: 'Hyper+K' }), /Hyper\? Meta/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'select', selector: '#plan' }), /which option/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'scroll', edge: 'middle' }), /top or bottom/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'select' }), /its number/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'new', url: 'https://example.com' }), /localhost only/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'text' }), /needs Laki's window/)
   // with an app window that can: the op goes to it, its answer comes back (a path: on the workspace's port)
   const app = await connect(rig)
@@ -1063,12 +1071,17 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   app.notify('view', { tab: null, tabs: [], focused: false, browse: true })
   // through the client's events, as the renderer's: a message with an id would be a reply
   const relay = setInterval(() => {
-    for (const m of app.events.splice(0)) if (m.ev === 'browse') app.call('browseDone', m.op === 'text' ? { id: m.req, ok: true, result: { url: m.url ?? m.home, text: 'Hello' } } : { id: m.req, ok: false, error: `no element matches ${m.selector}` })
+    for (const m of app.events.splice(0)) if (m.ev === 'browse') app.call('browseDone', m.op === 'text' ? { id: m.req, ok: true, result: { url: m.url ?? m.home, text: 'Hello' } } : ['drag', 'tabs', 'press'].includes(m.op) ? { id: m.req, ok: true, result: { got: [m.selector, m.to, m.key, m.act, m.n, m.url] } } : { id: m.req, ok: false, error: `no element matches ${m.selector}` })
   }, 20)
   t.after(() => clearInterval(relay))
   await until(async () => (await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' }).catch(() => null))?.text === 'Hello', 'the app answers')
   assert.equal((await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' })).url, `http://localhost:${ws.port}/about`)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click', selector: '#nope' }), /no element matches #nope/)
+  // the new verbs' words reach the app as given (tabs new: its path on the workspace's port)
+  assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'drag', selector: '.card', to: '#done' })).got, ['.card', '#done', null, null, null, null])
+  assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'press', key: 'Meta+K' })).got, [null, null, 'Meta+K', null, null, null])
+  assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'new', url: '/admin' })).got, [null, null, null, 'new', null, `http://localhost:${ws.port}/admin`])
+  assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'tabs' })).got, [null, null, null, 'list', null, null])
 })
 
 test('the view goes out only when it changed: tool calls that keep a tab running send none', async t => {

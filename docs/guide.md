@@ -106,10 +106,13 @@ changing it: [AGENTS.md](../AGENTS.md).
   HTML, CSS and screenshot, goes to the agent), and a booted iOS Simulator or Android emulator live, to tap and type
   in (Settings › Simulators turns it on). Markdown files preview rendered or raw; changed images show before and after. ⌘P finds a file by name.
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
-  browser of the app's, take screenshots, click, fill in fields and read the page. A click, a fill or an open says
-  what it caused: the page it moved to, popups and links off localhost it refused, the page's console errors, and the
-  lines of text that came and went (or *(no changes)*), so the agent needs fewer screenshots. `--expect-url /login`
-  (MCP's `expect_url`) on a click or fill says which page it's meant for: on any other it's refused and nothing changes.
+  browser of the app's, take screenshots, read the page, and do what a person does: click, fill in fields, hover a
+  menu open, press a key (Enter, Escape, ⌘K as `Meta+K`), scroll a list, pick from a dropdown, tick a box, drag a
+  card onto a column, go back, forward or reload, and open a second tab (`tabs new /admin`, `tabs select 2`). Hover,
+  keys and drags are real input, which the page can't tell from yours. Each op says what it caused: the page it moved
+  to, popups and links off localhost it refused, the page's console errors, and the lines of text that came and went
+  (or *(no changes)*), so the agent needs fewer screenshots. `--expect-url /login` (MCP's `expect_url`) on any op but
+  open says which page it's meant for: on any other it's refused and nothing changes.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
   a workspace, a tab or a page of the app.
 - **Board**: every workspace in a column by what it needs next (Working, Answer, Review, Fix, Merge, Done: the sidebar's rules), and to-dos
@@ -2246,6 +2249,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | select, hold ⌥ | the pill offers more: *New workspace* (the new-workspace page with the text as its prompt), *New tab here* (your default agent, started with it), *Ask Laki AI* |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | Space (a file's row focused) | Quick Look (macOS): the file in macOS's preview, from Changes, the Review tab's files, Files and Artifacts; also in a file's right click. Not for a deleted file or a workspace on an SSH host or in the cloud |
+| Drag a file's row out | The file itself to Finder, Slack, a mail or a browser's upload box: from Changes, the Review tab's files, Files, Artifacts and a turn's files in the Reader. Only a file on this Mac (not an SSH host's or a cloud workspace's, not from a phone) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |
@@ -2858,6 +2862,8 @@ laki screen tap 120 640 | swipe 200 700 200 200 | type "hi" | describe   # the s
 laki browser fix-the-login open /login                  # the agent browser (the app must be open)
 laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | text | screenshot
 laki browser fix-the-login click "#save" --expect-url /settings   # refused, nothing done, on any other page
+laki browser fix-the-login hover "nav .menu" | press Meta+K | scroll --to bottom | select "#plan" Pro | check "#terms"
+laki browser fix-the-login drag ".card" "#done" | back | forward | reload | tabs [list | new /admin | select 2 | close 2]
 laki archive fix-the-login | restore … | fork … | rm …
 laki archive fix-the-login --force   # with uncommitted work too (kept, back with restore); rm --force: unpushed work goes
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace

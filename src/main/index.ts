@@ -3,9 +3,9 @@
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, powerMonitor, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
 import { type ChildProcess, execFile, spawn, spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -16,10 +16,10 @@ import { AI_TO, DROP_IMG, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NO
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
-import { type BrowseDid, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
+import { type BrowseDid, keyEvent, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk } from './guards.ts'
 import { updater } from './update.ts'
 
 // the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
@@ -1230,99 +1230,214 @@ ipcMain.on('sound', (e, name: string) => {
   if (from(e) && typeof name === 'string' && /^[A-Za-z]+$/.test(name)) execFile('afplay', [`/System/Library/Sounds/${name}.aiff`], () => {})
 })
 
-// the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
-// to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
-type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string; expect?: string } // expect: --expect-url's
+// the agent browser (laki browser, MCP's laki_browser): hidden windows per workspace (its tabs, AGENT_TABS at most) in
+// the preview's session, kept to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the
+// daemon through the renderer
+type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string; expect?: string; to?: string; key?: string; px?: number; edge?: string; off?: boolean; act?: string; n?: number } // expect: --expect-url's
 // errors, blocked: what the page did during an op (its answer's), 20 of each; turn: the op before (one at a time: two
-// at once would mix their clicks and their reports)
-type AgentWin = { w: BrowserWindow; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown> }
+// at once would mix their clicks and their reports); tabs: its windows, at the one ops go to
+type AgentWin = { tabs: BrowserWindow[]; at: number; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown> }
+const AGENT_TABS = 5 // ponytail: five tabs per workspace; a sixth is refused
 const agentWins = new Map<string, AgentWin>()
+const agentEnd = (a: AgentWin) => (clearTimeout(a.idle), a.tabs.forEach(w => !w.isDestroyed() && w.destroy()))
 const pageJs = (f: string, ...args: unknown[]) => `(${f})(${args.map(a => JSON.stringify(a)).join(',')})`
+// a tab: a hidden window (its timers at full speed), its popups and links off localhost refused and told
+function agentTab(a: AgentWin) {
+  const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: AGENT_BROWSER, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
+  const block = (u: string) => a.blocked.length < 20 && a.blocked.push(u.slice(0, 300))
+  w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))
+  w.webContents.on('will-navigate', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
+  w.webContents.on('will-redirect', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
+  w.webContents.on('console-message', ev => ev.level === 'error' && a.errors.length < 20 && a.errors.push(ev.message.slice(0, 300)))
+  a.tabs.push(w)
+  a.at = a.tabs.length - 1
+  return w
+}
 ipcMain.handle('browse', async (e, r: Browse) => {
   if (e.sender !== win?.webContents) throw new Error('not the app window')
   let a = agentWins.get(r.ws)
-  if (!a || a.w.isDestroyed()) {
-    const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: AGENT_BROWSER, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
-    const made: AgentWin = { w, errors: [], blocked: [], turn: Promise.resolve() }
-    const block = (u: string) => made.blocked.length < 20 && made.blocked.push(u.slice(0, 300))
-    w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))
-    w.webContents.on('will-navigate', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
-    w.webContents.on('will-redirect', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
-    w.webContents.on('console-message', ev => ev.level === 'error' && made.errors.length < 20 && made.errors.push(ev.message.slice(0, 300)))
-    agentWins.set(r.ws, (a = made))
-  }
+  if (!a) agentWins.set(r.ws, (a = { tabs: [], at: 0, errors: [], blocked: [], turn: Promise.resolve() }))
   const entry = a
   clearTimeout(entry.idle)
   entry.idle = setTimeout(() => {
     if (agentWins.get(r.ws) === entry) agentWins.delete(r.ws)
-    if (!entry.w.isDestroyed()) entry.w.destroy()
+    agentEnd(entry)
   }, 10 * 60e3)
-  const go = entry.turn.then(() => browseOp(entry, r))
+  const go = entry.turn.then(() => {
+    entry.tabs = entry.tabs.filter(w => !w.isDestroyed()) // closed by Stop (Resources) or a crash
+    if (!entry.tabs.length) agentTab(entry)
+    entry.at = Math.min(entry.at, entry.tabs.length - 1)
+    return browseOp(entry, r)
+  })
   entry.turn = go.catch(() => {})
   return go
 })
+// trusted input (hover, press, drag): Chromium's own events through the DevTools protocol, the page told it has the
+// focus (a hidden window has none, and keys go to the focused element)
+async function cdp(wc: Electron.WebContents) {
+  const d = wc.debugger
+  if (!d.isAttached()) {
+    d.attach('1.3')
+    await d.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
+  }
+  return (method: string, params?: object) => d.sendCommand(method, params)
+}
 async function browseOp(entry: AgentWin, r: Browse) {
   entry.errors.length = entry.blocked.length = 0 // this op's only
-  const wc = entry.w.webContents
+  const wc = entry.tabs[entry.at].webContents
   // what a click starts gets a moment; a page it loads, until it's loaded (5 s at most)
-  const settle = async () => {
+  const settle = async (c = wc) => {
     await new Promise(ok => setTimeout(ok, 300))
-    if (wc.isLoading())
+    if (c.isLoading())
       await new Promise<void>(ok => {
-        const done = () => (clearTimeout(t), wc.off('did-stop-loading', done), ok())
+        const done = () => (clearTimeout(t), c.off('did-stop-loading', done), ok())
         const t = setTimeout(done, 5000)
-        wc.once('did-stop-loading', done)
+        c.once('did-stop-loading', done)
       })
   }
-  const lines = () => wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 200000)`).then((t: string) => t.split('\n').map(l => l.trim()).filter(Boolean), () => [] as string[])
-  const caused = () => ({ ...(entry.errors.length > 0 && { errors: [...entry.errors] }), ...(entry.blocked.length > 0 && { blocked: [...entry.blocked] }) })
-  if (r.op === 'open' || !wc.getURL()) {
-    const u = r.url ?? r.home
+  const load = async (c: Electron.WebContents, u: string) => {
     if (!local(u)) throw new Error(`only this Mac's localhost: ${u}`)
-    await wc.loadURL(u).catch(err => {
+    await c.loadURL(u).catch(err => {
       throw new Error(/ERR_CONNECTION_REFUSED/.test(String(err)) ? `nothing listens on ${new URL(u).host}: start the dev server (laki run)` : String(err.message ?? err))
     })
   }
+  const lines = () => wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 200000)`).then((t: string) => t.split('\n').map(l => l.trim()).filter(Boolean), () => [] as string[])
+  const caused = () => ({ ...(entry.errors.length > 0 && { errors: [...entry.errors] }), ...(entry.blocked.length > 0 && { blocked: [...entry.blocked] }) })
+  if (r.op === 'open' || (!wc.getURL() && r.op !== 'tabs')) await load(wc, r.url ?? r.home)
   if (r.op === 'open') await settle() // its scripts' first errors
   const page = { url: wc.getURL(), title: wc.getTitle() }
   if (r.expect && !urlIs(page.url, r.expect)) throw new Error(`the agent browser is on ${page.url}, not ${r.expect}: nothing done`)
   if (r.op === 'open') return { ...page, ...caused() }
+  if (r.op === 'tabs') {
+    // list; new <url> (a blank first tab takes it); select <n>, close <n> (1 is the first)
+    const act = r.act ?? 'list'
+    const i = (r.n ?? 0) - 1
+    if ((act === 'select' || act === 'close') && !entry.tabs[i]) throw new Error(`no tab ${r.n}: ${entry.tabs.length} open`)
+    if (act === 'new') {
+      if (wc.getURL() && entry.tabs.length >= AGENT_TABS) throw new Error(`${AGENT_TABS} tabs at most: close one first (tabs close <n>)`)
+      const c = wc.getURL() ? agentTab(entry).webContents : wc
+      await load(c, r.url ?? r.home)
+      await settle(c)
+    } else if (act === 'select') entry.at = i
+    else if (act === 'close') {
+      entry.tabs.splice(i, 1)[0].destroy()
+      entry.at = Math.max(0, Math.min(entry.at > i ? entry.at - 1 : entry.at, entry.tabs.length - 1))
+      if (!entry.tabs.length) agentTab(entry) // the next op opens the workspace's page in it
+    } else if (act !== 'list') throw new Error(`browser tabs ${act}? list, new <url>, select <n> or close <n>`)
+    return { tabs: entry.tabs.map((w, n) => ({ n: n + 1, url: w.webContents.getURL(), title: w.webContents.getTitle(), ...(n === entry.at && { current: true }) })), ...caused() }
+  }
   if (r.op === 'screenshot') {
     const img = await wc.capturePage()
     if (img.isEmpty()) throw new Error('nothing painted yet: try again')
     return { url: page.url, png: img.toPNG().toString('base64') }
   }
   if (r.op === 'text') return { ...page, text: await wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 20000)`) }
-  // click, fill: the first element the selector finds, scrolled into sight; fill types as a user would (input events);
-  // its answer says what it caused: the page it moved to, popups and links refused, errors, the text that changed
   const was = await lines()
-  const found = await wc.executeJavaScript(
-    pageJs(
-      String((sel: string, op: string, text: string) => {
-        const el = document.querySelector(sel) as HTMLElement | null
-        if (!el) return `no element matches ${sel}`
-        el.scrollIntoView({ block: 'center' })
-        if (op === 'click') return el.click(), ''
-        const f = el as HTMLInputElement
-        if (!('value' in f)) return `${sel} isn't a field`
-        f.focus()
-        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(f), 'value')?.set?.call(f, text)
-        f.dispatchEvent(new Event('input', { bubbles: true }))
-        f.dispatchEvent(new Event('change', { bubbles: true }))
-        return ''
-      }),
-      r.selector ?? '',
-      r.op,
-      r.text ?? '',
-    ),
-  )
-  if (found) throw new Error(found)
+  if (r.op === 'back' || r.op === 'forward' || r.op === 'reload') {
+    const h = wc.navigationHistory
+    if (r.op === 'back' ? !h.canGoBack() : r.op === 'forward' && !h.canGoForward()) throw new Error(`no page ${r.op === 'back' ? 'before' : 'after'} this one`)
+    r.op === 'back' ? h.goBack() : r.op === 'forward' ? h.goForward() : wc.reload()
+  } else if (r.op === 'hover' || r.op === 'drag') {
+    // the element's middle (the target's too), each scrolled into sight; then the mouse, as yours would move
+    const at = await wc.executeJavaScript(
+      pageJs(
+        String((sels: string[]) => {
+          const els = sels.map(s => document.querySelector(s) as HTMLElement | null)
+          const no = els.findIndex(x => !x)
+          if (no >= 0) return `no element matches ${sels[no]}`
+          for (const x of els) x!.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          return els.map(x => {
+            const b = x!.getBoundingClientRect()
+            return { x: b.left + b.width / 2, y: b.top + b.height / 2 }
+          })
+        }),
+        [r.selector ?? '', ...(r.op === 'drag' ? [r.to ?? ''] : [])],
+      ),
+    )
+    if (typeof at === 'string') throw new Error(at)
+    const send = await cdp(wc)
+    const [a, b] = at as { x: number; y: number }[]
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: a.x, y: a.y })
+    if (r.op === 'drag') {
+      // a draggable element's drag (HTML drag and drop) is caught as it starts and dropped on the target with its data;
+      // a list that follows the mouse itself (pointer events) gets the moves and the release
+      let data: unknown
+      const caught = (_e: unknown, method: string, p: { data?: unknown }) => method === 'Input.dragIntercepted' && (data = p.data)
+      wc.debugger.on('message', caught)
+      try {
+        await send('Input.setInterceptDrags', { enabled: true })
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: a.x, y: a.y, button: 'left', buttons: 1, clickCount: 1 })
+        for (let k = 1; k <= 10; k++) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: a.x + ((b.x - a.x) * k) / 10, y: a.y + ((b.y - a.y) * k) / 10, button: 'left', buttons: 1 })
+        await new Promise(ok => setTimeout(ok, 50))
+        if (data) for (const type of ['dragEnter', 'dragOver', 'drop']) await send('Input.dispatchDragEvent', { type, x: b.x, y: b.y, data })
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: b.x, y: b.y, button: 'left', buttons: 0, clickCount: 1 })
+      } finally {
+        wc.debugger.off('message', caught)
+        await send('Input.setInterceptDrags', { enabled: false }).catch(() => {})
+      }
+    }
+  } else if (r.op === 'press') {
+    const k = keyEvent(r.key ?? '') // throws on a key it doesn't know
+    const send = await cdp(wc)
+    await send('Input.dispatchKeyEvent', { ...k, type: k.text ? 'keyDown' : 'rawKeyDown' })
+    await send('Input.dispatchKeyEvent', { ...k, type: 'keyUp', text: undefined })
+  } else {
+    // click, fill, select, check, scroll: the first element the selector finds, scrolled into sight; fill and select as
+    // a user would (input and change events), check clicks it only when it isn't so already
+    const found = await wc.executeJavaScript(
+      pageJs(
+        String((sel: string, op: string, text: string, off: boolean, px: number | null, edge: string | null) => {
+          const el = (sel ? document.querySelector(sel) : op === 'scroll' ? (document.scrollingElement ?? document.documentElement) : null) as HTMLElement | null
+          if (!el) return `no element matches ${sel}`
+          if (op === 'scroll') {
+            el.scrollTo({ top: edge === 'top' ? 0 : edge === 'bottom' ? el.scrollHeight : el.scrollTop + (px ?? el.clientHeight), behavior: 'instant' })
+            return { top: Math.round(el.scrollTop), max: Math.max(0, el.scrollHeight - el.clientHeight) }
+          }
+          el.scrollIntoView({ block: 'center' })
+          if (op === 'click') return el.click(), ''
+          if (op === 'check') {
+            const box: HTMLElement | null = el instanceof HTMLLabelElement ? el.control : el
+            const input = box instanceof HTMLInputElement && /^(checkbox|radio)$/.test(box.type) ? box : null
+            if (!box || (!input && !/^(checkbox|switch|radio)$/.test(box.getAttribute('role') ?? ''))) return `${sel} isn't a checkbox, a radio button or a switch`
+            const on = () => (input ? input.checked : box.getAttribute('aria-checked') === 'true')
+            if (on() !== !off) box.click()
+            return on() === !off ? '' : `${sel} stayed ${on() ? 'on' : 'off'}`
+          }
+          const f = el as HTMLInputElement
+          let value = text
+          if (op === 'select') {
+            if (!(el instanceof HTMLSelectElement)) return `${sel} isn't a <select>`
+            const opts = [...el.options]
+            const o = opts.find(x => x.text.trim() === text || x.value === text) ?? opts.find(x => x.text.trim().toLowerCase().includes(text.toLowerCase()))
+            if (!o) return `${sel} has no option ${text}: ${opts.map(x => x.text.trim()).slice(0, 20).join(', ')}`
+            value = o.value
+          } else if (!('value' in f)) return `${sel} isn't a field`
+          f.focus()
+          Object.getOwnPropertyDescriptor(Object.getPrototypeOf(f), 'value')?.set?.call(f, value)
+          f.dispatchEvent(new Event('input', { bubbles: true }))
+          f.dispatchEvent(new Event('change', { bubbles: true }))
+          return ''
+        }),
+        r.selector ?? '',
+        r.op,
+        r.text ?? '',
+        !!r.off,
+        typeof r.px === 'number' ? r.px : null,
+        r.edge ?? null,
+      ),
+    )
+    if (typeof found === 'string' && found) throw new Error(found)
+    if (r.op === 'scroll') {
+      await settle()
+      return { url: wc.getURL(), title: wc.getTitle(), ...caused(), changed: pageChanges(was, await lines()), scrolled: found } satisfies BrowseDid
+    }
+  }
   await settle()
   let now = { url: wc.getURL(), title: wc.getTitle() }
   let changed = pageChanges(was, await lines())
-  // a click that changed nothing yet, on the same page: a fetch it started may answer a moment later (one more look)
+  // an op that changed nothing yet, on the same page: a fetch it started may answer a moment later (one more look)
   // ponytail: one second; a slower answer still reads as (no changes)
-  if (r.op === 'click' && !changed.length && now.url === page.url) {
+  if (r.op !== 'fill' && !changed.length && now.url === page.url) {
     await new Promise(ok => setTimeout(ok, 1000))
     now = { url: wc.getURL(), title: wc.getTitle() }
     changed = pageChanges(was, await lines())
@@ -1900,7 +2015,7 @@ ipcMain.handle('procs', e => {
     if (wc.session === session.fromPartition(BROWSER)) add(wc.getOSProcessId(), `Browser: ${new URL(wc.getURL() || 'about:blank').host || 'a page'}${page ? '' : ' (sign-in window)'}`, page ? 'browsers' : undefined)
     else if (page) add(wc.getOSProcessId(), 'The preview', 'preview')
   }
-  for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
+  for (const [ws, a] of agentWins) for (const w of a.tabs) if (!w.isDestroyed()) add(w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
   for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
   if (talkW && !talkW.isDestroyed()) add(talkW.webContents.getOSProcessId(), 'Talk pill', 'floater') // Q2: its own
   if (cardWin && !cardWin.isDestroyed()) add(cardWin.webContents.getOSProcessId(), 'Cards on screen')
@@ -1920,9 +2035,8 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
   } else if (what.startsWith('browse:')) {
     const a = agentWins.get(what.slice(7))
     if (!a) return
-    clearTimeout(a.idle)
     agentWins.delete(what.slice(7))
-    if (!a.w.isDestroyed()) a.w.destroy()
+    agentEnd(a)
   }
 })
 // its length along the edge (a height; on top or bottom, a width), kept on screen (a drag may be under way); the same:
@@ -2814,6 +2928,34 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   else shell.showItemInFolder(real)
   return 'opened'
 })
+
+// C10: a file's row dragged out (Changes, Files, Artifacts, a turn's files) to Finder, Slack, a mail or an upload box:
+// macOS's own file drag, now (it must start while the mouse is down: sync). The app window's or a floated tab's; a
+// regular file inside root (its workspace or storage folder: dragOk), never the data folder's own (daemon.json's token,
+// keys; its storage/ is the artifacts'). Its icon: its kind's, once
+// app.getFileIcon has it (async), a generic document's meanwhile
+const dragIcons = new Map<string, Electron.NativeImage>()
+ipcMain.on('drag-out', (e, path: unknown, root: unknown) => {
+  if (!from(e, 'tab') || typeof path !== 'string' || typeof root !== 'string') return
+  const real = (p: string) => {
+    try {
+      return realpathSync(p)
+    } catch {
+      return ''
+    }
+  }
+  const file = real(path)
+  const data = real(dataDir())
+  const own = !!data && dragOk(file, [data], homedir()) && !dragOk(file, [join(data, 'storage')], homedir()) // the data folder's own files; its storage/ is the artifacts'
+  if (!file || own || !dragOk(file, [real(root)].filter(Boolean), homedir()) || !statSync(file, { throwIfNoEntry: false })?.isFile()) return
+  const kind = /\.([\w-]{1,10})$/.exec(file)?.[1]?.toLowerCase() ?? ''
+  const icon = dragIcons.get(kind) ?? dragIcons.get('')
+  if (!dragIcons.has(kind)) void app.getFileIcon(file, { size: 'normal' }).then(i => !i.isEmpty() && dragIcons.set(kind, i), () => {})
+  try {
+    e.sender.startDrag({ file, icon: icon && !icon.isEmpty() ? icon : nativeImage.createFromNamedImage('NSDocument').resize({ width: 32 }) })
+  } catch {} // no icon to drag with (off a Mac, before any came): no drag
+})
+app.whenReady().then(() => void app.getFileIcon(join(app.getAppPath(), 'package.json'), { size: 'normal' }).then(i => dragIcons.set('', i), () => {}))
 
 // U14: Space on a file's row (Changes, the full review, Files, Artifacts), or its menu's Quick Look: macOS's own preview
 // panel, from the app window or a floated tab's. A regular file only (links followed), off a Mac nothing

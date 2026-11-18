@@ -38,6 +38,11 @@ export const confirmAsk = (s: Sender, isWin: boolean, what: unknown, devOrigin =
 // one of the app's other pages by name: its ?window= (new, ai, tab, sim)
 export const pageIs = (url: string | undefined, page: string) => !!url && URL.canParse(url) && new URL(url).searchParams.get('window') === page
 
+// C10: a file dragged out of the app (main's drag-out): its real path (links followed) inside one of roots (a
+// workspace's folder, its storage folder), never a root itself, '/' or home as a root
+export const dragOk = (real: string, roots: string[], home: string) =>
+  real.startsWith('/') && !real.includes('\0') && roots.some(r => r.startsWith('/') && r !== '/' && r.replace(/\/+$/, '') !== home.replace(/\/+$/, '') && real.startsWith(`${r.replace(/\/+$/, '')}/`))
+
 // this Mac's localhost over http, no userinfo (http://localhost@evil.example is evil.example's), any port
 export const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
 // a website: http(s) only (not file:, javascript:, a custom scheme)

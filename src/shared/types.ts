@@ -1386,8 +1386,39 @@ export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
 // page's console errors meanwhile; blocked: popups and links off localhost refused; changed: click and fill's
-// pageChanges ([]: none)
-export type BrowseDid = { url: string; title: string; nav?: { url: string; title: string }; errors?: string[]; blocked?: string[]; changed?: string[] }
+// pageChanges ([]: none); scrolled: a scroll's place (its top, and the most it goes, in px)
+export type BrowseDid = { url: string; title: string; nav?: { url: string; title: string }; errors?: string[]; blocked?: string[]; changed?: string[]; scrolled?: { top: number; max: number } }
+// laki browser press's key (Enter, Escape, Meta+K, Shift+Tab, a letter, F5) as the DevTools protocol's key event:
+// its modifiers (Alt 1, Control 2, Meta 4, Shift 8), key, code, Windows key code and the text it types (none with
+// Control, Meta or Alt held). Throws on a key it doesn't know
+const KEY_NAMES: Record<string, [string, number, string?]> = { Enter: ['Enter', 13, '\r'], Tab: ['Tab', 9], Escape: ['Escape', 27], Backspace: ['Backspace', 8], Delete: ['Delete', 46], Space: ['Space', 32, ' '], ArrowUp: ['ArrowUp', 38], ArrowDown: ['ArrowDown', 40], ArrowLeft: ['ArrowLeft', 37], ArrowRight: ['ArrowRight', 39], Home: ['Home', 36], End: ['End', 35], PageUp: ['PageUp', 33], PageDown: ['PageDown', 34] }
+const KEY_ALIAS: Record<string, string> = { return: 'Enter', esc: 'Escape', up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }
+const KEY_MODS: Record<string, number> = { alt: 1, option: 1, opt: 1, control: 2, ctrl: 2, meta: 4, cmd: 4, command: 4, shift: 8 }
+export function keyEvent(s: string): { modifiers: number; key: string; code: string; windowsVirtualKeyCode: number; text?: string } {
+  const parts = s.trim().split(/\+(?=.)/)
+  const name = parts.pop() ?? ''
+  let modifiers = 0
+  for (const m of parts) {
+    const v = KEY_MODS[m.trim().toLowerCase()]
+    if (!v) throw new Error(`press: ${m}? Meta (Cmd), Control, Alt or Shift, then + and the key`)
+    modifiers |= v
+  }
+  const typed = (t: string) => (modifiers & 7 ? undefined : t) // Alt, Control or Meta held: a shortcut, no text
+  const named = KEY_ALIAS[name.toLowerCase()] ?? Object.keys(KEY_NAMES).find(k => k.toLowerCase() === name.toLowerCase())
+  if (named) {
+    const [code, vk, text] = KEY_NAMES[named]
+    return { modifiers, key: named === 'Space' ? ' ' : named, code, windowsVirtualKeyCode: vk, ...(text && typed(text) !== undefined && { text }) }
+  }
+  const f = /^f([1-9]|1[0-2])$/i.exec(name)
+  if (f) return { modifiers, key: `F${f[1]}`, code: `F${f[1]}`, windowsVirtualKeyCode: 111 + Number(f[1]) }
+  if ([...name].length === 1) {
+    const up = name.toUpperCase()
+    const key = /[a-z]/i.test(name) ? (modifiers & 8 ? up : name.toLowerCase()) : name
+    const code = /[a-z]/i.test(name) ? `Key${up}` : /\d/.test(name) ? `Digit${name}` : ''
+    return { modifiers, key, code, windowsVirtualKeyCode: /[a-z\d]/i.test(name) ? up.charCodeAt(0) : 0, ...(typed(key) !== undefined && { text: key }) }
+  }
+  throw new Error(`press: ${name || s}? a key like Enter, Escape, Tab, ArrowDown, F5 or a letter, with Meta+, Control+, Alt+ or Shift+ before it`)
+}
 export const CHANGED_MAX = 20
 // a page's text lines added (+, in the new page's order) and gone (-), CHANGED_MAX at most, then how many more
 // ponytail: counted as a multiset, so a line that only moved is neither (a list reordered says nothing)
@@ -1410,6 +1441,7 @@ export const browseSays = (r: BrowseDid) =>
     `${r.nav ? '→ ' : ''}${r.url}${r.title ? `  ${r.title}` : ''}`,
     ...(r.blocked ?? []).map(u => `blocked: ${u}`),
     ...(r.errors ?? []).map(e => `console error: ${e}`),
+    ...(r.scrolled ? [`scrolled to ${r.scrolled.top} of ${r.scrolled.max}`] : []),
     ...(r.changed ? (r.changed.length ? r.changed : ['(no changes)']) : []),
   ].join('\n')
 // laki browser --expect-url: the page the agent means is the one it's on: the same address, or one under it (a path

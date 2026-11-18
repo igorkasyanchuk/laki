@@ -321,11 +321,15 @@ Below, \`laki\` stands for the launcher SKILL.md names (\`"${cli}"\`).
 
 \`laki browser open /\` loads the workspace's dev server (\`$PORT\`; start it with \`laki run <ws>\`) in a hidden
 browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css>"\`, \`fill "<css>" "<text>"\`,
-\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. \`open\`, \`click\` and
-\`fill\` print what they caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost),
-\`console error:\` lines, and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that
-before taking a screenshot. Add \`--expect-url /login\` (a path or a localhost URL) to a click or fill meant for one
-page: on any other it's refused and nothing is done.
+\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. Do what a person does
+instead of asking them to check: \`hover "<css>"\` (a menu that opens on hover), \`press Enter\` (or \`Escape\`,
+\`Tab\`, \`Meta+K\`: in the focused element), \`scroll [<css>] --by 600\` or \`--to bottom\`, \`select "<css>" "<option>"\`,
+\`check "<css>" [--off]\`, \`drag "<css>" "<css>"\` (a card onto a column), \`back\`, \`forward\`, \`reload\`, and
+\`tabs\` (\`new /admin\`, \`select 2\`, \`close 2\`). Hover, press and drag are real input. Each op prints what it
+caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost), \`console error:\` lines,
+and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that before taking a screenshot.
+Add \`--expect-url /login\` (a path or a localhost URL) to an op meant for one page: on any other it's refused and
+nothing is done.
 
 `,
   }

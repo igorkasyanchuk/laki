@@ -100,8 +100,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too, with an outline of its headings; a changed HTML file as a page; CSV as a table you can edit), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots to the agent, and a design mode: pick an element (⌥⌘P), say what to change, and its
-  selector, text, styles, a screenshot and its likely source file go to the agent. Agents can
-  drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
+  selector, text, styles, a screenshot and its likely source file go to the agent. Drag a file's row (Changes, Files,
+  Artifacts, a turn's files) straight to Finder or any app. Agents can drive a browser of their own on it (`laki browser`: click, fill, hover, keys, scroll, select, check, drag, back, tabs). The Simulator (Settings › Simulators turns it on and checks what
   this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
   a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
   every app; an emulator it starts has no window but Laki's. A *Review* tab puts every changed file's diff in one page, with comments gathered and

@@ -459,8 +459,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   (`id`, `level`: `answer` or `full`, D7's Answer only; the app's only);
 - terminals: `screen` (`all`: the whole terminal, the scrollback too, each wrapped line joined, `Session.allText`: a
   tab's *Copy contents*, App's `copyTab`), `input`, `resize`, `view`, `detach`;
-- the agent browser: `browse` (`ws`, `op`: open, screenshot, click, fill, text; `url` (a path: the workspace's
-  `$PORT`; localhost only), `selector`, `text`) goes to the newest client whose `view` says `browse` as a `browse`
+- the agent browser: `browse` (`ws`, `op`: core's `BROWSE_OPS`: open, screenshot, click, fill, text, hover, press,
+  scroll, select, check, drag, back, forward, reload, tabs; `url` (a path: the workspace's `$PORT`; localhost only),
+  `selector`, `text` (fill's, select's option), `to` (drag's target), `key` (press's: `keyEvent` checks it first),
+  `px`/`edge` (scroll's), `off` (check's), `act`/`n` (tabs': list, new, select, close), `expect`) goes to the newest client whose `view` says `browse` as a `browse`
   event (`req`: its id; an `id` would make it a reply), and waits up to 30 s for its `browseDone` (`id`, `ok`, `result` or `error`); a screenshot's PNG is saved
   (`imageSave`) and its path returned. The CLI's `laki browser`, MCP's `laki_browser`.
 

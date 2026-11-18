@@ -199,19 +199,26 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_browser',
     description:
-      "Drive a browser on the workspace's dev server (this Mac's localhost only; needs the Laki app open): open a URL or path (default: http://localhost:$PORT/), screenshot (a PNG's path, to read), click or fill an element by CSS selector, or read the page's text. Open, click and fill answer with what they caused: nav (the page it moved to), errors (the page's console errors), blocked (popups and links off localhost refused) and, for click and fill, changed (the page's text lines added + and gone -; [] is no change): read it before taking a screenshot.",
+      "Drive a browser on the workspace's dev server (this Mac's localhost only; needs the Laki app open): open a URL or path (default: http://localhost:$PORT/), screenshot (a PNG's path, to read), read the page's text, and on an element by CSS selector: click, fill, hover (real mouse: a menu that opens on hover), select (a <select>'s option by its text), check (a checkbox, radio or switch; off unticks), drag (onto a second selector, to), scroll (it, or the page without a selector: px, negative goes up, or edge top/bottom). press: a key in the focused element (Enter, Escape, Tab, ArrowDown, a letter; Meta+K, Shift+Tab), real input. back, forward, reload: its history. tabs: act list, new (url), select or close (n, 1 is the first; 5 tabs at most). Every op but screenshot, text and tabs answers with what it caused: nav (the page it moved to), errors (the page's console errors), blocked (popups and links off localhost refused) and changed (the page's text lines added + and gone -; [] is no change): read it before taking a screenshot.",
     inputSchema: obj(
       {
         ws: str('a workspace id'),
-        op: { type: 'string', enum: ['open', 'screenshot', 'click', 'fill', 'text'] },
-        url: str('for open: a URL on localhost, or a path like /login'),
-        selector: str('for click and fill: a CSS selector'),
-        text: str('for fill: what to type'),
-        expect_url: str('for click, fill, text and screenshot: the page (a localhost URL or a path) it is meant for; refused, nothing done, when the browser is on another'),
+        op: { type: 'string', enum: ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs'] },
+        url: str('for open and tabs new: a URL on localhost, or a path like /login'),
+        selector: str('for click, fill, hover, select, check, drag (the one dragged) and scroll (optional): a CSS selector'),
+        text: str('for fill: what to type; for select: the option’s text'),
+        to: str('for drag: the CSS selector of the element to drop it on'),
+        key: str('for press: Enter, Escape, Tab, ArrowDown, a letter, F5; with Meta+, Control+, Alt+, Shift+ (Meta+K)'),
+        px: { type: 'number', description: 'for scroll: how far down, in pixels (negative goes up); none: a screen' },
+        edge: { type: 'string', enum: ['top', 'bottom'], description: 'for scroll: to the top or the bottom instead' },
+        off: { type: 'boolean', description: 'for check: untick it' },
+        act: { type: 'string', enum: ['list', 'new', 'select', 'close'], description: 'for tabs (default list)' },
+        n: { type: 'number', description: 'for tabs select and close: the tab’s number (1 is the first)' },
+        expect_url: str('for every op but open: the page (a localhost URL or a path) it is meant for; refused, nothing done, when the browser is on another'),
       },
       ['ws', 'op'],
     ),
-    run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text, expect: a.expect_url }, 45000),
+    run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text, to: a.to, key: a.key, px: a.px, edge: a.edge, off: a.off, act: a.act, n: a.n, expect: a.expect_url }, 45000),
   },
   {
     name: 'laki_device',

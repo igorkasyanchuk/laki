@@ -21,7 +21,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
+import { type TabView, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -320,6 +320,24 @@ test("laki browser's report: the lines a click added and took away, 20 at most; 
   assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop', changed: [] }), 'http://localhost:3100/  Shop\n(no changes)')
   assert.equal(browseSays({ url: 'http://localhost:3100/done', title: '', nav: { url: 'http://localhost:3100/done', title: '' }, blocked: ['https://pay.example'], errors: ['boom'], changed: ['+ Done'] }), '→ http://localhost:3100/done\nblocked: https://pay.example\nconsole error: boom\n+ Done')
   assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop' }), 'http://localhost:3100/  Shop') // open, or an older app: no changed
+  assert.equal(browseSays({ url: 'http://localhost:3100/', title: '', scrolled: { top: 600, max: 2400 }, changed: [] }), 'http://localhost:3100/\nscrolled to 600 of 2400\n(no changes)')
+})
+
+test("laki browser press: a key's words as the DevTools protocol's key event, text only when it types", () => {
+  assert.deepEqual(keyEvent('Enter'), { modifiers: 0, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
+  assert.deepEqual(keyEvent('esc'), { modifiers: 0, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+  assert.deepEqual(keyEvent('Meta+K'), { modifiers: 4, key: 'k', code: 'KeyK', windowsVirtualKeyCode: 75 }) // a shortcut: no text
+  assert.deepEqual(keyEvent('Cmd+Shift+p'), { modifiers: 12, key: 'P', code: 'KeyP', windowsVirtualKeyCode: 80 })
+  assert.deepEqual(keyEvent('Shift+a'), { modifiers: 8, key: 'A', code: 'KeyA', windowsVirtualKeyCode: 65, text: 'A' })
+  assert.deepEqual(keyEvent('Control+Enter'), { modifiers: 2, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+  assert.deepEqual(keyEvent('Shift+Tab'), { modifiers: 8, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+  assert.deepEqual(keyEvent('Space'), { modifiers: 0, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' })
+  assert.deepEqual(keyEvent('7'), { modifiers: 0, key: '7', code: 'Digit7', windowsVirtualKeyCode: 55, text: '7' })
+  assert.deepEqual(keyEvent('F5'), { modifiers: 0, key: 'F5', code: 'F5', windowsVirtualKeyCode: 116 })
+  assert.deepEqual(keyEvent('Meta++').key, '+') // the plus key itself
+  assert.throws(() => keyEvent('Hyper+K'), /Hyper\? Meta/)
+  assert.throws(() => keyEvent('Launch'), /a key like Enter/)
+  assert.throws(() => keyEvent(''), /a key like Enter/)
 })
 
 test("ship's -R: a remote's URL as [HOST/]OWNER/REPO, none for a path", () => {

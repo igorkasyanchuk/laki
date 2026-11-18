@@ -34,6 +34,7 @@ type Bridge = {
   pathOf?(f: File): string
   openExternal(url: string): void
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
+  dragOut?(path: string, root: string): void // C10: macOS's file drag of a file inside root, from its row (main's drag-out)
   share?(url: string): void // U15: macOS's Share menu for a link, at the pointer (main's share-menu)
   bounce?(): void // U15: the Dock icon bounces once (informational), when Laki isn't in front
   quickLook?(path: string): void // U14: macOS's Quick Look of a file (main's quick-look; a regular file only, macOS only)

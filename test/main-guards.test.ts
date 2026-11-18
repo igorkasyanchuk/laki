@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { appFile, appPage, BROWSER, confirmAsk, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { appFile, appPage, BROWSER, confirmAsk, dragOk, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -147,4 +147,17 @@ test('10c: protectedKind keeps the floating windows out of screen recording: yes
   assert.deepEqual([...FLOAT_KINDS].sort(), ['ask', 'bar', 'card', 'inbox', 'menu', 'quick', 'talk', 'voice'])
   for (const k of ['app', 'main', 'annotate', 'tab', 'new', '']) assert.equal(protectedKind(k, { hideFloats: true }, true), false, `${k || '(none)'}: never`)
   assert.equal(protectedKind('bar', { hideFloats: 'yes' } as never, false), false, 'only true')
+})
+
+test('C10: a file dragged out: inside its root (a workspace, a storage folder), never the root itself, / or home as one', () => {
+  const home = '/Users/me'
+  assert.equal(dragOk('/Users/me/app/src/a.ts', ['/Users/me/app'], home), true)
+  assert.equal(dragOk('/Users/me/app/src/a.ts', ['/Users/me/app/'], home), true)
+  assert.equal(dragOk('/Users/me/app', ['/Users/me/app'], home), false) // the root itself
+  assert.equal(dragOk('/Users/me/app-old/a.ts', ['/Users/me/app'], home), false) // a sibling that starts the same
+  assert.equal(dragOk('/Users/me/.ssh/id_rsa', ['/Users/me'], home), false) // home as a root
+  assert.equal(dragOk('/etc/passwd', ['/'], home), false)
+  assert.equal(dragOk('relative/a.ts', ['relative'], home), false)
+  assert.equal(dragOk('/Users/me/app/a\0b', ['/Users/me/app'], home), false)
+  assert.equal(dragOk('/Users/me/app/a.ts', [], home), false)
 })

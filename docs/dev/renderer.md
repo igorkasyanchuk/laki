@@ -72,15 +72,25 @@ from inside the page, main's `before-input-event` takes ⌘W and ⌘T from it an
 agent without Laki's and Electron's names; on accounts.google.com (main's `googleSignIn`, every webContents of the session: the page and a sign-in popup) Firefox's (`FIREFOX`, the request's header too, no `sec-ch-ua*`), which Google lets sign in; its rejected page opens the sign-in in your browser (`shell.openExternal`, its `continue`), a popup closed, and `BrowserPane` says so. `text.ts` `browserUrl` reads the address bar (a URL, a site, else a
 DuckDuckGo search).
 
-The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, a partition of
+The agent browser (`browse` above) is main's: hidden `BrowserWindow`s per workspace, its tabs (`AgentWin.tabs`, ops on
+`at`'s; `AGENT_TABS` 5 at most; `tabs close` of the last leaves a blank one) (1280×800, a partition of
 its own, `AGENT_BROWSER`, in memory: S12, never the Preview's cookies; `PREVIEW_OK` permissions; sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
 click and fill run in the page (`pageJs`: the first match, scrolled into view; fill sets the value through the
 native setter and fires input and change), then wait 300 ms (`settle`: and a load it started, 5 s at most). Open,
 click and fill answer with what they caused (shared/types.ts `BrowseDid`): `nav` (moved), `errors` (`console-message`
 errors), `blocked` (popups, and navigations off localhost, refused), 20 of each, this op's only; click and fill also
 `changed`, `pageChanges` over the page's innerText lines before and after (+ added, - gone, `CHANGED_MAX` 20, then
-how many more); a click that changed nothing on the same page looks once more a second later (a fetch's answer). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON. ponytail: main's code, no test
-drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-more.test.ts`.
+how many more); an op (not fill) that changed nothing on the same page looks once more a second later (a fetch's answer). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON.
+select, check and scroll run in the page too (select: the option by its text, else value, else a text that has it,
+through the native setter; check: a checkbox, a radio, a label's control or a `role` checkbox/switch/radio, clicked
+only when it isn't so already; scroll: the element or the page by `px`, a screen, or to an `edge`, answered with
+`scrolled`). Hover, press and drag are trusted input through the window's `debugger` (`cdp`: attached once, focus
+emulated, as a hidden window has none): `Input.dispatchMouseEvent` to the element's middle; press's `keyEvent`
+(shared/types.ts) as `Input.dispatchKeyEvent`; drag presses, moves in 10 steps and releases, with
+`Input.setInterceptDrags` on, so an HTML drag (draggable) is caught as it starts and dropped on the target
+(`dispatchDragEvent` enter, over, drop) while a pointer-events list just follows the mouse. back, forward:
+`navigationHistory`. ponytail: main's code, no test drives it (Electron); `pageChanges`, `browseSays` and `keyEvent`
+are tested in `test/units-more.test.ts`.
 
 ### The memory budget for hidden Browsers pages
 
@@ -729,6 +739,13 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   artifact: `storage`) joined with the row's path, never typed text, then `bridge.quickLook`, main's `quick-look` (`from(e,
   'tab')`; a regular file after `realpath`; macOS only: `BrowserWindow.previewFile`). None for a deleted file (`D`) or a
   workspace with a `host` (SSH, a codespace).
+- **Drag a file out** (C10): the same rows (Changes, the full review's list, Files, the Artifacts bar's tiles, the Reader's
+  turn files) are `draggable` while `PanelApi.drag` (`ArtifactsApi.drag`, `ReaderApi.drag`) is set: App's, only with
+  `bridge.dragOut` (the app, not a phone's page) and no `host`. `dragstart` is cancelled and `bridge.dragOut(<root>/<path>,
+  root)` sends main's `drag-out` (`from(e, 'tab')`), which runs at once, while the mouse is down: `realpathSync` both,
+  guards.ts `dragOk` (inside root, never `/` or home as one; test/main-guards), a regular file, none of the data folder's
+  own (only its `storage/`), then `webContents.startDrag` with the kind's icon (`app.getFileIcon`, cached by extension
+  after its first drag; a generic document's meanwhile). A deleted file (`D`) and a kept link aren't draggable.
 - **Artifacts in Files** (`SidePanel.tsx` `Files` `root`, App's `filesRoot`): with a storage folder, Files has
   *Workspace* / *Artifacts* (`PanelApi.artifacts`: `artifactList` as the tree, the preview's `storage` (read-only,
   `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's

@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('laki', {
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
+  dragOut: (path: string, root: string) => ipcRenderer.send('drag-out', path, root), // C10: a file's row dragged to Finder or any app
   ...(process.platform === 'darwin' && { touchId: (): Promise<boolean> => ipcRenderer.invoke('touch-id'), confirm: (what: string): Promise<string | null> => ipcRenderer.invoke('confirm', what) }), // Touch ID (shared/confirm.ts): can this Mac ask; ask for one action, its ticket
   ...(process.platform === 'darwin' && { quickLook: (path: string) => ipcRenderer.send('quick-look', path), share: (url: string) => ipcRenderer.send('share-menu', url), bounce: () => ipcRenderer.send('dock-bounce') }), // U14: Space on a file row; U15: Share…, the Dock's bounce
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard

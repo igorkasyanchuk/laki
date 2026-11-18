@@ -73,6 +73,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               diff: against its base (--uncommitted: only what isn't committed);
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text [--expect-url <url|/path>]
+  laki browser [<ws>] hover <css> | press <key> | scroll [<css>] [--by <px>] [--to top|bottom] | select <css> <option> | check <css> [--off] | drag <css> <css>
+  laki browser [<ws>] back | forward | reload | tabs [list | new <url> | select <n> | close <n>]
                                               a hidden browser on the workspace's localhost (the app must be open);
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
@@ -389,15 +391,28 @@ another repo (a PR of the workspace's own branch shows by itself once pushed). R
   laki pr . --draft                       back to a draft: it went ready too early
   laki pr . --ready                       ready for review`,
   browser: `A hidden browser on the workspace's localhost (the app must be open): open loads a path on its $PORT (laki run
-starts the dev server) or a localhost URL; screenshot prints a PNG's path; click and fill take a CSS selector; text
-prints the page's text. Open, click and fill print what they caused: → <url> when the page moved, blocked: (a popup
-or a link off localhost), console error: lines, and the text lines added (+) and gone (-), or (no changes). In a tab,
-<ws> is its own. --expect-url <url|/path> on click, fill, text or screenshot: the page it's meant for (that address,
-or one under it); on any other page it's refused and nothing is done, so a page that moved meanwhile isn't typed into.
+starts the dev server) or a localhost URL; screenshot prints a PNG's path; text prints the page's text. On an element
+by its CSS selector: click; fill types into a field; hover moves the mouse over it (a menu that opens on hover);
+select picks a <select>'s option by its text; check ticks a checkbox, radio or switch (--off unticks); drag drags it
+onto a second one (a board's card to a column); scroll scrolls it, or the page with no selector (--by 600, negative
+goes up, else a screen; --to top or bottom). press presses a key in the focused element: Enter, Escape, Tab,
+ArrowDown, a letter, with Meta+, Control+, Alt+ or Shift+ (Meta+K). hover, press and drag are real input (the page
+can't tell them from yours). back, forward and reload move in its history; tabs lists its tabs (* the one the ops go
+to), tabs new <url> opens another (5 at most), select <n> and close <n>. Each op but screenshot, text and tabs prints
+what it caused: → <url> when the page moved, blocked: (a popup or a link off localhost), console error: lines, and
+the text lines added (+) and gone (-), or (no changes). In a tab, <ws> is its own. --expect-url <url|/path> on any op
+but open: the page it's meant for (that address, or one under it); on any other page it's refused and nothing is
+done, so a page that moved meanwhile isn't typed into.
 
   laki browser open /settings
   laki browser fill "#email" "a@b.co" --expect-url /login
   laki browser click "button[type=submit]"
+  laki browser hover "nav .account"
+  laki browser press Meta+K
+  laki browser select "#country" "Ukraine"
+  laki browser drag ".card:first-child" "#done"
+  laki browser scroll --to bottom
+  laki browser tabs new /admin
   laki browser screenshot`,
   diff: `Prints the workspace's changes against its base (what ship would put in a PR).`,
   archive: `Archives the workspace: its worktree goes, its branch stays (laki restore brings it back). With uncommitted work it stops and exits 1: commit first (--force archives anyway, the uncommitted files kept for restore; local projects). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).

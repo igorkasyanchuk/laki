@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { endpointOk, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -5097,30 +5097,40 @@ export async function agentUpdate(p: { agent: string }) {
 
 // the agent browser (laki browser, MCP's laki_browser): a hidden window of the app's per workspace (main's), asked
 // through the newest connected app window; a page on this Mac only (main checks too). screenshot: a PNG in images/
-const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text']
+export const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs']
 const browsing = new Map<string, { done: (r: { ok: boolean; result?: any; error?: string }) => void }>()
 // Laki AI looked at a tab, or used the agent browser (no tab: a window of its own): the app's glow over that tab's pane,
 // else its window, with Settings › General › Experimental › Laki AI's glow on (the renderer's)
 const peek = (ws: string, tab?: string) => broadcast({ ev: 'peek', ws, tab })
-export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string; expect?: string; by?: string }) {
+export type BrowseIn = { ws: string; op: string; url?: string; selector?: string; text?: string; expect?: string; by?: string; to?: string; key?: string; px?: number; edge?: string; off?: boolean; act?: string; n?: number }
+export async function browse(p: BrowseIn) {
   const ws = findWs(p.ws)
   if (p.by === 'ai') peek(ws.id)
   if (!BROWSE_OPS.includes(p.op)) throw new Error(`browser: ${p.op}? one of ${BROWSE_OPS.join(', ')}`)
-  if ((p.op === 'click' || p.op === 'fill') && !p.selector?.trim()) throw new Error(`browser ${p.op}: which element? a CSS selector`)
+  if (['click', 'fill', 'hover', 'select', 'check', 'drag'].includes(p.op) && !p.selector?.trim()) throw new Error(`browser ${p.op}: which element? a CSS selector`)
+  if (p.op === 'drag' && !p.to?.trim()) throw new Error('browser drag: onto which element? a second CSS selector')
+  if (p.op === 'press' && !p.key?.trim()) throw new Error('browser press: which key? Enter, Escape, Meta+K…')
+  if (p.op === 'press') keyEvent(p.key!) // a key it doesn't know: said here, before the app
+  if (p.op === 'select' && !p.text?.trim()) throw new Error('browser select: which option? its text')
+  if (p.op === 'scroll' && p.px !== undefined && !(typeof p.px === 'number' && Number.isFinite(p.px))) throw new Error('browser scroll --by: a number of pixels (negative goes up)')
+  if (p.op === 'scroll' && p.edge !== undefined && !['top', 'bottom'].includes(p.edge)) throw new Error('browser scroll --to: top or bottom')
+  const act = p.op === 'tabs' ? (p.act ?? 'list') : undefined
+  if (act && !['list', 'new', 'select', 'close'].includes(act)) throw new Error(`browser tabs ${act}? list, new <url>, select <n> or close <n>`)
+  if ((act === 'select' || act === 'close') && !(Number.isInteger(p.n) && p.n! >= 1)) throw new Error(`browser tabs ${act}: which tab? its number (tabs list)`)
   // a path is on the workspace's $PORT, localhost:3000 gets its http://
   const full = (u?: string) => (!u ? undefined : u.startsWith('/') ? `http://localhost:${ws.port}${u}` : /^https?:\/\//.test(u) ? u : `http://${u}`)
   const url = full(p.url?.trim())
   if (url && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error(`the agent browser opens this Mac's localhost only, not ${url}`)
   // --expect-url: the page the op is meant for; main refuses it, nothing done, when the browser is elsewhere
   const expect = full(p.expect?.trim())
-  if (expect && p.op === 'open') throw new Error('browser open: --expect-url is for the ops on a page already open (click, fill, text, screenshot)')
+  if (expect && p.op === 'open') throw new Error('browser open: --expect-url is for the ops on a page already open (click, fill, text, screenshot…)')
   const host = [...clients].reverse().find(c => c.view?.browse)
   if (!host) throw new Error("the agent browser needs Laki's window: open the app on this Mac")
   const id = randomUUID()
   const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
     const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "the agent browser didn't answer in 30 s" })), 30000)
     browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
-    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text, expect })
+    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text, expect, to: p.to, key: p.key, px: p.px, edge: p.edge, off: p.off === true || undefined, act, n: p.n })
   })
   if (!r.ok) throw new Error(r.error || 'the agent browser failed')
   if (p.op !== 'screenshot') return r.result

@@ -645,6 +645,7 @@ export function Pages({ app }: { app: AppCtx }) {
             page: path => (inViewer(path) ? artPage(ws, path) : undefined),
             unlink: url => api.call('linkRm', { ws: ws.id, url }),
             external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
+            drag: bridge?.dragOut && !ws.host ? path => bridge!.dragOut!(`${ws.storage}/${path}`, ws.storage!) : undefined,
           }}
         />
       )}

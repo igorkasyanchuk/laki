@@ -2106,6 +2106,7 @@ export function App() {
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     fileItems: path => fileMenu(w, path, false, false), // its menu has View as page already (webItems)
     look: bridge?.quickLook && !w.host ? (path, storage) => (storage ? w.storage : w.path) && bridge!.quickLook!(`${storage ? w.storage : w.path}/${path}`) : undefined, // host: SSH or a codespace, no file here
+    drag: bridge?.dragOut && !w.host ? (path, storage) => (root => root && bridge!.dragOut!(`${root}/${path}`, root))(storage ? w.storage : w.path) : undefined,
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
     page: artPage(w, 'x.html', true) ? path => setArtView({ ws: w.id, path, wt: true }) : undefined, // View as page: a changed HTML file
     undoHunk: async (path, hunk, lines, then, uncommitted) => {
@@ -3122,6 +3123,7 @@ export function App() {
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
     proof: t => (p => (p?.tab === t.id ? p : undefined))(view?.workspaces.find(w => w.id === t.workspace)?.proof), // the Proof card: its last checked turn's
     openProof: (t, path) => openFile({ ws: t.workspace, path, storage: true }),
+    drag: bridge?.dragOut && ((t, path) => (w => w?.path && !w.host && bridge!.dragOut!(`${w.path}/${path}`, w.path))(view?.workspaces.find(x => x.id === t.workspace))),
     spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
