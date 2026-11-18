@@ -380,6 +380,7 @@ function KeptArtifacts({ api }: { api: KeptApi }) {
         <p className="muted small">None kept.</p>
       ) : (
         <>
+          {err && <p className="warn small">{err}</p>}
           <p className="muted small">
             {list.length} workspace{list.length === 1 ? '' : 's'} · {sz(total)}{' '}
             <button type="button" className="link" onClick={() => void rm()}>

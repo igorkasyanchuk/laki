@@ -560,7 +560,7 @@ const MEMORY_HEAD = "# Project memory\n\nLaki's memory of this project, shared t
 export function memoryParse(text: string, mtime = 0): Memory[] {
   const out: Memory[] = []
   for (const line of text.split('\n').reverse()) {
-    const m = /^[-*] (?:(\d{4}-\d{2}-\d{2}) · )?(?:([\w-]{1,40}) · )?(?:(learned) · )?(.*\S.*)$/.exec(line.trim())
+    const m = /^[-*] (?:(\d{4}-\d{2}-\d{2}) · (?:([\w-]{1,40}) · )?)?(?:(learned) · )?(.*\S.*)$/.exec(line.trim()) // an id only after a date: Laki's lines; a hand-written `- Postgres · …` is all text
     if (!m) continue
     const id = m[2] ?? createHash('sha1').update(m[4].trim()).digest('hex').slice(0, 6)
     if (out.some(x => x.id === id)) continue
@@ -4284,20 +4284,20 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       // an API error's end (overloaded, a 500, the connection): not a limit, a refused model, signed out or your Esc
       r.failed = p.state === 'failed' && !r.limit && !refused && !out && !r.escAt ? failLine(err, last) : undefined
       if (r.failed) continueLater(tab, r)
-      else if (p.state !== 'failed') r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
+      else if (p.state !== 'failed' && !out) r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
       if (!viewed(tab.id)) r.done = true
-      const checking = !r.limit && p.state !== 'failed' && !!checkHooks.will?.(tab)
+      const checking = !r.limit && !out && p.state !== 'failed' && !!checkHooks.will?.(tab)
       const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : out ? 'signedout' : 'done', text: out ? `Signed out: sign in to ${tab.preset === 'codex' ? 'Codex' : 'Claude Code'}, and your message goes` : goalEnd && goalEnd !== 'cleared' ? `Goal ${GOAL_SAYS[goalEnd]}: ${goalOf(tab)?.text ?? ''}` : (r.last ?? ''), ...(checking && { checking }), ...(bell && { bell }) })
       if (!r.limit || bell) phone(tab, 'done', r.limit ? 'hit a usage limit' : out ? 'is signed out' : goalEnd && goalEnd !== 'cleared' ? `goal ${GOAL_SAYS[goalEnd]}` : (r.last ?? ''), bell)
-      if (!r.limit && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
-      if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
+      if (!r.limit && !out && p.state !== 'failed' && took !== undefined) turnTook(tab, took / 1000) // a clean end's
+      if (r.limit || out || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
-      if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
+      if (!r.limit && !out) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt (signed out: the queue waits for the sign-in)
       if (state.settings?.contextMeter !== false || state.settings?.costs !== false) setTimeout(() => meterRead(tab, true) && changed(), 1000) // its answer's usage, written by now (both off: none, as meterTick)
       for (const f of turnEnds)
         try {
-          f(tab, { last: last ? String(last) : undefined, limit: r.limit, failed: p.state === 'failed' && !r.limit }) // this turn's answer: r.last may be an earlier one's
+          f(tab, { last: last ? String(last) : undefined, limit: r.limit, failed: (p.state === 'failed' || out) && !r.limit }) // this turn's answer: r.last may be an earlier one's
         } catch (e) {
           log(`turn ${tab.id}: ${(e as Error).message}`)
         }
@@ -4321,6 +4321,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
 const goalHeld = new Map<string, Parameters<typeof turn>[0]>()
 let goalTimer: NodeJS.Timeout | undefined
 function goalHold(tab: Tab, r: Runtime, p: Parameters<typeof turn>[0]) {
+  const id = p.payload?.['thread-id'] // codex's chat, at its first turn's end: its transcript's name
+  if (typeof id === 'string' && id && id !== tab.resumeId) ((tab.resumeId = id), save())
   if (goalOf(tab)?.state !== 'working') return false
   goalHeld.set(tab.id, p)
   r.status = 'running'

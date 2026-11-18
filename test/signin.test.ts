@@ -102,4 +102,7 @@ test('C6: Cursor: a ready-made ACP profile, its models and effort before the fir
   assert.deepEqual(chat.said.slice(0, 2).map((s: any) => [s.who, s.text]), [['you', 'hello'], ['agent', 'cursor gpt-5/high: hello']])
   await rig.rpc('send', { target: tab3, text: 'more' })
   await until(async () => (await rig.rpc('chatRead', { tab: tab3 })).said?.some((s: any) => s.text === 'cursor gpt-5/high: more'), 'the same chat goes on')
+  // a message of two lines: one prompt (pasted), not two
+  await rig.rpc('send', { target: tab3, text: 'two\nlines' })
+  await until(async () => (await rig.rpc('chatRead', { tab: tab3 })).said?.some((s: any) => s.text === 'cursor gpt-5/high: two\nlines'), 'one prompt')
 })

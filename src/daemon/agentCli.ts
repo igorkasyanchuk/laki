@@ -77,7 +77,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
   )
   if (p.fresh || Date.now() - newest.at > NEWEST_KEPT) {
     const v: Record<string, string | undefined> = {}
-    await Promise.all(found.map(async f => (f.path ? (v[f.c.id] = await latest(f.pkg ?? f.c.npm ?? '').catch(() => undefined)) : undefined)))
+    await Promise.all(found.map(async f => (f.path && (f.pkg ?? f.c.npm) ? (v[f.c.id] = await latest((f.pkg ?? f.c.npm)!).catch(() => undefined)) : undefined))) // none on npm (Cursor's): no newest
     newest = { at: Date.now(), v: (f => (Object.values(f).some(Boolean) ? f : newest.v))(v) } // offline: the last ones kept
   }
   const out = found.map(f => {

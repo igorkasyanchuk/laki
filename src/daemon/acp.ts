@@ -51,7 +51,7 @@ export function acpModels(r?: Result): AgentModel[] {
   return (Array.isArray(r?.models?.availableModels) ? r.models.availableModels : []).flatMap(m => one(m?.modelId, m?.name, m?.description, r?.models?.currentModelId))
 }
 // a start's error that asks for a sign-in: ACP's auth_required (-32000), or its words
-const authNeeded = (e: Error & { code?: number }) => e.code === -32000 || /auth|log ?in|sign ?in|unauthori[sz]ed/i.test(e.message)
+const authNeeded = (e: Error & { code?: number }) => e.code === -32000 || /\bauth(?:entica|oriz|_required)|\blog ?in\b|\bsign ?in\b|unauthori[sz]ed|not logged/i.test(e.message)
 type Msg = { jsonrpc?: string; id?: number | string; method?: string; params?: Params; result?: unknown; error?: { code: number; message: string } }
 
 const chats = new Map<string, { said: Said[]; v: number }>() // by tab: the Reader's (its last start's)
@@ -70,6 +70,7 @@ export class AcpPty implements Pty {
   private waits = new Map<number, { ok: (v: Result | undefined) => void; fail: (e: Error) => void }>()
   private session?: string
   private typed = ''
+  private pasting = false // inside a bracketed paste: its newlines are the prompt's, not Enters
   private ask?: { id: number | string; options: Option[]; at: number }
   private busy = false
   private next: string[] = [] // typed while a prompt runs: after it
@@ -130,13 +131,20 @@ export class AcpPty implements Pty {
       else if (d.includes('\r')) return this.pick(a.at)
       return this.print(`\x1b8\x1b[J${this.menu()}`)
     }
-    for (const c of d.replace(/\x1b\[20[01]~/g, '')) {
-      if (c === '\r' || c === '\n') {
-        const t = this.typed
-        this.typed = ''
-        if (t.trim()) this.prompt(t)
-      } else if (c === '\x7f') this.typed = this.typed.slice(0, -1)
-      else if (c >= ' ' || c === '\t') this.typed += c
+    for (const part of d.split(/(\x1b\[20[01]~)/)) {
+      if (part === '\x1b[200~' || part === '\x1b[201~') {
+        this.pasting = part === '\x1b[200~'
+        continue
+      }
+      for (const c of part) {
+        if ((c === '\r' || c === '\n') && this.pasting) this.typed += '\n'
+        else if (c === '\r' || c === '\n') {
+          const t = this.typed
+          this.typed = ''
+          if (t.trim()) this.prompt(t)
+        } else if (c === '\x7f') this.typed = this.typed.slice(0, -1)
+        else if (c >= ' ' || c === '\t') this.typed += c
+      }
     }
   }
 
@@ -177,11 +185,12 @@ export class AcpPty implements Pty {
         ).finally(() => (this.loading = false))
       }
       s ??= await this.call('session/new', { cwd, mcpServers: [] })
-      this.session = String(s?.sessionId ?? '')
-      if (!this.session) throw new Error('no session')
-      if (t && init.agentCapabilities?.loadSession && t.resumeId !== this.session) ((t.resumeId = this.session), save()) // a chat it can load: kept for restarts (and sleep)
-      if (rtOf(this.tab).signedOut) ((rtOf(this.tab).signedOut = undefined), changed()) // in
-      await this.choose(s)
+      const sid = String(s?.sessionId ?? '')
+      if (!sid) throw new Error('no session')
+      if (t && init.agentCapabilities?.loadSession && t.resumeId !== sid) ((t.resumeId = sid), save()) // a chat it can load: kept for restarts (and sleep)
+      if ((o => o && o.step !== 'in')(rtOf(this.tab).signedOut)) ((rtOf(this.tab).signedOut = undefined), changed()) // in (signin.ts' own "Signed in" goes by itself)
+      await this.choose(sid, s) // before any prompt: what's typed meanwhile waits (no session yet)
+      this.session = sid
       const who = init.agentInfo?.title ?? init.agentInfo?.name
       this.print(`\x1b[90m${who ? `${who}, ` : ''}ACP ${ACP_VERSION}: ready\x1b[0m\r\n`)
       if (this.first?.trim()) this.prompt(this.first)
@@ -223,16 +232,16 @@ export class AcpPty implements Pty {
   }
 
   // the tab's model and effort, else its profile's: set on the session as it starts (one it doesn't have: said, not fatal)
-  private async choose(r?: Result) {
+  private async choose(sessionId: string, r?: Result) {
     const t = state.tabs.find(x => x.id === this.tab)
     const pr = t && presetOf(t)
     const model = t?.model || pr?.model?.trim()
     const effort = t?.effort || pr?.effort
     const opts = Array.isArray(r?.configOptions) ? r.configOptions : []
-    const set = (cat: string, v?: string) => (o => (v && o?.id && o.currentValue !== v ? this.call('session/set_config_option', { sessionId: this.session, configId: o.id, value: v }) : undefined))(opts.find(o => o?.category === cat))
+    const set = (cat: string, v?: string) => (o => (v && o?.id && o.currentValue !== v ? this.call('session/set_config_option', { sessionId, configId: o.id, value: v }) : undefined))(opts.find(o => o?.category === cat))
     try {
       if (opts.some(o => o?.category === 'model')) await set('model', model)
-      else if (model && r?.models && r.models.currentModelId !== model) await this.call('session/set_model', { sessionId: this.session, modelId: model })
+      else if (model && r?.models && r.models.currentModelId !== model) await this.call('session/set_model', { sessionId, modelId: model })
       await set('thought_level', effort)
     } catch (e) {
       this.print(`\x1b[90m${[model, effort].filter(Boolean).join(' · ')}: ${(e as Error).message}\x1b[0m\r\n`)

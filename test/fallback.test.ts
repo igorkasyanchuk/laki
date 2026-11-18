@@ -96,10 +96,9 @@ test("a model too new for the installed claude: the API's error kept and said, t
   await rig.rpc('agentModels', { agent: 'claude' })
   v = await until(async () => (x => !x.modelNeeds && x)(await rig.rpc('state')), 'dropped after the update')
   assert.equal(v.claudeHas, undefined) // the view says it only with a model to warn about
-  // Update Claude Code: a terminal typing claude's update; not an agent's to do
-  await assert.rejects(rig.rpc('agentUpdate', { agent: 'claude', from: { tab: tab.id } }), /update Claude Code/)
-  await assert.rejects(rig.rpc('agentUpdate', { agent: 'codex' }), /only Claude Code/)
+  // Update Claude Code (A9's agentUpdate): its own update in a script tab of "update agents"; not an agent's to do
+  await assert.rejects(rig.rpc('agentUpdate', { agent: 'claude', from: { tab: tab.id } }), /update an agent's CLI/)
   const up = await rig.rpc('agentUpdate', { agent: 'claude' })
-  assert.equal(up.name, 'update Claude Code')
-  await until(async () => (await rig.screen((await rig.tab(up.id, 'shell'))?.id ?? (await rig.rpc('state')).tabs.find((t: any) => t.workspace === up.id).id)).includes('claude update'), 'typed')
+  assert.equal(up.cmd, 'claude update')
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === up.ws).name, 'update agents')
 })

@@ -628,7 +628,8 @@ the Session an `AcpPty` for a pty, so the rest of Laki goes as for any agent:
   the agent says `loadSession`: its chat replays as `user_message_chunk`s and message chunks, no hooks meanwhile;
   `resumeId` kept only for such an agent, so `tabSleep` takes it). Then the tab's model and effort (else its profile's):
   `session/set_config_option` on configOptions' `model` and `thought_level`, else the older `session/set_model`; one it
-  refuses is said, not fatal. A `-32000` (or words of a sign-in) marks the tab signed out when its login is known
+  refuses is said, not fatal; the session id is the pty's only after that, so what's typed meanwhile waits. A pasted
+  message's lines are one prompt (bracketed paste). A `-32000` (or words of a sign-in) marks the tab signed out when its login is known
   (Cursor's: `signin.ts` `acpSignedOut`), the prompt kept (`acpWaiting`); else said, none run;
 - `session/update`: message chunks to the Reader (`acpChat`, `chatRead`'s shapes: you, agent, tool) and the mirror as
   plain text; a tool call a tool line (`failed` counts on it); a plan the live plan (`r.plan`, whole each time);
@@ -659,7 +660,7 @@ MCP server: `~/.cursor/mcp.json`'s `mcpServers`, shown to paste). Not installed:
 A claude or codex turn that ends signed out (`signedOutIn`: *Not logged in · Please run /login*, an expired or revoked
 token, `authentication_error`, codex's *re-run codex login*, a rejected refresh token; on a failed turn's error and
 answer, a short claude answer, codex's every end with its screen's last 6 lines) isn't an API error (`r.failed` stays
-unset, no auto continue): `turnSignedOut` first tries Auto fallback (the next account in `limitFallback` takes the tab,
+unset, no auto continue, no Done check, its queue waits; an SSH host's tab: an API error as before): `turnSignedOut` first tries Auto fallback (the next account in `limitFallback` not left signed out in the last 10 minutes takes the tab,
 `tabAccount`, and its message), else sets `r.signedOut` with the message (`r.asked`) and the account's credentials'
 fingerprint (`credOf`: claude's Keychain item or file, codex's `auth.json`). The turn event's kind is `signedout` (the
 notification: *Signed out: sign in to …*). `signIn` (the band's buttons, the user's only): `open` runs the agent's own

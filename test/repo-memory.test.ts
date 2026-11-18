@@ -20,6 +20,8 @@ test('B6: .laki/memory.md: one line each, newest first, read back as Laki keeps 
   assert.deepEqual((({ text, at, auto }) => ({ text, at, auto }))(hand[0]), { text: 'Run the linter before a PR', at: 5, auto: undefined })
   assert.match(hand[0].id, /^[0-9a-f]{6}$/)
   assert.deepEqual(memoryParse('# Project memory\n\nnot a line\n'), [])
+  // a hand-written line with a dot in it: all of it the text (an id only after a date)
+  assert.equal(memoryParse('- Postgres · use v15 for tests\n')[0].text, 'Postgres · use v15 for tests')
 })
 
 test('B6: notes and memory in the repo: the checkout\'s for the app, a worktree\'s own for its agent; switching back moves nothing', async t => {

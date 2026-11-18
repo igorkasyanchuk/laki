@@ -44,6 +44,7 @@ async function credOf(agent: 'claude' | 'codex', account?: string): Promise<stri
 export function turnSignedOut(tab: Tab, text: string, strict = false): boolean {
   const agent = tab.preset
   if ((agent !== 'claude' && agent !== 'codex') || !signedOutIn(text, strict)) return false
+  if (state.workspaces.find(w => w.id === tab.workspace)?.host) return false // an SSH host's sign-in is that machine's: an API error there
   const r = rtOf(tab.id)
   const account = accountFor(tab, presetOf(tab)?.account)
   const msg = r.asked?.trim() || undefined
@@ -139,7 +140,7 @@ function signedIn(tab: Tab, o: SignedOut, one = false) {
     wsLog({ id: t.workspace }, `${t.name}: signed in${msg ? ', its message sent again' : ''}`)
     spawnTab(t, { resume: true })
     if (o.agent === 'cursor') {
-      if (msg) sessions.get(t.id)?.write(`${msg}\r`) // ACP: what's typed waits for its session
+      if (msg) sessions.get(t.id)?.write(`\x1b[200~${msg}\x1b[201~\r`) // ACP: pasted (its lines one prompt), it waits for its session
     } else goOn(t, msg)
     setTimeout(() => r.signedOut?.step === 'in' && ((r.signedOut = undefined), changed()), process.env.LAKI_SIGNIN_MS ? 1500 : 8000) // "Signed in · sending your message", then gone (tests': sooner)
   }
