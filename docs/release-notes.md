@@ -28,6 +28,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Do not disturb is now *Quiet*, and it's in the menu bar's menu (its mark gets a slash), `laki quiet 1h` and Settings › Notifications with a default length. As it ends, one notification sums it up (*2 agents are waiting, 3 finished, 1 check failed*) and opens Needs you; nothing when nothing happened.
 - Worktrees stay out of Time Machine and Spotlight on a Mac (Settings › General › Storage; on for new installs). Settings › Resources › Disk says how much that keeps out of your backups.
 - A link to a picture on the web shows no hover card any more; a picture's path in a terminal still does
+- The status bar across the window's foot is a little taller, with room above and below its groups
 
 ## 0.55.0 · Nov 18, 2026
 

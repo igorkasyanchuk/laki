@@ -1358,13 +1358,14 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   takes it (`--sb: inherit`) and fades through a `:where(*)` transition (none overridden: no specificity), out after 600
   ms. The terminal's own (`.xterm-viewport`) is untouched. ponytail: the 8px gutter stays (Chromium draws a custom
   scrollbar in its own room).
-- **The selection slides** (`slide.ts`, `.slid`): `.seg`, the Terminal | Reader switch and the side panel's tabs draw
-  their pick's underline or fill as the group's `::before` at `--ind-x/y/w/h`, set by one MutationObserver (class and
-  aria changes on a group's items) right after React's commit; a group slides only from its first change on, from the
-  old pick (`data-still` for its first placing), and a resize places them again without moving. A look that fills a
-  `.seg`'s pick its own way (looks.css' `.seg button.on`: Frosted's accent, a gradient; `filled`: the pick's own
-  background, read with its transition off, not every button's) keeps its fill and nothing slides there: an underline
-  over it would be a second mark. Motion: Off, the catch-all.
+- **The selection slides** (`slide.ts`, `.slid`): the Terminal | Reader switch and the side panel's tabs draw their
+  pick's fill or underline as the group's `::before` at `--ind-x/y/w/h`, set by one MutationObserver (class and aria
+  changes on a group's items) right after React's commit; a group slides only from its first change on, from the old
+  pick (`data-still` for its first placing), and a resize places them again without moving. A look that fills the
+  side panel's pick its own way (`filled`: the pick's own background, read with its transition off, not every
+  button's) keeps its fill and nothing slides there: an underline over it would be a second mark. A segmented `.seg`
+  group doesn't slide: its pick is a solid fill of its own (`.seg button.on`, a look's fill wins; an underline drawn
+  square over its rounded ends stuck out). Motion: Off, the catch-all.
 - **Edges** (`--pane-x`, the terminal's text's inset: 10px, 18px in a lineless Design or Roomy padding, 4px Tiny or a
   phone, set on `.app`; `--pane-x2` = it + `--pane-icon` (14px) + `--sp-3`, where words after a strip's leading icon
   start; `--pane-r` the strips' right): `.term`'s left inset, the queue and Done check strips' head and rows
