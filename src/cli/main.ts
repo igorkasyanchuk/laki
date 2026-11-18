@@ -691,7 +691,7 @@ async function main() {
         return out(r, !r.ended ? 'not quiet' : r.lines.length ? `quiet ended:\n${r.lines.join('\n')}` : 'quiet ended: nothing happened meanwhile')
       }
       const m = /^(\d+(?:\.\d+)?)\s*(m|min|mins|minutes?|h|hrs?|hours?)?$/i.exec(arg)
-      if (arg && !m) throw new Error('usage: laki quiet [30m|1h|off]')
+      if (arg && !(m && Number(m[1]) > 0)) throw new Error('usage: laki quiet [30m|1h|off] (a length over 0)')
       const r = await rpc('dndSet', { ...(m && { minutes: Number(m[1]) * (/^h/i.test(m[2] ?? '') ? 60 : 1) }), from: caller() })
       return out(r, `quiet until ${hhmm(r.until)}`)
     }

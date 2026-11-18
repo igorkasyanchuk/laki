@@ -281,7 +281,7 @@ function useSwipe(onSwipe: () => void) {
       style: dx ? { transform: `translateX(${dx}px)` } : undefined,
       'data-swiping': s.current?.lock === 'x' ? '' : undefined,
       'data-gone': gone ? '' : undefined,
-      onPointerDown: (e: PointerEvent) => void (e.pointerType !== 'mouse' && !gone && (s.current = { x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, w: e.currentTarget.getBoundingClientRect().width || 1 })),
+      onPointerDown: (e: PointerEvent) => void ((was.current = false), e.pointerType !== 'mouse' && !gone && (s.current = { x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, w: e.currentTarget.getBoundingClientRect().width || 1 })), // a swipe with no click after it: the next tap is a tap
       onPointerMove: (e: PointerEvent) => {
         const p = s.current
         if (!p || e.pointerId !== p.id) return

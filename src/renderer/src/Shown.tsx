@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from './api'
 import type { Digest, DigestRow } from '../../shared/types'
+import { hhmm } from '../../shared/tray'
 import { Folded, Markdown } from './MarkdownView'
 import { Icon, IconButton } from './ui'
 
@@ -131,16 +132,15 @@ export function FloatNotices() {
     </div>
   )
 }
-// U8: what happened during Do not disturb, once it's over: who waits, what ended, which PRs moved; a row opens its tab
+// U8: what happened while it was quiet, once it's over: who waits, what ended, which PRs moved; a row opens its tab
 // (a PR's: its workspace); kept until closed
 export function DigestCard({ d, onOpen, onClose }: { d: Digest; onOpen: (r: DigestRow) => void; onClose: () => void }) {
-  const at = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   return (
-    <div className="shown-pop digest" role="region" aria-label="What happened during Do not disturb">
+    <div className="shown-pop digest" role="region" aria-label="What happened while it was quiet">
       <div className="shown-pop-head">
         <Icon name="moon" />
         <b className="shown-title">
-          While you were away ({at(d.since)} to {at(d.until)})
+          While it was quiet ({hhmm(d.since)} to {hhmm(d.until)})
         </b>
         <span className="spacer" />
         <IconButton icon="x" title="Close" onClick={onClose} />

@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
-import { AI_TO, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NOTE_TO, plainText, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
+import { AI_TO, DROP_IMG, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NOTE_TO, plainText, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
@@ -2066,9 +2066,9 @@ function newWsWin(prompt?: string, project?: string) {
 // with the mouse, over every app; one at a time. Sent, or Esc: it closes, and the app you were in has the keyboard again
 // (a panel never brought Laki forward). More: the whole new-workspace page with the text
 let quickW: BrowserWindow | null = null
-function quickWin(prompt?: string) {
+function quickWin(prompt?: string, add = false) {
   if (quickW && !quickW.isDestroyed()) {
-    if (prompt) quickW.webContents.send('new-prompt', prompt)
+    if (prompt) quickW.webContents.send('new-prompt', prompt, undefined, add) // add: after what's in its box (a drop), not over it
     return void (quickW.show(), quickW.focus())
   }
   quickReady = false
@@ -2120,7 +2120,7 @@ async function dropIn(d: { text?: string; files?: string[] }) {
     try {
       const st = statSync(path)
       if (st.isDirectory()) return [{ path, size: 0, dir: true }]
-      const text = st.size <= DROP_TEXT_MAX ? plainText(readFileSync(path)) : undefined
+      const text = st.size <= DROP_TEXT_MAX && !DROP_IMG.test(path) ? plainText(readFileSync(path)) : undefined // a picture: drawn, not read
       return [{ path, size: st.size, ...(text !== undefined && { text }) }]
     } catch {
       return []
@@ -2136,7 +2136,7 @@ async function dropIn(d: { text?: string; files?: string[] }) {
   if (r.refused.length) new Notification({ title: "Laki didn't take it", body: `${DROP_NO[0].toUpperCase()}${DROP_NO.slice(1)}: ${r.refused.map(f => basename(f)).join(', ')}` }).show()
   if (!r.prompt && !pngs.length) return
   dropPngs.push(...pngs)
-  quickWin(r.prompt || undefined)
+  quickWin(r.prompt || undefined, true)
   void tellSend()
 }
 ipcMain.on('quick-tell-ready', e => {

@@ -4,7 +4,8 @@
 // covers the page (styles.css). More: a sheet with the rest, AI and Settings, and Quiet
 import { useEffect, useState } from 'react'
 import { hhmm, quietChoices } from '../../shared/tray'
-import { Icon, type IconName, Num } from './ui'
+import type { IconName } from './ui'
+import { Icon, Num } from './ui'
 
 export type BarItem = { key: string; icon: IconName; label: string; on: boolean; run: () => void; n?: number }
 export type QuietApi = { until?: number; set: (o: { off?: true; minutes?: number; until?: number }) => void }
@@ -89,7 +90,7 @@ export function useDrawerSwipe(on: boolean, open: boolean, set: (open: boolean) 
     let s: { x: number; y: number; id: number; lock?: 'x' | 'y' } | null = null
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' || !(e.target instanceof Element)) return
-      if (open ? !e.target.closest('.sidebar, .side-backdrop') : !e.target.closest('.drawer-edge')) return
+      if (open ? !e.target.closest('.sidebar, .side-backdrop') || e.target.closest('.need-row') /* its own swipe: seen */ : !e.target.closest('.drawer-edge')) return
       s = { x: e.clientX, y: e.clientY, id: e.pointerId }
     }
     const move = (e: PointerEvent) => {

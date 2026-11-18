@@ -93,10 +93,15 @@ const NEW = /^(?:a |the )?new (?:task|session|workspace)(?: (?:in|for|on) (.+))?
 // Q5b: a note or a To-do, by its word at the very start (any case; English and Ukrainian), then a colon, comma, dash or
 // a space: "Note: check prod limits", "Нотатка …", "To-do in Shop: update deps" (its project as said, then a colon or a
 // comma), "Todo …", "Справа: …". The word isn't saved; one only inside a sentence routes nothing
-const NOTE_WORD = /^\s*(?:note|нотатка|замітка)(?:\s*[:,–—-]\s*|\s+|$)/iu
+// a bare space after the word only when what follows isn't how a sentence goes on ("Note that…", "To do this, …",
+// "Справа в тому, що…"); "to do" in two words only with a colon or a comma
+const goesOn = (words: string) => `(?:(?:${words})|[ву]\\s+(?:тому|тім))(?![\\p{L}])`
+const NOTE_ON = goesOn('that|this|these|those|the|how|it|to|down|of|on|in|about|which|what|when|where|why|here|there')
+const TODO_ON = goesOn('that|this|these|those|the|it|so|list|lists|with') // "in", "for": a project's (TODO_IN, or the words kept)
+const NOTE_WORD = new RegExp(`^\\s*(?:note|нотатка|замітка)(?:\\s*[:,–—-]\\s*|\\s+(?!${NOTE_ON})|$)`, 'iu')
 const TODO_WORD = '(?:to[- ]?do|справа|зробити)'
 const TODO_IN = new RegExp(`^\\s*${TODO_WORD}\\s+(?:in|for|on|в|у|для)\\s+([^:,\\n]{1,60}?)\\s*[:,]\\s*`, 'iu')
-const TODO_AT = new RegExp(`^\\s*${TODO_WORD}(?:\\s*[:,–—-]\\s*|\\s+|$)`, 'iu')
+const TODO_AT = new RegExp(`^\\s*(?:${TODO_WORD}\\s*[:,–—-]\\s*|(?:todo|to-do|справа|зробити)(?:\\s+(?!${TODO_ON})|$))`, 'iu')
 export function routeOf(text: string, o: { tabs: RouteTab[]; projects: { id: string; name: string }[]; aiOn?: boolean; aiWord?: string; fixes?: string; fix?: (t: string, fixes?: string) => { text: string }; note?: boolean; todo?: boolean; last?: string }): Route {
   const said = (o.fix ? o.fix(text, o.fixes).text : text).trim()
   const none: Route = { target: { kind: 'default' }, rest: said, how: '' }
@@ -198,7 +203,7 @@ export function spokenAnswer(text: string, lang?: string): 'yes' | 'no' | undefi
 // or on SEL_SKIP; in Laki, the page's selection or the focused terminal's. Masked with Ship's secret patterns, cut in
 // the middle past SEL_MAX; an agent and a new task get it quoted, Laki AI fenced as data. ponytail: a fixed list
 export const SEL_MAX = 4000
-export const SEL_SKIP = ['com.1password', 'com.agilebits', 'com.bitwarden', 'com.lastpass', 'com.dashlane', 'org.keepassxc', 'com.callpod.keepermac', 'com.apple.keychainaccess', 'com.apple.Passwords', 'in.sinew.Enpass', 'me.proton.pass', 'com.nordsec.nordpass', 'com.roboform', 'com.sap.ifm']
+export const SEL_SKIP = ['com.1password', 'com.agilebits', 'com.bitwarden', 'com.lastpass', 'com.dashlane', 'org.keepassxc', 'com.callpod.keepermac', 'com.apple.keychainaccess', 'com.apple.Passwords', 'in.sinew.Enpass', 'me.proton.pass', 'com.nordsec.nordpass', 'com.roboform']
 export const selSkip = (app: string) => !app || SEL_SKIP.some(d => app === d || app.startsWith(`${d}.`))
 const masked = (raw: string) => SECRETS.reduce((s, [re, m]) => s.replace(re, m), raw.replace(/\r\n?/g, '\n'))
 const fenced = (text: string) => `\`\`\`text\n${text.replace(/```/g, '`\u200b``')}\n\`\`\`` // a fence inside broken, so ours holds

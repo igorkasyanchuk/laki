@@ -2078,7 +2078,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 }
 @media (prefers-reduced-motion: no-preference) { .narrow .sidebar { animation: drawer-in var(--t-mid) var(--ease-out); } }
 @keyframes drawer-in { from { transform: translateX(-100%); } }
-.drawer-edge { position: fixed; top: 0; bottom: 0; left: 0; width: 20px; z-index: var(--z-sticky); touch-action: none; } /* a swipe from here opens the drawer (Phone.tsx) */
+.drawer-edge { position: fixed; top: calc(var(--safe-t) + 56px); bottom: calc(var(--pbar, 0px) + 96px); left: 0; width: 20px; z-index: var(--z-sticky); touch-action: none; } /* a swipe from here opens the drawer (Phone.tsx): clear of the tab bar's buttons over it and the message box under it */
 /* a phone's bottom bar (Phone.tsx): five columns, an icon over its label, 49px and the safe area under it; the drawer,
    its scrim, the status bar and toasts end above it. Gone while the keyboard is up (main.tsx' html[data-kb]) or a dialog covers the page */
 .phone-bar { display: none; }
@@ -2089,7 +2089,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .app.phone-bar-on :is(.sidebar, .side-backdrop) { bottom: var(--pbar); }
 .app.phone-bar-on .status { height: 26px; padding-bottom: 0; }
 .app.phone-bar-on .side-foot { height: var(--h-m); padding-bottom: 0; }
-.app.phone-bar-on :is(.toast, .toasts) { bottom: calc(var(--pbar) + var(--sp-4)); }
+.app.phone-bar-on .toasts { bottom: calc(var(--pbar) + var(--sp-4)); }
 .pb-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-1); min-width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--muted); }
 .pb-item.on { color: var(--accent-ink); }
 .pb-icon { position: relative; display: flex; }

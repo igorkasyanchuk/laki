@@ -224,7 +224,7 @@ export function QuickWindow() {
   const [shot, setShot] = useState<{ n: number; png: string; quiet?: boolean }>()
   const tellAt = useRef(-1) // Q7: where its picture is among the images (PromptInput adds it last), for the drawing that replaces it
   const [tell, setTell] = useState<{ png: string; mic: string; dictation: boolean }>() // Q7: its picture now, Laki's Microphone access, macOS dictation on
-  useEffect(() => void bridge?.onNewPrompt?.(p => setText(p)), []) // another New task with words: into the box
+  useEffect(() => void bridge?.onNewPrompt?.((p, _project, add) => setText(x => (add && x.trim() ? `${x.trim()}\n\n${p}` : p))), []) // another New task with words: into the box; a drop on the menu bar's item (add): after what's there
   useEffect(
     () =>
       void bridge?.onTell?.(t => {

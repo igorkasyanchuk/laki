@@ -312,6 +312,7 @@ test('U8: Quiet (was Do not disturb): laki quiet; no push for a finish or an ask
   assert.match(q2.out, /^quiet until /)
   assert.ok(Math.abs((await rig.rpc('state')).dnd.until - Date.now() - 30 * 60e3) < 60e3, '30 minutes')
   assert.equal((await rig.cli('quiet', 'soon')).code, 1)
+  assert.equal((await rig.cli('quiet', '0m')).code, 1, 'no length of 0')
   const q3 = await rig.cli('quiet', 'off')
   assert.match(q3.out, /nothing happened/)
   const v0 = await rig.rpc('state')

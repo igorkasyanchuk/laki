@@ -87,7 +87,7 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('folders-ready') // then main sends the ones that came first
     return () => void ipcRenderer.removeListener('open-folders', f)
   },
-  onNewPrompt: (cb: (prompt: string, project?: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string, project?: string) => cb(p, project)), // the new-workspace window's (project: Q5's new task in it)
+  onNewPrompt: (cb: (prompt: string, project?: string, add?: boolean) => void) => ipcRenderer.on('new-prompt', (_e, p: string, project?: string, add?: boolean) => cb(p, project, add === true)), // the new-workspace window's (project: Q5's new task in it)
   fitNew: (height: number) => ipcRenderer.send('new-fit', height), // its height: what the page needs
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
   pageShot: (webContentsId: number, whole: boolean, save: boolean): Promise<string> => ipcRenderer.invoke('page-shot', webContentsId, whole, save), // a Browsers page's: copied, or saved (its path)
@@ -146,7 +146,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
-    talkSend: (tab: string, text: string, project?: string, selection?: boolean): Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project, selection), // Q1; Q11: with the selection main has0: shot: the screen went with it to Laki AI
+    talkSend: (tab: string, text: string, project?: string, selection?: boolean): Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project, selection), // Q10: shot: the screen went with it to Laki AI; Q11: selection: with the selection main has (the pill's × leaves it out)
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),
     // the on-device engine (Laki Speech, main's): start, its lines, stop (keep: its final text), Cloud's cleanup of that text
     talkListen: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-listen'),

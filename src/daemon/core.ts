@@ -4416,8 +4416,7 @@ export function dndEnd() {
   if (!d) return { ended: false }
   delete state.dnd
   const rows = dndDigest(d)
-  if (rows.length) state.digest = { since: d.since, until: Date.now(), rows }
-  else delete state.digest // nothing happened: no card, no notification
+  if (rows.length) state.digest = { since: d.since, until: Date.now(), rows } // nothing happened: no new card or notification (an earlier one, not closed yet, stays)
   save()
   changed()
   return { ended: true, lines: rows.map(r => `${r.kind === 'wait' ? 'Waits' : r.kind === 'done' ? 'Finished' : 'PR'}: ${r.name}${r.text ? `: ${r.text}` : ''}`) }

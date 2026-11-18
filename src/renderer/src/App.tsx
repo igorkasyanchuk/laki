@@ -38,7 +38,7 @@ import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
 import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
-import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
+import { bounceOf, dockProgress, hhmm, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
 import { AskWrap, Choice, choiceProps, turnNext } from './Diff'
@@ -46,7 +46,8 @@ import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
 import { Term, xterms, type SelectionUse } from './Term'
-import { type BarItem, PhoneBar, useDrawerSwipe } from './Phone'
+import type { BarItem } from './Phone'
+import { PhoneBar, useDrawerSwipe } from './Phone'
 import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
@@ -3835,7 +3836,7 @@ export function App() {
           {view.dnd && ( // U8: Quiet: until when; a click ends it now (its digest shows)
             <button className="sb-rec" data-tip="Quiet: no notifications, sounds, cards or phone pushes, but an important workspace's ask and laki alert's · click: end now, and see what happened meanwhile" onClick={() => void call('dndSet', { off: true }).catch(() => {})}>
               <Icon name="moon" size={11} />
-              until {new Date(view.dnd.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              until {hhmm(view.dnd.until)}
             </button>
           )}
           {settings.recording && ( // Recording mode: private workspaces hidden until this is clicked
