@@ -613,7 +613,8 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip), in groups: view (Terminal | Reader, the side panel), open elsewhere
-(editor, Preview), workspace (Ship, Send later), your extensions', then ⋯ and Run. When the bar is narrow, whole groups
+(editor, Preview), workspace (Ship, Send later), your extensions', then ⋯ and Run; a group left with one button joins
+the next. When the bar is narrow, whole groups
 fold into ⋯ from the right. *Customize toolbar…* (a right click on the bar's empty room, View › Customize Toolbar…, or
 Settings › Appearance) picks which show and their order (Space shows or hides one, ⌥↑ ⌥↓ move it); a hidden one is in
 ⋯, its key and ⌘K still work. Full screen, Layout and Share live view can be added; ⋯ and Run always stay.

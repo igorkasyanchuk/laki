@@ -1208,6 +1208,16 @@ test("previewOf: ⌘K's preview of a workspace (agents, plan, PR, diff, next ste
   assert.equal(previewOf({ kind: 'ws', label: 'gone', ws: 'nope' }, view), null)
 })
 
+test('capsulesOf: a group of one joins the next, the last the one before; one alone stays', async () => {
+  const { capsulesOf } = await import('../src/renderer/src/toolbar.ts')
+  const g = (id: string, ...ids: string[]) => ({ id, label: id, ids })
+  assert.deepEqual(capsulesOf([g('view', 'panel'), g('open', 'editor', 'preview'), g('workspace', 'ship', 'timer')]).map(c => c.ids), [['panel', 'editor', 'preview'], ['ship', 'timer']])
+  assert.deepEqual(capsulesOf([g('view', 'panel', 'layout'), g('open', 'editor'), g('workspace', 'ship')]).map(c => c.ids), [['panel', 'layout'], ['editor', 'ship']])
+  assert.deepEqual(capsulesOf([g('view', 'panel', 'layout'), g('workspace', 'ship')]).map(c => c.ids), [['panel', 'layout', 'ship']])
+  assert.deepEqual(capsulesOf([g('view'), g('open', 'editor')]).map(c => c.ids), [['editor']])
+  assert.equal(capsulesOf([g('view', 'panel'), g('open', 'editor', 'preview')])[0].label, 'view, open')
+})
+
 test('fitTabs: all fit; the selected one kept when it would be hidden; no room: only the selected', async () => {
   const { fitTabs } = await import('../src/renderer/src/toolbar.ts')
   assert.deepEqual(fitTabs([100, 100, 100], 300, 0, 96), { shown: [0, 1, 2], hidden: [] })

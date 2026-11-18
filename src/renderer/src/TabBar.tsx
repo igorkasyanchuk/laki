@@ -11,7 +11,7 @@ import { timeLeft } from './Tunnel'
 import { retrying, retryText } from './text'
 import { Glyph, rollup } from './Glyph'
 import { type CSSProperties, Fragment, type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { collapseOf, fitTabs, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
+import { capsulesOf, collapseOf, fitTabs, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
 import { placesOf } from '../../shared/types'
 import { click as extClick, WidgetStrip } from './Widgets'
 import { api } from './api'
@@ -286,20 +286,13 @@ export function TabBar({ app }: { app: AppCtx }) {
         </span>
       )}
       {tabsAt !== 'top' && <span className="spacer" />}
-      {groups.filter(g => !folded.has(g.id)).map(g =>
-        g.id === 'ext' ? (
-          !(narrow && ws) && <ToolGroup key={g.id} id={g.id} label={g.label}><WidgetStrip widgets={ownWidgets.filter(w => extShown.has(`ext:${w.id}`))} api={widgetApi} place="top" /></ToolGroup> /* a phone: in the ⋯ menu (wsMore) */
-        ) : (
-          <Fragment key={g.id}>
-            {g.ids.includes('reader') && BTN.reader.node() /* the Terminal | Reader switch: a capsule of its own (U2: a split pane has it in its header) */}
-            {g.ids.some(id => id !== 'reader') && (
-              <ToolGroup id={g.id} label={g.label}>
-                {g.ids.filter(id => id !== 'reader').map(id => <Fragment key={id}>{BTN[id]?.node()}</Fragment>)}
-              </ToolGroup>
-            )}
-          </Fragment>
-        ),
-      )}
+      {inBar.has('reader') && BTN.reader.node() /* the Terminal | Reader switch: a capsule of its own (U2: a split pane has it in its header) */}
+      {capsulesOf(groups.filter(g => !folded.has(g.id) && g.id !== 'ext').map(g => ({ ...g, ids: g.ids.filter(id => id !== 'reader') }))).map(c => (
+        <ToolGroup key={c.id} id={c.id} label={c.label}>
+          {c.ids.map(id => <Fragment key={id}>{BTN[id]?.node()}</Fragment>)}
+        </ToolGroup>
+      ))}
+      {extShown.size > 0 && !(narrow && ws) && <ToolGroup id="ext" label="Extensions"><WidgetStrip widgets={ownWidgets.filter(w => extShown.has(`ext:${w.id}`))} api={widgetApi} place="top" /></ToolGroup> /* a phone: in the ⋯ menu (wsMore) */}
       {ws && (
         <div className="actions capsule nodrag tool-end">
           {narrow && !page && <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} /> /* a phone has no ⌘K */}

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import type { AppCtx } from './appCtx'
 import { Modal } from './panels'
 import { Icon } from './ui'
-import { TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
+import { capsulesOf, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
 import { toolbarHere } from './TabBar'
 
 export function ToolbarSheet({ app, onClose }: { app: AppCtx; onClose: () => void }) {
@@ -26,7 +26,9 @@ export function ToolbarSheet({ app, onClose }: { app: AppCtx; onClose: () => voi
     save(o, on)
   }
   const byId = (id: string) => items.find(x => x.id === id)
-  const shown = TOOLBAR_GROUPS.map(g => order.filter(id => on.has(id) && byId(id)?.group === g.id)).filter(g => g.length)
+  // as the bar draws them: Terminal | Reader on its own, the rest with no capsule of one, the extensions' last
+  const ids = (g: string) => order.filter(id => on.has(id) && byId(id)?.group === g)
+  const shown = [...(on.has('reader') ? [['reader']] : []), ...capsulesOf(TOOLBAR_GROUPS.filter(g => g.id !== 'ext').map(g => ({ ...g, ids: ids(g.id).filter(id => id !== 'reader') }))).map(c => c.ids), ...(ids('ext').length ? [ids('ext')] : [])]
   return (
     <Modal title="Customize toolbar" onClose={onClose}>
       <div className="tb-sheet">

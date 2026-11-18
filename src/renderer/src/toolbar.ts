@@ -42,6 +42,23 @@ export function toolbarOf(setting: unknown, items: { id: string; off?: boolean }
   return { shown, menu: ids.filter(x => !shown.includes(x)), seen: ids }
 }
 
+// the capsules the bar draws: each group's buttons, a group of one joined to the next (the last to the one before), so
+// no capsule holds a single icon unless it's the only one
+export function capsulesOf(groups: { id: string; label: string; ids: string[] }[]) {
+  const out = groups.filter(g => g.ids.length).map(g => ({ id: g.id, label: g.label, ids: [...g.ids] }))
+  for (let i = 0; i < out.length && out.length > 1; ) {
+    if (out[i].ids.length > 1) {
+      i++
+      continue
+    }
+    const at = i + 1 < out.length ? i : i - 1
+    const [a, b] = [out[at], out[at + 1]]
+    out.splice(at, 2, { id: `${a.id} ${b.id}`, label: `${a.label}, ${b.label}`, ids: [...a.ids, ...b.ids] })
+    i = at
+  }
+  return out
+}
+
 // the groups that fold into ⋯ (from the right, each whole) so the shown ones' buttons fit in room px
 export function collapseOf(groups: { id: string; n: number }[], room: number, button = 28) {
   const width = (g: { n: number }) => g.n * button + 12 // a capsule's padding and the gap before it

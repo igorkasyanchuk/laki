@@ -113,7 +113,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     open elsewhere, workspace, `ext:<id>` an extension's top bar ones), `toolbarOf(settings.toolbar, items,
     settings.toolbarSeen)` (unset: the default, today's bar; an unknown id dropped; one new since `seen` at its default
     place); TabBar's `toolbarHere` the ones that apply, `ToolGroup` (role group, a `.capsule` each: the look's glass or
-    flat; the sidebar's top row too), `collapseOf` folds groups from the right into ⋯ by the bar's width (one
+    flat; the sidebar's top row too), `capsulesOf` joins a group of one to the next (the last to the one before: no capsule of one icon; the Terminal |
+    Reader switch and the extensions' strip stay their own), `collapseOf` folds groups from the right into ⋯ by the bar's width (one
     ResizeObserver); a hidden or folded button's `BTN[id].item` is in ⋯. ⋯ and Run are fixed, never items.
     `ToolbarSheet.tsx` (Dialog `toolbar`, `laki://toolbar`, main's View › Customize Toolbar…, the bar's right click,
     Settings › Appearance) saves each change. The tabs over the terminals are in `.tab-list` (flex 1, `overflow: clip`):
@@ -1320,8 +1321,10 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **The selection slides** (`slide.ts`, `.slid`): `.seg`, the Terminal | Reader switch and the side panel's tabs draw
   their pick's underline or fill as the group's `::before` at `--ind-x/y/w/h`, set by one MutationObserver (class and
   aria changes on a group's items) right after React's commit; a group slides only from its first change on, from the
-  old pick (`data-still` for its first placing), and a resize places them again without moving. Motion: Off, the
-  catch-all.
+  old pick (`data-still` for its first placing), and a resize places them again without moving. A look that fills a
+  `.seg`'s pick its own way (looks.css' `.seg button.on`: Frosted's accent, a gradient; `filled`: the pick's own
+  background, read with its transition off, not every button's) keeps its fill and nothing slides there: an underline
+  over it would be a second mark. Motion: Off, the catch-all.
 - **Edges** (`--pane-x`, the terminal's text's inset: 10px, 18px in a lineless Design or Roomy padding, 4px Tiny or a
   phone, set on `.app`; `--pane-x2` = it + `--pane-icon` (14px) + `--sp-3`, where words after a strip's leading icon
   start; `--pane-r` the strips' right): `.term`'s left inset, the queue and Done check strips' head and rows

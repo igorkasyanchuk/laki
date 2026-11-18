@@ -18,6 +18,25 @@ function place(g: HTMLElement, el: Element | null | undefined, still: boolean) {
   if (still) void g.offsetWidth, g.removeAttribute('data-still') // drawn there at once, then free to move
 }
 
+// a look that fills the pick its own way (looks.css' .seg button.on: Frosted's accent, a gradient): its fill is the mark,
+// an underline sliding over it would be a second one, so that group doesn't slide. Read as the look ends it: the
+// transition skipped, else the new pick reads as it was a frame ago. The default's pick has none (an underline). ponytail:
+// a sibling not under the mouse as the look's plain button (one under it may show its hover)
+const bg = (e: HTMLElement) => {
+  const t = e.style.transition
+  e.style.transition = 'none'
+  const cs = getComputedStyle(e)
+  const v = { color: cs.backgroundColor, image: cs.backgroundImage }
+  e.style.transition = t
+  return { ...v, none: v.image === 'none' && (v.color === 'transparent' || /[,/]\s*0\)$/.test(v.color)), key: `${v.color} ${v.image}` }
+}
+function filled(g: HTMLElement, pick: Element | null) {
+  if (!(pick instanceof HTMLElement) || g.matches('.reader-switch')) return false // the Reader switch's slide is a fill itself
+  const plain = [...g.children].find((c): c is HTMLElement => c !== pick && c instanceof HTMLElement && c.tagName === pick.tagName && !c.matches(':hover'))
+  const p = bg(pick)
+  return !p.none && (!plain || bg(plain).key !== p.key) // a fill of its own, not the one every button has
+}
+
 export function slideStart() {
   // a group's size changed (an item came or went, Density, the zoom): its fill put back under the pick, without moving
   const again = (g: HTMLElement) => g.isConnected && g.classList.contains('slid') && place(g, g.querySelector(PICKED), true)
@@ -36,6 +55,10 @@ export function slideStart() {
       const g = (m.target as Element).parentElement
       if (!g?.matches(GROUP) || seen.has(g)) continue
       seen.add(g)
+      if (filled(g, g.querySelector(PICKED))) {
+        g.classList.remove('slid') // a look that fills it (one switched to as it showed, too)
+        continue
+      }
       if (!g.classList.contains('slid')) {
         // its first change: from the one that was picked (its old attribute said so)
         const was = ms.find(x => x.target.parentElement === g && /(^|\s)on(\s|$)|true/.test(x.oldValue ?? '') && !(x.target as Element).matches(PICKED.replace(':scope > ', '')))
