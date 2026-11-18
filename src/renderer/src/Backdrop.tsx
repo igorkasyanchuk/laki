@@ -19,7 +19,8 @@ const mix = (a: RGB, b: RGB, f: number) => `rgb(${a.map((v, i) => Math.round(v +
 const smooth = (f: number) => (f <= 0 ? 0 : f >= 1 ? 1 : f * f * (3 - 2 * f))
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
-export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropKind; motion?: 'high' | 'low' | 'none' }) {
+export function Backdrop({ kind: asked, motion = 'low' }: { kind?: BackdropKind; motion?: 'high' | 'low' | 'none' }) {
+  const kind = BACKDROPS.some(([v]) => v === asked) ? asked! : BACKDROP // unset, or one from a newer Laki: the default
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const cv = ref.current
@@ -91,7 +92,7 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     const fit = () => {
       const r = box.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
-      if (Math.round(r.width) === Math.round(w) && Math.round(r.height) === Math.round(h) && cv.width === Math.round(w * dpr)) return false
+      if (!r.width || !r.height || (Math.round(r.width) === Math.round(w) && Math.round(r.height) === Math.round(h) && cv.width === Math.round(w * dpr))) return false // hidden: kept as it was
       const [ow, oh] = [w, h]
       w = r.width
       h = r.height
@@ -152,7 +153,7 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     const net = (dt: number) => {
       let moving = false
       for (const k of knots) {
-        if (ambient) {
+        if (drift) {
           k.hx += k.vx * dt
           k.hy += k.vy * dt
           if (k.hx < 0 || k.hx > w) k.vx *= -1
@@ -292,7 +293,7 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     const fireflies = (t: number, dt: number) => {
       let moving = false
       for (const f of flies) {
-        if (ambient) {
+        if (drift) {
           f.a += (Math.random() - 0.5) * 0.3 * dt
           f.hx += Math.cos(f.a) * 0.35 * dt
           f.hy += Math.sin(f.a) * 0.35 * dt
@@ -316,13 +317,15 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     }
 
     const draws: Partial<Record<BackdropKind, (t: number, dt: number) => boolean>> = { stars: sky, dust: sky, dots, net: (_t, dt) => net(dt), grid, fireflies }
-    const draw = draws[kind] ?? sky // a kind from a newer Laki: the default's
+    const draw = draws[kind] ?? sky
     let raf = 0
     let seen = false // the cards to cut out: looked at again on the next frame
     let last = 0
     // drifting on its own: Motion High, and not while the window is away (html.away: its CSS animations pause too)
     const drifts = () => ambient && !document.documentElement.classList.contains('away')
+    let drift = ambient // this frame's: the net's knots and the fireflies wander only while it holds
     const paint = (t: number, dt: number) => {
+      drift = drifts()
       p.on += (p.want - p.on) * 0.12
       if (Math.abs(p.want - p.on) < 0.01) p.on = p.want
       p.sx += ((p.on ? p.x : w / 2) - p.sx) * 0.08
@@ -347,7 +350,7 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
       last = t
       if (seen) ((seen = false), look())
       const moving = paint(t, dt)
-      if (!still && (moving || drifts() || p.on !== p.want)) raf = requestAnimationFrame(frame)
+      if (!still && (moving || drift || p.on !== p.want)) raf = requestAnimationFrame(frame)
       else last = 0
     }
     const kick = () => (raf ||= requestAnimationFrame(frame))
@@ -368,8 +371,8 @@ export function Backdrop({ kind = BACKDROP, motion = 'low' }: { kind?: BackdropK
     kick()
     // a new size clears the canvas: drawn again at once, before this frame shows (a frame's wait blinks as a sidebar drags)
     const ro = new ResizeObserver(() => {
-      if (fit()) ((seen = false), look(), paint(performance.now(), 0))
-      again()
+      if (fit()) ((seen = false), look(), paint(performance.now(), 0), kick())
+      else again()
     })
     ro.observe(box)
     // the page's cards: as they change (another workspace's, Welcome's checks, the form's fields: once typing pauses, not
