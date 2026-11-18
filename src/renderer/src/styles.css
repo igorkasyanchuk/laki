@@ -3051,7 +3051,8 @@ button.board-name:hover { background: none; }
    passes over it) */
 .bd-tile { position: relative; display: block; width: 112px; height: 64px; border-radius: var(--r-m); border: 1px solid var(--line); background: var(--bg); overflow: hidden; }
 .bd-picks button.on .bd-tile { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
-.settings-page > .backdrop { z-index: -1; } /* a page's (New workspace): over the page's own fill, under all it holds (the page is a stacking context: its z-index) */
+.page-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; isolation: isolate; overflow: hidden; } /* a Page with a backdrop (New workspace): its body in a frame, the canvas under it (z-index -1 over the frame's own fill: a chrome design's card is the frame) */
+.page-frame > .backdrop { z-index: -1; }
 .icon-pack-strip { display: flex; gap: var(--sp-4); }
 .icon-look .seg button { display: inline-flex; align-items: center; gap: var(--sp-3); font-variant-numeric: tabular-nums; }
 /* a project's notes (panels.tsx ProjectNotes; Settings' field) */
@@ -4202,7 +4203,7 @@ html[data-motion='none'] .num > .num-in { animation: none; }
    Reduce transparency and in the flat looks). Motion: None and Reduce motion: the glass head, always. Its title is one
    size on every page: a large one that shrank showed only where the page scrolls (Schedule, Settings; not Board) */
 .settings-page { timeline-scope: --page; }
-.settings-page > .page-body, .settings-body > .settings-main { scroll-timeline: --page block; }
+.settings-page > .page-body, .page-frame > .page-body, .settings-body > .settings-main { scroll-timeline: --page block; }
 @keyframes page-head { from { --edge-o: 0; } to { --edge-o: 1; } }
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {

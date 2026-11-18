@@ -543,7 +543,7 @@ export function usePageMark() {
   return el
 }
 
-export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page, under its content */ }) {
+export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page's body */ }) {
   useEffect(() => {
     if (!esc) return
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
@@ -554,14 +554,13 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true, 
   const el = usePageMark()
   return (
     <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
-      {backdrop}
       <div className="settings-head edge-blur">
         {head ?? <b>{title}</b>}
         <span className="grow" />
         {tools}
         <IconButton icon="x" title={esc ? 'Close (Esc)' : 'Close'} onClick={onClose} />
       </div>
-      <div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>
+      {(body => (backdrop ? <div className="page-frame">{backdrop}{body}</div> /* under the body, in its card (a chrome design's), never under the head */ : body))(<div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>)}
       {toTop}
     </div>
   )
