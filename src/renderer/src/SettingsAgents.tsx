@@ -913,7 +913,7 @@ export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) 
               ) : (
                 <span className="small" data-tip={`${a.path}${a.cmd ? ` · updates with: ${a.cmd}` : ''}`}>
                   <span className="mono">{a.version ?? '?'}</span>
-                  {out(a) ? <span className="warn"> → <span className="mono">{a.newest}</span> is out</span> : a.newest ? <span className="muted"> · up to date</span> : <span className="muted"> · newest not known</span>}
+                  {out(a) ? <span className="warn"> → <span className="mono">{a.newest}</span> is out</span> : a.newest && a.version ? <span className="muted"> · up to date</span> : a.newest ? <span className="muted"> · the newest is {a.newest}</span> : <span className="muted"> · newest not known</span>}
                   <span className="muted"> · {a.how}</span>
                 </span>
               )}

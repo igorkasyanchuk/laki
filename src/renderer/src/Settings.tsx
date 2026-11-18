@@ -822,11 +822,11 @@ function UninstallField({ api }: { api: UninstallApi }) {
             {busy && r.state === 'todo' ? <span className="glyph spin" /> : ROW_MARK[r.state]}
           </span>
           {r.id === 'data' && !done ? (
-            <label className="grow">
+            <label className="grow check">
               <input type="checkbox" checked={data} disabled={busy} onChange={e => (setData(e.target.checked), setSure(false), void look(e.target.checked, trees))} /> Also delete my data <span className="muted small">{r.detail}</span>
             </label>
           ) : r.id === 'worktrees' && r.state !== 'none' && !done ? (
-            <label className="grow">
+            <label className="grow check">
               <input type="checkbox" checked={trees} disabled={busy} onChange={e => (setTrees(e.target.checked), setSure(false), void look(data, e.target.checked))} /> Also delete the worktrees <span className="muted small">{r.detail}</span>
             </label>
           ) : (

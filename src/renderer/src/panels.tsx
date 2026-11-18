@@ -882,7 +882,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         <p className="muted">Open a folder first (⌘O), or drop one on the window.</p>
       </Page>
     )
-  const prompting = view.presets.some(x => x.name === p.preset && x.agent !== 'command')
+  const prompting = view.presets.some(x => x.name === p.preset && (x.agent !== 'command' || x.acp)) // an ACP profile takes a prompt too (its first, over ACP)
   const sep = proj?.seps?.find(s => s.id === p.place)
   const canName = !p.local && !plain
   const canModel = (isAgent(starts) || acpPro) && !racing // a race's agents keep their own

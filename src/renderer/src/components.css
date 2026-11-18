@@ -45,6 +45,7 @@
 /* Settings: switches as rows, glass's sliders */
 .switch-row.toggle { background: none; } /* not button.on's */
 .switch-row { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 4px 0; text-align: left; color: var(--fg); font-size: var(--fs-3); }
+.settings-main > .switch-row { flex: none; } /* a switch between groups: the page's column doesn't squeeze it over the next */
 .switch-row .toggle-track { flex: none; width: 34px; height: 20px; border-radius: var(--rs, var(--r-pill)); }
 .switch-row .toggle-knob { top: 3px; left: 3px; width: 14px; height: 14px; }
 .switch-row.on .toggle-knob { translate: 14px 0; }
@@ -132,6 +133,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 /* A9: the agents' CLIs (SettingsAgents.tsx AgentVersions): a row each, its version and its update */
 .agent-versions { display: flex; flex-direction: column; gap: var(--sp-2); }
 .agent-version { align-items: center; gap: var(--sp-2); }
+.agent-version > input { flex: none; width: auto; } /* a settings row's inputs grow: not its box */
 .agent-version.off { opacity: 0.6; }
 .agent-version .ok { color: var(--done); }
 
