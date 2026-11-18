@@ -109,6 +109,17 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
   built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
+  - The tab bar's toolbar (`toolbar.ts`, pure, `settingsBase` re-exports `TOOLBAR_ITEMS`): its buttons by group (view,
+    open elsewhere, workspace, `ext:<id>` an extension's top bar ones), `toolbarOf(settings.toolbar, items,
+    settings.toolbarSeen)` (unset: the default, today's bar; an unknown id dropped; one new since `seen` at its default
+    place); TabBar's `toolbarHere` the ones that apply, `ToolGroup` (role group, a `.capsule` each: the look's glass or
+    flat; the sidebar's top row too), `collapseOf` folds groups from the right into ⋯ by the bar's width (one
+    ResizeObserver); a hidden or folded button's `BTN[id].item` is in ⋯. ⋯ and Run are fixed, never items.
+    `ToolbarSheet.tsx` (Dialog `toolbar`, `laki://toolbar`, main's View › Customize Toolbar…, the bar's right click,
+    Settings › Appearance) saves each change. The tabs over the terminals are in `.tab-list` (flex 1, `overflow: clip`):
+    `fitTabs` (each `--tab-min`, the selected one always shown, the rest behind `.tab-more`'s +n, its menu, its mark the
+    hidden ones' `rollup`); a strip beside the terminals scrolls as before. Tested in `test/units-more.test.ts`; `npm run
+    test:ui`'s `tab-overflow`.
   - ⌘K's preview (`palettePreview.ts` `previewOf`, pure, the highlighted item's only, from the view: no daemon call as the
     arrows move): a workspace's or tab's agents (status, time running), plan (`planCount`, `planNow`), PR, diff, One next
     step, its focused agent's `last`; a command's words (Settings › Keys' `KEYS` label, else its label after the colon),
@@ -400,7 +411,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   - panes are absolutely placed siblings keyed by tab, so splitting never remounts a terminal;
   - `useTabDrag`, VS Code style, pointer-based (not HTML5 DnD): a drag starts past 4px (less is a click); a pill
     (`.drag-ghost`) follows the pointer; `overAt` finds the target with `elementFromPoint`: a pane's edge band (`ZONE`,
-    30%) or its center, shaded (`.drop-zone`), or a tab bar (`[data-tabbar]`, its `.tab` children in groups' order, the
+    30%) or its center, shaded (`.drop-zone`), or a tab bar (`[data-tabbar]`, its `.tab[data-gi]` (the group's index: some
+    may be behind +n), `.tab-more` the end, the
     flex direction for top/bottom or left/right) and the index between tabs, a line there (`.drop-line`); App's `ok`
     (the drop changes the groups) hides the rest. Esc, a release elsewhere, the window's blur end it with nothing;
     `.tab-dragging` on `<html>`: grabbing, no selection. After a drop the pane's terminal gets the keyboard. Off on a

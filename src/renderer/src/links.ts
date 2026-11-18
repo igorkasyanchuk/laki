@@ -16,6 +16,7 @@ export type Link =
   | { to: 'onboard' }
   | { to: 'desk' }
   | { to: 'uikit'; icons?: boolean } // laki://uikit[/icons]: the UI kit's page, or its icon gallery
+  | { to: 'toolbar' } // laki://toolbar: Customize toolbar (View › Customize Toolbar…)
   | { to: 'starters' } // laki://starters: the starter picker (New extension from a starter…); a pick makes one
 
 const decode = (s: string) => {
@@ -67,6 +68,8 @@ export function parseLink(url: string): Link | null {
       return { to: 'uikit', ...(arg === 'icons' && { icons: true }) }
     case 'starters':
       return { to: 'starters' }
+    case 'toolbar':
+      return { to: 'toolbar' }
   }
   return null
 }

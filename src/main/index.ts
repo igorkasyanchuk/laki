@@ -335,6 +335,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => hasText('.pv-head button', 'Outline'), 'its Outline')
       await clickText('.pv-head button', 'Outline')
     }, async () => (await has('.menu .menu-filter')) && (await hasText('.menu-item', 'Rollout')) && (await hasText('.menu-item', 'Colors'))],
+    // the tab bar's overflow: a workspace with 9 tabs in a 1000px window shows +n, and the selected tab among the shown
+    ['tab-overflow', async () => {
+      const w = await named('checkout-flow')
+      for (let i = 0; i < 8; i++) await rpc('tabNew', { ws: w.id, preset: 'shell' })
+      await link(`laki://ws/${w.id}`)()
+      await size(1000, 800)
+    }, async () => (await has('.tab-list > .tab-more')) && (await has('.tab-list > .tab.sel'))],
+    ['tab-overflow-off', () => size(1440, 900), '.tab-list'],
     // T8: the phone's layout with a notched phone's insets (set as styles.css' --safe-*, as env() would): its bottom
     // bar's buttons end 34px over the bottom, clear of the home indicator; then back to the desktop's
     ['phone-safe', async () => {
@@ -2764,6 +2772,7 @@ const appMenu = () => Menu.setApplicationMenu(
         key('Changes', 'CmdOrCtrl+D', 'd'),
         { type: 'separator' },
         bound('Command Palette…', 'palette'),
+        { label: 'Customize Toolbar…', click: () => openLink('laki://toolbar') },
         { type: 'separator' },
         key('Bigger Text in This Tab', 'CmdOrCtrl+Plus', '='),
         key('Smaller Text in This Tab', 'CmdOrCtrl+-', '-'),

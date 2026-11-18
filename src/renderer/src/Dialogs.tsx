@@ -2,6 +2,7 @@
 // schedulesFor…) says: Pages, in the main area (Settings, Help, the AI page, the board, New workspace…), and Dialogs,
 // over everything (Ship, Check overlaps, the timers', renames, a project's notes…). App renders them with what
 // appCtx.ts says they read.
+import { ToolbarSheet } from './ToolbarSheet'
 import type { Call } from '../../shared/api'
 import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, specsOf, wsName } from './appCtx'
 import type { AccountsApi, SkillInfo } from './Settings'
@@ -735,6 +736,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog === 'toolbar' && <ToolbarSheet app={app} onClose={() => setDialog(null)} />}
       {dialog === 'palette' && <Palette items={paletteItems(app)} view={view} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
       <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (

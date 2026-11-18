@@ -45,6 +45,7 @@
   --lift-2: 0 8px 24px rgba(0, 0, 0, 0.35);
   --lift-3: 0 20px 60px rgba(0, 0, 0, 0.5);
   --h-s: 22px; --h-m: 28px; --h-l: 34px;
+  --tab-min: 120px; /* a tab's least width over the terminals: its mark and about 8 characters (TabList's fitTabs) */
   --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); /* Glass › Grain: a tile of grey noise */
   --grain-a: 0.04; /* and how much of it shows (a light theme's: 0.03) */
   --sel-a: 30%; /* the selection's strength (themes.ts SEL_A; a light theme's 24%, less where its text wouldn't read: selAlpha) */
@@ -726,24 +727,47 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
    (the bar scrolls), the pill looks or a Design with pill tabs, whose tabs float over their line. Between two other tabs, a short divider.
    ponytail: without anchor positioning (older browsers) the bar has no line beside the tab */
 .tabbar { --tab-line: 1px solid var(--line); position: relative; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel) { border-bottom-width: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab { margin-bottom: 0; } /* on the bar's bottom, the line drawn beside them */
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab.sel { position: relative; anchor-name: --laki-tab; border: var(--tab-line); border-bottom: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel)::before,
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel)::after { content: ''; position: absolute; bottom: 0; border-bottom: var(--tab-line); border-image: var(--tab-line-img, none); background: var(--tab-line-bg, none) fixed 0 0 / 100vw 100%; pointer-events: none; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab-list > .tab.sel) { border-bottom-width: 0; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab-list > .tab { margin-bottom: 0; } /* on the bar's bottom, the line drawn beside them */
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab-list > .tab.sel { position: relative; anchor-name: --laki-tab; border: var(--tab-line); border-bottom: 0; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab-list > .tab.sel)::before,
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab-list > .tab.sel)::after { content: ''; position: absolute; bottom: 0; border-bottom: var(--tab-line); border-image: var(--tab-line-img, none); background: var(--tab-line-bg, none) fixed 0 0 / 100vw 100%; pointer-events: none; }
 .tabbar::before { left: 0; right: anchor(--laki-tab left); }
 .tabbar::after { left: anchor(--laki-tab right); right: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab.sel::before { content: ''; position: absolute; inset: calc(-1 * var(--tab-line-w, 1px)) calc(-1 * var(--tab-line-w, 1px)) 0; border: var(--tab-line-w, 1px) solid transparent; border-top-width: max(2px, var(--tab-line-w, 1px)); border-bottom: 0; border-radius: inherit; background: var(--tab-line-bg) fixed 0 0 / 100vw 100% border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
-.tabbar > .tab:not(.sel) { position: relative; }
-.tabbar > .tab:not(.sel) + .tab:not(.sel)::after { content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; border-left: 1px solid var(--line); pointer-events: none; }
-.tabbar > .tab:not(.sel):hover::after, .tabbar > .tab:hover + .tab::after { display: none; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab-list > .tab.sel::before { content: ''; position: absolute; inset: calc(-1 * var(--tab-line-w, 1px)) calc(-1 * var(--tab-line-w, 1px)) 0; border: var(--tab-line-w, 1px) solid transparent; border-top-width: max(2px, var(--tab-line-w, 1px)); border-bottom: 0; border-radius: inherit; background: var(--tab-line-bg) fixed 0 0 / 100vw 100% border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.tabbar > .tab-list > .tab:not(.sel) { position: relative; }
+.tabbar > .tab-list > .tab:not(.sel) + .tab:not(.sel)::after { content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; border-left: 1px solid var(--line); pointer-events: none; }
+.tabbar > .tab-list > .tab:not(.sel):hover::after, .tabbar > .tab-list > .tab:hover + .tab::after { display: none; }
 .electron.side-closed .tabbar { padding-left: 76px; }
 .electron.list-off .tabbar { padding-left: max(0px, calc(76px - var(--rail-w, 68px))); } /* the rail without its list: past the traffic lights where the rail is narrower than them */
 .tabbar > .side-show { margin: 0 6px 0 0; }
 .tab .x { display: inline-grid; place-items: center; background: none; border: none; padding: 0 var(--sp-2); min-width: 20px; min-height: 20px; color: var(--muted); visibility: hidden; }
 .tab:hover .x, .tab.sel .x { visibility: visible; }
 .tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
-.tabbar > .ib { align-self: center; margin-left: 2px; }
+.tabbar > .ib, .tab-list > .ib { align-self: center; margin-left: 2px; }
+/* the tabs over the terminals (TabList): the room they have, as many as fit at --tab-min, the rest behind +n */
+.tab-list { display: flex; align-items: flex-end; gap: 1px; flex: 1 1 0; min-width: 0; align-self: stretch; overflow: clip; }
+.tabbar .tab-list > .tab { flex: 0 1 auto; min-width: 0; } /* a short name keeps its own width: fitTabs' count leaves each about --tab-min when they shrink */
+.tab-list > .tab.review-tab { flex: none; }
+.tab-more { align-self: center; flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); height: var(--h-s); padding: 0 var(--sp-3); margin-left: var(--sp-1); border: 1px solid var(--line); border-radius: var(--r-pill); background: none; color: var(--muted); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
+.tab-more:hover { color: var(--fg); background: var(--hover); }
+/* the toolbar's groups (TabBar: toolbar.ts' view, open elsewhere, workspace, extensions), a capsule each, then ⋯ and
+   Run; the sidebar's top row the same way. A look's capsule (glass or flat) is the .capsule rule's */
+.tabbar > .tool-group, .tabbar > .tool-end { margin: 0 0 0 var(--sp-2); }
+.tabbar > .tool-end { margin-right: var(--sp-1); }
+.tool-group .widget-strip { margin: 0; }
+.side-head .tool-group { margin: 0; }
+/* Customize toolbar (ToolbarSheet.tsx) */
+.tb-sheet { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 0; }
+.tb-preview { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-in); background: var(--side); }
+.tb-preview .actions.capsule { margin: 0; }
+.tb-preview .ib { display: inline-grid; place-items: center; width: var(--h-m); height: var(--h-m); }
+.tb-run { padding: 0 var(--sp-3); font-size: var(--fs-2); font-weight: 600; }
+.tb-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.tb-list li { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-in); }
+.tb-list li:hover, .tb-list li.dragging { background: var(--hover); }
+.tb-list label { flex: 1; display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.tb-grip { display: inline-flex; color: var(--muted); cursor: grab; }
 .tabbar > .reader-switch { align-self: center; } /* the bar keeps its tabs on its bottom line (flex-end); the switch sits with the buttons, not under them (Classic, Inset) */
 .actions { display: flex; gap: 1px; align-self: center; }
 /* the tabs elsewhere (Settings › Appearance › Tabs): a strip under the terminals, or a column beside them; the
@@ -3661,21 +3685,21 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .app[data-dz~='float'] .body > :is(.side-panel, .pv-wrap) { margin: 8px 8px 8px 0; border: 1px solid var(--line); border-radius: max(var(--r-m), calc(var(--d-r) - var(--r-xs))); overflow: hidden; box-shadow: var(--lift-1), var(--lift-3); }
 /* tabs: pills, or opening into the card under them */
 .app[data-dz~='pills'] .tabbar { align-items: center; }
-.app[data-dz~='pills'] .tabbar > .tab { height: 26px; margin: 0 1px; padding: 0 var(--sp-2) 0 var(--sp-5); border: 1px solid transparent; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 40%, transparent); }
-:where(.app[data-dz~='pills'] .tabbar) > .tab.sel { background: var(--panel); } /* a look's own selected tab (its color and text) wins */
-.app[data-dz~='pills'] .tabbar > .tab.sel { border-color: var(--line); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, var(--accent)) 45%, transparent), var(--d-lift); }
-.app[data-dz~='pills'] .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
-.app[data-dz~='pills'] .tabbar > .tab.review-tab { flex: none; justify-content: center; width: 34px; padding: 0; } /* only its icon: in the middle (a tab's room is for its ✕) */
+.app[data-dz~='pills'] .tabbar > .tab-list > .tab { height: 26px; margin: 0 1px; padding: 0 var(--sp-2) 0 var(--sp-5); border: 1px solid transparent; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 40%, transparent); }
+:where(.app[data-dz~='pills'] .tabbar) > .tab-list > .tab.sel { background: var(--panel); } /* a look's own selected tab (its color and text) wins */
+.app[data-dz~='pills'] .tabbar > .tab-list > .tab.sel { border-color: var(--line); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, var(--accent)) 45%, transparent), var(--d-lift); }
+.app[data-dz~='pills'] .tabbar > .tab-list > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
+.app[data-dz~='pills'] .tabbar > .tab-list > .tab.review-tab { flex: none; justify-content: center; width: 34px; padding: 0; } /* only its icon: in the middle (a tab's room is for its ✕) */
 /* V6, V1: Classic's tabs (no Design traits; not on a phone or the pill looks, which have their own): on --r-control,
    the open one underlined in its color or the strong neutral, no fill; its marks as they are */
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar { align-items: center; }
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { height: var(--h-m); margin: 0 1px; border: 1px solid transparent; border-radius: var(--r-control); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab.sel { background: none; } /* a look's own selected tab wins */
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab { height: var(--h-m); margin: 0 1px; border: 1px solid transparent; border-radius: var(--r-control); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab-list > .tab.sel { background: none; } /* a look's own selected tab wins */
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='joined'] .tabbar { padding-left: max(6px, var(--d-r)); }
 .app[data-dz~='joined'] .tabbar::before, .app[data-dz~='joined'] .tabbar::after { display: none; } /* the card's own edge is the line */
-.app[data-dz~='joined'] .tabbar > .tab.sel { z-index: 1; margin-bottom: -1px; } /* over the card's edge: open into it */
+.app[data-dz~='joined'] .tabbar > .tab-list > .tab.sel { z-index: 1; margin-bottom: -1px; } /* over the card's edge: open into it */
 /* lineless: tints instead of lines (but the rail's), round rows, more room around the text */
 .app[data-dz~='lineless'] :is(.sidebar, .side-foot, .tabbar, .status, .side-panel, .pv-wrap, .pane-head, .ask-bar, .artifacts, .tabstrip, .stale-bar) { border-color: transparent; }
 .app[data-dz~='lineless'] .side-scroll > .project { border-color: transparent; background: color-mix(in srgb, var(--fg) 4.5%, transparent); }
@@ -3924,7 +3948,7 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
   :root { --r-window: calc(var(--r-xl) * 1.25); --r-panel: calc(var(--r-l) * 1.25); --r-control: calc((var(--r-m) + 1px) * 1.25); }
   :is(.menu, .modal, .finder, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick, .set-group, .need, .remote-risk, .ws, .menu-item, .palette-item, input, select, textarea, button:not([class]), button.primary, .buttons button),
   html.material .app:not([data-dz], .narrow, .full) .main,
-  :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { corner-shape: squircle; }
+  :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab { corner-shape: squircle; }
   .capsule, .capsule :is(button, textarea) { corner-shape: round; }
 }
 

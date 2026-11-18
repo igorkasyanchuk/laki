@@ -16,13 +16,17 @@ function overAt(x: number, y: number): Pick<Drag, 'over' | 'line'> | undefined {
   const el = document.elementFromPoint(x, y)
   const bar = el?.closest<HTMLElement>('[data-tabbar]')
   if (bar) {
-    const rs = [...bar.querySelectorAll(':scope > .tab')].map(t => t.getBoundingClientRect()) // groups' order
+    // the tabs shown, by their group's index (data-gi: some may be behind +n, TabList's fitTabs); +n itself: the end
+    if (el?.closest('.tab-more')) return { over: { bar: Number(el.closest<HTMLElement>('.tab-more')!.dataset.gi) } }
+    const tabs = [...bar.querySelectorAll<HTMLElement>('.tab[data-gi]')]
+    const rs = tabs.map(t => t.getBoundingClientRect())
     if (!rs.length) return undefined // the top bar while tabs are elsewhere
     const col = getComputedStyle(bar).flexDirection.startsWith('column')
     const i = rs.filter(r => (col ? y > r.top + r.height / 2 : x > r.left + r.width / 2)).length
     const r = rs[Math.min(i, rs.length - 1)]
     const at = i < rs.length ? (col ? r.top : r.left) : col ? r.bottom : r.right
-    return { over: { bar: i }, line: col ? { left: r.left, top: at - 1, width: r.width, height: 2 } : { left: at - 1, top: r.top, width: 2, height: r.height } }
+    const gi = i < tabs.length ? Number(tabs[i].dataset.gi) : Number(tabs[tabs.length - 1].dataset.gi) + 1
+    return { over: { bar: gi }, line: col ? { left: r.left, top: at - 1, width: r.width, height: 2 } : { left: at - 1, top: r.top, width: 2, height: r.height } }
   }
   const p = el?.closest<HTMLElement>('[data-pane]')
   if (!p) return undefined

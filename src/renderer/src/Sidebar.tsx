@@ -1,6 +1,7 @@
 // The sidebar: its head, the picked rows' bar, Needs you, Pinned, each project's workspaces (its groups, the ones being
 // made), the timers and the foot (Sidebar), and what its rows are made of (sideOf: a workspace's row, a group's head,
 // the peek card App shows over everything). App renders them with what appCtx.ts says they read.
+import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
@@ -614,11 +615,13 @@ export function Sidebar({ app }: { app: AppCtx }) {
         {!railBar && histNav}
         <span className="spacer" />
         {rail && railKind !== 'projects' && !find && <IconButton icon="chevronsLeft" title="Fold the list to a strip · right click: a strip on the right" onClick={() => setStrip(railKind, 'left')} onContextMenu={e => (e.preventDefault(), setStrip(railKind, 'right'))} />}
-        <IconButton icon="filter" title={kt(find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR', 'filter')} keyId="filter" on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
-        <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
-        {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
-        {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
-        <IconButton icon="help" title={kt('Help: keys and commands', 'help')} keyId="help" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
+        <ToolGroup label="Sidebar" id="side">
+          <IconButton icon="filter" title={kt(find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR', 'filter')} keyId="filter" on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
+          <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
+          {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
+          {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
+          <IconButton icon="help" title={kt('Help: keys and commands', 'help')} keyId="help" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
+        </ToolGroup>
       </div>
       {find && (
         <div className="side-find">

@@ -1592,6 +1592,7 @@ export function App() {
     else if (l?.to === 'desk') settings.desk !== false ? setDialog('desk') : toast('My Desk is off: Settings › General › Pages')
     else if (l?.to === 'uikit') setDialog({ uikit: true, ...(l.icons && { icons: true }) })
     else if (l?.to === 'starters') setDialog('starters')
+    else if (l?.to === 'toolbar') setDialog('toolbar')
     else toast(`Laki can't open ${link.slice(0, 80)}`)
   }, [link, view])
 

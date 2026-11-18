@@ -2315,9 +2315,9 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 
 /* tabs: capsules */
 [data-look='frosted'] .tabbar { align-items: center; padding-right: 8px; }
-[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab) { box-shadow: none; transition: background-color 0.12s, color 0.12s; }
-[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab).sel { border-color: transparent; background: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi), inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 22%, transparent); }
-[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab):not(.sel):hover { background: var(--f-fill); }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab) { box-shadow: none; transition: background-color 0.12s, color 0.12s; }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab).sel { border-color: transparent; background: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi), inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 22%, transparent); }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab):not(.sel):hover { background: var(--f-fill); }
 [data-look='frosted'] .tabstrip .tab { border: 1px solid transparent; }
 [data-look='frosted'] .tabstrip.bottom { height: 38px; align-items: center; }
 [data-look='frosted'] .tabstrip.bottom .tab { height: 26px; margin: 0 1px; border-radius: 999px; }

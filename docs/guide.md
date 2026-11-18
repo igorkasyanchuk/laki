@@ -607,7 +607,13 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
-**Tab bar icons** (right side; hover for a tooltip):
+**Tab bar icons** (right side; hover for a tooltip), in groups: view (Terminal | Reader, the side panel), open elsewhere
+(editor, Preview), workspace (Ship, Send later), your extensions', then ⋯ and Run. When the bar is narrow, whole groups
+fold into ⋯ from the right. *Customize toolbar…* (a right click on the bar's empty room, View › Customize Toolbar…, or
+Settings › Appearance) picks which show and their order (Space shows or hides one, ⌥↑ ⌥↓ move it); a hidden one is in
+⋯, its key and ⌘K still work. Full screen, Layout and Share live view can be added; ⋯ and Run always stay.
+Tabs that don't fit go behind a *+n* button (its mark is the most urgent of them: waiting, then stopped, then
+working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach them all, and a tab dropped on *+n* goes last.
 - info (⌘I): the side panel on *Info* (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the project's editor: the last one you picked in

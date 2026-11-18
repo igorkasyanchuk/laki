@@ -10,7 +10,9 @@ import { colorOf, tabGlyph, wsName } from './appCtx'
 import { timeLeft } from './Tunnel'
 import { retrying, retryText } from './text'
 import { Glyph, rollup } from './Glyph'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, Fragment, type ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import { collapseOf, fitTabs, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
+import { placesOf } from '../../shared/types'
 import { WidgetStrip } from './Widgets'
 import { api } from './api'
 import { fresh } from './motion'
@@ -75,7 +77,37 @@ export function TabList({ app }: { app: AppCtx }) {
   const { accountsOf, byId, call, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
-  return (
+  // over the terminals: as many tabs as fit at --tab-min each, the rest behind +n (fitTabs); the selected one always
+  // shows. One ResizeObserver, its width read as it changes. A strip beside them scrolls instead
+  const fit = app.tabsAt === 'top'
+  const box = useRef<HTMLDivElement>(null)
+  const [room, setRoom] = useState({ w: 0, min: 120 })
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!fit || !el) return
+    const min = parseFloat(getComputedStyle(el).getPropertyValue('--tab-min')) || 120
+    const ro = new ResizeObserver(() => setRoom({ w: el.clientWidth - [...el.querySelectorAll<HTMLElement>(':scope > .review-tab, :scope > .newtab-btn')].reduce((s, x) => s + x.offsetWidth, 0), min }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [fit])
+  const sel = groups.indexOf(group!)
+  const { shown, hidden } = fit && room.w ? fitTabs(groups.map(() => room.min), room.w, sel, room.min) : { shown: groups.map((_, i) => i), hidden: [] as number[] }
+  const out = hidden.map(i => groups[i])
+  const outTabs = out.flatMap(g => tabsOf(g).map(byId).filter((t): t is TabView => !!t))
+  const waits = outTabs.filter(t => t.status === 'waiting').length
+  const more = out.length > 0 && (
+    <button
+      type="button"
+      className="tab-more nodrag"
+      data-gi={groups.length}
+      aria-label={`${out.length} more tab${out.length === 1 ? '' : 's'}${waits ? `, ${waits} waiting` : outTabs.some(t => t.failed) ? ', 1 stopped' : outTabs.some(t => t.status === 'running') ? ', working' : ''}`}
+      aria-haspopup="menu"
+      onClick={e => openMenu(e, out.map(g => (ts => ({ label: ts.map(t => t.name).join(' · '), sub: ts[0]?.kind === 'agent' ? ts[0].preset : undefined, mark: <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />, run: () => selectGroup(g) }) as MenuItem)(tabsOf(g).map(byId).filter((t): t is TabView => !!t))), 'right')}
+    >
+      <Glyph s={rollup(outTabs)} />+{out.length}
+    </button>
+  )
+  const body = (
     <>
       {reviewTab && (
         <div className={`tab nodrag review-tab ${reviewOn ? 'sel' : ''}`} role="tab" aria-label="Review" onClick={openReview} data-keys="⌘1" data-tip={`Review: ${ws!.stat?.files ? `${ws!.stat.files} file${ws!.stat.files === 1 ? '' : 's'}, +${ws!.stat.add} −${ws!.stat.del}` : `PR #${ws!.pr!.number}`}${reviewDot ? ' · changed since you looked' : ''} · ⌘1`}>
@@ -83,13 +115,15 @@ export function TabList({ app }: { app: AppCtx }) {
           {reviewDot && <i className="review-dot" />}
         </div>
       )}
-      {groups.map(g => {
+      {groups.map((g, gi) => {
+        if (!shown.includes(gi)) return null
         const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
         const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
         const ctx = ctxOn ? ts.flatMap(t => t.context ?? []).sort((a, b) => ctxPct(b) - ctxPct(a))[0] : undefined // a split's: the fullest
         return (
           <div
             key={ts[0]?.id}
+            data-gi={gi}
             className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}${fresh(ts[0]?.id) ? ' v-new' : ''}`}
             style={colorVar(colorOf(ts[0]))}
             {...act(() => selectGroup(g))}
@@ -133,8 +167,16 @@ export function TabList({ app }: { app: AppCtx }) {
           </div>
         )
       })}
+      {more}
       {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N) · ⌘-click an item: a tab of its own, never a split" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
     </>
+  )
+  return fit ? (
+    <div className="tab-list" ref={box}>
+      {body}
+    </div>
+  ) : (
+    body
   )
 }
 
@@ -148,12 +190,79 @@ export function TabStrip({ app }: { app: AppCtx }) {
   )
 }
 
+// a row of buttons as one group (role group, its name): a capsule each; the tab bar's toolbar and the sidebar's top
+// row follow the one rule (toolbar.ts' groups)
+export const ToolGroup = ({ label, id, children }: { label: string; id?: string; children: ReactNode }) => (
+  <div className="actions capsule nodrag tool-group" role="group" aria-label={label} data-g={id}>
+    {children}
+  </div>
+)
+
+// the toolbar's buttons that apply here, as toolbar.ts items (an extension's top bar ones too, by `ext:<id>`)
+export function toolbarHere(app: AppCtx): ToolbarItem[] {
+  const { onePane, readSwitch, canLater, narrow, ownWidgets, project, tab, ws } = app
+  const page = !ws || ws.browser !== undefined || project?.kind === 'shells' // a page or a terminal: no files, PR, preview or scripts
+  const can: Record<string, boolean> = {
+    reader: !!(onePane && readSwitch(tab?.id)),
+    full: !!ws,
+    panel: !page,
+    layout: !page,
+    editor: !page && !narrow,
+    preview: !page && !narrow,
+    share: !!tab && !tab.share && !narrow,
+    ship: !page && ws?.kind === 'worktree' && !narrow,
+    timer: !page && canLater && !narrow,
+  }
+  const ext = ownWidgets.filter(w => w.on && placesOf(w).includes('top') && w.here !== null).map(w => ({ id: `ext:${w.id}`, title: w.name, icon: 'panel' as const, group: 'ext' as const }))
+  return [...TOOLBAR_ITEMS.filter(x => can[x.id]), ...ext]
+}
+
 // the bar over the terminals: the tabs (unless they're in a strip), who made the workspace, the widgets, the buttons
+// in groups (view, open elsewhere, workspace, extensions: settings.toolbar's, toolbar.ts), then ⋯ and Run, fixed. A
+// button hidden, or its group folded for room (collapseOf, from the right, whole), is an item in ⋯. A right click on
+// the bar's empty room: Customize toolbar… (the sheet, ToolbarSheet.tsx)
 export function TabBar({ app }: { app: AppCtx }) {
-  const { onePane, readSwitch, canLater, devRunning, devTab, editorName, editScripts, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setReveal, setSideOpen, setWsId, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
+  const { onePane, readSwitch, devRunning, devTab, editorName, editScripts, inReader, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setRead, setReveal, setSharing, setSideOpen, setWsId, settings, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
+  const bar = useRef<HTMLDivElement>(null)
+  const [barW, setBarW] = useState(0)
+  useLayoutEffect(() => {
+    const el = bar.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setBarW(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const here = toolbarHere(app)
+  const { shown } = toolbarOf(settings.toolbar, [...TOOLBAR_ITEMS, ...here.filter(x => x.group === 'ext')], settings.toolbarSeen)
+  const on = shown.filter(id => here.some(x => x.id === id))
+  const groups = TOOLBAR_GROUPS.map(g => ({ ...g, ids: on.filter(id => here.find(x => x.id === id)!.group === g.id) })).filter(g => g.ids.length)
+  // room for the buttons: the bar less three tabs' least (--tab-min), ⋯ and Run, and Terminal | Reader where it shows
+  const folded = new Set(narrow || !barW ? [] : collapseOf(groups.map(g => ({ id: g.id, n: g.ids.filter(id => id !== 'reader').length })), barW - 3 * 120 - 150 - (on.includes('reader') ? 130 : 0)))
+  const inBar = new Set(groups.filter(g => !folded.has(g.id)).flatMap(g => g.ids))
+  const page = !ws || ws.browser !== undefined || project?.kind === 'shells'
+  const later = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)
+  // each built-in button: the bar's, and its ⋯ item when it isn't there (hidden or folded)
+  const BTN: Record<string, { node: () => ReactNode; item?: () => MenuItem }> = {
+    reader: { node: () => readSwitch(tab?.id), item: () => ({ label: tab && inReader(tab.id) ? 'Show as terminal' : 'Show as Reader', icon: 'bookOpen', run: () => tab && setRead(tab.id, inReader(tab.id) ? 'term' : 'reader') }) },
+    full: { node: () => <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} onClick={() => toggleFull(true)} /> },
+    panel: { node: () => <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />, item: () => ({ label: 'Side panel: info, files, changes, review, preview', icon: 'panel', hint: kh('panel'), run: () => togglePanel() }) },
+    layout: { node: () => <IconButton icon="layers" title={kt('Layout', 'layout')} onClick={e => openMenu(e, layoutMenu(), 'right')} /> },
+    editor: { node: () => <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />, item: () => ({ label: `Open in… (⌘E: ${editorName})`, icon: 'code', items: openInItems() }) },
+    preview: { node: () => ws && <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />, item: () => ({ label: `Preview localhost:${ws?.port}`, icon: 'globe', run: () => togglePanel('preview') }) },
+    share: { node: () => tab && <IconButton icon="share" title="Share live view…" onClick={() => setSharing(tab.id)} />, item: () => ({ label: 'Share live view…', icon: 'share', run: () => tab && setSharing(tab.id) }) },
+    ship: { node: () => <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />, item: () => ({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') }) },
+    timer: { node: () => <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={later} />, item: () => ({ label: 'Send a message later…', icon: 'timer', hint: kh('later'), run: later }) },
+  }
+  const outside: MenuItem[] = here.filter(x => !inBar.has(x.id) && BTN[x.id]?.item).map(x => BTN[x.id].item!())
   const full: MenuItem[] = ws ? [{ label: 'Full screen: just this tab', icon: 'maximize', hint: kh('full'), run: () => toggleFull(true) }] : [] // in ⋯, for the bar's room
+  const extShown = new Set(groups.find(g => g.id === 'ext' && !folded.has('ext'))?.ids ?? [])
+  const customize = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).matches('.spacer, .tab-list')) return
+    e.preventDefault()
+    openMenu(e, [{ label: 'Customize toolbar…', icon: 'settings', run: () => setDialog('toolbar') }])
+  }
   return (
-    <div className="tabbar drag" data-tabbar>
+    <div className="tabbar drag" data-tabbar ref={bar} onContextMenu={customize}>
       {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
       {tabsAt === 'top' && <TabList app={app} />}
       {ws && !narrow && (f => f && (by => (
@@ -166,33 +275,33 @@ export function TabBar({ app }: { app: AppCtx }) {
           <Icon name="agent" size={12} /> Created by <b>{ws.client}</b>
         </span>
       )}
-      <span className="spacer" />
-      {onePane && readSwitch(tab?.id) /* U2: a split pane has it in its header */}
-      {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
-      {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
-        <div className="actions capsule nodrag">
-          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(full), 'right')} />
-        </div>
+      {tabsAt !== 'top' && <span className="spacer" />}
+      {groups.filter(g => !folded.has(g.id)).map(g =>
+        g.id === 'ext' ? (
+          !(narrow && ws) && <ToolGroup key={g.id} id={g.id} label={g.label}><WidgetStrip widgets={ownWidgets.filter(w => extShown.has(`ext:${w.id}`))} api={widgetApi} place="top" /></ToolGroup> /* a phone: in the ⋯ menu (wsMore) */
+        ) : (
+          <Fragment key={g.id}>
+            {g.ids.includes('reader') && BTN.reader.node() /* the Terminal | Reader switch: a capsule of its own (U2: a split pane has it in its header) */}
+            {g.ids.some(id => id !== 'reader') && (
+              <ToolGroup id={g.id} label={g.label}>
+                {g.ids.filter(id => id !== 'reader').map(id => <Fragment key={id}>{BTN[id]?.node()}</Fragment>)}
+              </ToolGroup>
+            )}
+          </Fragment>
+        ),
       )}
-      {ws && ws.browser === undefined && project?.kind !== 'shells' && (
-        <div className="actions capsule nodrag">
-          {!narrow && ( // a phone: in ⌘K's palette (its search button)
-            <>
-              <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-              <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
-            </>
+      {ws && (
+        <div className="actions capsule nodrag tool-end">
+          {narrow && !page && <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} /> /* a phone has no ⌘K */}
+          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(page ? full : [...outside, ...(outside.length ? [null] : []), ...full, { label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }, null, { label: 'Customize toolbar…', icon: 'settings', run: () => setDialog('toolbar') }]), 'right')} />
+          {!page && (
+            <RunButton
+              running={devRunning}
+              onRun={() => (ws.run ? run() : editScripts())}
+              onStop={() => devTab && api.send('input', { tab: devTab.id, data: '\x03' })}
+              onMenu={e => openMenu(e, runMenu(), 'right')}
+            />
           )}
-          <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
-          {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
-          {narrow && <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} /> /* a phone has no ⌘K */}
-          {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
-          <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore([...full, { label: 'Layout', icon: 'layers', hint: kh('layout'), items: layoutMenu() }]), 'right')} />
-          <RunButton
-            running={devRunning}
-            onRun={() => (ws.run ? run() : editScripts())}
-            onStop={() => devTab && api.send('input', { tab: devTab.id, data: '\x03' })}
-            onMenu={e => openMenu(e, runMenu(), 'right')}
-          />
         </div>
       )}
     </div>

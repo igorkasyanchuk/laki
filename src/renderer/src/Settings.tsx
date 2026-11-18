@@ -150,6 +150,8 @@ export type AppSettings = Paint & {
   keepStorage?: boolean // a deleted workspace's storage folder stays
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
+  toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
+  toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
@@ -1830,6 +1832,9 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+                <button type="button" className="link small" data-tip="Which buttons the tab bar shows, and in what order (also its right click, View › Customize Toolbar…)" onClick={() => openExternal('laki://toolbar')}>
+                  Customize toolbar…
+                </button>
                 <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
                   Motion
                   <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>

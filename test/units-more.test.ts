@@ -1196,3 +1196,35 @@ test("previewOf: ⌘K's preview of a workspace (agents, plan, PR, diff, next ste
   assert.ok(previewOf({ kind: 'ws', label: 'hidden', ws: 'h' }, view))
   assert.equal(previewOf({ kind: 'ws', label: 'gone', ws: 'nope' }, view), null)
 })
+
+test('fitTabs: all fit; the selected one kept when it would be hidden; no room: only the selected', async () => {
+  const { fitTabs } = await import('../src/renderer/src/toolbar.ts')
+  assert.deepEqual(fitTabs([100, 100, 100], 300, 0, 96), { shown: [0, 1, 2], hidden: [] })
+  // 9 tabs at 96 in 600: 5 shown (the +n button takes a tab's room), the 4 others behind it
+  assert.deepEqual(fitTabs(Array(9).fill(96), 600, 1, 96), { shown: [0, 1, 2, 3, 4], hidden: [5, 6, 7, 8] })
+  // the selected one past them takes the last slot; the order otherwise stays
+  assert.deepEqual(fitTabs(Array(9).fill(96), 600, 7, 96), { shown: [0, 1, 2, 3, 7], hidden: [4, 5, 6, 8] })
+  assert.deepEqual(fitTabs([50, 50], 0, 1, 96), { shown: [1], hidden: [0] }) // widths under min count as min
+  assert.deepEqual(fitTabs([], 500, -1, 96), { shown: [], hidden: [] })
+})
+
+test('toolbarOf: the default when unset; hidden ones for ⋯; an unknown id dropped; a new one added once, at its place', async () => {
+  const { toolbarOf, TOOLBAR_ITEMS, collapseOf } = await import('../src/renderer/src/toolbar.ts')
+  const items = [{ id: 'a' }, { id: 'b' }, { id: 'c', off: true }, { id: 'd' }]
+  assert.deepEqual(toolbarOf(undefined, items), { shown: ['a', 'b', 'd'], menu: ['c'], seen: ['a', 'b', 'c', 'd'] })
+  assert.deepEqual(toolbarOf(null, items).shown, ['a', 'b', 'd'])
+  // yours: in your order, b hidden (in ⋯), an unknown id and a repeat dropped
+  assert.deepEqual(toolbarOf(['d', 'zz', 'a', 'd', 7], items, ['a', 'b', 'c', 'd']), { shown: ['d', 'a'], menu: ['b', 'c'], seen: ['a', 'b', 'c', 'd'] })
+  // a later version's e: at its default place for a custom list (after a, as by default), once: seen, it stays hidden
+  const later = [{ id: 'a' }, { id: 'e' }, { id: 'b' }, { id: 'c', off: true }, { id: 'd' }]
+  assert.deepEqual(toolbarOf(['a', 'd'], later, ['a', 'b', 'c', 'd']).shown, ['a', 'e', 'd'])
+  assert.deepEqual(toolbarOf(['a', 'd'], later, ['a', 'b', 'c', 'd', 'e']).shown, ['a', 'd'])
+  // today's bar by default: Reader, the side panel, Open in, Preview, Ship, the timer; ⋯ and Run aren't items
+  assert.deepEqual(toolbarOf(undefined, TOOLBAR_ITEMS).shown, ['reader', 'panel', 'editor', 'preview', 'ship', 'timer'])
+  assert.ok(!TOOLBAR_ITEMS.some(x => x.id === 'run' || x.id === 'more'))
+  // groups fold into ⋯ from the right, whole
+  const gs = [{ id: 'view', n: 2 }, { id: 'open', n: 2 }, { id: 'workspace', n: 2 }]
+  assert.deepEqual(collapseOf(gs, 1000), [])
+  assert.deepEqual(collapseOf(gs, 140), ['workspace'])
+  assert.deepEqual(collapseOf(gs, 0), ['workspace', 'open', 'view'])
+})

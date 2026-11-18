@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The tab bar's buttons sit in groups, fold into ⋯ when the bar is narrow, and can be picked and ordered: right click the bar › *Customize toolbar…* (or View › Customize Toolbar…). Tabs that don't fit go behind a *+n* button that shows the most urgent of them. [Try it](laki://toolbar)
 - ⌘K shows a preview beside the list in a wide window: a workspace's agents, plan, PR, diff and next step, or what an action does and its key. ⇥ goes to its buttons (Open, Changes, Ship).
 - Paste a token or key into a prompt box and a line under it says so, masked: *Pass as a secret* puts it in a file only you and the agent read and its path in the prompt. Checked in the window; ⏎ twice sends it as it is.
 - A *don't ask again* choice shows the whole rule it grants on a line of its own (`npm init *`), in Needs you, the Reader, the ask bar, the cards on screen and notifications. A broad one (a wildcard, a folder, a whole tool) is amber and says what it covers: *every command that starts with npm init*. Allow all and the answer keys never pick it.
