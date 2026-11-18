@@ -358,11 +358,12 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'laki_new_workspace', arguments: { project: proj.id, prompt: 'hi', preset: 'shell', name: 'mcp-ws', no_setup: true } } },
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'laki_screen', arguments: { target: 'nope' } } },
     { jsonrpc: '2.0', id: 5, method: 'resources/list' },
+    { jsonrpc: '2.0', id: 6, method: 'sampling/createMessage' },
   ]
   const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp', '--all') // every tool listed (laki_more's groups: cli-more)
   assert.equal(r.code, 0, r.err)
   const got = Object.fromEntries(r.out.trim().split('\n').map(l => JSON.parse(l)).map(m => [m.id, m]))
-  assert.deepEqual(Object.keys(got).sort(), ['1', '2', '3', '4', '5']) // the notification gets no answer
+  assert.deepEqual(Object.keys(got).sort(), ['1', '2', '3', '4', '5', '6']) // the notification gets no answer
   assert.equal(got[1].result.protocolVersion, '2025-03-26')
   assert.equal(got[1].result.serverInfo.name, 'laki')
   const names = got[2].result.tools.map((t: any) => t.name)
@@ -373,7 +374,8 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')
   assert.equal(JSON.parse(got[3].result.content[0].text).noSetup, true)
   assert.equal(got[4].result.isError, true)
-  assert.equal(got[5].error.code, -32601)
+  assert.ok(Array.isArray(got[5].result.resources), 'resources: a list (answered as they come: mcp-ws may not be made yet)')
+  assert.equal(got[6].error.code, -32601) // a method it doesn't have
   const v = JSON.parse((await rig.cli('ls', '--json')).out)
   assert.ok(v.workspaces.some((w: any) => w.id === 'mcp-ws'))
 })
