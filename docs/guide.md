@@ -2634,6 +2634,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   can't be), Esc to drop it. Say just *yes* or *no* (allow, deny, так, ні…) while an agent waits on a permission and the
   pill answers it: it shows what it answers, ⏎ answers (a plain command: by itself in 1.5 s), Tab sends your words as a
   message instead; a question, a plan, a secret or a risky command stays for Laki's window (*Answer asks* turns it off).
+  *Include the selected text* (off until on): what's selected in the app you're in goes with your words, quoted (to
+  Laki AI fenced as data): the pill says *+ selection · 3 lines*, and its × leaves it out. It's copied with ⌘C and the
+  clipboard put back (Accessibility for Laki; never from a password manager or Keychain Access); in Laki, the page's
+  selection or the shown terminal's. 4,000 characters at most (cut in the middle), secrets masked as Ship masks them.
   macOS asks for the microphone the first time. *It goes to*: *An agent* (as above) or
   *Laki AI*, which does what you say (start a task, check a PR, stop an agent); say "screenshot" or "my screen" and
   the screen under the pill goes with it (Screen Recording for Laki); Tab reaches Laki AI either way. *Route by first words* (on; the talk

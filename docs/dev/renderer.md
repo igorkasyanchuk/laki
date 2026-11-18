@@ -552,6 +552,17 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   line on its stdin, its final text; else killed), then `talk-fix` (the daemon's `voiceText { text }`: Cloud's cleanup,
   fillers and word fixes, nothing to OpenRouter) and `heard` (routing, sending) as Cloud's. A locale the Mac doesn't
   recognize on device: its `no-on-device` error, and Settings says so with *Use Cloud*.
+  Q11, the selection (`voice.selection`, on only if true; App's floats `selection`): main's `grabSelection` runs as the
+  key is pressed, before the pill takes the focus; the pill shows once it's back. Laki's main window focused: its
+  `window.lakiSelection` (App: `getSelection()`, else the shown tab's xterm selection); another of Laki's windows:
+  none; another app: `SEL_JXA` through osascript: the front app's bundle id (talk.ts `selSkip`: `SEL_SKIP`'s password
+  managers, Keychain Access, Passwords), its pasteboard's items kept (every type's data), ⌘C posted (CGEvent, keycode
+  8 with Command: Accessibility for Laki, else nothing lands), up to 150 ms for `changeCount` to move, the string read,
+  the items written back. `selectionOf` masks it (secrets.ts `SECRETS`, Ship's) and cuts the middle past `SEL_MAX`
+  (4,000); `talk` gets `selection: { label, head }` (`selLabel`: *+ selection · n lines*), and its × sends without it
+  (`talk-send`'s fourth argument). Main keeps the text (`talkSel`, until the pill closes) and adds it with
+  `withSelection`: quoted for an agent, a new task and the Voice note, fenced as data for Laki AI, none for a to-do.
+  tell.ts `handOff`'s `selection` does the same for the quick bar's targets.
   A spoken yes or no (shared/talk.ts `spokenAnswer`: the whole transcript one of a few words a language, fillers and
   punctuation aside; Settings › Voice › Talk key's *Answer asks*, `voice.answers`, unset on; App's floats `noAnswers`)
   with an ask waiting (the pill's target's, else the newest: `talkList` carries a waiting one's `ask` and `held`, its

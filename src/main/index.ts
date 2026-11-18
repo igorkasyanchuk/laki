@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
-import { AI_TO, NOTE_TO, TODO_TO, talkDefault, talkShot } from '../shared/talk.ts'
+import { AI_TO, NOTE_TO, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
@@ -1515,7 +1515,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */ } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string; note?: boolean; todo?: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1711,6 +1711,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     at: o.at === 'notch' ? 'notch' : 'edge',
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
     ...(o.talkAi === true && { talkAi: true }),
+    ...(o.selection === true && { selection: true }),
     ...(typeof o.speech === 'string' && /^[\w-]{2,20}$/.test(o.speech) && { speech: o.speech }),
     ...(o.noAnswers === true && { noAnswers: true }),
     ...(o.hide === true && { hide: true }),
@@ -2267,9 +2268,9 @@ const TALK = { width: 320, height: 78 }
 const aiAsked = (text: string, images?: string[]) => (floats.ai ? (void rpc('aiAsk', { text, ...(images && { images }) }).catch(() => {}), floats.aiShow && setTimeout(aiWin, 300), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
 // Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
 // (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
-async function aiTalk(text: string): Promise<{ ai?: boolean; shot?: boolean; noShot?: string; error?: string }> {
+async function aiTalk(said: string, text = said): Promise<{ ai?: boolean; shot?: boolean; noShot?: string; error?: string }> {
   if (!floats.ai) return aiAsked(text)
-  if (!talkShot(text) || !mac) return aiAsked(text)
+  if (!talkShot(said) || !mac) return aiAsked(text) // the words said ask for the screen, not a selection's
   if (screenOff()) return (privacySay('screen'), { ...aiAsked(text), noShot: 'Laki has no Screen Recording' })
   const w = talkW
   const on = screen.getDisplayMatching(w && !w.isDestroyed() ? w.getBounds() : { ...screen.getCursorScreenPoint(), width: 1, height: 1 }).bounds
@@ -2287,9 +2288,46 @@ let talkUndo: { tab: string; text: string } | null = null // a send that's still
 let talkTakeBack: (() => Promise<unknown>) | null = null // Q5b: a note's line or a Backlog's item just added: Undo removes it
 const talkList = () => ((floats.talk ?? floats.items) as (Float & { name?: string; pid?: string; alias?: string })[]).map(f => ({ tab: f.tab, name: f.name ?? f.tab, status: f.status ?? 'idle', ...(f.at && { at: f.at }), ...(f.pid && { project: f.pid }), ...(f.alias && { alias: f.alias }), ...(f.status === 'waiting' && f.ask && { ask: { options: f.ask.options.slice(0, 9), tool: f.ask.tool, what: f.ask.what?.slice(0, 300), question: f.ask.question?.slice(0, 300), steps: f.ask.steps } }), ...(f.held && { held: true }) })) // ask: what a spoken yes or no would answer
 let talkProject = '' // Q5: the project of the last talk or Say it sent: a route into another one shows a little longer
+// Q11: what was selected as the key was pressed (talk.ts selectionOf: masked, capped), until the pill closes; the pill's
+// × drops it from a send. In Laki's window: its page's selection or the focused terminal's (App's lakiSelection); else
+// the app in front's, by ⌘C (SEL_JXA: its pasteboard kept and put back, 150 ms for the copy to land; a password manager
+// or SEL_SKIP's: not copied; no Accessibility for Laki: the key does nothing, so nothing)
+let talkSel = ''
+const SEL_JXA = `ObjC.import('AppKit'); ObjC.import('CoreGraphics')
+function run(argv) {
+  const skip = JSON.parse(argv[0]), front = $.NSWorkspace.sharedWorkspace.frontmostApplication
+  const app = front.isNil() ? '' : ObjC.unwrap(front.bundleIdentifier) || ''
+  if (!app || skip.some(d => app === d || app.indexOf(d + '.') === 0)) return JSON.stringify({ app, skip: true })
+  const pb = $.NSPasteboard.generalPasteboard, was = pb.changeCount, kept = [], items = pb.pasteboardItems
+  for (let i = 0; i < items.count; i++) { const it = items.objectAtIndex(i), ts = it.types, k = []; for (let j = 0; j < ts.count; j++) { const t = ts.objectAtIndex(j), d = it.dataForType(t); if (!d.isNil()) k.push([t, d]) } kept.push(k) }
+  for (const down of [true, false]) { const e = $.CGEventCreateKeyboardEvent($(), 8, down); $.CGEventSetFlags(e, 0x100000); $.CGEventPost(0, e) }
+  for (let n = 0; n < 15 && pb.changeCount === was; n++) delay(0.01)
+  if (pb.changeCount === was) return JSON.stringify({ app, text: '' })
+  const s = pb.stringForType($.NSPasteboardTypeString), text = s.isNil() ? '' : ObjC.unwrap(s)
+  pb.clearContents
+  if (kept.length) pb.writeObjects($(kept.map(k => { const it = $.NSPasteboardItem.alloc.init; k.forEach(([t, d]) => it.setDataForType(d, t)); return it })))
+  return JSON.stringify({ app, text })
+}`
+function grabSelection(): Promise<string> {
+  if (!mac || !floats.selection) return Promise.resolve('')
+  const mine = BrowserWindow.getFocusedWindow()
+  if (mine && mine === win) return mine.webContents.executeJavaScript('window.lakiSelection ? window.lakiSelection() : String(getSelection() || "")', true).then(t => selectionOf(typeof t === 'string' ? t : ''), () => '')
+  if (mine) return Promise.resolve('') // another of Laki's windows: its own box has what you'd select
+  return new Promise(done =>
+    execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', SEL_JXA, JSON.stringify(SEL_SKIP)], { timeout: 2000 }, (err, out) => {
+      try {
+        const r = JSON.parse(String(out)) as { text?: unknown }
+        done(!err && typeof r.text === 'string' ? selectionOf(r.text) : '')
+      } catch {
+        done('')
+      }
+    }),
+  )
+}
 const routeFor = () => floats.route && { ...floats.route, aiOn: floats.ai, last: talkProject, lastTab: talkLast }
 function talk() {
   if (talkW && !talkW.isDestroyed()) return void talkW.webContents.send('talk-key') // the second press: stop, send
+  const sel = grabSelection() // first: the pill takes the focus as it shows
   const p = screen.getCursorScreenPoint()
   const d = screen.getDisplayNearestPoint(p).workArea
   const w = (talkW = new BrowserWindow({ ...floatOpts(TALK.width, TALK.height), x: clamp(p.x + 14, d.x, d.x + d.width - TALK.width), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
@@ -2297,11 +2335,13 @@ function talk() {
   pin(w, url)
   guardFloat('talk', w)
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null), (talkTakeBack = null), listen?.kill(), (listen = null)))
-  w.webContents.on('did-finish-load', () => {
+  w.on('closed', () => talkW === w && ((talkW = null), (talkUndo = null), (talkTakeBack = null), (talkSel = ''), listen?.kill(), (listen = null)))
+  w.webContents.on('did-finish-load', async () => {
+    talkSel = await sel
+    if (w.isDestroyed()) return
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), answers: !floats.noAnswers, list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor() })
+    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), answers: !floats.noAnswers, list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor(), ...(talkSel && { selection: { label: selLabel(talkSel), head: talkSel.split('\n')[0].slice(0, 120) } }) })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -2314,16 +2354,18 @@ ipcMain.handle('talk-text', async (e, audio: unknown) => {
   if (typeof audio !== 'string' || !audio || audio.length > 24 << 20) return { error: 'no recording' }
   return rpc<{ text: string }>('voiceText', { audio }).catch((err: Error) => ({ error: err.message }))
 })
-ipcMain.handle('talk-send', async (e, tab: unknown, text: unknown, project: unknown) => {
+ipcMain.handle('talk-send', async (e, tab: unknown, said: unknown, project: unknown, withSel: unknown) => {
   if (!fromTalk(e)) return { error: 'not the talk pill' }
-  if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
-  if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
+  if (typeof said !== 'string' || !said.trim()) return { error: 'nothing to send' }
+  if (said.length > 20000) return { error: 'too long: 20,000 characters at most' }
   if (typeof tab !== 'string') return { error: 'who gets it?' }
+  const sel = withSel === true && tab !== TODO_TO ? talkSel : '' // Q11: the pill's × left it out; a to-do is one line
+  const text = withSelection(said.trim(), sel, tab === AI_TO)
   const pid = typeof project === 'string' && floats.route?.projects.some(p => p.id === project) ? project : undefined
-  if (!tab) return (talkProject = pid ?? talkProject), newWsWin(text.trim(), pid), { new: true }
-  if (tab === AI_TO) return aiTalk(text.trim())
-  if (tab === NOTE_TO) return voiceNote(text.trim())
-  if (tab === TODO_TO) return voiceTodo(text.trim(), pid)
+  if (!tab) return (talkProject = pid ?? talkProject), newWsWin(text, pid), { new: true }
+  if (tab === AI_TO) return aiTalk(said.trim(), text)
+  if (tab === NOTE_TO) return voiceNote(text)
+  if (tab === TODO_TO) return voiceTodo(text, pid)
   if (!talkTo.has(tab)) return { error: 'not an agent the pill offered' }
   talkProject = ((floats.talk ?? floats.items) as (Float & { pid?: string })[]).find(x => x.tab === tab)?.pid ?? talkProject
   const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true, agent: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message })) // agent: never a shell

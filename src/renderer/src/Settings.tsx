@@ -2736,6 +2736,9 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={s.voice?.answers !== false} onChange={on => set({ voice: { ...s.voice, answers: on ? undefined : false } })}>
                     <Says title="Answer asks" hint="Say just yes or no (allow, deny, так, ні…) while an agent waits on a permission: the pill shows the ask, and ⏎ answers it. A plain command it answers by itself in 1.5 s; a question, a plan, a secret or a risky command stays for Laki's window. Tab sends your words as a message instead" />
                   </Switch>
+                  <Switch className="switch-row" on={s.voice?.selection === true} onChange={on => set({ voice: { ...s.voice, selection: on || undefined } })}>
+                    <Says title="Include the selected text" hint="What's selected in the app you're in goes with your words, quoted (to Laki AI as data): copied with ⌘C and the clipboard put back; needs Accessibility for Laki. Never from a password manager. In Laki, the selection or the focused terminal's. 4,000 characters at most, secrets masked; × on the pill leaves it out" />
+                  </Switch>
                 </div>
               )}
             </Group>

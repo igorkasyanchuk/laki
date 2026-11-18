@@ -103,7 +103,10 @@
       .t-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .t-to.moved { color: var(--waiting); }
       .t-undo { flex: none; font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; padding: 2px 9px; cursor: pointer; }
-      .t-note { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-note { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-sel { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; padding: 0 2px 0 7px; }
+      .t-sel[hidden] { display: none; }
+      .t-sel button { font: inherit; color: var(--muted); background: none; border: 0; padding: 0 4px; cursor: pointer; }
       .t-note.bad { color: #f7768e; white-space: normal; }
       #voice { box-sizing: border-box; height: 186px; display: flex; flex-direction: column; gap: 7px; padding: 10px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; user-select: text; -webkit-user-select: text; }
       .v-head { display: flex; align-items: center; justify-content: space-between; }
@@ -221,7 +224,7 @@
     </div>
     <div id="talk" role="dialog" aria-label="Talk to an agent">
       <div class="t-row"><i class="t-rec" title="Recording"></i><span class="t-level"><i></i></span><span class="t-time">0:00</span><b class="t-to"></b><button class="t-undo" hidden>Undo</button></div>
-      <div class="t-note"></div>
+      <div class="t-row"><span class="t-sel" hidden><span></span><button aria-label="Leave the selection out" title="Leave it out">×</button></span><div class="t-note"></div></div>
     </div>
     <script type="module" src="/src/floater.ts"></script>
   </body>

@@ -84,7 +84,7 @@ type Bridge = {
     onTalk: (cb: (c: Talk) => void) => void
     onTalkKey: (cb: () => void) => void
     talkText: (audio: string) => Promise<{ text?: string; error?: string }>
-    talkSend: (tab: string, text: string, project?: string) => Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }>
+    talkSend: (tab: string, text: string, project?: string, selection?: boolean) => Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }>
     talkUndo: () => Promise<{ error?: string }>
     talkClose: () => void
     talkListen: () => Promise<{ error?: string }>
@@ -96,7 +96,7 @@ type Bridge = {
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
 // npm run test:ui's (no microphone opened); ai: Laki AI is on (Tab goes to it too)
-type Talk = { list: TalkTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string; answers?: boolean } // answers: a spoken yes or no answers a waiting ask (Settings › Voice)
+type Talk = { list: TalkTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string; answers?: boolean; selection?: { label: string; head: string } } // answers: a spoken yes or no answers a waiting ask (Settings › Voice); selection (Q11): what main copied, its label and first line
 // a waiting one's ask (what a spoken yes or no answers) and held: its secret or plan (never answered from the pill)
 type TalkTab = RouteTab & { ask?: Ask; held?: boolean } // speech: the on-device engine's locale (main's Laki Speech), else Cloud
 // Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
@@ -743,6 +743,9 @@ function talkPage() {
   const level = box.querySelector<HTMLElement>('.t-level > i')!
   const note = box.querySelector<HTMLElement>('.t-note')!
   const undo = box.querySelector<HTMLButtonElement>('.t-undo')!
+  const selEl = box.querySelector<HTMLElement>('.t-sel')!
+  let withSel = false // Q11: the selection goes too (its × drops it)
+  selEl.querySelector('button')!.onclick = () => ((withSel = false), (selEl.hidden = true))
   let list: TalkTab[] = []
   let answers = false
   let lang: string | undefined
@@ -795,6 +798,9 @@ function talkPage() {
     lang = c.speech
     ai = !!c.ai
     cfg = c.route
+    withSel = !!c.selection
+    selEl.hidden = !c.selection
+    if (c.selection) (selEl.querySelector('span')!.textContent = c.selection.label), (selEl.title = c.selection.head)
     show()
     if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
     if (c.mic === 'not-determined') say('macOS asks once: Laki hears what you say to an agent, and only while this pill shows red')
@@ -964,7 +970,7 @@ function talkPage() {
     if (phase === 'sending' || phase === 'sent') return
     phase = 'sending'
     const name = talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name)
-    const r = await bridge?.talkSend(to, text, to && to !== TODO_TO ? undefined : toProject)
+    const r = await bridge?.talkSend(to, text, to && to !== TODO_TO ? undefined : toProject, withSel)
     phase = 'sent'
     if (r?.error) {
       const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)

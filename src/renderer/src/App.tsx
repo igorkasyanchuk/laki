@@ -227,6 +227,9 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 // an extension tool's asks: one dialog at a time, the others in line (tagged by req); toolOn: the one on screen
 type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'deny' }[]; answer: (allow: string) => void }
+// Q11: the talk key's selection in Laki's window (main's grabSelection runs it): the page's, else the shown terminal's
+const selFrom: { tab?: string } = {}
+Object.assign(window, { lakiSelection: () => (d => (d.trim() ? d : (selFrom.tab && xterms.get(selFrom.tab)?.getSelection()) || ''))(String(getSelection() ?? '')) })
 const toolLine = new Line<ToolAsk>()
 let toolOn: string | undefined
 const AWAY = -2 // #18: a page or dialog opened over the ask on screen: it waits, first in line, and comes back as that closes
@@ -708,6 +711,7 @@ export function App() {
   const shownOrder = useRef<string[]>([]) // the tab bar as last drawn: a closed tab's next one (else the one before) takes its place
   const nextOf = (id: string | null) => (o => (i => (i < 0 ? undefined : [...o.slice(i + 1), ...o.slice(0, i).reverse()].map(byId).find(Boolean)))(o.indexOf(id ?? '')))(shownOrder.current)
   const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.id === shownTab.current) ?? nextOf(shownTab.current) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  selFrom.tab = tab?.id
   shownTab.current = tab?.id ?? null
   shownOrder.current = groups.flatMap(tabsOf)
   const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
@@ -1134,7 +1138,7 @@ export function App() {
   const pool = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floats = fs?.floater === false ? [] : pool // the talk pill's are the same, with the bubbles off too
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(fs?.hideFloats === true && { hide: true }), ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }), ...(talkOn && fs?.voice?.talkEngine === 'mac' && { speech: fs.voice.locale || 'en-US' }), ...(talkOn && fs?.voice?.answers === false && { noAnswers: true }), ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), note: fs?.voice?.routeNote !== false, todo: fs?.voice?.routeTodo !== false, aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first words' names
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(fs?.hideFloats === true && { hide: true }), ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }), ...(talkOn && fs?.voice?.selection === true && { selection: true }), ...(talkOn && fs?.voice?.talkEngine === 'mac' && { speech: fs.voice.locale || 'en-US' }), ...(talkOn && fs?.voice?.answers === false && { noAnswers: true }), ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), note: fs?.voice?.routeNote !== false, todo: fs?.voice?.routeTodo !== false, aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first words' names
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   const asking = view?.tabs.filter(t => t.status === 'waiting').map(t => t.id).join(' ') // none: not connected, nothing known
   useEffect(() => void (asking !== undefined && bridge?.asking?.(asking ? asking.split(' ') : [])), [asking]) // asks on screen: an answered one's card goes
