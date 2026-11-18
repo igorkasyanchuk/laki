@@ -2,11 +2,11 @@
 // (macOS tints it for a light or dark menu bar and for the highlight from its alpha alone: no color), test/tray.test.ts
 // draws all four to PNGs. The renderer works out the state from its view (stateOf) and sends it with the badge.
 import { needsTab } from './nextStep.ts'
-import type { TabView, View } from './types.ts'
+import type { DigestRow, TabView, View } from './types.ts'
 
 export const TRAY_STATES = ['idle', 'working', 'waiting', 'blocked'] as const
 export type TrayState = (typeof TRAY_STATES)[number]
-export type TrayInfo = { state: TrayState; needs: number; working: number; blocked: number }
+export type TrayInfo = { state: TrayState; needs: number; working: number; blocked: number; quiet?: number /* U8: quiet until (ms) */ }
 
 // the agents' tabs of workspaces you hear from (muted and archived ones aside, as the Dock's count): blocked (one at its
 // plan limit, or a turn ended on an error) over waiting (one needs you: asks, a secret, finished unseen) over working (one
@@ -46,19 +46,47 @@ export function bounceOf(was: ReadonlySet<string> | null, view: Pick<View, 'tabs
   return { now, bounce: !!was && !front && view.settings.dockBounce !== false && [...now].some(w => !was.has(w)) }
 }
 
-// its tooltip, in words: "Laki: 2 need you, 3 working, 1 blocked"; nothing going on: the name alone
-export function trayTip(i: Pick<TrayInfo, 'needs' | 'working' | 'blocked'>, name = 'Laki') {
-  const parts = [i.needs && `${i.needs} need${i.needs === 1 ? 's' : ''} you`, i.working && `${i.working} working`, i.blocked && `${i.blocked} blocked`].filter(Boolean)
+// its tooltip, in words: "Laki: 2 need you, 3 working, 1 blocked"; nothing going on: the name alone; quiet: "quiet until
+// 14:30" first
+export const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+export function trayTip(i: Pick<TrayInfo, 'needs' | 'working' | 'blocked' | 'quiet'>, name = 'Laki', now = Date.now()) {
+  const parts = [(i.quiet ?? 0) > now && `quiet until ${hhmm(i.quiet!)}`, i.needs && `${i.needs} need${i.needs === 1 ? 's' : ''} you`, i.working && `${i.working} working`, i.blocked && `${i.blocked} blocked`].filter(Boolean)
   return parts.length ? `${name}: ${parts.join(', ')}` : name
+}
+
+// U8: Quiet's choices, the same in ⌘K and the menu bar's menu: 30 minutes, an hour, until 9:00 (after midnight: this
+// morning's, not a day and a night more)
+export function quietChoices(now = Date.now()): { label: string; o: { minutes: number } | { until: number } }[] {
+  const at9 = new Date(now)
+  const early = at9.getHours() < 9
+  at9.setHours(early ? 9 : 24 + 9, 0, 0, 0)
+  return [
+    { label: 'for 30 minutes', o: { minutes: 30 } },
+    { label: 'for 1 hour', o: { minutes: 60 } },
+    { label: early ? 'until 9:00' : 'until tomorrow 9:00', o: { until: at9.getTime() } },
+  ]
+}
+// what still comes while quiet: an important workspace's ask (its card) and laki alert's card (api.ts notify)
+export const quietLets = (card?: { ask?: boolean; alert?: string }) => !!(card?.ask || card?.alert)
+// a notification's tab that opens Needs you on a click (main's show sends it on as a tab id; App's onFocusTab)
+export const NEEDS = '@needs'
+// as it ends, the one notification's words: "While it was quiet: 2 agents are waiting, 3 finished, 1 check failed";
+// nothing happened: '' (no notification, no card)
+export function quietSummary(rows: Pick<DigestRow, 'kind' | 'text'>[]) {
+  const n = (k: DigestRow['kind'], f: (r: Pick<DigestRow, 'text'>) => boolean = () => true) => rows.filter(r => r.kind === k && f(r)).length
+  const [wait, done, fail, pr] = [n('wait'), n('done'), n('pr', r => r.text === 'checks fail'), n('pr', r => r.text !== 'checks fail')]
+  const parts = [wait && `${wait} agent${wait === 1 ? ' is' : 's are'} waiting`, done && `${done} finished`, fail && `${fail} check${fail === 1 ? '' : 's'} failed`, pr && `${pr} PR${pr === 1 ? '' : 's'} moved`].filter(Boolean)
+  return parts.length ? `While it was quiet: ${parts.join(', ')}` : ''
 }
 // its title beside the icon: the count of those that need you, with ! when one is blocked
 export const trayTitle = (i: Pick<TrayInfo, 'needs' | 'blocked'>) => `${i.needs || ''}${i.blocked ? '!' : ''}`
 
 // Laki's mark (a chevron and a dot) at 32×32 (@2x), BGRA, black with its alpha antialiased from a distance field:
 // waiting the filled mark (as it always was), idle its outline, working the outline and a dot under it, blocked the
-// filled mark and a bar under it
+// filled mark and a bar under it. quiet (U8): a slash through it, a gap cut either side; drop (Q9: something dragged
+// over the item): the filled mark in a rounded frame
 export const TRAY_PX = 32
-export function trayBitmap(state: TrayState): Buffer {
+export function trayBitmap(state: TrayState, o: { quiet?: boolean; drop?: boolean } = {}): Buffer {
   const S = TRAY_PX
   const px = Buffer.alloc(S * S * 4)
   const seg = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
@@ -66,7 +94,7 @@ export function trayBitmap(state: TrayState): Buffer {
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
     return Math.hypot(x - ax - t * dx, y - ay - t * dy)
   }
-  const filled = state === 'waiting' || state === 'blocked'
+  const filled = state === 'waiting' || state === 'blocked' || !!o.drop
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++) {
       const [cx, cy] = [x + 0.5, y + 0.5]
@@ -74,6 +102,11 @@ export function trayBitmap(state: TrayState): Buffer {
       let d = filled ? mark : Math.abs(mark + 0.8) - 0.8 // the outline: a band 1.6 px inside its edge
       if (state === 'working') d = Math.min(d, Math.hypot(cx - 15, cy - 28.5) - 2.2)
       if (state === 'blocked') d = Math.min(d, seg(cx, cy, 7, 28.5, 23, 28.5) - 1.3)
+      if (o.drop) d = Math.min(mark, Math.abs(Math.hypot(Math.max(Math.abs(cx - 16) - 11, 0), Math.max(Math.abs(cy - 16) - 11, 0)) - 3.5) - 1)
+      if (o.quiet) {
+        const slash = seg(cx, cy, 2, 21, 30, 12) // across both arms, under the dot
+        d = Math.min(Math.max(d, 2.6 - slash), slash - 1.2) // a gap 2.6 px either side of the line's middle, then the line
+      }
       px[(y * S + x) * 4 + 3] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - d))) // antialiased edges
     }
   return px

@@ -76,10 +76,14 @@ changing it: [AGENTS.md](../AGENTS.md).
   `owner/repo`, clones it into `~/code` (or the folder you name) and adds it as a project.
 - **Stop all agents**: ⌘K › *Stop all agents* (File menu too; give it a key in Settings › Keys) names the turns under
   way, asks once and interrupts each (Esc; nothing is closed). A queue it held shows *Resume queue*.
-- **Do not disturb**: ⌘K › *Do not disturb: 30 minutes / 1 hour / until tomorrow 9:00* (after midnight: until 9:00 that morning). No notifications, sounds or
-  phone pushes meanwhile, except an important workspace's ask. The status bar's moon ends it early; as it ends, one card
-  (*While you were away*) lists what waits for you, what finished and which PRs moved; a row opens its tab, and the
-  card stays until you close it.
+- **Quiet** (was Do not disturb): the menu bar's menu › *Quiet › For 30 Minutes / For 1 Hour / Until Tomorrow 9:00*, ⌘K ›
+  *Quiet for 30 minutes…*, `laki quiet 30m` (no length: Settings › Notifications' default, an hour unless set), or
+  Start in Settings › Notifications. After midnight, until 9:00 that morning. No notifications, sounds, cards or phone
+  pushes meanwhile; asks still show in Needs you, an important workspace's ask still comes, and `laki alert` still shows.
+  The menu bar's mark gets a slash (its tooltip says until when) and the status bar a moon; either ends it early (*End
+  Quiet*, `laki quiet off`). As it ends, one notification (*While it was quiet: 2 agents are waiting, 3 finished, 1
+  check failed*; a click opens Needs you) and one card list what waits for you, what finished and which PRs moved; a
+  row opens its tab, and the card stays until you close it. Nothing happened: neither. Yours only: an agent can't set it.
 - **Follow the system**: Settings › Theme & type › Theme › *Follow the system* paints a light theme while macOS is light
   and a dark one while it's dark (pick each); it turns with the system, terminals too.
 - **Menus**: Settings › Layout › *Menus* (macOS): *Laki's* or *macOS*: a workspace's and a tab's menu (a right click,
@@ -2660,7 +2664,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   "<question>"` asks it and prints its reply, `laki send @<name>` tells it something; MCP's `laki_name` and
   `laki_ask_agent` do the same. `laki bell <ws|tab>` (`--off`), or *Tell me when it finishes* in a tab's or a
   workspace's menu and ⌘K, tells you once when it next finishes, asks, fails or hits a plan limit: a notification and
-  a phone push as an important workspace's, even with finish notifications off (Do not disturb holds it). An agent
+  a phone push as an important workspace's, even with finish notifications off (Quiet holds it). An agent
   can't set one. A tab keeps its name until it closes or its workspace is archived; the tab bar shows it.
   It holds the app's path: update it after moving the app. A skill installed with other text than this Laki's (an
   older Laki's, or edited) says *out of date*, with *Update* (*Update all* for several); the app shows a bar with

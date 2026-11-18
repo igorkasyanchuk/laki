@@ -613,6 +613,7 @@ export type Settings = {
   scheduleMaxMinutes?: number // T8: a scheduled run's time limit, its agent's working time, for a task that sets none (unset: 60; 0: none)
   scheduleAtOnce?: number // T8: scheduled runs going at once; a due one past it waits its turn (unset: 2; 0: no cap)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
+  quietMinutes?: number // U8: Quiet's default length, in minutes (laki quiet, the phone's button): unset 60
   timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   presets?: Preset[] | null // null: the defaults

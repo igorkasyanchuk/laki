@@ -16,6 +16,12 @@ test('laki alert: a card for the app (none open: refused); with choices it waits
   const ev = await until(() => ws.events.find(e => e.ev === 'alert' && e.id === shown.id), 'the alert event')
   assert.deepEqual([ev.title, ev.text, ev.choices], ['Ready', 'Tests pass', []])
   assert.deepEqual(await rig.rpc('alertAnswer', { id: shown.id }), { gone: true })
+  // U8: quiet holds notifications, never laki alert's card
+  await rig.rpc('dndSet', { minutes: 30 })
+  const hushed = await rig.rpc('alertShow', { text: 'Still here' })
+  await until(() => ws.events.find(e => e.ev === 'alert' && e.id === hushed.id), 'an alert while quiet')
+  await rig.rpc('alertAnswer', { id: hushed.id })
+  await rig.rpc('dndSet', { off: true })
 
   // a question through the CLI: it waits for the pick and prints it; only one of its choices counts
   const cli = rig.cli('alert', 'Deploy', 'now?', '--choice', 'Deploy', '--choice', 'Not yet')

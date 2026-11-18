@@ -175,6 +175,7 @@ export function Pages({ app }: { app: AppCtx }) {
           own={own}
           settings={view.settings}
           presets={view.presets}
+          quiet={{ until: view.dnd?.until, set: o => void call('dndSet', o).catch(() => {}) }}
           apps={apps}
           onClose={() => setDialog(null)}
           onSection={id => {

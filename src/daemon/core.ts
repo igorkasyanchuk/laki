@@ -4370,9 +4370,11 @@ export function queueResume(target: string) {
   return { tab: tab.id, queued: tab.queue?.length ?? 0 }
 }
 
-// U8: Do not disturb (state.dnd: until when, the PRs as it began, what ended or asked meanwhile). While on, the window
-// notifies nothing (the view's dnd: api.ts notify) and no phone push goes (phone.ts), but an important workspace's ask.
-// As it ends (dndTick, or End now): one notice in Laki's window, the digest, from what the daemon has; no model
+// U8: Quiet, was Do not disturb (state.dnd: until when, the PRs as it began, what ended or asked meanwhile). While on,
+// the window notifies nothing (the view's dnd: api.ts notify), no card, no sound, and no phone push goes (phone.ts), but
+// an important workspace's ask and laki alert's card; asks still show in Needs you. Yours only (gates.ts: no agent; the
+// phone may). As it ends (dndTick, or End now): one notice in Laki's window, the digest, and one notification of its
+// counts (tray.ts quietSummary), from what the daemon has; nothing when nothing happened; no model
 export const dndOn = () => (state.dnd?.until ?? 0) > Date.now()
 const prSnap = () => Object.fromEntries(state.workspaces.filter(w => !w.archived && prs.get(w.id)).map(w => [w.id, `${prs.get(w.id)!.state}:${prs.get(w.id)!.checks ?? ''}`]))
 const DND_LOG = 200
@@ -4385,7 +4387,7 @@ turnEnds.add((tab, o) => void (o.limit || dndNote(tab, 'done', o.failed ? `stopp
 export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown; seen?: unknown }) {
   if (o.seen) return delete state.digest, save(), changed(), { seen: true }
   if (o.off) return dndEnd()
-  const until = typeof o.until === 'number' ? o.until : Date.now() + Math.max(1, Math.min(24 * 60, Number(o.minutes) || 30)) * 60_000
+  const until = typeof o.until === 'number' ? o.until : Date.now() + Math.max(1, Math.min(24 * 60, Number(o.minutes) || Number(state.settings?.quietMinutes) || 60)) * 60_000 // none: Settings › Notifications' default
   if (!(until > Date.now()) || until > Date.now() + 7 * 864e5) throw new Error('until when? 30 minutes, an hour, or a time in the next week')
   state.dnd = { since: state.dnd?.since ?? Date.now(), until, prs: state.dnd?.prs ?? prSnap(), log: state.dnd?.log ?? [] }
   save()
@@ -4414,7 +4416,8 @@ export function dndEnd() {
   if (!d) return { ended: false }
   delete state.dnd
   const rows = dndDigest(d)
-  state.digest = { since: d.since, until: Date.now(), rows }
+  if (rows.length) state.digest = { since: d.since, until: Date.now(), rows }
+  else delete state.digest // nothing happened: no card, no notification
   save()
   changed()
   return { ended: true, lines: rows.map(r => `${r.kind === 'wait' ? 'Waits' : r.kind === 'done' ? 'Finished' : 'PR'}: ${r.name}${r.text ? `: ${r.text}` : ''}`) }

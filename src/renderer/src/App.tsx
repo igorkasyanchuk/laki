@@ -38,7 +38,7 @@ import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
 import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
-import { bounceOf, dockProgress, inboxOf, stateOf } from '../../shared/tray'
+import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
 import { AskWrap, Choice, choiceProps, turnNext } from './Diff'
@@ -964,6 +964,7 @@ export function App() {
   // Q8: what the menu bar's icon shows (Settings › General › Menu bar's Show state, on unless off): idle, working,
   // waiting, blocked (the view as drawn: Recording mode's private workspaces out of it, as out of the count)
   const trayInfo = view && view.settings.trayState !== false ? stateOf(view) : undefined
+  const trayQuiet = view?.dnd?.until // U8: quiet: the picture slashed, the menu's End Quiet (with Show state off too)
   // blocked by a plan limit: drawn again as the soonest one resets (nothing else may change the view then)
   const [, trayTick] = useState(0)
   const resetAt = trayInfo?.blocked ? Math.min(...view!.tabs.map(t => t.limit ?? 0).filter(l => l > Date.now())) : Infinity
@@ -974,11 +975,11 @@ export function App() {
   }, [resetAt])
   const dockBar = view ? dockProgress(view) : -1 // U15: a Ship or a workflow run at work: the Dock's progress bar
   const inboxItems = view && view.settings.menuBarClick === 'inbox' ? inboxOf(view, id => waits.current.get(id)) : undefined // the menu bar's Inbox (tray.ts)
-  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], dockBar, inboxItems])
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], trayQuiet, dockBar, inboxItems])
   // Handoff: remote access's address while it runs, with Settings' switch on (main offers only a lasting https one)
   const rem = view?.remote
   useEffect(() => bridge?.handoff?.(view?.settings.remoteHandoff && rem?.url ? { url: rem.url, via: rem.via, host: rem.host } : null), [view?.settings.remoteHandoff, rem?.url, rem?.via, rem?.host])
-  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo, dockBar, inboxItems), [trayKey])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo || trayQuiet ? { ...trayInfo, quiet: trayQuiet } : undefined, dockBar, inboxItems), [trayKey])
   // the remote page installed as an app: its icon's badge, the same count (its service worker sets it as a push comes)
   const pageBadge = !bridge && view ? badgeOf(view) : 0
   useEffect(() => {
@@ -1055,13 +1056,15 @@ export function App() {
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
   setSecretHint(view?.settings.secretHint) // a pasted secret's line in the prompt boxes (secretHint.tsx)
-  setQuiet(!!view?.dnd) // U8: Do not disturb: api.ts notify sends nothing but an important ask's card
-  // as it ends: one notification of what its digest card holds (not for a card a restart found waiting)
+  setQuiet(!!view?.dnd) // U8: Quiet: api.ts notify sends nothing but an important ask's card and laki alert's
+  // as it ends: one notification of what its digest card holds, a click opens Needs you (not for a card a restart found
+  // waiting; the daemon keeps no digest when nothing happened)
+  const openNeeds = () => (setSideOpen(true), setFolded(f => f.filter(x => x !== 'needs'))) // the sidebar (a phone's drawer), its Needs you unfolded
   useEffect(() => {
     const d = view?.digest
-    if (!d?.rows.length || Date.now() - d.until > 60_000) return
-    const n = (k: string, one: string) => (c => (c ? [`${c} ${one}`] : []))(d.rows.filter(r => r.kind === k).length)
-    notify('Do not disturb is over', [...n('wait', 'waiting for you'), ...n('done', 'finished'), ...n('pr', 'PR moved')].join(', '), '', () => {}, view?.settings.notifySound)
+    const said = d && quietSummary(d.rows)
+    if (!d || !said || Date.now() - d.until > 60_000) return
+    notify('Quiet is over', said, NEEDS, openNeeds, view?.settings.notifySound)
   }, [view?.digest?.until])
   // Settings' Dock icon (unset: the app's own, nothing to send)
   const dockIcon = view?.settings.dockIcon
@@ -1533,7 +1536,7 @@ export function App() {
     })
     api.connect()
     // a notification's, a bubble's or the menu bar's: over any page, as ⌘J; its row unfolded into sight (below)
-    bridge?.onFocusTab((id, panel) => (setDialog(null), selectTab(id), panel === 'changes' && showPanel('changes'), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace), (scrolledTo.current = null), setScrollAsk(n => n + 1)))
+    bridge?.onFocusTab((id, panel) => id === NEEDS ? openNeeds() : (setDialog(null), selectTab(id), panel === 'changes' && showPanel('changes'), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace), (scrolledTo.current = null), setScrollAsk(n => n + 1)))
     bridge?.onDeepLink?.(setLink)
     onLakiLink(setLink) // a laki:// link in the app (the AI's to a workspace): routed here, as the Dock's
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
@@ -3797,8 +3800,8 @@ export function App() {
             </>
           )}
           {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} asks={settings.usage} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
-          {view.dnd && ( // U8: Do not disturb: until when; a click ends it now (its digest shows)
-            <button className="sb-rec" data-tip="Do not disturb: no notifications, sounds or phone pushes, but an important workspace's ask · click: end now, and see what happened meanwhile" onClick={() => void call('dndSet', { off: true }).catch(() => {})}>
+          {view.dnd && ( // U8: Quiet: until when; a click ends it now (its digest shows)
+            <button className="sb-rec" data-tip="Quiet: no notifications, sounds, cards or phone pushes, but an important workspace's ask and laki alert's · click: end now, and see what happened meanwhile" onClick={() => void call('dndSet', { off: true }).catch(() => {})}>
               <Icon name="moon" size={11} />
               until {new Date(view.dnd.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
             </button>

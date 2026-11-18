@@ -5,6 +5,7 @@
 import type { Method, Out, ParamsOf } from '../../shared/api'
 import { outCall, outFlush } from './outbox'
 import type { InboxItem, TrayInfo } from '../../shared/tray'
+import { quietLets } from '../../shared/tray'
 import type { UpdateState } from '../../shared/update'
 import { oldName, sendAs } from '../../shared/caps'
 import { confirmOf } from '../../shared/confirm'
@@ -70,7 +71,7 @@ type Bridge = {
   simFloating?(): Promise<string[]> // the devices in windows of their own
   onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
-  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: TrayInfo, progress?: number, inbox?: InboxItem[]): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip); progress: U15's Dock bar (tray.ts dockProgress)
+  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: Partial<TrayInfo>, progress?: number, inbox?: InboxItem[]): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip); progress: U15's Dock bar (tray.ts dockProgress)
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void
@@ -421,12 +422,12 @@ export const openKeptLink = async (url: string) => {
 // (main's addCard; the app only): ask, a waiting agent's (its diff with it); alert, laki alert's id; tone, the edge's
 // color (ok: a finish, bad: a limit)
 type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' | 'info'; origin?: string }
-// U8: Do not disturb (the view's dnd, App sets it): nothing is sent, no sound, but an important workspace's ask and a
-// laki alert (their cards)
+// U8: Quiet (the view's dnd, App sets it): nothing is sent, no sound, but an important workspace's ask and a laki alert
+// (their cards: tray.ts quietLets)
 let quiet = false
 export const setQuiet = (on: boolean) => void (quiet = on)
 export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[], card?: Card) {
-  if (quiet && !card?.ask && !card?.alert) return
+  if (quiet && !quietLets(card)) return
   if (bridge) return bridge.notify(title, body, tab, sound, actions, card)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()

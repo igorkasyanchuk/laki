@@ -42,6 +42,7 @@ export const FIND: [string, string, string?][] = [
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
   ['general', 'Bounce the Dock icon', 'dock bounce jump attention waiting notification'],
+  ['general', 'Quiet', 'do not disturb dnd focus silence mute notifications pause snooze summary until 9'],
   ['general', "Glow the window's edge when an agent waits", 'edge glow border pulse waiting attention another tab'],
   ['general', 'Continue after an API error by itself', 'retry overloaded 500 connection dropped auto resume failed'],
   ['general', 'Tell me when a turn runs longer than', 'long stuck loop hours hung alert notification time'],

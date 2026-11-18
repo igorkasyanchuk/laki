@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { crc32, deflateSync } from 'node:zlib'
-import { bounceOf, dockProgress, INBOX_ASKS, INBOX_WORKING, inboxOf, stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
+import { bounceOf, dockProgress, hhmm, INBOX_ASKS, INBOX_WORKING, inboxOf, quietChoices, quietLets, quietSummary, stateOf, TRAY_PX, TRAY_STATES, trayBitmap, trayTip, trayTitle } from '../src/shared/tray.ts'
 
 const tab = (o: object) => ({ id: Math.random().toString(36).slice(2), workspace: 'w1', kind: 'agent', status: 'idle', done: false, ...o }) as any
 const view = (tabs: any[], workspaces: any[] = [{ id: 'w1' }]) => ({ tabs, workspaces }) as any
@@ -81,6 +81,36 @@ test('Q8 its four pictures: template images (black, alpha only), each drawn, non
   assert.equal(seen.size, TRAY_STATES.length, 'four different pictures')
   // the outline has less ink than the filled mark; working and blocked each add to theirs
   assert.ok(inks.idle < inks.waiting && inks.idle < inks.working && inks.waiting < inks.blocked)
+  // U8 quiet: each state slashed, a picture of its own; Q9 drop: the filled mark framed, another
+  const b64 = (b: Buffer) => b.toString('base64')
+  const plain = new Set(TRAY_STATES.map(s => b64(trayBitmap(s))))
+  for (const s of TRAY_STATES) {
+    const q = trayBitmap(s, { quiet: true })
+    assert.ok(!plain.has(b64(q)), `${s}, quiet: not one of the four`)
+    assert.ok(ink(q) > 255 * 40, `${s}, quiet: drawn`)
+    for (let i = 0; i < q.length; i += 4) assert.deepEqual([q[i], q[i + 1], q[i + 2]], [0, 0, 0], `${s}, quiet: a template image`)
+  }
+  const drop = trayBitmap('idle', { drop: true })
+  assert.ok(!plain.has(b64(drop)) && b64(drop) !== b64(trayBitmap('idle', { quiet: true })), 'drop: a picture of its own')
+  assert.ok(ink(drop) > inks.waiting, 'drop: the filled mark and its frame')
+  writeFileSync(join(dir, 'quiet.png'), png(trayBitmap('idle', { quiet: true }), TRAY_PX, TRAY_PX))
+})
+
+test('U8 quiet: the tooltip says until when; the choices; the summary as it ends, nothing when nothing happened', () => {
+  const now = new Date(2026, 10, 18, 14, 0).getTime()
+  const until = now + 30 * 60e3
+  assert.equal(trayTip({ needs: 2, working: 0, blocked: 0, quiet: until }, 'Laki', now), `Laki: quiet until ${hhmm(until)}, 2 need you`)
+  assert.equal(trayTip({ needs: 0, working: 0, blocked: 0, quiet: now - 1 }, 'Laki', now), 'Laki', 'over: not said')
+  const c = quietChoices(now)
+  assert.deepEqual(c.map(x => x.label), ['for 30 minutes', 'for 1 hour', 'until tomorrow 9:00'])
+  assert.deepEqual(c[2].o, { until: new Date(2026, 10, 19, 9, 0).getTime() })
+  assert.deepEqual(quietChoices(new Date(2026, 10, 18, 1, 30).getTime())[2], { label: 'until 9:00', o: { until: new Date(2026, 10, 18, 9, 0).getTime() } }, 'after midnight: this morning')
+  const r = (kind: string, text = '') => ({ kind, text }) as any
+  assert.equal(quietSummary([r('wait'), r('wait'), r('done'), r('done'), r('done'), r('pr', 'checks fail')]), 'While it was quiet: 2 agents are waiting, 3 finished, 1 check failed')
+  assert.equal(quietSummary([r('wait'), r('pr', 'merged'), r('pr', 'checks fail'), r('pr', 'checks fail')]), 'While it was quiet: 1 agent is waiting, 2 checks failed, 1 PR moved')
+  assert.equal(quietSummary([]), '', 'nothing happened: nothing said')
+  // what still comes: an important ask's card and laki alert's; a finish's, a limit's, a plain notification: not
+  assert.deepEqual([quietLets({ ask: true }), quietLets({ alert: 'a1' }), quietLets({}), quietLets(undefined)], [true, true, false, false])
 })
 
 test('U15 dockProgress: none, a Ship (its pct or unknown), workflow runs by blocks visited, their mean', () => {

@@ -12,6 +12,7 @@ const LAB_PAGES = [['calendar', 'Calendar', 'calendar'], ['desk', 'My Desk', 'de
 import { cmdMap, keyShow } from '../../shared/keys'
 import { hasCap } from '../../shared/caps'
 import { LAYOUT_PRESETS } from '../../shared/layout'
+import { quietChoices } from '../../shared/tray'
 import { api, bridge, openExternal } from './api'
 import { tabGlyph, prNum, appIcon, SCRIPT_ICONS } from './appCtx'
 
@@ -237,13 +238,10 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ id: 'start', label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
   a({ id: 'browser', label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
   a({ id: 'ssh', label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
-  // U8: Stop all agents, Do not disturb
+  // U8: Stop all agents, Quiet
   if (app.view?.tabs.some(t => t.kind === 'agent' && t.status === 'running')) a({ label: 'Stop all agents: every turn under way', icon: 'stopCircle', hint: kh('stopAll'), run: () => void app.stopAllAsk() })
-  const at9 = new Date()
-  const early = at9.getHours() < 9 // after midnight: this morning's 9:00, not a day and a night more
-  at9.setHours(early ? 9 : 24 + 9, 0, 0, 0)
-  if (app.view?.dnd) a({ label: 'Do not disturb: end now', icon: 'moon', run: () => void call('dndSet', { off: true }).catch(() => {}) })
-  else for (const [label, o] of [['30 minutes', { minutes: 30 }], ['1 hour', { minutes: 60 }], [early ? 'until 9:00' : 'until tomorrow 9:00', { until: at9.getTime() }]] as const) a({ label: `Do not disturb: ${label}`, icon: 'moon', hint: 'no notifications', run: () => void call('dndSet', o).then(() => app.toast(`Do not disturb ${label.startsWith('until') ? label : `for ${label}`}: a digest follows`)).catch(() => {}) })
+  if (app.view?.dnd) a({ label: 'Quiet: end now', icon: 'moon', run: () => void call('dndSet', { off: true }).catch(() => {}) })
+  else for (const c of quietChoices()) a({ label: `Quiet ${c.label}`, icon: 'moon', hint: 'no notifications', run: () => void call('dndSet', c.o).then(() => app.toast(`Quiet ${c.label}: a summary follows`)).catch(() => {}) })
   a({ id: 'clone', label: 'Clone a repository… (a URL, or owner/repo)', icon: 'github', run: () => setDialog('clone') })
   a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
   a({ id: 'themes', label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit

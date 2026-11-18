@@ -9,6 +9,7 @@ import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc, rpcAny } from 
 import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { appOf } from '../shared/helper.ts'
+import { hhmm } from '../shared/tray.ts'
 import { VERSION } from '../shared/version.ts'
 import { mcp } from './mcp.ts'
 import { RECIPE_IDS, RECIPES, recipeOf, recipeText } from '../shared/clientRecipes.ts'
@@ -681,6 +682,18 @@ async function main() {
       if (!ref) throw new Error('usage: laki bell <ws|tab> [--off]')
       const r = await rpc('tabBell', { id: ref, on: flags.off === undefined, from: caller() })
       return out(r, r.on ? `bell on: ${r.tabs.join(', ')}` : 'bell off')
+    }
+    case 'quiet': {
+      // U8: laki quiet [30m|1h|off]: no notifications, sounds, cards or pushes for a while (none: Settings' default); yours only
+      const arg = rest.join(' ').trim()
+      if (/^(off|end|stop)$/i.test(arg)) {
+        const r = await rpc('dndSet', { off: true, from: caller() })
+        return out(r, !r.ended ? 'not quiet' : r.lines.length ? `quiet ended:\n${r.lines.join('\n')}` : 'quiet ended: nothing happened meanwhile')
+      }
+      const m = /^(\d+(?:\.\d+)?)\s*(m|min|mins|minutes?|h|hrs?|hours?)?$/i.exec(arg)
+      if (arg && !m) throw new Error('usage: laki quiet [30m|1h|off]')
+      const r = await rpc('dndSet', { ...(m && { minutes: Number(m[1]) * (/^h/i.test(m[2] ?? '') ? 60 : 1) }), from: caller() })
+      return out(r, `quiet until ${hhmm(r.until)}`)
     }
     case 'name': {
       // laki name <name> [--tab id]: an agent's @name (its own tab, $LAKI_TAB), for other agents' laki send and ask; '' none

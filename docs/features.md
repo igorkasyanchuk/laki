@@ -50,6 +50,9 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
   beside each plan's limits (Gemini CLI's quota per model too). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
+- **Quiet**: no notifications, sounds, cards or phone pushes for 30 minutes, an hour or until 9:00 (the menu bar's
+  menu, ⌘K, `laki quiet 1h`, Settings › Notifications); asks still show in Needs you and `laki alert` still comes. As it
+  ends, one notification and card sum up what waits, finished and failed.
 - **Recording mode**: mark workspaces or projects *Private*; Recording mode (⌘K, the menu bar) hides them everywhere,
   notifications and phone pushes too, while they keep running.
 - **Import chats**: Claude Code and Codex chats you ran in a project from a plain terminal open as tabs that resume them.

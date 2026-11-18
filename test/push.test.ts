@@ -293,7 +293,7 @@ test("answer from the phone: a workflow's Ask you pushed with its choices, a tap
   assert.equal(pushes().length, 3, 'no JSON with actions')
 })
 
-test('U8: Do not disturb: no push for a finish or an ask; ended, one notice says what waits and what finished; Stop all agents holds a queue', async t => {
+test('U8: Quiet (was Do not disturb): laki quiet; no push for a finish or an ask; ended, one notice says what waits and what finished; Stop all agents holds a queue', async t => {
   const got: string[] = []
   const server = createServer((req, res) => {
     let body = ''
@@ -303,6 +303,20 @@ test('U8: Do not disturb: no push for a finish or an ask; ended, one notice says
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const rig = await fresh(t)
+  // laki quiet: on for a length (Settings' default without one), off; nothing happened: no digest, so no card and no notification
+  await rig.rpc('settingsSet', { quietMinutes: 120 })
+  const q1 = await rig.cli('quiet')
+  assert.equal(q1.code, 0, q1.err)
+  assert.ok(Math.abs((await rig.rpc('state')).dnd.until - Date.now() - 120 * 60e3) < 60e3, 'the default: 2 hours')
+  const q2 = await rig.cli('quiet', '30m')
+  assert.match(q2.out, /^quiet until /)
+  assert.ok(Math.abs((await rig.rpc('state')).dnd.until - Date.now() - 30 * 60e3) < 60e3, '30 minutes')
+  assert.equal((await rig.cli('quiet', 'soon')).code, 1)
+  const q3 = await rig.cli('quiet', 'off')
+  assert.match(q3.out, /nothing happened/)
+  const v0 = await rig.rpc('state')
+  assert.equal(v0.dnd, undefined)
+  assert.equal(v0.digest, undefined, 'nothing happened: no summary')
   const proj = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude', name: 'quiet' })
   const tab = await rig.tab(ws.id)

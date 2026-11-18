@@ -15,7 +15,7 @@ import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandD
 import { AI_TO, NOTE_TO, TODO_TO, talkDefault, talkShot } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
-import { TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
+import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, type TrayState, trayTip, trayTitle } from '../shared/tray.ts'
 import { type BrowseDid, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
@@ -1421,6 +1421,9 @@ let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
 let barWas = -1 // U15: the Dock's progress bar as last set
 let recording = false // the last badge's: Recording mode is on (settings.recording), its item ticked
+let quietUntil = 0 // U8: the last badge's: quiet until (ms), its picture slashed, End Quiet in the menu
+const quietOn = () => quietUntil > Date.now()
+const quietSet = (o: object) => void rpc('dndSet', o).catch(() => {})
 let trayBuilt: Menu | null = null // the menu: the tray's own (a click), or a right click's with Inbox
 function trayMenu() {
   trayBuilt = Menu.buildFromTemplate([
@@ -1429,6 +1432,8 @@ function trayMenu() {
       ...(trayTabs.length ? [{ type: 'separator' as const }] : []),
       { label: 'New Task…', click: () => quickWin() }, // the quick bar (Q1), over the app you're in
       { label: 'Recording Mode', type: 'checkbox', checked: recording, click: () => void rpc('settingsSet', { recording: !recording }).catch(() => {}) }, // private workspaces hidden
+      // U8: Quiet (the daemon's dndSet, as the app): no notifications, sounds, cards or pushes but asks and laki alert's
+      quietOn() ? { label: `End Quiet (until ${hhmm(quietUntil)})`, click: () => quietSet({ off: true }) } : { label: 'Quiet', submenu: quietChoices().map(c => ({ label: c.label.replace(/\b[a-z]/g, ch => ch.toUpperCase()), click: () => quietSet(c.o) })) },
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
       { label: 'Show and Tell…', ...(keys.tell && { accelerator: keys.tell, registerAccelerator: false }), click: () => tellShot() }, // Q7: a part of the screen, then say what to do with it
@@ -1484,15 +1489,16 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
   if (p !== barWas) win?.setProgressBar((barWas = p) < 0 ? -1 : p, p === 2 ? { mode: 'indeterminate' } : undefined)
   if (!on) return void (tray?.destroy(), (tray = null), inboxHide())
   const num = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : 0)
-  const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked) } : undefined
+  quietUntil = num(st?.quiet) // sent with Show state off too (no state then)
+  const info = st && TRAY_STATES.includes(st.state as TrayState) ? { state: st.state as TrayState, needs: num(n), working: num(st.working), blocked: num(st.blocked), quiet: quietUntil } : undefined
   if (!tray) {
     tray = new Tray(trayIcon(info?.state))
     tray.on('click', () => barInbox && inboxOpen())
     tray.on('right-click', () => barInbox && trayBuilt && tray?.popUpContextMenu(trayBuilt))
   }
-  tray.setImage(trayIcon(info?.state)) // a state change swaps the picture (the same one: its cached image, nothing redrawn)
+  tray.setImage(trayIcon(info?.state, quietOn())) // a state change swaps the picture (the same one: its cached image, nothing redrawn)
   tray.setTitle(info ? trayTitle(info) : count, { fontType: 'monospacedDigit' })
-  tray.setToolTip(info ? trayTip(info, app.name) : count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
+  tray.setToolTip(info ? trayTip(info, app.name) : trayTip({ needs: num(n), working: 0, blocked: 0, quiet: quietUntil }, app.name))
   trayTabs = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
   trayMenu()
 })
@@ -2611,13 +2617,14 @@ ipcMain.on('annotate-cancel', e => annot && e.sender === annot.webContents && an
 // the menu bar's icon: Laki's mark (a chevron and a dot) as a 32×32 template image (@2x), one per state (Q8: shared/
 // tray.ts' trayBitmap: idle, working, waiting, blocked), made once each: macOS colors it for a light or dark menu bar
 // and the highlight from its alpha alone
-const trayIcons = new Map<TrayState, Electron.NativeImage>()
-function trayIcon(state: TrayState = 'waiting') {
-  let img = trayIcons.get(state)
+const trayIcons = new Map<string, Electron.NativeImage>()
+function trayIcon(state: TrayState = 'waiting', quiet = false, drop = false) {
+  const key = `${state}${quiet ? ' quiet' : ''}${drop ? ' drop' : ''}`
+  let img = trayIcons.get(key)
   if (!img) {
-    img = nativeImage.createFromBitmap(trayBitmap(state), { width: TRAY_PX, height: TRAY_PX, scaleFactor: 2 })
+    img = nativeImage.createFromBitmap(trayBitmap(state, { quiet, drop }), { width: TRAY_PX, height: TRAY_PX, scaleFactor: 2 })
     img.setTemplateImage(true)
-    trayIcons.set(state, img)
+    trayIcons.set(key, img)
   }
   return img
 }

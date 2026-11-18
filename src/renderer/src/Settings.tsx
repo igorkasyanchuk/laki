@@ -8,6 +8,7 @@ import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/s
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -162,6 +163,7 @@ export type AppSettings = Paint & {
   edgeGlow?: boolean // the window's edge glows while an ask waits in another tab (on only if true)
   usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
+  quietMinutes?: number // U8: Quiet's default length in minutes (unset: 60)
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
@@ -788,9 +790,11 @@ const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleD
 
 // who reads what Laki AI sends (memory compaction's line): its backend's company, OpenRouter's model
 const aiWho = (ai?: AppSettings['ai'], endpoint?: AppSettings['aiEndpoint']) => (b => (b === 'claude' ? 'Anthropic (claude -p, your Claude Code sign-in)' : b === 'codex' ? 'OpenAI (codex exec, your Codex sign-in)' : b === 'endpoint' ? `your endpoint${endpoint?.url && URL.canParse(endpoint.url) ? ` (${new URL(endpoint.url).host})` : ''}` : `OpenRouter${ai?.models?.openrouter ? ` (${ai.models.openrouter})` : ''}`))(ai?.backend ?? 'openrouter')
+const QUIET_FOR: [number, string][] = [[30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']] // Quiet's default length
 export function SettingsPage(p: {
   own?: number // its own ⌘± size (App's), over Pages size
   settings: AppSettings
+  quiet?: { until?: number; set: (o: { off?: true; minutes?: number }) => void } // U8: Notifications › Quiet (the view's dnd, the daemon's dndSet)
   apps: AppInfo[]
   onSave: (s: AppSettings) => void
   onClose: () => void
@@ -1513,8 +1517,21 @@ export function SettingsPage(p: {
                 </Switch>
                 {bridge?.bounce && (
                   <Switch className="switch-row" on={s.dockBounce !== false} onChange={v => set({ dockBounce: v })}>
-                    <Says title="Bounce the Dock icon" hint="Once, when a workspace starts waiting on you and Laki isn't in front. Not for a muted workspace, nor in Do not disturb unless it's important." />
+                    <Says title="Bounce the Dock icon" hint="Once, when a workspace starts waiting on you and Laki isn't in front. Not for a muted workspace, nor while quiet unless it's important." />
                   </Switch>
+                )}
+                {p.quiet && (
+                  <label className="switch-row">
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select aria-label="Quiet for" value={s.quietMinutes ?? 60} onChange={e => set({ quietMinutes: Number(e.target.value) })}>
+                        {QUIET_FOR.map(([m, t]) => (
+                          <option key={m} value={m}>{t}</option>
+                        ))}
+                      </select>
+                      {p.quiet.until ? <button type="button" onClick={() => p.quiet!.set({ off: true })}>End now</button> : <button type="button" onClick={() => p.quiet!.set({ minutes: s.quietMinutes ?? 60 })}>Start</button>}
+                    </span>
+                    <Says title={p.quiet.until ? `Quiet until ${hhmm(p.quiet.until)}` : 'Quiet'} hint="No notifications, sounds, cards or phone pushes for a while. Asks still show in Needs you, and laki alert still shows. As it ends, one summary of what happened. Also in the menu bar's menu, ⌘K and laki quiet." />
+                  </label>
                 )}
                 <label className="switch-row">
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
