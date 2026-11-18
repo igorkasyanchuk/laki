@@ -641,8 +641,8 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 /* the status bar, full width (App's wideBar; not on a phone): under the rail, the sidebar and the main area, over pages
    too (they cover the main area only), under dialogs; the sidebar's foot buttons first (.sb-foot), with their words,
    and without the rail its AI and Settings at the end */
-.app.wide-status { padding-bottom: 24px; }
-.status.wide { position: absolute; left: 0; right: 0; bottom: 0; z-index: calc(var(--z-page) + 1); height: 24px; padding-left: var(--sp-4); }
+.app.wide-status { padding-bottom: var(--h-m); } /* the bar's height: a control's and room either side of its capsules (--h-s) */
+.status.wide { position: absolute; left: 0; right: 0; bottom: 0; z-index: calc(var(--z-page) + 1); height: var(--h-m); padding-left: var(--sp-4); }
 .app.full .status.wide { display: none; }
 .app.wide-status:has(.overlay) .status.wide { z-index: 9; } /* a dialog open: under its backdrop, as under the main area's */
 .app.wide-status.full { padding-bottom: 0; }
