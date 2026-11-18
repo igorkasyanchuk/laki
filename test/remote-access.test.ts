@@ -558,8 +558,7 @@ test("T10: remote access turns itself off without a device: a device's call and 
   assert.deepEqual(notice.choices, ['Turn on again', 'OK'])
   assert.ok((await rig.rpc('state')).remoteDevices?.length >= 1, 'its device still paired')
   await app.call('alertAnswer', { id: notice.id, choice: 'Turn on again' })
-  await until(async () => !!(await st()), 'on again')
-  tokenOf((await rig.rpc('stateOwn')).remote.link) // the rig seals with the link's key, as a page does
+  tokenOf(await until(async () => (await rig.rpc('stateOwn')).remote?.link, 'on again, its link (once the tunnel is up)')) // the rig seals with the link's key, as a page does
   assert.equal(await rpcAt(port, url, jar), 200, 'a paired device gets in again, no new pairing')
   await rig.rpc('remoteStop')
   // laki serve's (headless): never off for want of a device
