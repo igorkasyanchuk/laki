@@ -1041,3 +1041,46 @@ test('T13: a broken worktree: gone, recreated (never over a folder there now); u
   assert.ok(existsSync(join(ws.path, '.git')))
   assert.ok(execFileSync('git', ['-C', rig.repo, 'branch', '--list', ws.branch], { encoding: 'utf8' }).includes(ws.branch))
 })
+
+// backup.ts: worktrees out of Time Machine (tmutil addexclusion, a fake first on PATH recording its arguments) and
+// Spotlight (.metadata_never_index in Laki's own worktrees folder only)
+test('Time Machine and Spotlight: a new worktree excluded once; off calls nothing; a failing tmutil fails nothing; no marker beside foreign folders', { skip: process.platform !== 'darwin' }, async t => {
+  const rig = await fresh(t)
+  const calls = join(rig.home, 'tmutil.log')
+  const fake = (code: number) => writeFileSync(join(rig.home, 'bin', 'tmutil'), `#!/bin/sh\necho "$@" >> '${calls}'\n${code ? `echo "tmutil: no" >&2\nexit ${code}` : 'exit 0'}\n`, { mode: 0o755 })
+  const lines = () => (existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean) : [])
+  fake(0)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  // off (a test's daemon, as an install from before): nothing called, no marker
+  const off = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await sleep(800)
+  assert.deepEqual(lines(), [])
+  const root = dirname(off.path)
+  assert.ok(!existsSync(join(root, '.metadata_never_index')))
+  // on: the one there now is excluded as the setting turns on, a new one once, the marker in Laki's own folder
+  await rig.rpc('settingsSet', { tmExclude: true, spotlightExclude: true })
+  await until(() => lines().includes(`addexclusion ${off.path}`), 'the existing worktree excluded')
+  assert.ok(existsSync(join(root, '.metadata_never_index')))
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await until(() => lines().includes(`addexclusion ${ws.path}`), 'the new worktree excluded')
+  await sleep(500)
+  assert.equal(lines().filter(l => l === `addexclusion ${ws.path}`).length, 1)
+  assert.ok(lines().every(l => !l.startsWith('addexclusion -p') && !l.includes(rig.repo + ' ') && l !== `addexclusion ${rig.repo}`)) // never -p, never the main checkout
+  // a failing tmutil: the workspace is made all the same
+  fake(1)
+  const failed = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.ok(existsSync(failed.path))
+  await until(() => lines().includes(`addexclusion ${failed.path}`), 'tried')
+  // turned off: removeexclusion on each, the marker gone
+  fake(0)
+  await rig.rpc('settingsSet', { tmExclude: false, spotlightExclude: false })
+  await until(() => lines().includes(`removeexclusion ${ws.path}`), 'put back in')
+  assert.ok(!existsSync(join(root, '.metadata_never_index')))
+  // a folder that isn't Laki's in the worktrees folder: no marker there, and the doctor says why
+  mkdirSync(join(root, 'mine'))
+  await rig.rpc('settingsSet', { spotlightExclude: true })
+  await sleep(500)
+  assert.ok(!existsSync(join(root, '.metadata_never_index')))
+  const d = await rig.rpc('doctor')
+  assert.match(d.backup.skipped.join('\n'), /other things in it too \(mine\)/)
+})

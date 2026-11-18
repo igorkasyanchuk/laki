@@ -314,6 +314,7 @@ function Disk({ load, tidy }: { load: (again?: boolean) => Promise<DiskUsage>; t
               {busy ? 'Measuring…' : 'Measure again'}
             </button>
           </p>
+          {d.backup && (wt => (wt > 0 ? <p className="muted small">{d.backup!.tm ? `${gb(wt)} of worktrees kept out of Time Machine${d.backup!.spotlight ? ' and Spotlight' : ''}` : `Worktrees take ${gb(wt)} of Time Machine's backups: Settings › General › Keep worktrees out of Time Machine`}</p> : null))(d.projects.flatMap(p => p.workspaces.flatMap(w => w.parts.filter(x => x.what === 'worktree'))).reduce((n, x) => n + x.bytes, 0))}
           <div className="disk-list">
             {d.projects.map(p => (
               <div key={p.id}>

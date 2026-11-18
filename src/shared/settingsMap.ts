@@ -192,6 +192,8 @@ export const FIND: [string, string, string?][] = [
   ['git', 'Terminals outlive the daemon (experimental)', 'pty host terminal survive crash restart daemon update keep running'],
   ['git', 'Turns kept', 'turn history checkpoint snapshot rewind undo restore files fork try again from here timeline'],
   ['git', 'Keep a spare worktree', 'spare ready instant fast new workspace worktree prepared'],
+  ['general', 'Keep worktrees out of Time Machine', 'backup time machine tmutil exclude disk space worktrees'],
+  ['general', 'Keep worktrees out of Spotlight', 'spotlight index search mds metadata_never_index worktrees'],
   ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
   ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],

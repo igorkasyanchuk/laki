@@ -46,7 +46,7 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
   a value but those (one already saved is off); an agent can't change it (main.ts' `AGENT_KEYS`, with `doneCheck`,
   `recording`, `nextPrompt`, `keepAwake`, the tidies' `storageDays`, `archivedDays`, `imageDays`, `memoryCompact`,
   `updateCheck`, `updateDelay`, and the global ones of what `projectSet`'s `config` holds: `actions`, `templates`,
-  `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`, `cloneDeps`, `spareWorktree`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
+  `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`, `cloneDeps`, `spareWorktree`, `tmExclude`, `spotlightExclude`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
   `uiReset`, nor `wsSet`'s `important`, nor `updateIdle` while `updateCheck` is off or `updateDelay` set; remote access can: Cancel). Tested with a `pmset`
   in the rig's `$HOME/bin` (`test/resources.test.ts`);
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -212,6 +212,14 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   10 minutes): `<worktrees>/<project>/.spare`, detached at the checkout's HEAD with those files in; `wsNew` takes it with
   `git worktree move` and `git switch -c <branch> <base>` (not for a PR, a host, a repo with `.gitmodules`), then makes
   the next; any failure falls back to `worktree add`.
+- out of Time Machine and Spotlight (`backup.ts`, macOS; `settings.tmExclude`, `spotlightExclude`, on for a new Mac
+  install, off for one from before; an agent can't set them: `AGENT_KEYS`): core's `excludeWs` after `wsNew` and
+  `wsRestore` runs `tmutil addexclusion <worktree>` (the sticky per-item form: never `-p`), and `spotlightSet` writes
+  `.metadata_never_index` in `worktreesOf(proj)` only when everything in it is Laki's worktrees or `.spare` and it neither
+  is nor holds the project's folder (else `spotWhy`, in `laki doctor`). Turning one on or off (`settingsSet`'s
+  `excludeAll`) applies it to every live local worktree (`removeexclusion`, the marker removed). Never the main checkout, a
+  host's or a codespace's; a failure is logged, never thrown. Settings › Resources › Disk says how much is kept out (or, off,
+  what worktrees take). Tested with a recording `tmutil` in the rig's `$HOME/bin` (`test/worktrees.test.ts`).
 - files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is

@@ -53,6 +53,7 @@ import { ticketOf } from './tickets.ts'
 import { managedView, policy, policyAgent, policySettings, policyTick } from './policy.ts'
 import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
+import { spotlightSet, tmSet } from './backup.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
 export const run = promisify(execFile)
@@ -241,6 +242,9 @@ export function load() {
   if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
   // U13: What's new shows once a version (App's WhatsNew): a new install has seen its own, one from before U13 none
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
+  // a new install keeps its worktrees out of Time Machine and Spotlight (backup.ts); one from before keeps them in (the
+  // Disk page says how much they take). A test's daemon only with LAKI_TEST_LEAN=1: tmutil isn't a test's to run
+  if (!had && process.platform === 'darwin' && state.settings?.tmExclude === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, tmExclude: true, spotlightExclude: true }
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
   // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts:
@@ -1291,6 +1295,28 @@ function worktreesOf(proj: Project) {
 
 const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
 export const settingUp = (ws: Workspace) => existsSync(setupMarker(ws)) // its setup script runs (agents wait for it)
+
+// backup.ts: a worktree out of Time Machine (settings.tmExclude) and its folder out of Spotlight (spotlightExclude), on a
+// Mac; never the main checkout (a local workspace), a host's or a codespace's. spotWhy: why a project's folder wasn't
+// marked (the doctor says it)
+export const spotWhy = new Map<string, string>()
+const excludable = (w: Workspace) => process.platform === 'darwin' && w.kind === 'worktree' && !w.host && w.codespace === undefined && !w.archived
+async function excludeWs(ws: Workspace, proj: Project) {
+  if (!excludable(ws)) return
+  if (state.settings?.tmExclude) await tmSet(ws.path, true, m => log(`${ws.id}: ${m}`))
+  if (state.settings?.spotlightExclude) spotMark(proj, true)
+}
+function spotMark(proj: Project, on: boolean) {
+  if (proj.host) return
+  const why = spotlightSet(worktreesOf(proj), on, { theirs: state.workspaces.filter(w => w.project === proj.id && excludable(w)).map(w => w.path), project: proj.path })
+  if (why) spotWhy.get(proj.id) !== why && log(`Spotlight: ${proj.id}: ${why}`), spotWhy.set(proj.id, why)
+  else spotWhy.delete(proj.id)
+}
+export async function excludeAll(k: 'tmExclude' | 'spotlightExclude', on: boolean) {
+  if (process.platform !== 'darwin') return
+  if (k === 'spotlightExclude') return void state.projects.forEach(p => !p.kind && spotMark(p, on))
+  for (const w of state.workspaces.filter(excludable)) await tmSet(w.path, on, m => log(`${w.id}: ${m}`))
+}
 
 // where storage folders go: settings.storageDir (~ is home), else <data>/storage
 export const storageRoot = () => (root => (root ? resolve(homedir(), tilde(root)) : join(dir, 'storage')))(typeof state.settings?.storageDir === 'string' ? state.settings.storageDir.trim() : '')
@@ -2468,7 +2494,9 @@ export function settingsSet(o: Settings, own = false) {
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   const { accounts: _, widgetDevAgent, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
   o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
+  const was = state.settings
   state.settings = { ...state.settings, ...o }
+  for (const k of ['tmExclude', 'spotlightExclude'] as const) if (k in o && !!o[k] !== !!was?.[k]) void excludeAll(k, !!o[k]) // every worktree there is, in or out
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
   setIconLook(lookOf(state.settings)) // a change: the widgets' icons, so the app asks for their HTML again
   save()
@@ -3018,6 +3046,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }), ...(!want && { untitled: true }) } // untitled: ws-<tail>, named by its first prompt
     if (!proj.host) await copyIncludes(proj, ws) // before setup and the agent: they may read .env. ponytail: not on a host (setup can copy them from $LAKI_PROJECT_PATH)
   }
+  void excludeWs(ws, proj) // out of Time Machine and Spotlight, as Settings say: never in its way
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
@@ -3666,6 +3695,7 @@ export async function wsRestore(ref: string) {
     })
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
+  void excludeWs(ws, proj)
   await archiveBack(ws).catch(e => wsLog(ws, `restore: its uncommitted files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${ws.id}`))
   ws.archived = false
   ws.archivedAt = undefined
@@ -5062,7 +5092,7 @@ export async function doctor(): Promise<Doctor> {
       return { id, found, ...(s !== undefined && { signedIn: s }) }
     }),
   )
-  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length } }
+  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
 }
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
 // version, counts, the Labs on, the logs' last lines; redacted (diagRedact)

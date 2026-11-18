@@ -707,6 +707,8 @@ export type Settings = {
   storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
   keepStorage?: boolean // a deleted workspace's storage folder stays (unset: removed with it)
   storageDays?: number // a file in a workspace's storage folder not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
+  tmExclude?: boolean // Settings › General: new and restored worktrees out of Time Machine (tmutil addexclusion; daemon/backup.ts); a new Mac install's on
+  spotlightExclude?: boolean // and the folder of Laki's worktrees out of Spotlight (.metadata_never_index, only where the folder is Laki's own)
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
@@ -1177,7 +1179,7 @@ export type HookSeen = { at?: number; tabs: number; deaf: number; native?: Nativ
 export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
 export type AgentServer = { name: string; scope: 'user' | 'project' | 'local'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
 export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string }; secrets?: { on: boolean; held: number } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string }; secrets?: { on: boolean; held: number }; backup?: { tm: boolean; spotlight: boolean; skipped?: string[] } } // backup: worktrees out of Time Machine and Spotlight (backup.ts), skipped: why a folder wasn't marked; idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 // A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
 export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && process.platform === 'darwin'): [string, string, string?][] {
   return [
@@ -1190,6 +1192,8 @@ export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && pr
     ...(d.agents.some(a => a.found) ? [] : [['✗', 'no agent found', 'install claude or codex'] as [string, string, string]]),
     ...(d.hooks ? [d.hooks.ok ? (['✓', "Laki's hooks reach the daemon"] as [string, string]) : (['✗', `Laki's hooks don't reach the daemon: ${d.hooks.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
     ...(d.secrets?.held ? [d.secrets.on ? (['✓', `${d.secrets.held} secret-looking variable${d.secrets.held === 1 ? '' : 's'} kept from agents`] as [string, string]) : (['●', `${d.secrets.held} secret-looking variable${d.secrets.held === 1 ? '' : 's'} reach agents`, 'Settings › Agents & profiles: Hide secret-looking variables from agents'] as [string, string, string])] : []),
+    ...(mac && d.backup ? [d.backup.tm ? (['✓', `worktrees kept out of Time Machine${d.backup.spotlight ? ' and Spotlight' : ''}`] as [string, string]) : (['●', 'worktrees are in Time Machine backups', 'Settings › General: Keep worktrees out of Time Machine'] as [string, string, string])] : []),
+    ...(mac && d.backup?.skipped?.length ? d.backup.skipped.map(why => ['●', `Spotlight: ${why}`, "set a worktrees folder of Laki's own (Settings › General › Worktrees)"] as [string, string, string]) : []),
     ...(d.hookFiles ? [d.hookFiles.ok ? (['✓', "agents' hook files"] as [string, string]) : (['✗', `agents' hook files: ${d.hookFiles.why ?? ''}`, "restart Laki's daemon from the app's status bar"] as [string, string, string])] : []),
   ]
 }
@@ -1235,7 +1239,7 @@ export type AgentDid = { at: number; tab: string; ws: string; method: string; wh
 // objects no branch has (none: git can't say); storage: its folder; saved: an archive's uncommitted files in git
 export type DiskPart = { what: 'worktree' | 'deps' | 'turns' | 'storage' | 'saved'; name?: string; bytes: number; shared?: true }
 export type DiskWs = { id: string; name: string; archived?: true; merged?: true; parts: DiskPart[]; bytes: number }
-export type DiskUsage = { at: number; free?: number; projects: { id: string; name: string; bytes: number; workspaces: DiskWs[] }[] }
+export type DiskUsage = { at: number; free?: number; backup?: { tm: boolean; spotlight: boolean } /* worktrees out of Time Machine, Spotlight (backup.ts) */; projects: { id: string; name: string; bytes: number; workspaces: DiskWs[] }[] }
 export type DiskTidyWhat = 'turns' | 'storage' | 'archives'
 // Ship's secret check (core.ts shipSecrets): a token-shaped string in a line it would commit: masked, never itself; hash
 // names it for "Not a secret" (ship's allowSecrets, remembered for that workspace)

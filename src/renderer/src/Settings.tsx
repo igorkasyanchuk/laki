@@ -209,6 +209,8 @@ export type AppSettings = Paint & {
   copyUntracked?: boolean // and the untracked ones (unset: off)
   cloneDeps?: boolean // F7: dependency folders cloned whole
   spareWorktree?: boolean // F7: a spare worktree per project
+  tmExclude?: boolean // worktrees out of Time Machine (daemon/backup.ts)
+  spotlightExclude?: boolean // and their folder out of Spotlight
   ptyHost?: boolean // R6: terminals in a pty host
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
@@ -1560,6 +1562,16 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={!!s.keepStorage} onChange={v => set({ keepStorage: v })}>
                     <Says title="Keep a deleted workspace's storage" hint="Off: deleting a workspace deletes its storage folder too (archiving keeps it)" />
                   </Switch>
+                  {/Mac/.test(navigator.userAgent) && (
+                    <>
+                      <Switch className="switch-row" on={!!s.tmExclude} onChange={v => set({ tmExclude: v })}>
+                        <Says title="Keep worktrees out of Time Machine" hint="New and existing worktrees: they're copies of your repo, and git has your commits. Never the project's own folder, SSH or cloud workspaces. Off puts them back in" />
+                      </Switch>
+                      <Switch className="switch-row" on={!!s.spotlightExclude} onChange={v => set({ spotlightExclude: v })}>
+                        <Says title="Keep worktrees out of Spotlight" hint="Only where the worktrees' folder holds nothing but Laki's worktrees (laki doctor says where it didn't)" />
+                      </Switch>
+                    </>
+                  )}
                   <label className="switch-row">
                     <select value={s.artifactsIn ?? 'app'} onChange={e => set({ artifactsIn: e.target.value === 'browser' ? 'browser' : 'app' })}>
                       <option value="app">In Laki</option>

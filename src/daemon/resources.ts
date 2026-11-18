@@ -417,7 +417,7 @@ export async function diskScan(): Promise<DiskUsage> {
       return f.bavail * f.bsize
     } catch {}
   })()
-  return { at: Date.now(), ...(free !== undefined && { free }), projects: projects.sort((a, b) => b.bytes - a.bytes) }
+  return { at: Date.now(), ...(free !== undefined && { free }), ...(process.platform === 'darwin' && { backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude } }), projects: projects.sort((a, b) => b.bytes - a.bytes) }
 }
 // what: turns (kept turns older than days, of workspaces with no turn running), storage (the storage folders of archived
 // workspaces whose PR merged, to the trash), archives (archived over days: archivedTidy's own way, its day's notice and
