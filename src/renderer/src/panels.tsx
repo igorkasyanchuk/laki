@@ -9,6 +9,7 @@ import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
 import { Markdown, outlineItems } from './MarkdownView'
 import { preview, THEMES } from './themes'
+import { Backdrop } from './Backdrop'
 import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, groupNew, laterText, nameOf, type PalKind, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
@@ -1055,6 +1056,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   return (
     <Page
       title="New workspace"
+      backdrop={<Backdrop kind={view.settings.backdrop} motion={view.settings.motion} />}
       head={
         /* as Laki AI's window: a mark in the project's color, the title and where it starts (the window hides nw-hello) */
         <span className="nw-head" style={{ '--nw-tint': tint } as CSSProperties}>

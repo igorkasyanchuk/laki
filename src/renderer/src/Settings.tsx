@@ -18,7 +18,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { BACKDROPS, type BackdropKind } from './Backdrop'
+import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
@@ -156,7 +156,7 @@ export type AppSettings = Paint & {
   finishedRows?: boolean // Needs you's finished turns as rows
   density?: 'compact' | 'regular' | 'roomy' // space and control heights (themes.ts)
   pointerHand?: boolean // the pointing hand over buttons (unset: on)
-  backdrop?: BackdropKind // an empty pane's background (Backdrop.tsx; unset: dots)
+  backdrop?: BackdropKind // an empty page's background (Backdrop.tsx; unset: stars)
   toolbar?: string[] | null // the tab bar's buttons shown (toolbar.ts), toolbarSeen: the ids there were
   toolbarSeen?: string[] | null
   projectLook?: ProjectLook // the sidebar's project names
@@ -1883,9 +1883,8 @@ export function SettingsPage(p: {
                   <Says title="Text size" hint="Tabs, menus and dropdowns, the status bar, tooltips, the side panel's tabs, as one" />
                 </label>
               </div>
-              <div className="grid2">
-                <label data-tip="Settings, Help, Scheduled tasks, Workflows' list, Specs & Brainstorms' list, Achievements and project pages. ⌘+ and ⌘− on any page size that page alone, kept for it (⌘0: back to 100%)">
-                  Pages size
+              <div className="setting-box">
+                <label className="switch-row" data-tip="Settings, Help, Scheduled tasks, Workflows' list, Specs & Brainstorms' list, Achievements and project pages">
                   <select value={PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom : 1} onChange={e => set({ pageZoom: Number(e.target.value) })}>
                     {PAGE_ZOOMS.map(z => (
                       <option key={z} value={z}>
@@ -1893,25 +1892,25 @@ export function SettingsPage(p: {
                       </option>
                     ))}
                   </select>
+                  <Says title="Pages size" hint="Settings, Help and the other pages. ⌘+ and ⌘− on a page size that page alone (⌘0: 100%)" />
                 </label>
-                <label data-tip={macApp() ? "System: your Mac's accent color (System Settings › Appearance), as it changes" : undefined}>
-                  Accent color
+                <div className="switch-row">
                   <span className="row-buttons">
-                    <input type="color" className="color-pick" value={(s.accent === 'system' ? systemAccent() : s.accent) || THEMES.find(t => t.id === (s.theme || 'default'))?.c?.accent || '#7aa2f7'} onChange={e => paint({ accent: e.target.value })} />
                     {macApp() && s.accent !== 'system' && (
-                      <button type="button" onClick={() => paint({ accent: 'system' })}>
+                      <button type="button" className="small" onClick={() => paint({ accent: 'system' })}>
                         System
                       </button>
                     )}
                     {s.accent && (
-                      <button type="button" onClick={() => paint({ accent: '' })}>
+                      <button type="button" className="small" onClick={() => paint({ accent: '' })}>
                         Theme's
                       </button>
                     )}
+                    <input type="color" className="color-pick" aria-label="Accent color" value={(s.accent === 'system' ? systemAccent() : s.accent) || THEMES.find(t => t.id === (s.theme || 'default'))?.c?.accent || '#7aa2f7'} onChange={e => paint({ accent: e.target.value })} />
                   </span>
-                </label>
-                <label>
-                  Corners
+                  <Says title="Accent color" hint={s.accent === 'system' ? "Your Mac's (System Settings › Appearance), as it changes" : s.accent ? 'Yours, over the theme’s' : 'The theme’s own'} />
+                </div>
+                <label className="switch-row">
                   <select value={s.radius ?? ''} onChange={e => paint({ radius: e.target.value })}>
                     {CORNERS.map(([v, name]) => (
                       <option key={v} value={v}>
@@ -1919,22 +1918,9 @@ export function SettingsPage(p: {
                       </option>
                     ))}
                   </select>
+                  <Says title="Corners" hint="Buttons, fields, cards and menus" />
                 </label>
-                <label>
-                  Tabs
-                  <select value={s.tabsAt ?? 'top'} onChange={e => set({ tabsAt: e.target.value as AppSettings['tabsAt'] })}>
-                    {TABS_AT.map(([v, name]) => (
-                      <option key={v} value={v}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" className="link small" data-tip="Which buttons the tab bar shows, and in what order (also its right click, View › Customize Toolbar…)" onClick={() => openExternal('laki://toolbar')}>
-                  Customize toolbar…
-                </button>
-                <div className="field">
-                  <span>Density</span>
+                <div className="switch-row">
                   <div className="seg" role="radiogroup" aria-label="Density">
                     {DENSITIES.map(([v, name]) => (
                       <button key={v} type="button" role="radio" aria-checked={(s.density ?? 'regular') === v} className={(s.density ?? 'regular') === v ? 'on' : ''} onClick={() => paint({ density: v })}>
@@ -1942,18 +1928,25 @@ export function SettingsPage(p: {
                       </button>
                     ))}
                   </div>
-                  <div className="density-preview" aria-hidden="true">
-                    <span className="ws">
-                      <Icon name="agent" size={12} /> fix-cart-total
-                    </span>
-                    <button type="button" tabIndex={-1}>Button</button>
-                  </div>
+                  <Says title="Density" hint="How tall rows, tabs and buttons are" />
                 </div>
-                <Switch className="switch-row" on={s.pointerHand !== false} /* as themes.ts applyTheme */ onChange={on => paint({ pointerHand: on })}>
-                  <Says title="Pointing hand over buttons" hint="Off: the arrow over buttons, tabs and rows, as macOS's own apps; links keep the hand" />
-                </Switch>
-                <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
-                  Motion
+                <label className="switch-row">
+                  <select value={s.tabsAt ?? 'top'} onChange={e => set({ tabsAt: e.target.value as AppSettings['tabsAt'] })}>
+                    {TABS_AT.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <Says title="Tabs" hint="Where a workspace's tabs are: over its terminals, under them or beside them" />
+                </label>
+                <div className="switch-row">
+                  <button type="button" className="small" onClick={() => openExternal('laki://toolbar')}>
+                    Customize…
+                  </button>
+                  <Says title="Customize toolbar" hint="Which buttons the tab bar shows, and in what order (also its right click, View › Customize Toolbar…)" />
+                </div>
+                <label className="switch-row" data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
                   <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>
                     {MOTION.map(([v, name]) => (
                       <option key={v} value={v}>
@@ -1961,9 +1954,9 @@ export function SettingsPage(p: {
                       </option>
                     ))}
                   </select>
+                  <Says title="Motion" hint="How much moves: menus and dialogs, rows growing in, the empty page's background" />
                 </label>
-                <label data-tip="Sideways labels: the Board's empty columns, the strips of workspaces and of a review's files, a diagram's lanes. By default the ones on the left read from the bottom up, the rest from the top down">
-                  Vertical text
+                <label className="switch-row" data-tip="The Board's empty columns, the strips of workspaces and of a review's files, a diagram's lanes">
                   <select value={s.vertText ?? ''} onChange={e => paint({ vertText: (e.target.value || undefined) as AppSettings['vertText'] })}>
                     {VERT.map(([v, name]) => (
                       <option key={v} value={v}>
@@ -1971,23 +1964,32 @@ export function SettingsPage(p: {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label data-tip="Behind a workspace with no tabs, Welcome and No workspace selected: dots, a net or stars that stir as the pointer passes. Motion High: they drift on their own too; None: still">
-                  Empty page background
-                  <select value={s.backdrop ?? 'dots'} onChange={e => set({ backdrop: e.target.value as BackdropKind })}>
-                    {BACKDROPS.map(([v, name]) => (
-                      <option key={v} value={v}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                  <Says title="Vertical text" hint="Sideways labels. By default the ones on the left read from the bottom up, the rest from the top down" />
                 </label>
               </div>
               <div className="setting-box">
+                <Switch className="switch-row" on={s.pointerHand !== false} /* as themes.ts applyTheme */ onChange={on => paint({ pointerHand: on })}>
+                  <Says title="Pointing hand over buttons" hint="Off: the arrow over buttons, tabs and rows, as macOS's own apps; links keep the hand" />
+                </Switch>
                 <Switch className="switch-row" on={!!s.highContrast} onChange={v => paint({ highContrast: v })}>
                   <Says title="High contrast mode" hint="Hints, labels and lines nearly as strong as the text, and the accent as text darker or lighter until it reads clearly, in every theme" />
                 </Switch>
               </div>
+              </Group>
+              <Group title="Empty page background" hint="Behind a workspace with no tabs, Welcome, No workspace selected and the New workspace page. It stirs as the pointer passes; with Motion High it drifts on its own too">
+                {(bd => (
+                  <div className="setting-box">
+                    <div className="switch-row icon-packs bd-picks" role="radiogroup" aria-label="Empty page background">
+                      {BACKDROPS.map(([v, name]) => (
+                        <button key={v} type="button" role="radio" aria-checked={bd === v} className={bd === v ? 'on' : ''} onClick={() => set({ backdrop: v })}>
+                          <span className="bd-tile">{v !== 'none' && <Backdrop kind={v} motion={s.motion === 'none' ? 'none' : 'low'} />}</span>
+                          {name}
+                          {v === BACKDROP ? ' (default)' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))(BACKDROPS.some(([v]) => v === s.backdrop) ? s.backdrop : BACKDROP)}
               </Group>
               <Group title="Icons" hint="The app's line icons, and the ones in extensions. A project's or an extension's icon is a name, the same in every pack, so it follows the one you pick; a name a pack lacks is drawn by Laki's own">
                 {(look => (

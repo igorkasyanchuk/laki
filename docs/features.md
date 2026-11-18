@@ -136,7 +136,7 @@ time and AI money per run (`budget: 60 min, $5`).
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 104 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), Density (Compact, Regular, Roomy), the pointing hand over buttons (or macOS's arrow) and scroll bars
-  that show as you scroll, dots, a net or stars behind an empty page that stir as the pointer passes, and your own CSS for the rest; the tab bar's buttons in groups you pick and order
+  that show as you scroll, stars (or stardust, dots, a net, a grid, fireflies) behind an empty page and New workspace that stir as the pointer passes, and your own CSS for the rest; the tab bar's buttons in groups you pick and order
   (*Customize toolbar…*), tabs past its room behind *+n*; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
 - **Extensions** (`laki ext`, or `laki widget`: the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often: any you make from a starter, with Laki AI on the extension's own page, an agent's

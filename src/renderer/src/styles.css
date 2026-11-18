@@ -600,7 +600,7 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .ws { --ws-bar: color-mix(in srgb, var(--tab-c, transparent) 70%, transparent); display: flex; align-items: center; gap: var(--sp-3); height: round(nearest, calc(var(--ws-h, 28px) * var(--density)), 1px); margin: var(--ws-gap, 1px) 8px; padding: 0 var(--sp-4) 0 var(--sp-4); border-radius: var(--r-control); cursor: var(--cur-act); border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
-.ws.sel { --ws-bar: var(--tab-c, transparent); background-color: var(--sel-fill); } /* V1: a neutral fill; a bar only in the workspace's own color */
+.ws.sel { --ws-bar: var(--tab-c, var(--accent)); background-color: color-mix(in srgb, var(--accent) 14%, var(--sel-fill)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); } /* the one you're in: an accent tint and edge, its bar in its own color (else the accent); a look's own wins. Away (html.away) the accent is grey */
 .ws.needs .ws-name { font-weight: 600; }
 .ws-new { color: var(--muted); }
 .ws-new:hover { color: var(--fg); }
@@ -682,10 +682,9 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .page-body > * { max-width: 760px; margin: 0 auto; }
 .settings-nav { width: max(210px, 15em); scrollbar-gutter: stable; flex: none; padding: var(--sp-5) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--side); } /* one width for Basic and All (their lists differ), its scrollbar's room kept: switching never moves the page; in em, so a bigger text size widens it; a long project name is cut (…) */
 .settings-nav > * { flex-shrink: 0; } /* a long list (All, many projects) scrolls; its rows (overflow: hidden, for the ellipsis) were squeezed under their text */
-.settings-nav button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: none; text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--muted); }
-.settings-nav button:hover { background: var(--hover); color: var(--fg); }
-.settings-nav button.on { background: var(--accent); color: var(--accent-fg); } /* the section you're in: never mistaken for the one under the pointer */
-.settings-nav button.on svg { color: inherit; }
+.settings-nav > button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: none; text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--muted); }
+.settings-nav > button:hover { background: var(--hover); color: var(--fg); }
+.settings-nav > button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--fg); box-shadow: inset 2px 0 0 var(--accent); } /* the section you're in: an accent tint and bar, never mistaken for the one under the pointer; the text stays --fg, so a look that sets only its own fill still reads (test/css.test.ts) */
 .set-new { flex: none; margin-left: auto; padding: 0 var(--sp-3); border-radius: var(--r-pill); font-size: var(--fs-1); line-height: 16px; font-weight: 600; color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); } .switch-text .set-new { margin-left: 6px; vertical-align: 1px; }
 .settings-main { flex: 1; overflow-y: auto; padding: 22px 28px 48px; max-width: 720px; gap: var(--sp-6); }
 .settings-main h2 { margin: 0; font-size: var(--fs-5); color: var(--fg); }
@@ -759,7 +758,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 /* the selected tab: joined to the terminal (--tab-sel: its background, or a lift over a gradient), a bar on
    top in its color or the accent; the others only a faint line in theirs (--tab-c, set inline) */
 .tab { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tab.sel { color: var(--fg); background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--tab-sel, var(--term-bg))); border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); } /* V1: underlined, as every tab and segment */
+.tab.sel { color: var(--fg); background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--tab-sel, var(--term-bg))); border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--accent)); } /* V1: underlined, as every tab and segment */
 .tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 14%, var(--hover)); }
 /* a real tab (the top bar's): the bar's line runs up to the selected tab, up its sides and over its top, and never
    under it, so the tab opens into its terminal (a see-through one, glass, can't show it either). The bar's ::before and
@@ -819,16 +818,16 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .tabstrip > .ib { align-self: center; margin: 2px; }
 .tabstrip.bottom { height: var(--h-l); align-items: flex-start; padding: 0 var(--sp-3); border-top: 1px solid var(--line); }
 .tabstrip.bottom .tab { border: 1px solid transparent; border-top: none; border-radius: 0 0 var(--radius) var(--radius); margin: -1px 0 0; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.bottom .tab.sel { border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
+.tabstrip.bottom .tab.sel { border-color: var(--line); box-shadow: inset 0 -2px 0 var(--tab-c, var(--accent)); }
 .tabstrip:is(.left, .right) { width: 180px; flex-direction: column; overflow-y: auto; padding: var(--sp-3) 0; }
 .tabstrip.left { border-right: 1px solid var(--line); }
 .tabstrip.right { border-left: 1px solid var(--line); }
 .tabstrip:is(.left, .right) > .ib { align-self: flex-start; margin: 2px 8px; }
 .tabstrip:is(.left, .right) .tab { flex: none; max-width: none; height: var(--h-m); margin: 0; border: 1px solid transparent; border-radius: 0; }
 .tabstrip.left .tab { border-right: none; box-shadow: inset 2px 0 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.left .tab.sel { border-color: var(--line); border-right: none; box-shadow: inset 2px 0 0 var(--tab-c, var(--neutral-strong)); }
+.tabstrip.left .tab.sel { border-color: var(--line); border-right: none; box-shadow: inset 2px 0 0 var(--tab-c, var(--accent)); }
 .tabstrip.right .tab { border-left: none; box-shadow: inset -2px 0 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
-.tabstrip.right .tab.sel { border-color: var(--line); border-left: none; box-shadow: inset -2px 0 0 var(--tab-c, var(--neutral-strong)); }
+.tabstrip.right .tab.sel { border-color: var(--line); border-left: none; box-shadow: inset -2px 0 0 var(--tab-c, var(--accent)); }
 .body { flex: 1; display: flex; min-height: 0; }
 .term-wrap { flex: 1; min-width: 0; position: relative; background: var(--term-bg); }
 .term { position: absolute; inset: 6px 4px 4px var(--pane-x); }
@@ -1032,7 +1031,7 @@ button.danger:focus-visible { outline: 2px solid var(--error); outline-offset: 2
 .seg button { border-radius: 0; margin-left: var(--seg-overlap, -1px); }
 .seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.seg button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); position: relative; } /* picked: the accent, as a switch that's on (a look's own fill wins) */
+.seg button.on { background: color-mix(in srgb, var(--accent) 24%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 70%, var(--line)); color: var(--fg); position: relative; z-index: 1; } /* picked: an accent tint and edge (over its neighbors' shared edge); the text stays --fg, so a look's own fill still reads */
 /* the selection slides (slide.ts .slid, from a group's first change): the picked item's underline or fill is the
    group's ::before, moved with the spring; the item keeps its text color, its focus ring its own */
 :is(.reader-switch, .sp-tabs).slid { position: relative; }
@@ -1522,7 +1521,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: var(--r-m); background: var(--line); transition: background 0.15s; }
 .toggle.on .toggle-track { background: var(--accent); } /* on: the accent, as the UI kit's (k-toggle); off a neutral track */
 .toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: translate var(--t-spring) var(--spring); }
-.toggle.on .toggle-knob { translate: 10px 0; background: var(--accent-fg); } /* V14: moved, never laid out again; the accent's own text color: clear on it */
+.toggle.on .toggle-knob { translate: 10px 0; background: var(--bg); } /* V14: moved, never laid out again; --bg: what every look's own on track was made with */
 .info .toggle { font-size: var(--fs-2); }
 .info .row { flex-wrap: wrap; }
 
@@ -1992,9 +1991,9 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 /* the message a chat search opened the Reader at, lit a moment */
 .rd-hit { outline: 2px solid var(--accent); outline-offset: var(--sp-1); border-radius: var(--r-m); transition: outline-color var(--t-slow) var(--ease-out); }
 .settings-nav-head { margin: 14px 10px 4px; font-size: var(--fs-1); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.settings-nav button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings-nav button > svg { flex: none; } /* a long project name squeezed its icon away */
-.settings-nav button > span { overflow: hidden; text-overflow: ellipsis; }
+.settings-nav > button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-nav > button > svg { flex: none; } /* a long project name squeezed its icon away */
+.settings-nav > button > span { overflow: hidden; text-overflow: ellipsis; }
 
 /* expose to the world (Tunnel.tsx): the status bar's globe and its popup */
 .port-item { display: inline-flex; align-items: center; gap: var(--sp-2); }
@@ -2148,7 +2147,7 @@ html.away :is(.narrow .sidebar, .phone-sheet) { animation-play-state: running !i
 .narrow .status::-webkit-scrollbar { display: none; }
 .narrow .settings-body { flex-direction: column; }
 .narrow .settings-nav { width: auto; flex-direction: row; overflow-x: auto; padding: var(--sp-3); border-right: none; border-bottom: 1px solid var(--line); scrollbar-width: none; }
-.narrow .settings-nav button { flex: none; }
+.narrow .settings-nav > button { flex: none; }
 .narrow .settings-nav input { flex: 0 0 150px; } /* Find a setting: first in the scrolling row, not squeezed to a square */
 .narrow .settings-nav-head { display: none; }
 .narrow .settings-main, .narrow .page-body { padding: var(--sp-6) var(--sp-5) 40px; }
@@ -3027,7 +3026,7 @@ button.board-name:hover { background: none; }
 .ws-pill.t-done { color: var(--done); } .ws-pill.t-error { color: var(--error); } .ws-pill.t-running { color: var(--running); } .ws-pill.t-merged { color: var(--tc-purple); }
 .ws-state.g-waiting { color: var(--waiting); } .ws-state.g-running { color: var(--running); } .ws-state.g-done { color: var(--done); } .ws-state.g-limit { color: var(--error); }
 .sidebar[data-style='cards'] .ws { margin: 4px 8px; padding: var(--sp-4) var(--sp-4); border: 1px solid var(--line); background-color: color-mix(in srgb, var(--panel) 70%, transparent); }
-.sidebar[data-style='cards'] .ws.sel { background-color: var(--sel); }
+.sidebar[data-style='cards'] .ws.sel { background-color: color-mix(in srgb, var(--accent) 12%, var(--sel)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: none; }
 .ws-last { flex-basis: 100%; padding-left: var(--sp-6); margin-top: 3px; font-size: var(--fs-2); line-height: 1.35; color: var(--fg); opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
 .side-styles { margin-bottom: 8px; }
 /* Settings › Appearance: the floating bubbles' styles, each a live preview (floater.css) */
@@ -3047,6 +3046,11 @@ button.board-name:hover { background: none; }
 :is(.dock-icons, .icon-packs) button { display: inline-flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-4) var(--sp-3); border-radius: var(--r-l); font-size: var(--fs-2); }
 :is(.dock-icons, .icon-packs) button.on { border-color: var(--accent); color: var(--fg); box-shadow: 0 0 0 1px var(--accent); }
 .icon-packs button { gap: var(--sp-3); padding-top: var(--sp-4); } /* Appearance's Icons: a strip of each pack over its name */
+/* Appearance's Empty page background: each one live in a tile over its name (Backdrop.tsx, stirred as the pointer
+   passes over it) */
+.bd-tile { position: relative; display: block; width: 112px; height: 64px; border-radius: var(--r-m); border: 1px solid var(--line); background: var(--bg); overflow: hidden; }
+.bd-picks button.on .bd-tile { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.settings-page > .backdrop { z-index: -1; } /* a page's (New workspace): over the page's own fill, under all it holds (the page is a stacking context: its z-index) */
 .icon-pack-strip { display: flex; gap: var(--sp-4); }
 .icon-look .seg button { display: inline-flex; align-items: center; gap: var(--sp-3); font-variant-numeric: tabular-nums; }
 /* a project's notes (panels.tsx ProjectNotes; Settings' field) */
@@ -3844,7 +3848,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar { align-items: center; }
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab { height: var(--h-m); margin: 0 1px; border: 1px solid transparent; border-radius: var(--r-control); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab-list > .tab.sel { background: none; } /* a look's own selected tab wins */
-:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, var(--neutral-strong)); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, var(--accent)); }
 :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='joined'] .tabbar { padding-left: max(6px, var(--d-r)); }
 .app[data-dz~='joined'] .tabbar::before, .app[data-dz~='joined'] .tabbar::after { display: none; } /* the card's own edge is the line */

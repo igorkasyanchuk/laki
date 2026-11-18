@@ -543,7 +543,7 @@ export function usePageMark() {
   return el
 }
 
-export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
+export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page, under its content */ }) {
   useEffect(() => {
     if (!esc) return
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
@@ -554,6 +554,7 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
   const el = usePageMark()
   return (
     <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
+      {backdrop}
       <div className="settings-head edge-blur">
         {head ?? <b>{title}</b>}
         <span className="grow" />
