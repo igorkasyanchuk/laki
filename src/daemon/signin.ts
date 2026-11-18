@@ -152,13 +152,23 @@ let timer: NodeJS.Timeout | undefined
 function watch() {
   timer ??= setInterval(() => void signTick(), Number(process.env.LAKI_SIGNIN_MS) || 5000)
 }
+let ticking = false // one look at a time: two would both see the sign-in and send the message twice
 export async function signTick() {
+  if (ticking) return
+  ticking = true
+  try {
+    await look()
+  } finally {
+    ticking = false
+  }
+}
+async function look() {
   const waiting = state.tabs.filter(t => (o => o && o.step !== 'in')(rt.get(t.id)?.signedOut))
   if (!waiting.length) return void (timer && (clearInterval(timer), (timer = undefined)))
   const done = new Set<string>()
   for (const t of waiting) {
     const o = rt.get(t.id)?.signedOut
-    if (!o || done.has(`${o.agent}:${o.account}`)) continue
+    if (!o || o.step === 'in' || done.has(`${o.agent}:${o.account}`)) continue
     const s = o.login ? sessions.get(o.login) : undefined
     let ok = !!s?.exited && s.exitCode === 0
     if (s?.exited && s.exitCode !== 0 && o.step === 'opened') ((o.step = 'out'), changed()) // its login failed or was closed: Sign in again

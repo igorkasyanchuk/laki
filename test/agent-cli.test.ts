@@ -60,6 +60,6 @@ test('A9: Settings › Versions: each CLI, the newest from the registry, a dot i
   const failed = await until(async () => (await rig.rpc('agentVersions')).find((a: any) => a.id === 'gemini' && a.update?.state === 'failed'), 'the update fails')
   assert.equal(failed.update.code, 3)
   await assert.rejects(rig.rpc('agentUpdate', { agent: 'nope' }), /no agent CLI nope/)
-  await assert.rejects(rig.rpc('agentUpdate', { agent: 'cursor' }), /isn't installed/)
+  await assert.rejects(rig.rpc('agentUpdate', { agent: 'grok' }), /doesn't know how it was installed/) // (every CLI's fake is on PATH, Cursor's too: none here isn't installed)
   await assert.rejects(rig.rpc('agentUpdate', { agent: 'codex' }), /doesn't know how it was installed/)
 })

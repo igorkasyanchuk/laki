@@ -2901,6 +2901,7 @@ laki browser fix-the-login hover "nav .menu" | press Meta+K | scroll --to bottom
 laki browser fix-the-login drag ".card" "#done" | back | forward | reload | tabs [list | new /admin | select 2 | close 2]
 laki archive fix-the-login | restore … | fork … | rm …
 laki archive fix-the-login --force   # with uncommitted work too (kept, back with restore); rm --force: unpushed work goes
+laki rm fix-the-login --delete-artifacts   # its artifacts too (by default they're kept: Settings › Resources › Artifacts of deleted workspaces)
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace
 laki rename . "login redirect" --asked                  # an agent, over a name you gave it: only when you asked
 laki pr . 42                                            # attach a PR (URL or number) to the workspace

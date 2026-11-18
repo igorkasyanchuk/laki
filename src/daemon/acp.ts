@@ -166,6 +166,7 @@ export class AcpPty implements Pty {
   }
 
   private async start() {
+    this.print('\x1b[?2004h') // bracketed paste on (its mirror's): what's typed in with several lines comes as a paste, one prompt (core's typeInto)
     try {
       const init = await this.call('initialize', { protocolVersion: ACP_VERSION, clientCapabilities: NONE, clientInfo: { name: 'laki', title: 'Laki', version: '1' } })
       if (init?.protocolVersion !== ACP_VERSION) throw new Error(`it speaks ACP ${init?.protocolVersion ?? '?'}; Laki speaks ${ACP_VERSION}`)

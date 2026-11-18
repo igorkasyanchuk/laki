@@ -946,7 +946,7 @@ test("R8: an archived workspace's saved work goes to the trash, not away; told a
   writeFileSync(join(store, 'notes.md'), 'kept\n')
   await rig.rpc('wsArchive', { id: work.id, force: true })
   await rig.rpc('wsArchive', { id: bare.id })
-  await rig.rpc('settingsSet', { archivedDays: 7 })
+  await rig.rpc('settingsSet', { archivedDays: 7, keepStorage: false }) // C5's off: its storage folder to the trash with its changes (on: to the kept artifacts, test/kept-artifacts.test.ts)
   const now = Date.now()
   const has = async (id: string) => (await rig.rpc('state')).workspaces.some((w: any) => w.id === id)
   await rig.rpc('archivedTidy', { now: now + 5 * 86400e3 })
