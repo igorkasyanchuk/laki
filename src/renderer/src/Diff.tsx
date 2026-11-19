@@ -1,14 +1,14 @@
 // A diff's pieces that the side panel's Changes and Review and the full review (FullReview.tsx) share: the diff read
 // into each file's lines, a file's lines drawn in one column or two, a line's comment box, an image's before and
 // after, Revert's picked lines, GitHub's Viewed boxes, and review threads with their suggestions.
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
-import { askScope, diffCounts } from '../../shared/ask'
+import { askScope, denyOf, diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
-import type { Annotation, Annotations } from '../../shared/types'
+import type { Annotation, Annotations, Ask } from '../../shared/types'
 
 // what load gives, again every few seconds while the window is in front, and on reload()
 export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
@@ -379,6 +379,54 @@ export function Choice({ text, n, agent }: { text: string; n?: ReactNode; agent?
   )
 }
 export const choiceProps = (text: string, agent?: string) => (s => (s ? { 'aria-label': text, title: text, 'data-scope': s.broad ? 'broad' : 'exact' } : {}))(askScope(text, agent))
+
+// "No, and say why" (Needs you's card, the Reader's ask, the ask bar; not notifications): ⌥-click or a long press on
+// the choice that says no (shared/ask.ts denyOf: the agent's own "tell it what to do differently", else a last No), or
+// N on the card, opens a line under the choices; ⏎ answers with that choice and sends the words (answer's say: typed into
+// the agent's own box, or the next message once it took the answer), Esc closes it. on(o): a choice button's handlers
+export function useSayWhy(ask: Ask | undefined, answer: (n: number, label: string, say?: string) => void) {
+  const [open, setOpen] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const long = useRef(false)
+  const no = ask ? denyOf(ask) : undefined
+  const clear = () => clearTimeout(timer.current)
+  useEffect(() => clear, [])
+  const on = (o: { n: number; label: string }) => ({
+    onClick: (e: MouseEvent) => {
+      if (long.current) return void (long.current = false) // a long press's own release
+      if (no && o.n === no.n && e.altKey) return void setOpen(true)
+      answer(o.n, o.label)
+    },
+    ...(no && o.n === no.n && {
+      'aria-keyshortcuts': 'N',
+      onPointerDown: () => ((long.current = false), clear(), (timer.current = setTimeout(() => ((long.current = true), setOpen(true)), 500))),
+      onPointerUp: clear,
+      onPointerLeave: clear,
+    }),
+  })
+  const key = (e: KeyEvent) => !!no && !open && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'n' || e.key === 'N') && (e.preventDefault(), setOpen(true), true)
+  const box = open && no ? <SayWhy label={no.label} onSend={t => (setOpen(false), answer(no.n, no.label, t))} onClose={() => setOpen(false)} /> : null
+  return { no, on, key, box }
+}
+function SayWhy({ label, onSend, onClose }: { label: string; onSend: (text: string) => void; onClose: () => void }) {
+  const [text, setText] = useState('')
+  return (
+    <div className="say-why" onClick={e => e.stopPropagation()}>
+      <input
+        autoFocus
+        aria-label={`${label}: say why`}
+        placeholder="No, because… or what to do instead (⏎ sends, Esc closes)"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          e.stopPropagation() // the card's 1–9 and N are its own
+          if (e.key === 'Escape') e.preventDefault(), onClose()
+          else if (e.key === 'Enter' && !e.nativeEvent.isComposing && text.trim()) e.preventDefault(), onSend(text.trim())
+        }}
+      />
+    </div>
+  )
+}
 
 export function AskDiff({ diff }: { diff: string }) {
   const [open, setOpen] = useState(false)

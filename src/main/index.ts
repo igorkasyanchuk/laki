@@ -63,10 +63,11 @@ const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smo
 // in the console; a screenshot each, result.json at the end, then the app quits (1: a step failed)
 let smoked = false
 
-// test:sheet: a picture against the last run's (scripts/ui-sheet.ts moved it to prev/): the share of its pixels that
-// changed (shared/pixelDiff.ts), both read back from their files (one scale), or new
-function sheetDiff(png: string, prev: string): { diff?: number; new?: true } {
-  if (!existsSync(prev)) return { new: true }
+// test:sheet: a picture against the last run's (scripts/ui-sheet.ts' LAKI_SHEET_PREV, its folder): the share of its
+// pixels that changed (shared/pixelDiff.ts), both read back from their files (one scale), or new
+function sheetDiff(png: string, name: string): { diff?: number; new?: true } {
+  const prev = process.env.LAKI_SHEET_PREV ? join(process.env.LAKI_SHEET_PREV, `${name}.png`) : ''
+  if (!prev || !existsSync(prev)) return { new: true }
   const [a, b] = [nativeImage.createFromPath(png), nativeImage.createFromPath(prev)]
   const [sa, sb] = [a.getSize(), b.getSize()]
   return { diff: pixelDiff(a.toBitmap(), sa.width, sa.height, b.toBitmap(), sb.width, sb.height) }
@@ -493,7 +494,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     await new Promise(r => setTimeout(r, 250)) // drawn
     const png = join(dir, sheet.length ? `${name}.png` : `${String(i + 1).padStart(2, '0')}-${name}.png`)
     writeFileSync(png, (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
-    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }), ...(sheet.length && { facts: await facts().catch(() => undefined), ...sheetDiff(png, join(dir, 'prev', `${name}.png`)) }) })
+    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }), ...(sheet.length && { facts: await facts().catch(() => undefined), ...sheetDiff(png, name) }) })
     writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
     if (/(^|-)(palette|get-started|ship-sheet)$/.test(name)) await key('Escape')()
   }

@@ -202,7 +202,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   no escape), another workspace's terminal refused before any ask), `queueClear`, `queueSet` (the whole list: an edit, a
   reorder, a removal; `was` refuses one made over a delivery), `queueNow` (Esc into a running turn, 5 s for it to stop, then `deliver`; an asleep one, a restart's too, woken
   instead, its first one going as it settles; an ended one refused, as is a delivery that couldn't type);
-  `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below; `label`: refused unless choice `n` still says that), `unread` (its ● again: `done`, until a look clears it);
+  `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below; `label`: refused unless choice `n` still says that; `say`: *No, and say why*, with a no only (`shared/ask.ts` `sayable`): the tell-why choice (`TELL_WHY`) gets the words typed into the agent's box once its menu is gone, a plain no sends them with `send`'s `whenIdle` (the queue: after it took the no), core's `sayAfter`; refused at remote access's answer level (main.ts `ANSWER`); the renderer's `useSayWhy` (Diff.tsx: ⌥-click, a long press, N) in Needs you, the Reader and the ask bar), `unread` (its ● again: `done`, until a look clears it);
 - a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
   another, named `<name>-<preset>`, sharing a random `race` id (the sidebar's flag; the renderer's `Compare.tsx`);
 - an issue (`wsNew`/`wsFan` `issue`: a URL or number): `fromIssue` runs `gh issue view <ref> --json number,title,body,url`

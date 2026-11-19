@@ -1259,6 +1259,7 @@ const ANSWER: Record<string, true | ((p: any) => string)> = {
   reviewNotesSet: true,
   ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer alertAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
   send: sendOk,
+  answer: p => (typeof p?.say === 'string' && p.say.trim() ? 'say why (a message to the agent)' : ''), // No, and say why: a full device's
   wsNew: newOk(false),
   tabNew: newOk(true),
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',

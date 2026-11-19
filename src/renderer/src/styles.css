@@ -2193,6 +2193,10 @@ html[data-kb] { --safe-b: 0px; }
 .ask-bar { flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--pane-r) var(--sp-3) var(--pane-x); overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--line); background: var(--side); font-size: var(--fs-2); }
 .ask-bar::-webkit-scrollbar { display: none; }
 .ask-bar > span { flex: none; }
+.ask-bar > .ask-choices { display: contents; } /* its choices are the bar's, laid out as before */
+/* No, and say why (Diff.tsx useSayWhy): one line under the choices */
+.say-why { display: flex; } .say-why input { flex: 1; min-width: 0; height: var(--h-m); padding: 0 var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-s); background: var(--bg); color: var(--fg); font: inherit; font-size: var(--fs-2); }
+.ask-bar .say-why { flex: 1 0 240px; } .need .say-why { margin-top: var(--sp-2); }
 .ask-bar .ask-tool { font-weight: 600; }
 .ask-bar > .ask-what { flex: 0 1 auto; min-width: 80px; max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2); color: var(--fg); }
 .ask-diff pre { margin: 0; max-height: 50vh; overflow: auto; padding: var(--sp-2) 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m); font: var(--fs-1)/1.45 var(--mono); } /* an approval's diff (AskDiff) */

@@ -150,6 +150,8 @@ const turn = text => {
   }
   // "quiz": AskUserQuestion's menu, asked through PermissionRequest (an Esc declines it: no hook, as the real one)
   if (text.startsWith('quiz')) { hook('PermissionRequest', { hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Which color?' }] } }); process.stdout.write('Which color?\r\n'); MENU = QUIZ; menu = 1; drawMenu(); return }
+  // "menuno": a menu of Yes and a plain No (no tell-why choice), as another agent's
+  if (text.startsWith('menuno')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); MENU = ['Yes', 'No']; menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('menu')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true

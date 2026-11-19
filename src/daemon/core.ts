@@ -8,7 +8,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, release, tmpdir, userInfo } from 'node:os'
-import { type AllowRule, allowRuleOf, alwaysAskOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
+import { type AllowRule, allowRuleOf, alwaysAskOf, type Perm, permOf, rulePattern, sayable, TELL_WHY } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -2416,7 +2416,10 @@ async function autoAllow(tab: Tab, rule: AllowRule, perm: Perm, tell: () => void
 // one at a time per tab, and not again for a second after (a double click, Allow and a click: the menu isn't redrawn yet)
 const answering = new Set<string>()
 // label: the choice's words as they were asked (a notification's, a phone's button): refused when n says something else now
-export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'last'; label?: string }) {
+// say ("No, and say why": Needs you, the Reader, the ask bar): with a no only; the agent's tell-why choice gets the words
+// typed into its box once its menu is gone, a plain no sends them as the next message, after it took the answer (send's
+// whenIdle: the queue)
+export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'last'; label?: string; say?: unknown }) {
   const t = findTab(p.tab)
   const s = sessions.get(t.id)
   if (!s || s.exited) throw new Error(`${t.name} isn't running`)
@@ -2430,16 +2433,28 @@ export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'las
     const n = p.n ?? (p.pick === 'last' ? a.options.at(-1)!.n : a.options[0].n)
     if (!a.options.some(o => o.n === n)) throw new Error(`${t.name} has no choice ${n}`)
     if (p.label !== undefined && a.options.find(o => o.n === n)!.label !== p.label) throw new Error(`${t.name} asks something else now`)
+    const picked = a.options.find(o => o.n === n)!.label
+    const say = typeof p.say === 'string' ? p.say.trim().slice(0, 8000) : ''
+    if (say && !sayable(picked)) throw new Error(`say goes with a no, not with ${picked}`)
     const key = `\x1b${s.appCursor ? 'O' : '['}${n > a.at ? 'B' : 'A'}`
     // one key at a time: a TUI reads a burst as one unknown key
     for (let i = 0; i < Math.abs(n - a.at); i++) input(t.id, key), await new Promise(r => setTimeout(r, 40))
     input(t.id, '\r')
     setTimeout(() => answering.delete(t.id), 1000)
-    return { picked: a.options.find(o => o.n === n)!.label }
+    if (say) void sayAfter(t, s, picked, say).catch((e: Error) => wsLog({ id: t.workspace }, `to ${t.name}: why not sent: ${e.message}`))
+    return { picked }
   } catch (e) {
     answering.delete(t.id)
     throw e
   }
+}
+
+async function sayAfter(t: Tab, s: Session, picked: string, say: string) {
+  if (!TELL_WHY.test(picked)) return void send({ target: t.id, text: say, whenIdle: true })
+  for (const end = Date.now() + 3000; Date.now() < end && !s.exited && s.ask(); ) await new Promise(r => setTimeout(r, 100)) // its box once the menu is gone
+  typeInto(s, textFor(t, say))
+  if (tracked(t)) rtOf(t.id).status = 'running'
+  changed()
 }
 
 // mark a tab unread: its ● again, until it's looked at

@@ -307,3 +307,27 @@ test('the fakes echo; FAKE_SCRIPT is the demo only', async t => {
   assert.match(screen, /Welcome to Claude Code[\s\S]*> say hi[\s\S]*Read\(src\/cart\.js\)[\s\S]*⏺ Totals round to cents\./)
   assert.doesNotMatch(screen, /fake|answer:/)
 })
+
+// No, and say why (answer's say): claude's own tell-why choice gets the words typed into its box; a plain No sends
+// them as its next message once it took the answer; never with a yes, never an agent's
+test("No, and say why: the tell-why choice, then the words as its next prompt; a plain No, the words after it; a yes can't", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const tab = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
+  const screen = () => rig.rpc('screen', { target: tab }) as Promise<string>
+  const ask = () => until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)?.ask, 'its ask')
+  await until(async () => /> $/m.test(await screen()), 'the fake claude up')
+  await rig.rpc('send', { target: tab, text: 'menu' })
+  await ask()
+  await assert.rejects(rig.rpc('answer', { tab, n: 1, say: 'go on' }), /say goes with a no/)
+  await assert.rejects(rig.rpc('answer', { tab, n: 3, say: 'x', from: { ws: ws.id, tab } }), /an agent can't answer an agent's question/)
+  assert.deepEqual(await rig.rpc('answer', { tab, n: 3, say: 'use the trash, not rm' }), { picked: 'No, and tell Claude what to do differently (esc)' })
+  await until(async () => /picked: No, and tell Claude[\s\S]*answer: use the trash, not rm/.test(await screen()), 'its answer, then the words as its prompt')
+  // a menu with a plain No (another agent's): the words wait for it to take the answer, then go
+  await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)?.status === 'idle', 'its turn done')
+  await rig.rpc('send', { target: tab, text: 'menuno' })
+  await until(async () => (await ask()).options.length === 2, 'the Yes / No menu')
+  assert.deepEqual(await rig.rpc('answer', { tab, n: 2, say: 'build it first' }), { picked: 'No' })
+  await until(async () => /picked: No\r?\n[\s\S]*answer: build it first/.test(await screen()), 'the No, then the words')
+})

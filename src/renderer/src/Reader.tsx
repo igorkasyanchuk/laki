@@ -5,7 +5,7 @@
 // an answer, a laki-ui block drawn with the UI kit (UiBlock). The terminal stays attached under it: Terminal brings
 // it back as it was
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AskDiff, Choice, choiceProps } from './Diff'
+import { AskDiff, Choice, choiceProps, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
@@ -31,7 +31,7 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[]; kept?: boolean }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined; openProof?: (tab: TabView, path: string) => void; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView, marks: TurnMark[]) => React.ReactNode; drag?: (tab: TabView, path: string) => void } // drag (C10): a turn's file dragged out to Finder or any app // turnChips (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
+export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[]; kept?: boolean }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string, say?: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined; openProof?: (tab: TabView, path: string) => void; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView, marks: TurnMark[]) => React.ReactNode; drag?: (tab: TabView, path: string) => void } // drag (C10): a turn's file dragged out to Finder or any app // turnChips (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex' || t.preset === 'acp') // acp: an ACP agent's (Labs), the Reader only
@@ -149,6 +149,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     return () => removeEventListener('keydown', on)
   }, [steps, tab.id])
   const hint = useSecretHint(text, setText, { ws: tab.workspace, send: () => send() })
+  const why = useSayWhy(tab.status === 'waiting' ? tab.ask : undefined, (n, label, say) => api.answer(tab.id, n, label, say)) // No, and say why
   const send = () => {
     const t = text.trim()
     if (!t) return
@@ -366,9 +367,9 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
             </span>
           )}
           {tab.ask.diff && <AskDiff key={tab.ask.what} diff={tab.ask.diff} />}
-          <div className="rd-opts">
+          <div className="rd-opts" onKeyDown={why.key}>
             {tab.ask.options.map(o => (
-              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} {...choiceProps(optLabel(tab.ask!, o), tab.preset)} onClick={() => api.answer(tab.id, o.n, o.label)}>
+              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} {...choiceProps(optLabel(tab.ask!, o), tab.preset)} {...why.on(o)} {...(why.no?.n === o.n && { 'data-tip': '⌥-click, a long press or N: say why' })}>
                 <Choice text={optLabel(tab.ask!, o)} agent={tab.preset} n={`${o.n}. `} />
               </button>
             ))}
@@ -378,6 +379,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
               </button>
             )}
           </div>
+          {why.box}
         </div>
       ) : (
         <>

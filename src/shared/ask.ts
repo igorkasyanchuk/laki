@@ -225,6 +225,11 @@ export function bulkOk(t: { status?: string; ask?: Ask; secret?: unknown }, sand
   if (a.options.length && !yesNo(a)) return false
   return !risky(a.what) && (sandboxOn || !FILES.test(a.tool) || !OUTSIDE.test(a.what))
 }
+// "No, and say why": the agent's own way to hear it (claude's "No, and tell Claude what to do differently (esc)",
+// codex's), else a no that's its menu's last (deny: the words go as the next message once it took the answer)
+export const TELL_WHY = /\btell \w+ what to do differently\b/i
+export const denyOf = (a: Ask) => a.options.find(o => TELL_WHY.test(o.label)) ?? (a.options.length >= 2 && NO.test(a.options.at(-1)!.label) ? a.options.at(-1) : undefined)
+export const sayable = (label: string) => TELL_WHY.test(label) || NO.test(label)
 // what Allow all / Deny all and the global hotkeys send: the first option (a plain yes: never a standing permission) or
 // the last (a no); none when the menu isn't a plain yes … no (then nothing is sent)
 export const bulkPick = (a: Ask, allow: boolean) => (yesNo(a) ? (allow ? a.options[0] : a.options.at(-1)) : undefined)

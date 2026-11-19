@@ -9,7 +9,7 @@
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
 import { bulkOk, optLabel } from '../../shared/ask'
-import { AskDiff, Choice, choiceProps } from './Diff'
+import { AskDiff, Choice, choiceProps, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
@@ -21,7 +21,7 @@ export type NeedsApi = {
   keep: (t: TabView) => void // a turn that ended on an API error: goes on
   dismiss: (t: TabView) => void
   open: (t: TabView) => void
-  answer: (t: TabView, n: number, label: string) => void
+  answer: (t: TabView, n: number, label: string, say?: string) => void // say: No, and say why (Diff.tsx useSayWhy)
   pick: (t: TabView, pick: 'first' | 'last') => void // a permission prompt with no menu read: Allow / Deny
   permission: (t: TabView) => boolean // its last wait said "permission" (the turn event's text)
   review: (t: TabView) => void
@@ -143,8 +143,10 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
   const opts = waiting ? (t.ask?.options ?? []) : []
   const allow = waiting && !opts.length && api.permission(t)
   const stop = (e: MouseEvent) => (e.target as HTMLElement).closest('button') && e.stopPropagation() // a button's own click; the row's room around it opens the tab
+  const why = useSayWhy(waiting ? t.ask : undefined, (n, label, say) => api.answer(t, n, label, say)) // ⌥-click, a long press or N: No, and say why
   const key = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return // a button of its own has the key
+    if (why.key(e)) return
     const o = opts.find(o => String(o.n) === e.key)
     if (o) e.preventDefault(), api.answer(t, o.n, o.label)
     else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && waiting && t.ask?.steps && api.keys) e.preventDefault(), api.keys(t, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C') // its other questions
@@ -210,7 +212,7 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
           {(opts.length > 0 || allow) && (
             <div className="need-opts" onClick={stop}>
               {opts.map(o => (
-                <button key={o.n} className={o.n === t.ask?.at ? 'on' : ''} {...choiceProps(optLabel(t.ask!, o), t.preset)} onClick={() => api.answer(t, o.n, o.label)}>
+                <button key={o.n} className={o.n === t.ask?.at ? 'on' : ''} {...choiceProps(optLabel(t.ask!, o), t.preset)} {...why.on(o)} {...(why.no?.n === o.n && { 'data-tip': '⌥-click, a long press or N: say why' })}>
                   <Choice text={optLabel(t.ask!, o)} agent={t.preset} n={<span className="need-n">{o.n}</span>} />
                 </button>
               ))}
@@ -222,6 +224,7 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
               )}
             </div>
           )}
+          {why.box}
         </>
       ) : (
         <>

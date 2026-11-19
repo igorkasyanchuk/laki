@@ -19,18 +19,20 @@ const themes = process.env.LAKI_SHEET_THEMES === 'all' ? [...src('themes.ts').sp
 if (!looks.length || !themes.length) throw new Error('no looks or themes found in their sources')
 const at = Date.now()
 const dir = join(root, 'dist/ui-sheet')
-// the last run's pictures to prev/ (an older prev replaced), for the comparison
-const prevDir = join(dir, 'prev')
+// the last run's pictures aside (an older prev replaced), out of dist/ui-sheet while ui-smoke makes it anew; main
+// compares each new one with its (LAKI_SHEET_PREV), and they're dist/ui-sheet/prev after
+const aside = join(root, 'dist/ui-sheet-prev')
 const lastRun = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.png')) : []
 if (lastRun.length) {
-  rmSync(prevDir, { recursive: true, force: true })
-  mkdirSync(prevDir, { recursive: true })
-  for (const f of lastRun) renameSync(join(dir, f), join(prevDir, f))
+  rmSync(aside, { recursive: true, force: true })
+  mkdirSync(aside, { recursive: true })
+  for (const f of lastRun) renameSync(join(dir, f), join(aside, f))
 }
-const before = existsSync(prevDir) ? readdirSync(prevDir).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)) : []
+const before = existsSync(aside) ? readdirSync(aside).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)) : []
 try {
-  execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/ui-smoke.ts'], { cwd: root, stdio: 'inherit', env: { ...process.env, LAKI_SHEET: JSON.stringify({ looks, themes }) } })
+  execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/ui-smoke.ts'], { cwd: root, stdio: 'inherit', env: { ...process.env, LAKI_SHEET: JSON.stringify({ looks, themes }), ...(before.length && { LAKI_SHEET_PREV: aside }) } })
 } catch {} // a step that failed is in result.json: shown on the sheet
+if (before.length && existsSync(dir)) renameSync(aside, join(dir, 'prev'))
 if (!existsSync(join(dir, 'result.json'))) throw new Error('no dist/ui-sheet/result.json: the window never finished')
 type Step = { name: string; ok: boolean; why?: string; facts?: { clipped: string[]; over: string[] }; diff?: number; new?: true }
 const steps = new Map((JSON.parse(readFileSync(join(dir, 'result.json'), 'utf8')) as Step[]).map(s => [s.name, s]))

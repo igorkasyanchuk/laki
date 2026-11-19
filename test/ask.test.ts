@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type AllowRule, allowRuleOf, alwaysAskOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, standing, streakOf } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, alwaysAskOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, denyOf, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, sayable, standing, streakOf } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -213,4 +213,14 @@ test('F15: always-ask globs and the rule a streak of allows would make', () => {
   assert.deepEqual(streakOf({ tool: 'Edit', what: 'src/ui/app.ts' }), { key: 'Edit src/ui/**', tool: 'Edit', pattern: 'src/ui/**' })
   for (const what of ['rm -rf build', 'git push --force', 'npm test && rm x', 'cat /etc/hosts', 'npm test db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Bash', what }, g), undefined, what)
   for (const what of ['README.md', '../x/a.ts', 'db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Edit', what }, g), undefined, what)
+})
+
+test("No, and say why: the agent's tell-why choice, else a last No; nothing to say why on another menu", () => {
+  const o = (...ls: string[]) => ({ options: ls.map((label, i) => ({ n: i + 1, label })), at: 1 })
+  assert.equal(denyOf(o('Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)'))?.n, 3)
+  assert.equal(denyOf(o('Yes, allow once', 'No, and tell Codex what to do differently', 'Yes, always'))?.n, 2) // wherever it is
+  assert.equal(denyOf(o('Allow once', 'Allow always', 'No'))?.n, 3)
+  assert.equal(denyOf(o('Red', 'Green', 'Blue')), undefined)
+  assert.equal(denyOf(o('No')), undefined, 'one choice: no menu to say no in')
+  assert.ok(sayable('No') && sayable('No, and tell Claude what to do differently (esc)') && !sayable('Yes'))
 })

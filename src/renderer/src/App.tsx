@@ -42,7 +42,7 @@ import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } f
 import { bounceOf, dockProgress, hhmm, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
-import { AskWrap, Choice, choiceProps, turnNext } from './Diff'
+import { AskWrap, Choice, choiceProps, turnNext, useSayWhy } from './Diff'
 import { type TurnApi, TurnButton, TurnStrip } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
@@ -457,6 +457,25 @@ function KeyBar({ onKey }: { onKey: (data: string) => void }) {
         </button>
       ))}
     </div>
+  )
+}
+
+// the ask bar's choices (the daemon moves and presses ⏎), with No, and say why (Diff.tsx useSayWhy)
+function BarChoices({ tab, answer }: { tab: TabView; answer: (n: number, label: string, say?: string) => void }) {
+  const why = useSayWhy(tab.ask, answer)
+  return (
+    <span className="ask-choices" onKeyDown={why.key}>
+      {tab.ask!.options.map(o => {
+        const label = optLabel(tab.ask!, o)
+        const scoped = askScope(label, tab.preset) // a standing permission: never cut, its rule on a line of its own
+        return (
+          <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={why.no?.n === o.n ? '⌥-click, a long press or N: say why' : scoped ? undefined : o.label} {...choiceProps(label, tab.preset)} {...why.on(o)}>
+            {scoped ? <Choice text={label} agent={tab.preset} n={`${o.n}. `} /> : `${o.n}. ${label.length > 48 ? `${label.slice(0, 46)}…` : label}`}
+          </button>
+        )
+      })}
+      {why.box}
+    </span>
   )
 }
 
@@ -3171,7 +3190,7 @@ export function App() {
     spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
-    answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
+    answer: (tab, n, label, say) => void call('answer', { tab, n, label, ...(say && { say }) }).catch(() => {}), // say: No, and say why; label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
     undo: t =>
       void ask(`Undo ${t.name}'s last turn?`, { text: `${t.changes!.n} file${t.changes!.n === 1 ? '' : 's'} back as they were before it: ${t.changes!.files.slice(0, 4).map(f => f.path).join(', ')}${t.changes!.n > 4 ? '…' : ''}. Files it made are removed. Nothing is committed.`, ok: 'Undo', danger: true }).then(ok => void (ok && call<{ files: number }>('turnUndo', { tab: t.id }).then(r => done(`${r.files} file${r.files === 1 ? '' : 's'} back as before the turn`), () => {}))),
@@ -4314,15 +4333,7 @@ export function App() {
             ) : (
               <span className="muted">{tab.name} asks:</span>
             )}
-            {tab.ask!.options.map(o => {
-              const label = optLabel(tab.ask!, o)
-              const scoped = askScope(label, tab.preset) // a standing permission: never cut, its rule on a line of its own
-              return (
-                <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={scoped ? undefined : o.label} {...choiceProps(label, tab.preset)} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
-                  {scoped ? <Choice text={label} agent={tab.preset} n={`${o.n}. `} /> : `${o.n}. ${label.length > 48 ? `${label.slice(0, 46)}…` : label}`}
-                </button>
-              )
-            })}
+            <BarChoices tab={tab} answer={(n, label, say) => void call('answer', { tab: tab.id, n, label, ...(say && { say }) }).catch(() => {})} />
             {tab.held ? (
               <span className="muted small" data-tip="Settings › the project › Always ask for: no rule answers it">
                 Asked because it touches {tab.held}
