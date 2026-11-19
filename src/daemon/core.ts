@@ -551,9 +551,9 @@ export const REPO_MEMORY = join('.laki', 'memory.md')
 export const inRepo = (p?: Project) => !!p?.inRepo && !p.host && !p.kind
 // .laki or its file as a link (a branch's .laki/memory.md -> ~/.zshrc, or .laki -> ~; a hard link an agent made in its
 // worktree): never read or written through it, a repo's or an agent's worktree's links are anyone's
-const LINKED = (rel: string) => `${rel} or its folder is a link (to a file elsewhere?): not written`
+const LINKED = (rel: string) => `${rel} isn't a plain file in a folder of its own (a link to a file elsewhere?): not written`
 function repoFile(root: string, rel: string): string | undefined {
-  const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile() && s.nlink === 1))(lstatSync(p, { throwIfNoEntry: false }))
+  const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile() && s.nlink <= 1))(lstatSync(p, { throwIfNoEntry: false }))
   return not(join(root, dirname(rel)), true) || not(join(root, rel), false) ? undefined : join(root, rel)
 }
 const repoRead = (root: string, rel: string) => {
@@ -571,11 +571,11 @@ function repoWrite(root: string, rel: string, text: string) {
   mkdirSync(join(root, dirname(rel)), { recursive: true })
   const f = repoFile(root, rel)
   if (!f) throw new Error(LINKED(rel))
-  const fd = openSync(f, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o644)
+  const fd = openSync(f, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o666)
   try {
     const at = fstatSync(fd)
     const now = lstatSync(f, { throwIfNoEntry: false })
-    if (!repoFile(root, rel) || !now || now.ino !== at.ino || now.dev !== at.dev || at.nlink !== 1) throw new Error(LINKED(rel))
+    if (!repoFile(root, rel) || !now || now.ino !== at.ino || now.dev !== at.dev || at.nlink > 1) throw new Error(LINKED(rel))
     ftruncateSync(fd)
     writeFileSync(fd, text)
   } finally {
@@ -1880,7 +1880,8 @@ function realOf(p: string): string {
   }
 }
 // what a wrapped agent and its hooks read in the data folder: claude's settings and plugin, gemini's settings, opencode's
-// config folder, the status line's script, pasted pictures and files (laki hook's tool-gates: a stat, so not here)
+// config folder, the status line's script, pasted pictures and files (laki hook's tool-gates: a stat, so not here).
+// ponytail: every workspace's images/ and files/, as claude's own sandbox gives them
 const wrapReads = () => [...new Set([...Object.keys(hookFiles(localHooks)), ...Object.keys(claudePlugin())].map(f => f.split('/')[0]))].map(f => join(dir, f)).concat(statusSh, join(dir, 'images'), join(dir, 'files'))
 function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: string; env: Record<string, string> } {
   const bin = sandboxBin()
