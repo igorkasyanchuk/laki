@@ -528,7 +528,7 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
       <Group title="Chat button" hint="A button in the window's bottom right corner opens Laki AI over what you're doing, the same conversation as the AI page; with each ask it tells the AI the page, workspace and tab you're on and the tab's screen">
         <div className="setting-box">
           <Switch className="switch-row" on={ai.float !== false} onChange={v => onChange({ ...ai, float: v })}>
-            <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
+            <Says title="Chat button" hint="At the status bar's end (its right click floats it to the window's corner). Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
           </Switch>
           <Switch className="switch-row" on={ai.show !== false} onChange={v => onChange({ ...ai, show: v ? undefined : false })}>
             <Says title="Show its work" hint="Its window opens when you talk to it (the talk key, Say it), so you see what it does and its Yes / No; and a command it runs at your Yes shows its tab, with what it printed in the chat" />

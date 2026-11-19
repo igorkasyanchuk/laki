@@ -102,7 +102,10 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['projects', null, '.sidebar .ws'],
     ['switch-apart', null, () => apart('.reader-switch', '.pane.active .xterm-screen')], // U2: Terminal | Reader off the terminal's lines
     ['reader', click('.reader-switch button:last-child'), '.reader'],
-    ['fab-apart', null, () => apart('.ai-fab', '.rd-box button.primary')], // U2: the AI button off the Reader's Send
+    // the AI button: in the status bar by default; floated again from its right click, it's off the Reader's Send (U2);
+    // its – puts it back
+    ['fab-apart', () => pick('.sb-ai', 'Float the button again'), () => apart('.ai-fab', '.rd-box button.primary')],
+    ['fab-dock', click('.ai-fab-min'), '.sb-ai'],
     ['review', click('.review-tab'), '.full-review'],
     // T18: two columns (its key's event) once the diff has 900px (the files and the comments folded away): each changed
     // line's row has an old and a new cell; then one again

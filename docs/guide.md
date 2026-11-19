@@ -844,10 +844,11 @@ groups gets each new workspace in the group its task belongs to, by what the nam
 *Reviews*, a spike in *POC*; a general *Work* only when no other fits), or none when none plainly fits, and it says which;
 agents' `laki new --group` follows the same rule (the laki skill); a group with a prompt
 template starts it with that template, else it picks one of yours that plainly fits the task. The bubbles' window is
-the chat alone: no Calls, Info or cost (the app's AI page has them). The chat button at the window's bottom right (every
-page but AI, Settings, Help and Specs; Settings › AI › *Chat button* hides it) opens the same chat over what
-you're doing (drag its head to move it; a double-click puts it back). The – on the button's corner as you rest on
-it (or its right click) minimizes it into the status bar's end, where it stays until its right click (or ⌘K's *Float the Laki AI button again*) floats it again; and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
+the chat alone: no Calls, Info or cost (the app's AI page has them). The chat button, *AI* at the status bar's end (every
+page but AI, Settings, Help and Specs; Settings › AI › *Chat button* hides it), opens the same chat over what
+you're doing (drag its head to move it; a double-click puts it back). Its right click (or ⌘K's *Float the Laki AI button
+again*) floats it at the window's bottom right instead, where the – on its corner as you rest on it (or its right
+click) minimizes it into the status bar again; with the status bar off it's a small *AI* pill in that corner; and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
 answer, and the tab's last 40 lines. It knows Laki's built-in tools too (timers, the stopwatch, reminders, Send later,
 Bird view…) and starts a timer, a stopwatch, a reminder or a Send later when you ask (*remind me about the login PR
 in an hour*). Ask it where a setting is (*where do I turn off the sounds?*, *is copy on select on?*) and it answers

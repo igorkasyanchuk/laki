@@ -476,13 +476,14 @@ export function App() {
   const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('laki.tabs', {})) // the focused pane's session
   const [aiFloat, setAiFloat] = useState(false) // the floating Laki AI chat, open
-  // its button minimized into the status bar (laki.aiDock) until put back; fly: on its way down or back up (DOCK_MS)
-  const [aiDock, setAiDock] = useState(() => load('laki.aiDock', false))
+  // its button minimized into the status bar (laki.aiDock; unset: minimized, false: floated at the bottom right) until
+  // put back; fly: on its way down or back up (DOCK_MS)
+  const [aiDock, setAiDock] = useState(() => load('laki.aiDock', true))
   const [fly, setFly] = useState<'' | 'down' | 'up' | 'landed'>('')
   const docked = (on: boolean) => {
     const to = on ? 'landed' : 'up' // the status bar's item pops in, or the button rises back
     setAiDock(on)
-    store('laki.aiDock', on || undefined)
+    store('laki.aiDock', on ? undefined : false)
     setFly(to)
     setTimeout(() => setFly(f => (f === to ? '' : f)), DOCK_MS)
   }

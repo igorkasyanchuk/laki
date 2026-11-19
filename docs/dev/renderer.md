@@ -202,8 +202,9 @@ are tested in `test/units-more.test.ts`.
     - `laki.aiFloatAt`: where the floating Laki AI chat was dragged (App's `AiFloat`: `right` and `bottom` in px, held
       8px inside the main area as it changes size; a double-click on its head drops it and the size); `laki.aiFloatSize`:
       its size, from its edges and corners (`.ai-grip`s; the window clips, so they reach past the round corners).
-    - `laki.aiDock`: the chat button minimized into the status bar (App's `dock`: `fly` down, `DOCK_MS`; `.sb-ai`, sticky at
-      the bar's end; its right click, or ⌘K where no status bar shows it, floats it again).
+    - `laki.aiDock`: the chat button minimized into the status bar, unset (the default) or `true`; `false`: floated at the
+      bottom right (App's `dock`: `fly` down, `DOCK_MS`; `.sb-ai`, sticky at the bar's end; its right click, or ⌘K where no
+      status bar shows it, floats it again; `.ai-fab-min` minimizes it).
     - `laki.checkOffered`: projects Done check was offered for (its toast, once each).
     - `laki.reader`: each claude or codex tab's Reader view or terminal (`reader`, `term`; unset: Reader on a phone).
     - `laki.radarHide`: Collision radar's overlaps you hid (`radarKey`: both sides' lines; a change shows it again), the newest 200.

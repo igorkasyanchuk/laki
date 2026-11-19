@@ -178,7 +178,7 @@ export const FIND: [string, string, string?][] = [
   ['terminal', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
   ['terminal', 'Show progress', 'percent sidebar tab both'],
   ['terminal', 'Progress in the sidebar', 'percent line bar row'],
-  ['ai', 'Chat button in the corner', 'floating chat ask laki ai anywhere'],
+  ['ai', 'Chat button', 'floating chat ask laki ai anywhere status bar corner minimize minimized float'],
   ['voice', 'Speech to text', 'voice dictation dictate microphone mic speak talk speech transcribe whisper cloud openrouter engine'],
   ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
   ['voice', 'Route by first words', 'voice route address name workspace agent first words pause comma say send to laki ai new task'],
