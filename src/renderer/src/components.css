@@ -30,8 +30,10 @@
 /* the theme's accent, its waiting color from 70%, its error's from 90% */
 .usage-ring .track { stroke: color-mix(in srgb, var(--accent) 22%, transparent); }
 .usage-ring .fill { stroke: var(--accent); stroke-linecap: round; filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)); }
-.usage-ring.mid .fill, .usage-bar.mid i, .tab-ctx.mid { stroke: var(--waiting); background: var(--waiting); }
-.usage-ring.high .fill, .usage-bar.high i, .tab-ctx.high { stroke: var(--error); background: var(--error); }
+.usage-ring.mid .fill, .usage-bar.mid i { stroke: var(--waiting); background: var(--waiting); }
+.tab-ctx.mid { --ctx-fill: var(--waiting); }
+.usage-ring.high .fill, .usage-bar.high i { stroke: var(--error); background: var(--error); }
+.tab-ctx.high { --ctx-fill: var(--error); }
 .tunnel-pop.usage-pop { width: 420px; }
 .usage-agent { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .usage-name { display: flex; align-items: baseline; gap: 8px; }

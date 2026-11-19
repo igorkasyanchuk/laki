@@ -170,7 +170,7 @@ export function TabList({ app }: { app: AppCtx }) {
               </span>
             )}
             {queued > 0 && <span className="badge">+{queued}</span>}
-            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} role="img" aria-label={`Context ${ctxPct(ctx)}%, ${levelWord(ctxPct(ctx))}`} style={{ width: `${ctxPct(ctx)}%` }} />}
+            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} role="img" aria-label={`Context ${ctxPct(ctx)}%, ${levelWord(ctxPct(ctx))}`} style={{ '--p': `${ctxPct(ctx)}%` } as CSSProperties} />}
             {ctx && ctxLook === 'ring' && <Ring p={ctxPct(ctx)} />}
             <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
               <Icon name="x" size={10} />

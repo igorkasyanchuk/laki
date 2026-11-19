@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A tab's context line runs along its straight bottom edge as a faint track, filled as far as the chat's context is: no stray mark under a round tab.
 - Pick the shell your terminals start: Settings › Terminal › *Shell* (your login shell, fish, bash, nushell or another path, checked). Agents and project scripts keep your login shell. [Try it](laki://settings/terminal?spot=Shell)
 - Terminals kept alive across a restart stay kept when the new daemon starts quickly (a restart from Settings or an update no longer starts fresh shells).
 - *Ask me first* on New workspace (⌥⏎): Laki AI asks up to three questions your task leaves open, with choices; your picks go with the prompt. Never automatic.
