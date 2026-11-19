@@ -110,3 +110,31 @@ export function menuModelOk(m: unknown): NativeItem[] | undefined {
 // the app's window, the annotate editor or a floated tab: you may want to show those
 export const FLOAT_KINDS = ['bar', 'card', 'menu', 'voice', 'ask', 'inbox', 'quick', 'talk'] as const
 export const protectedKind = (kind: string, s: { hideFloats?: boolean }, recording: boolean) => (FLOAT_KINDS as readonly string[]).includes(kind) && (s.hideFloats === true || recording)
+
+// a launch's window: shown, unless macOS opened Laki at login (Settings › General › Start Laki at login: the daemon and
+// the menu bar item then, the window made but hidden: its notifications go on). A smoke run's or a capture's: shown
+export const showAtLaunch = (o: { mac: boolean; atLogin: boolean; check?: boolean }) => !(o.mac && o.atLogin && !o.check)
+
+// the Dock's menu (macOS): up to five agents waiting, from the window's list (names only; Recording mode's private
+// workspaces never in it, the window leaves them out), each checked here
+export type DockAgent = { ws: string; tab: string; name: string }
+const idOk = (x: unknown) => (typeof x === 'string' && /^[\w-]{1,64}$/.test(x) ? x : undefined)
+export function dockAgents(v: unknown): DockAgent[] {
+  if (!Array.isArray(v)) return []
+  return v.slice(0, 5).flatMap((a: { ws?: unknown; tab?: unknown; name?: unknown } | null) => {
+    const ws = idOk(a?.ws)
+    const tab = idOk(a?.tab)
+    const name = typeof a?.name === 'string' ? a.name.replace(/\s+/g, ' ').trim().slice(0, 60) : ''
+    return ws && tab && name ? [{ ws, tab, name }] : []
+  })
+}
+// its items by id (main gives each its click): New Task…, the agents waiting, Quiet for an Hour or End Quiet
+export type DockItem = { type: 'separator' } | { id: string; label: string }
+export const dockMenu = (agents: DockAgent[], quiet: boolean): DockItem[] => [
+  { id: 'new', label: 'New Task…' },
+  ...(agents.length ? [{ type: 'separator' } as const, ...agents.map(a => ({ id: `tab:${a.tab}`, label: `${a.name} — waiting` }))] : []),
+  { type: 'separator' },
+  quiet ? { id: 'quiet-off', label: 'End Quiet' } : { id: 'quiet', label: 'Quiet for an Hour' },
+]
+// a project's folder for the Dock's recent items: an absolute path on this Mac (an SSH host's is never sent)
+export const recentOk = (p: unknown): p is string => typeof p === 'string' && p.length > 1 && p.length <= 1024 && p.startsWith('/') && !p.includes('\0')

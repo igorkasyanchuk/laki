@@ -240,6 +240,7 @@ export type AppSettings = Paint & {
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
   menuBarClick?: 'menu' | 'inbox' // General › Menu bar click: its menu, or the Inbox under it (macOS)
+  loginAsked?: boolean // Start Laki at login's one notice was answered (App.tsx), or the switch was set
   trayState?: boolean // Q8: its picture shows the state (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
   floaterStyle?: FloaterStyle // a working agent's bubble (unset: gradient)
@@ -1022,6 +1023,8 @@ export function SettingsPage(p: {
   const [themeQ, setThemeQ] = useState('') // the themes' name filter
   const [findQ, setFindQ] = useState('') // Find a setting
   const [touchCan, setTouchCan] = useState(false) // this Mac can ask for Touch ID (General's Confirm risky actions shows)
+  const [login, setLogin] = useState<boolean | null>(null) // Start Laki at login: the login item (macOS; null: hidden)
+  useEffect(() => void bridge?.loginItem?.().then(setLogin, () => {}), [])
   useEffect(() => void bridge?.touchId?.().then(setTouchCan, () => {}), [])
   const findRef = useRef(findQ)
   findRef.current = findQ
@@ -1616,6 +1619,13 @@ export function SettingsPage(p: {
                       </Switch>
                     )}
                   </div>
+                </Group>
+              )}
+              {login !== null && (
+                <Group title="Startup">
+                  <Switch className="switch-row" on={login} onChange={v => void bridge!.setLoginItem!(v).then(r => r !== null && (setLogin(r), set({ loginAsked: true })))}>
+                    <Says title="Start Laki at login" hint="In the menu bar, no window: scheduled tasks and reminders run after a restart" />
+                  </Switch>
                 </Group>
               )}
               {globalKeys}

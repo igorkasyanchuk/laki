@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { appFile, appPage, BROWSER, confirmAsk, dragOk, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { appFile, appPage, BROWSER, confirmAsk, dockAgents, dockMenu, dragOk, recentOk, showAtLaunch, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -160,4 +160,24 @@ test('C10: a file dragged out: inside its root (a workspace, a storage folder), 
   assert.equal(dragOk('relative/a.ts', ['relative'], home), false)
   assert.equal(dragOk('/Users/me/app/a\0b', ['/Users/me/app'], home), false)
   assert.equal(dragOk('/Users/me/app/a.ts', [], home), false)
+})
+
+test('showAtLaunch: the window shows, but not when macOS opened Laki at login (a smoke run or a capture still shows it)', () => {
+  assert.equal(showAtLaunch({ mac: true, atLogin: false }), true)
+  assert.equal(showAtLaunch({ mac: true, atLogin: true }), false)
+  assert.equal(showAtLaunch({ mac: true, atLogin: true, check: true }), true)
+  assert.equal(showAtLaunch({ mac: false, atLogin: true }), true)
+})
+
+test("the Dock's menu: five agents at most, ids and names checked; New Task…, the agents, Quiet or End Quiet", () => {
+  const list = [...Array(7)].map((_, i) => ({ ws: `w${i}`, tab: `t${i}`, name: `  agent\n${i} `.repeat(i === 6 ? 20 : 1) }))
+  assert.deepEqual(dockAgents(list).map(a => a.tab), ['t0', 't1', 't2', 't3', 't4'])
+  assert.equal(dockAgents(list)[0].name, 'agent 0')
+  assert.deepEqual(dockAgents([{ ws: 'w', tab: 'x y', name: 'n' }, { ws: 'w', tab: 't', name: '' }, { ws: 1, tab: 't', name: 'n' }, null, 'x']), [])
+  assert.deepEqual(dockAgents('nope'), [])
+  assert.equal(dockAgents([{ ws: 'w', tab: 't', name: 'x'.repeat(200) }])[0].name.length, 60)
+  assert.deepEqual(dockMenu([], false), [{ id: 'new', label: 'New Task…' }, { type: 'separator' }, { id: 'quiet', label: 'Quiet for an Hour' }])
+  assert.deepEqual(dockMenu([{ ws: 'w', tab: 't', name: 'api' }], true), [{ id: 'new', label: 'New Task…' }, { type: 'separator' }, { id: 'tab:t', label: 'api — waiting' }, { type: 'separator' }, { id: 'quiet-off', label: 'End Quiet' }])
+  for (const p of ['/Users/me/repo', '/a']) assert.ok(recentOk(p), p)
+  for (const p of ['repo', '/', '', 3, '/x\0y', `/${'a'.repeat(1100)}`]) assert.ok(!recentOk(p), String(p))
 })

@@ -83,6 +83,10 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.on('deep-link', (_e, url: string) => cb(url))
     ipcRenderer.send('deep-link-ready') // then main sends one that came first
   },
+  dockMenu: (list: { ws: string; tab: string; name: string }[]) => ipcRenderer.send('dock-menu', list), // the Dock's menu: agents waiting (main's dockAgents checks them)
+  recent: (path: string) => ipcRenderer.send('recent', path), // a project's folder for the Dock's recent items
+  loginItem: () => ipcRenderer.invoke('login-item') as Promise<boolean | null>, // Start Laki at login (macOS; null: not here)
+  setLoginItem: (on: boolean) => ipcRenderer.invoke('login-item-set', on) as Promise<boolean | null>,
   onFolders: (cb: (paths: string[]) => void) => {
     const f = (_e: unknown, paths: string[]) => cb(paths) // dropped on the Dock icon
     ipcRenderer.on('open-folders', f)

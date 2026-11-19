@@ -19,7 +19,7 @@ import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, ty
 import { type BrowseDid, keyEvent, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk, dockAgents, dockMenu, recentOk, showAtLaunch, type DockAgent } from './guards.ts'
 import { updater } from './update.ts'
 
 // the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
@@ -828,7 +828,7 @@ const saveWin = () => {
 }
 const keepWin = () => (clearTimeout(winSave), (winSave = setTimeout(saveWin, 500))) // a drag's moves: once it rests
 
-function create() {
+function create(hidden = false) {
   const at = winAt()
   float = !!at?.float
   win = new BrowserWindow({
@@ -855,6 +855,7 @@ function create() {
     },
   })
   win.once('ready-to-show', () => {
+    if (hidden) return // opened at login: made, not shown (the Dock icon or the menu bar's Open shows it)
     if (!at || at.max) win?.maximize()
     if (at?.full) win?.setFullScreen(true)
     win?.show()
@@ -1642,6 +1643,39 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
   tray.setToolTip(info ? trayTip(info, app.name) : trayTip({ needs: num(n), working: 0, blocked: 0, quiet: quietUntil }, app.name))
   trayTabs = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
   trayMenu()
+  dockSet() // Quiet's state comes with it
+})
+// the Dock's menu (macOS): New Task… (the quick bar, as the menu bar's), up to five agents waiting (the window's list, a
+// click shows that tab), Quiet for an Hour or End Quiet (the menu bar's dndSet); built again as either changes
+let dockList: DockAgent[] = []
+let dockWas = ''
+const dockClick = (id: string) => (id === 'new' ? quickWin() : id === 'quiet' ? quietSet({ minutes: 60 }) : id === 'quiet-off' ? quietSet({ off: true }) : id.startsWith('tab:') && show(id.slice(4)))
+function dockSet() {
+  if (!mac || !app.dock) return
+  const items = dockMenu(dockList, quietOn())
+  const k = JSON.stringify(items)
+  if (k === dockWas) return
+  dockWas = k
+  app.dock.setMenu(Menu.buildFromTemplate(items.map(i => ('type' in i ? i : { label: i.label, click: () => dockClick(i.id) }))))
+}
+ipcMain.on('dock-menu', (e, list: unknown) => {
+  if (!from(e)) return
+  dockList = dockAgents(list)
+  dockSet()
+})
+// the Dock's recent items: the projects you open, this Mac's folders (opened again: open-file, below)
+let recentWas = ''
+ipcMain.on('recent', (e, path: unknown) => {
+  if (!from(e) || !mac || !recentOk(path) || path === recentWas) return
+  recentWas = path
+  app.addRecentDocument(path)
+})
+// Settings › General › Start Laki at login (macOS): a login item; opened by it, the window is made, not shown
+ipcMain.handle('login-item', e => (from(e) && mac ? app.getLoginItemSettings().openAtLogin : null))
+ipcMain.handle('login-item-set', (e, on: unknown) => {
+  if (!from(e) || !mac || typeof on !== 'boolean') return null
+  app.setLoginItemSettings({ openAtLogin: on }) // macOS 13+'s SMAppService: no openAsHidden; wasOpenedAtLogin keeps the window hidden instead
+  return app.getLoginItemSettings().openAtLogin
 })
 
 // the floating bubbles (Settings › Appearance): a drop stuck to the screen's left or right edge, over every app and
@@ -3182,7 +3216,7 @@ app.whenReady().then(async () => {
   if (app.isPackaged) app.setAsDefaultProtocolClient('laki')
   if (!dev) serveApp()
   await Promise.all([daemon().catch(e => dialog.showErrorBox('Laki', `The daemon didn't start: ${e.message}`)), moveStorage()])
-  create()
+  create(!showAtLaunch({ mac, atLogin: mac && app.getLoginItemSettings().wasOpenedAtLogin, check: !!smoke || !!capture }))
 })
 app.on('before-quit', () => (quitting = true))
 app.on('activate', () => show())

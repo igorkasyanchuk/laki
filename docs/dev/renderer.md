@@ -232,6 +232,16 @@ are tested in `test/units-more.test.ts`.
       the first unlock.
     - `laki.newWs`: the new-workspace page's last choices (`LastNew`: project, preset, cmd, local, model, effort,
       base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); its More starts closed.
+  - The Dock's menu (`bridge.dockMenu`, main's `dock-menu`: `from(e)`, guards.ts `dockAgents` checks it, `dockMenu` its
+    items, `app.dock.setMenu` again as the list or Quiet changes): `recorded(view)`'s waiting tabs that `needsYou`, five,
+    `{ ws, tab, name }` (the workspace's name only). Its recent items: the open project's folder (`bridge.recent`, main's
+    `recent`, `recentOk`: this Mac's absolute paths, `app.addRecentDocument`); one opened from there or with Laki (main's
+    `open-file`, `onFolders`' `openFolders`) goes to that project's workspace open last (`laki.ws`) or its first, as a
+    `laki://ws/` link (none: `laki://new?project=`); another folder is added as a drop is. Start Laki at login
+    (`bridge.loginItem`, `setLoginItem`: main's `login-item`, `login-item-set`, `from(e)`, macOS only, `app.setLoginItemSettings`);
+    opened at login (`wasOpenedAtLogin`, guards.ts `showAtLaunch`) the window is made hidden (`create(true)`), so the
+    menu bar's item and notifications go on. A scheduled task on with it off: one notice (`noticeShow`, *Start at login*,
+    *No*), `settings.loginAsked` after (`loginOffered`: once per window).
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image (Q8: one per state, `shared/tray.ts` `trayBitmap`: idle the mark's

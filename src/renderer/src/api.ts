@@ -46,6 +46,10 @@ type Bridge = {
   dictationSettings?(): void
   glass?(on: boolean, light?: boolean, float?: boolean, side?: boolean): void // side: V5's sidebar material
   fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
+  dockMenu?(list: { ws: string; tab: string; name: string }[]): void // the Dock's menu: up to five agents waiting (names only)
+  recent?(path: string): void // a project's folder for the Dock's recent items (this Mac's only)
+  loginItem?(): Promise<boolean | null> // Settings › General › Start Laki at login (macOS; null: not here)
+  setLoginItem?(on: boolean): Promise<boolean | null>
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them

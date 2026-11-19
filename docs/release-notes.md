@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Start Laki at login: Settings › General › *Startup* starts it in the menu bar with no window, so scheduled tasks and reminders run after a restart; your first scheduled task asks once. [Try it](laki://settings/general?spot=Startup)
+- The Dock icon's menu: *New Task…*, the agents waiting (a click opens that tab) and *Quiet for an Hour*; its recent items are your projects, and opening one goes to its workspace.
 - The wrapper sandbox (macOS) has a *Network* too: *Listed hosts* lets a Gemini, Grok or OpenCode profile reach only the project's registries, GitHub, its model and what you allowed, through Laki; another host gets a card with *Allow this domain in this project*.
 - Agents can change only how Laki looks (theme, fonts, glass, the sidebar's and rail's layout); every other setting, Global memory and where worktrees go among them, is yours alone.
 - An extension's picture from the web is fetched only when its site's address is on the internet: a name that points at this Mac or your network is refused.

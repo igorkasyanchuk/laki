@@ -217,6 +217,7 @@ export const FIND: [string, string, string?][] = [
   ['git', 'Collision radar', 'overlap conflict collide same lines files worktrees merge base moved'],
   ['general', 'Menu bar click', 'menu bar tray click inbox popover panel asks waiting choices new task'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
+  ['general', 'Start Laki at login', 'login startup boot restart reboot launch open automatically menu bar hidden no window scheduled tasks reminders'],
   ['general', 'Show state', 'menu bar tray icon state idle working waiting blocked limit error tooltip'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
   ['general', 'Update delay', 'update delay wait days old release skip once later'],

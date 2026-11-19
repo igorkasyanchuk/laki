@@ -1,7 +1,7 @@
 import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, veiled, type AgentDid, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type AgentDid, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { askScope, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
@@ -460,6 +460,8 @@ function KeyBar({ onKey }: { onKey: (data: string) => void }) {
   )
 }
 
+let loginOffered = false // this window's: the Start at login notice is up or was answered
+
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
@@ -722,6 +724,7 @@ export function App() {
   const wsFiles = ws ? openFiles.filter(f => f.ws === ws.id) : [] // this workspace's open files, its tabs
   const previewed = wsFiles.find(f => fileKey(f) === shownFile[ws?.id ?? '']) ?? wsFiles.at(-1) ?? null // the one in front
   const project = view?.projects.find(p => p.id === ws?.project)
+  useEffect(() => void (project && !project.host && bridge?.recent?.(project.path)), [project?.id]) // the Dock's recent items: this Mac's folders
   const git = project?.git !== false
   const tabs = useMemo(() => view?.tabs.filter(t => t.workspace === ws?.id) ?? [], [view, ws])
   const byId = (id: string) => tabs.find(t => t.id === id)
@@ -1003,6 +1006,27 @@ export function App() {
   // Handoff: remote access's address while it runs, with Settings' switch on (main offers only a lasting https one)
   const rem = view?.remote
   useEffect(() => bridge?.handoff?.(view?.settings.remoteHandoff && rem?.url ? { url: rem.url, via: rem.via, host: rem.host } : null), [view?.settings.remoteHandoff, rem?.url, rem?.via, rem?.host])
+  // the Dock's menu: up to five agents waiting, names only, as the view is drawn (Recording mode's private ones out)
+  const dockList = view ? recorded(view).tabs.filter(t => t.status === 'waiting' && needsYou(t)).slice(0, 5).map(t => ({ ws: t.workspace, tab: t.id, name: (w => (w ? wsName(w) : t.name))(view.workspaces.find(w => w.id === t.workspace)) })) : []
+  const dockKey = JSON.stringify(dockList)
+  useEffect(() => bridge?.dockMenu?.(dockList), [dockKey])
+  // Start Laki at login, offered once as a scheduled task is on (its runs need the daemon, which nothing starts after a
+  // restart): a notice, Start at login or No, remembered (settings.loginAsked); never while the login item is on
+  const schedOn = !!view?.schedules?.some(s => s.on && !s.archived)
+  useEffect(() => {
+    if (!schedOn || view?.settings.loginAsked || loginOffered || !bridge?.loginItem) return
+    loginOffered = true
+    void bridge
+      .loginItem()
+      .then(async on => {
+        if (on !== false) return
+        const a = await call('noticeShow', { title: 'Start Laki at login?', text: 'Scheduled tasks and reminders run only while Laki does. Start it at login, in the menu bar with no window, and they run after a restart too.', choices: ['Start at login', 'No'] }) as { choice?: string; timedOut?: boolean }
+        if (a.timedOut) return void (loginOffered = false)
+        if (a.choice === 'Start at login') await bridge?.setLoginItem?.(true)
+        await call('settingsSet', { loginAsked: true })
+      })
+      .catch(() => {})
+  }, [schedOn, view?.settings.loginAsked])
   useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording, trayInfo || trayQuiet ? { ...trayInfo, quiet: trayQuiet } : undefined, dockBar, inboxItems), [trayKey])
   // the remote page installed as an app: its icon's badge, the same count (its service worker sets it as a push comes)
   const pageBadge = !bridge && view ? badgeOf(view) : 0
@@ -1666,7 +1690,20 @@ export function App() {
         setDialog('new')
       }
     }
-    const unFolders = bridge?.onFolders?.(paths => void addFolders(paths))
+    // the Dock's (a recent project, a folder opened with Laki): a project you have goes to its workspace open last (else its first;
+    // none: New workspace for it), as its laki:// link; another is added, as a drop on the window is
+    const openFolders = (paths: string[]) => {
+      const v = viewRef.current
+      const known = (path: string) => v?.projects.find(p => !p.host && p.path.replace(/\/+$/, '') === path.replace(/\/+$/, ''))
+      const last = paths.map(known).findLast(Boolean)
+      const rest = paths.filter(p => !known(p))
+      if (rest.length) return void addFolders(rest)
+      if (!last) return
+      const live = v?.workspaces.filter(x => x.project === last.id && !x.archived) ?? []
+      const w = live.find(x => x.id === load<string | null>('laki.ws', null)) ?? live[0] // the one open last, else its first
+      setLink(w ? `laki://ws/${encodeURIComponent(w.id)}` : `laki://new?project=${encodeURIComponent(last.id)}`)
+    }
+    const unFolders = bridge?.onFolders?.(openFolders)
     window.addEventListener('dragover', over)
     window.addEventListener('dragleave', leave)
     window.addEventListener('drop', drop)
