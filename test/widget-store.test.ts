@@ -22,7 +22,9 @@ test('the store: get, set, delete, keys, all; on ones only; keys and size checke
   await assert.rejects(s('keys'), /off/i, 'off: none')
   await rig.rpc('widgetSet', { id: 'kv', on: true })
   await until(async () => (await s('get', { key: 'runs' })).value === 1, 'its first run counted')
-  await until(async () => (await rig.rpc('widgetRun', { id: 'kv' })).ok, 'a second fetch')
+  // that run over first: a widgetRun while it fetches queues one more (again), so polling it under load never got an ok
+  await until(async () => !((await rig.rpc('state')).widgets ?? []).find((w: any) => w.id === 'kv')?.running, 'its first run over')
+  assert.ok((await rig.rpc('widgetRun', { id: 'kv' })).ok, 'a second fetch')
   assert.equal((await s('get', { key: 'runs' })).value, 2, 'the script read and wrote it')
   await s('set', { key: 'cfg', value: { a: [1, 2] } })
   assert.deepEqual((await s('get', { key: 'cfg' })).value, { a: [1, 2] })
