@@ -9,11 +9,12 @@ from it (limits, hooks).
 ## Build, test, run
 
 ```bash
-npm install
+npm install                       # on Node 26.13.1 (.tool-versions: asdf); package.json's engines stay >=22.12
 npm run typecheck                 # tsc --noEmit
 npm run check                     # typecheck, then test:fast (~15 s): before a commit that touches src/; `npm run dmg` runs it first
 npm test                          # node:test, every file (158), 4 at a time: 10 to 15 min on an 8-core Mac, more beside running agents (14 min on 19 Nov 2026; 6 at a time was no quicker); cap a background run at 25 min
 npm run test:release              # npm test, then each file that failed run once more alone: flaky ones pass, twice fails (scripts/test-rerun.ts; release.sh's)
+LAKI_TEST_BUILT=1 npm test          # the rig's daemon, CLI and hooks from out/main (npm run build first, 2 s): 2-3x less CPU, as the suite is CPU-bound on 4 performance cores
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~10 s
 npm run test:changed              # the tests for what changed against origin/main and isn't committed, each with why (a changed test, an import of a changed file directly or through one source file, a test named for it), then run as test:one runs them; none: test:fast (scripts/test-changed.ts; more args go to node --test)

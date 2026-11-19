@@ -14,6 +14,10 @@ import { type Channel, channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const fakes = join(root, 'test/fakes')
 const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
+// LAKI_TEST_BUILT=1: the daemon and the CLI from the build (out/main: npm run build), which also gives the daemon's
+// hooks and laki CLI their built scripts (core.ts cliPath, hookPath): a daemon boots on 0.2 s of CPU, not 0.75
+const built = process.env.LAKI_TEST_BUILT === '1'
+const entry = (src: string, out: string) => join(root, built ? out : src)
 
 // R9: one multiplier for every wait's limit (until, seen; not sleep): LAKI_TEST_SLOW, else from the load as this file
 // starts (1 on a quiet machine, up to 3 with more runnable processes than cores: a release build beside the tests)
@@ -102,7 +106,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     out: '', // what the daemon said (its daemon.log when detached), every start's
     app: '', // S1: the app's token, as main reads it from the daemon it starts (fd 3): the rig's calls are the app's window
     async start() {
-      daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env: { ...env, LAKI_APP_PIPE: '3' }, stdio: ['ignore', 'pipe', 'pipe', 'pipe'] })
+      daemon = spawn(node[0], [...node.slice(1), entry('src/daemon/main.ts', 'out/main/daemon.js')], { env: { ...env, LAKI_APP_PIPE: '3' }, stdio: ['ignore', 'pipe', 'pipe', 'pipe'] })
       daemon.stdout!.on('data', d => (rig.out += d))
       daemon.stderr!.on('data', d => (rig.out += d))
       let said = ''
@@ -148,7 +152,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     },
     cliIn(stdin: string | undefined, ...args: string[]): Promise<{ code: number; out: string; err: string }> {
       return new Promise(r => {
-        const p = spawn(node[0], [...node.slice(1), join(root, 'src/cli/main.ts'), ...args], { env: { ...env, ...(rig.app && { LAKI_APP_TOKEN: rig.app }) } }) // S1: the app's, as your window's calls
+        const p = spawn(node[0], [...node.slice(1), entry('src/cli/main.ts', 'out/main/cli.js'), ...args], { env: { ...env, ...(rig.app && { LAKI_APP_TOKEN: rig.app }) } }) // S1: the app's, as your window's calls
         if (stdin !== undefined) p.stdin.end(stdin)
         let out = ''
         let err = ''

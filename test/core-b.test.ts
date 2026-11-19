@@ -64,7 +64,7 @@ exec /usr/sbin/lsof "$@"
   writeFileSync(join(d, 'ps-none'), '')
   const none = await rig.rpc('resources')
   assert.deepEqual(none.tabs.find((x: any) => x.tab === tab.id), { tab: tab.id, rss: 0, cpu: 0, procs: [] })
-  assert.match(none.daemon.cmd, /src\/daemon\/main\.ts/)
+  assert.match(none.daemon.cmd, /src\/daemon\/main\.ts|out\/main\/daemon\.js/) // from source, or the build (LAKI_TEST_BUILT)
   assert.equal(none.daemon.cpu, 0)
   assert.ok(none.daemon.rss > 0 && none.daemon.heap > 0)
   rmSync(join(d, 'ps-none'))
