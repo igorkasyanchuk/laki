@@ -210,7 +210,7 @@ local server: no Authorization header). The same loop (`openrouter()`) and `aiCo
 memory's compaction, aiOnce) go there; OpenRouter's own parts stay out: no cache_control marks, no `usage.include` (the
 standard `stream_options.include_usage` instead), no x-title, no cost (the call log's `cost` unset: not priced). Voice
 and the decision blocks stay OpenRouter's. `aiEndpointTest`: one short ask, its answer (Settings' Test). Both methods are
-the user's only (gates.ts AGENT_NO, REMOTE_NO; main.ts FROM, ANSWER_NO), as `aiEndpoint` is (AGENT_KEYS, REMOTE_KEYS); a
+the user's only (gates.ts AGENT_NO, REMOTE_NO; main.ts FROM, ANSWER_NO), as `aiEndpoint` is (AGENT_SETTINGS_NO, REMOTE_KEYS); a
 managed policy locks it like any setting. `aiState`'s `endpointKey`: whether a key is kept, never the key.
 
 ### Keys in the Keychain (`keychain.ts`)

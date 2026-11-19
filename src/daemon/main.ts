@@ -62,7 +62,7 @@ import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRest
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
 import { agentContext, agentContextOpen } from './sees.ts'
-import { AGENT_NO, AGENT_OK, AGENT_OWN, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_NO, REMOTE_OK } from './gates.ts'
+import { AGENT_NO, AGENT_OK, AGENT_OWN, AGENT_SETTINGS_OK, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_KEYS, REMOTE_NO, REMOTE_OK } from './gates.ts'
 import * as clientsMod from './clients.ts'
 
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -776,10 +776,11 @@ const api = {
 export type Api = typeof api
 const table: Record<string, Handler> = api // a name looked up at run time
 
-// remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_KEYS = /^(touchId|remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|sandboxNew|hideSecrets|hideSecretsAsked)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs; allowOn, allowKey, denyOn, denyKey, talkOn, talkKey: the global keys that answer the newest ask from any app (one bound to a key you press for something else approves for you); sandboxNew: the default profiles' sandbox; hideSecrets: what agents get of Laki's environment
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
-const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
+const changes = (p: any, keys: (k: string) => boolean) => Object.keys(p ?? {}).some(k => keys(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
+// an agent's: every setting but the look and layout (gates.ts AGENT_SETTINGS_OK); what call() and whoCalls add is no setting
+const CALL_KEYS = new Set(['from', 'caller', 'byClient', 'now', 'touchTicket', 'cid'])
+const agentSettingsNo = (p: Record<string, unknown>) => changes(p, k => !AGENT_SETTINGS_OK.has(k) && !CALL_KEYS.has(k))
 // S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
 // never ends, a project's scripts, a scheduled task. A shell tab stays (the phone's own terminal: it's the user, signed in)
 const SCRIPT_KEYS = ['setup', 'teardown', 'run', 'test', 'lint', 'format', 'deploy', 'ticket', 'check', 'actions', 'env']
@@ -792,7 +793,7 @@ const scriptsChange = (p: any) => !!p?.config && typeof p.config === 'object' &&
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
-  (method === 'settingsSet' && changes(p, REMOTE_KEYS)) ||
+  (method === 'settingsSet' && changes(p, k => REMOTE_KEYS.test(k))) ||
   (method === 'shareStart' && Number(p?.hours ?? 0) === 0) ||
   (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined || p?.alwaysAsk !== undefined)) // F14: a project's auto-answer rules, F15: its Always ask for: the Mac's own
 
@@ -1260,19 +1261,6 @@ const answerNo = (method: string, p: any) => {
 }
 // S5: deny unless allowed: every method says who may call it (FROM, CALLER) or that anyone may (OPEN)
 for (const k of Object.keys(api)) if (!FROM.has(k) && !CALLER.has(k) && !OPEN.has(k)) throw new Error(`api's ${k} isn't in FROM, CALLER or OPEN: classify it (docs/dev/api.md)`)
-// settings an agent can't change either (remote access can: they're the user's own on the phone, Cancel's whenDone off
-// too): when everything is done (the Mac sleeps, locks or shuts down), the Done check, Recording mode, the next prompt
-// guessed (your messages to a model), keep awake; how old the tidies let storage files, archived workspaces and pasted
-// images get (a small one deletes them all within the hour); memory's compaction (memories to a model, as
-// memoryCompact); the app's updates (Electron's security fixes come with them); and the global ones of what a project's
-// config holds (refused in projectSet): Run ▾'s actions, prompt templates, the PR switches' prompts and trusted review
-// bots (whose comments go to agents), and the files copied into new worktrees (git's ignored ones: .env); which of your
-// accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
-// yours Laki starts); S6: voice (its dictionary rewrites what you dictate and send), Laki AI's own (ai.context is its
-// instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action);
-// the global answer keys (Allow, Deny, talk: from any app, as REMOTE_KEYS), scheduled runs' limits (0 is none),
-// Labs and Workflows (what starts on its own: a workflow's triggers) and how many turns are kept (0 deletes them)
-const AGENT_KEYS = /^(gitTidy|workHours|touchId|browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|cloneDeps|spareWorktree|tmExclude|spotlightExclude|ptyHost|inHooks|voice|ai|readerTools|keys|cmdKeys|aiEndpoint|allowOn|allowKey|denyOn|denyKey|talkOn|talkKey|scheduleAtOnce|scheduleMaxMinutes|labs|workflows|turnsKept|hideSecrets|hideSecretsAsked|secretHint|voiceNote)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -1299,7 +1287,7 @@ function agentNo(method: string, p: any) {
   if (method === 'input') text(p.data, 'data')
   if (method === 'send') text(p.text, 'text')
   boxNo(method, p)
-  if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
+  if (method === 'settingsSet' && (remoteNo(method, p) || agentSettingsNo(p))) notAgent(p, 'change that setting')
   else if (method === 'scheduleSet' && p?.onlyIf?.kind === 'cmd') notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
   else if (method === 'scheduleSet' && p?.maxMinutes === 0 && core.state.schedules?.find(x => x.id === p.id)?.maxMinutes !== 0) notAgent(p, "turn off a scheduled task's time limit (settings.scheduleMaxMinutes is the user's too)") // T8: 1 to 1440 minutes is fine; a task already without one, sent back as it is, too
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)

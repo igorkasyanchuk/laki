@@ -183,11 +183,14 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   the agent's until you type there yourself.
 - A repo's extension isn't trusted as its `node_modules/` (its installed packages) or what widget.json's `state`
   names: code it runs from there can change without turning it off.
-- An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
-  phone webhook, extension folders, what Open in editor runs, *When everything is done*, the Done check, Recording
-  mode and what it hides, *Guess my next prompt*, keep awake, how long storage files, archived workspaces and pasted
-  images are kept, memory's compaction, updates, the background picture, or reset the interface, nor a project's
-  scripts, env, trust or memory list), and ask Laki AI,
+- An agent can change only how Laki looks and is laid out: the theme, fonts, the accent, corners, density, glass,
+  icons, the sidebar's rows, the rail, where the tabs are, the status bar, saved layouts and the Reader's switch
+  (`AGENT_SETTINGS_OK` in `src/daemon/gates.ts`). Every other setting is yours: Global memory, workflows' variables,
+  where storage folders and worktrees go, notifications, env, profiles, the phone webhook, extension folders, PR
+  prompts, actions, prompt templates, Laki AI's, voice, keys, *When everything is done*, the Done check, Recording
+  mode, *Guess my next prompt*, keep awake, how long storage files, archived workspaces and pasted images are kept,
+  memory's compaction, updates and the background picture. Nor can it reset the interface or change a project's
+  scripts, env, trust or memory list. It can ask Laki AI,
   which then acts with that agent's rights, in a chat of that tab's own (never yours: it can't read, open or delete your chats), but not in an extension's page chat.
   The view an agent or the remote page reads has no remote access link or PIN, phone webhook or env values. It can't import worktrees either (a delete removes their
   folder); an imported one's folder is removed only by `git worktree remove`, which checks it's that repo's.

@@ -13,8 +13,8 @@ todos, plans, skills, plugins, commands, agents, hooks, output-styles, settings.
 skills, prompts, config.toml, AGENTS.md) from the agent's own folder, at its making and each start, so a chat resumes on
 any account (claude's missing folders made in `~/.claude` first; `~/.codex` is never written: only what's there). `spawnTab` keeps `tab.account` (`accountFor`: its own, else its profile's, else `settings.accountUse`, else
 home; a removed one: home); `tabAccount` (a tab's right click › *Restart on another account*) sets it and resumes.
-An agent can't call `tabAccount` or `accountRm`, nor set `accountUse`, `limitFallback` or `mcpApps` (main.ts
-`AGENT_NO`, `AGENT_KEYS`): they'd move work onto an account you never picked.
+An agent can't call `tabAccount` or `accountRm`, nor set `accountUse`, `limitFallback` or `mcpApps` (gates.ts
+`AGENT_NO`, `AGENT_SETTINGS_NO`): they'd move work onto an account you never picked.
 Auto fallback (`settings.limitFallback`, each agent's account ids in order, SettingsAgents' `.account-fb`): core's
 `checkLimit` calls `fallback` a second after a new limit (new by tab and account, `limitSent`; the turn's end told
 first: a workflow pauses on it), which
@@ -499,7 +499,7 @@ the card's *Restart without the wrapper* (`tabUnbox`: the tab's `wrap: false`). 
 `HARMLESS` and `envAllowOf` (`AGENT_KEY_ENV`, the agent's own sign-in key, and the profile's `envAllow`, its *Let
 through*); Settings', the project's and the profile's env go on top as ever. `agentContext` (What it sees) gives
 `held` (names only) and `profile`, whose *Allow for this profile* is `presetSave`'s `envAllow`; `doctor`'s `secrets`
-counts them. An agent's `hideSecrets`, `hideSecretsAsked` (AGENT_KEYS, REMOTE_KEYS) and `envAllow` (`agentNo`) are refused.
+counts them. An agent's `hideSecrets`, `hideSecretsAsked` (AGENT_SETTINGS_NO, REMOTE_KEYS) and `envAllow` (`agentNo`) are refused.
 A sandboxed profile's `net` (`Net`: `all` unset, `list`, `off`; `NET_OK` per agent, `NET_NO` why not; `presetSave` refuses
 the rest, an agent's `net` refused by `agentNo`). From the agents' docs (Nov 2026): Claude Code's sandbox routes a
 command's connections through a proxy that checks each host against `sandbox.network.allowedDomains` (empty by default:

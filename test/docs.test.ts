@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { AGENT_SETTINGS_NO, AGENT_SETTINGS_OK, REMOTE_KEYS } from '../src/daemon/gates.ts'
 import { THEMES } from '../src/renderer/src/themes.ts'
 import { ACHIEVEMENTS } from '../src/shared/achievements.ts'
 import { API } from '../src/shared/types.ts'
@@ -53,4 +54,21 @@ test(`rpcAny and callAny: ${RPC_ANY_MAX} uses at most`, () => {
   }
   walk(src)
   assert.ok(n <= RPC_ANY_MAX, `${n} uses of rpcAny or callAny in src, the ceiling ${RPC_ANY_MAX}: call rpc or call by a name the typecheck knows, or raise RPC_ANY_MAX on purpose`)
+})
+
+// SECURITY.md's paragraph on what settings an agent can change, by their names in Settings, against gates.ts
+const CAN: Record<string, string[]> = { 'the theme': ['theme'], fonts: ['fontFamily', 'fontSize', 'uiFont'], 'the accent': ['accent'], corners: ['radius'], density: ['density'], glass: ['glass'], icons: ['iconPack'], "the sidebar's rows": ['sideStyle', 'rowMarks'], 'the rail': ['railOrder', 'railHide'], 'where the tabs are': ['tabsAt'], 'the status bar': ['statusBar'], 'saved layouts': ['layouts'], "the Reader's switch": ['reader'] }
+const CANT: Record<string, string[]> = { 'Global memory': ['memory'], "workflows' variables": ['flowVars'], 'where storage folders and worktrees go': ['storageDir', 'worktrees'], notifications: ['notify', 'notifyOn'], env: ['env'], profiles: ['presets'], 'the phone webhook': ['webhook'], 'extension folders': ['widgetDirs', 'widgetDev'], 'PR prompts': ['prPrompts'], actions: ['actions'], 'prompt templates': ['templates'], "Laki AI's": ['ai', 'aiEndpoint'], voice: ['voice'], keys: ['keys', 'cmdKeys'], '*When everything is done*': ['whenDone'], 'the Done check': ['doneCheck'], 'Recording mode': ['recording'], '*Guess my next prompt*': ['nextPrompt'], 'keep awake': ['keepAwake'], 'how long storage files, archived workspaces and pasted images are kept': ['storageDays', 'archivedDays', 'imageDays'], "memory's compaction": ['memoryCompact'], updates: ['updateCheck', 'updateDelay'], 'the background picture': ['background'] }
+test("SECURITY.md: the settings it says an agent can and can't change are gates.ts'", () => {
+  const para = /- An agent can change only ([\s\S]*?)\n- /.exec(read('SECURITY.md'))?.[1].replace(/\s+/g, ' ') ?? ''
+  const [can, cant] = para.split('Every other setting is yours')
+  assert.ok(cant, "SECURITY.md: the paragraph's two halves")
+  for (const [name, keys] of Object.entries(CAN)) {
+    assert.ok(can.includes(name), `SECURITY.md says an agent can change ${name}`)
+    for (const k of keys) assert.ok(AGENT_SETTINGS_OK.has(k) && !AGENT_SETTINGS_NO.has(k) && !REMOTE_KEYS.test(k), `${name}: ${k} is an agent's (AGENT_SETTINGS_OK)`)
+  }
+  for (const [name, keys] of Object.entries(CANT)) {
+    assert.ok(cant.includes(name), `SECURITY.md says an agent can't change ${name}`)
+    for (const k of keys) assert.ok(!AGENT_SETTINGS_OK.has(k) && (AGENT_SETTINGS_NO.has(k) || REMOTE_KEYS.test(k)), `${name}: ${k} is the user's`)
+  }
 })

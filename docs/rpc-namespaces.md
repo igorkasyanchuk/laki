@@ -26,7 +26,7 @@ What came out differently from the plan below:
   6. `Dialogs.tsx:163` hooks: `api >= 146` (`hooksSeen`).
   The CLI, MCP and main check nothing: they call and read the error.
 - **Checks keyed by a method's name** in main.ts: 21 `method === '…'` tests (`agentNo`, `remoteNo`, `hookWho`…) and the
-  sets `REMOTE_NO`, `FROM`, `CALLER`, `AGENT_NO`, plus `AGENT_KEYS` for settings. This is the part a rename can break:
+  sets `REMOTE_NO`, `FROM`, `CALLER`, `AGENT_NO`, plus `AGENT_SETTINGS_OK` for settings. This is the part a rename can break:
   an alias that reaches a handler without passing the same checks would let an agent or remote access do what the old
   name refuses.
 

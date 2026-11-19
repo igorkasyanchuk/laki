@@ -26,7 +26,7 @@ window's own page, a known action), main prompts with that action's words (`syst
 AGENT_NO, REMOTE_NO, ANSWER_NO), and the call carries the ticket as `touchTicket`. main.ts `ticketNo`, in `call()` after
 `agentNo`: with the setting on, a `CONFIRM` call without a live ticket for that action (30 s, used once, gone once tried)
 is refused, by whoever (the CLI, a phone, an agent, the app's token): *to … , Laki asks for Touch ID first*;
-`touchTicket` is taken off every call's params. `touchId` is in `AGENT_KEYS` and `REMOTE_KEYS`.
+`touchTicket` is taken off every call's params. `touchId` is in `AGENT_SETTINGS_NO` and `REMOTE_KEYS`.
 
 What its agents did (`agentLog.ts`): `call()` (and `asAgent`, Laki AI asked by an agent) records an agent's tab's call
 (its `from`, else its `caller`: whoCalls' own) once it went through, unless it is one of `READS` or `AGENT_QUIET`
@@ -43,7 +43,7 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
   then, once none is, the view's `whenDone` (`{ act, at }`: App's bar with Cancel, `settingsSet` `whenDone: 'off'`) for
   `WHEN_DONE_WAIT` (`LAKI_WHEN_DONE_MS`: tests'), anything going again cancels it; then `pmset sleepnow`,
   `pmset displaysleepnow` (the lock) or loginwindow's shut down, and the setting goes back to off. `settingsSet` refuses
-  a value but those (one already saved is off); an agent can't change it (main.ts' `AGENT_KEYS`, with `doneCheck`,
+  a value but those (one already saved is off); an agent can't change it (gates.ts' `AGENT_SETTINGS_NO`, with `doneCheck`,
   `recording`, `nextPrompt`, `keepAwake`, the tidies' `storageDays`, `archivedDays`, `imageDays`, `memoryCompact`,
   `updateCheck`, `updateDelay`, and the global ones of what `projectSet`'s `config` holds: `actions`, `templates`,
   `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`, `cloneDeps`, `spareWorktree`, `tmExclude`, `spotlightExclude`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
@@ -242,7 +242,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `git worktree move` and `git switch -c <branch> <base>` (not for a PR, a host, a repo with `.gitmodules`), then makes
   the next; any failure falls back to `worktree add`.
 - out of Time Machine and Spotlight (`backup.ts`, macOS; `settings.tmExclude`, `spotlightExclude`, on for a new Mac
-  install, off for one from before; an agent can't set them: `AGENT_KEYS`): core's `excludeWs` after `wsNew` and
+  install, off for one from before; an agent can't set them: `AGENT_SETTINGS_NO`): core's `excludeWs` after `wsNew` and
   `wsRestore` runs `tmutil addexclusion <worktree>` (the sticky per-item form: never `-p`), and `spotlightSet` writes
   `.metadata_never_index` in `worktreesOf(proj)` only when everything in it is Laki's worktrees or `.spare` and it neither
   is nor holds the project's folder (else `spotWhy`, in `laki doctor`). Turning one on or off (`settingsSet`'s
@@ -628,11 +628,17 @@ started itself is its own to delete; no window: refused); `fileWrite`, `fileNew`
 `tabSet` only its own tab; `shareStart` never; `openIn` with a `file` in its default app or a browser (`BROWSERS`,
 `fileApp`; S7) never (a page it wrote would run outside Laki); `tunnelStart` asks in the app (`exposeAsk`: a `toolAsk`
 with `cross: 'expose'`, who and how long shown, once only) unless the project has an `expose`, which remote.ts'
-`exposeRule` holds every caller to. A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
-`AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`, the global answer keys (`allowOn`, `allowKey`,
-`denyOn`, `denyKey`, `talkOn`, `talkKey`: in `REMOTE_KEYS` too; one bound to a key you press for something else would
-allow for you), scheduled runs' limits (`scheduleAtOnce`, `scheduleMaxMinutes`: 0 is none), `labs` and `workflows`
-(a workflow's triggers start runs) and `turnsKept` (0 deletes the kept turns). Recording mode (S7): `state` from an agent,
+`exposeRule` holds every caller to. A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. An agent's
+`settingsSet` is an allow-list (`agentSettingsNo`): it may change only gates.ts' `AGENT_SETTINGS_OK`, how Laki looks and
+is laid out (theme, fonts, accent, corners, density, glass, icons, the sidebar's and the rail's rows and buttons, where
+the tabs are, the status bar, saved layouts, the Reader's switch); any other key that differs from the saved one is
+refused through `notAgent` (so it's in the workspace's agent log), one sent back unchanged goes through, and a key
+nobody listed is refused too. `AGENT_SETTINGS_NO` names the rest of the Settings type, each the user's on purpose (Global
+memory, `flowVars`, `storageDir`, `worktrees`, notifications, `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`, the global
+answer keys: `allowOn`, `allowKey`, `denyOn`, `denyKey`, `talkOn`, `talkKey`, in `REMOTE_KEYS` too; scheduled runs'
+limits, `labs`, `workflows`, `turnsKept`…); `test/settings-gates.test.ts` (no daemon) fails on a Settings key in
+neither, and `test/docs.test.ts` holds SECURITY.md's paragraph to them. The call's own keys (`from`, `caller`,
+`byClient`, `now`, `touchTicket`, `cid`: `CALL_KEYS`) are no setting. Recording mode (S7): `state` from an agent,
 Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
 `recorded` (no private workspace, its tabs, nor a private project), and `turnList` and `turnDiff` refuse an agent a
 private workspace that isn't its own (`turnsSeen`); `whoCalls` looks the caller of those three (`RECORDED`) up only
