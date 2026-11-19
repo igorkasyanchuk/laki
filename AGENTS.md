@@ -12,9 +12,8 @@ from it (limits, hooks).
 npm install                       # on Node 26.13.1 (.tool-versions: asdf); package.json's engines stay >=22.12
 npm run typecheck                 # tsc --noEmit
 npm run check                     # typecheck, then test:fast (~15 s): before a commit that touches src/; `npm run dmg` runs it first
-npm test                          # node:test, every file (158), 4 at a time: 10 to 15 min on an 8-core Mac, more beside running agents (14 min on 19 Nov 2026; 6 at a time was no quicker); cap a background run at 25 min
+npm test                          # the build first (pretest, 2 s: the rig's daemon, CLI and hooks are out/main's, a third of the CPU; LAKI_TEST_SRC=1: from source), then node:test, every file (158), 4 at a time: ~8 min on an 8-core Mac (460 s on 19 Nov 2026; from source on Node 23: 14 min), more beside other heavy work (it's CPU-bound on the 4 performance cores; 6 at a time was no quicker); cap a background run at 20 min
 npm run test:release              # npm test, then each file that failed run once more alone: flaky ones pass, twice fails (scripts/test-rerun.ts; release.sh's)
-LAKI_TEST_BUILT=1 npm test          # the rig's daemon, CLI and hooks from out/main (npm run build first, 2 s): 2-3x less CPU, as the suite is CPU-bound on 4 performance cores
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~10 s
 npm run test:changed              # the tests for what changed against origin/main and isn't committed, each with why (a changed test, an import of a changed file directly or through one source file, a test named for it), then run as test:one runs them; none: test:fast (scripts/test-changed.ts; more args go to node --test)
@@ -33,7 +32,8 @@ npm run dev                       # Electron + renderer dev server on :5199
 ```
 
 - **Tests** are `node --test` with type stripping (`test/*.test.ts`), no framework.
-  - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_HOME` and `HOME`, its own daemon, and the
+  - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_HOME` and `HOME`, its own daemon (the build's, `out/main`:
+    npm test, test:one and test:changed build first; a build older than src, or `LAKI_TEST_SRC=1`, runs it from source), and the
     fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), `caffeinate` (records its starts and stops), a shell `tsh`,
     `ssh` (every host is this machine) and `da-probe` (counts terminal query replies). No network.
   - The fakes echo their arguments and prompts; tests lean on that. `FAKE_SCRIPT=<file>` (only `scripts/demo.ts` sets it,

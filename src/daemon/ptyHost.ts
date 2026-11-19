@@ -151,7 +151,7 @@ function script() {
   for (const p of [join(here, 'ptyhost.js'), join(here, '../ptyhost.js'), join(here, '../ptyhost/main.ts')]) if (existsSync(p)) return p
   throw new Error('pty host script not found')
 }
-async function up(again = true): Promise<void> {
+async function up(again = true, tries = 0): Promise<void> {
   if (sock) return
   let s = await dial().catch(() => undefined)
   if (!s) {
@@ -167,7 +167,12 @@ async function up(again = true): Promise<void> {
   if (!s) throw new Error("the pty host didn't start: see ptyhost.log")
   wire(s)
   const h = await ask<{ version?: number; pid?: number }>({ op: 'hello', version: PTY_PROTO })
-  if (h.version === undefined) throw new Error('the pty host turned this daemon away (another one is connected)')
+  if (h.version === undefined) {
+    // another daemon still connected: the one before this, on its way out (laki stop --keep, an update, a crash), whose
+    // connection ends a moment after its daemon.json goes; two never live at once (the data folder's lock), so 3 s of tries
+    if (tries < 30) return void ((sock = undefined), s.destroy()), sleep(100).then(() => up(again, tries + 1))
+    throw new Error('the pty host turned this daemon away (another one is connected)')
+  }
   hostPid = h.pid ?? 0
   hostVersion = h.version
   wanted = true

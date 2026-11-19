@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Terminals kept alive across a restart stay kept when the new daemon starts quickly (a restart from Settings or an update no longer starts fresh shells).
 - *Ask me first* on New workspace (⌥⏎): Laki AI asks up to three questions your task leaves open, with choices; your picks go with the prompt. Never automatic.
 - A working agent's bubble fills a ring as its turn goes, against how long its turns usually take in the project; it turns the waiting color once it runs long, and its card says *about 2 min left* or *running long*.
 - Spoken answers: ask Laki AI with the talk key and the pill reads out the first two sentences of its answer (Settings › Voice › *Speak Laki AI's answers*, with *Try*; Esc stops it; never in Quiet or Recording mode). [Try it](laki://settings/voice?spot=Speak)

@@ -9,7 +9,7 @@ const named = process.argv.slice(2)
 const files = named.length ? named : readdirSync('test').filter(f => f.endsWith('.test.ts')).map(f => `test/${f}`)
 mkdirSync('dist', { recursive: true })
 const lcov = 'dist/coverage.lcov'
-const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--test', '--test-concurrency=4', '--experimental-test-coverage', '--test-coverage-include=src/daemon/**', '--test-coverage-include=src/shared/**', '--test-reporter=dot', '--test-reporter-destination=stdout', '--test-reporter=lcov', `--test-reporter-destination=${lcov}`, ...files], { stdio: 'inherit' })
+const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--test', '--test-concurrency=4', '--experimental-test-coverage', '--test-coverage-include=src/daemon/**', '--test-coverage-include=src/shared/**', '--test-reporter=dot', '--test-reporter-destination=stdout', '--test-reporter=lcov', `--test-reporter-destination=${lcov}`, ...files], { stdio: 'inherit', env: { ...process.env, LAKI_TEST_SRC: '1' } }) // the rig's daemon from source: coverage of src, not of the build
 const rows = readFileSync(lcov, 'utf8')
   .split('end_of_record')
   .map(rec => ({ file: /^SF:(.+)$/m.exec(rec)?.[1], found: Number(/^LF:(\d+)$/m.exec(rec)?.[1] ?? 0), hit: Number(/^LH:(\d+)$/m.exec(rec)?.[1] ?? 0) }))

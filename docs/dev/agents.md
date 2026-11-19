@@ -618,7 +618,7 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   hash when that path is too long for a socket), frames of a 4-byte length and JSON. Ops: `hello`, `list`, `spawn`,
   `attach { id, from }`, `write`, `resize`, `kill { id, signal }`, `forget`, `quit`; events: `spawned`, `data` (`at`: its
   offset in that pty's output), `exit`, and the replies by `re`. Anything else is nothing. One daemon at a time: while one
-  is connected every other connection is closed at once.
+  is connected every other connection is closed at once. A daemon turned away (its `hello` answered with no version) tries again for 3 s (`up`'s tries): the one before it, on its way out (`laki stop --keep`, an update, a crash), lets go a moment after its `daemon.json` goes, and the data folder's lock never has two live.
 - **The daemon's side.** `Session` takes a `Pty` (node-pty's, or `HostPty`): `spawnTab` gives it a `HostPty` when the
   setting is on and the host is up; a `HostPty`'s pid is -1 until the host says, and the host signals the job (`group`).
   A host that goes ends its terminals with a line saying so, and is started again for the next ones.

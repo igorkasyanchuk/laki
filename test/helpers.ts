@@ -1,7 +1,7 @@
 // Test rig: a temp LAKI_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
@@ -14,9 +14,19 @@ import { type Channel, channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const fakes = join(root, 'test/fakes')
 const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
-// LAKI_TEST_BUILT=1: the daemon and the CLI from the build (out/main: npm run build), which also gives the daemon's
-// hooks and laki CLI their built scripts (core.ts cliPath, hookPath): a daemon boots on 0.2 s of CPU, not 0.75
-const built = process.env.LAKI_TEST_BUILT === '1'
+// The rig's daemon and CLI come from the build (out/main: npm test, test:one and test:changed build first, 2 s), which
+// gives its hooks and laki calls their built scripts too (core.ts cliPath, hookPath): a daemon boots on a third of the
+// CPU, and the suite is CPU-bound. From source with LAKI_TEST_SRC=1 (test:cov: coverage of src), or when the build is
+// missing or older than any file it's made of (a node --test run by hand after an edit): said once, never stale code
+const built = (() => {
+  if (process.env.LAKI_TEST_SRC === '1') return false
+  const at = (f: string) => statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0
+  const made = Math.min(...['daemon.js', 'cli.js', 'hook.js'].map(f => at(join(root, 'out/main', f))))
+  const src = ['daemon', 'shared', 'cli', 'ptyhost'].flatMap(d => readdirSync(join(root, 'src', d), { recursive: true }).map(f => at(join(root, 'src', d, String(f)))))
+  if (made && Math.max(...src) <= made) return true
+  console.error(`test rig: ${made ? 'out/main is older than src' : 'no out/main'} (npm run build): the daemon runs from source, slower`)
+  return false
+})()
 const entry = (src: string, out: string) => join(root, built ? out : src)
 
 // R9: one multiplier for every wait's limit (until, seen; not sleep): LAKI_TEST_SLOW, else from the load as this file
