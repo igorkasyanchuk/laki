@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Refraction: a menu bends what's under its edges, as thick glass does (Settings › Layout, on unless you turn it off; where menus blur: not with Glass, a flat look, Reduce transparency or Motion: None). [Try it](laki://settings/layout?spot=Refraction)
 - Frosted's sidebar floats: the rail and the list are one glass panel over the window's background, which now runs edge to edge behind them; your terminals keep their size. Off with Reduce transparency.
 - Needs you's cards are lighter: no outlines, the choices filled and the first tinted with your accent, the newest card ringed in its color (Default and Frosted designs; outlines stay with Reduce transparency or more contrast).
 - *No, and say why*: ⌥-click or long-press an ask's No (or press N on its card) in Needs you, the Reader or the bar under a tab, type why or what to do instead, ⏎: the agent gets the no and your words.

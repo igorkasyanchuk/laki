@@ -1121,8 +1121,8 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual); vertText: --vt, the writing-mode of every sideways label
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; density?: 'compact' | 'regular' | 'roomy'; pointerHand?: boolean; vertText?: 'down' | 'up'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'sideClear', 'translucent', 'motion', 'vertText', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark', 'density', 'pointerHand'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; refraction?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; density?: 'compact' | 'regular' | 'roomy'; pointerHand?: boolean; vertText?: 'down' | 'up'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'refraction', 'sideClear', 'translucent', 'motion', 'vertText', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark', 'density', 'pointerHand'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1331,6 +1331,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // the rail: the sidebar's color a shade darker (a light theme's less: 18% black is a muddy grey there), at pct
   const rail = (side: string, pct = 100) => `color-mix(in srgb, color-mix(in srgb, ${side} ${t.light ? 94 : 82}%, #000) ${pct}%, transparent)`
   root.classList.toggle('glass', !!o.glass)
+  root.classList.toggle('lens', o.refraction !== false) // V17: Refraction (on unless false): styles.css' lens on the small floats
   root.classList.toggle('grain', !!o.glass && o.glassGrain !== false) // Glass › Grain (on unless false): styles.css' noise over its surfaces
   // Settings' Sidebar see-through, without glass; only in the app (window.laki): a browser has no blur behind the page
   const app = !!(globalThis as { laki?: unknown }).laki

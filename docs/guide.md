@@ -2428,7 +2428,7 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
   terminals are, *Glow*: the theme's colors lit from two corners behind it, and *Grain* (on by default): a fine noise over menus, dialogs and the sidebar, as frosted glass has; every theme's rows, lines, hovers and
   selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
-  (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Translucent sidebar* (macOS, the Classic
+  (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Refraction* (on by default: a menu bends what's under its edges, as thick glass does; not in a flat look, with Reduce transparency or Motion: None) and *Translucent sidebar* (macOS, the Classic
   design; on by default: the sidebar and the rail over macOS's sidebar material, the main area a card on it, their words
   made to read over any wallpaper) and *Sidebar see-through* (with it on, how much shows through, Auto by default; off
   macOS a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, their

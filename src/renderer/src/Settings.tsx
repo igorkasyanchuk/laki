@@ -2189,6 +2189,12 @@ export function SettingsPage(p: {
                     </Switch>
                   </>
                 )}
+                {!glassy && (
+                  // V17: where menus blur (not in glass: its floats are solid), styles.css html.lens
+                  <Switch className="switch-row" on={s.refraction !== false} onChange={v => paint({ refraction: v })}>
+                    <Says title="Refraction" hint="Menus bend what's under their edges, as thick glass does. Not in a flat look, with Reduce transparency or Motion: None." />
+                  </Switch>
+                )}
                 {!glassy && /Mac/.test(navigator.userAgent) && bridge && (
                   // V5: the sidebar over macOS's sidebar material, the main area a card on it (themes.ts material)
                   <Switch className="switch-row" on={s.translucent !== false} disabled={!!s.design && s.design !== 'classic'} onChange={v => paint({ translucent: v })}>

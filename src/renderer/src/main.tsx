@@ -15,6 +15,16 @@ import './looks.css'
 // E8: when the first sidebar row is painted, as performance's laki-sidebar mark (test:ui prints it)
 new MutationObserver((_, o) => document.querySelector('.sidebar .ws') && (o.disconnect(), requestAnimationFrame(() => performance.mark('laki-sidebar')))).observe(document, { childList: true, subtree: true })
 exits(document.body) // V7: what floats fades out as it closes
+// V17: Refraction's lens (styles.css html.lens): a displacement map 10px deep at each edge of the box (red across x,
+// green across y, 0.5 none), so the backdrop there comes from further in. Drawn by feImage, never from the backdrop:
+// Chromium ignores a map made from what's behind (its SourceAlpha: tainted). Every window has it: a missing one drops
+// the menus' blur too
+const lensMap = (hi: string, mid: string, y: boolean) => {
+  const g = y ? " x2='0' y2='1'" : ''
+  const strips = y ? "<rect width='100%' height='10' fill='url(#a)'/><rect y='100%' width='100%' height='10' transform='translate(0 -10)' fill='url(#b)'/>" : "<rect width='10' height='100%' fill='url(#a)'/><rect x='100%' width='10' height='100%' transform='translate(-10)' fill='url(#b)'/>"
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><defs><linearGradient id='a'${g}><stop stop-color='${hi}'/><stop offset='1' stop-color='${mid}'/></linearGradient><linearGradient id='b'${g}><stop stop-color='${mid}'/><stop offset='1' stop-color='#000'/></linearGradient></defs><rect width='100%' height='100%' fill='${mid}'/>${strips}</svg>`)}`
+}
+document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="laki-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feImage href="${lensMap('#f00', '#800000', false)}" preserveAspectRatio="none" result="x"/><feImage href="${lensMap('#0f0', '#008000', true)}" preserveAspectRatio="none" result="y"/><feComposite in="x" in2="y" operator="arithmetic" k2="1" k3="1" result="map"/><feDisplacementMap in="SourceGraphic" in2="map" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter></svg>`)
 slideStart() // the picked segment's fill slides to the next (slide.ts)
 // overlay scrollbars (macOS's Show scroll bars unless Always; off a Mac and on the phone page none: the thumb always):
 // a scroller scrolled has data-scrolling until 900 ms after its last scroll event, one passive listener for all

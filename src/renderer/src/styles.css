@@ -137,6 +137,19 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
+/* V17: Refraction (Settings › Appearance › Window, html.lens: on unless false): a menu bends what's under its edges, as
+   thick glass does: main.tsx' #laki-lens before its blur, a lit top and a shade along the bottom. Only where menus blur:
+   not in glass (floats solid there: a backdrop-filter over the native blur flickers), a flat look, Reduce transparency
+   or Motion: None; the plain blur stays where url() isn't taken. Menus only, not toasts or the bars' groups: each lensed
+   surface costs about 1 ms of GPU a frame (12 at once over a printing terminal: 29 ms frames, 17 without), and the bars'
+   are always on screen. A menu with a filter or submenus (.rich, often tall) keeps its plain blur. ponytail: a plain
+   menu of many items can pass 400px tall; cap it by class if the lens costs there */
+@media (prefers-reduced-transparency: no-preference) {
+  html.lens:not(.opaque, .glass, [data-motion='none']) .menu:not(.rich) { box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--surface-lift); }
+  @supports (backdrop-filter: url(#a)) {
+    html.lens:not(.opaque, .glass, [data-motion='none']) .menu:not(.rich) { backdrop-filter: url(#laki-lens) var(--surface-blur); }
+  }
+}
 button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-4); cursor: var(--cur-act); }
 button:hover { background: var(--hover); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
