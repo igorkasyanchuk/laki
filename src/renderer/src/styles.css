@@ -1154,6 +1154,10 @@ html.away .voice-bar { animation-play-state: running !important; } /* paused at 
 .nw-composer .prompt-tools .nw-pick { height: var(--h-m); font-size: var(--fs-3); }
 .nw-pick.warn { color: var(--waiting); }
 .ib.nw-fast.on { color: var(--waiting); background: color-mix(in srgb, var(--waiting) 14%, transparent); }
+.ib.nw-fast.nw-ask.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* Ask me first: Laki AI's questions under the prompt, each with its choices and You decide */
+.nw-card.nw-ask-qs { gap: var(--sp-4); padding: var(--sp-5) var(--sp-6); }
+.nw-ask-q { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(--fs-3); }
 .nw-send { position: relative; display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; margin-left: 4px; padding: 0; border: none; border-radius: 50%; background: var(--accent); color: var(--accent-fg); box-shadow: none; }
 .nw-send:hover:not(:disabled) { filter: brightness(1.08); }
 .nw-send:disabled { opacity: 0.45; }

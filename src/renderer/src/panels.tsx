@@ -1,4 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { keyFor, keyMap, keyShow } from '../../shared/keys'
+import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
 import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
@@ -755,6 +757,29 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const modelBox = useRef<HTMLInputElement>(null) // More's model: Another model… goes there
   const [ownModel, setOwnModel] = useState(false) // Another model… picked: More shows a box to type one in
   const [busy, setBusy] = useState(false)
+  // Ask me first (⌥⏎): Laki AI's questions on the task (the daemon's promptQuestions), each with its choices and You
+  // decide; what you pick goes after the prompt as Answers when it's made. Never on its own; Start works any time
+  const [qs, setQs] = useState<{ q: string; choices: string[] }[] | null>(null)
+  const [picks, setPicks] = useState<Record<number, string>>({})
+  const [asking, setAsking] = useState<'' | 'asking' | 'none' | string>('')
+  const askOff = !aiOnOf(view.settings) ? 'Laki AI answers it: turn it on in Settings › AI' : ''
+  const askFirst = async () => {
+    if (askOff || asking === 'asking' || !p.prompt?.trim()) return
+    setAsking('asking')
+    try {
+      const r = await api.call<{ questions: { q: string; choices: string[] }[] }>('promptQuestions', { project: p.project, prompt: p.prompt })
+      setPicks({})
+      setQs(r.questions.length ? r.questions : null)
+      setAsking(r.questions.length ? '' : 'none')
+      if (!r.questions.length) setTimeout(() => setAsking(a => (a === 'none' ? '' : a)), 2000)
+    } catch (e) {
+      setAsking(`Not asked: ${(e as Error).message}`)
+    }
+  }
+  const askRef = useRef(askFirst)
+  askRef.current = askFirst
+  useEffect(() => (f => (addEventListener('laki-ask-first', f), () => removeEventListener('laki-ask-first', f)))(() => void askRef.current()), [])
+  const answers = qs ? qs.flatMap((x, i) => (picks[i] ? [`- ${x.q.replace(/\?\s*$/, '')}: ${picks[i]}`] : [])) : []
   const [images, setImages] = useState<Img[]>(() => [...(draft?.images ?? []), ...(shots ?? [])])
   const had = useRef(new Set((shots ?? []).map(s => s.path))) // screenshots given so far: one taken out stays out
   useEffect(() => {
@@ -857,7 +882,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
-      const prompt = withImages(filled, images) || undefined
+      const prompt = withImages(answers.length ? `${filled.trimEnd()}\n\nAnswers:\n${answers.join('\n')}` : filled, images) || undefined // Ask me first's picks
       const own = (isAgent(starts) || acpPro) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
       await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, sandbox: own ? boxSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
@@ -1072,7 +1097,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       onClose={onClose}
     >
       {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
-      <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy} style={{ '--nw-tint': tint, '--nw-agent': agentTint } as CSSProperties}>
+      <form onSubmit={e => e.preventDefault()} onKeyDown={e => (keyFor(e, keyMap(view.settings.keys)) === 'askFirst' ? (e.preventDefault(), void askFirst()) : e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit()))} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy} style={{ '--nw-tint': tint, '--nw-agent': agentTint } as CSSProperties}>
         {proj && (
           <h2 className="nw-hello">
             {who ? (
@@ -1170,6 +1195,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               lead={lead || <span />}
               tools={
                 <>
+                  <button type="button" className={`ib nw-fast nw-ask ${qs ? 'on' : ''}`} aria-label="Ask me first" disabled={!!askOff || !p.prompt?.trim() || asking === 'asking'} data-tip={askOff || (p.prompt?.trim() ? `Ask me first: Laki AI's questions on the task, before the agent starts (${keyShow(keyMap(view.settings.keys).askFirst) || 'no key'})` : 'Write the task first')} onClick={() => void askFirst()}>
+                    {asking === 'asking' ? <span className="btn-spin" /> : <Icon name="help" />}
+                  </button>
                   {fast}
                   {box}
                   {isAgent(starts) && <StartChip start={start} onStart={setStart} agent={starts} account={prof?.account} usageAt={view.settings.usageAt ?? USAGE_AT} off={inCs ? "A codespace's agent starts with it" : undefined} />}
@@ -1242,6 +1270,23 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               </span>
             </span>
             <span className="nw-bar" />
+          </div>
+        )}
+        {(qs || (asking && asking !== 'asking')) && (
+          <div className="nw-card nw-ask-qs" role="group" aria-label="Laki AI's questions">
+            {asking === 'none' ? <span className="muted small">Nothing to ask</span> : asking && asking !== 'asking' ? <span className="warn small">{asking}</span> : null}
+            {qs?.map((x, i) => (
+              <div key={`${i}:${x.q}`} className="nw-ask-q">
+                <span>{x.q}</span>
+                <div className="seg wrap">
+                  {[...x.choices, ''].map(c => (
+                    <button key={c || 'you decide'} type="button" className={i in picks && picks[i] === c ? 'on' : ''} onClick={() => setPicks(o => ({ ...o, [i]: c }))}>
+                      {c || 'You decide'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
         {initial?.linked && p.prompt === initial.prompt && !busy && (

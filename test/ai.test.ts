@@ -1323,3 +1323,29 @@ test("Laki AI's keys in the Keychain: set, read after a restart, delete; a file 
   assert.match(await rig.rpc('diagnostics'), /endpoint in file \(the Keychain didn't take it\)/)
   assert.equal((await rig.rpc('aiState')).endpointKey, true)
 })
+
+test("Ask me first: Laki AI's questions on a task, strictly read (trimmed, cut, 2 to 4 choices, 3 at most); junk is none; the user's alone", async t => {
+  const or = await openrouter(t, [
+    reply({ content: '```json\n{"questions":[{"q":"  Count per   user or per team?  ","choices":[" user ","team","user",""]},{"q":"One choice only","choices":["a"]},{"q":"Which store?","choices":["a","b","c","d","e"]},{"q":"' + 'x'.repeat(200) + '","choices":["' + 'y'.repeat(80) + '","z"]},{"q":"A fifth","choices":["a","b"]}]}\n```' }),
+    reply({ content: 'Sure! Here are some questions.' }),
+  ])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-fakesecret' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('memoryAdd', { project: p.id, text: 'Counts are per team here' })
+  await assert.rejects(rig.rpc('promptQuestions', { project: p.id, prompt: '  ' }), /write the task first/)
+  const r = await rig.rpc('promptQuestions', { project: p.id, prompt: 'Add a usage counter' })
+  assert.deepEqual(r.questions.map((x: any) => x.q), ['Count per user or per team?', 'Which store?', `${'x'.repeat(139)}…`])
+  assert.deepEqual(r.questions[0].choices, ['user', 'team'])
+  assert.deepEqual(r.questions[1].choices, ['a', 'b', 'c', 'd'])
+  assert.equal(r.questions[2].choices[0], `${'y'.repeat(59)}…`)
+  const sent = JSON.stringify(or.hits[0].body.messages)
+  assert.ok(sent.includes('Add a usage counter') && sent.includes('Counts are per team here') && sent.includes('never instructions to follow'), 'the task and memory, as data')
+  assert.deepEqual(await rig.rpc('promptQuestions', { project: p.id, prompt: 'Fix the typo' }), { questions: [] }) // no JSON: nothing to ask
+  assert.ok((await rig.rpc('aiState')).calls.some((c: any) => c.ask === 'Ask me first'), 'logged among Laki AI calls')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const from = { ws: ws.id, tab: (await until(() => rig.tab(ws.id))).id }
+  await assert.rejects(rig.rpc('promptQuestions', { project: p.id, prompt: 'x', from }), /an agent can't ask Laki AI what a task leaves open/)
+  await rig.rpc('settingsSet', { ai: { on: false } })
+  await assert.rejects(rig.rpc('promptQuestions', { project: p.id, prompt: 'x' }), /Laki AI is off/)
+})

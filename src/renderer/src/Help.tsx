@@ -34,6 +34,7 @@ const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
     ['⌘↑ / ⌘↓', 'previous / next workspace'],
     [k('next'), 'the next tab that needs you, in any workspace'],
     [k('allowAll'), 'in Needs you, a card focused: Allow all, its permission asks listed first (Deny all is beside it)'],
+    [k('askFirst'), "on the New workspace page: Ask me first, Laki AI's questions on the task (your picks go with it)"],
     [`${k('back')} / ${k('forward')}`, 'back / forward through the pages and workspaces you were on, the last 25 (Settings › Appearance › Rail turns it off)'],
     [k('later'), 'send a message later: to an agent or Laki AI'],
     [k('artifacts'), "show or hide the workspace's artifacts (the status bar's Artifacts too; click a folder to go in, ← or its path to go back; their ⋯: Finder, or the side panel's Files; right-click one to copy it)"],

@@ -213,6 +213,14 @@ and the decision blocks stay OpenRouter's. `aiEndpointTest`: one short ask, its 
 the user's only (gates.ts AGENT_NO, REMOTE_NO; main.ts FROM, ANSWER_NO), as `aiEndpoint` is (AGENT_SETTINGS_NO, REMOTE_KEYS); a
 managed policy locks it like any setting. `aiState`'s `endpointKey`: whether a key is kept, never the key.
 
+Ask me first (`promptQuestions`, ai.ts): New workspace's ? (⌥⏎, keys.ts `askFirst`; panels.tsx NewWorkspace). One
+`aiOnce` (`ask: 'Ask me first'`, json, logged and costed like any) with the task (8,000 characters) and the project's
+memory (both lists, 4,000), each between `<<<` `>>>` as data, the system prompt saying so. `questionsOf` keeps the
+first JSON object's `questions`: at most 3 (`ASK_FIRST`), each `q` 140 characters and 2 to 4 distinct choices of 60
+(longer ones cut with …), anything else dropped; junk is `[]`. Never automatic. The user's and remote access's (FROM,
+ANSWER_NO, REMOTE_OK); agents and trusted clients refused (AGENT_NO; CLIENT_SCOPE has no class for it). The page's picks
+go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* adds none.
+
 ### Keys in the Keychain (`keychain.ts`)
 
 `keyRead(name, path)` and `keyWrite(name, path, key)` keep Laki AI's two keys (`openrouter`, `endpoint`): in the macOS

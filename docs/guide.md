@@ -1318,6 +1318,10 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   `<name>-<preset>`) on the same prompt, and Compare opens (also in a race workspace's menu and ⌘K). Compare shows
   each one's status, diff size, last answer and changed files; *Open* goes to it, *Keep this one* archives the
   others (*Undo* in the message brings them back);
+- *Ask me first* (the ? beside the agent picker, ⌥⏎) has Laki AI read the task and the project's memory and ask up to
+  three questions it leaves open, each with a few choices and *You decide*. What you pick goes after the prompt as
+  *Answers* (`- Count per: user`); *You decide* adds nothing. It never runs on its own, costs a call (AI page › Calls),
+  and is off until Laki AI is set up. Start works any time, answered or not; *Nothing to ask* means the task is clear.
 - ⌘⏎ creates it. Meanwhile a line under the page says what's happening (the worktree, then the files and the agent)
   and for how long, *Create* spins, and the sidebar shows its row, *creating…*, where it will be. Esc closes the
   page; it goes on there.
