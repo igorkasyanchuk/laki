@@ -89,9 +89,9 @@ test('events: a PR\'s checks failing and its merge, once per head; nothing repla
   assert.equal(log(), '')
   pr('bbb', 'OPEN', 'FAILURE')
   await head('bbb')
-  // its checks' scan, then the action's node: slow under a full run's load; a timeout says what was there
+  // a timeout says what was there
   const seenNow = async () => `pr.log ${JSON.stringify(log())}, its PR ${JSON.stringify((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr)}, its runs ${JSON.stringify(await rig.rpc('widgetRuns', { id: 'prs' }).catch((e: Error) => e.message)).slice(0, 1500)}`
-  await until(async () => log() === 'pr.checks.failed 7 test\n' || Promise.reject(new Error(await seenNow())), 'failed on bbb', 40000)
+  await until(async () => log() === 'pr.checks.failed 7 test\n' || Promise.reject(new Error(await seenNow())), 'failed on bbb')
   await sleep(1200)
   assert.equal(log(), 'pr.checks.failed 7 test\n', 'once per head')
   pr('bbb', 'MERGED', 'SUCCESS')
