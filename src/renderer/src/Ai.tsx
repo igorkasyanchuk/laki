@@ -265,16 +265,16 @@ export function AiPage({
                   rows={2}
                   placeholder="Ask Laki… or paste a screenshot of PR links"
                   tools={
-                    <>
-                      {onLater && (
-                        <button type="button" className="ib" aria-label="Ask later" data-tip={images.length ? 'Ask later takes words only: remove the images' : !ready ? 'Laki AI isn’t set up: Settings › AI' : 'Ask later: in 10 min, at 3pm… (what’s typed goes with it)'} disabled={!ready || !!images.length} onClick={() => onLater(text)}>
-                          <Icon name="timer" />
-                        </button>
-                      )}
-                      <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={d?.busy ? `Queue it (${sendKeyName()}): sent with any others when this answer ends` : sendTip('Ask')} disabled={!can} onClick={ask}>
-                        <Icon name="arrowRight" size={14} />
+                    onLater && (
+                      <button type="button" className="ib" aria-label="Ask later" data-tip={images.length ? 'Ask later takes words only: remove the images' : !ready ? 'Laki AI isn’t set up: Settings › AI' : 'Ask later: in 10 min, at 3pm… (what’s typed goes with it)'} disabled={!ready || !!images.length} onClick={() => onLater(text)}>
+                        <Icon name="timer" />
                       </button>
-                    </>
+                    )
+                  }
+                  send={
+                    <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={d?.busy ? `Queue it (${sendKeyName()}): sent with any others when this answer ends` : sendTip('Ask')} disabled={!can} onClick={ask}>
+                      <Icon name="arrowRight" size={14} />
+                    </button>
                   }
                 />
               </div>

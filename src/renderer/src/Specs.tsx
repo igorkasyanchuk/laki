@@ -559,7 +559,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             onBusy={setSaving}
             rows={2}
             placeholder={d?.chat.length ? 'Ask for more: another option, a darker prototype…' : 'Or say what to explore…'}
-            tools={
+            send={
               <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={d?.busy ? `Queue it (${sendKeyName()}): sent with any others when this answer ends` : sendTip('Ask')} disabled={!api.aiOn || saving || (!text.trim() && !images.length)} onClick={send}>
                 <Icon name="arrowRight" size={14} />
               </button>

@@ -780,7 +780,8 @@ are tested in `test/units-more.test.ts`.
 - **`PromptInput.tsx`**: `useComplete` (@ a file, # a PR or issue, / a template; the box's `complete`, `completeOf(view, …)`:
   each kind read as its menu first opens, a minute; Esc keeps the word, a space or the caret out of it opens the next);
   a prompt with pasted/dropped images (saved by the daemon) and dictation (the mic's ⌄: where
-  macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end;
+  macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end; `send`: its send button, last (never in `tools`:
+  Voice's *Stop and send* takes its place while it listens);
   `saveFile` (`fileSave`; the new-workspace page's and the board's, never Laki AI's): any other file (HEIC, SVG too) a
   `FileChip` (icon, name, size, ✕; an `Img` without `url`), refused past `FILE_MAX` before it's read (the socket would
   drop); `files`: the caller's own (Desk's). A folder dropped in is its path typed at the cursor (`pathText`, Term.tsx's

@@ -243,9 +243,9 @@ export function PromptInput(p: {
   onBusy?: (busy: boolean) => void // images still saving: their paths aren't in yet
   placeholder?: string
   rows?: number
-  tools?: ReactNode // the toolbar's right end
+  tools?: ReactNode // the toolbar's right end (pickers: a send button goes in send)
   lead?: ReactNode // pickers right after +: then the mic goes to the right end, before send
-  send?: ReactNode // the toolbar's last button
+  send?: ReactNode // the toolbar's last button, the box's send: Voice's Stop and send takes its place while it listens
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
   shot?: { n: number; png: string; quiet?: boolean } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on (quiet: not, Q7's drawing back from the editor)
   inserts?: Inserts // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
@@ -428,7 +428,7 @@ export function PromptInput(p: {
           </button>
         )}
         {err && <span className="warn small">{err}</span>}
-        {(p.tools || p.lead) && (
+        {(p.tools || p.lead || p.send) && (
           <span className="prompt-tools-end">
             {p.tools}
             {p.lead && mic}

@@ -401,7 +401,7 @@ function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: strin
             onBusy={setSaving}
             rows={2}
             placeholder={!w ? 'Describe the extension…' : mine ? `What should change in ${w.name}?` : `Ask about ${w.name}…`}
-            tools={
+            send={
               <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={sendTip('Ask')} disabled={busy || saving || (!text.trim() && !images.length)} onClick={send}>
                 <Icon name="arrowRight" size={14} />
               </button>

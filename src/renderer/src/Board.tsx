@@ -114,20 +114,20 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                 placeholder="What should an agent do? Paste or drop screenshots and files. (⌘⏎ adds it)"
                 complete={completeOf(view, { project, files: true })}
                 tools={
-                  <>
-                    {projects.length > 1 && (
-                      <select value={project} onChange={e => setPick(e.target.value)} title="Project">
-                        {projects.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <button type="submit" className="primary" disabled={(!text.trim() && !images.length) || saving}>
-                      Add
-                    </button>
-                  </>
+                  projects.length > 1 && (
+                    <select value={project} onChange={e => setPick(e.target.value)} title="Project">
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )
+                }
+                send={
+                  <button type="submit" className="primary" disabled={(!text.trim() && !images.length) || saving}>
+                    Add
+                  </button>
                 }
               />
             </form>
