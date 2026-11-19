@@ -11,11 +11,11 @@ from it (limits, hooks).
 ```bash
 npm install                       # on Node 26.13.1 (.tool-versions: asdf); package.json's engines stay >=22.12
 npm run typecheck                 # tsc --noEmit
-npm run check                     # typecheck, then test:fast (~15 s): before a commit that touches src/; `npm run dmg` runs it first
+npm run check                     # typecheck, then test:fast (~9 s): before a commit that touches src/; `npm run dmg` runs it first
 npm test                          # the build first (pretest, 2 s: the rig's daemon, CLI and hooks are out/main's, a third of the CPU; LAKI_TEST_SRC=1: from source), then node:test, every file (158), 4 at a time: ~8 min on an 8-core Mac (460 s on 19 Nov 2026; from source on Node 23: 14 min), more beside other heavy work (it's CPU-bound on the 4 performance cores; 6 at a time was no quicker); cap a background run at 20 min
 npm run test:release              # npm test, then each file that failed run once more alone: flaky ones pass, twice fails (scripts/test-rerun.ts; release.sh's)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
-npm run test:fast                 # the files that start no daemon (never call fresh()): ~10 s
+npm run test:fast                 # the files that start no daemon (never call fresh()): ~7 s
 npm run test:changed              # the tests for what changed against origin/main and isn't committed, each with why (a changed test, an import of a changed file directly or through one source file, a test named for it), then run as test:one runs them; none: test:fast (scripts/test-changed.ts; more args go to node --test)
 npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~1 min, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
 npm run test:sheet                # a contact sheet: test:ui's pages in every look × dark and light (LAKI_SHEET_THEMES=all: every theme), 1440×900 and the phone's, into dist/ui-sheet/index.html with each page's layout facts, and against the last run's (moved to dist/ui-sheet/prev; main compares them by pixels, shared/pixelDiff.ts): Changed (n) first, before and after, new and removed pages, `changed: n of m` at the end (scripts/ui-sheet.ts; npm run build first): ~2.5 min, 197 pictures
@@ -48,7 +48,7 @@ npm run dev                       # Electron + renderer dev server on :5199
     connected window; both limits are multiplied by `SLOW`: `LAKI_TEST_SLOW=2`, else from the load as the file
     starts (1 to 3); `sleep` is as written. A timeout says what it waited for and the multiplier.
   - A file's tests run one after another, the files 4 at a time in name order: keep a file under a minute (the
-    longest now, `pr` and `widget-events`, about that), else split it by topic as `daemon` was (`agents`, `presets`,
+    longest now, `api`, 75 s; `workflow-runs`, `pr`, `restart`, `worktrees` and `ai` about one), else split it by topic as `daemon` was (`agents`, `presets`,
     `restart`, `worktrees`), or it's the run's tail.
 - **Trying the UI in a browser**:
   1. `npm run demo -- /tmp/laki-x` builds a temp world (a repo, 3 workspaces, fake agents) and a daemon
