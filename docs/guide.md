@@ -2795,7 +2795,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   10 minutes; *Measure again* does it now. Three buttons make room, each naming what goes first: *Kept turns over 7
   days old* (workspaces with no turn running), *Storage of merged archives* (to the trash) and *Archives over 30 days
   old* (as the archive age setting deletes them: what's their own goes to the trash after a day's notice). Nothing
-  outside Laki's own data and the worktrees it made. `laki doctor --disk` prints it.
+  outside Laki's own data and the worktrees it made. `laki doctor --disk` prints it. Each project's line under it says
+  what its `.git` takes, its loose objects and packs, and when Laki last tidied it: once a week, while none of its
+  agents works, Laki runs `git worktree prune` (records of worktrees whose folder is gone) and `git maintenance run
+  --auto`, quietly and at low priority; never a branch, tag, stash or kept turn, and not where your git config says
+  `maintenance.auto=false` or `git maintenance start` already looks after it. *Tidy now* runs it at once; *Tidy each
+  project's git weekly* turns it off. `laki doctor` names a project with over 20,000 loose objects.
 - *Hidden browser pages* (Resources; off unless you turn it on, 2 GB to start): over the budget, the oldest Browsers page you aren't on
   is unloaded, one every 15 seconds at most; opening it loads its address again, but what you typed or scrolled to isn't kept. Never the
   page you're on, the two you used last, or one playing, downloading, being inspected, or with typing or form edits. Pressing a key in a page

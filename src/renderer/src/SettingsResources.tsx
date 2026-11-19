@@ -1,6 +1,6 @@
 // Settings › Resources: Laki and each tab by memory and CPU, with their processes, and when idle agents sleep.
 // Settings.tsx re-exports it.
-import { type DiskTidyWhat, type DiskUsage, type KeptArts, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
+import { type DiskTidyWhat, type DiskUsage, type GitTidied, type KeptArts, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
 import { BUDGET_DEFAULT } from '../../shared/browserBudget'
 import { Icon, Switch, act, ask } from './ui'
@@ -22,6 +22,7 @@ export type ResourcesApi = {
   disk?: (again?: boolean) => Promise<DiskUsage> // Disk (diskUsage): measured as it opens, kept 10 minutes
   tidy?: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }>
   kept?: KeptApi // C5: Artifacts of deleted workspaces
+  gitNow?: (project: string) => Promise<unknown> // B8: a project's git tidied now (gitTidy)
 }
 export type KeptApi = { list: () => Promise<KeptArts[]>; rm: (dir?: string) => Promise<unknown>; open: (dir: string, file?: string) => Promise<unknown>; start: (k: KeptArts, file: string) => void }
 
@@ -73,7 +74,7 @@ function ResGraph() {
   )
 }
 
-export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget, onBrowserBudget }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void; browserBudget: number; onBrowserBudget?: (mb: number) => void }) {
+export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget, onBrowserBudget, gitTidy, onGitTidy }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void; browserBudget: number; onBrowserBudget?: (mb: number) => void; gitTidy?: boolean; onGitTidy?: (on: boolean) => void }) {
   const [r, setR] = useState<Resources | null>(null)
   const [named, setNamed] = useState<{ pid: number; name: string; stop?: string }[]>([])
   const [open, setOpen] = useState<string | null>(null) // the row whose processes show
@@ -262,7 +263,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget,
           {api.budgetSaid?.() && <div className="muted small">{api.budgetSaid()}</div>}
         </Group>
       )}
-      {api.disk && api.tidy && <Disk load={api.disk} tidy={api.tidy} />}
+      {api.disk && api.tidy && <Disk load={api.disk} tidy={api.tidy} gitNow={api.gitNow} weekly={gitTidy} onWeekly={onGitTidy} />}
       {api.kept && <KeptArtifacts api={api.kept} />}
       <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host. After a restart, one unused this long stays asleep until you open it.">
         <label>
@@ -290,7 +291,11 @@ const TIDY: [DiskTidyWhat, string, string][] = [
   ['storage', 'Storage of merged archives', 'archived workspaces whose PR merged: their storage folders to the trash'],
   ['archives', 'Archives over 30 days old', "deleted as Settings' archive age would; what's their own goes to the trash after a day's notice"],
 ]
-function Disk({ load, tidy }: { load: (again?: boolean) => Promise<DiskUsage>; tidy: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }> }) {
+// B8: a project's git: its .git, loose objects and packs, when it was last tidied (or why not)
+const tidiedWords = (t?: GitTidied) => (!t ? 'not tidied yet' : `${t.failed ? 'tidy failed' : t.skipped ? 'tidy skipped' : 'tidied'} ${new Date(t.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`)
+function Disk({ load, tidy, gitNow, weekly, onWeekly }: { load: (again?: boolean) => Promise<DiskUsage>; tidy: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }>; gitNow?: (project: string) => Promise<unknown>; weekly?: boolean; onWeekly?: (on: boolean) => void }) {
+  const [tidying, setTidying] = useState('')
+  const now = (project: string) => (setTidying(project), gitNow!(project).then(() => get(true), e => setErr(String(e?.message ?? e))).finally(() => setTidying('')))
   const [d, setD] = useState<DiskUsage | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -325,6 +330,18 @@ function Disk({ load, tidy }: { load: (again?: boolean) => Promise<DiskUsage>; t
                   <b>{p.name}</b>
                   <span className="num">{gb(p.bytes)}</span>
                 </div>
+                {p.git && (
+                  <div className="disk-row disk-git" title={p.git.tidied?.skipped ?? p.git.tidied?.failed}>
+                    <span className="res-name muted small">
+                      .git{p.git.bytes !== undefined && ` ${gb(p.git.bytes)}`} · {p.git.loose.toLocaleString()} loose objects, {p.git.packs} {p.git.packs === 1 ? 'pack' : 'packs'} · {tidiedWords(p.git.tidied)}
+                    </span>
+                    {gitNow && (
+                      <button type="button" className="link small" disabled={!!tidying} data-tip="git worktree prune, then git maintenance run --auto: never a branch, tag, stash or kept turn" onClick={() => void now(p.id)}>
+                        {tidying === p.id ? 'Tidying…' : 'Tidy now'}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {p.workspaces.map(w => (
                   <div key={w.id} className="disk-row" title={w.parts.map(x => `${x.name ?? PART[x.what]}: ${gb(x.bytes)}${x.shared ? ' (may be shared)' : ''}`).join('\n')}>
                     <span className="res-name">
@@ -349,6 +366,12 @@ function Disk({ load, tidy }: { load: (again?: boolean) => Promise<DiskUsage>; t
               </button>
             ))}
           </div>
+          {onWeekly && (
+            <Switch className="switch-row" on={weekly !== false} onChange={onWeekly}>
+              Tidy each project's git weekly
+              <span className="muted small">git worktree prune and git maintenance run --auto, while no agent of it works; never a branch, tag, stash or kept turn</span>
+            </Switch>
+          )}
           {err && <p className="muted small">{err}</p>}
         </>
       )}

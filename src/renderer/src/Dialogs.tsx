@@ -251,6 +251,7 @@ export function Pages({ app }: { app: AppCtx }) {
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             ...(hasCap(view, 'kept.artifacts') && { kept: { list: () => api.call<KeptArts[]>('keptList'), rm: dir => api.call('keptRm', dir ? { dir } : { all: true }), open: (dir, file) => api.call('keptOpen', { dir, file }), start: (k, file) => (setDialog(null), newWs(view.projects.some(p => p.id === k.project) ? k.project : undefined, { prompt: `${k.path}/${file} ` })) } }),
             ...(hasCap(view, 'disk.usage') && { disk: (again?: boolean) => api.call<DiskUsage>('diskUsage', { again }), tidy: (what: DiskTidyWhat, days: number, dry: boolean) => api.call<{ goes: string[] }>('diskTidy', { what, days, dry }) }),
+            ...(hasCap(view, 'git.tidy') && { gitNow: (project: string) => api.call('gitTidy', { project }) }),
           }}
           remote={{ state: view.remote, devices: view.remoteDevices, check: () => api.call('remoteCheck'), log: remoteLog, pair: () => api.call('remotePair'), revoke: id => api.call('remoteDeviceRm', id ? { id } : { all: true }), level: (id, level) => api.call('remoteDeviceSet', { id, level }), start: (hours, mail, open, pin, via, funnel, host) => api.call('remoteStart', { hours, mail, open, pin, via, funnel, host }), stop: () => api.call('remoteStop'), keep: () => api.call('remoteKeep'), copy, open: openExternal }}
           widgets={extCfg}

@@ -122,6 +122,7 @@ export const proofs = new Map<string, Proof>() // and the Proof card of its last
 export const annotAt = new Map<string, number>() // and when its extensions' notes on diff lines last changed (P6: widgets.ts annotate)
 // a path in a storage folder's proof/: Laki's own (the Proof card's), never another method's to write
 export const proofIn = (root: string, path: string) => relative(root, path).split(sep)[0] === 'proof'
+export const gitTidyMod: { loose?: (p: Project) => Promise<number> } = {} // B8: gitTidy.ts' (core doesn't import it)
 export const checkHooks: { will?: (tab: Tab) => boolean; prompt?: (tab: Tab, prompt: unknown) => void } = {} // verify.ts': a check follows this turn's end (the app waits for it to notify); A1b: a prompt the agent took (yours pauses Laki's goal)
 // each turn's start (claude's UserPromptSubmit: its first hook, before any edit) and end
 export const turnStarts = new Set<(tab: Tab) => void>()
@@ -5338,7 +5339,8 @@ export async function doctor(): Promise<Doctor> {
       return { id, found, ...(s !== undefined && { signedIn: s }) }
     }),
   )
-  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
+  const loose = (await Promise.all(state.projects.map(async p => ({ project: p.name, loose: (await gitTidyMod.loose?.(p)) ?? 0 })))).filter(x => x.loose > 20000) // B8: count-objects only (no du)
+  return { ...(loose.length && { loose }), git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
 }
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
 // version, counts, the Labs on, the logs' last lines; redacted (diagRedact)

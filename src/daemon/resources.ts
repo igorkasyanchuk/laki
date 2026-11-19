@@ -9,6 +9,7 @@ import { dir } from './dir.ts'
 import { scanArtifacts } from './artifacts.ts'
 import { archivedTidy, bgTell, changed, CLONE_DIRS, findTab, findWs, log, ports, prs, procs, projectConfig, queued, restoreNow, rt, rtOf, run, save, sessions, spawnTab, state, storageFull, storageTrash, tabStatus } from './core.ts'
 import { syncBranches } from './pr.ts'
+import { gitFacts } from './gitTidy.ts'
 import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
 import type { turnsDrop, turnsKept } from './turns.ts'
@@ -353,7 +354,7 @@ async function limited<T>(f: () => Promise<T>): Promise<T> {
     else slots.n--
   }
 }
-async function du(path: string): Promise<number | undefined> {
+export async function du(path: string): Promise<number | undefined> {
   if (!existsSync(path)) return
   return limited(async () => {
     try {
@@ -409,7 +410,8 @@ export async function diskScan(): Promise<DiskUsage> {
   for (const p of state.projects) {
     if (p.host) continue
     const workspaces = (await Promise.all(state.workspaces.filter(w => w.project === p.id && !w.host).map(wsOf))).sort((a, b) => b.bytes - a.bytes)
-    if (workspaces.length) projects.push({ id: p.id, name: p.name, bytes: workspaces.reduce((n, w) => n + w.bytes, 0), workspaces })
+    const g = await gitFacts(p) // B8: its .git, loose objects, last tidy
+    if (workspaces.length || g) projects.push({ id: p.id, name: p.name, bytes: workspaces.reduce((n, w) => n + w.bytes, 0), workspaces, ...(g && { git: g }) })
   }
   const free = (() => {
     try {

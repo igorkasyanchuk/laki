@@ -226,6 +226,7 @@ export type AppSettings = Paint & {
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
   prBots?: string[] // review bots whose threads go to the agent (unset: PR_BOTS)
+  gitTidy?: boolean // B8: Resources › Disk: each project's git tidied weekly (unset: on)
   browserBudget?: number // Resources: MB of hidden pages before the oldest is unloaded (shared/browserBudget.ts)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
@@ -2832,7 +2833,7 @@ export function SettingsPage(p: {
               </button>
             </div>
           )}
-          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} browserBudget={s.browserBudget ?? 0} onBrowserBudget={p.resources.procs && (browserBudget => set({ browserBudget }))} />}
+          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} browserBudget={s.browserBudget ?? 0} onBrowserBudget={p.resources.procs && (browserBudget => set({ browserBudget }))} gitTidy={s.gitTidy !== false} onGitTidy={p.resources.gitNow && (gitTidy => set({ gitTidy }))} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (
             <>

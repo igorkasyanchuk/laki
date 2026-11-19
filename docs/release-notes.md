@@ -15,6 +15,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - A goal for Gemini, OpenCode, Grok and other agents with no `/goal`: the tab's menu › *Set goal › Until test passes…*; Laki runs the script after each turn and sends back what fails, until it passes, 12 turns go by or the same failure comes back 3 times.
 - A status mark moves once as it changes: a finished one ticks in, and with Motion: high one that needs you nods and one that failed shakes; never with Motion off or Reduce motion.
 - Needs you's finished rows never show a stub of the agent's last words (*Bu…*): where fewer than a dozen characters fit, the words don't show, and the name and time keep their room.
+- Laki tidies each project's git once a week while its agents rest (`git worktree prune`, `git maintenance run --auto`; never a branch, tag, stash or kept turn): Settings › Resources › Disk shows each `.git`'s size, loose objects and last tidy, with *Tidy now*; `laki doctor` names one with over 20,000 loose objects.
 
 ## 0.56.0 · Nov 19, 2026
 

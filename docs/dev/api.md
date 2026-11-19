@@ -352,6 +352,9 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   turns kept), `goalClear` (`tab`); both the user's (AGENT_NO), remote access may clear, not set. The view's `tab.goal`
   with `own`, `check`, `turns`, `maxTurns`, `spent`, `maxUsd`, `why`; its ends are `check` events (passed, over; a
   failure sent back: failed, never notified);
+- git tidy (B8, gitTidy.ts): `gitTidy` (`project`: *Tidy now*; the user's only, never remote; skipped with why, or
+  throws what failed), `gitTidyTick` (`now`: tests'); `settings.gitTidy` (unset: on; not an agent's); the Disk page's
+  `projects[].git` (`bytes`, `loose`, `packs`, `tidied`); the doctor's `loose`;
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app
   bundle's processes by `--type`, none on plain node, which the renderer names by main's `procs` IPC (each pid's
   holder: the window, a JS widget's or the video's frame (`framesInSubtree`: JS widgets share one process, one site),

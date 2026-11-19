@@ -256,6 +256,19 @@ as it's archived, or the PR seen merged) with a storage folder of their own (`st
 (a noticed one keeps its `soon.days` for the hourly run). `dry` says what would go, by name. Both are the user's
 (AGENT_NO); a phone reads `diskUsage` (REMOTE_OK, ANSWER), never `diskTidy`. The page: SettingsResources.tsx `Disk`.
 
+A project's git, weekly (B8, gitTidy.ts): `gitTidyTick` (hourly, `settings.gitTidy` unless false) takes the first
+project due (`TIDY_DAYS`, 7, since its `tidied.at`, or never; git, not Terminals or Browsers, not archived) that isn't
+busy (an agent of it running, a workspace of it in `making` or its setup running, a tidy of it going), one a tick.
+`gitTidy`: skipped, with why, where its git says `maintenance.auto=false` or `maintenance.repo` lists it (`git
+maintenance start`'s); else `nice -n 10 git worktree prune` (not while a live worktree of Laki's is missing: a volume
+unplugged would lose its record) and `git -c gc.reflogExpire=never -c gc.reflogExpireUnreachable=never maintenance
+run --auto` (gc's own grace periods; reflogs, and so stashes, kept; refs never touched), each 10 minutes at most,
+through `exec` (an SSH project's on its host). `p.tidied` keeps `at` and `skipped` or `failed`: a failure logged once
+and tried again a week on, thrown only to `gitTidy` (*Tidy now*: the user's, AGENT_NO, REMOTE_NO). `gitFacts` (the
+Disk page's project row, `DiskUsage.projects[].git`): the git dir's `du`, `git count-objects -v`'s `count` (loose) and
+`packs`, `tidied`; `laki doctor` says each project over `LOOSE_MANY` (20,000) loose objects (`gitLoose`: count-objects
+alone; core's `gitTidyMod.loose`, main.ts sets it: core doesn't import gitTidy.ts).
+
 ### Scheduled tasks
 
 `schedule.ts` `scheduleSet`, `scheduleTick` (every 30 s), `runSchedule`; the rule comes from `shared/when.ts` `parseWhen`

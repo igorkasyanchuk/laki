@@ -1095,3 +1095,44 @@ test('Time Machine and Spotlight: a new worktree excluded once; off calls nothin
   const d = await rig.rpc('doctor')
   assert.match(d.backup.skipped.join('\n'), /other things in it too \(mine\)/)
 })
+
+test("B8: git tidy: a gone worktree folder's record pruned; a branch and a kept turn's ref stay; nothing while an agent works; maintenance.auto=false skips with why; never an agent's", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const g = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, encoding: 'utf8' }).trim()
+  // a worktree of the user's whose folder went by hand; a branch and a kept turn's ref
+  const lost = join(rig.home, 'lost-wt')
+  g('worktree', 'add', '-q', '-b', 'lost', lost)
+  rmSync(lost, { recursive: true, force: true })
+  g('branch', 'keep-me')
+  g('update-ref', 'refs/laki/turns/x/1', 'HEAD')
+  assert.match(g('worktree', 'list'), /lost-wt/)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'busy' })
+  const tab = (await until(() => rig.tab(ws.id), 'its tab')).id
+  await assert.rejects(rig.rpc('gitTidy', { project: p.id, from: { ws: ws.id, tab } }), /an agent can't tidy a project's git/)
+  // its agent at work: the weekly one waits, Tidy now says why
+  await rig.rpc('send', { target: tab, text: 'slow work', whenIdle: true })
+  await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)?.status === 'running', 'the agent working')
+  await rig.rpc('gitTidyTick', { now: Date.now() })
+  assert.equal((await rig.rpc('state')).projects[0].tidied, undefined)
+  await assert.rejects(rig.rpc('gitTidy', { project: p.id }), /not now: an agent is working in it/)
+  await rig.rpc('tabClose', { id: tab })
+  // maintenance.auto=false: skipped, with why, nothing run
+  g('config', 'maintenance.auto', 'false')
+  assert.deepEqual(await rig.rpc('gitTidy', { project: p.id }), { skipped: 'its git config says maintenance.auto=false' })
+  assert.match((await rig.rpc('state')).projects[0].tidied.skipped, /maintenance\.auto=false/)
+  assert.match(g('worktree', 'list'), /lost-wt/)
+  g('config', '--unset', 'maintenance.auto')
+  // a week on: the gone record pruned; the live worktree, the branch and the kept turn's ref stay
+  await rig.rpc('gitTidyTick', { now: Date.now() + 8 * 86400e3 })
+  const done = (await rig.rpc('state')).projects[0].tidied
+  assert.ok(done?.at && !done.skipped && !done.failed, JSON.stringify(done))
+  const list = g('worktree', 'list')
+  assert.doesNotMatch(list, /lost-wt/)
+  assert.match(list, new RegExp(basename(ws.path)))
+  assert.equal(g('rev-parse', '--verify', 'keep-me'), g('rev-parse', 'HEAD'))
+  assert.equal(g('rev-parse', '--verify', 'refs/laki/turns/x/1'), g('rev-parse', 'HEAD'))
+  // the Disk page: its .git, loose objects and packs, when it was tidied
+  const row = (await rig.rpc('diskUsage', { again: true })).projects.find((x: any) => x.id === p.id)
+  assert.ok(row.git.bytes > 0 && row.git.loose >= 0 && row.git.packs >= 0 && row.git.tidied.at === done.at, JSON.stringify(row.git))
+})
