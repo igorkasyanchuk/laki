@@ -8,7 +8,7 @@ import type { Call } from '../../shared/api'
 import { useEffect, useRef, useState } from 'react'
 import { ago } from './Info'
 import { SpecEditor } from './SpecEditor'
-import { Ghosts, ask, colorVar, Edge, Icon, IconButton, keep, load as stored, type MenuItem, Page, TAB_COLORS, useMenu, usePageSide } from './ui'
+import { Ghosts, ask, colorVar, Edge, Icon, IconButton, keep, load as stored, type MenuItem, Page, TAB_COLORS, useMenu, usePageSide, ScrollEdge } from './ui'
 
 const SIDE_W = 'laki.notesW' // the list's width
 const SIDE_INIT = 290
@@ -121,6 +121,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
             </div>
           )}
           <div className="notes-list">
+            <ScrollEdge />
             {err && <p className="warn small">{err}</p>}
             {list && !shown.length && !q && !only && <Ghosts>{([['Release checklist', 'Tests, notes, tag', 'green', true], ['Ideas', 'What to build next', 'yellow', false], ['Standup', 'Yesterday, today, blocked', undefined, false]] as const).map(([title, preview, color, pinned], i) => row({ id: `sample-${i}`, title, preview, color, pinned, created: Date.now(), at: Date.now() - i * 3_600_000 }))}</Ghosts>}
             {list && !shown.length && <p className="muted small notes-none">{q || only ? 'No note matches.' : 'No notes yet: New note writes one.'}</p>}

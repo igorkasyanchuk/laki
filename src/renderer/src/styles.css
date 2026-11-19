@@ -4165,7 +4165,17 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 /* the scroll edge (ui.tsx ScrollEdge): a list scrolled under its header fades into it instead of a line */
 .scroll-edge { display: block; height: 1px; margin-bottom: -1px; flex: none; pointer-events: none; }
 .settings-main > .scroll-edge { margin-bottom: calc(-1px - var(--sp-6)); } /* its column's gap */
-:is(.side-scroll, .reader-scroll, .fr-files)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); } /* Settings' own: the collapsing title instead (below) */
+.scroll-edge.end { margin-bottom: 0; margin-top: -1px; } /* the last child: data-more on its list while more is below */
+/* a list scrolled under its head fades in at its top (ScrollEdge): the sidebar, the Reader, the Review tab's files, the
+   side panel's Files and Commits (not Changes: its file heads stick there), Notes' list, a workflow's runs; ⌘K's list and
+   a long menu fade out at their bottom while more is below. Settings' own: the collapsing title instead (below); the
+   pages' heads (Board, Schedules, Usage, Help…): their scroll-driven glass (page-head). Reduce transparency: a line */
+:is(.side-scroll, .reader-scroll, .fr-files, .sp-tree, .sp-commits, .notes-list, .wf-hist-list)[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); }
+:is(.palette-list, .menu-list)[data-more] { mask-image: linear-gradient(to top, transparent, #000 20px); }
+@media (prefers-reduced-transparency: reduce) {
+  :is(.side-scroll, .reader-scroll, .fr-files, .sp-tree, .sp-commits, .notes-list, .wf-hist-list)[data-scrolled] { mask-image: none; box-shadow: inset 0 1px 0 var(--line); }
+  :is(.palette-list, .menu-list)[data-more] { mask-image: none; box-shadow: inset 0 -1px 0 var(--line); }
+}
 .settings-head { border-bottom-color: transparent; }
 
 /* V12: continuous corners, as macOS draws them (a superellipse, not a circle's quarter): what takes the window's, a

@@ -10,7 +10,7 @@ import { SplitToggle, useSplit, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useA
 import type { Annotations, MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu, act } from './ui'
+import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu, act, ScrollEdge } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -215,6 +215,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
         </div>
       )}
       <div className="sp-body sp-tree">
+        <ScrollEdge />
         {err && <div className="warn small pad">{err}</div>}
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
@@ -523,7 +524,8 @@ function CommitsTab({ api }: { api: PanelApi }) {
         <span className="sp-sum muted small grow">{d ? `${list.length}${d.more ? '+' : ''} commit${list.length === 1 ? '' : 's'} ${d.base ? `over ${d.base}` : 'no remote has'}${out ? ` · ${out} not pushed` : list.length ? ' · all pushed' : ''}` : err ? '' : 'Loading…'}</span>
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
-      <div className="sp-body">
+      <div className="sp-body sp-commits">
+        <ScrollEdge />
         {err && <div className="warn small pad">{err}</div>}
         {d && !list.length && <div className="muted small pad">{d.base ? `No commits over ${d.base} yet: Changes shows what isn't committed.` : 'Every commit here is on a remote.'}</div>}
         {list.map(c => (

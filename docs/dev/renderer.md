@@ -1412,6 +1412,12 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Laki's own lines in a terminal** (`[process exited]`, *waiting for the setup script*, …) are bright black (SGR 90),
   not dim (SGR 2): xterm's WebGL renderer draws a dim glyph over an opaque cell, a dark patch on a gradient or glass
   panel (an agent's own dim text still can).
+- **Scroll edges** (ui.tsx `ScrollEdge`): a 1px sentinel first in a scroller sets its `data-scrolled` once it scrolls
+  out (IntersectionObserver, no scroll listener); `end` puts it last and sets `data-more` while more is below. Top
+  fades: the sidebar, the Reader, the Review tab's files, the side panel's Files (`.sp-tree`) and Commits
+  (`.sp-commits`; not Changes, whose file heads stick), Notes' list, a workflow's runs; bottom fades: ⌘K's list and a
+  menu's. The pages (Board, Schedules, Usage, Help…) have their head's scroll-driven glass instead. Reduce
+  transparency: a 1px line.
 - **Motion: rows that move, menus, presses** (V18 to V20). `useFlip(ref, within)` (ui.tsx, Sidebar's `.side-scroll`): rows
   marked `data-flip` (a workspace row, not a pinned copy; a Needs you card by its key) glide to a new place (FLIP: `el.animate`
   translate on `--t-spring`/`--spring`), each placed against its closest `.project-ws` or `.needs-cards`; every commit reads

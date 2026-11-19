@@ -17,7 +17,7 @@ import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
 import { Modal } from './panels'
-import { Ghosts, ask, choose, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
+import { Ghosts, ask, choose, Icon, IconButton, type MenuItem, Page, Switch, useMenu, ScrollEdge } from './ui'
 import './workflows.css'
 
 export type WorkflowsApi = {
@@ -1373,6 +1373,7 @@ function HistoryDialog({ item, dirty, api, onClose, onBack }: { item: WorkflowIt
       ) : (
         <div className="wf-hist">
           <div className="wf-hist-list">
+            <ScrollEdge />
             {list.map(v => (
               <button key={v.at} className={`wf-hist-row ${v.at === sel ? 'on' : ''}`} onClick={() => setSel(v.at)}>
                 <b>{ago(v.at)}</b>

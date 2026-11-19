@@ -1,6 +1,6 @@
 // ⌘K: the palette (Palette) and what App puts in it (paletteItems: built as it shows, from what appCtx.ts says it reads)
 import type { AppCtx } from './appCtx'
-import { type IconName, type MenuItem, Icon, ON, ProjectMark, act } from './ui'
+import { type IconName, type MenuItem, Icon, ON, ProjectMark, act, ScrollEdge } from './ui'
 import { type ReactNode, useState, useMemo, useRef, useEffect, useId, useSyncExternalStore } from 'react'
 import { type Preview, type PreviewAct, previewOf } from './palettePreview'
 import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
@@ -172,6 +172,7 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
               </div>
             ))}
         {!list.length && <div className="muted pad">Nothing matches.</div>}
+        <ScrollEdge end />
       </div>
       {wide && !step && (
         <div ref={pane} className="palette-pane">

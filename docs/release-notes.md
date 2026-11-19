@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- More lists fade under their head as you scroll: the side panel's Files and Commits, Notes' list, a workflow's runs; ⌘K and long menus fade at the bottom while more is below.
 - Badges' words and counts sit in their middle, not low: a group's name, the rail's count, a row's PR pill and plan chip (trimmed to their capitals, same size).
 - Rows glide to their new place: a workspace moving in its project, a card in Needs you; a menu grows from what you clicked, its items and ⌘K's come in one after another, and a switch's knob stretches as you press it (none with Motion: None or Reduce motion).
 - Refraction: a menu bends what's under its edges, as thick glass does (Settings › Layout, on unless you turn it off; where menus blur: not with Glass, a flat look, Reduce transparency or Motion: None). [Try it](laki://settings/layout?spot=Refraction)

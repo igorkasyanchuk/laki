@@ -148,17 +148,19 @@ export function rowsMorph(ids: string[], fn: () => void) {
 // V11: a scrolling list's edge: once it's scrolled, its top fades under the header above it (styles.css
 // [data-scrolled]: a mask). A sentinel, its scroller's first child, seen by one IntersectionObserver: no scroll listener.
 // A data attribute, not a class: React leaves it alone as the scroller's className changes
-export function ScrollEdge() {
+// end: the last child instead, its parent data-more while more is below (a bottom fade: ⌘K, a long menu)
+export function ScrollEdge({ end = false }: { end?: boolean } = {}) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
     const root = el?.parentElement
+    const at = end ? 'data-more' : 'data-scrolled'
     if (!el || !root || typeof IntersectionObserver === 'undefined') return
-    const io = new IntersectionObserver(([e]) => root.toggleAttribute('data-scrolled', !e.isIntersecting), { root })
+    const io = new IntersectionObserver(([e]) => root.toggleAttribute(at, !e.isIntersecting), { root })
     io.observe(el)
-    return () => (io.disconnect(), root.removeAttribute('data-scrolled'))
-  }, [])
-  return <div ref={ref} className="scroll-edge" aria-hidden />
+    return () => (io.disconnect(), root.removeAttribute(at))
+  }, [end])
+  return <div ref={ref} className={`scroll-edge${end ? ' end' : ''}`} aria-hidden />
 }
 
 // space: what Space does instead of a click (U14: a file row's Quick Look)
@@ -1012,6 +1014,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
             ),
           )}
           {words.length > 0 && !main.length && !gridShown.length && <div className="menu-none">Nothing matches</div>}
+          <ScrollEdge end />
         </div>
         {foot.length > 0 && <div className="menu-foot">{foot.map(item)}</div>}
       </div>
