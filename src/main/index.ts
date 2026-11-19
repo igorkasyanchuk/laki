@@ -9,6 +9,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pixelDiff } from '../shared/pixelDiff.ts'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { appOf, helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
@@ -61,6 +62,15 @@ const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smo
 // link, a click, a key), waits for something only that page draws, and fails on ui.tsx' Boundary (.boom) or an error
 // in the console; a screenshot each, result.json at the end, then the app quits (1: a step failed)
 let smoked = false
+
+// test:sheet: a picture against the last run's (scripts/ui-sheet.ts moved it to prev/): the share of its pixels that
+// changed (shared/pixelDiff.ts), both read back from their files (one scale), or new
+function sheetDiff(png: string, prev: string): { diff?: number; new?: true } {
+  if (!existsSync(prev)) return { new: true }
+  const [a, b] = [nativeImage.createFromPath(png), nativeImage.createFromPath(prev)]
+  const [sa, sb] = [a.getSize(), b.getSize()]
+  return { diff: pixelDiff(a.toBitmap(), sa.width, sa.height, b.toBitmap(), sb.width, sb.height) }
+}
 
 async function uiSmoke(w: BrowserWindow, dir: string) {
   mkdirSync(dir, { recursive: true })
@@ -481,8 +491,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       why = (e as Error).message
     }
     await new Promise(r => setTimeout(r, 250)) // drawn
-    writeFileSync(join(dir, sheet.length ? `${name}.png` : `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
-    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }), ...(sheet.length && { facts: await facts().catch(() => undefined) }) })
+    const png = join(dir, sheet.length ? `${name}.png` : `${String(i + 1).padStart(2, '0')}-${name}.png`)
+    writeFileSync(png, (await w.webContents.capturePage()).toPNG()) // a failed one's too: what it showed
+    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }), ...(sheet.length && { facts: await facts().catch(() => undefined), ...sheetDiff(png, join(dir, 'prev', `${name}.png`)) }) })
     writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2)) // so far: a window killed midway shows where
     if (/(^|-)(palette|get-started|ship-sheet)$/.test(name)) await key('Escape')()
   }

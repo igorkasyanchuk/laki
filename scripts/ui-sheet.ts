@@ -1,12 +1,16 @@
 // npm run test:sheet (npm run build first): a contact sheet of the UI. scripts/ui-smoke.ts' walk (one demo world, one
 // Electron) with LAKI_SHEET: its pages in every look (settingsBase' DESIGNS) × the default dark and light themes
 // (LAKI_SHEET_THEMES=all: every theme id in themes.ts), at 1440×900 and the phone's 390×844; no flows. Then
-// dist/ui-sheet/index.html: looks as columns, pages as rows, each with its layout facts (a report, not a gate).
+// dist/ui-sheet/index.html: looks as columns, pages as rows, each with its layout facts (a report, not a gate). Each
+// run's pictures are compared with the last run's (moved to dist/ui-sheet/prev first; main's uiSmoke compares them by
+// pixels, shared/pixelDiff.ts): Changed (n) first, before and after side by side, then new and removed pages, the rest
+// folded; "changed: n of m" at the end.
 // ponytail: the looks' and themes' ids read from their sources by a pattern (a node script can't import the renderer's)
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CHANGED } from '../src/shared/pixelDiff.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const src = (f: string) => readFileSync(join(root, 'src/renderer/src', f), 'utf8')
@@ -14,12 +18,21 @@ const looks = [...src('settingsBase.ts').split('export const DESIGNS')[1].split(
 const themes = process.env.LAKI_SHEET_THEMES === 'all' ? [...src('themes.ts').split('export const THEMES')[1].split('\n]')[0].matchAll(/^\s*id: '([\w-]+)'/gm)].map(m => m[1]) : ['laki', 'laki-light']
 if (!looks.length || !themes.length) throw new Error('no looks or themes found in their sources')
 const at = Date.now()
+const dir = join(root, 'dist/ui-sheet')
+// the last run's pictures to prev/ (an older prev replaced), for the comparison
+const prevDir = join(dir, 'prev')
+const lastRun = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.png')) : []
+if (lastRun.length) {
+  rmSync(prevDir, { recursive: true, force: true })
+  mkdirSync(prevDir, { recursive: true })
+  for (const f of lastRun) renameSync(join(dir, f), join(prevDir, f))
+}
+const before = existsSync(prevDir) ? readdirSync(prevDir).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)) : []
 try {
   execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/ui-smoke.ts'], { cwd: root, stdio: 'inherit', env: { ...process.env, LAKI_SHEET: JSON.stringify({ looks, themes }) } })
 } catch {} // a step that failed is in result.json: shown on the sheet
-const dir = join(root, 'dist/ui-sheet')
 if (!existsSync(join(dir, 'result.json'))) throw new Error('no dist/ui-sheet/result.json: the window never finished')
-type Step = { name: string; ok: boolean; why?: string; facts?: { clipped: string[]; over: string[] } }
+type Step = { name: string; ok: boolean; why?: string; facts?: { clipped: string[]; over: string[] }; diff?: number; new?: true }
 const steps = new Map((JSON.parse(readFileSync(join(dir, 'result.json'), 'utf8')) as Step[]).map(s => [s.name, s]))
 // a step's name is <look>-<theme>-<page>: the page is what's left after the look and the theme
 const pageOf = (n: string) => {
@@ -30,13 +43,30 @@ const pageOf = (n: string) => {
 const pages = [...new Set([...steps.keys()].map(pageOf).filter((x): x is string => !!x))]
 const esc = (s: string) => s.replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`)
 const cols = looks.flatMap(l => themes.map(t => `${l}-${t}`))
+const factsOf = (s: Step) => {
+  const f = s.facts
+  return [!s.ok && `<b>failed</b>: ${esc(s.why ?? '')}`, f?.clipped.length && `<span title="${esc(f.clipped.join('\n'))}">${f.clipped.length} clipped</span>`, f?.over.length && `<span title="${esc(f.over.join('\n'))}">${f.over.length} past the edge</span>`].filter(Boolean)
+}
 const cell = (c: string, p: string) => {
   const s = steps.get(`${c}-${p}`)
   if (!s) return '<td></td>'
-  const f = s.facts
-  const notes = [!s.ok && `<b>failed</b>: ${esc(s.why ?? '')}`, f?.clipped.length && `<span title="${esc(f.clipped.join('\n'))}">${f.clipped.length} clipped</span>`, f?.over.length && `<span title="${esc(f.over.join('\n'))}">${f.over.length} past the edge</span>`].filter(Boolean)
+  const notes = factsOf(s)
   return `<td><a href="${esc(`${c}-${p}.png`)}"><img loading="lazy" src="${esc(`${c}-${p}.png`)}" alt="${esc(`${c} ${p}`)}"></a>${notes.length ? `<div class="n">${notes.join(' · ')}</div>` : ''}</td>`
 }
+// against the last run: changed (most first), new, removed
+const pct = (x: number) => `${(x * 100).toFixed(x < 0.01 ? 2 : 1)}%`
+const changed = [...steps.values()].filter(s => (s.diff ?? 0) > CHANGED).sort((a, b) => b.diff! - a.diff!)
+const made = [...steps.values()].filter(s => s.new && s.name !== 'first-row' && before.length)
+const gone = before.filter(n => !steps.has(n))
+const pair = (s: Step) => {
+  const notes = factsOf(s)
+  return `<figure data-page="${esc(s.name)}"><figcaption><b>${esc(s.name)}</b> ${pct(s.diff!)} of its pixels${notes.length ? ` · ${notes.join(' · ')}` : ''}</figcaption><a href="${esc(`prev/${s.name}.png`)}"><img loading="lazy" src="${esc(`prev/${s.name}.png`)}" alt="${esc(`${s.name} before`)}"></a><a href="${esc(`${s.name}.png`)}"><img loading="lazy" src="${esc(`${s.name}.png`)}" alt="${esc(`${s.name} after`)}"></a></figure>`
+}
+const versus = before.length
+  ? `<section><h2>Changed (${changed.length})</h2>${changed.length ? changed.map(pair).join('\n') : '<p>Nothing since the last run.</p>'}
+${made.length ? `<h2>New (${made.length})</h2><p>${made.map(s => `<a href="${esc(`${s.name}.png`)}">${esc(s.name)}</a>`).join(', ')}</p>` : ''}
+${gone.length ? `<h2>Removed (${gone.length})</h2><p>${gone.map(n => `<a href="${esc(`prev/${n}.png`)}">${esc(n)}</a>`).join(', ')}</p>` : ''}</section>`
+  : '<p>No earlier run to compare with: the next one will.</p>'
 writeFileSync(
   join(dir, 'index.html'),
   `<!doctype html><meta charset="utf-8"><title>Laki contact sheet</title>
@@ -55,12 +85,19 @@ dialog { padding: 0; border: 0; max-width: 96vw; max-height: 96vh; background: n
 dialog img { width: auto; max-width: 96vw; max-height: 90vh }
 dialog p { color: white; margin: 4px 0; text-shadow: 0 1px 2px black }
 dialog::backdrop { background: rgb(0 0 0 / 0.8) }
+h2 { font-size: 15px; margin: 16px 0 8px }
+figure { margin: 0 0 12px; display: grid; grid-template-columns: repeat(2, 480px); gap: 6px }
+figure img { width: 480px }
+figcaption { grid-column: 1 / -1 }
+summary { cursor: pointer; margin: 16px 0 8px; font-weight: 600 }
 </style>
 <header><strong>Laki contact sheet</strong><span>${steps.size} pictures, ${((Date.now() - at) / 60e3).toFixed(1)} min, ${new Date().toISOString().slice(0, 16).replace('T', ' ')}</span>
 <label>Page <input id="f" placeholder="filter" autocomplete="off"></label><span>Click: full size · ← → ↑ ↓ step · Esc close</span></header>
+${versus}
+<details${before.length ? '' : ' open'}><summary>Every page (${steps.size}${before.length ? `, ${steps.size - changed.length} unchanged` : ''})</summary>
 <table><thead><tr><th></th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
 ${pages.map(p => `<tr data-page="${esc(p)}"><th>${esc(p)}</th>${cols.map(c => cell(c, p)).join('')}</tr>`).join('\n')}
-</tbody></table>
+</tbody></table></details>
 <dialog id="d"><p id="t"></p><img id="big" alt=""></dialog>
 <script>
 const d = document.getElementById('d'), big = document.getElementById('big'), t = document.getElementById('t')
@@ -80,3 +117,4 @@ document.getElementById('f').addEventListener('input', e => { const q = e.target
 )
 const failed = [...steps.values()].filter(s => !s.ok).length
 console.log(`${steps.size} pictures in ${((Date.now() - at) / 60e3).toFixed(1)} min${failed ? `, ${failed} failed` : ''}: ${join(dir, 'index.html')}`)
+console.log(`changed: ${changed.length} of ${steps.size}${before.length ? '' : ' (no earlier run)'}`)
