@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
-import { request } from 'node:http'
+import { createServer, request } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
@@ -1463,7 +1464,7 @@ test("new worktrees: the page's base is the repo's main branch; Sync the base br
 })
 
 test("an extension's https picture comes through the daemon's /img, behind its own key: never the app window's fetch (L7)", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_TEST_DNS: JSON.stringify({ 'pics.example': '127.0.0.1', 'v6.example': '::1' }) } })
   const { port } = rig.info()
   const v = await rig.rpc('state')
   assert.match(v.imgKey, /\w{16,}/)
@@ -1472,6 +1473,13 @@ test("an extension's https picture comes through the daemon's /img, behind its o
   assert.equal((await img(v.imgKey, 'http://example.com/a.png')).status, 400) // https only
   assert.equal((await img(v.imgKey, 'file:///etc/passwd')).status, 400)
   for (const u of ['https://127.0.0.1:1/a.png', 'https://localhost/a.png', 'https://192.168.1.1/a.png', 'https://[::1]/a.png']) assert.equal((await img(v.imgKey, u)).status, 400, u) // never this Mac's or the LAN's
+  // nor a name that resolves to one (the rig's resolver: LAKI_TEST_DNS), refused before any connection
+  const hit = createServer((_q, r) => (hits++, r.end()))
+  let hits = 0
+  await new Promise<void>(ok => hit.listen(0, '127.0.0.1', ok))
+  t.after(() => hit.close())
+  for (const name of ['pics.example', 'v6.example']) assert.equal((await img(v.imgKey, `https://${name}:${(hit.address() as AddressInfo).port}/a.png`)).status, 400, name)
+  assert.equal(hits, 0, 'nothing reached this Mac')
 })
 
 test("a workspace's rail icon (wsSet icon): an icon's name or an emoji, '' none, anything else refused", async t => {

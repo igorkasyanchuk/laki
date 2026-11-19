@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - Agents can change only how Laki looks (theme, fonts, glass, the sidebar's and rail's layout); every other setting, Global memory and where worktrees go among them, is yours alone.
+- An extension's picture from the web is fetched only when its site's address is on the internet: a name that points at this Mac or your network is refused.
 
 ## 0.57.0 · Nov 19, 2026
 

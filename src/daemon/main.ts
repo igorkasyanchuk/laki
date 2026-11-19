@@ -21,6 +21,7 @@ import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { meme } from './fun.ts'
+import { getPublic } from './netAddr.ts'
 import * as core from './core.ts'
 import * as agentCliMod from './agentCli.ts'
 import * as uninstallMod from './uninstall.ts'
@@ -252,8 +253,8 @@ const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charse
 // fetched here, https all the way, an image's type only, 10 MB at most; the key the view gives (imgKey). An SVG is a
 // picture in an <img> (no scripts); opened on its own, its CSP runs none either
 const IMG = /^image\/(png|jpe?g|gif|webp|avif|svg\+xml|x-icon|vnd\.microsoft\.icon)\b/i
-// an https address on the internet, by its name: no IP literal of this Mac or a private network, no localhost.
-// ponytail: a name that resolves to one (DNS) still goes; a lookup before each fetch if that matters
+// an https address on the internet, by its name: no IP literal of this Mac or a private network, no localhost (the
+// picture proxy then checks what the name resolves to: netAddr.ts)
 const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.|0\.|\[)/i
 const webOk = (u: string) => URL.canParse(u) && (x => x.protocol === 'https:' && !PRIVATE_HOST.test(x.hostname))(new URL(u))
 // S5: Send test's address: on the internet (webOk), or this Mac's own relay (webhookUrl's http exception); a Test never
@@ -269,22 +270,31 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
   const u = q.get('u') ?? ''
   if (!webOk(u)) return no(400, 'an https picture only')
   try {
-    // redirects one at a time, each https and not this Mac's or the LAN's (a picture's link can't make the daemon ask them)
-    let r: Response | undefined
+    // redirects one at a time, each https and not this Mac's or the LAN's, by name and by address, each fetched at the
+    // address checked (a picture's link can't make the daemon ask them, nor a name that resolves to one: netAddr.ts)
+    let r: IncomingMessage | undefined
     const signal = AbortSignal.timeout(15000)
     for (let at = u, n = 0; n < 5; n++) {
-      r = await fetch(at, { signal, headers: { accept: 'image/*' }, redirect: 'manual' })
-      const to = r.status >= 300 && r.status < 400 && r.headers.get('location')
+      try {
+        r = await getPublic(at, signal, { accept: 'image/*' })
+      } catch (e) {
+        if (/isn't on the internet/.test(String((e as Error).message))) return no(400, 'an https picture on the internet only')
+        throw e
+      }
+      const code = r.statusCode ?? 0
+      const to = code >= 300 && code < 400 && r.headers.location
       if (!to) break
+      r.resume()
       at = new URL(to, at).href
       if (!webOk(at)) return no(502, 'not a picture')
       r = undefined
     }
-    const type = r?.headers.get('content-type') ?? ''
-    if (!r?.ok || !IMG.test(type)) return no(502, 'not a picture')
-    if (Number(r.headers.get('content-length')) > 10 << 20) return no(413, 'over 10 MB')
-    const { buf: body, cut } = await readCapped(r, 10 << 20)
-    if (cut) return no(413, 'over 10 MB')
+    const type = r?.headers['content-type'] ?? ''
+    const code = r?.statusCode ?? 0
+    if (!r || code < 200 || code > 299 || !IMG.test(type)) return r?.resume(), no(502, 'not a picture')
+    if (Number(r.headers['content-length']) > 10 << 20) return r.resume(), no(413, 'over 10 MB')
+    const { buf: body, cut } = await readCapped({ body: r }, 10 << 20)
+    if (cut) return r.destroy(), no(413, 'over 10 MB')
     res.writeHead(200, { 'content-type': type, 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'", 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' })
     res.end(body)
   } catch {

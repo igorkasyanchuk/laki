@@ -414,7 +414,7 @@ every 15 s with `CLOCK`'s options, its interval cleared by the cleanup), funnel,
 (`STEP`'s words, `MX`), marquee (two copies, the second `inert`; paused on hover and under reduced motion) and bento.
 `menuRow` gives each row `data-label` (its words for a confirm and `run`'s label). The app's CSP takes no `https:` pictures but GitHub's avatars (L7): the kit's images in the window go through
 the daemon's `GET /img?k=<imgKey>&u=<https URL>` (main.ts `imgPage`: the view's `imgKey`, `urlKey('img')`; `IMG` types only,
-10 MB, 15 s, redirects one at a time, each `webOk`: https, no localhost, LAN or IP-literal host; its own sandbox CSP), Widgets.tsx `clean` rewriting each https `src` by App's `imagesVia` (none set: dropped;
+10 MB, 15 s, redirects one at a time, each `webOk`: https, no localhost, LAN or IP-literal host, then netAddr.ts' `getPublic`: the name looked up, refused (400) when any of its addresses is this Mac's, a private network's, link-local, CGNAT, unique local or unspecified (`addrPrivate`, IPv4 in IPv6 too), and connected to the address checked, the name kept for TLS and Host, so a second lookup can't differ (DNS rebinding); the rig's `LAKI_TEST_DNS` (`{ name: address }`, `inRig` only) stands in for DNS; its own sandbox CSP), Widgets.tsx `clean` rewriting each https `src` by App's `imagesVia` (none set: dropped;
 `srcset` dropped; a web address stays only on an `a` or `area`); Markdown's pictures are links. The guide tool's `max`: 60,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 
 Tools for agents (widgetTools.ts; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an

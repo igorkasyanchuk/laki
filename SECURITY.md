@@ -226,8 +226,6 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   stop it; a quick tunnel's at a new address, with a new link.
 - My domain (remote access on your named tunnel) has only Laki's PIN unless you add a Cloudflare Access policy for its
   hostname in Cloudflare's dashboard: cloudflared can't set one.
-- An extension's https picture comes through the daemon from a public site, judged by its name: a name that resolves
-  to this Mac or your network still goes (`ponytail:` in `src/daemon/main.ts`).
 
 ## No telemetry
 
