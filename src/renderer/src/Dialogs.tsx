@@ -373,6 +373,7 @@ export function Pages({ app }: { app: AppCtx }) {
           schedules={view.schedules?.filter(s => !s.archived) ?? []}
           runs={view.runs ?? []}
           reminders={view.reminders ?? []}
+          waits={(view.flows ?? []).flatMap(r => (r.status === 'waiting' && r.wait?.kind === 'timer' && r.wait.until - (r.at ?? r.started) > 86400000 ? [{ id: r.id, name: r.task || r.name, until: r.wait.until, ws: r.ws }] : []))}
           workspaces={live.map(w => ({ id: w.id, name: wsName(w) }))}
           api={{
             add: r => call('reminderAdd', r),
@@ -475,6 +476,8 @@ export function Pages({ app }: { app: AppCtx }) {
                 ai: aiOn(settings) ? ask => (setAiFloat(true), ask && void whereNow().then(context => api.call('aiAsk', { text: ask, context })).catch(fail)) : undefined,
                 globals: settings.flowVars,
                 setGlobals: flowVars => call('settingsSet', { flowVars }),
+                workHours: settings.workHours,
+                setWorkHours: workHours => call('settingsSet', { workHours }),
               }}
             />
           </Lazy>

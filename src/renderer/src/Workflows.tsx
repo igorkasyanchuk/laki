@@ -10,7 +10,7 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem, pauseKeys, pauseText, type WorkHours, WORK_HOURS, type Pause } from '../../shared/workflow'
 import { tabAgent } from '../../shared/install'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
@@ -30,6 +30,8 @@ export type WorkflowsApi = {
   ai?: (ask?: string) => void // the floating Laki AI chat over the page; with an ask, that sent to it
   globals?: Record<string, string> // Settings' flowVars: {{vars.NAME}} in every workflow
   setGlobals?: (v: Record<string, string>) => Promise<unknown>
+  workHours?: WorkHours // W9: Settings' workHours (unset: WORK_HOURS), a wait block's hours
+  setWorkHours?: (w: WorkHours) => Promise<unknown>
 }
 export type Sel = { id: string; source: WorkflowSource; project?: string }
 export type FlowStartAt = Sel & { ws?: string; at?: number } // the page opened on a workflow's Run sheet, in that workspace; at: when it was asked (once)
@@ -44,7 +46,10 @@ const H = 58
 const RUNS_SHOWN = 12
 const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', extension: 'teal', parallel: 'blue', each: 'blue', call: 'teal', end: 'gray' }
 const STATUS_WORDS: Record<string, string> = { queued: 'queued', running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
-const statusWords = (r: { status: string; hold?: number }) => (r.hold ? 'pausing' : STATUS_WORDS[r.status]) // Pause after this block, asked: its block finishing
+const statusWords = (r: { status: string; hold?: number; wait?: FlowRun['wait'] }) => (r.hold ? 'pausing' : r.wait?.kind === 'timer' && r.status === 'waiting' ? `waiting until ${untilWords(r.wait.until)}` : STATUS_WORDS[r.status]) // Pause after this block, asked: its block finishing
+// W9: a wait block's end, short: Thu 18:00 (today's: 18:00)
+const untilWords = (t: number) => new Date(t).toLocaleString([], new Date(t).toDateString() === new Date().toDateString() ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+export const asksYou = (r: { status: string; wait?: FlowRun['wait'] }) => r.status === 'waiting' && r.wait?.kind !== 'timer' // a wait for a time asks nothing
 const atEnd = (r: { wait?: FlowRun['wait'] }) => r.wait?.kind === 'hold' && r.wait.end !== undefined // parked before the run's end: cur is the block it finished
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
@@ -125,7 +130,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
   const run = at.kind === 'run' ? flows.find(r => r.id === at.id) : undefined
   const going = flows.filter(r => !ended(r) && r.status !== 'queued')
   const queued = flows.filter(r => r.status === 'queued')
-  const asks = flows.filter(r => r.status === 'waiting').length
+  const asks = flows.filter(asksYou).length
   const done = flows.filter(ended)
   const ok = done.filter(r => r.status === 'done').length
   const failed = done.filter(r => r.status === 'failed').length
@@ -187,6 +192,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
     )
   // Run again (an ended run's id) or Run from here (and a block): the new run opens
   const again = (id: string, block?: string) => api.call<FlowRun>('flowStart', block ? { from: { run: id, block } } : { again: id }).then(x => setAt({ kind: 'run', id: x.id }), e => api.toast((e as Error).message))
+  const waitEnd = (id: string, act: 'continue' | 'cancel') => api.call('flowWaitEnd', { id, act }).catch(e => api.toast((e as Error).message)) // W9
   const removeRun = async (r: FlowView) => {
     const live = !ended(r)
     if (!(await ask('Delete this run?', { text: `${r.task || r.name}\n${live ? 'It stops first. ' : ''}Its workspace and its agents' tabs stay.`, ok: 'Delete', danger: true }))) return false
@@ -407,6 +413,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                         onClick={e =>
                           openMenu(e, [
                             ...(ended(r) ? [{ label: 'Run again', sub: 'Its task and inputs, the workflow as it is now', icon: 'refresh', run: () => void again(r.id) } as MenuItem, null] : []),
+                            ...(r.status === 'waiting' && r.wait?.kind === 'timer' ? [{ label: 'Continue now', sub: 'It goes on at once, not at its time', icon: 'run', run: () => void waitEnd(r.id, 'continue') } as MenuItem, { label: 'Cancel', sub: 'Stops the run', icon: 'stop', run: () => void waitEnd(r.id, 'cancel') } as MenuItem, null] : []),
                             { label: 'Delete…', icon: 'trash', danger: true, run: () => void removeRun(r) },
                           ])
                         }
@@ -609,7 +616,7 @@ function subOf(b: Block, wf: Workflow) {
     case 'choice': return branchLabel({ of: b.of ?? '', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })
     case 'case': return [b.of, `${b.options?.length ?? 0} ways`].filter(Boolean).join(' · ')
     case 'action': return (ACTIONS[b.action ?? ''] ?? b.action ?? '') + (b.confirm === false ? '' : ['ship', 'approve', 'merge', 'archive'].includes(b.action ?? '') ? ' · asks first' : '')
-    case 'wait': return WAITS[b.for ?? ''] ?? b.for ?? ''
+    case 'wait': return b.pause ? pauseText(b.pause) : (WAITS[b.for ?? ''] ?? b.for ?? '')
     case 'save': return b.link !== undefined ? `link: ${b.link}` : b.from !== undefined ? `${b.from} → ${b.file ?? ''}` : b.file ?? ''
     case 'parallel': return `${b.join === 'any' ? 'the first ok' : 'every one ok'} · ${b.children?.length ?? 0} at once`
     case 'each': return [b.items, `max ${b.limit ?? EACH_MAX}`, b.goOn && 'goes on past a failure'].filter(Boolean).join(' · ')
@@ -1302,6 +1309,58 @@ A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`a
 
 Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.log}}\` (the end of a wait's failed GitHub Actions logs), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
+// W9: a wait block's form: For a length, Until a time, Hours (working or off), or its PR's checks; the working hours
+// themselves edited here too (Settings' workHours, every workflow's)
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+function WaitFor({ b, set, field, api }: { b: Block; set: (f: (x: Block) => void) => void; field: (label: string, el: React.ReactNode, hint?: string) => React.ReactNode; api: WorkflowsApi }) {
+  const mode = b.pause ? (pauseKeys(b.pause)[0] ?? 'for') : 'checks'
+  const first: Record<string, Pause> = { for: { for: '2h' }, until: { until: '18:00' }, hours: { hours: 'work' } }
+  const to = (m: string) => set(x => void (m === 'checks' ? ((x.pause = undefined), (x.for = 'checks')) : ((x.for = undefined), (x.pause = first[m]))))
+  const wh = api.workHours ?? WORK_HOURS
+  const hours = (o: Partial<WorkHours>) => void api.setWorkHours?.({ ...wh, ...o })
+  return (
+    <>
+      {field(
+        'Waits',
+        <div className="seg">
+          {[['for', 'For'], ['until', 'Until'], ['hours', 'Hours'], ['checks', 'PR checks']].map(([k, l]) => (
+            <button key={k} type="button" className={mode === k ? 'on' : ''} onClick={() => mode !== k && to(k)}>
+              {l}
+            </button>
+          ))}
+        </div>,
+        mode === 'checks' ? undefined : 'Meanwhile the run holds no agent, tab or budget; its run’s row has Continue now',
+      )}
+      {mode === 'for' && field('How long', <Typed value={b.pause?.for ?? ''} placeholder="2h" onText={v => set(x => void (x.pause = { for: v.trim() }))} />, '30m, 2h, 3d: 30 days at most')}
+      {mode === 'until' && field('Until', <Typed value={b.pause?.until ?? ''} placeholder="18:00" onText={v => set(x => void (x.pause = { until: v.trim() }))} />, '18:00 (the next one), tomorrow 9am, 2026-11-20 14:30, in this Mac’s time')}
+      {mode === 'hours' && (
+        <>
+          {field(
+            'Until',
+            <select value={b.pause?.hours ?? 'work'} onChange={e => set(x => void (x.pause = { hours: e.target.value as 'work' | 'off' }))}>
+              <option value="work">Working hours start (at once inside them)</option>
+              <option value="off">Working hours end (at once outside them)</option>
+            </select>,
+          )}
+          {field(
+            'Working hours',
+            <div className="row-buttons">
+              {DAY_LETTERS.map((d, i) => (
+                <button key={i} type="button" className={`btn small ${wh.days.includes(i) ? 'primary' : ''}`} aria-pressed={wh.days.includes(i)} aria-label={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i]} disabled={!api.setWorkHours} onClick={() => hours({ days: wh.days.includes(i) ? wh.days.filter(x => x !== i) : [...wh.days, i].sort() })}>
+                  {d}
+                </button>
+              ))}
+              <input type="time" value={wh.from} aria-label="From" disabled={!api.setWorkHours} onChange={e => e.target.value && hours({ from: e.target.value })} />
+              <input type="time" value={wh.to} aria-label="To" disabled={!api.setWorkHours} onChange={e => e.target.value && hours({ to: e.target.value })} />
+            </div>,
+            'Yours, for every workflow',
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
 function Inspector({ wf, flows = [], onCall, id, presets, actions, exts, edit, onPick, api, project, onDoom, stats, onTurnOn, events, onOpenRun }: { flows?: WorkflowItem[]; onCall?: CallLink; wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void; stats?: WorkflowItem['stats']; onTurnOn?: () => void; events?: WorkflowItem['events']; onOpenRun?: (id: string) => void }) {
   const b = wf.blocks.find(x => x.id === id)
   const used = b?.use ? findAction(actions, [], b.use) : undefined
@@ -1767,7 +1826,8 @@ function Inspector({ wf, flows = [], onCall, id, presets, actions, exts, edit, o
           )}
         </>
       )}
-      {b.kind === 'wait' && field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 60} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />, `Until its PR’s checks pass or fail. On fail, {{steps.${b.id}.output}} names the failed checks and {{steps.${b.id}.log}} is the end of their GitHub Actions logs, for an agent block after it`)}
+      {b.kind === 'wait' && <WaitFor b={b} set={set} field={field} api={api} />}
+      {b.kind === 'wait' && !b.pause && field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 60} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />, `Until its PR’s checks pass or fail. On fail, {{steps.${b.id}.output}} names the failed checks and {{steps.${b.id}.log}} is the end of their GitHub Actions logs, for an agent block after it`)}
       {b.kind === 'save' && (
         <>
           {field(
@@ -2623,6 +2683,19 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
         <Meter label="Working time" now={r.spent ?? 0} max={r.budget?.ms} say={`${dur(r.spent ?? 0)}${r.budget?.ms ? ` of ${minutes(r.budget.ms)}` : ''}`} tip="Not while it waits for you, a usage limit or its turn" />
         <Meter label="Cost" now={r.cost ?? 0} max={r.budget?.usd} say={`${dollars(r.cost ?? 0)}${r.budget?.usd ? ` of ${dollars(r.budget.usd)}` : ''}${r.uncounted?.length ? ` + agents not counted: ${r.uncounted.join(', ')}` : ''}`} tip={`What it would cost ${PRICED}${r.uncounted?.length ? `; ${r.uncounted.join(', ')}’s turns have no cost Laki can read` : ''}`} />
       </div>
+      {r.status === 'waiting' && r.wait?.kind === 'timer' && (
+        <div className="wf-ask">
+          <div className="wf-ask-q">
+            <Icon name="clock" size={14} />
+            <b>Waits until {untilWords(r.wait.until)}</b>
+            <span className="wf-hint">it holds no agent, tab or budget meanwhile</span>
+          </div>
+          <div className="wf-ask-btns">
+            <button className="btn primary" onClick={() => void api.call('flowWaitEnd', { id, act: 'continue' }).catch(e => api.toast((e as Error).message))}>Continue now</button>
+            <button className="btn danger" onClick={() => void api.call('flowWaitEnd', { id, act: 'cancel' }).catch(e => api.toast((e as Error).message))}>Cancel</button>
+          </div>
+        </div>
+      )}
       {asking && (
         <div className={`wf-ask ${asking.kind === 'agent-ask' ? 'agent' : ''}`}>
           <div className="wf-ask-q">
@@ -2783,7 +2856,7 @@ function RunTime({ r, onPick }: { r: FlowRun; onPick: (id: string) => void }) {
   if (!t.rows.length) return <div className="wf-empty">No block has run yet.</div>
   const name = (id: string) => (b => (b ? blockName(b) : id))(blockAny(r, id))
   const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
-  const KIND = { work: 'working', you: 'waiting on you', ci: 'waiting on CI' } as const
+  const KIND = { work: 'working', you: 'waiting on you', ci: 'waiting on CI', timer: 'waiting for a time' } as const
   return (
     <div className="wf-time">
       <div className="wf-time-sum">
@@ -2801,10 +2874,11 @@ function RunTime({ r, onPick }: { r: FlowRun; onPick: (id: string) => void }) {
           <span className="wf-time-name">{name(row.block)}</span>
           <span className="wf-time-track" aria-hidden>
             {row.segs.map((s, i) => (
-              <i key={i} data-kind={s.kind} data-tip={`${KIND[s.kind]}: ${clock(s.start)} – ${row.running && s.to >= 1 ? 'now' : clock(s.end)} (${dur(s.end - s.start)})`} style={{ left: `${s.from * 100}%`, width: `${(s.to - s.from) * 100}%` }} />
+              <i key={i} data-kind={s.kind} data-tip={`${KIND[s.kind]}: ${clock(s.start)} – ${row.running && s.to >= 1 ? (s.until ? `until ${new Date(s.until).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'now') : clock(s.end)} (${dur(s.end - s.start)})`} style={{ left: `${s.from * 100}%`, width: `${(s.to - s.from) * 100}%` }} />
             ))}
           </span>
           <span className="wf-time-end">
+            {row.running && row.segs.at(-1)?.until ? `until ${new Date(row.segs.at(-1)!.until!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ` : ''}
             {dur(row.ms)}
             {row.cost ? ` · ${dollars(row.cost)}` : ''}
           </span>

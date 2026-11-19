@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { tabAgent } from '../shared/install.ts'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { queueOrder, type Span, SPANS_MAX, EACH_CAP, EACH_MAX, itemsOf, itemVars, ACTIONS, AGENT_TIMEOUT, leftWords, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, type Span, SPANS_MAX, EACH_CAP, EACH_MAX, itemsOf, itemVars, ACTIONS, AGENT_TIMEOUT, leftWords, pauseText, waitEnd, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, rtOf, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew, proofIn } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
@@ -719,7 +719,7 @@ function next() {
   for (const r of runs().filter(x => x.status === 'queued').sort(queueOrder)) {
     const of = { id: r.workflow, source: r.source, project: r.project }
     const k = `${r.source}/${r.source === 'project' ? r.project : ''}/${r.workflow}`
-    if (held.has(k) || runs().filter(x => going(x) && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) {
+    if (held.has(k) || runs().filter(x => going(x) && x.wait?.kind !== 'timer' && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) { // W9: a run waiting for a time holds no slot
       held.add(k)
       continue
     }
@@ -795,12 +795,12 @@ function trackWait(r: FlowRun) {
   if (!live(r)) return
   const sp = r.spans?.findLast(x => x.block === r.cur && x.end === undefined)
   if (!sp) return
-  const k = r.wait && WAITS_YOU.includes(r.wait.kind) ? 'you' : r.wait?.kind === 'wait' ? 'ci' : undefined
+  const k = r.wait && WAITS_YOU.includes(r.wait.kind) ? 'you' : r.wait?.kind === 'wait' ? 'ci' : r.wait?.kind === 'timer' ? 'timer' : undefined
   const open = (w => (w && w.end === undefined ? w : undefined))(sp.waits?.at(-1))
   if (open?.kind === k) return
   const now = Date.now()
   if (open) open.end = now
-  if (k) (sp.waits ??= []).push({ kind: k, start: now })
+  if (k) (sp.waits ??= []).push({ kind: k, start: now, ...(r.wait?.kind === 'timer' && { until: r.wait.until }) })
 }
 
 // Pause after this block (flowHold): parked before b (cur, not entered: no visit counted, nothing of it runs), or
@@ -838,6 +838,7 @@ function again(r: FlowRun, b: Block, until?: number) {
 
 async function work(r: FlowRun, b: Block) {
   const vars = varsOf(r)
+  if (r.sim && b.kind === 'wait' && b.pause) return leave(r, b, 'pass', `wait ${pauseText(b.pause)}: skipped (simulated)`) // W9
   if (r.sim && b.kind !== 'end' && b.kind !== 'call') return simWork(r, b, vars) // a call: its blocks are simulated
   switch (b.kind) {
     case 'parallel':
@@ -898,6 +899,7 @@ async function work(r: FlowRun, b: Block) {
       if (OUTWARD.includes(b.action!) && b.confirm !== false && !r.dry) return ask(r, 'confirm', `${ACTIONS[b.action!]}?`, b.action === 'ship' ? `Commit message: ${fill(b.text || '{{task}}', vars)}` : undefined, ['Do it', 'Stop the run'])
       return act(r, b)
     case 'wait':
+      if (b.pause) return pause(r, b)
       r.wait = { kind: 'wait' }
       touch()
       return waitTick(r, b, Date.now()) // it asks for a scan: its state now, not at the minute's
@@ -916,6 +918,39 @@ async function work(r: FlowRun, b: Block) {
       return leave(r, b, 'next', `showed you “${clip(title, 60)}”`)
     }
   }
+}
+
+// W9: a wait for a time: its end computed once, as it's reached (in state: a restart keeps it); the run waits holding no
+// agent, tab, slot or budget (sample counts running only), then flowTick's timers go on by pass
+function pause(r: FlowRun, b: Block) {
+  const until = waitEnd(b.pause!, Date.now(), state.settings?.workHours)
+  if (typeof until !== 'number') return leave(r, b, 'fail', until.error)
+  if (until <= Date.now()) return leave(r, b, 'pass', `wait ${pauseText(b.pause!)}: now`)
+  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'timer', until } })
+  say(r, `${blockName(b)}: waits until ${new Date(until).toLocaleString()} (${pauseText(b.pause!)})`)
+  touch()
+}
+// the runs whose time came, the earliest first: a restart or a sleep past it, at flowTick's first look once the agents'
+// tabs are back (RESUME_AFTER)
+function timers(now: number) {
+  const back = Date.now() >= boot + RESUME_AFTER
+  for (const r of runs().filter(x => live(x) && x.status === 'waiting' && x.wait?.kind === 'timer' && now >= x.wait.until && (back || (x.at ?? 0) >= boot)).sort((a, b) => (a.wait as { until: number }).until - (b.wait as { until: number }).until)) {
+    const b = blockOf(r, r.cur)
+    const until = (r.wait as { until: number }).until
+    if (b) Object.assign(r, { status: 'running' as FlowStatus }), leave(r, b, 'pass', `waited until ${new Date(until).toLocaleString()}`)
+  }
+}
+// Continue now (the run's row and page): a waiting one goes on at once; Cancel stops the run. The user's
+export function flowWaitEnd(o: { id: string; act?: 'continue' | 'cancel' }) {
+  const r = runs().find(x => x.id === o.id)
+  if (!r || !live(r)) throw new Error('no such run going')
+  if (r.wait?.kind !== 'timer') throw new Error(`${r.flow.name} isn't waiting for a time`)
+  const b = blockOf(r, r.cur)
+  if (o.act === 'cancel') return finish(r, 'stopped', `${b ? blockName(b) : 'its wait'}: cancelled by you`), { ok: true }
+  if (!b) throw new Error('its block is gone')
+  r.status = 'running'
+  leave(r, b, 'pass', 'you said continue now', true)
+  return { ok: true }
 }
 
 // an extension: fetched now, waited for, then its data as steps.<id>.data and each field of it as steps.<id>.<field>
@@ -2034,6 +2069,7 @@ export function flowForget(o: { id: string }) {
 export function flowTick(now = Date.now()) {
   if (!flowsOn(state.settings)) return
   if (resumeLater) flowResume() // turned on since the start
+  timers(now)
   for (const r of runs()) {
     if (!live(r)) continue
     const b = blockOf(r, r.cur)

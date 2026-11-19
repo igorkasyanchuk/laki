@@ -796,6 +796,7 @@ export type Settings = {
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
   memoryCompact?: { on?: boolean; days?: number } // on (unless false; it sends them to Laki AI's model): agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; else only Compact now
+  workHours?: { days: number[]; from: string; to: string } // W9: your working days (0 Sun … 6) and hours (HH:MM), a wait block's hours: work|off (unset: weekdays 09:00–18:00)
   flowVars?: Record<string, string> // workflows' global variables, {{vars.NAME}} in every one (a workflow's own var lines win)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   design?: Design // the window's frame: cards, tiles, sections… (unset: classic)
@@ -1402,7 +1403,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 201
+export const API = 202
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

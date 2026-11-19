@@ -5,6 +5,7 @@
 
 import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDGET_EVENTS } from './types.ts'
 import { fenced, plain, untrusted } from './fence.ts'
+import { parseAt } from './when.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'parallel', 'each', 'call', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -16,6 +17,46 @@ export const BLOCK_NAMES: Record<BlockKind, string> = { start: 'Start', agent: '
 export const ACTIONS: Record<string, string> = { ship: 'Open a PR (commit, push, gh pr create)', approve: 'Approve its PR', merge: 'Merge its PR', dev: 'Run the dev server', archive: 'Archive the workspace' }
 export const OUTWARD = ['ship', 'approve', 'merge', 'archive'] // what others see: asks first unless the block says ask first: no
 export const WAITS: Record<string, string> = { checks: 'Its PR’s checks pass or fail' }
+// W9: a wait for a time (Block.pause): for a length (2h, 3d), until a time (18:00, tomorrow 9am, 2026-11-20 14:30: when.ts
+// parseAt's words, the Mac's time zone), or hours: work (inside the working hours, settings.workHours), off (outside them).
+// Exactly one; WAIT_DAYS at most. The run holds nothing meanwhile (no agent, tab, slot or budget) and goes on by its pass
+export type Pause = { for?: string; until?: string; hours?: 'work' | 'off' }
+export type WorkHours = { days: number[]; from: string; to: string } // days 0 (Sun) … 6; from, to: HH:MM
+export const WORK_HOURS: WorkHours = { days: [1, 2, 3, 4, 5], from: '09:00', to: '18:00' }
+export const WAIT_DAYS = 30
+const hm = (s: string) => (m => (m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : NaN))(/^(\d{1,2}):(\d{2})$/.exec(s.trim()))
+export const pauseKeys = (p?: Pause) => (['for', 'until', 'hours'] as const).filter(k => p?.[k] !== undefined && p[k] !== '')
+// the moment a wait goes on, from now (computed once, as the run reaches it): an error's words when it can't be one
+export function waitEnd(p: Pause, now: number, wh: WorkHours = WORK_HOURS): number | { error: string } {
+  const keys = pauseKeys(p)
+  if (keys.length !== 1) return { error: keys.length ? `one of ${keys.join(', ')}, not ${keys.length}` : 'for, until or hours: how long it waits' }
+  if (p.for !== undefined) {
+    const t = parseAt(`in ${p.for.trim().replace(/^(\d+)(\w)/, '$1 $2')}`, now)
+    if (typeof t !== 'number') return { error: `for ${p.for}? a length: 30m, 2h, 3d` }
+    return t - now > WAIT_DAYS * 86400000 ? { error: `for ${p.for}? ${WAIT_DAYS} days at most` } : t
+  }
+  if (p.until !== undefined) {
+    const t = parseAt(/^\d{1,2}:\d{2}$/.test(p.until.trim()) ? `at ${p.until.trim()}` : p.until, now)
+    if (typeof t !== 'number') return { error: `until ${p.until}? a time: 18:00, tomorrow 9am, 2026-11-20 14:30` }
+    if (t - now > WAIT_DAYS * 86400000) return { error: `until ${p.until}? ${WAIT_DAYS} days ahead at most` }
+    return Math.max(t, now)
+  }
+  if (p.hours !== 'work' && p.hours !== 'off') return { error: `hours ${p.hours}? work or off` }
+  const from = hm(wh.from)
+  const to = hm(wh.to)
+  if (!(from < to) || !wh.days?.length) return { error: 'working hours: a from before a to, and a day' }
+  const inside = (d: Date) => wh.days.includes(d.getDay()) && d.getHours() * 60 + d.getMinutes() >= from && d.getHours() * 60 + d.getMinutes() < to
+  const d = new Date(now)
+  if ((p.hours === 'work') === inside(d)) return now
+  // work: the next start of the working hours; off: today's end of them
+  if (p.hours === 'off') return new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(to / 60), to % 60).getTime()
+  for (let i = 0; i < 8; i++) {
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i, Math.floor(from / 60), from % 60)
+    if (wh.days.includes(day.getDay()) && day.getTime() > now) return day.getTime()
+  }
+  return { error: 'working hours: no day' }
+}
+export const pauseText = (p: Pause) => (p.for ? `for ${p.for}` : p.until ? `until ${p.until}` : `hours ${p.hours ?? ''}`)
 export const TESTS = ['contains', 'matches', 'equals', '>=', '<=', '>', '<', 'js'] as const // the last five: a number's, and a case branch's own JS
 export const NUM_TESTS = ['>=', '<=', '>', '<']
 export const WHERES: Record<string, string> = { worktree: 'A new worktree per run', main: "The project's folder (its own workspace)", here: 'A workspace you pick (its ⋯ › Run workflow)' }
@@ -152,7 +193,8 @@ export type Block = {
   value?: string
   action?: string
   confirm?: boolean // an outward action: false skips the ask (unset: asks)
-  for?: string // wait
+  for?: string // wait: checks
+  pause?: Pause // wait: for a time instead (W9)
   file?: string // save: a path in the workspace's storage folder
   from?: string // save: a file or folder of the workspace, copied there (instead of text); webhook: a file of it, sent as the body
   link?: string // save: a link, kept in the storage folder's links as <file> (the workspace's Artifacts list links first)
@@ -508,10 +550,18 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       if (!(v in ACTIONS)) problems.push(`${at}: action: ${Object.keys(ACTIONS).join(', ')}`)
       return void (b.action = v)
     case 'ask first': return void (b.confirm = yes(v))
-    case 'wait':
+    case 'wait': {
       if (b.kind === 'ask') return void (n => (typeof n === 'string' ? problems.push(`${at}: wait: ${n}`) : (b.deadline = n)))(askMinutes(v)) // W8: an ask's deadline
-      if (!(v in WAITS)) problems.push(`${at}: wait: ${Object.keys(WAITS).join(', ')}`)
+      const m = /^(for|until|hours)\s+(.+)$/i.exec(v) // W9: a time
+      if (m) return void ((b.pause ??= {})[m[1].toLowerCase() as keyof Pause] = m[2].trim() as never)
+      if (!(v in WAITS)) problems.push(`${at}: wait: ${Object.keys(WAITS).join(', ')}, for <2h>, until <18:00> or hours work|off`)
       return void (b.for = v)
+    }
+    case 'for':
+    case 'until':
+    case 'hours':
+      if (b.kind === 'wait') return void ((b.pause ??= {})[k as keyof Pause] = v as never) // W9: check() says when there's more than one
+      break
     case 'save': return void (b.file = v)
     case 'from': return void (b.from = v || undefined)
     case 'link': return void (b.link = v || undefined)
@@ -579,7 +629,13 @@ function blockFile(b: Block): string[] {
     case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
     case 'case': L.push(`case: ${b.of ?? ''}`.trimEnd()); break
     case 'action': L.push([`action: ${b.action || 'ship'}`, b.confirm === false && 'ask first: no', b.confirmEach && 'confirm: each'].filter(Boolean).join(' · ')); break
-    case 'wait': L.push(`wait: ${b.for || 'checks'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+    case 'wait':
+      if (b.pause && pauseKeys(b.pause).length) {
+        const [k, ...more] = pauseKeys(b.pause)
+        L.push(`wait: ${k} ${one(String(b.pause[k]))}`, ...more.map(x => `${x}: ${one(String(b.pause![x]))}`))
+      } else L.push(`wait: ${b.for || 'checks'}`)
+      if (b.timeout) L.push(`timeout: ${b.timeout}`)
+      break
     case 'save': L.push(`save: ${one(b.file)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.link) L.push(`link: ${one(b.link)}`); break
     case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes', b.popover && 'popover: yes', b.modal && 'modal: yes'].filter(Boolean).join(' · ')); break
   }
@@ -649,6 +705,15 @@ export function filesFinder(ids: () => string[], read: (id: string) => string | 
   }
 }
 const PAR_NO: Partial<Record<BlockKind, string>> = { agent: 'an agent block', ask: 'an ask', parallel: 'a parallel block' }
+// W9: a wait block's time, as check() sees it: exactly one of checks, for, until, hours; a length or a time that reads
+// (checked against now: until's words have a next time), within WAIT_DAYS
+function pauseProblem(b: Block): string | undefined {
+  const keys = pauseKeys(b.pause)
+  if (!keys.length && !b.for) return 'for, until or hours: how long it waits (or checks)'
+  if (keys.length + (b.for ? 1 : 0) > 1) return `one of checks, for, until, hours, not ${[b.for && 'checks', ...keys].filter(Boolean).join(' and ')}`
+  const t = waitEnd(b.pause!, Date.now())
+  return typeof t === 'number' ? undefined : t.error
+}
 export function check(wf: Workflow, calls?: Calls): string[] {
   const out: string[] = []
   const by = new Map(wf.blocks.map(b => [b.id, b]))
@@ -725,7 +790,8 @@ export function check(wf: Workflow, calls?: Calls): string[] {
     if (b.kind === 'extension' && !/^[\w.-]{1,80}$/.test(b.extension?.trim() ?? '')) out.push(`${blockName(b)}: extension: which one (its id)`)
     if (b.kind === 'save' && b.from && b.link) out.push(`${blockName(b)}: a file or a link, not both`)
     if (b.kind === 'agent' && b.session && !['run', 'new'].includes(b.session) && by.get(b.session)?.kind !== 'agent') out.push(`${blockName(b)}: session ${b.session} isn't an agent block`)
-    if (wf.where === 'main' && ((b.kind === 'action' && ['ship', 'approve', 'merge'].includes(b.action ?? '')) || b.kind === 'wait')) out.push(`${blockName(b)} needs a PR: runs in: worktree`) // a folder's own workspace has no PR of its own
+    if (b.kind === 'wait' && (b.pause || !b.for)) (e => e && out.push(`${blockName(b)}: wait ${e}`))(pauseProblem(b))
+    if (wf.where === 'main' && ((b.kind === 'action' && ['ship', 'approve', 'merge'].includes(b.action ?? '')) || (b.kind === 'wait' && !b.pause))) out.push(`${blockName(b)} needs a PR: runs in: worktree`) // a folder's own workspace has no PR of its own
   }
   // blocks that share a tab start it once, in the first one's mode: another mode there needs a tab of its own
   const first = new Map<string, Block>()
@@ -925,7 +991,7 @@ export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, are
     if (b.kind === 'agent' || b.kind === 'llm') at('answer', (b.kind === 'llm' ? (b.json ?? !!b.out?.length) : b.json) ? 'its answer: one JSON object (JSON mode)' : b.kind === 'agent' ? 'the agent’s answer: its last message this turn' : 'the model’s answer')
     if (b.kind === 'run') at('output', 'the command’s last 80 lines'), at('code', 'its exit code')
     if (b.kind === 'webhook') at('status', 'the HTTP status'), at('output', 'the response')
-    if (b.kind === 'wait') at('output', 'the checks that failed'), at('log', 'the end of the failed checks’ logs (GitHub Actions)')
+    if (b.kind === 'wait' && !b.pause) at('output', 'the checks that failed'), at('log', 'the end of the failed checks’ logs (GitHub Actions)')
     if (b.kind === 'save') at('output', 'the saved file’s path')
     if (b.kind === 'extension') at('data', `its data, fetched now, as JSON; each field of it: steps.${b.id}.<field>`)
     for (const n of OUT_KINDS.includes(b.kind) ? (b.out ?? []) : []) at(n, 'an output it names (out:)')
@@ -1151,6 +1217,7 @@ export type FlowWait =
   | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
   | { kind: 'retry'; until: number } // a bad exit's try again, at until
+  | { kind: 'timer'; until: number } // W9: a wait block's time: it goes on at until (absolute: a restart keeps it), holding nothing meanwhile
   | { kind: 'limit'; tab: string; until?: number }
   | { kind: 'hold'; again?: boolean; end?: string } // Pause after this block: parked before cur (again: its retry, not a new visit), or before the run's end (end: finish's words)
   | { kind: 'agent-ask'; tab: string; question: string; options: string[]; ns: number[]; used?: number } // its agent asks (a permission prompt): options its menu's choices (ns: their numbers), then Stop the run
@@ -1208,14 +1275,14 @@ export type Shown = { at: number; block: string; title: string; body: string }
 // again: another), from its start to its end, the parts it waited on you (an ask, a confirm, a model's or an agent's
 // question) or on a PR's checks (a wait block); a parallel's children and a for-each's or a called workflow's blocks
 // with their block (parent); what it cost. Saved with the run: a restart's resume goes on in the span it cut
-export type SpanWait = { kind: 'you' | 'ci'; start: number; end?: number }
+export type SpanWait = { kind: 'you' | 'ci' | 'timer'; start: number; end?: number; until?: number } // timer: a wait block's time (W9), until: when it goes on
 export type Span = { block: string; parent?: string; start: number; end?: number; waits?: SpanWait[]; cost?: number; c0?: number } // c0: the run's cost as it began (its own: what it grew by)
 export const SPANS_MAX = 500
 // the Time tab's rows: one per block in the order each first started, a block's children under it (depth), each
 // span a segment from its start to its end (a running one's: now), its waits split out of it; from and to are
 // fractions of the run's whole time, so the rows share one axis. you, ci: what of it waited on you, on CI (ms)
-export type BarSeg = { from: number; to: number; kind: 'work' | 'you' | 'ci'; start: number; end: number }
-export type BarRow = { block: string; depth: number; segs: BarSeg[]; start: number; end: number; ms: number; you: number; ci: number; cost?: number; tries: number; running: boolean }
+export type BarSeg = { from: number; to: number; kind: 'work' | 'you' | 'ci' | 'timer'; start: number; end: number; until?: number }
+export type BarRow = { block: string; depth: number; segs: BarSeg[]; start: number; end: number; ms: number; you: number; ci: number; timer: number; cost?: number; tries: number; running: boolean }
 export function barsOf(r: Pick<FlowRun, 'spans' | 'started' | 'ended' | 'cost'>, now: number) {
   const spans = r.spans ?? []
   const t0 = Math.min(r.started, ...spans.map(x => x.start))
@@ -1226,7 +1293,7 @@ export function barsOf(r: Pick<FlowRun, 'spans' | 'started' | 'ended' | 'cost'>,
   let ci = 0
   for (const sp of spans) {
     const end = sp.end ?? r.ended ?? now
-    const row = rows.get(sp.block) ?? (rows.set(sp.block, { block: sp.block, parent: sp.parent, depth: 0, segs: [], start: sp.start, end, ms: 0, you: 0, ci: 0, tries: 0, running: false }).get(sp.block)!)
+    const row = rows.get(sp.block) ?? (rows.set(sp.block, { block: sp.block, parent: sp.parent, depth: 0, segs: [], start: sp.start, end, ms: 0, you: 0, ci: 0, timer: 0, tries: 0, running: false }).get(sp.block)!)
     row.tries++
     row.end = Math.max(row.end, end)
     row.ms += end - sp.start
@@ -1240,9 +1307,10 @@ export function barsOf(r: Pick<FlowRun, 'spans' | 'started' | 'ended' | 'cost'>,
       const b = Math.min(end, w.end ?? end)
       if (b <= a) continue
       work(a)
-      row.segs.push({ from: f(a), to: f(b), kind: w.kind, start: a, end: b })
+      row.segs.push({ from: f(a), to: f(b), kind: w.kind, start: a, end: b, ...(w.until && { until: w.until }) })
       row[w.kind] += b - a
-      w.kind === 'you' ? (you += b - a) : (ci += b - a)
+      if (w.kind === 'you') you += b - a
+      else if (w.kind === 'ci') ci += b - a
       at = b
     }
     work(end)
@@ -1290,6 +1358,7 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.
 - case: <variable or block id>, then its branches in order, the first that holds wins: "- contains|matches|equals "<text>" → <block>", a branch may test another variable ("- steps.size.output equals "0" → <block>"), a number's "- steps.triage.urgent.p >= 0.8 → <block>", a JS expression's "- js: num('steps.triage.urgency') >= 2 && vars['steps.triage.team'] === 'payments' → <block>" (vars: every variable, num(name), json(name)), and "- else → <block>" last (needed). if/elsif/else, or a switch on one value. To route on what an agent found, tell it to answer with one word (only_specs, code…) and test {{steps.<id>.answer}}.
 - action: ship|approve|merge|dev|archive (ship's commit message as "> " lines). ship, approve, merge and archive ask the user first unless "ask first: no". Exits ok, error.
+- wait: for <length> | until <time> | hours work|off: the run waits, holding no agent, tab or budget, then goes on by pass. for: 30m, 2h, 3d; until: 18:00 (the next one), tomorrow 9am, 2026-11-20 14:30; hours work: until the user's working hours (Settings › Workflows, weekdays 09:00–18:00 unless set), at once inside them; hours off: until they end. One of them, ${WAIT_DAYS} days at most. A simulated run skips it.
 - wait: checks: until the workspace's PR's checks pass or fail (timeout: <minutes>). Exits pass, fail. On fail, {{steps.<id>.output}} is the failed checks' names and links, and {{steps.<id>.log}} the end of up to 3 failed GitHub Actions logs, fenced and marked as the PR's own output: data, not instructions.
 - save: <file> in the workspace's storage folder (its Artifacts), its text as "> " lines; or "from: <a file or folder of the workspace>" copied there; or "link: <https URL, {{pr.url}}…>" kept as <file>.url. Exit ok.
 - llm: <an OpenRouter model, e.g. anthropic/claude-sonnet-4.5; empty: Settings › AI's> (system: <its system prompt> · temperature: 0 to 2 · json: yes|no · timeout: <minutes>), the prompt as "> " lines: one call to OpenRouter with the key in Settings › AI, no tools, no agent. json: yes is JSON mode (its answer one JSON object; on by itself with out:). Exits ok, error. {{steps.<id>.answer}}: its answer.

@@ -141,6 +141,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   folder, then `git worktree prune` in its repo) and the data folder (but its `worktrees/` unless picked; Laki AI's
   Keychain items) go in main.ts' `shutdown` (`wipe`), after the sessions end. The user's only, never remote;
   `test/uninstall.test.ts`;
+- `flowWaitEnd` (`id`, `act`: `continue` or `cancel`): a workflow run waiting for a time (W9, a wait block's `timer`) goes on now by pass, or stops; the user's and a phone's, never an agent's (AGENT_NO) nor an answer-level page's;
 - Backup and restore (dataBackup.ts; Settings › General › Backup's `BackupField`, `laki backup`, `laki restore <file.tgz>`):
   `dataBackup` (`file`, a full path, never one already there): the system's `tar -czf`, the archive 0600: `manifest.json`
   first (`laki`, `stateV`: core.ts' `STATE_V`, `made`, `counts`), then `state.json` (the state in memory, without

@@ -296,5 +296,6 @@
 .wf-time-track i { position: absolute; top: 0; bottom: 0; min-width: 2px; border-radius: var(--r-xs); background: var(--accent); }
 .wf-time-track i[data-kind='you'], .wf-time-track i[data-kind='ci'] { background: var(--waiting); }
 .wf-time-track i[data-kind='ci'] { opacity: 0.7; }
-.wf-time-row.running .wf-time-track i:last-child { background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 25%, transparent)); }
+.wf-time-track i[data-kind='timer'] { background: repeating-linear-gradient(-45deg, var(--waiting) 0 var(--sp-1), transparent var(--sp-1) calc(var(--sp-1) * 3)); } /* W9: a wait for a time, hatched */
+.wf-time-row.running .wf-time-track i:last-child:not([data-kind='timer']) { background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 25%, transparent)); }
 .wf-time-end { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -65,7 +65,7 @@ const remindersAt = (r: Reminder, from: number, to: number): { at: number; n: nu
   return timesOf(rule, Math.max(from, r.at), to).flatMap(ats => (ats.length > MANY ? [{ at: ats[0], n: ats.length }] : ats.map(at => ({ at, n: 1 }))))
 }
 
-export function CalendarPage({ schedules, runs, reminders, workspaces, api, onClose }: { schedules: Schedule[]; runs: ScheduleRun[]; reminders: Reminder[]; workspaces: { id: string; name: string }[]; api: CalendarApi; onClose: () => void }) {
+export function CalendarPage({ schedules, runs, reminders, waits = [], workspaces, api, onClose }: { schedules: Schedule[]; runs: ScheduleRun[]; reminders: Reminder[]; waits?: { id: string; name: string; until: number; ws?: string }[]; workspaces: { id: string; name: string }[]; api: CalendarApi; onClose: () => void }) {
   const [mode, setMode] = useState<'week' | 'month'>(() => load('laki.calendar', 'week'))
   const [anchor, setAnchor] = useState(() => Date.now())
   const [form, setForm] = useState<{ at: string; text: string; ws: string; important?: boolean } | null>(null)
@@ -83,12 +83,13 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
     const all: Item[] = [
       ...schedules.flatMap(s => occurrences(s, Math.max(first, Date.now()), end)), // what's coming; what was is the runs
       ...runs.filter(r => r.at >= first && r.at < end).map(r => ({ key: `r:${r.id}`, at: r.at, kind: 'run' as const, text: r.name, tip: runLine(r), ok: r.ok && r.state !== 'failed', icon: runIcon(r), ws: r.ws })),
+      ...waits.filter(w => w.until >= first && w.until < end).map(w => ({ key: `w:${w.id}`, at: w.until, kind: 'task' as const, text: `${w.name} goes on`, tip: 'A workflow run waiting for this time (W9)', ws: w.ws })), // a run waiting more than a day
       ...reminders.flatMap(r => remindersAt(r, first, end).map(x => ({ r, ...x }))).map(({ r, at, n }) => ({ key: `m:${r.id}:${at}`, at, kind: 'reminder' as const, text: n > 1 ? `${r.text} ×${n}` : r.text, tip: [r.every && `repeats: ${r.every} (a tick stops it)`, r.by && `from ${r.by}`, r.ws && workspaces.find(w => w.id === r.ws)?.name].filter(Boolean).join(' · ') || undefined, r, ws: r.ws })),
     ]
     const by = new Map<number, Item[]>()
     for (const i of all.sort((a, b) => a.at - b.at)) by.set(dayOf(i.at), [...(by.get(dayOf(i.at)) ?? []), i])
     return by
-  }, [schedules, runs, reminders, workspaces, first, end])
+  }, [schedules, runs, reminders, waits, workspaces, first, end])
   const move = (n: number) => setAnchor(a => (mode === 'week' ? addDays(a, 7 * n) : new Date(new Date(a).getFullYear(), new Date(a).getMonth() + n, 1).getTime()))
   const today = dayOf(Date.now())
   const title = mode === 'week'

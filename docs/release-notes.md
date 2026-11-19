@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - Back up and restore: Settings › General › *Backup* (or `laki backup` and `laki restore <file.tgz>`) puts your projects, settings, notes, specs, workflows, extensions and Laki AI chats in one file, without keys, sign-ins or logs, and brings them back on another Mac; a restore says what changes first and keeps what was there. [Try it](laki://settings/general?spot=Backup)
+- Workflows can wait: a *Wait* block for a time (*For* 2h, *Until* 18:00, or your *Hours*: until work starts or ends) holds no agent or budget meanwhile, shows hatched in the run's timeline with its end, and its row has *Continue now* and *Cancel*; a wait of more than a day shows in the Calendar.
 - Always ask for: list paths in Settings › the project (migrations, `.github/**`, lockfiles…) and an edit of one, or a command that names one, is always asked, whatever your auto-answer rules say; its card says why. And after you allow the same kind of ask 5 times in a row, Laki offers to make it a rule.
 - Fixed: hovering a finished row in Needs you drew *Changes* and *Seen* over the workspace's name; the name now gives way (cut with …) and the buttons sit beside it.
 

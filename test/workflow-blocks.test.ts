@@ -6,7 +6,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { check, FLOW_ENDED, flowVars, parse, toFile } from '../src/shared/workflow.ts'
+import { check, FLOW_ENDED, flowVars, parse, toFile, waitEnd } from '../src/shared/workflow.ts'
 import { fresh, until } from './helpers.ts'
 
 // parallel: commands (and AI calls, webhooks) at once, join all or any
@@ -223,4 +223,75 @@ test('workflow call: Simulate steps through the called blocks, by their <call>/<
   assert.equal(r.status, 'done')
   assert.deepEqual(r.decisions.map((d: any) => `${d.block}:${d.exit}`), ['start:next', 'sub/start:next', 'sub/name:ok', 'sub/ask:Yes', 'sub/done:ok', 'sub:ok', 'after:ok'])
   assert.ok(r.sim.sent.some((s: any) => s.block === 'sub/name' && s.what === `$ printf '{"title": "%s"}' "x of x"`), "what it would have run, with:'s values in")
+})
+
+// W9: a wait for a time: for, until, hours (the working hours'); check() takes exactly one, 30 days at most
+const WAIT = (line: string) => `# Pause\nWaits.\n\nruns in: main\n\n## start\ninput: task?\nnext: w\n\n## w\n${line}\npass: done\n\n## done\nend: success\n`
+test('workflow wait for a time: for 2h, until 18:00 at 19:00 is tomorrow, work hours on a Saturday are Monday 09:00; one of them, 30 days at most', () => {
+  const at = (y: number, m: number, d: number, h: number, mi = 0) => new Date(y, m - 1, d, h, mi).getTime()
+  const fri19 = at(2026, 11, 20, 19) // a Friday
+  assert.equal(waitEnd({ for: '2h' }, fri19), fri19 + 2 * 3600000)
+  assert.equal(waitEnd({ for: '3d' }, fri19), fri19 + 3 * 86400000)
+  assert.equal(waitEnd({ until: '18:00' }, fri19), at(2026, 11, 21, 18))
+  assert.equal(waitEnd({ until: '18:00' }, at(2026, 11, 20, 9)), at(2026, 11, 20, 18))
+  assert.equal(waitEnd({ hours: 'work' }, at(2026, 11, 21, 11)), at(2026, 11, 23, 9)) // Saturday: Monday 09:00
+  assert.equal(waitEnd({ hours: 'work' }, at(2026, 11, 20, 10)), at(2026, 11, 20, 10)) // inside them: at once
+  assert.equal(waitEnd({ hours: 'off' }, at(2026, 11, 20, 10)), at(2026, 11, 20, 18))
+  assert.equal(waitEnd({ hours: 'work' }, at(2026, 11, 21, 11), { days: [6], from: '08:00', to: '12:00' }), at(2026, 11, 21, 11)) // yours: Saturdays
+  assert.match((waitEnd({ for: '31d' }, fri19) as { error: string }).error, /30 days at most/)
+  assert.match((waitEnd({ for: '2h', until: '18:00' }, fri19) as { error: string }).error, /one of for, until/)
+  for (const line of ['wait: for 2h', 'wait: until 18:00', 'wait: hours work', 'wait: hours off']) {
+    const { workflow, problems } = parse(WAIT(line), 'pause')
+    assert.deepEqual([problems, check(workflow)], [[], []], line)
+    assert.match(toFile(workflow), new RegExp(`^${line}$`, 'm'))
+  }
+  const several = parse(WAIT('wait: for 2h\nuntil: 18:00'), 'pause').workflow
+  assert.deepEqual(check(several), ['w: wait one of checks, for, until, hours, not for and until'])
+  assert.deepEqual(check(parse(WAIT('wait: for 45d'), 'pause').workflow), ['w: wait for 45d? 30 days at most'])
+  assert.deepEqual(check({ ...several, blocks: several.blocks.map(b => (b.id === 'w' ? { ...b, pause: {} } : b)) }), ['w: wait for, until or hours: how long it waits (or checks)'])
+})
+
+test('workflow wait for a time: the run waits holding nothing, goes on at its time, after a restart at once, by Continue now; Cancel stops it; never an agent’s', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('flowSave', { id: 'pause', text: WAIT('wait: for 2h') })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const start = async () => {
+    const run = await rig.rpc('flowStart', { workflow: 'pause', project: p.id })
+    return until(async () => (x => x.status === 'waiting' && x.wait?.kind === 'timer' && x)(await get(run.id)), 'it waits')
+  }
+  // for 2h: still waiting an hour on, on at two
+  let r = await start()
+  assert.ok(Math.abs(r.wait.until - (Date.now() + 2 * 3600000)) < 60000, 'two hours from now')
+  assert.match(r.log.join('\n'), /waits until .* \(for 2h\)/)
+  await rig.rpc('flowTick', { now: Date.now() + 3600000 })
+  assert.equal((await get(r.id)).status, 'waiting')
+  await rig.rpc('flowTick', { now: r.wait.until + 1000 })
+  assert.equal((await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(r.id)), 'on at two hours')).status, 'done')
+  assert.ok(!(await get(r.id)).spent || (await get(r.id)).spent < 60000, 'the wait is no working time')
+  // an agent can't continue or cancel it; you can
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const from = { ws: ws.id, tab: (await until(() => rig.tab(ws.id))).id }
+  r = await start()
+  await assert.rejects(rig.rpc('flowWaitEnd', { id: r.id, act: 'continue', from }), /an agent can't continue or cancel a workflow run's wait/)
+  await assert.rejects(rig.rpc('flowWaitEnd', { id: r.id, act: 'cancel', from }), /an agent can't continue or cancel/)
+  await rig.rpc('flowWaitEnd', { id: r.id, act: 'continue' })
+  assert.equal((await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(r.id)), 'continued')).status, 'done')
+  r = await start()
+  await rig.rpc('flowWaitEnd', { id: r.id, act: 'cancel' })
+  assert.equal((await get(r.id)).status, 'stopped')
+  // a simulated run skips it, and says so
+  const sim = await rig.rpc('flowStart', { workflow: 'pause', project: p.id, simulate: {} })
+  const simmed = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(sim.id)), 'the simulation ends')
+  assert.match(simmed.log.join('\n'), /wait for 2h: skipped \(simulated\)/)
+  // a restart past its time: on at once (once the agents' tabs had their moment)
+  r = await start()
+  await rig.stop()
+  const f = join(rig.data, 'state.json')
+  const s = JSON.parse(readFileSync(f, 'utf8'))
+  s.flows.find((x: { id: string }) => x.id === r.id).wait.until = Date.now() - 1000
+  writeFileSync(f, JSON.stringify(s))
+  await rig.start()
+  assert.equal((await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(r.id)), 'on after the restart', 30000)).status, 'done')
+  assert.match((await get(r.id)).log.join('\n'), /waited until/)
 })

@@ -3448,7 +3448,7 @@ export function App() {
   const toSpecs = () => setDialog(d => (specsOf(d) ? null : { specs: '' }))
   const SPECS_TIP = 'Specs & Brainstorms: requirements to implement, ideas to explore with Laki AI'
   const toFlows = () => setDialog(d => (flowsOf(d) ? null : { workflows: '' }))
-  const flowsAsk = (view?.flows ?? []).filter(r => r.status === 'waiting').length
+  const flowsAsk = (view?.flows ?? []).filter(r => r.status === 'waiting' && r.wait?.kind !== 'timer').length // W9: a wait for a time asks nothing
   const FLOWS_TIP = `Workflows: blocks Laki runs for a task${flowsAsk ? ` · ${flowsAsk} ask${flowsAsk > 1 ? '' : 's'} you` : ''}`
   const calOn = settings.calendar !== false // Settings › General › Pages
   const toCal = () => setDialog(d => (d === 'calendar' ? null : 'calendar'))
