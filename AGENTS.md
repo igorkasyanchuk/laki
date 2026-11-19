@@ -61,7 +61,9 @@ npm run dev                       # Electron + renderer dev server on :5199
   windows) fail quietly or fall back. The AppImage's starter is AppImage's static type2 runtime
   (`build.toolsets.appimage`, electron-builder's `1.0.3`): no libfuse2, and on arm64 no `libz.so` (the old toolset's
   wanted both; Ubuntu has neither by default). Tried on Ubuntu 24.04 arm64 (a live session) with `--no-sandbox`.
-- `npm run test:ui` (`scripts/ui-smoke.ts`): a demo world of its own, the built app (`out/`) in Electron with
+- `npm run test:ui` (`scripts/ui-smoke.ts`): first a short launch of its own on an empty data folder (no state.json, no
+  project; its daemon the app's own, `test/fakes` first on PATH; main's `LAKI_SMOKE_FIRST`, `firstRun`): the Welcome
+  screen, then *Try it on a sample repo* lands on New workspace with the sample's task (`first-*.png`). Then a demo world of its own, the built app (`out/`) in Electron with
   `--laki-smoke=<dir>` (main's `uiSmoke`): Projects, Reader, the Review tab, New workspace, Settings, Board, Schedule,
   AI, Workflows and ⌘K, each opened (its laki:// link, a click, a key), a selector of its own waited for, failed by
   ui.tsx' Boundary (`.boom`) or a console error; a screenshot each. Then the flows (E3), each done as you would (a right

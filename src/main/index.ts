@@ -371,6 +371,12 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       for (const p of (await rpc<View>('state')).projects) await rpc('projectRm', { id: p.id }).catch(() => {})
     }, async () => (await has('.welcome')) && (await hasText('.welcome-checks .check', 'not signed in')) && (await hasText('.welcome-checks button', 'Sign in')) && (await has('.welcome-ready'))],
   ]
+  // the first run (LAKI_SMOKE_FIRST, ui-smoke.ts' own short launch on an empty data folder, before the demo's): Welcome,
+  // then Try it on a sample repo lands on New workspace with the sample's task (0.49.1's fix: it ended on Laki hit an error)
+  const firstRun: typeof steps = [
+    ['first-welcome', null, '.welcome'],
+    ['first-sample', () => clickText('.welcome button', 'Try it on a sample repo'), async () => (await has('.nw-composer')) && (await js<boolean>("[...document.querySelectorAll('.nw-composer textarea')].some(t => t.value.includes('Fix the failing test'))"))],
+  ]
   // M1: the rich demo world (LAKI_DEMO_RICH): the README's stills instead of the walk, each in Laki's two themes (dark,
   // then light): Needs you with its answer buttons, a workspace's Done check and Collision radar, the phone's view
   const readme: typeof steps = []
@@ -456,8 +462,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const out: { name: string; ok: boolean; ms: number; why?: string; facts?: { clipped: string[]; over: string[] } }[] = []
   // E8: the page's start to its first sidebar row painted (main.tsx' mark): what a lazy page saves shows here
   const first = await js<number>("performance.getEntriesByName('laki-sidebar')[0]?.startTime ?? -1").catch(() => -1)
-  out.push({ name: 'first-row', ok: first >= 0, ms: Math.round(first), ...(first < 0 && { why: 'no laki-sidebar mark' }) })
-  for (const [i, [name, go, sel]] of (sheet.length ? sheet : readme.length ? readme : steps).entries()) {
+  if (!process.env.LAKI_SMOKE_FIRST) out.push({ name: 'first-row', ok: first >= 0, ms: Math.round(first), ...(first < 0 && { why: 'no laki-sidebar mark' }) }) // Welcome has no row
+  for (const [i, [name, go, sel]] of (process.env.LAKI_SMOKE_FIRST ? firstRun : sheet.length ? sheet : readme.length ? readme : steps).entries()) {
     const at = Date.now()
     const seen = errors.length
     let why: string | undefined
