@@ -6,7 +6,7 @@
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
-import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, release, tmpdir, userInfo } from 'node:os'
 import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -342,7 +342,7 @@ export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boole
 // S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles); globs:
 // state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp). Its Bash and the
 // wrapper sandbox (wrapCmd) hide the whole folder instead
-const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'daemon.log']
+const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'agent-log', 'review-notes', 'background', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -549,12 +549,11 @@ const MEMORY_SAYS = 2000
 export const REPO_NOTES = join('.laki', 'notes.md')
 export const REPO_MEMORY = join('.laki', 'memory.md')
 export const inRepo = (p?: Project) => !!p?.inRepo && !p.host && !p.kind
-// .laki or its file as a link (a branch's .laki/memory.md -> ~/.zshrc, or .laki -> ~): never read or written through it,
-// a repo's or an agent's worktree's links are anyone's. ponytail: a link swapped in between the check and the write;
-// O_NOFOLLOW guards the file, so only a notes.md or memory.md in another folder could be hit
+// .laki or its file as a link (a branch's .laki/memory.md -> ~/.zshrc, or .laki -> ~; a hard link an agent made in its
+// worktree): never read or written through it, a repo's or an agent's worktree's links are anyone's
 const LINKED = (rel: string) => `${rel} or its folder is a link (to a file elsewhere?): not written`
 function repoFile(root: string, rel: string): string | undefined {
-  const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile()))(lstatSync(p, { throwIfNoEntry: false }))
+  const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile() && s.nlink === 1))(lstatSync(p, { throwIfNoEntry: false }))
   return not(join(root, dirname(rel)), true) || not(join(root, rel), false) ? undefined : join(root, rel)
 }
 const repoRead = (root: string, rel: string) => {
@@ -565,13 +564,19 @@ const repoRead = (root: string, rel: string) => {
     return undefined
   }
 }
+// opened without O_TRUNC, then emptied only once it's still the file checked in a folder of its own (.laki swapped for a
+// link meanwhile: refused, nothing emptied). ponytail: a swap there and back between that check and the write
 function repoWrite(root: string, rel: string, text: string) {
   if (!repoFile(root, rel)) throw new Error(LINKED(rel))
   mkdirSync(join(root, dirname(rel)), { recursive: true })
   const f = repoFile(root, rel)
   if (!f) throw new Error(LINKED(rel))
-  const fd = openSync(f, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | fsConstants.O_NOFOLLOW, 0o644)
+  const fd = openSync(f, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o644)
   try {
+    const at = fstatSync(fd)
+    const now = lstatSync(f, { throwIfNoEntry: false })
+    if (!repoFile(root, rel) || !now || now.ino !== at.ino || now.dev !== at.dev || at.nlink !== 1) throw new Error(LINKED(rel))
+    ftruncateSync(fd)
     writeFileSync(fd, text)
   } finally {
     closeSync(fd)
@@ -1890,7 +1895,7 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     tmp: [realOf('/tmp'), dirname(realOf(tmpdir()))],
     write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
     data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
-    allowRead: [...wrapReads(), ...(account ? [account] : [])].map(realOf),
+    allowRead: [...wrapReads(), ...(account ? [account] : []), ...(p => (p ? [p.path] : []))(state.projects.find(p => p.id === ws.project))].map(realOf), // its project's checkout: a repo in the data folder (the sample) has its git config there
     net: presetOf(tab)?.net, // ponytail: not applied yet: the network stays as it is
   })
   const out: Record<string, string> = { ...env, LAKI_SB_PROFILE: text, LAKI_SB_CMD: line, ...(daemonPort && { LAKI_DAEMON_PORT: String(daemonPort) }) }

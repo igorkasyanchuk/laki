@@ -3035,7 +3035,7 @@ export function SettingsPage(p: {
                         {pr.agent !== 'command' && /Mac/.test(navigator.userAgent) && !(SANDBOX[pr.agent as Agent] && pr.sandbox) && (
                           // the macOS wrapper sandbox (shared/wrap.ts): only where its own sandbox is off or none
                           <Switch className="switch-row" on={pr.wrap === 'macos'} onChange={on => setPreset(i, { wrap: on ? 'macos' : undefined })}>
-                            <Says title="Wrapper sandbox (macOS)" hint="Runs it under sandbox-exec: it writes only in its worktree, git's folder, temp folders and its own settings, and can't read ~/.ssh, ~/.aws, your keychains or other agents' settings. Apple marks sandbox-exec deprecated" />
+                            <Says title="Wrapper sandbox (macOS)" hint="Runs it under sandbox-exec: it writes only in its worktree, git's folder, temp folders and its own settings, and can't read ~/.ssh, ~/.aws, your keychains, other agents' settings or Laki's own data. Apple marks sandbox-exec deprecated" />
                           </Switch>
                         )}
                         {pr.sandbox && NET_OK[pr.agent as Agent] && !sandboxOff(pr.agent, pr.perm, pr.args) && (

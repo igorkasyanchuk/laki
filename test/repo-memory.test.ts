@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { memoryParse, memoryText } from '../src/daemon/core.ts'
@@ -78,4 +78,11 @@ test("B6: a repo's .laki/memory.md or .laki as a link (to ~/.zshrc, to ~) is nev
   symlinkSync(away, join(rig.repo, '.laki'))
   await assert.rejects(rig.rpc('projectSet', { id: p.id, memory: [{ id: 'team1', text: 'Use pnpm', at: 1 }] }), /is a link/)
   assert.ok(!existsSync(join(away, 'memory.md')))
+  // a hard link (an agent's, in its worktree): neither
+  unlinkSync(join(rig.repo, '.laki')) // the link, not its folder
+  mkdirSync(join(rig.repo, '.laki'))
+  linkSync(rc, join(rig.repo, '.laki/memory.md'))
+  assert.equal((await proj()).memory, undefined, 'not read')
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, memory: [{ id: 'team1', text: 'Use pnpm', at: 1 }] }), /is a link/)
+  assert.equal(readFileSync(rc, 'utf8'), '- 2026-11-18 · rc1 · export SECRET=1\n', 'yours as it was')
 })

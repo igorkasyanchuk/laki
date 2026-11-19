@@ -310,7 +310,8 @@ of its text). The view's project `notes` and `memory` are the checkout's files t
 were: switching moves nothing). `memoryRoot`: an agent's workspace's own folder for its start (`memoryNote`'s `root`),
 `memoryAdd` and `memoryRm` (their `tab`), else the checkout; memory.ts' compaction and Laki AI read and write it too.
 `.laki` or a file in it as a link (a branch's `.laki/memory.md -> ~/.zshrc`) is never read or written through
-(`repoFile`, `repoWrite`: lstat, then `O_NOFOLLOW`; a write says it's a link). `test/repo-memory.test.ts`.
+(`repoFile`, `repoWrite`: lstat, one link only (no hard link), then `O_NOFOLLOW` without `O_TRUNC`, emptied once the open
+file is still the one checked; a write says it's a link). `test/repo-memory.test.ts`.
 
 Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
@@ -465,7 +466,8 @@ but the worktree, `gitWrites`' folders, /tmp and $TMPDIR's folder, the agent's o
 account's folder, claude's status line folder; deny reads of Laki's whole data folder (`file-read-data` only: its files
 and listings, never a stat, so a worktree or storage folder in it is still walked to; trusted clients' tokens and any
 secret added later too), read back what it works in that's in it and `wrapReads` (claude's settings and plugin, gemini's
-settings, opencode's folder, statusline.sh, pasted `images/` and `files/`) and its account's folder; then deny reads of
+settings, opencode's folder, statusline.sh, pasted `images/` and `files/`), its account's folder and its project's
+checkout (a repo in the data folder, the sample: git reads its `.git`); then deny reads of
 `SECRET_HOME` and every other agent's folders (as `file-read*` and `file-read-data` both: macOS gives a `file-read-data`
 rule the win over a `file-read*` one, wherever it is); each path `realOf` (realpath, or its nearest folder's) and a
 `-D P<n>=<path>` (`test/units-more.test.ts` runs the profile under the real sandbox-exec). The network as it is (`net` not applied yet). `LAKI_DAEMON_PORT` in its env: its laki calls go with its

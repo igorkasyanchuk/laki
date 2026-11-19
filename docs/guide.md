@@ -2509,8 +2509,8 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   --net all|list|off` does the same. *Wrapper sandbox (macOS)*, for an agent with no sandbox of its own on (OpenCode;
   Gemini CLI and Grok with theirs off; Claude Code or Codex with *Sandbox* off), starts it under macOS's
   `sandbox-exec`: it writes only in its worktree, git's folder, the temp folders, its storage folder and its own
-  settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `gh`'s config, your keychains or other agents' settings (its
-  network stays as it is). A new Gemini, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
+  settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `gh`'s config, your keychains, other agents' settings or
+  Laki's own data but what it works in (its network stays as it is). A new Gemini, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
   in Needs you with *Restart without the wrapper* (the profile keeps it). `laki preset set <name> --wrap` (`--no-wrap`)
   does the same. Apple marks `sandbox-exec` deprecated. *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
