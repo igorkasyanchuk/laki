@@ -1072,8 +1072,11 @@ numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). 
 restyle of the whole window), nothing in the terminal: hover colors and a press's `scale: 0.985` on rows, tabs and
 buttons; the side panel and the sidebar coming in; `.overlay` fading and `.menu`, `.modal` (⌘K is one), `.toast`
 scaling in (`v-in`, 6px and 0.97); `.tip` fading; a Needs you card arriving; a row that starts to need you (`b-lit`); a
-waiting glyph breathing (opacity, 1.8 s); a glyph turning done ticking once (Glyph.tsx `g-pop`, 400 ms, from the render
-where its status changed: not as it's first drawn); a new row or tab growing in (`v-new`: motion.ts `fresh(id)`, an id
+waiting glyph breathing (opacity, 1.8 s); a status mark's one-shot effect (V7b, Glyph.tsx `useFx`, glyphFx.ts `fxOf`: `data-fx` done, ask
+or err for 400 ms as its status changes while it's drawn, never as it's first drawn or remounted; the sidebar's rows,
+a tab's mark and the rest that draw a `Glyph`): done grows in with an overshoot (`fx-done`, a check draws itself:
+`fx-draw`), and with Motion: high an ask nods 3px (`fx-ask`) and an error shakes 2px twice (`fx-err`); transform and
+opacity only; test:ui's `flow-archive-undo` checks none is left a second on; a new row or tab growing in (`v-new`: motion.ts `fresh(id)`, an id
 not seen since App's first view, `settle`; a drag reorders keyed elements, so nothing replays). Leaving: motion.ts
 `exits` watches the body for a removed `.menu-backdrop`, `.menu`, `.overlay`, `.tip` or `.toast` (all `position:
 fixed`, so a copy takes no room) and puts an inert copy back with `.leaving` (120 ms out, `!important` over Motion:

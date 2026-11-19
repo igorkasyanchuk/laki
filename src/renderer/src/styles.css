@@ -3706,7 +3706,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
    frame); nothing in the terminal. Hover and press on rows, tabs and buttons; menus, ⌘K, dialogs, tooltips and toasts
    scale in, and fade out faster (motion.ts' exits: a copy of what React removed, .leaving); the side panel and the
    sidebar come in (in the flow: no way out); a new row or tab grows in (motion.ts' fresh: not one seen before, never a
-   drag); a status that needs you breathes, one that ends ticks once (Glyph.tsx' g-pop). Off under Motion: Off (above) and
+   drag); a status that needs you breathes, one that ends ticks once (Glyph.tsx' data-fx; with Motion: high an ask nods and an error shakes). Off under Motion: Off (above) and
    the system's Reduce motion (the media query, and the catch-all further up) */
 :root { --t-fast: 120ms; --t-mid: 200ms; --t-slow: 320ms; --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); --ease: var(--ease-out); }
 /* V14: springs, as linear() sampled from one (scripts/spring.ts): --spring overshoots and settles (small things that
@@ -3725,6 +3725,12 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 @keyframes v-tab { from { opacity: 0; scale: 0.6 1; } }
 @keyframes v-breathe { 50% { opacity: 0.4; } }
 @keyframes v-tick { 0% { scale: 0.4; opacity: 0; } 60% { scale: 1.35; opacity: 1; } }
+/* V7b: a status mark's one-shot effects (Glyph.tsx' data-fx, 400 ms): done grows in with a small overshoot (a check
+   draws itself), ask nods up 3px once, err shakes 2px twice; transform and opacity only, never a loop */
+@keyframes fx-done { 0% { transform: scale(0.6); opacity: 0.5; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes fx-draw { from { stroke-dashoffset: 22; } }
+@keyframes fx-ask { 50% { transform: translateY(-3px); } }
+@keyframes fx-err { 20%, 60% { transform: translateX(-2px); } 40%, 80% { transform: translateX(2px); } }
 .leaving { pointer-events: none !important; animation: v-fade-out var(--t-fast) var(--ease-out) forwards !important; } /* !important: over an element's own (Motion: high's) */
 .leaving:is(.menu, .toast), .leaving :is(.menu, .modal) { animation: v-out var(--t-fast) var(--ease-out) forwards !important; }
 @media (prefers-reduced-motion: no-preference) {
@@ -3748,9 +3754,12 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   :where(.ws.v-new) { animation: v-row var(--t-mid) var(--ease-out); transform-origin: top; }
   :where(.tab.v-new) { animation: v-tab var(--t-mid) var(--ease-out); transform-origin: left; }
   :where(.glyph.g-waiting) { animation: v-breathe 1.8s ease-in-out infinite; }
-  :where(.glyph.g-pop) { animation: v-tick 400ms var(--ease-pop); }
+  :where(.glyph[data-fx='done']) { animation: fx-done var(--t-slow) var(--ease-pop); }
+  :where(.glyph[data-fx='done']:is(.g-ok, .g-finished) path) { stroke-dasharray: 22; animation: fx-draw var(--t-slow) var(--ease-out); }
+  :where(html[data-motion='high'] .glyph[data-fx='ask']) { animation: fx-ask var(--t-slow) var(--ease-out); } /* Motion: low (unset), only done */
+  :where(html[data-motion='high'] .glyph[data-fx='err']) { animation: fx-err var(--t-slow) linear; }
 }
-html.away :is(.sidebar, .side-panel, .overlay, .menu, .modal, .toast, .needs-cards > div, .needs-cards > button, .ws.needs, .ws.v-new, .tab.v-new, .glyph.g-pop) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
+html.away :is(.sidebar, .side-panel, .overlay, .menu, .modal, .toast, .needs-cards > div, .needs-cards > button, .ws.needs, .ws.v-new, .tab.v-new, .glyph[data-fx], .glyph[data-fx] path) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
 
 /* V9: the window behind another app (html.away: main's 'front'): the accent's fills, the picked row and the focus ring
    go to a neutral, as AppKit's do when a window isn't key. The accent as text (links: --accent-ink, resolved on <html>)

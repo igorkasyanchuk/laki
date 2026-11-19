@@ -182,7 +182,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await pick(row(ws.dark.id), 'Archive workspace')
     }, () => hasText('.ask-box', 'notes.txt')],
     ['flow-archived', () => answer('Archive'), async () => (await has('.toast-undo')) && !(await has(row(ws.dark.id)))],
-    ['flow-archive-undo', click('.toast-undo'), async () => (await has(row(ws.dark.id))) && !(await named('dark-mode')).archived],
+    ['flow-archive-undo', click('.toast-undo'), async () => (await has(row(ws.dark.id))) && !(await named('dark-mode')).archived && (await nap(1000), !(await has(`${row(ws.dark.id)} [data-fx]`)))], // V7b: its mark's effect gone after a second
     // (c) the Review tab: a file reverted, then Undo
     ['flow-revert', async () => {
       ws.cart = await named('fix-cart-total')
