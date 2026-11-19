@@ -391,6 +391,8 @@ export function useSayWhy(ask: Ask | undefined, answer: (n: number, label: strin
   const no = ask ? denyOf(ask) : undefined
   const clear = () => clearTimeout(timer.current)
   useEffect(() => clear, [])
+  const which = ask && `${ask.question ?? ''}\n${ask.what ?? ''}\n${ask.options.map(o => o.label).join('\n')}`
+  useEffect(() => setOpen(false), [which]) // another question now: the words were for the last one
   const on = (o: { n: number; label: string }) => ({
     onClick: (e: MouseEvent) => {
       if (long.current) return void (long.current = false) // a long press's own release

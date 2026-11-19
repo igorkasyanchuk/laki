@@ -151,7 +151,7 @@ contextBridge.exposeInMainWorld('laki', {
     // down, sent (no tab: a new task), taken back from a queue, closed
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
-    onTalkSpeak: (cb: (text: string) => void) => ipcRenderer.on('talk-speak', (_e, t) => typeof t === 'string' && cb(t)), // Laki AI's answer, to read out
+    onTalkSpeak: (cb: (text: string) => void) => ipcRenderer.on('talk-speak', (_e, t) => typeof t === 'string' && cb(t)), // Laki AI's answer, to read out ('': none)
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
     talkSend: (tab: string, text: string, project?: string, selection?: boolean): Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project, selection), // Q10: shot: the screen went with it to Laki AI; Q11: selection: with the selection main has (the pill's × leaves it out)
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),

@@ -840,10 +840,11 @@ export async function promptQuestions(p: { project?: unknown; prompt?: unknown }
 // length; anything else dropped
 export function questionsOf(text: string): { q: string; choices: string[] }[] {
   let j: unknown
-  try {
-    j = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] ?? '')
-  } catch {
-    return []
+  for (const t of [text.trim(), /```(?:json)?\s*([\s\S]*?)```/.exec(text)?.[1], /\{[\s\S]*\}/.exec(text)?.[0]]) {
+    try {
+      j = JSON.parse(t ?? '')
+      break
+    } catch {}
   }
   const list = (j as { questions?: unknown })?.questions
   const cut = (s: unknown, n: number) => (typeof s === 'string' ? (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ').trim()) : '')

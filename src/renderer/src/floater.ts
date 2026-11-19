@@ -780,6 +780,7 @@ function talkPage() {
   bridge?.onTalkSpeak?.(text => {
     if (phase !== 'speak') return
     clearTimeout(waitSpeak)
+    if (!text) return close() // nothing to read out (code, a link) or no answer: it's on the AI page
     const u = new SpeechSynthesisUtterance(text)
     const l = langOf(text, navigator.languages)
     const v = l && speechSynthesis.getVoices().find(x => x.lang.toLowerCase().split(/[-_]/)[0] === l.toLowerCase().split('-')[0])

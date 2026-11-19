@@ -228,9 +228,10 @@ process.stdin.on('data', d => {
     for (const k of keys) {
       if (k === '\r') {
         const pick = MENU[menu - 1]
+        const gone = /tell Claude what to do differently/.test(pick) ? `\x1b[${MENU.length}A\x1b[J` : '' // as the real one: that choice is its Esc, the menu goes
         menu = 0
         MENU = MENU0
-        process.stdout.write(`picked: ${pick}\r\n> `)
+        process.stdout.write(`${gone}picked: ${pick}\r\n> `)
         return hook('Stop', { last_assistant_message: `picked: ${pick}` })
       }
       menu = k.endsWith('B') ? Math.min(MENU.length, menu + 1) : Math.max(1, menu - 1)

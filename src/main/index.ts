@@ -868,9 +868,9 @@ function create(hidden = false) {
     },
   })
   win.once('ready-to-show', () => {
-    if (hidden) return // opened at login: made, not shown (the Dock icon or the menu bar's Open shows it)
-    if (!at || at.max) win?.maximize()
-    if (at?.full) win?.setFullScreen(true)
+    const place = () => (!at || at.max ? win?.maximize() : undefined, at?.full && win?.setFullScreen(true)) // either shows it
+    if (hidden) return void win?.once('show', place) // opened at login: made, not shown (the Dock icon or the menu bar's Open shows it), placed then
+    place()
     win?.show()
   })
   for (const e of ['resize', 'move', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'] as const) win.on(e as 'resize', keepWin)
@@ -2497,7 +2497,7 @@ const TALK = { width: 320, height: 78 }
 // Laki AI asked in the background (its chat has the answer: the AI page); only while it's on. Settings › AI › Show its
 // work (aiShow, on unless off): its window opens with the ask (Q13: what it does, its Yes / No, without the app)
 // spoken: the talk pill's (aiTalk): its answer's first sentences to the pill, read out there while it's open (speakable)
-const aiAsked = (text: string, images?: string[], spoken = false) => (floats.ai ? (void rpc<{ text?: string }>('aiAsk', { text, ...(images && { images }) }).then(r => (s => s && spoken && floats.speak && talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-speak', s))(typeof r?.text === 'string' ? speakable(r.text) : ''), () => {}), floats.aiShow && setTimeout(aiWin, 300), { ai: true, ...(spoken && floats.speak && { speak: true }) }) : { error: 'Laki AI is off: Settings › AI' })
+const aiAsked = (text: string, images?: string[], spoken = false) => (floats.ai ? (void rpc<{ text?: string }>('aiAsk', { text, ...(images && { images }) }).then(r => (typeof r?.text === 'string' ? speakable(r.text) : ''), () => '').then(s => spoken && floats.speak && talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-speak', s)), floats.aiShow && setTimeout(aiWin, 300), { ai: true, ...(spoken && floats.speak && { speak: true }) }) : { error: 'Laki AI is off: Settings › AI' })
 // Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
 // (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
 async function aiTalk(said: string, text = said): Promise<{ ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string; error?: string }> {

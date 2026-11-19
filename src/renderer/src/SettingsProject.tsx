@@ -131,7 +131,7 @@ export type ProjectInfo = { id: string; name: string; path: string; git: boolean
 // not yet. A name that isn't one yet (typing) is kept here and saved once it is: projectSet refuses the list otherwise
 function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; profiles: { name: string; agent: string }[]; onChange: (l: McpServer[]) => void }) {
   const [rows, setRows] = useState<McpServer[]>(list)
-  const put = (l: McpServer[]) => (setRows(l), l.every(s => MCP_NAME.test(s.name) && (s.command?.trim() || s.url?.trim())) && new Set(l.map(s => s.name)).size === l.length && onChange(l))
+  const put = (l: McpServer[]) => (setRows(l), l.every(s => MCP_NAME.test(s.name) && (s.command?.trim() || s.url?.trim())) && new Set(l.map(s => s.name)).size === l.length && onChange(l.map(s => (s.args ? { ...s, args: s.args.map(a => a.trim()).filter(Boolean) } : s)))) // args' empty lines: kept while typing, never saved
   const set = (i: number, x: Partial<McpServer>) => put(rows.map((s, n) => (n === i ? { ...s, ...x } : s)))
   const not = [...new Set(profiles.filter(x => !MCP_AGENTS.includes(x.agent) && x.agent !== 'command').map(x => AGENT_NAMES[x.agent as Agent] ?? x.agent))]
   return (
@@ -145,7 +145,7 @@ function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; pro
           </div>
           {!s.url && (
             <>
-              <textarea className="mono" rows={2} value={(s.args ?? []).join('\n')} aria-label="Arguments" placeholder="Arguments, one per line" spellCheck={false} onChange={e => set(i, { args: e.target.value.split('\n').filter(Boolean) })} />
+              <textarea className="mono" rows={2} value={(s.args ?? []).join('\n')} aria-label="Arguments" placeholder="Arguments, one per line" spellCheck={false} onChange={e => set(i, { args: e.target.value.split('\n') })} />
               <EnvField value={s.env} placeholder="Its env: KEY=value, one per line (shown as •••• once saved)" onChange={env => set(i, { env })} />
             </>
           )}
