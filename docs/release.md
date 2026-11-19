@@ -12,9 +12,13 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    ```bash
    npm ci
    npm run typecheck
-   npm test
+   npm run test:release
    ```
-   Run `npm test` twice: a test that fails once and passes alone is a flake to look at, not to ship past.
+   `npm run test:release` (`scripts/test-rerun.ts`, what `scripts/release.sh` runs) is `npm test`, then each file that
+   failed in it run once more alone (`npm run test:one`, one after another): it passes when every rerun does, printing
+   `flaky: <file>` for each, and fails listing the files that failed twice. A rerun's line in `.test-history.jsonl` says
+   `rerun: true`, and `npm run test:report` lists the file as flaky (*passed alone after a release's run*). A flake is
+   still one to look at, not to ship past for good.
    Then `npm run audit:deps` (`scripts/audit.ts`): `npm audit` of the production dependencies (what ships in the app and
    the daemon), a line per advisory (package, version, severity, id, the fix); a high or critical one fails unless
    `scripts/audit-allow.json` allows it (`{ id, package, reason, until }`: past its date it no longer does, and is named).

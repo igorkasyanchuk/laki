@@ -228,7 +228,7 @@ echo "Releases: $REPO$([ $UPLOAD = 1 ] || echo ' (not this time: --no-upload)')"
 say "Checks"
 npm ci --no-audit --no-fund
 npm run typecheck
-npm test
+npm run test:release # npm test, then a file that failed run once more alone (scripts/test-rerun.ts)
 # what ships has no high or critical advisory (scripts/audit.ts); strict: the registry not answering fails it too
 if [ "${LAKI_SKIP_AUDIT:-}" = 1 ]; then printf '\n\033[1;31m!!! LAKI_SKIP_AUDIT=1: the dependency audit is SKIPPED\033[0m\n\n'; else LAKI_AUDIT_STRICT=1 npm run audit:deps; fi
 

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export type Run = { date: string; sha: string; file: string; ms: number; pass: boolean; failed?: string[]; slow?: number; load?: number }
+export type Run = { date: string; sha: string; file: string; ms: number; pass: boolean; failed?: string[]; slow?: number; load?: number; rerun?: boolean } // rerun: npm run test:release's second try, alone (test-rerun.ts)
 export const HISTORY = '.test-history.jsonl'
 export const HISTORY_MAX = 5000
 const LAST = 20
@@ -28,7 +28,7 @@ export const median = (xs: number[]) => {
 }
 export type Report = {
   slow: { file: string; median: number; runs: number; over: boolean }[]
-  flaky: { file: string; runs: number; fails: number; shas?: string[]; tests: { name: string; fails: number; sameSha?: boolean }[] }[]
+  flaky: { file: string; runs: number; fails: number; shas?: string[]; reruns?: number; tests: { name: string; fails: number; sameSha?: boolean }[] }[] // reruns: how often a release's rerun (test:release) passed it
 }
 export function report(runs: Run[], last = LAST): Report {
   const by = new Map<string, Run[]>()
@@ -41,14 +41,15 @@ export function report(runs: Run[], last = LAST): Report {
   for (const [file, rs] of by) {
     const recent = rs.slice(-last)
     const fails = recent.filter(r => !r.pass).length
+    const reruns = recent.filter(r => r.rerun && r.pass).length
     const onSha = (sha: string) => rs.filter(r => r.sha === sha)
     const shas = [...new Set(rs.map(r => r.sha))].filter(sha => onSha(sha).some(r => r.pass) && onSha(sha).some(r => !r.pass))
-    if (!shas.length && !(fails > 0 && fails < recent.length / 3)) continue
+    if (!shas.length && !reruns && !(fails > 0 && fails < recent.length / 3)) continue
     const names = new Map<string, number>()
     for (const r of recent) for (const n of new Set(r.failed ?? [])) names.set(n, (names.get(n) ?? 0) + 1)
     // a test that failed in one run of a sha and not in another of it
     const sameSha = (name: string) => [...new Set(rs.map(r => r.sha))].some(sha => onSha(sha).some(r => r.failed?.includes(name)) && onSha(sha).some(r => !r.failed?.includes(name)))
-    flaky.push({ file, runs: recent.length, fails, ...(shas.length && { shas }), tests: [...names].map(([name, n]) => ({ name, fails: n, ...(sameSha(name) && { sameSha: true }) })).sort((a, b) => b.fails - a.fails || a.name.localeCompare(b.name)) })
+    flaky.push({ file, runs: recent.length, fails, ...(shas.length && { shas }), ...(reruns && { reruns }), tests: [...names].map(([name, n]) => ({ name, fails: n, ...(sameSha(name) && { sameSha: true }) })).sort((a, b) => b.fails - a.fails || a.name.localeCompare(b.name)) })
   }
   return { slow, flaky: flaky.sort((a, b) => b.fails - a.fails || a.file.localeCompare(b.file)) }
 }
@@ -65,7 +66,7 @@ export function reportText(r: Report) {
     ...(r.slow.length ? r.slow.map(x => `  ${s(x.median).padStart(8)}  ${x.file}${x.over ? '  over 60 s: split it by topic' : ''}  (${x.runs} run${x.runs === 1 ? '' : 's'})`) : ['  none yet: npm test writes the history']),
     '',
     'Flaky:',
-    ...(r.flaky.length ? r.flaky.flatMap(f => [`  ${f.file}: failed ${f.fails} of its last ${f.runs}${f.shas ? `; passed and failed on ${f.shas.join(', ')}` : ''}`, ...f.tests.map(t => `    ${t.fails}×  ${t.name}${t.sameSha ? '  (passed and failed on one sha)' : ''}`)]) : ['  none']),
+    ...(r.flaky.length ? r.flaky.flatMap(f => [`  ${f.file}: failed ${f.fails} of its last ${f.runs}${f.shas ? `; passed and failed on ${f.shas.join(', ')}` : ''}${f.reruns ? `; passed alone after a release's run ${f.reruns}×` : ''}`, ...f.tests.map(t => `    ${t.fails}×  ${t.name}${t.sameSha ? '  (passed and failed on one sha)' : ''}`)]) : ['  none']),
   ].join('\n')
 }
 
