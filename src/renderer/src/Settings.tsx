@@ -1,6 +1,7 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The daemon keeps
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
+import { speakable } from '../../shared/speak'
 import type { Call } from '../../shared/api'
 import { TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
@@ -2920,6 +2921,15 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={s.voice?.answers !== false} onChange={on => set({ voice: { ...s.voice, answers: on ? undefined : false } })}>
                     <Says title="Answer asks" hint="Say just yes or no (allow, deny, так, ні…) while an agent waits on a permission: the pill shows the ask, and ⏎ answers it. A plain command it answers by itself in 1.5 s; a question, a plan, a secret or a risky command stays for Laki's window. Tab sends your words as a message instead" />
                   </Switch>
+                  {/* spoken answers: Laki AI's answer to a talk-key question, read out by the pill (shared/speak.ts) */}
+                  <div className="row">
+                    <Switch className="switch-row grow" on={s.voice?.speak === 'short'} disabled={!aiOn(s)} onChange={on => set({ voice: { ...s.voice, speak: on ? 'short' : undefined } })}>
+                      <Says title="Speak Laki AI's answers" hint={aiOn(s) ? "When you ask it with the talk key, the pill reads out the first two sentences of its answer (no code, links or paths). Esc or the key again stops it; never in Quiet or Recording mode" : 'Laki AI answers it: turn Laki AI on in Settings › AI'} />
+                    </Switch>
+                    <button type="button" onClick={() => (speechSynthesis.cancel(), speechSynthesis.speak(new SpeechSynthesisUtterance(speakable("Here's how an answer sounds. The rest stays on the AI page."))))}>
+                      Try
+                    </button>
+                  </div>
                   <Switch className="switch-row" on={s.voice?.selection === true} onChange={on => set({ voice: { ...s.voice, selection: on || undefined } })}>
                     <Says title="Include the selected text" hint="What's selected in the app you're in goes with your words, quoted (to Laki AI as data): copied with ⌘C and the clipboard put back; needs Accessibility for Laki. Never from a password manager. In Laki, the selection or the focused terminal's. 4,000 characters at most, secrets masked; × on the pill leaves it out" />
                   </Switch>

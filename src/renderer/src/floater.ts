@@ -16,6 +16,7 @@ import type { SpeechLine } from '../../shared/speech'
 import { spokenMode } from '../../shared/ask'
 import { AI_TO, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
+import { langOf } from '../../shared/speak'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -83,8 +84,9 @@ type Bridge = {
     islandEv: (ev: string) => void
     onTalk: (cb: (c: Talk) => void) => void
     onTalkKey: (cb: () => void) => void
+    onTalkSpeak?: (cb: (text: string) => void) => void
     talkText: (audio: string) => Promise<{ text?: string; error?: string }>
-    talkSend: (tab: string, text: string, project?: string, selection?: boolean) => Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; shot?: boolean; noShot?: string }>
+    talkSend: (tab: string, text: string, project?: string, selection?: boolean) => Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string }>
     talkUndo: () => Promise<{ error?: string }>
     talkClose: () => void
     talkListen: () => Promise<{ error?: string }>
@@ -754,11 +756,29 @@ function talkPage() {
   let toProject: string | undefined // a new task's project (Q5)
   let cfg: RouteCfg | undefined
   let ai = false // Laki AI on: a Tab target
-  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'answer' | 'sending' | 'sent' = 'wait'
+  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'answer' | 'sending' | 'sent' | 'speak' = 'wait' // speak: Laki AI's answer awaited, then read out
   let routed: { text: string; t: ReturnType<typeof setTimeout> } | undefined // Q5: shown before it goes
   let stopRec: ((send: boolean) => void) | undefined
   const close = () => bridge?.talkClose()
   const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
+  // Settings › Voice › Speak Laki AI's answers: its answer's first sentences (main's speakable), in a voice of its
+  // language (langOf: by its script, yours first) else the default; Esc, the key again or the pill closing stops it
+  let waitSpeak: ReturnType<typeof setTimeout> | undefined
+  const hush = () => (clearTimeout(waitSpeak), speechSynthesis.cancel(), close())
+  addEventListener('pagehide', () => speechSynthesis.cancel())
+  bridge?.onTalkSpeak?.(text => {
+    if (phase !== 'speak') return
+    clearTimeout(waitSpeak)
+    const u = new SpeechSynthesisUtterance(text)
+    const l = langOf(text, navigator.languages)
+    const v = l && speechSynthesis.getVoices().find(x => x.lang.toLowerCase().split(/[-_]/)[0] === l.toLowerCase().split('-')[0])
+    if (l) u.lang = l
+    if (v) u.voice = v
+    u.onend = u.onerror = () => close()
+    box.classList.add('speaking')
+    say(text)
+    speechSynthesis.speak(u)
+  })
   const show = () => (toEl.textContent = `→ ${to ? talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   document.addEventListener('keydown', e => {
@@ -770,6 +790,7 @@ function talkPage() {
       if (e.key === 'Escape') return void (e.preventDefault(), clearTimeout(asking.t), close())
       return
     }
+    if (e.key === 'Escape' && phase === 'speak') return void (e.preventDefault(), hush())
     if (e.key === 'Escape') return void (e.preventDefault(), routed && clearTimeout(routed.t), stopRec ? stopRec(false) : close())
     if (e.key === 'Tab' && (phase === 'rec' || phase === 'wait' || phase === 'route')) {
       e.preventDefault()
@@ -782,7 +803,7 @@ function talkPage() {
     if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
     else if (e.key === 'Enter' && phase === 'route' && routed) e.preventDefault(), clearTimeout(routed.t), void send(routed.text) // now
   })
-  bridge?.onTalkKey(() => (phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  bridge?.onTalkKey(() => (phase === 'speak' ? hush() : phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
   undo.onclick = async () => {
     undo.disabled = true
     const r = await bridge?.talkUndo()
@@ -978,6 +999,7 @@ function talkPage() {
     }
     if (r?.new) return close() // the new task's window has it
     if (r?.kept) return void (say(`Added to ${name}`), (undo.hidden = false), setTimeout(close, 4000)) // Q5b: a note's line, a Backlog's item; Undo takes it out
+    if (r?.ai && r.speak) return void ((phase = 'speak'), say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is read out here · Esc stops${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), (waitSpeak = setTimeout(close, 120_000))) // a long answer, or one queued behind another: given up on
     if (r?.ai) return void (say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is on the AI page${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), setTimeout(close, r.noShot ? 5000 : 2500))
     say(r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`)
     undo.hidden = !r?.queued

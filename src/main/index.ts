@@ -10,6 +10,7 @@ import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { pixelDiff } from '../shared/pixelDiff.ts'
+import { speakable } from '../shared/speak.ts'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { appOf, helperBin } from '../shared/helper.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
@@ -1702,7 +1703,7 @@ ipcMain.handle('login-item-set', (e, on: unknown) => {
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */ } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { speak?: boolean /* Settings › Voice: Laki AI's answer to a talk-key question read out by the pill (off in Quiet and Recording mode) */; hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */ } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string; note?: boolean; todo?: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -1901,6 +1902,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ...(o.selection === true && { selection: true }),
     ...(typeof o.speech === 'string' && /^[\w-]{2,20}$/.test(o.speech) && { speech: o.speech }),
     ...(o.noAnswers === true && { noAnswers: true }),
+    ...(o.speak === true && { speak: true }),
     ...(o.hide === true && { hide: true }),
     ...(o.aiShow === true && { aiShow: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined, note: o.route.note !== false, todo: o.route.todo !== false } }),
@@ -2494,21 +2496,22 @@ ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.
 const TALK = { width: 320, height: 78 }
 // Laki AI asked in the background (its chat has the answer: the AI page); only while it's on. Settings › AI › Show its
 // work (aiShow, on unless off): its window opens with the ask (Q13: what it does, its Yes / No, without the app)
-const aiAsked = (text: string, images?: string[]) => (floats.ai ? (void rpc('aiAsk', { text, ...(images && { images }) }).catch(() => {}), floats.aiShow && setTimeout(aiWin, 300), { ai: true }) : { error: 'Laki AI is off: Settings › AI' })
+// spoken: the talk pill's (aiTalk): its answer's first sentences to the pill, read out there while it's open (speakable)
+const aiAsked = (text: string, images?: string[], spoken = false) => (floats.ai ? (void rpc<{ text?: string }>('aiAsk', { text, ...(images && { images }) }).then(r => (s => s && spoken && floats.speak && talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-speak', s))(typeof r?.text === 'string' ? speakable(r.text) : ''), () => {}), floats.aiShow && setTimeout(aiWin, 300), { ai: true, ...(spoken && floats.speak && { speak: true }) }) : { error: 'Laki AI is off: Settings › AI' })
 // Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
 // (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
-async function aiTalk(said: string, text = said): Promise<{ ai?: boolean; shot?: boolean; noShot?: string; error?: string }> {
-  if (!floats.ai) return aiAsked(text)
-  if (!talkShot(said) || !mac) return aiAsked(text) // the words said ask for the screen, not a selection's
-  if (screenOff()) return (privacySay('screen'), { ...aiAsked(text), noShot: 'Laki has no Screen Recording' })
+async function aiTalk(said: string, text = said): Promise<{ ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string; error?: string }> {
+  if (!floats.ai) return aiAsked(text, undefined, true)
+  if (!talkShot(said) || !mac) return aiAsked(text, undefined, true) // the words said ask for the screen, not a selection's
+  if (screenOff()) return (privacySay('screen'), { ...aiAsked(text, undefined, true), noShot: 'Laki has no Screen Recording' })
   const w = talkW
   const on = screen.getDisplayMatching(w && !w.isDestroyed() ? w.getBounds() : { ...screen.getCursorScreenPoint(), width: 1, height: 1 }).bounds
   w?.hide()
   const png = await new Promise<string>(done => screenshot(false, on, done, () => done('')))
   if (w && !w.isDestroyed()) w.showInactive()
-  if (!png) return (screenOff(true) && privacySay('screen'), { ...aiAsked(text), noShot: 'no picture: Screen Recording for Laki' })
+  if (!png) return (screenOff(true) && privacySay('screen'), { ...aiAsked(text, undefined, true), noShot: 'no picture: Screen Recording for Laki' })
   const path = await rpc<string>('imageSave', { data: png, ext: 'png' }).catch(() => '')
-  return path ? { ...aiAsked(text, [path]), shot: true } : { ...aiAsked(text), noShot: "the picture wasn't saved" }
+  return path ? { ...aiAsked(text, [path], true), shot: true } : { ...aiAsked(text, undefined, true), noShot: "the picture wasn't saved" }
 }
 let talkW: BrowserWindow | null = null
 let talkTo = new Set<string>() // the agents the pill offered

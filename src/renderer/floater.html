@@ -97,6 +97,8 @@
       .t-rec { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
       #talk.rec .t-rec { background: #f7768e; animation: t-pulse 1.2s ease-in-out infinite; }
       @keyframes t-pulse { 50% { opacity: 0.35; } }
+      #talk.speaking .t-rec { background: var(--running); animation: t-pulse 1.2s ease-in-out infinite; } /* reading Laki AI's answer out */
+      @media (prefers-reduced-motion: reduce) { #talk.speaking .t-rec { animation: none; } }
       .t-level { flex: none; width: 64px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 10%, var(--bg)); overflow: hidden; }
       .t-level > i { display: block; height: 100%; width: 0; background: var(--running); transition: width 0.06s; }
       .t-time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }

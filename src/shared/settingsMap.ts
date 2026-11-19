@@ -120,6 +120,7 @@ export const FIND: [string, string, string?][] = [
   ['layout', 'Glow', 'glass colors'],
   ['layout', 'Grain', 'glass noise texture frosted film'],
   ['layout', 'Refraction', 'lens bend edge glass menus toasts liquid'],
+  ['voice', "Speak Laki AI's answers", 'read aloud speech say out loud tts spoken answer talk key'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
   ['appearance', 'Favorites', 'theme star starred favorite'],
   ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],

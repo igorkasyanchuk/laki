@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Spoken answers: ask Laki AI with the talk key and the pill reads out the first two sentences of its answer (Settings › Voice › *Speak Laki AI's answers*, with *Try*; Esc stops it; never in Quiet or Recording mode). [Try it](laki://settings/voice?spot=Speak)
 - MCP servers per project: Settings › the project › *MCP servers* gives this project's Claude Code and Codex tabs your tools (a command or a URL, its env, on for the profiles you pick), by flags as they start, never written into their config.
 - More lists fade under their head as you scroll: the side panel's Files and Commits, Notes' list, a workflow's runs; ⌘K and long menus fade at the bottom while more is below.
 - Badges' words and counts sit in their middle, not low: a group's name, the rail's count, a row's PR pill and plan chip (trimmed to their capitals, same size).
