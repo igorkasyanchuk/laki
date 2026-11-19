@@ -89,7 +89,7 @@ test('events: a PR\'s checks failing and its merge, once per head; nothing repla
   assert.equal(log(), '')
   pr('bbb', 'OPEN', 'FAILURE')
   await head('bbb')
-  await until(() => log() === 'pr.checks.failed 7 test\n', 'failed on bbb')
+  await until(() => log() === 'pr.checks.failed 7 test\n', 'failed on bbb', 40000) // its checks' scan, then the action's node: slow under a full run's load
   await sleep(1200)
   assert.equal(log(), 'pr.checks.failed 7 test\n', 'once per head')
   pr('bbb', 'MERGED', 'SUCCESS')

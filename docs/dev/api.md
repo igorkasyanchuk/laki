@@ -233,7 +233,8 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   after `synced`): `origin/<b>` (`--no-track`) when origin has it, else refused, `base <b> not found in <project>`;
 - `worktreeAdd` (`wsNew`'s and `wsRestore`'s `git worktree add`): `-c checkout.workers=0` (a worker per core) unless the
   project's `git config --get checkout.workers` says something (`ownWorkers`: read once per repo per daemon, by host and path, a host's
-  there); tested with a logging `git` in the rig's `$HOME/bin` (`test/worktrees.test.ts`);
+  there); one at a time per repo (`adding`: two at once race in git, one reading the other's half-written
+  `.git/worktrees/<id>/commondir`); tested with a logging `git` in the rig's `$HOME/bin` (`test/worktrees.test.ts`);
 - whole folders first (F7, `cloneDirs`, called by `copyIncludes`): `.laki.json`'s `clone` and, with `settings.cloneDeps`,
   `CLONE_DIRS` at the repo's root, each one `cp -cR` (Linux `--reflink=auto -R`), skipped when the worktree has the
   folder or a link leads out. The spare (`settings.spareWorktree`, `spareMake`/`spareTake`/`spareDrop`, `spareTick` every

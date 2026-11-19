@@ -1099,12 +1099,19 @@ const hasRef = (at: At, ref: string) => git(at, 'rev-parse', '--verify', '--quie
 // before 2.32 ignores the key) unless the project's own git config, here or on its host, sets checkout.workers
 // ponytail: read once per repo per daemon (by its host and path); a config changed meanwhile counts after a restart
 const ownWorkers = new Map<string, Promise<boolean>>()
+// one add at a time per repo: two at once race in git itself (an add reads every worktree's admin folder, another's
+// half written: "failed to read .git/worktrees/<id>/commondir"), as several workspaces made at once did
+const adding = new Map<string, Promise<unknown>>()
 function worktreeAdd(proj: Project, ...args: string[]) {
   if (!proj.host) roomFor(args.find(a => isAbsolute(a)) ?? proj.path, 'make a worktree') // R4: where the worktree goes (the worktrees folder may be on another volume)
   const key = `${proj.host ?? ''}:${proj.path}`
   let own = ownWorkers.get(key)
   if (!own) ownWorkers.set(key, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
-  return own.then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
+  const go = (adding.get(key) ?? Promise.resolve())
+    .then(() => own)
+    .then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
+  adding.set(key, go.catch(() => {}))
+  return go
 }
 
 // Laki's own gh calls since the hour began, by kind (pr view, api graphql…): its log says how many each hour (ghHour),
