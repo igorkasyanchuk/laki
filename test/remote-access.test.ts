@@ -490,6 +490,13 @@ test('S14: a sealed call runs once: replayed after 20,001 junk salts, after a re
   const one = sealed()
   assert.equal(await send(one), 200)
   assert.ok(await replayed(one), 'again: a replay')
+  // its salt spelled another way (the 22nd character's low 4 bits aren't the salt's): the same salt, a replay
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  for (const k of [1, 6, 15]) {
+    const other = one.salt.slice(0, 21) + B64[B64.indexOf(one.salt[21]) ^ k] + '=='
+    assert.ok(Buffer.from(other, 'base64').equals(Buffer.from(one.salt, 'base64')))
+    assert.ok(await replayed({ ...one, salt: other }), `respelled (${k}): a replay`)
+  }
   const both = sealed()
   assert.deepEqual((await Promise.all([send(both), send(both)])).sort(), [200, 400], 'two copies in flight: one runs')
   // the tunnel's flood: 20,001 salts of junk, each from an address it makes up (so no address is refused for it)

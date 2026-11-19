@@ -38,12 +38,15 @@ export type WrapIn = {
   gitDirs?: string[] // what git commit writes for this worktree (a worktree's live in the main repo's .git)
   tmp: string[] // the system's temp folders (/private/tmp, $TMPDIR's)
   write?: string[] // more it may write: its storage folder, its account's folder, Laki's status line folder
-  denyRead?: string[] // more it never reads: Laki's data folder's secrets
-  allowRead?: string[] // carved back out of those (its account's folder)
+  data?: string // Laki's data folder: no file in it read, nor its folders listed (its secrets, ones made later too), but
+  // walked through (a stat, a realpath of its worktree in it), so file-read-data only: file-read* breaks the path to them
+  allowRead?: string[] // read back out of it, never written: its hook and plugin files, pasted pictures (what it writes too)
   net?: 'all' | 'list' | 'off' // not applied: the network stays as it is in this step
 }
-// SBPL's last matching rule wins: everything allowed, then writes denied but where it works, then reads denied of
-// secrets (each a -D parameter: subpath for a folder, literal for a file name: .claude.json)
+// SBPL's last matching rule wins, of rules for the same operation (one for file-read-data wins over file-read*'s, as
+// macOS 26 runs it): everything allowed, then writes denied but where it works, then the data folder's files, then what
+// it works in and reads of it back, then reads denied of secrets (each a -D parameter: subpath for a folder, literal for
+// a file name: .claude.json); a worktree that holds ~/.ssh still can't read it
 export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
   const params: string[] = []
   const ref = (path: string, kind: 'subpath' | 'literal' = 'subpath') => {
@@ -55,15 +58,19 @@ export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
   const own = AGENT_WRITES[o.agent].map(rel => ref(h(rel), /\.json$/.test(rel) ? 'literal' : 'subpath'))
   const writes = [o.worktree, ...(o.gitDirs ?? []), ...o.tmp, ...(o.write ?? [])].map(p => ref(p))
   const others = (Object.keys(AGENT_WRITES) as Agent[]).filter(a => a !== o.agent).flatMap(a => AGENT_WRITES[a]).filter(rel => !AGENT_WRITES[o.agent].includes(rel))
-  const reads = [...SECRET_HOME.map(h), ...others.map(h), ...(o.denyRead ?? [])].map(p => ref(p, /\.json$/.test(p) ? 'literal' : 'subpath'))
-  const back = (o.allowRead ?? []).map(p => ref(p))
+  const reads = [...SECRET_HOME.map(h), ...others.map(h)].map(p => ref(p, /\.json$/.test(p) ? 'literal' : 'subpath'))
+  const data = o.data ? ref(o.data) : undefined
+  // only what's in it: a worktree that holds the data folder (a project at ~) doesn't read it all back
+  const back = data ? [o.worktree, ...(o.gitDirs ?? []), ...(o.write ?? []), ...(o.allowRead ?? [])].filter(p => p.startsWith(`${o.data!.replace(/\/+$/, '')}/`)).map(p => ref(p)) : []
   const text = [
     '(version 1)',
     '(allow default)',
     '(deny file-write*)',
     `(allow file-write*\n  ${[...writes, ...own].join('\n  ')}\n  (literal "/dev/null") (literal "/dev/zero") (literal "/dev/dtracehelper") (literal "/dev/ptmx")\n  (regex #"^/dev/tty") (regex #"^/dev/fd/"))`,
+    ...(data ? [`(deny file-read-data ${data})`] : []),
+    ...(back.length ? [`(allow file-read-data\n  ${back.join('\n  ')})`] : []), // never one with none: that allows every read
     `(deny file-read*\n  ${reads.join('\n  ')})`,
-    ...(back.length ? [`(allow file-read* file-write*\n  ${back.join('\n  ')})`] : []),
+    ...(data ? [`(deny file-read-data\n  ${reads.join('\n  ')})`] : []), // file-read* never wins over a file-read-data rule, before it or after
     '',
   ].join('\n')
   return { text, params }

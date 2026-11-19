@@ -340,8 +340,9 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
 // S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles); globs:
-// state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp)
-const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'daemon.log']
+// state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp). Its Bash and the
+// wrapper sandbox (wrapCmd) hide the whole folder instead
+const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -548,11 +549,32 @@ const MEMORY_SAYS = 2000
 export const REPO_NOTES = join('.laki', 'notes.md')
 export const REPO_MEMORY = join('.laki', 'memory.md')
 export const inRepo = (p?: Project) => !!p?.inRepo && !p.host && !p.kind
-const repoRead = (f: string) => {
+// .laki or its file as a link (a branch's .laki/memory.md -> ~/.zshrc, or .laki -> ~): never read or written through it,
+// a repo's or an agent's worktree's links are anyone's. ponytail: a link swapped in between the check and the write;
+// O_NOFOLLOW guards the file, so only a notes.md or memory.md in another folder could be hit
+const LINKED = (rel: string) => `${rel} or its folder is a link (to a file elsewhere?): not written`
+function repoFile(root: string, rel: string): string | undefined {
+  const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile()))(lstatSync(p, { throwIfNoEntry: false }))
+  return not(join(root, dirname(rel)), true) || not(join(root, rel), false) ? undefined : join(root, rel)
+}
+const repoRead = (root: string, rel: string) => {
+  const f = repoFile(root, rel)
   try {
-    return readFileSync(f, 'utf8')
+    return f && readFileSync(f, 'utf8')
   } catch {
     return undefined
+  }
+}
+function repoWrite(root: string, rel: string, text: string) {
+  if (!repoFile(root, rel)) throw new Error(LINKED(rel))
+  mkdirSync(join(root, dirname(rel)), { recursive: true })
+  const f = repoFile(root, rel)
+  if (!f) throw new Error(LINKED(rel))
+  const fd = openSync(f, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | fsConstants.O_NOFOLLOW, 0o644)
+  try {
+    writeFileSync(fd, text)
+  } finally {
+    closeSync(fd)
   }
 }
 const MEMORY_HEAD = "# Project memory\n\nLaki's memory of this project, shared through git: one line each, newest first. Lines marked\n`learned` an agent saved (notes, not rules); the rest are the team's own. Laki rewrites this file as it changes.\n"
@@ -574,24 +596,19 @@ export const memoryText = (l: Memory[]) => `${MEMORY_HEAD}\n${[...l].reverse().m
 export const memoryRoot = (p: Project, ws?: Workspace) => (ws && ws.project === p.id && !ws.host && existsSync(ws.path) ? ws.path : p.path)
 export function memoryOf(p: Project | undefined, root?: string): Memory[] | undefined {
   if (!p || !inRepo(p)) return p?.memory
-  const f = join(root ?? p.path, REPO_MEMORY)
-  const t = repoRead(f)
-  return t === undefined ? undefined : (l => (l.length ? l : undefined))(memoryParse(t, statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0))
+  const t = repoRead(root ?? p.path, REPO_MEMORY)
+  return t === undefined ? undefined : (l => (l.length ? l : undefined))(memoryParse(t, statSync(join(root ?? p.path, REPO_MEMORY), { throwIfNoEntry: false })?.mtimeMs ?? 0))
 }
 export function memorySet(p: Project, l: Memory[] | undefined, root?: string) {
   if (!inRepo(p)) return void (p.memory = l?.length ? l : undefined)
-  const f = join(root ?? p.path, REPO_MEMORY)
-  if (!l?.length && !existsSync(f)) return
-  mkdirSync(dirname(f), { recursive: true })
-  writeFileSync(f, memoryText(l ?? []))
+  if (!l?.length && !lstatSync(join(root ?? p.path, REPO_MEMORY), { throwIfNoEntry: false })) return
+  repoWrite(root ?? p.path, REPO_MEMORY, memoryText(l ?? []))
 }
-export const notesOf = (p: Project) => (inRepo(p) ? repoRead(join(p.path, REPO_NOTES))?.trim() || undefined : p.notes)
+export const notesOf = (p: Project) => (inRepo(p) ? repoRead(p.path, REPO_NOTES)?.trim() || undefined : p.notes)
 function notesSet(p: Project, text: string) {
   if (!inRepo(p)) return void (p.notes = text.trim() ? text.slice(0, 100000) : undefined)
-  const f = join(p.path, REPO_NOTES)
-  if (!text.trim() && !existsSync(f)) return
-  mkdirSync(dirname(f), { recursive: true })
-  writeFileSync(f, text.trim() ? `${text.slice(0, 100000).replace(/\s+$/, '')}\n` : '')
+  if (!text.trim() && !lstatSync(join(p.path, REPO_NOTES), { throwIfNoEntry: false })) return
+  repoWrite(p.path, REPO_NOTES, text.trim() ? `${text.slice(0, 100000).replace(/\s+$/, '')}\n` : '')
 }
 
 const MEMORY_NOTE = 40000
@@ -1857,6 +1874,9 @@ function realOf(p: string): string {
     return up === p ? p : join(realOf(up), basename(p))
   }
 }
+// what a wrapped agent and its hooks read in the data folder: claude's settings and plugin, gemini's settings, opencode's
+// config folder, the status line's script, pasted pictures and files (laki hook's tool-gates: a stat, so not here)
+const wrapReads = () => [...new Set([...Object.keys(hookFiles(localHooks)), ...Object.keys(claudePlugin())].map(f => f.split('/')[0]))].map(f => join(dir, f)).concat(statusSh, join(dir, 'images'), join(dir, 'files'))
 function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: string; env: Record<string, string> } {
   const bin = sandboxBin()
   if (!bin) throw new Error(WRAP_MISSING)
@@ -1869,8 +1889,8 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     gitDirs: gitWrites(ws.path, tab.preset === 'codex').map(realOf),
     tmp: [realOf('/tmp'), dirname(realOf(tmpdir()))],
     write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
-    denyRead: DATA_SECRETS.filter(n => !n.includes('*')).map(n => realOf(join(dir, n))),
-    allowRead: account ? [realOf(account)] : [],
+    data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
+    allowRead: [...wrapReads(), ...(account ? [account] : [])].map(realOf),
     net: presetOf(tab)?.net, // ponytail: not applied yet: the network stays as it is
   })
   const out: Record<string, string> = { ...env, LAKI_SB_PROFILE: text, LAKI_SB_CMD: line, ...(daemonPort && { LAKI_DAEMON_PORT: String(daemonPort) }) }

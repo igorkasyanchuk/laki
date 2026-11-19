@@ -1793,10 +1793,14 @@ const saltsSeen = new Map<string, number>(
 )
 const saltsBusy = new Set<string>()
 let saltsUnkept = false // the last write failed: said once in daemon.log
-function saltOf(h: unknown): { h: string; b: Buffer } | undefined {
-  if (typeof h !== 'string' || !/^[A-Za-z0-9+/]{22}==$/.test(h) || saltsSeen.has(h) || saltsBusy.has(h)) return undefined
+// kept by its bytes' own spelling: the 22nd character's low 4 bits aren't the salt's, so 16 spellings decode to one salt
+function saltOf(s: unknown): { h: string; b: Buffer } | undefined {
+  if (typeof s !== 'string' || !/^[A-Za-z0-9+/]{22}==$/.test(s)) return undefined
+  const b = Buffer.from(s, 'base64')
+  const h = b.toString('base64')
+  if (saltsSeen.has(h) || saltsBusy.has(h)) return undefined
   saltsBusy.add(h)
-  return { h, b: Buffer.from(h, 'base64') }
+  return { h, b }
 }
 // its call opened and is recent: kept, on disk too before the call runs (false: full of live salts)
 function saltKeep(h: string): boolean {

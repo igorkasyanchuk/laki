@@ -309,7 +309,8 @@ repo: `.laki/notes.md` and `.laki/memory.md` (core's `notesOf`, `memoryOf`, `not
 of its text). The view's project `notes` and `memory` are the checkout's files then (`p.notes`, `p.memory` kept as they
 were: switching moves nothing). `memoryRoot`: an agent's workspace's own folder for its start (`memoryNote`'s `root`),
 `memoryAdd` and `memoryRm` (their `tab`), else the checkout; memory.ts' compaction and Laki AI read and write it too.
-`test/repo-memory.test.ts`.
+`.laki` or a file in it as a link (a branch's `.laki/memory.md -> ~/.zshrc`) is never read or written through
+(`repoFile`, `repoWrite`: lstat, then `O_NOFOLLOW`; a write says it's a link). `test/repo-memory.test.ts`.
 
 Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
@@ -461,9 +462,13 @@ env turn them on, `ownBoxOn`). core's `wrapped(tab)` (a Mac, this Mac's workspac
 `wrap` not false) makes `agentCmd` return `wrapCmd`: `<sandbox-exec> -p "$LAKI_SB_PROFILE" -D "$LAKI_SB_D0" … /bin/sh -c
 "$LAKI_SB_CMD"`, the profile and every path in the tab's env, never in the line. `wrapProfile`: allow default, deny writes
 but the worktree, `gitWrites`' folders, /tmp and $TMPDIR's folder, the agent's own (`AGENT_WRITES`), its storage folder, its
-account's folder, claude's status line folder; deny reads of `SECRET_HOME`, every other agent's folders and Laki's data
-folder's `DATA_SECRETS` (its account's folder allowed back); each path `realOf` (realpath, or its nearest folder's) and a
-`-D P<n>=<path>`. The network as it is (`net` not applied yet). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
+account's folder, claude's status line folder; deny reads of Laki's whole data folder (`file-read-data` only: its files
+and listings, never a stat, so a worktree or storage folder in it is still walked to; trusted clients' tokens and any
+secret added later too), read back what it works in that's in it and `wrapReads` (claude's settings and plugin, gemini's
+settings, opencode's folder, statusline.sh, pasted `images/` and `files/`) and its account's folder; then deny reads of
+`SECRET_HOME` and every other agent's folders (as `file-read*` and `file-read-data` both: macOS gives a `file-read-data`
+rule the win over a `file-read*` one, wherever it is); each path `realOf` (realpath, or its nearest folder's) and a
+`-D P<n>=<path>` (`test/units-more.test.ts` runs the profile under the real sandbox-exec). The network as it is (`net` not applied yet). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
 tab's token, daemon.json unread (conn.ts `daemonInfo`). No sandbox-exec (`sandboxBin` on PATH; a test's
 `LAKI_TEST_NO_SANDBOX_EXEC`): the tab doesn't start, a notice and the workspace's log say why. A write it refuses
 (`wrapRefused` in the tab's output: *Operation not permitted* for a path out of the worktree) is `boxed` with `wrap: true`:

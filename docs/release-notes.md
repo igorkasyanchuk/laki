@@ -12,6 +12,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Cursor is a ready-made agent: *Add a profile for…* › *Cursor* (there already when `cursor-agent` is installed). Its models and effort are in the new-workspace menus, its chats come back after a restart, and *Sign in* runs its login.
 - Deleting a workspace keeps the screenshots and reports its agents made: Settings › Resources › *Artifacts of deleted workspaces* opens them, starts a new workspace with one, or deletes them. Tick *Also delete its artifacts* in the Delete dialog to drop them with it. [Try it](laki://settings/resources)
 - Settings › Versions shows each agent CLI's version and the newest; *Update* (or *Update all*) runs the update in a terminal tab, and Settings gets a dot when one is out of date.
+- Security: a remote call can't be replayed by spelling its salt another way; the macOS wrapper sandbox hides Laki's whole data folder (trusted clients' tokens too); a repo's `.laki/memory.md` or `notes.md` as a link is never read or written through.
 - Drag a file from the side panel, the Review tab, Artifacts or a turn's files straight to Finder or any app. Agents' browser does more: hover, keys, scroll, select, check, drag, back and forward, and tabs.
 - The skills a chat loaded: the status bar's context meter lists them, the Reader marks each; a click opens its SKILL.md.
 - A project can keep its notes and memory in the repo (`.laki/notes.md`, `.laki/memory.md`), shared with your team through git: the project page's *Keep notes and memory in the repo*.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { memoryParse, memoryText } from '../src/daemon/core.ts'
@@ -55,4 +55,27 @@ test('B6: notes and memory in the repo: the checkout\'s for the app, a worktree\
   assert.ok(existsSync(join(rig.repo, '.laki/notes.md')))
   // an agent can't move them
   await assert.rejects(rig.rpc('projectSet', { id: p.id, inRepo: true, from: { ws: ws.id, tab } }), /notes and memory place/)
+})
+
+test("B6: a repo's .laki/memory.md or .laki as a link (to ~/.zshrc, to ~) is never read or written through", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, inRepo: true })
+  const proj = async () => (await rig.rpc('state')).projects.find((x: any) => x.id === p.id)
+  const rc = join(rig.home, '.zshrc')
+  writeFileSync(rc, '- 2026-11-18 · rc1 · export SECRET=1\n')
+  mkdirSync(join(rig.repo, '.laki'))
+  symlinkSync(rc, join(rig.repo, '.laki/memory.md'))
+  symlinkSync(rc, join(rig.repo, '.laki/notes.md'))
+  assert.deepEqual([(await proj()).memory, (await proj()).notes], [undefined, undefined], 'not read')
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, memory: [{ id: 'team1', text: 'Use pnpm', at: 1 }] }), /is a link/)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, notes: 'x' }), /is a link/)
+  assert.equal(readFileSync(rc, 'utf8'), '- 2026-11-18 · rc1 · export SECRET=1\n', 'yours as it was')
+  // .laki itself a link: its memory.md (elsewhere) neither
+  rmSync(join(rig.repo, '.laki'), { recursive: true })
+  const away = join(rig.home, 'away')
+  mkdirSync(away)
+  symlinkSync(away, join(rig.repo, '.laki'))
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, memory: [{ id: 'team1', text: 'Use pnpm', at: 1 }] }), /is a link/)
+  assert.ok(!existsSync(join(away, 'memory.md')))
 })

@@ -399,7 +399,8 @@ within 5 s must be the page's own 16 bytes of salt followed by a sealed `{ auth 
 provider can't play an old session's frames to either side by sending its salt again) (S11's token, or `device` with its cookie): a clear one closes 4426 (`OLD_PAGE`:
 open a new link), one no secret opens 4401 `bad key`. Then every frame both ways is sealed (`Conn.send` seals, a
 message that doesn't open, or opens out of order, closes 4400). `/rpc` from the remote origin: a salt of the page's own
-in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay), its body a sealed frame with `at` (when it was
+in `x-laki-e2e` (16 bytes; one seen in 10 minutes: 400, a replay; kept by its bytes' own base64, so another of the 16
+spellings of the same bytes is the same salt), its body a sealed frame with `at` (when it was
 sealed: over 5 minutes from now, `SEALED_AGE`, refused, so one older than the salts kept can't come back), the answer sealed
 (`application/octet-stream`); none: 426 after the token check (so the page's `whyNot` still tells a dead link by 401).
 A salt is kept (`saltKeep`) only once its call opened with the page's key and its `at` passed: the tunnel sees the bearer
