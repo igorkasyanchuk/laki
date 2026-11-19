@@ -1549,7 +1549,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .toggle.on { color: var(--fg); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: var(--r-m); background: var(--line); transition: background 0.15s; }
 .toggle.on .toggle-track { background: var(--accent); } /* on: the accent, as the UI kit's (k-toggle); off a neutral track */
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: translate var(--t-spring) var(--spring); }
+.toggle-knob { --knob: 8px; position: absolute; top: 2px; left: 2px; width: var(--knob); height: var(--knob); border-radius: var(--r-pill); /* round, square in a square look: as its track */ background: #fff; box-shadow: var(--lift-1); transition: translate var(--t-spring) var(--spring); }
 .toggle.on .toggle-knob { translate: 10px 0; background: var(--bg); } /* V14: moved, never laid out again; --bg: what every look's own on track was made with */
 .info .toggle { font-size: var(--fs-2); }
 .info .row { flex-wrap: wrap; }
@@ -3720,7 +3720,7 @@ html[data-motion='none'] *, html[data-motion='none'] *::before, html[data-motion
 html[data-motion='high'] .settings-page { animation: m-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
 html[data-motion='high'] .overlay { animation: m-fade 0.16s ease-out; }
 html[data-motion='high'] .modal { animation: m-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
-html[data-motion='high'] .menu { animation: m-pop 0.14s ease-out; transform-origin: top left; }
+html[data-motion='high'] .menu { animation: m-pop 0.14s ease-out; transform-origin: clamp(0px, var(--ox, 0px), 100%) clamp(0px, var(--oy, 0px), 100%); }
 html[data-motion='high'] .tip { animation: m-fade 0.14s ease-out; }
 html[data-motion='high'] .toast { animation: m-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
 html[data-motion='high'] .side-panel { animation: m-side 0.22s ease-out; }
@@ -3771,9 +3771,25 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 @keyframes fx-err { 20%, 60% { transform: translateX(-2px); } 40%, 80% { transform: translateX(2px); } }
 .leaving { pointer-events: none !important; animation: v-fade-out var(--t-fast) var(--ease-out) forwards !important; } /* !important: over an element's own (Motion: high's) */
 .leaving:is(.menu, .toast), .leaving :is(.menu, .modal) { animation: v-out var(--t-fast) var(--ease-out) forwards !important; }
+@keyframes v-stagger { from { opacity: 0; translate: 0 var(--sp-1); } }
 @media (prefers-reduced-motion: no-preference) {
+  /* V19: a menu's items, ⌘K's first screen and Needs you's cards as it unfolds come in one after another (18 ms apart,
+     up to the 8th): only as it opens (data-opening, its first 250 ms: ui.tsx Menu, Palette.tsx; html[data-unfold] as a
+     click unfolds), not as a filter or a new card changes them; only opacity and place: clicks and keys at once */
+  @supports (animation-delay: calc(sibling-index() * 1ms)) {
+    html:not([data-motion='none']) :is(.menu[data-opening] > .menu-list > .menu-item, .palette-list[data-opening] .palette-item) { animation: v-stagger var(--t-fast) var(--ease-out) both; animation-delay: calc(min(sibling-index(), 8) * 18ms); }
+    html[data-unfold]:not([data-motion='none']) .needs-cards > * { animation-delay: calc(min(sibling-index(), 8) * 18ms); animation-fill-mode: both; }
+  }
   :where(.ws, .tab, .menu-item, .palette-item, .sp-row, .rail-icon, .ib, button) { transition: background-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), scale var(--t-fast) var(--ease-out); }
   :where(.ws, .tab, .menu-item, .palette-item, .sp-row, button):active { scale: 0.985; }
+  /* V20: a press stretches a switch's knob by half toward where it will go (off: right; on: left), back as it slides; a
+     square look's knob stays square-cornered (it widens, never scales). A segmented control's fill gives a little. Not
+     from the keyboard (Space: :focus-visible), only the slide */
+  html:not([data-motion='none']) .toggle-knob { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), margin-left var(--t-spring) var(--spring); }
+  html:not([data-motion='none']) .toggle:active:not(:focus-visible, :disabled) .toggle-knob { width: calc(var(--knob) * 1.5); }
+  html:not([data-motion='none']) .toggle.on:active:not(:focus-visible, :disabled) .toggle-knob { margin-left: calc(var(--knob) / -2); }
+  html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid::before { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring), scale var(--t-fast) var(--ease-out); }
+  html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid:active::before, html:not([data-motion='none']) .seg > button.on:active { scale: 0.97; }
   .menu-item, .palette-item { transition: scale var(--t-fast) var(--ease-out); } /* the highlight moves at once, as in a native menu: a fade left the last one lit beside the new */
   :where(.side-panel) { animation: m-side var(--t-mid) var(--ease-out); }
   :where(.sidebar) { animation: m-row var(--t-mid) var(--ease-out); }
@@ -3783,7 +3799,9 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
      CSS can't animate a node that's gone), which a starting style mustn't catch */
   :where(.menu, .modal, .toast, .tunnel-pop, .shown-pop, .link-peek, .ws-peek) { transition: opacity var(--t-fast) ease-out, scale var(--t-spring-soft) var(--spring-soft), display var(--t-fast) allow-discrete, overlay var(--t-fast) allow-discrete; }
   @starting-style { :where(.menu, .modal, .toast, .tunnel-pop, .shown-pop, .link-peek, .ws-peek):not(.leaving) { opacity: 0; scale: 0.96; } }
-  :where(.menu) { transform-origin: top left; }
+  /* where each grows from: its button's middle or the pointer (ui.tsx Menu, LinkPeek), a submenu's item, a peek's row */
+  :where(.menu, .link-peek, .ws-peek) { transform-origin: clamp(0px, var(--ox, 0px), 100%) clamp(0px, var(--oy, 0px), 100%); }
+  :where(.ws-peek.pr-peek) { --oy: 100%; } /* held by its bottom, over its button */
   :where(.tip) { transition: opacity var(--t-fast) ease-out, display var(--t-fast) allow-discrete; }
   @starting-style { :where(.tip):not(.leaving) { opacity: 0; } }
   :where(.needs-cards > div, .needs-cards > button) { animation: v-rise var(--t-spring) var(--spring), v-fade-in var(--t-mid) ease-out; }

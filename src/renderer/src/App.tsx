@@ -644,7 +644,7 @@ export function App() {
   const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
   // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
   // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
-  const [peek, setPeekNow] = useState<{ id: string; top: number; left: number } | null>(null)
+  const [peek, setPeekNow] = useState<{ id: string; top: number; left: number; oy?: number } | null>(null)
   // none to hide: no update at all. setPeekNow(null) on none still runs App (React bails out after the render), and a
   // menu's open, a row's press and leaving a row ask for it: 10 ms each with 40 workspaces
   const peekOn = useRef(false)

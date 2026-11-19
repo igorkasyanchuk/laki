@@ -78,6 +78,8 @@ function PreviewPane({ pv, id, run, act, more, back }: { pv: Preview | null; id:
 export function Palette({ items, onClose, forName, view }: { items: PaletteItem[]; onClose: () => void; forName?: string; view?: View | null }) {
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
+  const [opening, setOpening] = useState(true) // V19: its first screen's stagger (styles.css), only as it opens
+  useEffect(() => (t => () => clearTimeout(t))(setTimeout(() => setOpening(false), 250)), [])
   const [steps, setSteps] = useState<Step[]>([])
   const ran = useMemo(recent, [])
   const groups = useMemo(() => paletteGroups(items, q, ran, forName), [items, q, ran, forName])
@@ -160,7 +162,7 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
         }}
       />
       <div className={`palette-body${wide && !step ? ' two' : ''}`}>
-      <div className="palette-list" ref={ref}>
+      <div className="palette-list" ref={ref} data-opening={opening ? '' : undefined}>
         {step
           ? shown.map(m => row(m, n++))
           : groups.map(g => (

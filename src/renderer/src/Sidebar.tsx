@@ -6,7 +6,7 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
 import { GOAL_SAYS } from '../../shared/types'
-import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText } from './ui'
+import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
@@ -41,7 +41,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     peekTimer.current = window.setTimeout(() => {
       if (!id || !el?.isConnected) return setPeek(null)
       const r = el.getBoundingClientRect()
-      setPeek({ id, top: r.top, left: (el.closest('.sidebar') ?? el).getBoundingClientRect().right + 6 })
+      setPeek({ id, top: r.top, left: (el.closest('.sidebar') ?? el).getBoundingClientRect().right + 6, oy: r.height / 2 }) // oy: it grows from its row's middle
     }, !id ? 250 : peek ? 120 : 550)
   }
   const pause = (id: string) => setTimer(id, x => (x.left === undefined ? { ...x, left: Math.max(1000, x.end - Date.now()) } : { ...x, end: Date.now() + x.left, left: undefined })) // or go on
@@ -230,6 +230,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
+        data-flip={pin ? undefined : w.id}
         role="treeitem"
         aria-level={2}
         aria-selected={w.id === ws?.id}
@@ -449,7 +450,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
     ].filter(Boolean)
     return (
-      <div className="ws-peek" ref={peekBox} style={{ top: peek!.top, left: peek!.left, ...colorVar(tint(w)) }} onPointerEnter={() => clearTimeout(peekTimer.current)} onPointerLeave={() => peekAt()}>
+      <div className="ws-peek" ref={peekBox} style={{ top: peek!.top, left: peek!.left, '--oy': `${peek!.oy ?? 0}px`, ...colorVar(tint(w)) } as CSSProperties} onPointerEnter={() => clearTimeout(peekTimer.current)} onPointerLeave={() => peekAt()}>
         <div className="wp-head">
           <Glyph s={st} />
           <b>{wsName(w)}</b>
@@ -606,6 +607,7 @@ function treeKey(e: ReactKey<HTMLElement>) {
 
 export function Sidebar({ app }: { app: AppCtx }) {
   const tree = useRef<HTMLDivElement>(null)
+  useFlip(tree, '.project-ws, .needs-cards') // V18: a row that changes place glides there, within its project or Needs you
   // a stuck head's collapse: its section's top back in view (not the rows after it)
   const stuckFold = (head: Element) => (sec => sec && tree.current && sec.getBoundingClientRect().top < tree.current.getBoundingClientRect().top && sec.scrollIntoView({ block: 'start' }))(head.closest('.project'))
   // its one tab stop: kept where the keys left it while the focus is in it, else the selected row (or the first)

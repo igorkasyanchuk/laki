@@ -1,6 +1,7 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
 import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
@@ -710,6 +711,37 @@ export const iconItems = (now: string | undefined, set: (icon?: string) => void)
   ...(now ? [{ label: 'No icon', icon: 'x', run: () => set() } as MenuItem] : []),
 ]
 
+// V18: rows that change place glide there (FLIP, flip.ts' flipMoves). useFlip: the [data-flip="<id>"] rows under ref, each placed against its closest `within` (a project's list, Needs
+// you's cards: a project folding above doesn't move them). Each commit reads only their ids in order (no layout); a
+// new order reads every row's place once, then animates the moved ones (translate, --t-spring on --spring, the two read
+// once). Skipped: Motion: None or Reduce motion, a drag or swipe in it ([data-swiping]), a sidebar behind a page
+// (data-away), a row coming in (.v-new). ponytail: the places kept are the last order's, so a row that grew since (an
+// opened card) glides from a stale place once; getSnapshotBeforeUpdate would need a class component
+export function useFlip(ref: { current: HTMLElement | null }, within: string) {
+  const last = useRef({ order: '', at: new Map<string, number>() })
+  useLayoutEffect(() => {
+    const box = ref.current
+    if (!box) return
+    const els = [...box.querySelectorAll<HTMLElement>('[data-flip]')]
+    const order = els.map(el => el.dataset.flip).join()
+    if (order === last.current.order) return
+    const tops = new Map<Element, number>()
+    const top = (el: Element) => tops.get(el) ?? (t => (tops.set(el, t), t))(el.getBoundingClientRect().top)
+    const at = new Map(els.map(el => [el.dataset.flip!, top(el) - top(el.parentElement?.closest(within) ?? box)]))
+    const was = last.current.at
+    last.current = { order, at }
+    const root = document.documentElement
+    if (!was.size || root.dataset.motion === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches || box.closest('[data-away], [data-swiping]') || box.querySelector('[data-swiping]')) return
+    const moves = flipMoves(was, at)
+    if (!moves?.length) return
+    const cs = getComputedStyle(root)
+    const duration = parseFloat(cs.getPropertyValue('--t-spring')) || 600 // ms (styles.css' :root)
+    const easing = cs.getPropertyValue('--spring').trim() || 'ease-out'
+    const byId = new Map(els.map(el => [el.dataset.flip!, el]))
+    for (const [id, dy] of moves) (el => el && !el.classList.contains('v-new') && el.animate([{ translate: `0 ${dy}px` }, { translate: '0 0' }], { duration, easing }))(byId.get(id))
+  })
+}
+
 // a row dropped before or after another of its kind (and group: workspaces stay in their project)
 // into: onto a group's head (data-head) from a row that isn't one: first in that group (after the head)
 export type RowDrop = { kind: string; id: string; target: string; after: boolean; into?: boolean }
@@ -730,6 +762,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
     dragged.current = false
     const move = (ev: PointerEvent) => {
       if (!moved && Math.abs(ev.clientY - y0) < 5) return
+      if (!moved) list?.setAttribute('data-swiping', '') // useFlip waits it out
       moved = true
       document.getSelection()?.removeAllRanges()
       // near the list's top or bottom edge, or past it: it scrolls (ponytail: only as the pointer moves)
@@ -747,6 +780,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      list?.removeAttribute('data-swiping')
       setOver(null)
       dragged.current = moved // the click that ends a drag isn't one
       if (cur) done.current(cur)
@@ -899,6 +933,13 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [])
+  // V19: its items' stagger (styles.css) only as it opens: set before the first paint, gone after 250 ms
+  useLayoutEffect(() => {
+    const el = box.current
+    el?.setAttribute('data-opening', '')
+    const t = setTimeout(() => el?.removeAttribute('data-opening'), 250)
+    return () => clearTimeout(t)
+  }, [])
   // kept inside the window: flipped up or left when there's no room. Inside a zoomed page (Settings' size) a px of its
   // style is z of the window's: every place is the window's over z
   useLayoutEffect(() => {
@@ -920,6 +961,15 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     if (r.bottom > window.innerHeight - 6) beside ? (el.style.top = px(Math.max(6, window.innerHeight - r.height - 6))) : anchor.top - r.height - 4 < 6 ? (el.style.top = px(6)) : ((el.style.top = 'auto'), (el.style.bottom = px(window.innerHeight - anchor.top + 4)))
     // held by its right edge: by the left one, its width as measured squeezed against the window's edge, it'd widen past it
     if (r.right > window.innerWidth - 6) (el.style.left = 'auto'), (el.style.right = px(beside ? window.innerWidth - beside.left + 4 : 6)) // a submenu: on the other side
+    // where it grows from (styles.css' transform-origin, clamped to its box there): the button's middle, the pointer (a
+    // right click's anchor is a point), a submenu's item on the side it touches; from the places set above, nothing read
+    const [w, h, iw, ih] = [r.width, r.height, window.innerWidth, window.innerHeight]
+    const top = r.bottom > ih - 6 ? (beside ? Math.max(6, ih - h - 6) : anchor.top - h - 4 < 6 ? 6 : anchor.top - 4 - h) : anchor.bottom + 4
+    const flip = r.right > iw - 6
+    const left = flip ? (beside ? beside.left - 4 - w : iw - 6 - w) : align === 'left' ? anchor.left : anchor.right - w
+    const [x, y] = beside ? [flip ? beside.left : beside.right, (beside.top + beside.bottom) / 2] : [(anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2]
+    el.style.setProperty('--ox', px(x - left))
+    el.style.setProperty('--oy', px(y - top))
   }, [anchor])
   const pos = align === 'left' ? { left: anchor.left } : { right: window.innerWidth - anchor.right }
   const menu = (

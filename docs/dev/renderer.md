@@ -1412,6 +1412,16 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Laki's own lines in a terminal** (`[process exited]`, *waiting for the setup script*, …) are bright black (SGR 90),
   not dim (SGR 2): xterm's WebGL renderer draws a dim glyph over an opaque cell, a dark patch on a gradient or glass
   panel (an agent's own dim text still can).
+- **Motion: rows that move, menus, presses** (V18 to V20). `useFlip(ref, within)` (ui.tsx, Sidebar's `.side-scroll`): rows
+  marked `data-flip` (a workspace row, not a pinned copy; a Needs you card by its key) glide to a new place (FLIP: `el.animate`
+  translate on `--t-spring`/`--spring`), each placed against its closest `.project-ws` or `.needs-cards`; every commit reads
+  only their ids in order, a new order reads their places once (≤0.3 ms with 200 rows) and diffs them with `flip.ts`'
+  `flipMoves` (none over 40 moved); skipped with Motion: None, Reduce motion, `data-away`, `[data-swiping]` (a swipe, or a
+  row drag: `useRowDrag` marks its list) and `.v-new`. A menu sets `--ox`/`--oy` as it's placed (its button's middle, the
+  pointer, a submenu's item on the side it touches), as do LinkPeek (the pointer) and the sidebar's peek (its row's middle):
+  their `transform-origin`. Menus' items and ⌘K's first screen stagger in (CSS `sibling-index()`) only while
+  `data-opening` (their first 250 ms), Needs you's cards under `html[data-unfold]`. A switch's knob widens by half on a
+  pointer press (`--knob`, not from Space: `:focus-visible`); a segmented fill gives to 0.97.
 - **Frosted's floating sidebar** (V16, looks.css, on the window's glass): the main area's background moves to `.app`, so it
   spans the window; the rail, the list and Terminals' strip are one glass panel on it (`--lift-2`, a lit top, the window's
   corners less `--sp-2`, squircle where `corner-shape` is, `clip-path` cutting each shadow where two meet). `.main` keeps

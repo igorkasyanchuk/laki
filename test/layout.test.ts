@@ -116,3 +116,15 @@ test('one-click layouts: roles filled from the tabs, the focused agent first, th
   assert.deepEqual(tree, { dir: 'row', a: { role: 'agent', n: 1 }, b: { role: 'dev' }, at: 0.6 }) // a tab with no role drops out
   assert.deepEqual(w(fillRoles(tree, tabs, 'c1')), ['c2 | run', 'c1', 'sh', 'setup'])
 })
+
+test('V18 flipMoves: the rows that moved, from where they were; new ones and still ones left out; over the limit, none', async () => {
+  const { flipMoves } = await import('../src/renderer/src/flip.ts')
+  const was = new Map([['a', 0], ['b', 30], ['c', 60]])
+  assert.deepEqual(flipMoves(was, new Map([['b', 0], ['a', 30], ['c', 60]])), [['b', 30], ['a', -30]]) // a and b swapped, c stayed
+  assert.deepEqual(flipMoves(was, new Map([['n', 0], ['a', 30], ['b', 60], ['c', 90]])), [['a', -30], ['b', -30], ['c', -30]]) // one came in above: the rest glide down, n doesn't
+  assert.deepEqual(flipMoves(was, new Map([['a', 0.4], ['c', 30]])), [['c', 30]]) // under a pixel isn't a move; b left
+  assert.deepEqual(flipMoves(new Map(), new Map([['a', 0]])), [])
+  const many = (d: number) => new Map(Array.from({ length: 41 }, (_, i) => [`r${i}`, i * 30 + d]))
+  assert.equal(flipMoves(many(0), many(30)), null) // 41 moved: a re-sort, no glide
+  assert.equal(flipMoves(many(0), many(30), 50)?.length, 41)
+})

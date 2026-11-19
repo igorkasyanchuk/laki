@@ -254,7 +254,7 @@ export type AppBase = {
   panelShown: boolean
   panelTab: PanelTab
   panelW: number
-  peek: { id: string; top: number; left: number } | null
+  peek: { id: string; top: number; left: number; oy?: number } | null
   peekBox: RefObject<HTMLDivElement | null>
   peekStat: { id: string; stat: Stat } | null
   peekTimer: RefObject<number>
@@ -327,7 +327,7 @@ export type AppBase = {
   setPanelOpen: Dispatch<SetStateAction<boolean>>
   setPanelTab: Dispatch<SetStateAction<PanelTab>>
   setPanelW: Dispatch<SetStateAction<number>>
-  setPeek: (p: { id: string; top: number; left: number } | null) => undefined
+  setPeek: (p: { id: string; top: number; left: number; oy?: number } | null) => undefined
   setPicked: Dispatch<SetStateAction<string[]>>
   setPicking: Dispatch<SetStateAction<boolean>>
   setPops: Dispatch<SetStateAction<ShownPop[]>>
