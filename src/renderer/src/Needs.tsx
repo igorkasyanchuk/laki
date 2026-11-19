@@ -86,7 +86,8 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   // unless its sandbox is on), two or more
   const many = items.map(x => x.t).filter(t => bulkOk(t, t.sandbox === true && t.perm !== 'bypassPermissions'))
   // the key: a new wait or finish, or one going stale, starts the card over (its detail open or not)
-  const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
+  const newest = items.reduce<Need | undefined>((m, x) => ((x.t.needAt ?? 0) > (m?.t.needAt ?? 0) ? x : m), undefined)?.t.id // its card's ring (styles.css)
+  const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} newest={x.t.id === newest} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
   return (
     <div className="project needs-list" role="group" aria-label="Needs you">
       <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
@@ -137,7 +138,7 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   )
 }
 
-function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsApi; next: boolean; stale: boolean; shown?: boolean; show?: () => void }) {
+function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api: NeedsApi; next: boolean; newest?: boolean; stale: boolean; shown?: boolean; show?: () => void }) {
   const [open, setOpen] = useState(!stale) // detail open for what needs you, a stale finish one line
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
@@ -184,7 +185,7 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
     )
   }
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : 'done'} />
         <b className="need-ws">

@@ -1195,6 +1195,8 @@ export function selAlpha(accent: string, bgs: string[], fg: string, min = 4.5, f
   for (let a = from; a > 8; a -= 2) if (bgs.every(b => contrast(fg, flat(alpha(accent, a), b)) >= min)) return a
   return 8
 }
+// Needs you's first choice's tint (its hover's: the rest is 6 less): 28% at most, less where its words wouldn't read
+export const pickTint = (accent: string, raised: string, fg: string, min = 4.5) => selAlpha(accent, [raised.slice(0, 7)], fg.slice(0, 7), min, 28)
 // looks that draw solid things (paper, print, a bitmap screen): their floats stay solid (html.opaque)
 export const OPAQUE_LOOKS = new Set(['brutal', 'blueprint', 'classic', 'retro', 'eink', 'receipt', 'gazette', 'greenbar', 'notebook', 'manuscript', 'kraft', 'riso', 'comic', 'chalk', 'pellet', 'overworld', 'bauhaus'])
 // text on an accent: black or white, whichever reads better
@@ -1368,6 +1370,9 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   {
     const a = selAlpha(accent, bgs, t.c?.fg ?? rootVar('--fg'), o.highContrast ? 7 : 4.5, t.light ? SEL_A_LIGHT : SEL_A) // the selection's strength: its text reads
     if (a !== SEL_A) st.setProperty('--sel-a', `${a}%`)
+    // Needs you's first choice (styles.css): the accent's tint over the card, 22% (its hover 28%) or less, as its words still read
+    const pick = pickTint(accent, t.c?.raised ?? rootVar('--raised'), t.c?.fg ?? rootVar('--fg'), o.highContrast ? 7 : 4.5)
+    if (pick !== 28) st.setProperty('--pick-a', `${pick - 6}%`), st.setProperty('--pick-hover-a', `${pick}%`) // else styles.css' own
   }
   // V8: the floating surface's strength, where its text needs more than 72% (a light theme's panel over a dark terminal)
   {
@@ -1419,6 +1424,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
     st.setProperty('--side', alpha(side, 100 - clear))
     st.setProperty('--rail-bg', rail(side, 100 - clear))
   }
+  root.classList.toggle('contrast', !!(o.highContrast || asked(MORE_CONTRAST))) // styles.css: lines that a fill alone would draw (Needs you's choices)
   if (o.highContrast || asked(MORE_CONTRAST)) {
     // halfway to the text (High contrast mode: most of the way): hints and labels, and lines between things (the theme's,
     // or glass's tint)

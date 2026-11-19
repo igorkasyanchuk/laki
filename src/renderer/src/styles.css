@@ -562,6 +562,21 @@ html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:i
 .need-earlier-head:hover { color: var(--fg); }
 .need-earlier .need-all { flex: none; font: inherit; font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-m); border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: var(--cur-act); }
 .need-earlier .need-all:hover { border-color: var(--muted); }
+/* Needs you's cards in the default look and Frosted (glass or not; a themed look keeps its own shapes: looks.css): no
+   outline within an outline. The card a step up the panel's material, its state the glyph beside the name and, on the
+   newest card only, a hairline ring in that state's color; its choices fills, the first tinted with the accent, the key
+   (1, 2, 3) on the right. Reduced transparency and more contrast give the choices their line back */
+:root:is([data-look=''], [data-look='frosted']) .need { border: 0; border-radius: var(--r-m); background: var(--raised); box-shadow: var(--lift-1); }
+:root:is([data-look=''], [data-look='frosted']) .need:hover { background: color-mix(in srgb, var(--raised) 94%, var(--fg) 6%); }
+:root:is([data-look=''], [data-look='frosted']) .need[data-newest] { box-shadow: var(--lift-1), inset 0 0 0 1px color-mix(in srgb, var(--waiting) 35%, transparent); }
+:root:is([data-look=''], [data-look='frosted']) .need.need-done[data-newest] { box-shadow: var(--lift-1), inset 0 0 0 1px color-mix(in srgb, var(--done) 35%, transparent); }
+:root:is([data-look=''], [data-look='frosted']) .need-opts button { border: 0; background: color-mix(in srgb, var(--fg) 7%, transparent); }
+:root:is([data-look=''], [data-look='frosted']) .need-opts button:hover { background: color-mix(in srgb, var(--fg) 11%, transparent); }
+:root:is([data-look=''], [data-look='frosted']) .need-opts button:first-child { background: color-mix(in srgb, var(--accent) var(--pick-a, 22%), transparent); color: var(--fg); } /* themes.ts pickTint: less where its words wouldn't read */
+:root:is([data-look=''], [data-look='frosted']) .need-opts button:first-child:hover { background: color-mix(in srgb, var(--accent) var(--pick-hover-a, 28%), transparent); }
+:root:is([data-look=''], [data-look='frosted']) .need-opts .need-n { float: right; min-width: 0; margin-left: var(--sp-2); color: var(--muted); }
+@media (prefers-reduced-transparency: reduce) { :root:is([data-look=''], [data-look='frosted']) .need-opts button { border: 1px solid var(--line); } }
+:root.contrast:is([data-look=''], [data-look='frosted']) .need-opts button { border: 1px solid var(--line); }
 .project-ws .ws { padding-left: var(--sp-4); }
 .ws { font-size: var(--ws-font); } /* unset: invalid, so inherited */
 /* Settings › Appearance › Project names (App.tsx phAttrs): over any theme's (theirs are on .project-head, these on the name

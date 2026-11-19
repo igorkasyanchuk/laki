@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, contrast as ratio, materialInk, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
+import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
 
 // what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
 // 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
@@ -67,6 +67,13 @@ test('contrast: every theme is readable', () => {
       const line = over(ansi[i].slice(0, 7) + '1f', c.panel)
       need(`word mark (${k})`, c.fg, over(ink.slice(0, 7) + '26', line), 4.5)
     }
+    // Needs you's choices (styles.css, the default look and Frosted): the text on a fill of it (7%, its hover 11%) or of
+    // the accent (22%, 30%) over the card (raised)
+    // (themes.ts pickTint, its hover's; the rest 6 less, 22% at most)
+    const mix = (a: string, b: string, k: number) => hex(rgb(a).map((x, i) => x * k + rgb(b)[i] * (1 - k)))
+    const pick = pickTint(c.accent, c.raised, c.fg)
+    if (pick - 6 < 8) bad.push(`${t.name}: a Needs you choice's accent tint is ${pick - 6}%: too faint to tell it`)
+    for (const [k, what] of [[0.07, 'fg'], [0.11, 'fg'], [(pick - 6) / 100, 'accent'], [pick / 100, 'accent']] as const) need(`a Needs you choice (${what} ${Math.round(k * 100)}%)`, c.fg, mix(c[what].slice(0, 7), c.raised.slice(0, 7), k), 4.5)
     // the accent as text: applyTheme's --accent-ink
     for (const b of [...bg, c.panel, ...side]) need('accent text', readable(c.accent, [...bg, c.panel, ...side]), b, 4.5)
     // V5's translucent sidebar: its tint of the sidebar's color over the brightest and the darkest wallpaper, the worst
