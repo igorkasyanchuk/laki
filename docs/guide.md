@@ -990,6 +990,13 @@ run fails, saying so.
   `{{event.url}}`, `{{event.number}}` and `{{event.branch}}` in the prompt are its (the title goes to the agent as the
   outsider's text, never as an instruction), and a PR's run is linked to that PR. A fork's PR is held: *Run it* on its
   log entry starts it (`laki schedule add <project> --on ci.failed …`, `laki schedule release <run>`).
+- *Or after another task ends* (or type *after Nightly deps* as its time): a run as that task's run ends, at once:
+  *when it ended done* (not failed, not waiting for you) or *however it ended*; 10 a day at most, and through the same
+  queue, Only if, time limit and retries as any run. *In the workspace of the run it follows* (Where) goes on in that
+  run's worktree, its agent there. It shows under that task, a step in, with *after done* or *after any*; the Calendar
+  shows it on that task's days, with no time. One project; no loops; a chain of 5 at most. Deleting or archiving a task
+  others run after asks first and turns them off (`laki schedule add <project> --after <task> [--any] [--where parent]`,
+  `laki schedule rm <id> --force`).
 - A new workspace each run keeps its last 5 (the *keeps its last* chip: 1 to 10, or all): older ones are archived as a
   new run starts, only when nothing would be lost (no uncommitted work, no open PR, not pinned, no agent at work; the
   row counts the ones kept). A run that changed nothing is archived as its agent ends. Restore brings either back.

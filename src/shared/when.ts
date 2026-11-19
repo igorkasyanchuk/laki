@@ -66,6 +66,15 @@ const andsOf = (b: string) => {
   }
   return [...out, rest]
 }
+// T9: "after <task name>": as that task's run ends done; "…, any" / "…, either way" / "after <name> ends": however it
+// ended. The name is the task's name or id, found by the caller (schedule.ts' scheduleSet, the page's form)
+export function parseAfter(text: string): { name: string; when: 'done' | 'any' } | undefined {
+  const m = /^\s*after\s+(.+?)\s*$/i.exec(text)
+  if (!m) return undefined
+  const either = /(?:,?\s*(?:either way|any|done or not)|\s+ends)$/i
+  const name = m[1].replace(either, '').replace(/,?\s+(?:is\s+)?done$/i, '').replace(/^["'“]|["'”]$/g, '').trim()
+  return name ? { name, when: either.test(m[1]) ? 'any' : 'done' } : undefined
+}
 // English first, then a cron expression; an error in the words of the one it looks like
 export function parseWhen(text: string, now = Date.now()): Rule | { error: string } {
   if (/^\s*@/.test(text)) return parseCron(text, now) // @hourly…: cron's, never words

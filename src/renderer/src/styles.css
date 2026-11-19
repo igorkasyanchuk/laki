@@ -2327,6 +2327,8 @@ button[data-scope='broad'] .choice-rule, button[data-scope='broad'] .choice-plai
 .sched-row { display: flex; align-items: center; gap: var(--sp-5); padding: var(--sp-5) var(--sp-6); }
 .sched-row:hover { background: color-mix(in srgb, var(--hover) 50%, transparent); }
 .sched-row.editing { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+/* T9: the tasks that run after one, under it, a step in */
+.sched-deps { margin-left: var(--sp-6); padding-left: var(--sp-4); border-left: 1px solid var(--line); }
 /* the AI page (Ai.tsx): a chat like Claude's (the thread in a column, the composer at the bottom), Calls and Info tabs */
 .page-body.wide:has(> .ai-page) { padding: 0; overflow: hidden; }
 .page-body > .ai-page { flex: 1; min-height: 0; margin: 0; max-width: none; display: flex; flex-direction: column; }

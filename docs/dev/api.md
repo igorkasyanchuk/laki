@@ -344,7 +344,9 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   no checks, as off and a group;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock), `eventTick` (T4, `now`), `scheduleRelease` (`run`:
-  a held one, yours only); the CLI's `laki schedule`;
+  a held one, yours only); the CLI's `laki schedule`; T9: `scheduleSet`'s `after` (`{ task, when: 'done' | 'any',
+  perDay? }`, or `when: "after <name>"`; not with `trigger` or times; `null` clears it) and `ws: 'parent'`; `scheduleRm`'s
+  and archive's `dependents: 'off'` (the tasks after it turned off; without it a task others run after is refused);
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app
   bundle's processes by `--type`, none on plain node, which the renderer names by main's `procs` IPC (each pid's
   holder: the window, a JS widget's or the video's frame (`framesInSubtree`: JS widgets share one process, one site),

@@ -10,6 +10,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Share a workflow: its ⋯ › *Share…* saves or copies a clean file (your projects, profiles, paths and secrets become inputs), and *New workflow* › *Import…* reads one, says what it does and asks for its inputs; it comes in off.
 - Always ask for: list paths in Settings › the project (migrations, `.github/**`, lockfiles…) and an edit of one, or a command that names one, is always asked, whatever your auto-answer rules say; its card says why. And after you allow the same kind of ask 5 times in a row, Laki offers to make it a rule.
 - Fixed: hovering a finished row in Needs you drew *Changes* and *Seen* over the workspace's name; the name now gives way (cut with …) and the buttons sit beside it.
+- A scheduled task can run after another one ends: *Or after another task ends…* (or *after Nightly deps* as its time), when it ended done or however it ended, in a new workspace or on in that run's own; it shows under that task and on its days in the Calendar. [Try it](laki://schedules)
 
 ## 0.56.0 · Nov 19, 2026
 

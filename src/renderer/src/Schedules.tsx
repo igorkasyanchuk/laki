@@ -2,16 +2,17 @@
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { OnlyIf, Schedule, ScheduleRun, Settings, TaskEvent, TaskNotify, TaskTrigger, View } from '../../shared/types'
+import type { OnlyIf, Schedule, ScheduleRun, Settings, TaskAfter, TaskEvent, TaskNotify, TaskTrigger, View } from '../../shared/types'
+import { hasCap } from '../../shared/caps'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
-import { describe, nextRun, parseWhen, partsOf, type Rule, stamp, wsTitle } from '../../shared/when'
+import { describe, nextRun, parseAfter, parseWhen, partsOf, type Rule, stamp, wsTitle } from '../../shared/when'
 import { runIcon, runLine } from './runs'
 import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
 
 export type SchedulesApi = {
-  set(s: { [K in keyof Omit<Schedule, 'archived'>]?: Schedule[K] | null } & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false); null: unset (missed, catchUntil, onlyIf)
-  rm(id: string): Promise<unknown> // Delete permanently: an archived one's
+  set(s: { [K in keyof Omit<Schedule, 'archived'>]?: Schedule[K] | null } & { archived?: boolean; dependents?: 'off' }): Promise<Schedule> // archived: Archive (true) or Restore (false); null: unset (missed, catchUntil, onlyIf)
+  rm(id: string, dependents?: 'off'): Promise<unknown> // Delete permanently: an archived one's; dependents (T9): the tasks after it turned off
   toast?: (text: string, undo?: () => void) => void // Archive's, with Undo
   run(id: string): Promise<ScheduleRun>
   open(ws: string, tab?: string): void
@@ -39,7 +40,7 @@ const AT_ONCE = [1, 2, 3, 5, 0] // T8: runs going at once (0: no cap)
 const mins = (m: number) => (m ? (m % 60 ? `${m} min` : `${m / 60} h`) : 'no time limit')
 const NOTIFY: [TaskNotify, string, string][] = [['needs', 'Tell me when it needs me or fails', 'The default'], ['always', 'Tell me always', 'When it waits, fails or is done'], ['never', 'Never tell me', 'Its log says how it went']]
 // where a run goes: its words, its icon
-export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['same', 'a new workspace, then the same one each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
+export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['same', 'a new workspace, then the same one each run', 'fork'], ['parent', 'in the workspace of the run it follows', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']] // parent (T9): a task after another's only
 export const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 // how soon a run is: in 5 min, in 3 h, in 2 days
 export const soon = (t: number, now = Date.now()) => {
@@ -54,7 +55,7 @@ const SAMPLES: [string, string, string, string][] = [
   ['Update dependencies', 'every monday at 8:00', 'codex', 'Update the dependencies to their latest minor versions, run the tests, and open a PR with what changed.'],
   ['Check the nightly build', 'every day at 7:30', 'claude', "Check last night's CI run on the main branch; if it failed, find why and propose a fix."],
 ]
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean; notify?: TaskNotify; missed?: 'skip' | 'catchup'; catchUntil?: number; onlyIf?: OnlyIf; trigger?: TaskTrigger; keep?: number; emptyGone?: boolean; maxMinutes?: number } // maxMinutes (T8); trigger (T4): on an event instead of times; keep, emptyGone (T5); notify (T1), missed and catchUntil (T2), onlyIf (T3): the task's // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean; fresh?: boolean; notify?: TaskNotify; missed?: 'skip' | 'catchup'; catchUntil?: number; onlyIf?: OnlyIf; trigger?: TaskTrigger; after?: TaskAfter; keep?: number; emptyGone?: boolean; maxMinutes?: number } // after (T9): as another task's run ends; maxMinutes (T8); trigger (T4): on an event instead of times; keep, emptyGone (T5); notify (T1), missed and catchUntil (T2), onlyIf (T3): the task's // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -180,8 +181,9 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const only = view.projects.length > 1 && view.projects.some(p => p.id === picked) ? picked : '' // a removed project, or the only one: all
   const all = (view.schedules ?? []).filter(s => !only || s.project === only)
   const schedules = all.filter(s => !s.archived)
-  const timed = schedules.filter(s => !s.trigger)
-  const onEvents = schedules.filter(s => s.trigger) // T4: their own section
+  const under = (s: Schedule) => !!s.after && schedules.some(x => x.id === s.after!.task) // T9: shown under the task it runs after
+  const timed = schedules.filter(s => !s.trigger && !under(s))
+  const onEvents = schedules.filter(s => s.trigger && !under(s)) // T4: their own section
   const archived = all.filter(s => s.archived).sort((a, b) => b.archived! - a.archived!)
   const [showArchived, setShowArchived] = useState(false)
   const runs = (view.runs ?? []).filter(r => !only || (r.project ?? view.schedules?.find(s => s.id === r.schedule)?.project) === only)
@@ -230,7 +232,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const [menu, openMenu] = useMenu()
   const set = (k: Partial<Form>) => setForm(f => f && { ...f, ...k })
   const project = view.projects.find(p => p.id === form?.project)
-  const rule = form?.when.trim() ? parseWhen(form.when) : null
+  const rule = form?.when.trim() && !parseAfter(form.when) ? parseWhen(form.when) : null // T9's "after <task>": not a time
   const fail = (e: unknown) => setErr((e as Error).message)
   const first = rule && !('error' in rule) ? nextRun(rule, Date.now()) : undefined // the next run: what the names preview
   const makes = !form?.workflow && !form?.widget && (form?.ws === 'new' || form?.ws === 'local-new' || form?.ws === 'same') // a row of its own each run (same: its first), named (a workflow's runs: as it names them)
@@ -246,13 +248,19 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const base = form?.base ?? (form?.id ? '' : (listed?.main ?? ''))
 
   const evented = !!form?.trigger && !form.workflow && !form.widget // T4: on an event, not at times
+  // T9: after another task: the chips' pick, or "after <name>" typed in When (the daemon finds it by name or id)
+  const mine = schedules.filter(x => x.project === form?.project && x.id !== form?.id)
+  const typed = form && !form.after ? parseAfter(form.when) : undefined
+  const typedTask = typed && mine.find(x => x.id === typed.name || x.name?.toLowerCase() === typed.name.toLowerCase())
+  const aftered = !evented && (!!form?.after || !!typedTask)
+  const afterOn = hasCap(view, 'schedule.after')
   const newEach = form?.ws === 'new' && !form.workflow && !form.widget // T5: a worktree each run: how many it keeps
-  const ready = !!form && !saving && (!!form.prompt.trim() || !!form.widget) && (evented || (!!rule && !('error' in rule))) && !!form.ws && (!scopedExt || !WHERE.some(x => x[0] === form.ws))
+  const ready = !!form && !saving && (!!form.prompt.trim() || !!form.widget) && (evented || aftered || (!!rule && !('error' in rule))) && !!form.ws && (!scopedExt || !WHERE.some(x => x[0] === form.ws))
   const save = async () => {
     if (!form || !ready) return
     setSaving(true)
     setErr('')
-    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh, notify: form.notify ?? 'needs', missed: form.missed ?? null, catchUntil: form.catchUntil ?? null, onlyIf: !form.workflow && !form.widget ? (form.onlyIf ?? null) : null, trigger: evented ? form.trigger : null, when: evented ? '' : form.when, keep: newEach ? (form.keep ?? null) : null, emptyGone: newEach && form.emptyGone === false ? false : null, maxMinutes: !form.workflow && !form.widget ? (form.maxMinutes ?? null) : null }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script; null: unset
+    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip, fresh: shares && !!form.fresh, notify: form.notify ?? 'needs', missed: form.missed ?? null, catchUntil: form.catchUntil ?? null, onlyIf: !form.workflow && !form.widget ? (form.onlyIf ?? null) : null, trigger: evented ? form.trigger : null, ...(afterOn && { after: !evented && form.after ? form.after : null }), when: evented || (form.after && !evented) ? '' : form.when, ws: form.ws === 'parent' && !aftered ? where0(form.project) : form.ws, keep: newEach ? (form.keep ?? null) : null, emptyGone: newEach && form.emptyGone === false ? false : null, maxMinutes: !form.workflow && !form.widget ? (form.maxMinutes ?? null) : null }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script; null: unset
     setSaving(false)
   }
   const run = async (s: Schedule) => {
@@ -264,8 +272,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const edit = (s: Schedule) => {
     // the project's local workspace is its folder; one that's gone: what Where's menu offers, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
-    const ws = ['new', 'same', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf, trigger: s.trigger, keep: s.keep, emptyGone: s.emptyGone, maxMinutes: s.maxMinutes })
+    const ws = ['new', 'same', 'parent', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }), notify: s.notify, missed: s.missed, catchUntil: s.catchUntil, onlyIf: s.onlyIf, trigger: s.trigger, after: s.after, keep: s.keep, emptyGone: s.emptyGone, maxMinutes: s.maxMinutes })
   }
   // T6: Fix on a task that's off after failing: its form, at the field that broke
   const [spot, setSpot] = useState<{ id: string; field: string }>() // the task's form, once it's open (a discard ask may come first)
@@ -283,6 +291,21 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       ...EVENT_WORDS.map(([k, words, icon]) => ({ label: `When ${words}`, icon, hint: form?.trigger?.event === k ? ON : undefined, run: () => setTrigger({ event: k }) }) as MenuItem),
       null,
       { label: 'At times instead', icon: 'clock', run: () => set({ trigger: undefined }) },
+    ])
+  // T9: the task it runs after, and how that run must end
+  const afterTo = (k: Partial<TaskAfter>) => setForm(f => (f?.after ? { ...f, after: { ...f.after, ...k } } : f))
+  const afterName = (id?: string) => (t => (t ? titleOf(t) : 'a task that is gone'))(view.schedules?.find(x => x.id === id))
+  const afterMenu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { head: 'Runs after' },
+      ...mine.map(t => ({ label: titleOf(t), sub: t.after ? `after ${afterName(t.after.task)}` : t.trigger ? triggerWords(t.trigger) : describe(t.rule), icon: 'cornerUpRight', hint: form?.after?.task === t.id ? ON : undefined, run: () => afterTo({ task: t.id }) }) as MenuItem),
+      null,
+      { label: 'At times instead', icon: 'clock', run: () => set({ after: undefined, ...(form?.ws === 'parent' && { ws: where0(form.project) }) }) },
+    ])
+  const afterHow = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { label: 'When it ended done', sub: 'Not failed, not waiting for you', icon: 'check', hint: form?.after?.when !== 'any' ? ON : undefined, run: () => afterTo({ when: 'done' }) },
+      { label: 'However it ended', sub: 'Done, failed or stopped', icon: 'cornerUpRight', hint: form?.after?.when === 'any' ? ON : undefined, run: () => afterTo({ when: 'any' }) },
     ])
   const byMenu = (e: React.MouseEvent) =>
     openMenu(e, (['any', 'others', 'me'] as const).map(k => ({ label: k === 'any' ? 'By anyone' : k === 'others' ? 'By others' : 'By me', sub: k === 'me' ? 'Your GitHub login' : undefined, icon: 'user', hint: (form?.trigger?.by ?? 'any') === k ? ON : undefined, run: () => setTrigger({ by: k === 'any' ? undefined : k }) }) as MenuItem))
@@ -312,10 +335,14 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
         : []),
     ])
   const titleOf = (s: Schedule) => s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))
-  const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: 'It and its settings go for good; its runs stay in the log.', ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id).catch(fail))
+  // T9: the tasks that run after it, turned off as it goes (asked first)
+  const after = (s: Schedule) => (view.schedules ?? []).filter(x => x.after?.task === s.id && !x.archived)
+  const offToo = (s: Schedule) => (n => (n.length ? ` ${n.map(titleOf).join(', ')} ${n.length > 1 ? 'run' : 'runs'} after it: ${n.length > 1 ? 'they turn' : 'it turns'} off.` : ''))(after(s))
+  const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: `It and its settings go for good; its runs stay in the log.${offToo(s)}`, ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id, 'off').catch(fail))
   // Archive: off the list and never run, until it's restored; the toast's Undo restores it
-  const archive = (s: Schedule, on: boolean) =>
-    api.set({ id: s.id, archived: on }).then(
+  const archive = async (s: Schedule, on: boolean) =>
+    (!on || !after(s).length || (await ask(`Archive ${titleOf(s)}?`, { text: offToo(s).trim(), ok: 'Archive' }))) &&
+    api.set({ id: s.id, archived: on, ...(on && { dependents: 'off' as const }) }).then(
       () => (on && form?.id === s.id && setForm(null), api.toast?.(on ? `Archived ${titleOf(s)}` : `Restored ${titleOf(s)}`, on ? () => void api.set({ id: s.id, archived: false }).catch(fail) : undefined)),
       fail,
     )
@@ -355,7 +382,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     form &&
     openMenu(e, [
       ...(scopedExt ? [] : [{ head: 'Each run' } as MenuItem]),
-      ...WHERE.filter(([k]) => !scopedExt && ((k !== 'new' && k !== 'same') || project?.git !== false)).flatMap(([k, label, icon]) => [
+      ...WHERE.filter(([k]) => !scopedExt && (k !== 'parent' || (aftered && !form.workflow && !form.widget)) && ((k !== 'new' && k !== 'same') || project?.git !== false)).flatMap(([k, label, icon]) => [
         { label: label[0].toUpperCase() + label.slice(1), icon, hint: form.ws === k && !(k === 'new' && skip) ? ON : undefined, run: () => set({ ws: k, noSetup: undefined }) } as MenuItem,
         // as the new-workspace page's New worktree, no setup: a prompt's task, where the project has a setup script
         ...(k === 'new' && !form.workflow && !form.widget && project?.hasSetup ? [{ label: 'A new workspace each run, no setup', icon, sub: "Without the project's setup script", hint: skip ? ON : undefined, run: () => set({ ws: k, noSetup: true }) } as MenuItem] : []),
@@ -412,18 +439,21 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const valid = !!rule && !('error' in rule)
 
   // a task's row: the list's, and the empty list's samples (B6)
-  const row = (s: Schedule) => (
+  const row = (s: Schedule, seen: string[] = []): React.ReactNode => (
+    <>
                 <div className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
                   {((k: IconName) => (
                     <span className="sched-icon" data-kind={k}>
                       <Icon name={k} />
                     </span>
-                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' || s.ws === 'same' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
+                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' || s.ws === 'same' || s.ws === 'parent' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
                   <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
                     <span className="sched-name">{s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt)}</span>
                     <span className="sched-meta">
-                      <b>{s.trigger ? triggerWords(s.trigger) : describe(s.rule)}</b>
-                      {s.trigger ? (
+                      <b>{s.after ? `after ${s.after.when}` : s.trigger ? triggerWords(s.trigger) : describe(s.rule)}</b>
+                      {s.after ? (
+                        <span>{s.on ? `as ${(p => (p ? titleOf(p) : 'a task that is gone'))(view.schedules?.find(x => x.id === s.after!.task))} ends` : 'off'}</span>
+                      ) : s.trigger ? (
                         <span>{s.on ? 'on events' : 'off'}</span>
                       ) : s.on && s.next ? (
                         <span className="sched-next" data-tip={at(s.next)}>
@@ -454,8 +484,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                     {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
                     <IconButton icon="archive" title="Archive: off the list, never runs; Archived below brings it back" onClick={() => void archive(s, true)} />
                   </span>
-                  <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
+                  <Switch on={s.on} tip={s.on ? (s.after ? 'On: runs as the task above ends' : 'On: runs at its times') : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
                 </div>
+      {/* T9: the tasks that run after it, under it */}
+      {(kids => kids.length > 0 && <div className="sched-deps">{kids.map(k => <div key={k.id}>{row(k, [...seen, s.id])}</div>)}</div>)(schedules.filter(x => x.after?.task === s.id && !seen.includes(x.id)))}
+    </>
   )
   return (
     <Page title="Scheduled tasks" esc={false} onClose={onClose}>
@@ -507,7 +540,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
           <div key={s.id} className="sched-paused" role="alert">
             <Icon name="alertCircle" />
             <span>
-              <b>{titleOf(s)}</b> is off: it failed {s.fails ?? 3} times in a row. {s.pausedWhy}
+              <b>{titleOf(s)}</b> is off{s.fails ? `: it failed ${s.fails} times in a row` : ''}. {s.pausedWhy}
             </span>
             <button type="button" onClick={() => fix(s)}>
               Fix
@@ -565,6 +598,23 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   <Icon name="check" /> One run an event, {form.trigger!.gap ?? 30} minutes apart at least, {form.trigger!.perDay ?? 10} a day at most; a fork's PR waits for your click. {'{{event.title}}'}, {'{{event.url}}'}, {'{{event.number}}'} and {'{{event.branch}}'} in the prompt are its
                 </div>
               </>
+            ) : form.after ? (
+              <>
+                <div className="nw-chips sched-event">
+                  <button type="button" className="nw-chip" data-field="after" aria-haspopup="menu" data-tip="The task whose run it follows" onClick={afterMenu}>
+                    <Icon name="cornerUpRight" />
+                    <span className="nw-chip-text">after {afterName(form.after.task)}</span>
+                    <Icon name="chevron" size={11} />
+                  </button>
+                  <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="How that run must end" onClick={afterHow}>
+                    <span className="nw-chip-text">{form.after.when === 'any' ? 'however it ended' : 'when it ended done'}</span>
+                    <Icon name="chevron" size={11} />
+                  </button>
+                </div>
+                <div className="schedule-preview muted">
+                  <Icon name="check" /> Runs at once as {afterName(form.after.task)}'s run ends{form.after.when === 'any' ? '' : ' done'}, {form.after.perDay ?? 10} a day at most
+                </div>
+              </>
             ) : (
               <>
               <label className={`nw-chip sched-when ${rule && !valid ? 'bad' : ''}`}>
@@ -572,12 +622,13 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 <input className="nw-chip-input" value={form.when} aria-label="When" placeholder={`When: ${EXAMPLES[0]}`} spellCheck={false} onChange={e => set({ when: e.target.value })} />
               </label>
               {rule && 'error' in rule && <div className="field-err">{rule.error}</div>}
+              {typed && (typedTask ? <div className="schedule-preview"><Icon name="check" /> Runs as {titleOf(typedTask)}'s run ends{typed.when === 'any' ? '' : ' done'}</div> : <div className="field-err">No task in {project?.name} is named {typed.name}</div>)}
               {valid && (
                 <button type="button" className="link small sched-missed" aria-haspopup="menu" onClick={missedMenu}>
                   If the Mac sleeps through it: {catchesOf(rule, form.missed) ? `runs when it wakes, until ${form.catchUntil !== undefined ? hm(form.catchUntil) : 'its next time'}` : 'skipped (the log says so)'}
                 </button>
               )}
-              {valid ? (
+              {typed ? null : valid ? (
                 <div className="schedule-preview">
                   <Icon name="check" /> {describe(rule)} · next {nextOf(rule).map(at).join(', ')}
                 </div>
@@ -593,6 +644,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 {!form.workflow && !form.widget && (
                   <button type="button" className="link small sched-missed" onClick={() => set({ trigger: { event: 'ci.failed' } })}>
                     Or on an event: CI failing, a PR, an issue, a push…
+                  </button>
+                )}
+                {afterOn && mine.length > 0 && !typed && (
+                  <button type="button" className="link small sched-missed" onClick={() => set({ after: { task: mine[0].id, when: 'done' } })}>
+                    Or after another task ends…
                   </button>
                 )}
               </>

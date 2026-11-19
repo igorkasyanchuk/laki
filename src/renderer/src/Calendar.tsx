@@ -16,7 +16,7 @@ export type CalendarApi = {
   openWs(ws: string): void
   openSchedules(): void
 }
-type Item = { key: string; at: number; kind: 'task' | 'run' | 'reminder'; text: string; tip?: string; ok?: boolean; icon?: IconName; r?: Reminder; ws?: string } // icon: a run's end (T1)
+type Item = { key: string; at: number; kind: 'task' | 'run' | 'reminder'; text: string; tip?: string; ok?: boolean; icon?: IconName; r?: Reminder; ws?: string; untimed?: boolean } // icon: a run's end (T1); untimed (T9): a task after another, on that one's day
 
 const DAY = 86400000
 const MANY = 4 // a task with more times a day than this is one line for the day (every 30 minutes…)
@@ -46,6 +46,18 @@ export function occurrences(s: Schedule, from: number, to: number): Item[] {
     else for (const at of ats) out.push({ key: `t:${s.id}:${at}`, at, kind: 'task', text: name, tip })
   }
   return out
+}
+// T9: a task after another: on each day its chain's first task (one at times) runs, after it, with no time of its own
+export function afterOccurrences(s: Schedule, all: Schedule[], from: number, to: number): Item[] {
+  if (!s.on || !s.after) return []
+  let root: Schedule | undefined = s
+  for (let n = 0; root?.after && n < 6; n++) root = all.find(x => x.id === root!.after!.task && x.on && !x.archived)
+  if (!root || root.after || root.trigger) return [] // off, gone, or on an event: no day to show
+  const name = s.name || s.prompt.trim().split(/\s+/).slice(0, 6).join(' ')
+  const p = all.find(x => x.id === s.after!.task)
+  const tip = `${name} · after ${p?.name || p?.prompt.trim().split(/\s+/).slice(0, 6).join(' ')} (${s.after.when === 'any' ? 'however it ends' : 'done'})`
+  const days = new Set<number>()
+  return occurrences(root, from, to).filter(x => !days.has(dayOf(x.at)) && days.add(dayOf(x.at))).map(x => ({ key: `a:${s.id}:${dayOf(x.at)}`, at: x.at + 1, kind: 'task' as const, text: name, tip, untimed: true }))
 }
 // a rule's times between from and to, a list per day that has any
 const timesOf = (rule: Rule, from: number, to: number) => {
@@ -81,7 +93,7 @@ export function CalendarPage({ schedules, runs, reminders, waits = [], workspace
   const end = addDays(first, days)
   const items = useMemo(() => {
     const all: Item[] = [
-      ...schedules.flatMap(s => occurrences(s, Math.max(first, Date.now()), end)), // what's coming; what was is the runs
+      ...schedules.flatMap(s => (s.after ? afterOccurrences(s, schedules, Math.max(first, Date.now()), end) : occurrences(s, Math.max(first, Date.now()), end))), // what's coming; what was is the runs
       ...runs.filter(r => r.at >= first && r.at < end).map(r => ({ key: `r:${r.id}`, at: r.at, kind: 'run' as const, text: r.name, tip: runLine(r), ok: r.ok && r.state !== 'failed', icon: runIcon(r), ws: r.ws })),
       ...waits.filter(w => w.until >= first && w.until < end).map(w => ({ key: `w:${w.id}`, at: w.until, kind: 'task' as const, text: `${w.name} goes on`, tip: 'A workflow run waiting for this time (W9)', ws: w.ws })), // a run waiting more than a day
       ...reminders.flatMap(r => remindersAt(r, first, end).map(x => ({ r, ...x }))).map(({ r, at, n }) => ({ key: `m:${r.id}:${at}`, at, kind: 'reminder' as const, text: n > 1 ? `${r.text} ×${n}` : r.text, tip: [r.every && `repeats: ${r.every} (a tick stops it)`, r.by && `from ${r.by}`, r.ws && workspaces.find(w => w.id === r.ws)?.name].filter(Boolean).join(' · ') || undefined, r, ws: r.ws })),
@@ -113,7 +125,7 @@ export function CalendarPage({ schedules, runs, reminders, waits = [], workspace
       ) : (
         <Icon name={i.kind === 'task' ? 'clock' : (i.icon ?? (i.ok ? 'check' : 'x'))} size={11} />
       )}
-      <span className="cal-time">{hm(i.at)}</span>
+      <span className="cal-time">{i.untimed ? 'after' : hm(i.at)}</span>
       {i.r?.every && <Icon name="repeat" size={10} />}
       <span className="cal-text" {...act(() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules()))}>{i.text}</span>
       {i.kind === 'reminder' && <IconButton icon="alertCircle" title={i.r!.important ? 'Important: rings as a card on screen (a click: a notification again)' : 'Make it important: it rings as a card on screen, until you close it'} className={`cal-imp ${i.r!.important ? 'on' : ''}`} onClick={() => api.set({ id: i.r!.id, important: !i.r!.important }).catch(() => {})} />}

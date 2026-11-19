@@ -358,6 +358,22 @@ still waiting at its task's next time: a *skipped: queue* entry at its due time,
 archived: its place goes. Run now, a retry and a catch-up don't wait; an extension's fetch isn't counted. The form's
 clock chip sets the task's limit and, below it, every task's and how many at once (`SchedulesApi.settings`).
 
+After another task (T9, `after: { task, when, perDay }`, instead of times or an event: `when` '', an empty `rule`, no
+`next`; `afterOf` as it's saved: the task there, not itself, in its project, not archived, no loop (the chain above it,
+walked), `CHAIN_MAX` 5 with the chain below it (`below`); `when: "after <name>"` is when.ts' `parseAfter`, the name or id
+found among the project's tasks). `afterEnded(r)` as a run ends: `runEnded` (done, failed: not a wait), `timeTick`'s
+stopped, `scheduleFlowEnded`, an extension's run, a failed start with no retry waiting (`settle`'s `again` is not an
+end); each task after it that's on (`done`: only a run that ended done; `any`: however) once per run (`afterRun`, the
+run's id, set before it starts: a resumed turn's end again doesn't start it twice), `afterGo`: `perDay` (unset
+`EVENT_DAY`, 10) by its runs today with `after`, a skipped one logged; then the queue (`full`, `inLine`, one waiting
+skipped as the queue's are) or `runSchedule` with *after Nightly deps (done):* before what it did. Only if, its plan
+limit, its time limit, retries: as any run. `ws: 'parent'` (after only, an agent's task): `parentWs`, the workspace of
+the run in `afterRun`, its agent there told (`send` whenIdle), as a workspace it shares. Deleting or archiving a task
+others run after throws unless `dependents: 'off'` (the page asks; the CLI's `--force`): `orphans` turns them off with
+`pausedWhy` and `pausedField: 'after'` (Fix, at its chip). The page shows them under that task (`under`, a step in:
+`.sched-deps`), *after done* / *after any*; the Calendar on that chain's first timed task's days (`afterOccurrences`,
+`untimed`).
+
 ### Notifications
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind

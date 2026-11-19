@@ -568,7 +568,7 @@ export function Pages({ app }: { app: AppCtx }) {
           onClose={() => setDialog(null)}
           api={{
             set: s => api.call('scheduleSet', s),
-            rm: id => api.call('scheduleRm', { id }),
+            rm: (id, dependents) => api.call('scheduleRm', { id, ...(dependents && { dependents }) }),
             toast: (text, undo) => toast(text, undo),
             run: id => api.call('scheduleRun', { id }),
             release: run => api.call('scheduleRelease', { run }),

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { describe, describeHours, inHours, minutesOn, nextRun, parseCron, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
+import { describe, describeHours, inHours, minutesOn, nextRun, parseAfter, parseCron, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
 import { fresh, until } from './helpers.ts'
 
 const SUN = new Date(2026, 9, 4, 10, 0).getTime() // Sunday 4 October 2026, 10:00
@@ -528,4 +528,92 @@ test('cron: what it refuses names the field', () => {
   // through parseWhen: a cron-looking line says cron's error, words say the English one
   assert.match((parseWhen('0 9 ? * mon') as { error: string }).error, /day of month/)
   assert.match((parseWhen('sometime soon') as { error: string }).error, /time/i)
+})
+
+test('T9: after another task: B runs as A ends done, not when A fails; any runs both ways; loops, long chains and another project refused', async t => {
+  assert.deepEqual(parseAfter('after Nightly deps'), { name: 'Nightly deps', when: 'done' })
+  assert.deepEqual(parseAfter('after "Build" ends'), { name: 'Build', when: 'any' })
+  assert.deepEqual(parseAfter('after build, any'), { name: 'build', when: 'any' })
+  assert.equal(parseAfter('afternoon at 3'), undefined)
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { scheduleAtOnce: 0 }) // T8's cap: schedule-runs.test
+  const task = (o: object) => rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', when: 'every day at 2am', ...o })
+  const runsOf = async (id: string) => ((await rig.rpc('state')).runs as any[]).filter(r => r.schedule === id)
+  const ended = (id: string, st: string) => until(async () => (await runsOf(id))[0]?.state === st, `${id}'s run ${st}`)
+  const a = await task({ name: 'Nightly deps', prompt: 'nightly deps' })
+  const f = await task({ name: 'Breaks', prompt: 'apierror please' })
+  // the English line, or the field: no times, no next; one trigger a task
+  const b = await task({ prompt: 'after deps', when: 'after nightly deps' })
+  assert.deepEqual([b.after, b.when, b.next, b.rule.times], [{ task: a.id, when: 'done' }, '', undefined, []])
+  const e = await task({ prompt: 'after deps either way', when: '', after: { task: a.id, when: 'any' } })
+  const c = await task({ prompt: 'after breaks', when: 'after Breaks' })
+  const d = await task({ prompt: 'after breaks either way', when: 'after Breaks, any' })
+  await assert.rejects(task({ prompt: 'x', when: 'after nobody' }), /none in .* is named nobody/)
+  await assert.rejects(task({ prompt: 'x', after: { task: a.id }, trigger: { event: 'push' } }), /one trigger a task/)
+  await assert.rejects(task({ prompt: 'x', ws: 'parent' }), /that's for a task that runs after another/)
+  await assert.rejects(rig.rpc('scheduleSet', { id: a.id, after: { task: a.id } }), /can't run after itself/)
+  // a loop refused; a chain of 5 at most (a, b, x1, x2, x3)
+  await assert.rejects(rig.rpc('scheduleSet', { id: a.id, when: 'after ' + b.id }), /a loop: Nightly deps → after deps → Nightly deps/)
+  const x1 = await task({ name: 'x1', prompt: 'x1', after: { task: b.id }, when: '' })
+  const x2 = await task({ name: 'x2', prompt: 'x2', after: { task: x1.id }, when: '' })
+  const x3 = await task({ name: 'x3', prompt: 'x3', after: { task: x2.id }, when: '' })
+  await assert.rejects(task({ prompt: 'x4', after: { task: x3.id }, when: '' }), /a chain of 5 tasks at most: this one would make 6/)
+  for (const x of [x3, x2, x1]) await rig.rpc('scheduleRm', { id: x.id })
+  // another project's task: refused
+  const plain = join(rig.home, 'other')
+  mkdirSync(plain)
+  execFileSync('git', ['init', '-q', plain])
+  const q = await rig.rpc('projectAdd', { path: plain })
+  await assert.rejects(rig.rpc('scheduleSet', { project: q.id, preset: 'claude', ws: 'local', prompt: 'x', after: { task: a.id }, when: '' }), /is in another project/)
+
+  // A done: B (done) and E (any) run, once each; F failed: C (done) doesn't, D (any) does
+  await rig.rpc('scheduleRun', { id: a.id })
+  await rig.rpc('scheduleRun', { id: f.id })
+  await ended(a.id, 'done')
+  await ended(f.id, 'failed')
+  await until(async () => (await runsOf(b.id)).length && (await runsOf(e.id)).length && (await runsOf(d.id)).length, 'b, e and d ran')
+  const [rb] = await runsOf(b.id)
+  assert.match(rb.what, /^after Nightly deps \(done\): started in a new workspace/)
+  assert.equal(rb.after, (await runsOf(a.id))[0].id)
+  assert.match((await runsOf(d.id))[0].what, /^after Breaks \(failed\): started/)
+  assert.equal((await runsOf(c.id)).length, 0)
+  assert.equal((await rig.rpc('state')).schedules.find((x: any) => x.id === c.id).afterRun, undefined)
+  await until(async () => (await rig.tab(rb.ws)).last === 'answer: after deps', 'b got its prompt')
+  await ended(b.id, 'done')
+  assert.equal((await runsOf(b.id)).length, 1, 'once per run of a')
+
+  // deleting or archiving a task others wait on: asked, then they're off with why
+  await assert.rejects(rig.rpc('scheduleRm', { id: f.id }), /after breaks, after breaks either way wait on it: deleting it turns them off/)
+  const no = await rig.cli('schedule', 'archive', f.id)
+  assert.ok(no.code !== 0 && /wait on it: archiving it turns them off/.test(no.err), no.err)
+  assert.equal((await rig.cli('schedule', 'archive', f.id, '--force')).out.trim(), `${f.id} archived`)
+  const off = (await rig.rpc('state')).schedules.find((x: any) => x.id === d.id)
+  assert.deepEqual([off.on, off.pausedWhy, off.pausedField], [false, 'it runs after Breaks, which was archived', 'after'])
+})
+
+test('T9: in the same workspace as its run: B goes on in A\'s worktree, its agent; the runs a day at most still hold', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { scheduleAtOnce: 0 })
+  const runsOf = async (id: string) => ((await rig.rpc('state')).runs as any[]).filter(r => r.schedule === id)
+  const a = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', name: 'Fix', prompt: 'fix it', when: 'every day at 2am' })
+  // the CLI: --after (its name or id), --where parent, the line says so
+  const add = await rig.cli('schedule', 'add', p.id, '--after', 'Fix', '--where', 'parent', '--name', 'Review', 'review it')
+  assert.match(add.out, / {2}after Fix \(done\) {2}/, add.err)
+  const b = (await rig.rpc('state')).schedules.find((x: any) => x.name === 'Review')
+  await rig.rpc('scheduleSet', { id: b.id, after: { task: a.id, when: 'done', perDay: 1 } })
+  const r1 = await rig.rpc('scheduleRun', { id: a.id })
+  await until(async () => (await runsOf(b.id)).length > 0, 'b ran')
+  const [rb] = await runsOf(b.id)
+  assert.equal(rb.ws, r1.ws, "a's run's workspace")
+  assert.equal(rb.tab, r1.tab, 'its agent there got it')
+  assert.match(rb.what, /^after Fix \(done\): (sent to|queued for) its tab/)
+  await until(async () => (await rig.tab(r1.ws)).last === 'answer: review it', 'the same agent answered')
+  // a second run of a today: b's one a day is used, its run skipped and logged
+  await rig.rpc('scheduleRun', { id: a.id })
+  await until(async () => (await runsOf(b.id)).length === 2, "b's second, skipped")
+  const [skip] = await runsOf(b.id)
+  assert.equal(skip.skipped, true)
+  assert.match(skip.what, /^skipped: after Fix \(done\), 1 today already \(its most\)/)
 })
