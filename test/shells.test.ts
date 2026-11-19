@@ -251,8 +251,14 @@ test('Shell: shell tabs start the picked one, checked; agents keep the login she
   assert.equal((await rig.rpc('termShells', { check: fish })).ok, fish)
   const listed = await rig.rpc('termShells', {})
   assert.ok(listed.login && !listed.shells.includes(listed.login) && listed.shells.every((x: string) => x.startsWith('/')), 'the login shell, then the others')
-  await rig.rpc('settingsSet', { termShell: fish })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const before = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'before' })
+  const old = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === before.id), 'a shell on the login one')
+  await rig.rpc('settingsSet', { termShell: fish })
+  // one started before the change keeps its own shell's quoting (POSIX here), not the picked one's
+  await rig.rpc('tabSet', { id: old.id, name: "it's" })
+  await rig.rpc('send', { target: old.id, text: 'echo {{tab}}', vars: true })
+  await until(async () => (await rig.screen(`${before.id}/${old.id}`)).includes("echo 'it'\\''s'"), 'POSIX quoting in the older tab')
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
   const sh = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its shell')
   const target = `${ws.id}/${sh.id}`
@@ -279,4 +285,7 @@ test('Shell: shell tabs start the picked one, checked; agents keep the login she
   const said = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Your shell is gone'), 'its notice, once')
   assert.match(said.text, /fish isn't there: shell tabs start your login shell/)
   assert.equal((await rig.rpc('state')).settings.termShell, fish)
+  // '' is the login shell again (Settings' pick: undefined never reaches the daemon)
+  await rig.rpc('settingsSet', { termShell: '' })
+  assert.equal((await rig.rpc('state')).settings.termShell, undefined)
 })

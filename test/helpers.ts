@@ -17,8 +17,10 @@ const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
 // The rig's daemon and CLI come from the build (out/main: npm test, test:one and test:changed build first, 2 s), which
 // gives its hooks and laki calls their built scripts too (core.ts cliPath, hookPath): a daemon boots on a third of the
 // CPU, and the suite is CPU-bound. From source with LAKI_TEST_SRC=1 (test:cov: coverage of src), or when the build is
-// missing or older than any file it's made of (a node --test run by hand after an edit): said once, never stale code
-const built = (() => {
+// missing or older than any file it's made of (a node --test run by hand after an edit): said once, never stale code;
+// checked at a file's first daemon or CLI call (test:fast's files start neither)
+let builtAt: boolean | undefined
+const built = () => (builtAt ??= (() => {
   if (process.env.LAKI_TEST_SRC === '1') return false
   const at = (f: string) => statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0
   const made = Math.min(...['daemon.js', 'cli.js', 'hook.js'].map(f => at(join(root, 'out/main', f))))
@@ -26,8 +28,8 @@ const built = (() => {
   if (made && Math.max(...src) <= made) return true
   console.error(`test rig: ${made ? 'out/main is older than src' : 'no out/main'} (npm run build): the daemon runs from source, slower`)
   return false
-})()
-const entry = (src: string, out: string) => join(root, built ? out : src)
+})())
+const entry = (src: string, out: string) => join(root, built() ? out : src)
 
 // R9: one multiplier for every wait's limit (until, seen; not sleep): LAKI_TEST_SLOW, else from the load as this file
 // starts (1 on a quiet machine, up to 3 with more runnable processes than cores: a release build beside the tests)

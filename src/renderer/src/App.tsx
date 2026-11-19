@@ -3763,7 +3763,7 @@ export function App() {
           {/* Video, Meme and Timer under ⋯ (each still off in Settings › Appearance); one in use shows as its own button */}
           {!!video && <IconButton icon="youtube" title="The video you're watching" label={words ? 'Video' : undefined} on onClick={() => setDialog('video')} />}
           {timers.length + watches.length > 0 && <IconButton icon="timer" title="Timers: another one, or a stopwatch" label={words ? 'Timer' : undefined} on onClick={e => openMenu(e, startMenu())} />}
-          {(extras => extras.length > 0 && <IconButton icon="more" title="More: Video, Meme, Timer" on={dialog === 'fun'} onClick={e => openMenu(e, extras)} />)([
+          {(extras => extras.length > 0 && <IconButton icon="more" className="foot-more" title={`More: ${extras.map(i => (i && 'label' in i ? i.label : '')).filter(Boolean).join(', ')}`} on={dialog === 'fun'} onClick={e => openMenu(e, extras)} />)([
             ...(settings.videoButton !== false && !video ? [{ label: 'Video', icon: 'youtube', tip: 'Watch a YouTube video while you work (off: Settings › Appearance)', run: () => setDialog('video') } as MenuItem] : []),
             ...(settings.fun !== false ? [{ label: 'Meme', icon: 'smile', tip: 'A random meme from Reddit, for a break (off: Settings › Appearance)', run: () => setDialog(d => (d === 'fun' ? null : 'fun')) } as MenuItem] : []),
             ...(settings.timerButton !== false && timers.length + watches.length === 0 ? [{ label: 'Timer', icon: 'timer', tip: 'A countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)', items: startMenu() } as MenuItem] : []),

@@ -408,38 +408,41 @@ const SAMPLE = [
 // a terminal drawing SAMPLE with the settings; click it to see the cursor as in a focused tab
 // Terminal › Shell: the login shell, or one of this Mac's (the daemon's termShells: /etc/shells and the usual install
 // folders), or another path; each checked by the daemon before it's set (Settings saves every setting at once: a bad one
-// would hold the rest back). One set and gone since says so: shell tabs start the login shell meanwhile
-function ShellField({ value, call, onChange }: { value?: string; call?: Call; onChange: (v?: string) => void }) {
+// would hold the rest back); '' is the login shell again (undefined never reaches it). One set and gone since says so: shell
+// tabs start the login shell meanwhile. Its group: none until the daemon lists them (an older one doesn't)
+function ShellField({ value, call, onChange }: { value?: string; call?: Call; onChange: (v: string) => void }) {
   const [list, setList] = useState<{ login: string; shells: string[] }>()
   const [other, setOther] = useState(false)
   const [err, setErr] = useState('')
   useEffect(() => void call?.('termShells', {}).then(setList, () => {}), [])
   useEffect(() => void (value && call?.('termShells', { check: value }).then(() => setErr(''), e => setErr(`${(e as Error).message}: shell tabs start your login shell meanwhile`))), [value])
-  const pick = (v: string) => (v ? call?.('termShells', { check: v }).then(() => (setErr(''), setOther(false), onChange(v)), e => setErr((e as Error).message)) : (setErr(''), onChange(undefined)))
+  const pick = (v: string) => (v ? call?.('termShells', { check: v }).then(() => (setErr(''), setOther(false), onChange(v)), e => setErr((e as Error).message)) : (setErr(''), onChange('')))
   if (!list) return null
   const shells = value && !list.shells.includes(value) ? [...list.shells, value] : list.shells
   return (
-    <div className="setting-box">
-      <label className="switch-row">
-        <select value={other ? '…' : (value ?? '')} onChange={e => (e.target.value === '…' ? setOther(true) : (setOther(false), void pick(e.target.value)))}>
-          <option value="">Your login shell ({list.login.split('/').pop()})</option>
-          {shells.map(x => (
-            <option key={x} value={x}>
-              {x}
-            </option>
-          ))}
-          <option value="…">Another path…</option>
-        </select>
-        <Says title="New shell tabs start" hint="Terminals too. Agents and a project's scripts (setup, run, teardown) keep your login shell" />
-      </label>
-      {other && (
-        <label className="switch-row sub">
-          <input className="mono" autoFocus aria-label="The shell's full path" placeholder="/opt/homebrew/bin/fish" spellCheck={false} onKeyDown={e => e.key === 'Enter' && void pick(e.currentTarget.value.trim())} onBlur={e => e.currentTarget.value.trim() && void pick(e.currentTarget.value.trim())} />
-          <Says title="Its full path" hint="Checked as you press ⏎: sh, bash, zsh, dash, ksh, mksh, yash, fish or nu" />
+    <Group title="Shell">
+      <div className="setting-box">
+        <label className="switch-row">
+          <select value={other ? '…' : (value ?? '')} onChange={e => (e.target.value === '…' ? setOther(true) : (setOther(false), void pick(e.target.value)))}>
+            <option value="">Your login shell ({list.login.split('/').pop()})</option>
+            {shells.map(x => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+            <option value="…">Another path…</option>
+          </select>
+          <Says title="New shell tabs start" hint="Terminals too. Agents and a project's scripts (setup, run, teardown) keep your login shell" />
         </label>
-      )}
-      {err && <p className="warn small">{err}</p>}
-    </div>
+        {other && (
+          <label className="switch-row sub">
+            <input className="mono" autoFocus aria-label="The shell's full path" placeholder="/opt/homebrew/bin/fish" spellCheck={false} onKeyDown={e => e.key === 'Enter' && void pick(e.currentTarget.value.trim())} onBlur={e => e.currentTarget.value.trim() && void pick(e.currentTarget.value.trim())} />
+            <Says title="Its full path" hint="Checked as you press ⏎: sh, bash, zsh, dash, ksh, mksh, yash, fish or nu" />
+          </label>
+        )}
+        {err && <p className="warn small">{err}</p>}
+      </div>
+    </Group>
   )
 }
 
@@ -2641,9 +2644,7 @@ export function SettingsPage(p: {
                   <TermPreview key={String(transparent())} s={s} />
                 </div>
               </section>
-              <Group title="Shell">
-                <ShellField value={s.termShell} call={p.call} onChange={v => set({ termShell: v })} />
-              </Group>
+              <ShellField value={s.termShell} call={p.call} onChange={v => set({ termShell: v })} />
               <Group title="Text" hint="Ligatures (=> as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.">
                 <div className="setting-box">
                   <label className="switch-row">

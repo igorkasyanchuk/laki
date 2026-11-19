@@ -147,7 +147,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     // place more: an extension's item in the foot's ⋯ menu, with Video, Meme and Timer (ui-smoke.ts' Docs)
-    ['more-menu', click('button[aria-label^="More: Video"]'), () => hasText('.menu-item', 'Docs')],
+    ['more-menu', click('.foot-more'), () => hasText('.menu-item', 'Docs')],
     ['palette', async () => (await key('Escape')(), await key('k', true)()), '.palette-input'],
     // F5: the Preview of a workspace's dev server (localhost) has Pick; then the side panel shut again
     ['preview-pick', async () => {

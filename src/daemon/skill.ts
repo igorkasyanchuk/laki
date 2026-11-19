@@ -400,7 +400,7 @@ ${run} Below, \`laki\` stands for it.
     laki widget render <id> [--full] # the HTML it shows now
     laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs; from an agent, the user is asked first)
     laki widget ls                   # each one: on or off, size, schedule, last error
-    laki widget set <id> --place desk --size 3x2 --every 10 key=value  # where it shows (side, top, status, rail, foot, desk, panel, row), its size, schedule, settings
+    laki widget set <id> --place desk --size 3x2 --every 10 key=value  # where it shows (side, top, status, rail, foot, more, desk, panel, row), its size, schedule, settings
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
     laki widget check <id> --no-run  # what's wrong with it: fix every ✗ before you answer (after every change)
     laki widget new <name> --kind <k> # a starter to begin from: ${STARTER_KINDS.join(', ')}

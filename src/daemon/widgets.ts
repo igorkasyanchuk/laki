@@ -43,7 +43,7 @@ export * from './widgetDev.ts'
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
 // (its default export, or what it prints); actions: commands its buttons run by name (data-run="name", data-arg:
-// $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status, rail, foot: the user's
+// $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status, rail, foot, more: the user's
 // choice wins). As a button (a rail or foot place, or no preview in widget.html): icon (an icon of the app's, or a
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other

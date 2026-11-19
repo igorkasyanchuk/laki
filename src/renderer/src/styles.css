@@ -3044,6 +3044,7 @@ button.board-name:hover { background: none; }
 .tab > .usage-ring { flex: none; } /* contextMeter 'ring': the status bar's ring on its tab */
 .tab-ctx { --ctx-in: var(--sp-4); --ctx-fill: color-mix(in srgb, var(--accent) 70%, transparent); position: absolute; left: var(--ctx-in); right: var(--ctx-in); bottom: 0; height: 2px; pointer-events: none; background: linear-gradient(90deg, var(--ctx-fill) var(--p), color-mix(in srgb, var(--fg) 10%, transparent) var(--p)); } /* the context meter on a tab (TabBar): a track along its bottom edge, clear of its round corners, filled as far as its context is full; amber and red: components.css */
 .app[data-dz~='pills'] .tab-ctx, [data-look='clay'] .tab-ctx { --ctx-in: calc(26px / 2); } /* a pill's round end: half its height */
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar .tab-ctx { bottom: 2px; } /* Classic: its tabs' 2px underline is the bottom edge: the track just above it */
 .status .sb-ctx { display: inline-flex; align-items: center; gap: var(--sp-3); flex: none; font-variant-numeric: tabular-nums; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: var(--cur-act); }
 .status .sb-ctx .sb-skills { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--muted); } /* B7: how many skills its chat loaded */
 .status .sb-ctx:hover { color: var(--fg); }

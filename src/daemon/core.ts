@@ -100,7 +100,6 @@ export function termShells(p: { check?: unknown } = {}): { login: string; shells
   return { login: shell, shells: [...new Set(all)].filter(x => x !== shell && shellKind(x) && runnable(x)) }
 }
 const shellGone = new Set<string>() // a picked shell found gone, told once a run (spawnTab)
-const shellOf = new Map<string, string>() // a shell tab's own shell, when it isn't the login one: what varsIn quotes for
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
@@ -2149,8 +2148,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
       }
     }
     ;[file, args] = [t.path, ['-l']]
-    if (file === shell) shellOf.delete(tab.id)
-    else shellOf.set(tab.id, file)
+    if (tab.shell !== (file === shell ? undefined : file)) (tab.shell = file === shell ? undefined : file), save() // what varsIn quotes for, an adopted tab's too
   }
   else {
     if (tab.kind === 'agent' && o.cmd === undefined && wrapped(tab) && !sandboxBin()) {
@@ -2966,7 +2964,6 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 // a tab gone (closed, its workspace deleted, its start failed): its sandbox's settings file (netFile), its project's MCP
 // servers with their env (mcpFile), its proxy password (netProxy.ts)
 function tabFilesGone(id: string) {
-  shellOf.delete(id)
   rmSync(join(dir, 'net', `${id}.json`), { force: true })
   rmSync(join(dir, 'mcp', `${id}.json`), { force: true })
   proxyDrop(id)
@@ -4582,7 +4579,7 @@ export function varsIn(tab: Tab, text: string) {
   const vars = wsVars(ws, tab)
   // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted,
   // as the tab's own shell reads it (shared/shells.ts shellWord: POSIX, fish's or nushell's; a host's: POSIX)
-  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@+=:,./-]+$/.test(v)) vars[k] = ws.host ? q(v) : shellWord(v, shellKind(shellOf.get(tab.id) ?? termShell().path))
+  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@+=:,./-]+$/.test(v)) vars[k] = ws.host ? q(v) : shellWord(v, shellKind(tab.shell ?? shell))
   return fillVars(text, vars)
 }
 

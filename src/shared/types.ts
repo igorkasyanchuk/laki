@@ -501,6 +501,7 @@ export type Tab = {
   workspace: string
   name: string
   flow?: string // the workflow run that last sent it a block's prompt (the status bar links to it)
+  shell?: string // a local shell tab's shell when it isn't the login one (Settings › Terminal › Shell, spawnTab): what varsIn quotes for, kept across a restart
   kind: TabKind
   preset?: string // an Agent or custom: what the agent is (hooks, resume)
   profile?: string // the preset (Settings) it started from: its args and env
