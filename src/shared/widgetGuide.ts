@@ -67,7 +67,7 @@ number; put the words in \`tip\`. Add them only when the user asks.
 - \`size\`: cells [across 1–4, down 0.5 or 1–4]; a cell is about 60×64 px (a 240 px sidebar, 4 cells across), 0.5 a line 29 px tall. \`every\`: minutes
   between fetches (default ${WIDGET_EVERY}). \`view\`: the full view's size, \`s\`, \`m\` (default) or \`l\`. The user can change them.
 - \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
-  ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one), \`panel\` (a
+  ½ high), \`rail\` or \`foot\` (a button, below), \`more\` (an item in the sidebar foot's ⋯ menu, with Video, Meme and Timer: its icon, label and badge, the same click), \`desk\` (a Desk tile, its full view when it has one), \`panel\` (a
   tab of the side panel, its full view as wide as the panel), \`row\` (per workspace only: a mark on each workspace's
   row in the sidebar, its \`badge\` (else \`label\`) filled from that workspace's data, its \`tip\` on hover, \`click\`
   runs there; every live workspace's is fetched, so keep it cheap), \`turn\` (per workspace: a chip under each agent turn
@@ -88,7 +88,7 @@ number; put the words in \`tip\`. Add them only when the user asks.
   *Needs jq* when one isn't on its PATH, and the turn-on sheet lists each) and the oldest Laki it runs on. Check warns at
   a program its commands run that isn't listed.
   To show nothing for now (no PR on this branch, nothing to say), add \`"hidden": true\` to the data: it vanishes from
-  every place (bars, sidebar, rail, foot, Desk, panel, row marks) until data without it comes; Settings still lists it.
+  every place (bars, sidebar, rail, foot, ⋯ menu, Desk, panel, row marks) until data without it comes; Settings still lists it.
 - Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
   them), \`$LAKI_WIDGET_CONFIG\` (all of them, typed JSON), \`$LAKI_WIDGET_FILE\` (its storage: the last \`data\`),
   \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).
@@ -110,7 +110,7 @@ number; put the words in \`tip\`. Add them only when the user asks.
   in a dialog, or its json block's \`toast\`, \`modal\` or \`data\` (the extension's new data); no fetch after it.
 - \`notify\`: a template over its data, \`"{{#if mentions}}{{mentions}} new mentions{{/if}}"\`: after each fetch, when it
   reads as something new (not empty, not what it last said) Laki posts it as a notification and a toast.
-- A **button** (in \`rail\` or \`foot\`, or with no preview at all): \`icon\` (Laki's by name: \`board\`, \`bell\`, \`clock\`,
+- A **button** (in \`rail\`, \`foot\` or \`more\`, or with no preview at all): \`icon\` (Laki's by name: \`board\`, \`bell\`, \`clock\`,
   \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
   \`smile\`…: \`laki widget kit icons\` lists every one; or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
   (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).

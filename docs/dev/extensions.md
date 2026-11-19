@@ -3,7 +3,7 @@
 ### Widgets
 
 `daemon/widgets.ts` (the SDK for people: `docs/extensions.md`): every one off until turned on (`onOf`: the store's `on`). A widget is a folder with `widget.json` (`Manifest`: name, `place` (`WIDGET_PLACES`: side, top,
-status, rail, foot; the store's wins, `placeOf`), a button's `icon` (`iconOf`: a name, the renderer's `isIconName`, or an
+status, rail, foot, more: an item in the foot's ⋯ menu, App's `footButtons`; the store's wins, `placeOf`), a button's `icon` (`iconOf`: a name, the renderer's `isIconName`, or an
 emoji), `label`, `badge`, `tip` (templates over its data, `faceOf`: plain text, kept as the entry's `face`, filled at scan,
 after each fetch and settings change) and `click` (`clickOf`: one of its `actions`); the view's `button`: a
 `BUTTON_PLACES` place or no preview in widget.html (`preview`), size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's

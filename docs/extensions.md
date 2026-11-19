@@ -50,7 +50,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-4 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`, `desk`; a list for several), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.json` | `name`, `description`, `size` (cells across 1-4 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`, `more`, `desk`; a list for several), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | `fixtures/<name>.json` | sample data (`sample.json`, `empty.json`, and a few more: busy, all good, an odd one): its preview's *Sample* picks one, its Data tab lists them, and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
@@ -660,13 +660,14 @@ the daemon either way.
 | `status` | the status bar's right end (a Browsers page has none) | a line high, its cells across wide |
 | `rail` | a button among the rail's icons (no rail: the sidebar's foot) | a button |
 | `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
+| `more` | an item in the sidebar foot's ⋯ menu, with Video, Meme and Timer | its icon, `label` and `badge`; a click as a button's |
 | `desk` | a tile on the Desk page, sized there | its full view, else its preview |
 | `panel` | a tab of the right panel (⌥⌘B), after Info, Files, Changes, Review and Preview | its full view, else its preview, the panel's width |
 | `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover, colored by its data's `tone` |
 | `turn` | a chip under each agent turn in the Reader and on Needs you's card (per workspace only) | its `label`, `badge` and `tip` from what its `turn.done` handler left, colored by `tone`; a click shows that turn's data |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
-*Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk / Right panel / Workspace rows*, one or several). For the
+*Sidebar / Top bar / Status bar / Rail / Sidebar foot / ⋯ menu / Desk / Right panel / Workspace rows*, one or several). For the
 bars, design it ½ high: a number and a word, a few links. In a bar its width is its cells across, or *Auto* (its Size):
 as wide as its words need, 4 cells at most (a JS page: as wide as its content measures; its cells until it has loaded).
 

@@ -1442,13 +1442,13 @@ last fetch failed, a setting it needs is empty, its log has an error from the la
 red dot. ⌘K has *UI kit*, *Icons* and *New extension from a starter…* too.
 
 Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
-*Sidebar foot*, *My Desk*, *Side panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
+*Sidebar foot*, *⋯ menu*, *My Desk*, *Side panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
 bar left of its buttons, the status bar's right end, a tab of the side panel (⌥⌘B), or a mark on each workspace's row
 (a per-workspace one: its count for that workspace, its tip on hover); the
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, at the status bar's start)
 or at the status bar's start (beside the ⋯ of Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
-its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
+its actions (none: its full view, or a fetch now). In the *⋯ menu* (the foot's, with Video, Meme and Timer) it's an item: its icon, label and badge, the same click. One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
 half that: ½, a thin line, like a row of links as plain words with a rule between them, wrapping when they don't fit),
 plain values on the sidebar (no tiles; Settings › Extensions turns them on and off). A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its settings).

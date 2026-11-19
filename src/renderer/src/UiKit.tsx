@@ -36,7 +36,7 @@ function lookOf(k: StarterKind): Look {
   const size: [number, number] = [Math.min(4, m.size?.[0] ?? 4), Math.min(3, m.size?.[1] ?? 2)]
   const one = !f['widget.json'] ? Object.values(f)[0] : undefined
   if (one) return { data, size, code: one.split('\n').slice(0, 9).join('\n') }
-  if (m.place === 'rail' || m.place === 'foot' || (!m.ui && !f['widget.html'])) return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
+  if (m.place === 'rail' || m.place === 'foot' || m.place === 'more' || (!m.ui && !f['widget.html'])) return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
   return m.ui ? { ui: m.ui, data, size, ws: m.scope === 'workspace' } : { data, size, js: true }
 }
 export function StarterPicker({ onPick, onClose }: { onPick: (k: StarterKind) => void; onClose: () => void }) {

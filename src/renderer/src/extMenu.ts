@@ -13,6 +13,7 @@ export const PLACES: [WidgetPlace, string, string][] = [
   ['status', 'Status bar', "At the status bar's right end: a line high"],
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside its ⋯ (Video, Meme, Timer)'],
+  ['more', '⋯ menu', 'An item in the sidebar foot’s ⋯ menu, with Video, Meme and Timer'],
   ['desk', 'My Desk', 'A tile on the My Desk page, sized there'],
   ['panel', 'Side panel', 'A tab of the side panel (⌥⌘B), beside Info and Files'],
   ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],

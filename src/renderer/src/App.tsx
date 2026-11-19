@@ -29,7 +29,7 @@ import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './P
 import type { ProjectTab } from './Project' // a type alone: verbatimModuleSyntax keeps a { type } import's module in the bundle (E8)
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { hasCap } from '../../shared/caps'
-import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, status as extStatus, TurnChips, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { byOrder as extOrder, click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, status as extStatus, TurnChips, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, whenOk } from '../../shared/widgetSchema'
@@ -3767,6 +3767,8 @@ export function App() {
             ...(settings.videoButton !== false && !video ? [{ label: 'Video', icon: 'youtube', tip: 'Watch a YouTube video while you work (off: Settings › Appearance)', run: () => setDialog('video') } as MenuItem] : []),
             ...(settings.fun !== false ? [{ label: 'Meme', icon: 'smile', tip: 'A random meme from Reddit, for a break (off: Settings › Appearance)', run: () => setDialog(d => (d === 'fun' ? null : 'fun')) } as MenuItem] : []),
             ...(settings.timerButton !== false && timers.length + watches.length === 0 ? [{ label: 'Timer', icon: 'timer', tip: 'A countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)', items: startMenu() } as MenuItem] : []),
+            // place more: an extension's item, its click as its button's (an action, its full view, a fetch)
+            ...ownWidgets.filter(w => w.on && placesOf(w).includes('more')).sort(extOrder).map((w): MenuItem => ({ label: w.label ?? w.name, mark: <ExtGlyph w={w} />, hint: w.badge, tip: w.here === null ? 'Per workspace: select one' : w.tip, off: w.here === null, run: () => extClick(w, widgetApi) })),
           ])}
           <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
           {!rail && !bar && !narrow && (

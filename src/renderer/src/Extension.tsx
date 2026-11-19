@@ -9,7 +9,7 @@
 // back where it was opened from. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { sendKeyName, sendTip } from '../../shared/keys'
 import { type MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { type AiMsg, type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
+import { type AiMsg, type AiSettings, BUTTON_PLACES, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
@@ -599,7 +599,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
   const bar = place === 'top' || place === 'status'
   const desk = place === 'desk' || place === 'panel' // a tile there (a right panel's tab: as wide): its full view when it has one
   const row = place === 'row' // its mark on a row: its instance's badge
-  const button = w.button || place === 'rail' || place === 'foot'
+  const button = w.button || BUTTON_PLACES.includes(place)
   return (
     <>
       {w.byAi && !w.on && (

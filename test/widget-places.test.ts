@@ -155,3 +155,17 @@ test("an action's open and files come back checked; a javascript: link and a pat
   assert.ok(logs.some((x: string) => x.includes('action give: files refused') && x.includes('../../../../etc/passwd') && x.includes(join(a.path, 'out')) && x.endsWith(', 5')), logs.join('\n'))
   assert.ok(logs.some((x: string) => x.includes('action bad: files refused') && x.endsWith('"a.txt"')), logs.join('\n'))
 })
+
+test("more: an item in the sidebar foot's ⋯ menu, a button (icon, label, badge from its data), widgetSet takes it; the checker knows it", async t => {
+  assert.ok(!manifestCheck({ name: 'M', place: 'more', fetch: 'echo {}', sample: {} }).some(p => p.where === 'widget.json place'), 'more is a place')
+  const rig = await fresh(t)
+  make(rig, 'menu', { name: 'Menu', place: 'more', icon: 'link', label: 'Docs', badge: '{{n}}', fetch: 'echo \'{"n": 3}\'', sample: { n: 1 } })
+  make(rig, 'tile', { name: 'Tile', fetch: 'echo {}', sample: {}, ui: { type: 'text', text: 'hi' } })
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'menu', on: true })
+  const w = await until(async () => (x => x?.badge === '3' && x)(await find(rig, 'menu')), 'its badge from its data')
+  assert.equal(w.button, true)
+  assert.deepEqual([w.label, w.icon], ['Docs', 'link'])
+  await rig.rpc('widgetSet', { id: 'tile', place: ['side', 'more'] })
+  assert.deepEqual((await find(rig, 'tile')).places, ['side', 'more'])
+})

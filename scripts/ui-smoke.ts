@@ -5,7 +5,7 @@
 // world, and the README's stills instead of the walk (main's uiSmoke readme), copied to docs/img. LAKI_UI_THEME=<theme id>:
 // the walk in that theme (laki, laki-light), not the system's. LAKI_SHEET: scripts/ui-sheet.ts' (npm run test:sheet).
 import { execFileSync, spawn } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -87,6 +87,11 @@ try {
   if (demo.token) env.LAKI_APP_TOKEN = process.env.LAKI_APP_TOKEN = demo.token // S1: the app's token (the demo daemon isn't the app's to pair with: plain node)
   const { rpc } = await import('../src/shared/conn.ts')
   await rpc('settingsSet', { labs: true, workflows: true }) // Workflows on the rail (the other Labs pages stay off: it fits)
+  // an extension in the foot's ⋯ menu (place more): its item, for main's more-menu step
+  mkdirSync(join(home, 'data/widgets/docs'), { recursive: true })
+  writeFileSync(join(home, 'data/widgets/docs/widget.json'), JSON.stringify({ name: 'Docs', place: 'more', icon: 'link', label: 'Docs', fetch: 'echo {}', sample: {} }))
+  await rpc('widgetReload')
+  await rpc('widgetSet', { id: 'docs', on: true })
   if (process.env.LAKI_UI_THEME) await rpc('settingsSet', { theme: process.env.LAKI_UI_THEME, themeAuto: false }) // LAKI_UI_THEME=laki-light: the walk in that theme (a look's check in each)
   const app = spawn(electron, [
     join(root, 'out/main/index.js'), `--user-data-dir=${join(home, 'userdata')}`, `--laki-smoke=${join(home, 'shots')}`], { cwd: root, env, stdio: 'ignore' })
