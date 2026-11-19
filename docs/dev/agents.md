@@ -96,7 +96,7 @@ per workspace) isn't built.
 
 `shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
 `{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
-(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: fish's way under fish, else `q`) where the caller says `vars`: `send` (before a queue), `addTab`'s
+(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: `shared/shells.ts` `shellWord`, POSIX, fish's or nushell's by the shell it started, `shellOf`) where the caller says `vars`: `send` (before a queue), `addTab`'s
 prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MCP's `laki_run_action` and
 `laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
 their own (`varsOf`). Settings' chips under an action or a template list them.
@@ -564,6 +564,15 @@ A turn that ends on an API error (`turn`'s `failed`, not a limit, a refused mode
 A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the chip (`Reader.tsx` `modeItems`, also the tab's menu). S9: `claudeMode` says `default` only with the footer on screen (`FOOT_SEEN`: the input box's rule or `>` prompt, or `? for shortcuts`); without it (a transcript view, a menu, a start not drawn yet) it's `undefined`: the tab keeps the last mode seen with `modeUnknown` (the chip reads *Mode unknown*, its tip the last one), and `tabMode` refuses to press from a mode it can't read. ponytail: the marks are from Claude Code's screens as known in Nov 2026; a build that draws none of them would read as unknown. Not kept across a restart: a resume starts as `t.perm` says. An agent's `tabMode` is refused, and so is the key itself (main.ts `shiftTabNo`, for `input` and `send`: `SHIFT_TAB`, and `keyTail`, per tab, for an Esc in one call and `[Z` in the next, `queueNow`'s Esc too, moved only by `input` as a `send` may just be queued; a plain Esc goes through; `send`'s own escapes are stripped by `typeInto`, `noKeys`). ponytail: only those bytes: a key rebound in claude's `keybindings.json` or a slash command typed isn't.
 
 ### Resume
+
+Settings › Terminal › *Shell* (`settings.termShell`, core.ts `termShell`, `termShellOk`): a local shell tab starts that
+shell with `-l` and `$SHELL` set to it; every other tab (agents, setup, dev, script, ship), the editor command, Done
+check's and workflows' commands and teardown stay on the login shell (`shell`). Only shells whose quoting Laki knows
+(`shared/shells.ts` `SHELL_KINDS`: the POSIX family, fish, nu), an absolute path that is an executable file; checked in
+`settingsSet` only as it changes (Settings sends every setting back, one gone since too). Gone at a tab's start: the login
+shell, daemon.log's line and once a run a notice. `termShells`: `/etc/shells` and `SHELL_DIRS`' shells that run, the
+login one, or `check` one path (Settings' picker checks before it sets, so a bad one never holds back the rest). The
+user's alone: AGENT_SETTINGS_NO, REMOTE_KEYS.
 
 `state.json` keeps projects, workspaces, tabs and resume ids (`save`: `v` stamped (`STATE_V`), fsync, rename, the folder
 fsynced; `load` copies one that reads as today's `state.json.bak-YYYY-MM-DD` (R7: one a day, the 7 newest kept), and

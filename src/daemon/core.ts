@@ -61,6 +61,7 @@ import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 import { spotlightSet, tmSet } from './backup.ts'
 import { ownBoxOn, WRAP_NET, wrapProfile, wrapRefused } from '../shared/wrap.ts'
 import { claudeMcpConfig, codexMcpArgs, type McpServer, mcpFor, mcpOk } from '../shared/mcp.ts'
+import { SHELL_DIRS, SHELL_KINDS, shellKind, shellWord } from '../shared/shells.ts'
 import { proxyDrop, proxyFor, proxyUp } from './netProxy.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
@@ -69,6 +70,37 @@ export const run = promisify(execFile)
 const statePath = join(dir, 'state.json')
 export const runDir = join(dir, 'run')
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
+// Settings › Terminal › Shell (shared/shells.ts): what a shell tab on this Mac starts, else the login shell; one picked
+// and gone since (uninstalled, Homebrew moved) gives the login shell, said in the workspace's log (spawnTab). Agents,
+// setup, run, teardown and Run ▾'s scripts stay on the login shell: a project's .laki.json runs the same for everyone
+const runnable = (p: string) => {
+  try {
+    accessSync(p, fsConstants.X_OK)
+    return statSync(p).isFile()
+  } catch {
+    return false
+  }
+}
+export const termShell = (): { path: string; gone?: string } => (p => (!p ? { path: shell } : runnable(p) ? { path: p } : { path: shell, gone: p }))(state.settings?.termShell)
+export function termShellOk(v: unknown): string | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  if (typeof v !== 'string' || !isAbsolute(v) || v.length > 1024 || v.includes('\0')) throw new Error('Shell: its full path, such as /opt/homebrew/bin/fish')
+  if (!shellKind(v)) throw new Error(`Shell: Laki starts ${Object.keys(SHELL_KINDS).join(', ')} (what it types into one is quoted for it)`)
+  if (!runnable(v)) throw new Error(`Shell: ${v} isn't a program on this Mac`)
+  return v
+}
+// the shells to pick from: /etc/shells' and the usual install folders' (shared/shells.ts SHELL_DIRS), each one Laki starts
+export function termShells(p: { check?: unknown } = {}): { login: string; shells: string[]; ok?: string } {
+  if (p.check !== undefined) return { login: shell, shells: [], ok: termShellOk(p.check) }
+  let listed: string[] = []
+  try {
+    listed = readFileSync('/etc/shells', 'utf8').split('\n').map(l => l.trim()).filter(l => l.startsWith('/'))
+  } catch {}
+  const all = [...listed, ...SHELL_DIRS.flatMap(d => Object.keys(SHELL_KINDS).map(k => join(d, k)))]
+  return { login: shell, shells: [...new Set(all)].filter(x => x !== shell && shellKind(x) && runnable(x)) }
+}
+const shellGone = new Set<string>() // a picked shell found gone, told once a run (spawnTab)
+const shellOf = new Map<string, string>() // a shell tab's own shell, when it isn't the login one: what varsIn quotes for
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
@@ -2105,7 +2137,21 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   let argEnv: Record<string, string> | undefined // an agent's values (agentCmd)
   if (o.adopt) args = []
   else if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
-  else if (tab.kind === 'shell') args = ['-l']
+  else if (tab.kind === 'shell') {
+    const t = termShell()
+    if (t.gone) {
+      log(`${tab.name}: its shell, ${t.gone}, isn't there: the login shell instead`)
+      if (!shellGone.has(t.gone)) {
+        shellGone.add(t.gone) // once a run: a notice, kept until closed
+        try {
+          alertShow({ title: 'Your shell is gone', text: `${t.gone} isn't there: shell tabs start your login shell (${shell}) until you pick another in Settings › Terminal › Shell.`, to: tab.id }, 'notice', 'Laki')
+        } catch {}
+      }
+    }
+    ;[file, args] = [t.path, ['-l']]
+    if (file === shell) shellOf.delete(tab.id)
+    else shellOf.set(tab.id, file)
+  }
   else {
     if (tab.kind === 'agent' && o.cmd === undefined && wrapped(tab) && !sandboxBin()) {
       // its wrapper sandbox can't start: neither does it (never without the sandbox it was set up with)
@@ -2127,7 +2173,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   if (tab.preset === 'acp' && ws.host) throw new Error('ACP agents run on this Mac, not an SSH host')
   const viaHost = !!state.settings?.ptyHost && ptyTakes() && tab.preset !== 'acp' // R6: its terminal in the pty host, where it outlives this daemon
   const ptyId = `${tab.id}.${randomBytes(6).toString('hex')}`
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : tab.preset === 'acp' ? { pty: p => new AcpPty(tab.id, p, o.resume ? undefined : o.prompt, !!o.resume) } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(file !== shell && !ws.host && { SHELL: file }) /* a picked shell's own: what it starts ($SHELL) is it too */, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize, ...(o.adopt ? { cols: o.adopt.cols, rows: o.adopt.rows, pty: () => o.adopt!.pty } : tab.preset === 'acp' ? { pty: p => new AcpPty(tab.id, p, o.resume ? undefined : o.prompt, !!o.resume) } : viaHost && { pty: p => new HostPty(ptyId, p) }) })
   // R6: in the pty host, its start's keys are kept (pty.json, 0600) for the daemon that finds it there after this one
   if (s.pty instanceof HostPty) {
     const id = s.pty.id
@@ -2732,6 +2778,7 @@ export function settingsSet(o: Settings, own = false) {
   if (o.ptyHost && !state.settings?.ptyHost) void ptyUp().catch((e: Error) => log(`pty host: ${(e as Error).message}`)) // R6: new terminals go there from now on
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
   if (o.aiEndpoint) o = { ...o, aiEndpoint: String(o.aiEndpoint.url ?? '').trim() ? { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } : undefined } // https, or http on this Mac; no credentials. No URL: none
+  if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)
@@ -2919,6 +2966,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 // a tab gone (closed, its workspace deleted, its start failed): its sandbox's settings file (netFile), its project's MCP
 // servers with their env (mcpFile), its proxy password (netProxy.ts)
 function tabFilesGone(id: string) {
+  shellOf.delete(id)
   rmSync(join(dir, 'net', `${id}.json`), { force: true })
   rmSync(join(dir, 'mcp', `${id}.json`), { force: true })
   proxyDrop(id)
@@ -4533,8 +4581,8 @@ export function varsIn(tab: Tab, text: string) {
   if (!ws || !text.includes('{{')) return text
   const vars = wsVars(ws, tab)
   // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted,
-  // as the tab's own shell reads it (fish: \ and ' escaped inside single quotes; a host's: POSIX)
-  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@+=:,./-]+$/.test(v)) vars[k] = !ws.host && basename(shell) === 'fish' ? `'${v.replace(/[\\']/g, '\\$&')}'` : q(v)
+  // as the tab's own shell reads it (shared/shells.ts shellWord: POSIX, fish's or nushell's; a host's: POSIX)
+  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@+=:,./-]+$/.test(v)) vars[k] = ws.host ? q(v) : shellWord(v, shellKind(shellOf.get(tab.id) ?? termShell().path))
   return fillVars(text, vars)
 }
 

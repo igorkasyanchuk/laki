@@ -240,6 +240,7 @@ export type AppSettings = Paint & {
   archiveIdleKeepPR?: boolean // not one with an open PR (unset: on)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
+  termShell?: string // Terminal › Shell: what shell tabs start, a full path (unset: the login shell; daemon's termShellOk)
   menuBarClick?: 'menu' | 'inbox' // General › Menu bar click: its menu, or the Inbox under it (macOS)
   loginAsked?: boolean // Start Laki at login's one notice was answered (App.tsx), or the switch was set
   trayState?: boolean // Q8: its picture shows the state (unset: on)
@@ -405,6 +406,43 @@ const SAMPLE = [
 ].join('\r\n')
 
 // a terminal drawing SAMPLE with the settings; click it to see the cursor as in a focused tab
+// Terminal › Shell: the login shell, or one of this Mac's (the daemon's termShells: /etc/shells and the usual install
+// folders), or another path; each checked by the daemon before it's set (Settings saves every setting at once: a bad one
+// would hold the rest back). One set and gone since says so: shell tabs start the login shell meanwhile
+function ShellField({ value, call, onChange }: { value?: string; call?: Call; onChange: (v?: string) => void }) {
+  const [list, setList] = useState<{ login: string; shells: string[] }>()
+  const [other, setOther] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => void call?.('termShells', {}).then(setList, () => {}), [])
+  useEffect(() => void (value && call?.('termShells', { check: value }).then(() => setErr(''), e => setErr(`${(e as Error).message}: shell tabs start your login shell meanwhile`))), [value])
+  const pick = (v: string) => (v ? call?.('termShells', { check: v }).then(() => (setErr(''), setOther(false), onChange(v)), e => setErr((e as Error).message)) : (setErr(''), onChange(undefined)))
+  if (!list) return null
+  const shells = value && !list.shells.includes(value) ? [...list.shells, value] : list.shells
+  return (
+    <div className="setting-box">
+      <label className="switch-row">
+        <select value={other ? '…' : (value ?? '')} onChange={e => (e.target.value === '…' ? setOther(true) : (setOther(false), void pick(e.target.value)))}>
+          <option value="">Your login shell ({list.login.split('/').pop()})</option>
+          {shells.map(x => (
+            <option key={x} value={x}>
+              {x}
+            </option>
+          ))}
+          <option value="…">Another path…</option>
+        </select>
+        <Says title="New shell tabs start" hint="Terminals too. Agents and a project's scripts (setup, run, teardown) keep your login shell" />
+      </label>
+      {other && (
+        <label className="switch-row sub">
+          <input className="mono" autoFocus aria-label="The shell's full path" placeholder="/opt/homebrew/bin/fish" spellCheck={false} onKeyDown={e => e.key === 'Enter' && void pick(e.currentTarget.value.trim())} onBlur={e => e.currentTarget.value.trim() && void pick(e.currentTarget.value.trim())} />
+          <Says title="Its full path" hint="Checked as you press ⏎: sh, bash, zsh, dash, ksh, mksh, yash, fish or nu" />
+        </label>
+      )}
+      {err && <p className="warn small">{err}</p>}
+    </div>
+  )
+}
+
 function TermPreview({ s }: { s: AppSettings }) {
   const box = useRef<HTMLDivElement>(null)
   const [xt, setXt] = useState<{ term: Terminal; fit: FitAddon } | null>(null)
@@ -2603,6 +2641,9 @@ export function SettingsPage(p: {
                   <TermPreview key={String(transparent())} s={s} />
                 </div>
               </section>
+              <Group title="Shell">
+                <ShellField value={s.termShell} call={p.call} onChange={v => set({ termShell: v })} />
+              </Group>
               <Group title="Text" hint="Ligatures (=> as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.">
                 <div className="setting-box">
                   <label className="switch-row">

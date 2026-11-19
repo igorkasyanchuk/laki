@@ -138,6 +138,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['settings-layout', async () => (await clickText('.settings-view button', 'All'), await link('laki://settings/layout?spot=Rail')()), async () => !(await has('.settings-main[data-basic]')) && (await hasText('.settings-main h2', 'Layout')) && (await hasText('.settings-main h3', 'Rail'))],
     // All's list is taller than the window: it scrolls, no row squeezed under its text
     ['settings-rows', null, () => js<boolean>(`[...document.querySelectorAll('.settings-nav > button')].every(b => b.scrollHeight <= b.clientHeight + 1)`)],
+    // Terminal › Shell: the daemon's list came (the login shell first, Another path… last)
+    ['settings-shell', link('laki://settings/terminal?spot=Shell'), () => js<boolean>(`[...document.querySelectorAll('.settings-main select')].some(s => s.options[0]?.textContent.startsWith('Your login shell') && s.options[s.options.length - 1].value === '…')`)],
     ['board', link('laki://board'), '.board'],
     // behind a rail page the sidebar is hidden but keeps its box (its scroll with it), the main area over it
     ['board-sidebar', null, () => js<boolean>(`(([s, m]) => getComputedStyle(s).visibility === 'hidden' && s.getBoundingClientRect().width > 0 && Math.abs(s.getBoundingClientRect().height - m.getBoundingClientRect().height) < 2 && m.getBoundingClientRect().left < s.getBoundingClientRect().right)([document.querySelector('.sidebar'), document.querySelector('.main')])`)],

@@ -129,6 +129,7 @@ export const FIND: [string, string, string?][] = [
   ['extras', 'Hide bubbles and cards from screen recording', 'content protection screen share recording screenshot private hide floating bubbles cards'],
   ['presets', 'Tell it about Laki', 'note system prompt skill rename pr storage'],
   ['presets', 'Send into the running turn', 'steer mid turn queue message while it works interrupt follow up'],
+  ['terminal', 'Shell', 'fish bash zsh nushell nu login default program path'],
   ['terminal', 'Font', 'monospace family'],
   ['terminal', 'Font size', 'zoom bigger smaller'],
   ['terminal', 'Line height', ''],

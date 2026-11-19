@@ -760,6 +760,7 @@ export type Settings = {
   copyUntracked?: boolean // and the untracked ones (unset: off)
   cloneDeps?: boolean // F7: and the dependency folders at the repo's root (core.ts CLONE_DIRS), each cloned whole (unset: off)
   ptyHost?: boolean // R6: terminals live in a pty host and outlive the daemon (a new install's on; one from before off, asked once: ptyHostAsked)
+  termShell?: string // Settings › Terminal › Shell: the full path of what shell tabs start (shared/shells.ts; unset: the login shell); the user's alone, refused to agents and remote access
   ptyHostAsked?: boolean // R9: the one notice for an install from before was answered. Never an agent's or a phone's
   spareWorktree?: boolean // F7: a spare worktree per project, ready for the next new workspace (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
@@ -1422,7 +1423,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 209
+export const API = 210
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

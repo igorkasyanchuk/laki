@@ -1363,3 +1363,15 @@ test("shared/mcp: TOML strings, codex's -c lines, a profile's servers, what proj
   assert.equal(mcpOk([], undefined, '•••', ENV), undefined)
   for (const [bad, why] of [[[{ name: 'a', command: 'x' }, { name: 'a', command: 'y' }], /twice/], [[{ name: 'a', url: 'ftp://x' }], /http/], [[{ name: 'a', command: 'x', env: { 'BAD-NAME': '1' } }], /env/], [[{ name: 'x'.repeat(41), command: 'x' }], /name/], ['nope', /a list/]] as const) assert.throws(() => mcpOk(bad, undefined, '•••', ENV), why)
 })
+
+test("Shell (shared/shells.ts): a shell's kind by its file's name; a value as one word of it, never code", async () => {
+  const { shellKind, shellWord } = await import('../src/shared/shells.ts')
+  assert.deepEqual(['/bin/zsh', '/opt/homebrew/bin/fish', '/opt/homebrew/bin/nu', '/bin/tcsh', '/usr/bin/pwsh', ''].map(shellKind), ['posix', 'fish', 'nu', undefined, undefined, undefined])
+  const v = "a'b \\ $(rm -rf ~) `x` \"q\""
+  assert.equal(shellWord(v), `'a'\\''b \\ $(rm -rf ~) \`x\` "q"'`)
+  assert.equal(shellWord(v, 'fish'), `'a\\'b \\\\ $(rm -rf ~) \`x\` "q"'`)
+  assert.equal(shellWord(v, 'nu'), JSON.stringify(v))
+  // sh reads the POSIX word back as the value itself
+  const { execFileSync } = await import('node:child_process')
+  assert.equal(execFileSync('/bin/sh', ['-c', `printf %s ${shellWord(v)}`], { encoding: 'utf8' }), v)
+})

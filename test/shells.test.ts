@@ -232,3 +232,51 @@ test("several lines typed and not run (the Reader's Run) wait for a new terminal
   await rig.rpc('send', { target: one.id, text: 'echo hi', enter: false })
   await until(async () => (await rig.screen(one.id)).includes('echo hi'), 'typed', 1500)
 })
+
+// Settings › Terminal › Shell: a picked shell (its full path, checked) for shell tabs, with $SHELL its own and what's
+// typed into it quoted its way; agents keep the login shell; one gone since starts the login shell, said in the log;
+// the user's alone (agents, remote access)
+test('Shell: shell tabs start the picked one, checked; agents keep the login shell; one gone gives the login shell, logged', async t => {
+  const rig = await fresh(t)
+  const dir = join(rig.home, 'shells')
+  mkdirSync(dir)
+  const fish = join(dir, 'fish')
+  writeFileSync(fish, '#!/bin/sh\necho "picked-shell $1 SHELL=$SHELL"\nexec /bin/sh\n', { mode: 0o755 })
+  writeFileSync(join(dir, 'tcsh'), '#!/bin/sh\nexec /bin/sh\n', { mode: 0o755 })
+  writeFileSync(join(dir, 'zsh'), 'not a program\n', { mode: 0o644 })
+  for (const [v, why] of [['fish', /its full path/], [join(dir, 'tcsh'), /Laki starts sh, bash, zsh/], [join(dir, 'zsh'), /isn't a program on this Mac/], [join(dir, 'nu'), /isn't a program/]] as const) {
+    await assert.rejects(rig.rpc('settingsSet', { termShell: v }), why, v)
+    await assert.rejects(rig.rpc('termShells', { check: v }), why, v)
+  }
+  assert.equal((await rig.rpc('termShells', { check: fish })).ok, fish)
+  const listed = await rig.rpc('termShells', {})
+  assert.ok(listed.login && !listed.shells.includes(listed.login) && listed.shells.every((x: string) => x.startsWith('/')), 'the login shell, then the others')
+  await rig.rpc('settingsSet', { termShell: fish })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
+  const sh = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its shell')
+  const target = `${ws.id}/${sh.id}`
+  await until(async () => (await rig.screen(target)).includes(`picked-shell -l SHELL=${fish}`), 'the picked shell, as a login shell, $SHELL its own')
+  // what Laki types into it is quoted as fish reads it
+  await rig.rpc('tabSet', { id: sh.id, name: "it's" })
+  await rig.rpc('send', { target: sh.id, text: 'echo {{tab}}', vars: true })
+  await until(async () => (await rig.screen(target)).includes("echo 'it\\'s'"), "fish's quoting")
+  // an agent keeps the login shell
+  const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => (await rig.screen(`${ws.id}/${ag.id}`)).includes('> '), 'the agent up')
+  assert.doesNotMatch(await rig.screen(`${ws.id}/${ag.id}`), /picked-shell/)
+  // the user's alone: an agent and remote access can't change it (sent back as it is: fine)
+  await assert.rejects(rig.rpc('settingsSet', { termShell: '/bin/sh', from: { ws: ws.id, tab: ag.id } }), /an agent can't change that setting/)
+  await rig.rpc('settingsSet', { termShell: fish, from: { ws: ws.id, tab: ag.id } })
+  // gone since: the login shell, and the workspace's log says why; the setting stays (Settings saves it back as it is)
+  rmSync(fish)
+  await rig.rpc('settingsSet', { termShell: fish })
+  const two = await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })
+  await until(async () => (await rig.screen(`${ws.id}/${two.id}`)).length > 0, 'the second shell')
+  assert.doesNotMatch(await rig.screen(`${ws.id}/${two.id}`), /picked-shell/)
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const said = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Your shell is gone'), 'its notice, once')
+  assert.match(said.text, /fish isn't there: shell tabs start your login shell/)
+  assert.equal((await rig.rpc('state')).settings.termShell, fish)
+})

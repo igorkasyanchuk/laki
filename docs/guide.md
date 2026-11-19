@@ -550,6 +550,10 @@ selected workspace's PR is in the status bar.
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar (⌘⇧N from the keyboard) opens a new tab: shell (⌘T), one of your profiles (claude, codex, gemini, …) or a command.
   With Settings › Terminal › *New tabs open as a split* it opens beside the pane you're on instead, in the same tab.
+- Settings › Terminal › *Shell*: what shell tabs and Terminals start: your login shell (the default), one this Mac has
+  (`/etc/shells`, Homebrew's: fish, bash, nushell…) or another path, checked as you pick it. Agents and a project's
+  scripts (setup, run, teardown, Run ▾'s) keep your login shell, so `.laki.json` runs the same for everyone. One that's
+  gone since (uninstalled) starts your login shell instead, with a notice.
 - How a workspace's tabs are split is kept by Laki itself (not each window): the app, a phone over remote access, the
   CLI (`laki ls --json`'s `tabs`) and Laki AI see the same arrangement, and it survives a restart.
 - Splitting:

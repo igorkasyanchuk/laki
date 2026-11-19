@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Pick the shell your terminals start: Settings › Terminal › *Shell* (your login shell, fish, bash, nushell or another path, checked). Agents and project scripts keep your login shell. [Try it](laki://settings/terminal?spot=Shell)
 - Terminals kept alive across a restart stay kept when the new daemon starts quickly (a restart from Settings or an update no longer starts fresh shells).
 - *Ask me first* on New workspace (⌥⏎): Laki AI asks up to three questions your task leaves open, with choices; your picks go with the prompt. Never automatic.
 - A working agent's bubble fills a ring as its turn goes, against how long its turns usually take in the project; it turns the waiting color once it runs long, and its card says *about 2 min left* or *running long*.
