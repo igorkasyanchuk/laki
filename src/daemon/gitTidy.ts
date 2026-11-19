@@ -82,8 +82,8 @@ export async function gitTidyTick(now = Date.now()) {
 }
 
 const counts = async (p: Project) => Object.fromEntries((await git(p, 'count-objects', '-v')).split('\n').map(l => l.split(':').map(s => s.trim())))
-// laki doctor's: its loose objects (0: none, or no git of its own here)
-export const gitLoose = (p: Project) => (!tidyable(p) || p.host ? Promise.resolve(0) : counts(p).then(kv => Number(kv.count) || 0, () => 0))
+// laki doctor's: its loose objects past LOOSE_MANY (0: fewer, or no git of its own here)
+export const gitLoose = (p: Project) => (!tidyable(p) || p.host ? Promise.resolve(0) : counts(p).then(kv => (n => (n > LOOSE_MANY ? n : 0))(Number(kv.count) || 0), () => 0))
 // the Disk page's: its .git's size, git count-objects -v (loose objects, packs), when tidied
 export async function gitFacts(p: Project): Promise<GitFacts | undefined> {
   if (!tidyable(p) || p.host) return undefined

@@ -5339,7 +5339,7 @@ export async function doctor(): Promise<Doctor> {
       return { id, found, ...(s !== undefined && { signedIn: s }) }
     }),
   )
-  const loose = (await Promise.all(state.projects.map(async p => ({ project: p.name, loose: (await gitTidyMod.loose?.(p)) ?? 0 })))).filter(x => x.loose > 20000) // B8: count-objects only (no du)
+  const loose = (await Promise.all(state.projects.map(async p => ({ project: p.name, loose: (await gitTidyMod.loose?.(p)) ?? 0 })))).filter(x => x.loose > 0) // B8: over gitTidy.ts' LOOSE_MANY; count-objects only (no du)
   return { ...(loose.length && { loose }), git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
 }
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's

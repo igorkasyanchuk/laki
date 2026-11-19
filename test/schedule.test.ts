@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { describe, describeHours, inHours, minutesOn, nextRun, parseAfter, parseCron, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, sleep, until } from './helpers.ts'
 
 const SUN = new Date(2026, 9, 4, 10, 0).getTime() // Sunday 4 October 2026, 10:00
 const rule = (t: string) => {
@@ -582,6 +582,14 @@ test('T9: after another task: B runs as A ends done, not when A fails; any runs 
   await until(async () => (await rig.tab(rb.ws)).last === 'answer: after deps', 'b got its prompt')
   await ended(b.id, 'done')
   assert.equal((await runsOf(b.id)).length, 1, 'once per run of a')
+  // A's next run: B again; then a turn of yours in A's first run's tab is no run's end (B's afterRun is the newer one)
+  const [ra1] = await runsOf(a.id)
+  await rig.rpc('scheduleRun', { id: a.id })
+  await until(async () => (await runsOf(b.id)).length === 2, 'b after a second run of a')
+  await rig.rpc('send', { target: ra1.tab, text: 'one more thing', whenIdle: true })
+  await until(async () => (await rig.tab(ra1.ws)).last === 'answer: one more thing', 'your turn in its tab')
+  await sleep(2500) // runEnded's 1.5 s after a turn's end
+  assert.equal((await runsOf(b.id)).length, 2, 'a later turn in a run tab starts nothing')
 
   // deleting or archiving a task others wait on: asked, then they're off with why
   await assert.rejects(rig.rpc('scheduleRm', { id: f.id }), /after breaks, after breaks either way wait on it: deleting it turns them off/)

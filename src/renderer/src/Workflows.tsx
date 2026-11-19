@@ -855,7 +855,8 @@ function ImportSheet({ api, projects, presets, onClose, onDone }: { api: Workflo
   const [look, setLook] = useState<{ name: string; inputs: PortableInput[]; summary: string[]; problems: string[] } | null>(null)
   const [vals, setVals] = useState<Record<string, string>>({})
   const [err, setErr] = useState('')
-  const read = (t: string) => (setText(t), setLook(null), setErr(''), t.trim() && void api.call<NonNullable<typeof look>>('flowImport', { text: t }).then(setLook, e => setErr((e as Error).message)))
+  // read once it's all there (Read it, or a file chosen): not as it's typed, where a first line would already parse
+  const read = (t: string) => (setText(t), setErr(''), t.trim() && void api.call<NonNullable<typeof look>>('flowImport', { text: t }).then(setLook, e => setErr((e as Error).message)))
   const set = (k: string, v: string) => setVals(o => ({ ...o, [k]: v }))
   const pick = (i: PortableInput, v: string) => {
     set(i.name, v)
@@ -871,7 +872,7 @@ function ImportSheet({ api, projects, presets, onClose, onDone }: { api: Workflo
         {!look ? (
           <label className="wf-field">
             <span>Paste it, or choose its file</span>
-            <textarea autoFocus rows={8} value={text} placeholder="# A workflow…" onChange={e => read(e.target.value)} />
+            <textarea autoFocus rows={8} value={text} placeholder="# A workflow…" onChange={e => (setText(e.target.value), setErr(''))} />
             <input type="file" accept=".md,text/markdown,text/plain" onChange={e => void e.target.files?.[0]?.text().then(read)} />
           </label>
         ) : (
@@ -913,9 +914,13 @@ function ImportSheet({ api, projects, presets, onClose, onDone }: { api: Workflo
         {err && <p className="field-err">{err}</p>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          {look && (
+          {look ? (
             <button type="button" className="btn primary" disabled={!ready} onClick={save}>
               Import it, off
+            </button>
+          ) : (
+            <button type="button" className="btn primary" disabled={!text.trim()} onClick={() => read(text)}>
+              Read it
             </button>
           )}
         </div>

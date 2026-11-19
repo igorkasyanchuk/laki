@@ -118,9 +118,11 @@ export async function dataRestore(p: { file?: unknown; dryRun?: boolean; force?:
     const s = json(join(stage, 'state.json'))
     if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('not a Laki backup: its state.json is unreadable')
     const dropped = drop(stage)
-    const rows = (Object.keys(manifest.counts ?? {}) as (keyof Counts)[]).map(what => ({ what, now: countsOf(dir, state)[what], backup: countsOf(stage, s)[what] }))
+    const [here, there] = [countsOf(dir, state), countsOf(stage, s)]
+    const rows = (Object.keys(manifest.counts ?? {}) as (keyof Counts)[]).map(what => ({ what, now: here[what], backup: there[what] }))
     const aside = join(dir, `backup-before-restore-${stamp()}`)
     if (p.dryRun) return { dryRun: true, manifest, rows, dropped, aside }
+    if (pending) throw new Error('a restore is already under way: Laki is restarting') // one started while this was read
     pending = { stage, aside }
     log(`restore: ${file} (made by Laki ${manifest.laki}); the data now goes to ${aside} as the daemon restarts`)
     setTimeout(stop, 200) // after this answer

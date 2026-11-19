@@ -492,7 +492,7 @@ export type Goal = { text: string; state: GoalState; at: number; own?: true; che
 // A1b: the goal Laki runs for a tab whose agent has no /goal of its own, kept on the tab (state.json): the project's script
 // that says it's met (format, lint or test), at most maxTurns turns (unset 12) and maxUsd spent; turns so far, the chat's
 // cost as it was set, the last failure's hash and how many turns in a row it came back the same
-export type TabGoal = { text: string; check: 'format' | 'lint' | 'test'; maxTurns: number; maxUsd?: number; state: GoalState; at: number; turns: number; cost0?: number; outHash?: string; same?: number; why?: string }
+export type TabGoal = { text: string; check: 'format' | 'lint' | 'test'; maxTurns: number; maxUsd?: number; state: GoalState; at: number; turns: number; cost0?: number; outHash?: string; same?: number; why?: string; skip?: true } // skip: set while its agent was mid-turn, that turn's end isn't the goal's
 export const GOAL_SAYS: Record<GoalState, string> = { working: 'working', paused: 'paused', budget: 'out of budget', limit: 'at a usage limit', blocked: 'blocked', reached: 'reached', failed: "can't be met" }
 export type SignedOutView = { agent: string; step: 'out' | 'opened' | 'in'; account?: string; waiting?: boolean; at: number }
 export type Tab = {

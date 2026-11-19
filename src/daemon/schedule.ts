@@ -295,7 +295,7 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean; dependents?: '
   delete s.again
   s.name = s.name?.trim() || undefined
   // T4: on an event instead of a clock (no times, no next); what it heard starts over when the event changes
-  const trig = triggerOf(s.trigger, s)
+  const trig = aft ? undefined : triggerOf(s.trigger, s) // after another task: its old event goes (one trigger a task)
   const what = (t?: TaskTrigger) => JSON.stringify([t?.event, t?.branch, t?.label])
   if (!trig || what(trig) !== what(old?.trigger)) delete s.marks, delete s.seen
   if (trig && (proj.host || proj.kind || proj.git === false || !onGitHub(proj.path))) throw new Error(`on an event: ${proj.name} isn't a GitHub repository on this Mac (its origin), so there's nothing to hear`)
@@ -1089,7 +1089,7 @@ async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) 
     if (st === 'failed' && !limit) failedRun(s, `its agent ended on an error${said ? `: ${said}` : ''}`) // T6: counts; a wait or a plan limit doesn't
     if (st === 'done') goodRun(s)
   }
-  afterEnded(r) // T9: the tasks waiting on it (once per run)
+  if (was === 'running' || was === 'waiting') afterEnded(r) // T9: the tasks waiting on it, as the run first ends (a later turn in its tab is yours, not the run's)
   if (st === 'done' && was !== 'done') await emptyGone(r, d) // T5
   if (st !== 'waiting') lineNext() // T8: its place, to one waiting
 }
