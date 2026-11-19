@@ -125,6 +125,11 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki mcp [--all]                            Laki as an MCP server (stdio): claude mcp add laki -- laki mcp; its core
                                               tools listed, laki_more adds a group (--all, LAKI_MCP_ALL=1: every one)
   laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
+  laki backup <file.tgz>                      your data in one file: projects, settings, notes, specs, workflows, extensions,
+                                              Laki AI's chats, prompts (no keys, tokens, sign-ins or logs)
+  laki restore <file.tgz> [--dry-run] [--force]
+                                              put a backup back: what's here goes aside first, then Laki restarts;
+                                              --dry-run: what would change; --force: while agents work (their turns end)
   laki uninstall [--yes] [--data] [--worktrees] [--json]
                                               what Laki put outside its app (the laki command, agent skills, the daemon);
                                               --yes removes them and stops the daemon; --data: your data too, --worktrees: the worktrees Laki made
@@ -417,6 +422,22 @@ done, so a page that moved meanwhile isn't typed into.
   laki browser scroll --to bottom
   laki browser tabs new /admin
   laki browser screenshot`,
+  backup: `Writes your data to one .tgz (the system's tar): manifest.json first (the Laki that made it, the state's
+version, counts), then projects, workspaces and settings (state.json, without this Mac's remote access), notes and
+To-dos, specs and brainstorms, workflows, extensions' folders, Laki AI's chats and the prompt history. Never in it:
+daemon.json's token, Laki AI's keys, the phone's key, accounts and sign-ins, logs, temp files, the trash. It holds your
+settings' env values and webhook: keep it as you would a password file (it's written 0600). Refuses a file already
+there. The user's only: refused in an agent's tab.
+
+  laki backup ~/laki-backup.tgz`,
+  restore: `laki restore <ws> brings back an archived workspace. laki restore <file.tgz> puts a backup back: only
+what laki backup writes is taken (a link or any other file in it is refused or dropped), one from a newer Laki is
+refused. What's here now goes to <data>/backup-before-restore-<time> first, then the daemon restarts (open terminals
+close; the app reconnects). It refuses while agents work unless --force. --dry-run prints what would change, a line
+per kind (here → in the backup). The user's only: refused in an agent's tab.
+
+  laki restore ~/laki-backup.tgz --dry-run
+  laki restore ~/laki-backup.tgz`,
   uninstall: `Lists what Laki put outside its app, a line each: the laki command on PATH, the agent skills in each
 agent's folder, the background daemon and the terminals it kept, the worktrees Laki made (only with --worktrees: their
 uncommitted changes go too), your data (only with --data). A launcher or skill that drives another Laki's data folder

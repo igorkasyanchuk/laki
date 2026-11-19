@@ -859,6 +859,75 @@ function UninstallField({ api }: { api: UninstallApi }) {
   )
 }
 
+// laki backup / laki restore (daemon dataBackup.ts): Back up… writes laki-backup-<time>.tgz into a folder you pick;
+// Restore… takes a .tgz, says what changes (a dry run), and its Restore restores it (what's here goes aside; Laki restarts)
+type Restore = { dryRun?: boolean; manifest: { laki: string; made: number }; rows: { what: string; now: number; backup: number }[]; dropped: number; aside: string }
+export type BackupApi = { make: (file: string) => Promise<{ file: string; bytes: number }>; restore: (o: { file: string; dryRun?: boolean }) => Promise<Restore> }
+const KINDS: Record<string, string> = { projects: 'Projects', workspaces: 'Workspaces', notes: 'Notes', specs: 'Specs & brainstorms', workflows: 'Workflows', extensions: 'Extensions', aiChats: 'Laki AI chats', prompts: 'Prompts' }
+const stampOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+function BackupField({ api }: { api: BackupApi }) {
+  const [said, setSaid] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [plan, setPlan] = useState<{ file: string; r: Restore } | null>(null)
+  const pick = useRef<HTMLInputElement>(null)
+  const run = (f: () => Promise<unknown>) => (setBusy(true), setErr(''), setSaid(''), void f().catch(e => setErr((e as Error).message)).finally(() => setBusy(false)))
+  const make = () =>
+    run(async () => {
+      const at = await bridge?.pickFolder()
+      if (!at) return
+      const r = await api.make(`${at}/laki-backup-${stampOf()}.tgz`)
+      setSaid(`Saved ${r.file} (${(r.bytes / 1e6).toFixed(1)} MB)`)
+    })
+  const chosen = (f?: File) => {
+    const file = f && bridge?.pathOf?.(f)
+    if (file) run(async () => setPlan({ file, r: await api.restore({ file, dryRun: true }) }))
+  }
+  const restore = (file: string) => run(async () => (await api.restore({ file }), setPlan(null), setSaid('Restored: Laki restarts now')))
+  return (
+    <>
+      <div className="row cli-row">
+        <Says title="Back up or restore" hint="Your projects, settings, notes, specs, workflows, extensions and Laki AI chats in one .tgz; no keys, sign-ins or logs. It holds your settings' env values: keep it safe" />
+        <span className="grow" />
+        <button type="button" disabled={busy} onClick={make}>
+          Back up…
+        </button>
+        <button type="button" disabled={busy} onClick={() => pick.current?.click()}>
+          Restore…
+        </button>
+        <input ref={pick} type="file" accept=".tgz,.gz" hidden onChange={e => (chosen(e.target.files?.[0]), (e.target.value = ''))} />
+      </div>
+      {plan && (
+        <div className="setting-box">
+          <b>Restore {plan.file.split('/').pop()}</b>
+          <p className="muted small">
+            Made by Laki {plan.r.manifest.laki} on {new Date(plan.r.manifest.made).toLocaleString()}. Here now → in the backup:
+          </p>
+          {plan.r.rows.map(x => (
+            <div key={x.what} className="row">
+              <span className="grow">{KINDS[x.what] ?? x.what}</span>
+              <span className={x.now === x.backup ? 'muted small' : 'small'}>
+                {x.now} → {x.backup}
+              </span>
+            </div>
+          ))}
+          <p className="muted small">What's here goes to {plan.r.aside} first, then Laki restarts and its terminals close.</p>
+          <div className="row-buttons">
+            <button type="button" className="danger" disabled={busy} onClick={() => restore(plan.file)}>
+              {busy ? 'Restoring…' : 'Restore'}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setPlan(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {said && <p className="muted small">{said}</p>}
+      {err && <p className="field-err">{err}</p>}
+    </>
+  )
+}
+
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
@@ -899,6 +968,7 @@ export function SettingsPage(p: {
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
   uninstall?: UninstallApi // B3: General › Developer's Uninstall Laki
+  backup?: BackupApi // General › Backup: laki backup and restore
   storage?: () => Promise<{ dir: string; bytes: number; folders: number }> // General › Storage: its folder, size and folders (the daemon's storageInfo)
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
@@ -1717,6 +1787,11 @@ export function SettingsPage(p: {
                 <Group title="Developer" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki screen…; the skill teaches agents the same">
                   <CliField api={p.cli} onSkill={() => openSec('skill')} />
                   {p.uninstall && <UninstallField api={p.uninstall} />}
+                </Group>
+              )}
+              {p.backup && (
+                <Group title="Backup" hint="Carry your Laki to another Mac, or back to how it was">
+                  <BackupField api={p.backup} />
                 </Group>
               )}
               <Group title="Pages" hint="On unless you turn them off; a new install starts with Labs off">

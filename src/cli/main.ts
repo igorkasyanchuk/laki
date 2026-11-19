@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
+const BOOL = new Set(['dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -305,6 +305,11 @@ async function main() {
     }
     case 'stop':
       return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
+    case 'backup': {
+      if (!rest[0]) throw new Error('usage: laki backup <file.tgz>')
+      const r = await rpc<{ file: string; bytes: number; manifest: { counts: Record<string, number> } }>('dataBackup', { file: resolve(rest[0]), from: caller() })
+      return out(r, `Backed up to ${r.file} (${(r.bytes / 1e6).toFixed(1)} MB): ${Object.entries(r.manifest.counts).map(([k, n]) => `${n} ${k}`).join(', ')}`)
+    }
     case 'uninstall': {
       // B3: the pieces Laki put outside its app, a line each; on a terminal it asks, --yes doesn't; then they're removed
       // and the daemon stops (an open app quits with it)
@@ -545,6 +550,15 @@ async function main() {
     case 'rm':
     case 'archive':
     case 'restore':
+      if (cmd === 'restore' && rest[0] && (/\.(tgz|tar\.gz)$/.test(rest[0]) || (existsSync(rest[0]) && statSync(rest[0]).isFile()))) {
+        // a backup (laki backup's), not an archived workspace
+        type Row = { what: string; now: number; backup: number }
+        const r = await rpc<{ dryRun?: boolean; manifest: { laki: string; made: number }; rows: Row[]; dropped: number; aside: string }>('dataRestore', { file: resolve(rest[0]), dryRun: !!flags['dry-run'], force: !!flags.force, from: caller() })
+        const rows = r.rows.map(x => `  ${x.what.padEnd(11)} ${String(x.now).padStart(5)} → ${x.backup}${x.now === x.backup ? '' : ' *'}`).join('\n')
+        const head = `Backup made by Laki ${r.manifest.laki} on ${new Date(r.manifest.made).toLocaleString()}; here now → in the backup:\n${rows}${r.dropped ? `\n  ${r.dropped} link${r.dropped === 1 ? '' : 's'} in it left out` : ''}`
+        return out(r, r.dryRun ? `${head}\n\nNothing changed. laki restore ${rest[0]} puts it back (what's here goes to ${r.aside})` : `${head}\n\nRestored: Laki restarts now. What was here is in ${r.aside}`)
+      }
+    // falls through: an archived workspace
     case 'fork': {
       const m = ({ rm: 'wsRm', archive: 'wsArchive', restore: 'wsRestore', fork: 'wsFork' } as const)[cmd as 'rm' | 'archive' | 'restore' | 'fork']
       // archive: the extensions' gates run first (by you, or the agent whose tab this is); --force past them, yours only

@@ -23,7 +23,7 @@ import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../s
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
-import { dir, inRig } from './dir.ts'
+import { DATA_SECRETS, dir, inRig } from './dir.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
@@ -339,10 +339,6 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // the daemon on 127.0.0.1) and nothing asked for a sandboxed command
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
-// S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles); globs:
-// state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp). Its Bash and the
-// wrapper sandbox (wrapCmd) hide the whole folder instead
-const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'pty.json', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'agent-log', 'review-notes', 'background', 'daemon.log']
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
@@ -969,7 +965,7 @@ const WHEN_DONE_CMD: Record<Exclude<WhenDone, 'off'>, [string, string[]]> = {
 let doneArmed = false
 let doneSoon: { act: Exclude<WhenDone, 'off'>; at: number; timer: NodeJS.Timeout } | undefined
 const doneWait = () => Number(process.env.LAKI_WHEN_DONE_MS) || WHEN_DONE_WAIT
-const agentsBusy = (v: View) => v.tabs.some(t => (t.status === 'running' || t.status === 'waiting') && (tracked(t) || !!t.runs))
+export const agentsBusy = (v: View) => v.tabs.some(t => (t.status === 'running' || t.status === 'waiting') && (tracked(t) || !!t.runs))
 function goingNow(agents: boolean) {
   const soon = Date.now() + WHEN_DONE_AHEAD
   return (

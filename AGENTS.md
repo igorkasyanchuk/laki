@@ -140,7 +140,7 @@ for the part you change, and keep it up to date with the change.
 
 - [docs/dev/api.md](docs/dev/api.md): the daemon's API (`src/daemon/main.ts` `api`): each method over `/rpc` and the
   WebSocket, its events and the view; `laki mcp`, the MCP server.
-- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 199. Bump `API` (`src/shared/types.ts`)
+- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 200. Bump `API` (`src/shared/types.ts`)
   when the renderer starts relying on a new method or daemon behavior (a setting needs no bump); the next one goes at its end.
 - [docs/dev/agents.md](docs/dev/agents.md): profiles and accounts, layouts, agent variables, turns, asks, sessions, sleep,
   terminal queries, agents and their hooks, projects and their trust, presets, interrupts, resume after a restart.
@@ -204,6 +204,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
+| `src/daemon/dataBackup.ts` | `laki backup`, `laki restore <file.tgz>` (Settings › General › Backup): the user's data (dir.ts' `BACKUP_KEEP`) in a .tgz by the system's tar, its manifest first; a restore checked, staged, moved in as the daemon stops (`apply`, main.ts shutdown) |
 | `src/daemon/uninstall.ts` | B3: Uninstall Laki (Settings › General › Developer, `laki uninstall`): a row per piece (the laki command, this Laki's skills, the daemon, the worktrees, the data), removed; the data and worktrees as the daemon stops (`wipe`, main.ts shutdown), an open app told (`uninstalled`: main's dialog, to the Trash) |
 | `src/daemon/agentCli.ts` | A9: the agents' CLIs: each one's version and npm's newest, how it was installed (`howOf`), its update in a `script` tab (`agentUpdate`), `outdated` (the view's `agentUpdates`) |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |

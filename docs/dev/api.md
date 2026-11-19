@@ -138,6 +138,19 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   folder, then `git worktree prune` in its repo) and the data folder (but its `worktrees/` unless picked; Laki AI's
   Keychain items) go in main.ts' `shutdown` (`wipe`), after the sessions end. The user's only, never remote;
   `test/uninstall.test.ts`;
+- Backup and restore (dataBackup.ts; Settings › General › Backup's `BackupField`, `laki backup`, `laki restore <file.tgz>`):
+  `dataBackup` (`file`, a full path, never one already there): the system's `tar -czf`, the archive 0600: `manifest.json`
+  first (`laki`, `stateV`: core.ts' `STATE_V`, `made`, `counts`), then `state.json` (the state in memory, without
+  `remote`, `remoteDevices`, `tunnels`: this Mac's), and dir.ts' `BACKUP_KEEP` (notes, To-dos, plans, workflows,
+  widgets, Laki AI's chats, prompts.json), `*.tmp`, `*.broken-*` and `._*` left out; an allowlist, so nothing of
+  `DATA_SECRETS` but state.json, notes, prompts and the AI chats goes in. `dataRestore` (`file`, `dryRun`, `force`):
+  its names listed first (only the manifest and `BACKUP_KEEP`'s, none absolute or with `..`), extracted into
+  `<data>/.restore-…`, links and other non-files dropped (`dropped`), a manifest with a higher `stateV` refused, refused
+  while `agentsBusy` unless `force`; `{ dryRun?, manifest, rows: { what, now, backup }[], dropped, aside }`. Not a dry
+  run: the daemon stops 200 ms after its answer and `shutdown` calls `apply` last (the daemon.lock kept till then): each
+  `BACKUP_KEEP` name moved into `aside` (`<data>/backup-before-restore-<time>`), the backup's moved in, this Mac's
+  remote access and tunnels written back into its state.json. The user's only (AGENT_NO, REMOTE_NO, ANSWER_NO;
+  `backup` cap); `test/cli-more.test.ts`;
 - memory's compaction (`daemon/memory.ts`): `memoryCompact` (`project`: its learned memories, never the user's, to Laki
   AI's model through `ai.ts` `aiOnce` (OpenRouter's `aiComplete`, or `claude -p`/`codex exec` with no tools), back as
   `{memories: [{text, from}]}`; an answer that isn't one, empty or longer changes nothing; what changed meanwhile

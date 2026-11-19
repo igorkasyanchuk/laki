@@ -2,14 +2,15 @@
 // hooks without a tab or with a bad payload, a second daemon, host projects, the agent browser, widgets, schedules'
 // failures, another version's daemon, MCP's protocol errors, request limits, a stalled client, the log's rotation.
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { createServer, request } from 'node:http'
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fixtureWidgets, fresh, type Rig, until } from './helpers.ts'
 import { GROUPS, skillTools, toolGroup, tools } from '../src/shared/tools.ts'
+import { BACKUP_KEEP, DATA_SECRETS } from '../src/daemon/dir.ts'
 
 const cliPath = fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))
 
@@ -535,4 +536,68 @@ test('laki mcp: resources (a diff, a plan, memory) and prompts (the templates); 
   assert.deepEqual([a.by[3].result.isError, a.by[3].result.content[0].text], [true, a.by[2].error.message]) // refused as the tool is
   assert.match(a.by[4].result.contents[0].text, /\+hello from mine/)
   assert.ok(a.by[5].result.prompts.some((x: any) => x.name === 'Fix it'), 'the templates: read-only, an agent sees them too')
+})
+
+test("laki backup and restore: a note and a workflow come back in another world; no secret, log, temp file or trash goes in; never an agent's", async t => {
+  const a = await fresh(t)
+  const note = await a.rpc('noteNew', { title: 'Carry me' })
+  await a.rpc('flowSave', { id: 'carry', text: '# Carry\n\n## start\nnext: e\n\n## e\nend: success\n' })
+  for (const f of ['tap-key', 'ai-key', 'accounts/claude-work/.credentials.json', 'daemon.log', 'trash/notes/old.json', 'widget-secrets.json', `notes/${note.id}.json.1-ab.tmp`]) {
+    mkdirSync(dirname(join(a.data, f)), { recursive: true })
+    writeFileSync(join(a.data, f), 'fake-secret')
+  }
+  const p = await a.rpc('projectAdd', { path: a.repo })
+  const ws = await a.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const from = { ws: ws.id, tab: (await until(() => a.tab(ws.id))).id }
+  const file = join(a.home, 'laki.tgz')
+  await assert.rejects(a.rpc('dataBackup', { file, from }), /an agent can't back up the user's data/)
+  await assert.rejects(a.rpc('dataRestore', { file, from }), /an agent can't restore the user's data/)
+  let r = await a.cli('backup', file)
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, /1 notes, 0 specs, 1 workflows/)
+  assert.equal(statSync(file).mode & 0o777, 0o600)
+  assert.equal((await a.cli('backup', file)).code, 1, 'never over a file already there')
+  const names = execFileSync('tar', ['-tzf', file], { encoding: 'utf8' }).split('\n').filter(Boolean).map(n => n.replace(/^\.\//, '').replace(/\/$/, ''))
+  assert.equal(names[0], 'manifest.json')
+  const out = DATA_SECRETS.filter(n => !BACKUP_KEEP.includes(n))
+  const glob = (g: string) => new RegExp(`^${g.replace(/[.]/g, '\\.').replace(/\*/g, '.*')}$`)
+  for (const n of names) {
+    assert.ok(['manifest.json', ...BACKUP_KEEP].includes(n.split('/')[0]), n)
+    assert.ok(!out.some(g => glob(g).test(n.split('/')[0])), n)
+    assert.ok(!n.endsWith('.tmp'), n)
+  }
+  assert.ok(names.includes(`notes/${note.id}.json`) && names.includes('workflows/carry.md'), names.join(' '))
+
+  // another world: --dry-run says what changes and changes nothing; then it's restored, the daemon restarts on it
+  const b = await fresh(t)
+  r = await b.cli('restore', file, '--dry-run')
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, /notes\s+0 → 1 \*/)
+  assert.match(r.out, /Nothing changed/)
+  assert.deepEqual(await b.rpc('noteList'), [])
+  r = await b.cli('restore', file)
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, /Restored: Laki restarts now/)
+  await until(() => !existsSync(join(b.data, 'daemon.lock')), 'the restore moved in and the daemon gone')
+  await b.stop()
+  await b.start()
+  assert.deepEqual((await b.rpc('noteList')).map((n: any) => n.title), ['Carry me'])
+  assert.ok((await b.rpc('flowList', {})).some((w: any) => w.id === 'carry'))
+  assert.equal((await b.rpc('state')).projects[0]?.path, p.path)
+  assert.ok(readdirSync(b.data).some(n => n.startsWith('backup-before-restore-')), 'what was there, set aside')
+  assert.ok(!existsSync(join(b.data, 'tap-key')), "the other world's keys never came")
+
+  // what isn't laki backup's: a file outside its names, a newer state's
+  const make = (name: string, files: Record<string, string>) => {
+    const d = join(b.home, name)
+    mkdirSync(d, { recursive: true })
+    for (const [f, text] of Object.entries(files)) writeFileSync(join(d, f), text)
+    execFileSync('tar', ['-czf', `${d}.tgz`, '-C', d, ...Object.keys(files)])
+    return `${d}.tgz`
+  }
+  const manifest = (stateV: number) => JSON.stringify({ laki: '99.0.0', stateV, made: Date.now(), counts: {} })
+  r = await b.cli('restore', make('extra', { 'manifest.json': manifest(1), 'state.json': '{}', 'daemon.json': '{}' }), '--dry-run')
+  assert.match(r.err, /not a Laki backup: it has daemon.json/)
+  r = await b.cli('restore', make('newer', { 'manifest.json': manifest(99), 'state.json': '{}' }), '--dry-run')
+  assert.match(r.err, /from a newer Laki \(99.0.0, state v99/)
 })
