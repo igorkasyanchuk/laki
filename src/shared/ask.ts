@@ -324,6 +324,8 @@ export function alwaysAskOf(globs: string[] | undefined, a: { tool?: string; wha
 // words (npm test, git status), a file's folder (src/ui/**); none for what no rule may take (the risky or chained, a path
 // outside the worktree, a file at the root: a rule of * is none) or what Always ask for holds
 export const STREAK_AT = 5
+// ponytail: the first word alone; a runner's two (uv run, bun run, time python) still make a rule of those two
+const RUNS_CODE = /^(node|nodejs|deno|bun|bunx|npx|pnpx|python[\d.]*|pip[\d.]*|uv|uvx|ruby|perl|php|lua|osascript|swift|java|bash|sh|zsh|fish|dash|ksh|env|xargs|eval|exec|nohup|time|watch|timeout|nice|caffeinate)$/
 export function streakOf(a: { tool?: string; what?: string }, globs?: string[]): { key: string; tool: string; pattern: string } | undefined {
   const w = a.what?.trim()
   if (!a.tool || !w || w.endsWith('…') || !RULE_TOOLS.includes(a.tool) || risky(w) || OUTSIDE.test(w) || alwaysAskOf(globs, a)) return
@@ -331,7 +333,9 @@ export function streakOf(a: { tool?: string; what?: string }, globs?: string[]):
   if (a.tool === 'Bash') {
     if (CHAIN.test(w)) return
     const words = w.split(' ')
-    pattern = words.slice(0, words[1] && /^[a-z][\w:.-]*$/i.test(words[1]) ? 2 : 1).join(' ')
+    const n = words[1] && /^[a-z][\w:.-]*$/i.test(words[1]) ? 2 : 1
+    if (n === 1 && words.length > 1 && RUNS_CODE.test(words[0])) return // node -e …, bash -c …: a rule of node alone would allow any code
+    pattern = words.slice(0, n).join(' ')
   } else {
     if (w.split('/').includes('..') || !w.includes('/')) return
     pattern = `${w.slice(0, w.lastIndexOf('/'))}/**`

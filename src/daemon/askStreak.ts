@@ -3,7 +3,7 @@
 // Undo of a turn, a rewind or a revert in the project starts them all over (core.ts streakReset). At STREAK_AT, one
 // notice in Laki's window asks "make it a rule?": Make it a rule adds it through projectSet's allow (the user's own
 // path: the pick is alertAnswer's, never an agent's), No starts it over, Don't suggest again keeps it off (state.ruleNo).
-// Only your answers count (main.ts' answer, never a rule's own Allow: autoAllow calls core's answer), and never what no
+// Only your answers count (main.ts' answer, a phone's tap: phone.ts; never a rule's own Allow: autoAllow calls core's answer), and never what no
 // rule may take: risky or chained commands, paths outside the worktree, what Always ask for holds. Each suggestion and
 // its answer is in daemon.log, as rule answers are
 import { STREAK_AT, standing, streakOf } from '../shared/ask.ts'

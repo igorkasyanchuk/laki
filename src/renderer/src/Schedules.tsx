@@ -249,7 +249,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
 
   const evented = !!form?.trigger && !form.workflow && !form.widget // T4: on an event, not at times
   // T9: after another task: the chips' pick, or "after <name>" typed in When (the daemon finds it by name or id)
-  const mine = schedules.filter(x => x.project === form?.project && x.id !== form?.id)
+  const mine = schedules.filter(x => x.project === form?.project && x.id !== form?.id && !x.archived)
   const typed = form && !form.after ? parseAfter(form.when) : undefined
   const typedTask = typed && mine.find(x => x.id === typed.name || x.name?.toLowerCase() === typed.name.toLowerCase())
   const aftered = !evented && (!!form?.after || !!typedTask)

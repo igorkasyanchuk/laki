@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { badgeOf } from '../shared/nextStep.ts'
 import { answerOk, pushOn, type Tab, type Webhook, type Workspace } from '../shared/types.ts'
+import { answered } from './askStreak.ts'
 import { answer, changed, log, rtOf, save, sessions, state, view } from './core.ts'
 import { dir } from './dir.ts'
 import { pushTo, replies, type Tap, tapOf, type Vapid, vapidNew, webPush } from './push.ts'
@@ -132,8 +133,9 @@ export async function takeTap(tap: Tap) {
   const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? s.ask() : undefined
   const o = now && JSON.stringify(now.options) === a.key ? now.options.find(x => x.n === tap.n) : undefined
   if (!o) return // it moved on
+  const perm = rtOf(a.tab).perm // the ask as it was, for F15's count (askStreak.ts), as main.ts' answer does
   await answer({ tab: a.tab, n: o.n, label: o.label }).then(
-    () => log(`answered ${a.tab} from the phone: ${o.label}`),
+    r => (answered(state.tabs.find(t => t.id === a.tab)?.workspace, perm, r.picked), log(`answered ${a.tab} from the phone: ${o.label}`)),
     e => log(`answer from the phone ${a.tab}: ${e.message}`),
   )
 }

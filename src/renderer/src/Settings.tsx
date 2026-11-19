@@ -865,7 +865,7 @@ function UninstallField({ api }: { api: UninstallApi }) {
 type Restore = { dryRun?: boolean; manifest: { laki: string; made: number }; rows: { what: string; now: number; backup: number }[]; dropped: number; aside: string }
 export type BackupApi = { make: (file: string) => Promise<{ file: string; bytes: number }>; restore: (o: { file: string; dryRun?: boolean }) => Promise<Restore> }
 const KINDS: Record<string, string> = { projects: 'Projects', workspaces: 'Workspaces', notes: 'Notes', specs: 'Specs & brainstorms', workflows: 'Workflows', extensions: 'Extensions', aiChats: 'Laki AI chats', prompts: 'Prompts' }
-const stampOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+const stampOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
 function BackupField({ api }: { api: BackupApi }) {
   const [said, setSaid] = useState('')
   const [err, setErr] = useState('')

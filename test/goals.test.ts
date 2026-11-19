@@ -31,6 +31,7 @@ test('A1b: a gemini goal reached as its test passes on the third run (three turn
   await until(async () => ['failed', 'paused'].includes((await goal(rig, tab))?.state), 'the goal over', 30000)
   const f = await goal(rig, tab)
   assert.deepEqual([f.state, f.turns], ['failed', 2], f.why)
+  await assert.rejects(rig.rpc('goalSet', { tab, resume: true }), /its goal stopped: set it again/) // only a paused or blocked one resumes
   assert.match(f.why, /lint still fails after 2 turns, its most/)
 
   // a prompt of yours pauses it; Resume sends it again; Clear: none

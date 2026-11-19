@@ -1,7 +1,7 @@
 // laki: the command line for the daemon. `laki hook <state>` is hook.ts: it never fails or blocks the agent for more
 // than a second.
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -118,6 +118,18 @@ function flowCheck(paths: string[]) {
 // actions as they run, a line each, until Ctrl-C (the link stays). --off <id|folder> unlinks, --list lists them
 // who runs this (the daemon's agentCaller tells an agent's tab from yours): laki widget's action, on, dev, run and check
 const caller = () => ({ ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB })
+// laki restore's: a file that starts as gzip does (1f 8b), a backup not named .tgz; not any file named as a workspace is
+const gzipped = (f: string) => {
+  try {
+    const fd = openSync(f, 'r')
+    const b = Buffer.alloc(2)
+    readSync(fd, b, 0, 2, 0)
+    closeSync(fd)
+    return b[0] === 0x1f && b[1] === 0x8b
+  } catch {
+    return false
+  }
+}
 // laki events' line: when, the event, its workspace and tab, the first words it says
 const eventLine = (e: Record<string, any>) => {
   const said = [e.last, e.error, e.text, e.title, e.message].find(x => typeof x === 'string' && x.trim())
@@ -550,7 +562,7 @@ async function main() {
     case 'rm':
     case 'archive':
     case 'restore':
-      if (cmd === 'restore' && rest[0] && (/\.(tgz|tar\.gz)$/.test(rest[0]) || (existsSync(rest[0]) && statSync(rest[0]).isFile()))) {
+      if (cmd === 'restore' && rest[0] && (/\.(tgz|tar\.gz)$/.test(rest[0]) || gzipped(rest[0]))) {
         // a backup (laki backup's), not an archived workspace
         type Row = { what: string; now: number; backup: number }
         const r = await rpc<{ dryRun?: boolean; manifest: { laki: string; made: number }; rows: Row[]; dropped: number; aside: string }>('dataRestore', { file: resolve(rest[0]), dryRun: !!flags['dry-run'], force: !!flags.force, from: caller() })

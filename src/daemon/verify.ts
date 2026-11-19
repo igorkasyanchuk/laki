@@ -319,6 +319,7 @@ export function goalSet(o: { tab: string; text?: string; check?: string; maxTurn
   const was = t.goalRun
   if (o.resume) {
     if (!was || was.state === 'working') throw new Error(was ? 'its goal is working already' : 'it has no goal to resume')
+    if (was.state === 'reached' || was.state === 'failed' || was.state === 'budget') throw new Error(`its goal ${was.state === 'reached' ? 'was reached' : 'stopped'}: set it again`)
     was.state = 'working'
     delete was.why, delete was.same, delete was.outHash
   } else {

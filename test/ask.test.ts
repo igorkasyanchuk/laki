@@ -208,6 +208,8 @@ test('F15: always-ask globs and the rule a streak of allows would make', () => {
   assert.equal(alwaysAskOf(undefined, { tool: 'Edit', what: 'db/migrations/001.sql' }), undefined)
   assert.deepEqual(streakOf({ tool: 'Bash', what: 'npm test -- --watch' }), { key: 'Bash npm test', tool: 'Bash', pattern: 'npm test' })
   assert.deepEqual(streakOf({ tool: 'Bash', what: 'ls -la' }), { key: 'Bash ls', tool: 'Bash', pattern: 'ls' })
+  for (const what of ['node -e "console.log(1)"', 'python3 -c "print(1)"', 'bash -c "make"', 'npx -y cowsay hi', 'env FOO=1 make', 'node scripts/x.js']) assert.equal(streakOf({ tool: 'Bash', what }), undefined, what) // the first word alone would run any code
+  assert.equal(streakOf({ tool: 'Bash', what: 'node build.js --watch' })?.pattern, 'node build.js')
   assert.deepEqual(streakOf({ tool: 'Edit', what: 'src/ui/app.ts' }), { key: 'Edit src/ui/**', tool: 'Edit', pattern: 'src/ui/**' })
   for (const what of ['rm -rf build', 'git push --force', 'npm test && rm x', 'cat /etc/hosts', 'npm test db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Bash', what }, g), undefined, what)
   for (const what of ['README.md', '../x/a.ts', 'db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Edit', what }, g), undefined, what)

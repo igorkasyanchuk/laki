@@ -38,6 +38,7 @@ function firstLoad() {
 async function gone(pid: number) {
   const alive = () => { try { return !!pid && process.kill(pid, 0) } catch { return false } }
   for (const end = Date.now() + 5000; alive() && Date.now() < end; ) await new Promise(r => setTimeout(r, 100))
+  return alive() // still there: 5 s went by
 }
 type Step = { name: string; ok: boolean; ms: number; why?: string }
 const electron = createRequire(import.meta.url)('electron') as string // Electron's binary itself: .bin/electron is a node script, and a version manager's node shim can't find node under the temp HOME
@@ -63,13 +64,14 @@ async function firstRun(): Promise<{ steps: Step[]; shots: string }> {
       pid = (JSON.parse(readFileSync(join(at, 'data/daemon.json'), 'utf8')) as { pid: number }).pid
       execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'bin/laki.js', 'stop'], { cwd: root, env: fenv, stdio: 'ignore', timeout: 10_000 })
     } catch {}
-    await gone(pid)
     // the app started it: it refuses this script's stop (its caller check knows only the app), so its own temp daemon
-    // is ended by its pid, or every run leaves one
-    try {
-      if (pid) process.kill(pid, 'SIGTERM')
-    } catch {}
-    await gone(pid)
+    // is ended by its pid, or every run leaves one; only while it's there (a pid gone may be another process's by now)
+    if (await gone(pid)) {
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {}
+      await gone(pid)
+    }
     rmSync(at, { recursive: true, force: true })
     await new Promise(r => setTimeout(r, 1000)) // a fake its daemon started (an agent's version asked) may still write its HOME
     rmSync(at, { recursive: true, force: true })
