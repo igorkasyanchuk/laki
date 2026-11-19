@@ -87,11 +87,14 @@ try {
   if (demo.token) env.LAKI_APP_TOKEN = process.env.LAKI_APP_TOKEN = demo.token // S1: the app's token (the demo daemon isn't the app's to pair with: plain node)
   const { rpc } = await import('../src/shared/conn.ts')
   await rpc('settingsSet', { labs: true, workflows: true }) // Workflows on the rail (the other Labs pages stay off: it fits)
-  // an extension in the foot's ⋯ menu (place more): its item, for main's more-menu step
-  mkdirSync(join(home, 'data/widgets/docs'), { recursive: true })
-  writeFileSync(join(home, 'data/widgets/docs/widget.json'), JSON.stringify({ name: 'Docs', place: 'more', icon: 'link', label: 'Docs', fetch: 'echo {}', sample: {} }))
-  await rpc('widgetReload')
-  await rpc('widgetSet', { id: 'docs', on: true })
+  // an extension in the foot's ⋯ menu (place more): its item, for main's more-menu step (the walk's alone: not the
+  // README's stills or the sheet, which never take it)
+  if (!process.env.LAKI_SHEET && !process.env.LAKI_DEMO_RICH) {
+    mkdirSync(join(home, 'data/widgets/docs'), { recursive: true })
+    writeFileSync(join(home, 'data/widgets/docs/widget.json'), JSON.stringify({ name: 'Docs', place: 'more', icon: 'link', label: 'Docs', fetch: 'echo {}', sample: {} }))
+    await rpc('widgetReload')
+    await rpc('widgetSet', { id: 'docs', on: true })
+  }
   if (process.env.LAKI_UI_THEME) await rpc('settingsSet', { theme: process.env.LAKI_UI_THEME, themeAuto: false }) // LAKI_UI_THEME=laki-light: the walk in that theme (a look's check in each)
   const app = spawn(electron, [
     join(root, 'out/main/index.js'), `--user-data-dir=${join(home, 'userdata')}`, `--laki-smoke=${join(home, 'shots')}`], { cwd: root, env, stdio: 'ignore' })

@@ -96,7 +96,7 @@ per workspace) isn't built.
 
 `shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
 `{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
-(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: `shared/shells.ts` `shellWord`, POSIX, fish's or nushell's by the shell it started, `shellOf`) where the caller says `vars`: `send` (before a queue), `addTab`'s
+(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: `shared/shells.ts` `shellWord`, POSIX, fish's or nushell's by the shell it started, `tab.shell`, kept on the tab so an adopted one's is known too) where the caller says `vars`: `send` (before a queue), `addTab`'s
 prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MCP's `laki_run_action` and
 `laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
 their own (`varsOf`). Settings' chips under an action or a template list them.

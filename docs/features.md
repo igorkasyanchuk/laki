@@ -78,7 +78,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; ⇧⌘T reopens a tab you closed, its chat resumed (the + menu lists the last 10); their dev servers' ports in the status bar (not
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
-  update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
+  update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Shell tabs start your
+  login shell or one you pick (Settings › Terminal › *Shell*: fish, bash, nushell…); agents and project scripts keep the login one. Terminals in
   your home folder and a browser (any website, sign-ins kept, Google's too; a screenshot of what's in sight or the whole page, copied or saved) live in the sidebar too, from + at its top. A tab floats
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text in an agent's terminal and *Reply*: it
   goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
@@ -140,7 +141,7 @@ time and AI money per run (`budget: 60 min, $5`).
   (*Customize toolbar…*), tabs past its room behind *+n*; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
 - **Extensions** (`laki ext`, or `laki widget`: the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often: any you make from a starter, with Laki AI on the extension's own page, an agent's
-  laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and at the start of the status bar (an icon, a label,
+  laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and at the start of the status bar, or items in its ⋯ menu beside Video, Meme and Timer (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
   Drawn with the UI kit (60 JSON elements: stats, lists, tables, charts, boards, calendars, chats, PRs, logs, diffs, pipelines, switches, forms; Settings › Extensions › *UI kit*, with its typography, colors and 330+ icons); edit an extension's files right in Laki; its data from a fetch, a file, a URL or an agent with your MCP servers (*sum up Slack since yesterday*, every hour); `laki widget new` starts one from a starter, `laki widget dev` reloads yours as you save, `laki widget check` says what's wrong; one can be per workspace (its branch, its server, its PR), answer events (a turn done, a PR's checks failing), stream, take `laki widget push`, or give your agents tools (asked first). With Laki AI, its page makes one from a sentence, on sample data beside its settings, with Undo and *Try it live*. The SDK: [extensions.md](extensions.md).
