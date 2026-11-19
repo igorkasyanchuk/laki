@@ -7,6 +7,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 - Agents can change only how Laki looks (theme, fonts, glass, the sidebar's and rail's layout); every other setting, Global memory and where worktrees go among them, is yours alone.
 - An extension's picture from the web is fetched only when its site's address is on the internet: a name that points at this Mac or your network is refused.
+- Laki started from a git hook, `npm run` or a test no longer keeps that start's `GIT_DIR`, color and npm variables for days: its own git and every new tab go without them, and `laki doctor` names what it left out.
 
 ## 0.57.0 · Nov 19, 2026
 

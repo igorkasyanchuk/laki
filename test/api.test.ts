@@ -508,6 +508,37 @@ test('the Host a request names: the daemon\'s own address, or remote access\'s w
   assert.equal(await at(`fake-${port}.trycloudflare.com`), 421)
 })
 
+test("daemon start: its starter's GIT_DIR, FORCE_COLOR and npm_* are left out (STARTER_ENV): a workspace's git is its own, a tab gets neither, doctor names them", async t => {
+  const rig = await fresh(t)
+  const other = join(rig.home, 'other')
+  execFileSync('git', ['init', '-q', '-b', 'main', other], { env: rig.env })
+  writeFileSync(join(other, 'other.txt'), 'x\n')
+  execFileSync('git', ['add', '-A'], { cwd: other, env: rig.env })
+  execFileSync('git', ['commit', '-qm', 'other'], { cwd: other, env: rig.env })
+  // started from inside another repo's git hook, by npm run, from node --test on a terminal
+  await rig.stop()
+  const starter = { GIT_DIR: join(other, '.git'), GIT_INDEX_FILE: join(other, '.git', 'index'), FORCE_COLOR: '1', npm_lifecycle_event: 'test', INIT_CWD: other }
+  Object.assign(rig.env, starter)
+  await rig.start()
+  for (const k of Object.keys(starter)) delete rig.env[k]
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' })
+  writeFileSync(join(ws.path, 'mine.txt'), 'y\n')
+  const d = await rig.rpc('diff', { ws: ws.id })
+  assert.deepEqual(d.files.map((f: any) => f.path), ['mine.txt'], "its own repo's diff")
+  assert.doesNotMatch(execFileSync('git', ['worktree', 'list'], { cwd: other, env: rig.env, encoding: 'utf8' }), /mine/, "no worktree in the other repo")
+  const tab = (await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })).id
+  const out = join(rig.home, 'tab-env')
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('$'), 'its prompt')
+  await rig.rpc('input', { tab, data: `env > ${out}.tmp; mv ${out}.tmp ${out}\r` })
+  const env = (await until(() => existsSync(out) && readFileSync(out, 'utf8'), 'its env', 20000)) as string
+  for (const k of Object.keys(starter)) assert.doesNotMatch(env, new RegExp(`^${k}=`, 'm'), k)
+  assert.match(env, /^HOME=/m, 'the rest as it was')
+  const named = (await rig.rpc('doctor')).starterEnv as string[]
+  for (const k of Object.keys(starter)) assert.ok(named.includes(k), `doctor names ${k}`)
+  assert.ok(!named.includes('HOME') && !named.includes('PATH'), 'names it left out only')
+})
+
 test('daemon start: a stale lock is taken over; from the app, the login shell\'s PATH; a dev origin when configured', async t => {
   const rig = await fresh(t)
   await rig.stop()

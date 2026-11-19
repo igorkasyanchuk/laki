@@ -24,6 +24,7 @@ import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { DATA_SECRETS, dir, inRig } from './dir.ts'
+import { STARTER_DROPPED } from './starterEnv.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
@@ -5347,7 +5348,7 @@ export async function doctor(): Promise<Doctor> {
     }),
   )
   const loose = (await Promise.all(state.projects.map(async p => ({ project: p.name, loose: (await gitTidyMod.loose?.(p)) ?? 0 })))).filter(x => x.loose > 0) // B8: over gitTidy.ts' LOOSE_MANY; count-objects only (no du)
-  return { ...(loose.length && { loose }), git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
+  return { ...(loose.length && { loose }), git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents, hooks: await hooksRun(), hookFiles: hookFilesOk(), secrets: { on: !!state.settings?.hideSecrets, held: envSplit(plainEnv(), envAllowOf('claude', presetNamed('claude')?.envAllow)).held.length }, ...(STARTER_DROPPED.length && { starterEnv: STARTER_DROPPED }), backup: { tm: !!state.settings?.tmExclude, spotlight: !!state.settings?.spotlightExclude, ...(spotWhy.size && { skipped: [...spotWhy.values()] }) } }
 }
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
 // version, counts, the Labs on, the logs' last lines; redacted (diagRedact)

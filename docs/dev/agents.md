@@ -493,6 +493,14 @@ tab's token, daemon.json unread (conn.ts `daemonInfo`). No sandbox-exec (`sandbo
 (`wrapRefused` in the tab's output: *Operation not permitted* for a path out of the worktree) is `boxed` with `wrap: true`:
 the card's *Restart without the wrapper* (`tabUnbox`: the tab's `wrap: false`). An agent's `presetSave` can't touch `wrap`
 (main.ts' `agentNo`); `presetSave` refuses it with the agent's own sandbox on (`test/presets.test.ts`, `test/units-more.test.ts`).
+The daemon's own environment is its starter's (conn.ts `ensureDaemon` spawns it with `process.env`), less
+`shared/env.ts` `STARTER_ENV`: `daemon/starterEnv.ts`, main.ts' first import, deletes those names from `process.env`
+once, before any other module loads (a git hook's `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+`GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX`, a tool's `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`,
+`GIT_CONFIG_KEY_n`, `GIT_CONFIG_VALUE_n`; `FORCE_COLOR`, `NO_COLOR`, `CI`, `INIT_CWD`, `npm_*`), so its git and gh,
+extensions' runs and every tab (`plainEnv` then drops `ELECTRON_*`, `LAKI_*`, `CLAUDECODE`, `CLAUDE_CODE_*`) start
+without them; `doctor`'s `starterEnv` names them, never their values (`test/api.test.ts`, daemon start). PATH, HOME,
+SSH_AUTH_SOCK, LANG and proxies stay.
 `settings.hideSecrets` (Settings › Agents & profiles; a new install's on, `load`, a test's daemon only with
 `LAKI_TEST_LEAN=1`; one from before is asked once by a notice, main.ts, `hideSecretsAsked`): an agent tab's environment
 (`childEnv`, not shells, setup or Run) is `shared/env.ts` `envSplit` over `plainEnv()`: `SECRET_ENV`'s names held but

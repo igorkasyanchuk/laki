@@ -29,3 +29,8 @@ export function envSplit(env: Record<string, string | undefined>, allow: readonl
 }
 // what a profile's agent lets through: its own sign-in key and the profile's envAllow
 export const envAllowOf = (agent: string | undefined, envAllow?: readonly string[]) => [...(AGENT_KEY_ENV[agent ?? ''] ?? []), ...(envAllow ?? [])]
+
+// what a daemon must not keep of its starter's environment (daemon/starterEnv.ts drops them as it starts): a git hook's
+// or a tool's git (another repo's GIT_DIR, its index, -c's), node --test's and npm run's (FORCE_COLOR, npm_*, INIT_CWD),
+// a CI's. Not PATH, HOME, SSH_AUTH_SOCK, LANG, proxies or anything a profile sets on purpose
+export const STARTER_ENV = /^(GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|COMMON_DIR|PREFIX|CONFIG_PARAMETERS|CONFIG_COUNT|CONFIG_KEY_\d+|CONFIG_VALUE_\d+)|FORCE_COLOR|NO_COLOR|CI|INIT_CWD|npm_.*)$/

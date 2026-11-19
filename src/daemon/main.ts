@@ -1,6 +1,7 @@
 // The terminal host: owns PTYs, state and scans; outlives the app. Reached over 127.0.0.1 only:
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
+import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
 import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
