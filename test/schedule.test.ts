@@ -534,6 +534,8 @@ test('T9: after another task: B runs as A ends done, not when A fails; any runs 
   assert.deepEqual(parseAfter('after Nightly deps'), { name: 'Nightly deps', when: 'done' })
   assert.deepEqual(parseAfter('after "Build" ends'), { name: 'Build', when: 'any' })
   assert.deepEqual(parseAfter('after build, any'), { name: 'build', when: 'any' })
+  assert.deepEqual(parseAfter('after build any'), { name: 'build', when: 'any' })
+  assert.deepEqual(parseAfter('after Company'), { name: 'Company', when: 'done' }) // any as a word of its own only
   assert.equal(parseAfter('afternoon at 3'), undefined)
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

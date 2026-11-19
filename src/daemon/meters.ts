@@ -199,7 +199,7 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
 // A1: its /goal as its transcript says now (read on at once); a claude or codex tab's. A1b: another agent's is the one
 // Laki runs (tab.goalRun: verify.ts), with its turns and what the chat spent since it was set
 export function goalOf(tab: Tab): Goal | undefined {
-  if (tab.goalRun) return ownGoal(tab, meterView(tab).usage?.cost)
+  if (tab.goalRun) return meterView(tab).goal
   if (tab.preset !== 'claude' && tab.preset !== 'codex') return
   meterRead(tab, true)
   const r = meters.get(tab.id)
@@ -331,7 +331,7 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
   const cost = m && m.tokens > 0 && m.priced ? Math.round(m.cost * 1e4) / 1e4 : undefined
   const goal = t.goalRun ? ownGoal(t, cost) : m?.goal // A1b: Laki's
-  return { ...(goal && { goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  return { ...(goal && { goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(cost !== undefined && { cost }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to

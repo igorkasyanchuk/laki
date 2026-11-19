@@ -939,7 +939,7 @@ async function main() {
         const look = await rpc<{ name: string; inputs: In[]; summary: string[]; problems: string[] }>('flowImport', { text, from: caller() })
         const given = Object.fromEntries(sets.map(x => [x.slice(0, x.indexOf('=') < 0 ? x.length : x.indexOf('=')).trim(), x.includes('=') ? x.slice(x.indexOf('=') + 1) : '']))
         const missing = look.inputs.filter(i => !given[i.name]?.trim())
-        const said = `${look.name}\n${look.summary.map(l => `  ${l}`).join('\n')}${look.inputs.length ? `\nInputs: ${look.inputs.map(i => `${i.name} (${i.kind === 'profile' ? `a ${i.agent} profile` : i.kind === 'secret' ? `a secret: ${i.what}` : i.kind === 'root' ? "a project's folder" : 'a project'})`).join(', ')}` : ''}`
+        const said = `${look.name}\n${look.summary.map(l => `  ${l}`).join('\n')}${look.inputs.length ? `\nInputs: ${look.inputs.map(i => `${i.name} (${i.kind === 'profile' ? `a ${i.agent} profile` : i.kind === 'secret' ? `a secret: ${i.what}` : i.kind === 'root' ? "a project's folder" : i.kind === 'home' ? 'your home folder' : 'a project'})`).join(', ')}` : ''}`
         if (missing.length) {
           out(look, `${said}\n\nNot imported: ${missing.map(i => `--set ${i.name}=…`).join(' ')} to give ${missing.length === 1 ? 'it' : 'them'}`)
           process.exit(1)

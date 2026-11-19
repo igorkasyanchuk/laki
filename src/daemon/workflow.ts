@@ -928,7 +928,7 @@ function pause(r: FlowRun, b: Block) {
   const until = waitEnd(b.pause!, Date.now(), state.settings?.workHours)
   if (typeof until !== 'number') return leave(r, b, 'fail', until.error)
   if (until <= Date.now()) return leave(r, b, 'pass', `wait ${pauseText(b.pause!)}: now`)
-  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'timer', until } })
+  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'timer', until, from: Date.now() } })
   say(r, `${blockName(b)}: waits until ${new Date(until).toLocaleString()} (${pauseText(b.pause!)})`)
   touch()
 }
@@ -1994,7 +1994,7 @@ function imported(text: unknown, values?: Record<string, string>) {
   const { inputs, body } = portableInputs(String(text ?? ''))
   if (!body.trim()) throw new Error("an empty file: export one from a workflow's ⋯ › Share…")
   if (Buffer.byteLength(body) > MAX_FILE) throw new Error('a workflow file is 256 KB at most')
-  const dummy = Object.fromEntries(inputs.map(i => [i.name, i.kind === 'profile' ? (i.agent ?? 'claude') : i.kind === 'root' ? '/x' : i.name]))
+  const dummy = Object.fromEntries(inputs.map(i => [i.name, i.kind === 'profile' ? (i.agent ?? 'claude') : i.kind === 'root' || i.kind === 'home' ? '/x' : i.name]))
   const filled = portableFill(body, inputs, values ?? dummy)
   const { workflow, problems } = parse(filled, 'import')
   if (problems.length) throw new Error(`not a workflow Laki reads: ${problems.slice(0, 3).join('; ')}`)
@@ -2018,7 +2018,7 @@ export function flowImportSave(o: { text?: unknown; inputs?: Record<string, unkn
       if (!p) throw new Error(`{{${i.name}}}: no profile ${v}`)
       if (i.agent && p.agent !== i.agent) throw new Error(`{{${i.name}}}: ${v} is a ${p.agent} profile; this one was ${i.agent}'s`)
       values[i.name] = v
-    } else if (i.kind === 'root' && !isAbsolute(v)) throw new Error(`{{${i.name}}}: a folder's full path`)
+    } else if ((i.kind === 'root' || i.kind === 'home') && !isAbsolute(v)) throw new Error(`{{${i.name}}}: a folder's full path`)
     else values[i.name] = v
   }
   const { workflow, filled } = imported(o.text, values)

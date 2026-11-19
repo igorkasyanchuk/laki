@@ -374,7 +374,7 @@ export function Pages({ app }: { app: AppCtx }) {
           schedules={view.schedules?.filter(s => !s.archived) ?? []}
           runs={view.runs ?? []}
           reminders={view.reminders ?? []}
-          waits={(view.flows ?? []).flatMap(r => (r.status === 'waiting' && r.wait?.kind === 'timer' && r.wait.until - (r.at ?? r.started) > 86400000 ? [{ id: r.id, name: r.task || r.name, until: r.wait.until, ws: r.ws }] : []))}
+          waits={(view.flows ?? []).flatMap(r => (r.status === 'waiting' && r.wait?.kind === 'timer' && r.wait.until - (r.wait.from ?? r.at ?? r.started) > 86400000 ? [{ id: r.id, name: r.task || r.name, until: r.wait.until, ws: r.ws }] : []))}
           workspaces={live.map(w => ({ id: w.id, name: wsName(w) }))}
           api={{
             add: r => call('reminderAdd', r),

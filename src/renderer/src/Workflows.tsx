@@ -887,7 +887,7 @@ function ImportSheet({ api, projects, presets, onClose, onDone }: { api: Workflo
             {look.inputs.map(i => (
               <label key={i.name} className="wf-field">
                 <span>
-                  {`{{${i.name}}}`} · {i.kind === 'project' ? 'a project' : i.kind === 'profile' ? `a ${i.agent ?? 'agent'} profile` : i.kind === 'root' ? "the project's folder" : `a secret: ${i.what ?? 'token'}`}
+                  {`{{${i.name}}}`} · {i.kind === 'project' ? 'a project' : i.kind === 'profile' ? `a ${i.agent ?? 'agent'} profile` : i.kind === 'root' ? "the project's folder" : i.kind === 'home' ? 'your home folder' : `a secret: ${i.what ?? 'token'}`}
                 </span>
                 {i.kind === 'project' ? (
                   <select value={vals[i.name] ?? ''} onChange={e => pick(i, e.target.value)}>
@@ -904,7 +904,7 @@ function ImportSheet({ api, projects, presets, onClose, onDone }: { api: Workflo
                     ))}
                   </select>
                 ) : (
-                  <input type={i.kind === 'secret' ? 'password' : 'text'} value={vals[i.name] ?? ''} placeholder={i.kind === 'root' ? '/Users/you/code/app' : ''} onChange={e => set(i.name, e.target.value)} />
+                  <input type={i.kind === 'secret' ? 'password' : 'text'} value={vals[i.name] ?? ''} placeholder={i.kind === 'root' ? '/Users/you/code/app' : i.kind === 'home' ? '/Users/you' : ''} onChange={e => set(i.name, e.target.value)} />
                 )}
               </label>
             ))}

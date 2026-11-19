@@ -1218,7 +1218,7 @@ export type FlowWait =
   | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
   | { kind: 'retry'; until: number } // a bad exit's try again, at until
-  | { kind: 'timer'; until: number } // W9: a wait block's time: it goes on at until (absolute: a restart keeps it), holding nothing meanwhile
+  | { kind: 'timer'; until: number; from?: number } // from: when it began to wait; W9: a wait block's time: it goes on at until (absolute: a restart keeps it), holding nothing meanwhile
   | { kind: 'limit'; tab: string; until?: number }
   | { kind: 'hold'; again?: boolean; end?: string } // Pause after this block: parked before cur (again: its retry, not a new visit), or before the run's end (end: finish's words)
   | { kind: 'agent-ask'; tab: string; question: string; options: string[]; ns: number[]; used?: number } // its agent asks (a permission prompt): options its menu's choices (ns: their numbers), then Stop the run
@@ -1383,10 +1383,10 @@ Examples: the templates that come with Laki (laki_workflows lists them with sour
 // whatever its strength). A header comment says the Laki that made it, the format and the inputs; an input's name is
 // never one the file uses already (its {{project}} is the run's own variable). Pure: no daemon, no disk
 export const PORTABLE_V = 1
-export type PortableInput = { name: string; kind: 'project' | 'profile' | 'root' | 'secret'; agent?: string; what?: string }
+export type PortableInput = { name: string; kind: 'project' | 'profile' | 'root' | 'home' | 'secret'; agent?: string; what?: string } // root: the project's folder; home: a workflow of no project's, its paths under the home folder
 export type PortableCtx = { laki: string; home?: string; root?: string; projects?: { id: string; name: string }[]; profiles?: { name: string; agent: string }[] }
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const INPUT_WORDS: Record<PortableInput['kind'], (i: PortableInput) => string> = { project: () => 'a project', profile: i => `a ${i.agent ?? 'agent'} profile`, root: () => "the project's folder", secret: i => `a secret: ${i.what ?? 'token'}` }
+const INPUT_WORDS: Record<PortableInput['kind'], (i: PortableInput) => string> = { project: () => 'a project', profile: i => `a ${i.agent ?? 'agent'} profile`, root: () => "the project's folder", home: () => 'your home folder', secret: i => `a secret: ${i.what ?? 'token'}` }
 export function flowPortable(flow: Workflow, ctx: PortableCtx): { text: string; changes: string[]; inputs: PortableInput[] } {
   let text = toFile(flow)
   const used = new Set([...text.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map(m => m[1]))
@@ -1417,7 +1417,7 @@ export function flowPortable(flow: Workflow, ctx: PortableCtx): { text: string; 
   // paths: under the project's folder (else the home folder), {{root}}-relative
   const base = (ctx.root || ctx.home || '').replace(/\/+$/, '')
   if (base) {
-    const root = free('root')
+    const root = free(ctx.root ? 'root' : 'home') // the home folder's: not a project's folder to pick
     let n = 0
     const swap = (from: string, to: string) => {
       const re = new RegExp(`${reEsc(from)}(?=[/'"\\s)]|$)`, 'gm')
@@ -1425,7 +1425,7 @@ export function flowPortable(flow: Workflow, ctx: PortableCtx): { text: string; 
     }
     swap(base, `{{${root}}}`)
     if (ctx.home && ctx.root && ctx.root.startsWith(`${ctx.home}/`)) swap(ctx.home.replace(/\/+$/, ''), `{{${root}}}/${ctx.root.slice(ctx.home.length + 1).split('/').map(() => '..').join('/')}`)
-    if (n) inputs.push({ name: root, kind: 'root' }), changes.push(`${n} path${n === 1 ? '' : 's'} under ${ctx.root ? "the project's folder" : 'the home folder'} became {{${root}}}-relative`)
+    if (n) inputs.push({ name: root, kind: ctx.root ? 'root' : 'home' }), changes.push(`${n} path${n === 1 ? '' : 's'} under ${ctx.root ? "the project's folder" : 'the home folder'} became {{${root}}}-relative`)
     else used.delete(root)
   }
   // projects: one by its id or its name, a whole word
@@ -1458,7 +1458,7 @@ export function portableInputs(text: string): { inputs: PortableInput[]; body: s
   const inputs: PortableInput[] = []
   for (const x of m[2].matchAll(/\{\{([\w-]+)\}\} \(([^)]*)\)/g)) {
     const w = x[2]
-    inputs.push(w === 'a project' ? { name: x[1], kind: 'project' } : w.endsWith(' profile') ? { name: x[1], kind: 'profile', agent: w.slice(2, -8) } : w.startsWith('a secret') ? { name: x[1], kind: 'secret', what: w.replace(/^a secret: /, '') } : { name: x[1], kind: 'root' })
+    inputs.push(w === 'a project' ? { name: x[1], kind: 'project' } : w.endsWith(' profile') ? { name: x[1], kind: 'profile', agent: w.slice(2, -8) } : w.startsWith('a secret') ? { name: x[1], kind: 'secret', what: w.replace(/^a secret: /, '') } : { name: x[1], kind: w === 'your home folder' ? 'home' : 'root' })
   }
   return { inputs, body: String(text).slice(m[0].length), format: Number(m[1]) }
 }
@@ -1473,6 +1473,9 @@ export function flowSummary(wf: Workflow): string[] {
   if (agents.length) out.push(`Starts ${agents.length} agent turn${agents.length === 1 ? '' : 's'} (${[...new Set(agents.map(b => b.agent || 'claude'))].join(', ')})`)
   for (const b of all.filter(b => b.kind === 'run')) out.push(`Runs a command: ${clip(b.cmd ?? '', 120)}`)
   for (const b of all.filter(b => b.kind === 'webhook')) out.push(`Calls a webhook: ${b.method ?? 'POST'} ${(b.url ?? '').replace(/\?.*$/, '')}`)
+  for (const b of all.filter(b => b.kind === 'llm' || b.kind === 'decide')) out.push(`Asks a model${b.model ? ` (${b.model})` : ''} with your key`)
+  for (const b of all.filter(b => b.kind === 'extension')) out.push(`Fetches the extension ${b.extension ?? ''}`)
+  for (const b of all.filter(b => b.kind === 'call')) out.push(`Runs your workflow ${b.workflow ?? ''} (the one of that name here)`)
   for (const b of all.filter(b => b.kind === 'action')) out.push(`${ACTIONS[b.action ?? 'ship'] ?? b.action}${b.confirm === false ? ', without asking first' : ', after asking you'}`)
   if (wf.on) out.push(`Starts on an event (${wf.on}) once you turn it on`)
   return out.length ? out : ['Nothing that runs a command or reaches outside Laki']

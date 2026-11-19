@@ -71,7 +71,7 @@ const andsOf = (b: string) => {
 export function parseAfter(text: string): { name: string; when: 'done' | 'any' } | undefined {
   const m = /^\s*after\s+(.+?)\s*$/i.exec(text)
   if (!m) return undefined
-  const either = /(?:,?\s*(?:either way|any|done or not)|\s+ends)$/i
+  const either = /(?:(?:,\s*|\s+)(?:either way|any|done or not)|\s+ends)$/i // its own word: Company isn't Comp, any
   const name = m[1].replace(either, '').replace(/,?\s+(?:is\s+)?done$/i, '').replace(/^["'“]|["'”]$/g, '').trim()
   return name ? { name, when: either.test(m[1]) ? 'any' : 'done' } : undefined
 }

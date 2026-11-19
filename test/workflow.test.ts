@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { apiQuestions, shellFill, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
+import { apiQuestions, shellFill, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowPortable, flowSummary, flowVars, fromApi, holds, jsonFill, outsOf, parse, portableInputs, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 import { AGENT, FLOW } from './flows.ts'
 
@@ -1288,4 +1288,12 @@ test("workflow share: export puts the project, a profile and a token out as inpu
   assert.ok(!saved.text.includes('{{profile}}') && saved.text.includes('{{task}}'), 'its inputs filled, the run’s own variables kept')
   // a broken file: the parser's words
   await assert.rejects(rig.rpc('flowImport', { text: '# Broken\n\n## start\nnope nope\n' }), /not a workflow Laki reads: .*nope nope\?/)
+  // a workflow of no project's: its home paths are {{home}}'s, your home folder (not a project's folder); the summary
+  // names a call of another workflow and a model's
+  const mine = parse('# Mine\n\n## start\nnext: go\n\n## go\nrun: /Users/me/scripts/x.sh\nok: more\n\n## more\nworkflow: cleanup\n', 'mine').workflow
+  const out = flowPortable(mine, { laki: '0', home: '/Users/me' })
+  assert.deepEqual(out.inputs, [{ name: 'home', kind: 'home' }])
+  assert.deepEqual(portableInputs(out.text).inputs, [{ name: 'home', kind: 'home' }])
+  assert.match(out.text, /run: \{\{home\}\}\/scripts\/x\.sh/)
+  assert.ok(flowSummary(mine).some(l => /^Runs your workflow cleanup/.test(l)), flowSummary(mine).join('\n'))
 })
