@@ -15,6 +15,8 @@ DONE=0
 
 npm run check
 if [ "${LAKI_SKIP_AUDIT:-}" = 1 ]; then loud "LAKI_SKIP_AUDIT=1: the dependency audit is SKIPPED"; else npm run audit:deps; fi
+echo "The oldest security shortcuts (npm run debt -- --old):" # never fails the build
+npm run -s debt -- --old 2> /dev/null | grep '  security  ' | head -3 || true
 T=$(mktemp -d "${TMPDIR:-/tmp}/laki-dmg.XXXXXX")
 H=$T/smoke # pack-smoke's own HOME and LAKI_HOME (never ~/.laki)
 
