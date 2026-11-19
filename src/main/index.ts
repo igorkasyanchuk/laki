@@ -352,18 +352,19 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     // than the screen; Projects opens the drawer over the whole width (the main area inert) with Needs you's counts, Esc
     // closes it; More's sheet has the rest and Quiet, Esc closes it
     ['phone-bar', async () => (await size(390, 844), await waitFor(() => has('.app.narrow .phone-bar'), 'the bottom bar')), () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.phone-bar .pb-item')]; const r = document.querySelector('.phone-bar').getBoundingClientRect(); return bs.length === 5 && bs.every(b => (x => x.width >= 44 && x.height >= 44)(b.getBoundingClientRect())) && document.querySelectorAll('.phone-bar [aria-current=page]').length === 1 && Math.abs(r.bottom - innerHeight) < 1 && document.scrollingElement.scrollWidth <= innerWidth })()")],
-    ['phone-drawer', click('.phone-bar .pb-item'), () => js<boolean>("(() => { const s = document.querySelector('.sidebar')?.getBoundingClientRect(); return !!s && Math.abs(s.width - innerWidth) < 1 && document.querySelector('main.main').inert && (!document.querySelector('.needs-list') || /to answer|failed|finished/.test(document.querySelector('.needs-counts')?.textContent ?? '')) })()")],
+    ['phone-drawer', click('.phone-bar .pb-item'), () => js<boolean>("(() => { const s = document.querySelector('.sidebar')?.getBoundingClientRect(); return !!s && Math.abs(s.width - innerWidth) < 1 && document.querySelector('main.main').inert && (!document.querySelector('.needs-list') || /to answer|failed|finished/.test(document.querySelector('.needs-counts')?.textContent ?? '')) && (c => !c || c.scrollWidth <= c.clientWidth)(document.querySelector('.needs-counts')) && (b => !b || b.getBoundingClientRect().left < 24)(document.querySelector('.side-head button')) })()")], // Needs you's counts whole (their own line, never cut); the sidebar's button at its left, no traffic lights' room
     ['phone-drawer-esc', key('Escape'), async () => !(await has('.sidebar')) && !(await js<boolean>("document.querySelector('main.main').inert"))],
     ['phone-more', click('.phone-bar .pb-item:last-child'), async () => (await hasText('.phone-sheet .ps-row', 'Settings')) && (await has('.phone-sheet .ps-quiet button'))],
     ['phone-more-esc', key('Escape'), async () => !(await has('.phone-sheet'))],
     // T8: the phone's layout with a notched phone's insets (set as styles.css' --safe-*, as env() would): its bottom
-    // bar's buttons end 34px over the bottom, clear of the home indicator; then back to the desktop's
+    // bar's buttons end 34px over the bottom, clear of the home indicator; the tab bar's sidebar button starts at the left
+    // inset (20px here), not past a Mac's traffic lights; then back to the desktop's
     ['phone-safe', async () => {
       await size(390, 844)
       await waitFor(() => has('.app.narrow'), 'the phone layout')
-      await js("(s => [['t', 47], ['r', 0], ['b', 34], ['l', 0]].forEach(([k, v]) => s.setProperty(`--safe-${k}`, `${v}px`)))(document.documentElement.style)")
+      await js("(s => [['t', 47], ['r', 0], ['b', 34], ['l', 20]].forEach(([k, v]) => s.setProperty(`--safe-${k}`, `${v}px`)))(document.documentElement.style)")
       await nap(300)
-    }, () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.status button, .side-foot button, .phone-bar button')].filter(b => b.getBoundingClientRect().height > 0); return bs.length > 0 && bs.every(b => b.getBoundingClientRect().bottom <= innerHeight - 34) })()")],
+    }, () => js<boolean>("(() => { const bs = [...document.querySelectorAll('.status button, .side-foot button, .phone-bar button')].filter(b => b.getBoundingClientRect().height > 0); return bs.length > 0 && bs.every(b => b.getBoundingClientRect().bottom <= innerHeight - 34) && (x => !x || (x.left >= 20 && x.left < 44))(document.querySelector('.tabbar > .side-show')?.getBoundingClientRect()) })()")],
     ['phone-safe-off', async () => (await js("['t', 'r', 'b', 'l'].forEach(k => document.documentElement.style.removeProperty(`--safe-${k}`))"), await size(1440, 900)), () => js<boolean>("!document.querySelector('.app.narrow')")],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {

@@ -363,7 +363,7 @@ are tested in `test/units-more.test.ts`.
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
-  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only. The drawer:
+  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only, and App leaves `.electron` off while narrow (a phone-sized window has no room to keep). The drawer:
   `drawer`, its own state (closed as it starts; 481–640px, `SMALL` not matching, as left in `laki.drawer`),
   `setSideOpen` routes there while narrow; `main` is `inert` under it, and ≤480px (`SMALL`) the drawer is 100vw and the
   main area `visibility: hidden` (no tab reported in view meanwhile: `drawerOver`). Phone.tsx: `useDrawerSwipe` (pointer
@@ -374,9 +374,9 @@ are tested in `test/units-more.test.ts`.
   and toasts above it; `html[data-kb]` or an `.overlay` in the app hides it. The histNav arrows and the foot's Schedule,
   Board, AI and Settings aren't drawn on a phone (the bar has them). `.app.narrow` clips: a row wider than the phone
   (the side panel's tools now scroll) would widen the layout viewport and take fixed bars off screen. Needs.tsx'
-  `phone`: `phoneGroups` (asks, `failedNeed`, the rest), the head's counts, finished ones always rows, `one` open at a
+  `phone`: `phoneGroups` (asks, `failedNeed`, the rest), the head's counts (under 460px, the `needs-head` container: a line of their own under the name, whole; Allow all and Deny all stay at the right; under 280px those are icons), finished ones always rows, `one` open at a
   time, `useSwipe` (40% of its width: `seenUndo`, App's toast with a 4 s Undo; else it springs back, no spring with
-  reduced motion), *Mark all finished as seen* under them (`ask` past 3). test:ui's `phone-bar`, `phone-drawer`,
+  reduced motion), *Mark all finished as seen* under them (`ask` past 3). test:ui's `phone-bar`, `phone-drawer` (the counts' scrollWidth within their width, the sidebar's button at its left),
   `phone-more`. `:root` has `-webkit-text-size-adjust: 100%` and `text-size-adjust` (the shared tab's
   page and the offline page too; test/css.test.ts): iOS Safari never inflates text in landscape, while Page zoom and the browser's
   zoom still work (no `user-scalable=no` or `maximum-scale`). T8, a notched
@@ -385,7 +385,7 @@ are tested in `test/units-more.test.ts`.
   foot's bottom inside the bar, the sidebar's top and left, toasts, overlays, the widget sheet, `.splash`: the lock
   screen and pairing). main.tsx sets `html[data-kb]` while the visual viewport is 120px or more short of the layout's
   (iOS's keyboard), which zeroes `--safe-b`: the keyboard covers the home indicator. test:ui's `phone-safe` sets the
-  four as inline custom properties (a 34px bottom) and checks the bottom bars' buttons end 34px over the bottom.
+  four as inline custom properties (a 34px bottom, a 20px left) and checks the bottom bars' buttons end 34px over the bottom and the tab bar's sidebar button starts at the left inset.
 - **A prompt box's @** (T17, PromptInput.tsx `useComplete`, text.ts `triggerAt`, `completions`): @ at a word's start, not
   in an email and not inside `code` or a ``` block (an odd count of backticks before it); the workspace's `files`
   (20,000 at most, read once a minute) and, once something's typed, their folders with a slash (`foldersOf`), ranked

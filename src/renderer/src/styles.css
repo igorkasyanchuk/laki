@@ -4012,6 +4012,11 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .needs-list > .project-head { container: needs-head / inline-size; }
 .needs-bulk button { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .needs-bulk button .icon-svg { display: none; }
+/* a phone's head (under 460px): the counts on a line of their own under the name (25px: past the chevron and icon), whole; Allow all and Deny all stay
+   on the first line at the right */
+.needs-list > .project-head:has(.needs-counts) { flex-wrap: wrap; height: auto; min-height: 40px; }
+.needs-list > .project-head .needs-counts { flex: 1 1 0; }
+@container needs-head (max-width: 460px) { .needs-list > .project-head .needs-counts { order: 1; flex-basis: 100%; margin: 0 0 var(--sp-2) 25px; white-space: normal; overflow: visible; text-overflow: clip; } }
 @container needs-head (max-width: 280px) { .needs-bulk button .icon-svg { display: block; } .needs-bulk .nb-word { display: none; } .needs-bulk button { padding: 0 var(--sp-2); } }
 .needs-bulk .needs-allow-all { color: var(--accent-ink); border-color: var(--accent); }
 
