@@ -952,6 +952,7 @@ export function SettingsPage(p: {
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
   onAllowProject?: (id: string, allow: AllowRule[]) => Promise<unknown> // F14: a project's auto-answer rules (none under a policy that turns them off)
+  onAlwaysAsk?: (id: string, globs: string[]) => Promise<unknown> // F15: a project's Always ask for
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
@@ -1454,6 +1455,7 @@ export function SettingsPage(p: {
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
               onSave={o => p.onSaveProject?.(project.id, o)}
               onAllow={p.onAllowProject && (a => p.onAllowProject!(project.id, a))}
+              onAlwaysAsk={p.onAlwaysAsk && (g => p.onAlwaysAsk!(project.id, g))}
             />
           )}
           {on('git') && (

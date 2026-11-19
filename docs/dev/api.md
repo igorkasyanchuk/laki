@@ -72,7 +72,10 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
   refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; F14's `allow`: its
   auto-answer rules, the whole list, each through shared/ask.ts `rulePattern` (else refused whole), refused to agents
   (`agentNo`) and remote access (`remoteNo`) and under a managed policy's `allowRules: false` (policy.ts; the view's
-  `managed.allowRules`); `notes`: the user's Markdown, the
+  `managed.allowRules`); F15's `alwaysAsk`: path globs (50 at most), the whole list, refused to agents and remote access
+  (shared/ask.ts `alwaysAskOf`: a matching ask's runtime `held`, the view's `tab.held`, never `autoAllow`'s; `always.ask`
+  cap); `answer` (the user's: main.ts) counts toward askStreak.ts' suggestion, `turnUndo`, `turnRewind`, `hunkUndo`,
+  `fileUndo` and a failed Done check (verify.ts) call core's `streakReset`; `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
   the project page's Memory, the whole list (the user's `MEMORY_MAX`, refused past it unless it had more; agents'
   `auto` ones, the newest `MEMORY_MAX`), likewise left out of MCP's state (MCP's `laki_memory` reads it); `seps`: the sidebar's groups (the app's word: a

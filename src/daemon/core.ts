@@ -8,7 +8,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, release, tmpdir, userInfo } from 'node:os'
-import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
+import { type AllowRule, allowRuleOf, alwaysAskOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -110,7 +110,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { goalEnd?: GoalState | 'cleared' /* A1: the goal that stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -851,7 +851,7 @@ export function view(): View {
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
-    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...((o => o && { signedOut: o })(signedOutView(r))), ...(r.failed && status === 'idle' && !r.signedOut && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(r.held && status === 'waiting' && { held: r.held }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...((o => o && { signedOut: o })(signedOutView(r))), ...(r.failed && status === 'idle' && !r.signedOut && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -1280,8 +1280,15 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; inRepo?: boolean }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean }) {
   const p = findProject(ref)
+  // F15: Always ask for, the whole list as Settings has it (main.ts refuses it to agents and remote access): path globs
+  if (o.alwaysAsk !== undefined) {
+    if (!Array.isArray(o.alwaysAsk) || o.alwaysAsk.length > 50 || o.alwaysAsk.some(g => typeof g !== 'string' || !g.trim() || g.trim().length > 200)) throw new Error('alwaysAsk: a list of up to 50 path globs (migrations/**, .github/**, yarn.lock)')
+    const globs = [...new Set((o.alwaysAsk as string[]).map(g => g.trim()))]
+    p.alwaysAsk = globs.length ? globs : undefined
+    log(`always-ask globs of ${p.id}: ${globs.join(', ') || 'none'}`)
+  }
   // F14: its auto-answer rules, the whole list as Settings has it (main.ts refuses it to agents and remote access);
   // each one Laki takes (rulePattern: no risky or chained command, no path out of the worktree), else refused whole
   if (o.allow !== undefined) {
@@ -2331,7 +2338,17 @@ function told(tab: Tab, r: Runtime, text: string) {
   }, 800)
 }
 // F14: the tab's project's auto-answer rules (none under a managed policy's allowRules: false)
-const rulesOf = (tab: Tab) => (policy()?.allowRules === false ? undefined : state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.allow)
+const projectOfTab = (tab: Tab) => state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)
+const rulesOf = (tab: Tab) => (policy()?.allowRules === false ? undefined : projectOfTab(tab)?.allow)
+// F15: your Allows in a row in a project (askStreak.ts) start over: a failed Done check, an Undo of a turn, a rewind or
+// a revert in one of its workspaces says the last ones weren't all right
+export function streakReset(ws: string, why: string) {
+  const p = state.workspaces.find(w => w.id === ws)?.project
+  if (!p || !state.askStreaks?.[p]) return
+  delete state.askStreaks[p]
+  log(`rule suggestions of ${p}: your allows in a row start over (${why})`)
+  save()
+}
 // F14: Allow, once its menu is drawn (3 s at most) and the ask still falls under the rule with it: the first choice, as
 // answer() picks it for your click; counted on the rule, in the workspace's log and on the tab (the Reader's line).
 // Anything else (no menu, another ask, a menu that isn't yes … no): told as any ask
@@ -2339,7 +2356,7 @@ async function autoAllow(tab: Tab, rule: AllowRule, perm: Perm, tell: () => void
   const r = rtOf(tab.id)
   for (let i = 0; i < 15; i++) {
     await new Promise(res => setTimeout(res, 200))
-    if (r.status !== 'waiting' || r.perm !== perm) return // answered meanwhile, or another ask now
+    if (r.status !== 'waiting' || r.perm !== perm || r.held) return // answered meanwhile, or another ask now
     const s = sessions.get(tab.id)
     const a = s && !s.exited ? s.ask() : undefined
     if (!a) continue
@@ -2347,6 +2364,7 @@ async function autoAllow(tab: Tab, rule: AllowRule, perm: Perm, tell: () => void
     try {
       await answer({ tab: tab.id, n: a.options[0].n, label: a.options[0].label })
     } catch {
+      if (answering.has(tab.id)) continue // your answer of the ask before it, a second ago: its lock goes in a moment
       break
     }
     rule.hits = (rule.hits ?? 0) + 1
@@ -4195,7 +4213,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   if (!late) {
     if (p.state !== 'start') r.bg = undefined
     r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
-    if (p.state !== 'waiting') r.perm = undefined // answered (its tool runs), refused or over
+    if (p.state !== 'waiting') r.perm = r.held = undefined // answered (its tool runs), refused or over
   }
   switch (p.state) {
     case 'compacting':
@@ -4255,6 +4273,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (pl.hook_event_name === 'PermissionRequest') {
         const w = state.workspaces.find(w => w.id === tab.workspace)
         r.perm = permOf(pl, w?.path, homedir(), priorOf(pl, w))
+        r.held = alwaysAskOf(projectOfTab(tab)?.alwaysAsk, r.perm ?? {}) // F15: never a rule's, its card says why
+        if (r.held && r.perm) log(`always-ask ${tab.workspace} ${tab.name}: ${r.perm.tool} ${r.perm.what} touches ${r.held}: asked`)
         if (sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
       }
       r.status = 'waiting'
@@ -4264,7 +4284,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
       // F14: an ask a project rule allows is answered as your click would, told to no one; one it can't answer is told
-      const rule = pl.hook_event_name === 'PermissionRequest' && r.perm ? allowRuleOf(rulesOf(tab), { status: 'waiting', ask: { options: [], at: 0, ...r.perm }, secret: r.secret, planAsk: r.planAsk }, false) : undefined
+      const rule = pl.hook_event_name === 'PermissionRequest' && r.perm && !r.held ? allowRuleOf(rulesOf(tab), { status: 'waiting', ask: { options: [], at: 0, ...r.perm }, secret: r.secret, planAsk: r.planAsk }, false) : undefined
       if (rule && r.perm) {
         autoAllow(tab, rule, r.perm, () => told(tab, r, text))
         break
@@ -4671,7 +4691,7 @@ function interrupted(id: string, s: Session) {
       const lastOf = (re?: RegExp) => (re ? lines.findLastIndex(l => re.test(l)) : -1)
       if (lastOf(ESC_ENDED) <= lastOf(busy) || (r.status === 'waiting' && s.ask())) return
       r.status = 'idle'
-      r.escAt = r.perm = undefined // the ask is over, as every hook but a wait says (turn)
+      r.escAt = r.perm = r.held = undefined // the ask is over, as every hook but a wait says (turn)
       changed()
     }, ms)
 }

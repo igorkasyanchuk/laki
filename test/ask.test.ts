@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type AllowRule, allowRuleOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, standing } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, alwaysAskOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, standing, streakOf } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -193,4 +193,22 @@ test('Allow all and the global hotkeys never pick a standing permission: the pla
     assert.equal(bulkPick(s.ask, true), undefined, first)
     assert.match(hotkeyAnswer(s), /^refuse:/, first)
   }
+})
+
+// F15: Always ask for holds an edit of a matching path or a command naming one (a glob without / by its name in any
+// folder); a streak's rule is a command's first words or a file's folder, never what no rule may take
+test('F15: always-ask globs and the rule a streak of allows would make', () => {
+  const g = ['**/migrations/**', '.github/**', 'yarn.lock']
+  assert.equal(alwaysAskOf(g, { tool: 'Edit', what: 'db/migrations/001.sql' }), '**/migrations/**')
+  assert.equal(alwaysAskOf(g, { tool: 'Write', what: '.github/workflows/ci.yml' }), '.github/**')
+  assert.equal(alwaysAskOf(g, { tool: 'MultiEdit', what: 'web/yarn.lock' }), 'yarn.lock')
+  assert.equal(alwaysAskOf(g, { tool: 'Bash', what: 'cat "./db/migrations/002.sql"' }), '**/migrations/**')
+  assert.equal(alwaysAskOf(g, { tool: 'Edit', what: 'src/app.ts' }), undefined)
+  assert.equal(alwaysAskOf(g, { tool: 'Read', what: 'db/migrations/001.sql' }), undefined, 'a read: not an edit')
+  assert.equal(alwaysAskOf(undefined, { tool: 'Edit', what: 'db/migrations/001.sql' }), undefined)
+  assert.deepEqual(streakOf({ tool: 'Bash', what: 'npm test -- --watch' }), { key: 'Bash npm test', tool: 'Bash', pattern: 'npm test' })
+  assert.deepEqual(streakOf({ tool: 'Bash', what: 'ls -la' }), { key: 'Bash ls', tool: 'Bash', pattern: 'ls' })
+  assert.deepEqual(streakOf({ tool: 'Edit', what: 'src/ui/app.ts' }), { key: 'Edit src/ui/**', tool: 'Edit', pattern: 'src/ui/**' })
+  for (const what of ['rm -rf build', 'git push --force', 'npm test && rm x', 'cat /etc/hosts', 'npm test db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Bash', what }, g), undefined, what)
+  for (const what of ['README.md', '../x/a.ts', 'db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Edit', what }, g), undefined, what)
 })

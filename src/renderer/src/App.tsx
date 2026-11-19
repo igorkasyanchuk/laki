@@ -4286,7 +4286,11 @@ export function App() {
                 </button>
               )
             })}
-            {!view.managed?.allowRules && ruleFrom(tab.ask) && (
+            {tab.held ? (
+              <span className="muted small" data-tip="Settings › the project › Always ask for: no rule answers it">
+                Asked because it touches {tab.held}
+              </span>
+            ) : !view.managed?.allowRules && ruleFrom(tab.ask) && (
               <button className="link small" data-tip="A rule of the project's: the same ask from any agent here is answered Allow (Settings › the project › Auto-answer rules)" onClick={() => void alwaysAllow(tab).catch(() => {})}>
                 Always allow here
               </button>

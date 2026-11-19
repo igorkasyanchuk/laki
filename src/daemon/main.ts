@@ -25,6 +25,7 @@ import * as core from './core.ts'
 import * as agentCliMod from './agentCli.ts'
 import * as uninstallMod from './uninstall.ts'
 import * as backupMod from './dataBackup.ts'
+import * as askStreak from './askStreak.ts'
 import { signIn } from './signin.ts'
 import { dir, inRig } from './dir.ts'
 import * as scheduleMod from './schedule.ts'
@@ -362,7 +363,14 @@ const api = {
   hookTick: p => core.hookTick(p?.now), // tests move the clock
   hooksSeen: () => core.hooksSeen(), // Settings › Agents & profiles: each agent's last hook
   wsFan: p => core.wsFan(yours(core.byCaller(p))),
-  answer: p => core.answer(p),
+  // F15: your answer counted toward a rule's suggestion (askStreak.ts): the ask as it was before it's answered
+  answer: async p => {
+    const t = core.state.tabs.find(x => x.id === p?.tab)
+    const perm = t && core.rt.get(t.id)?.perm
+    const r = await core.answer(p)
+    askStreak.answered(t?.workspace, perm, r.picked)
+    return r
+  },
   unread: p => core.unread(p.tab),
   seen: p => core.seen(p.tab), // the Needs you list's Seen: its ● cleared, as a look does
   show: p => core.show({ ...p, tab: p.from?.tab ?? p.tab }), // laki show: a card under the caller's own tab (its process's, when it's in one)
@@ -443,9 +451,9 @@ const api = {
   progress: p => core.progress(p),
   tabHandover: p => tabHandover(p), // a tab's Continue in Codex / Claude Code
   turnDiff: p => (turnsSeen(p), turnDiff(p)), // Changes' This turn
-  turnUndo: p => turnUndo(p), // the Reader's card's Undo
+  turnUndo: async p => (r => (core.streakReset(core.state.tabs.find(x => x.id === p?.tab)?.workspace ?? '', 'a turn undone'), r))(await turnUndo(p)), // the Reader's card's Undo
   turnList: p => (turnsSeen(p), turnList(p)), // F1: a workspace's kept turns (the strip under a tab, Changes' picker)
-  turnRewind: p => turnRewind(p), // its files as before turn n
+  turnRewind: async p => (r => (core.streakReset(p?.ws ?? core.state.tabs.find(x => x.id === p?.tab)?.workspace ?? '', 'a rewind'), r))(await turnRewind(p)), // its files as before turn n
   turnFork: p => turnFork(p), // a new workspace on turn n's files
   sideAsk: p => sideAsk(p), // Side chat: a question about an agent's work beside it (its chat forked)
   sideState: p => sideState(p),
@@ -513,8 +521,8 @@ const api = {
   artifactList: p => artifactsMod.artifactList(p.ws),
   linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), artifactsMod.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
   fileWrite: p => filesMod.fileWrite(p),
-  hunkUndo: p => filesMod.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
-  fileUndo: p => filesMod.fileUndo(p),
+  hunkUndo: async p => (r => (core.streakReset(p?.ws, 'a revert'), r))(await filesMod.hunkUndo(p)), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
+  fileUndo: async p => (r => (core.streakReset(p?.ws, 'a revert'), r))(await filesMod.fileUndo(p)),
   hunkRedo: p => filesMod.hunkRedo(p),
   skills: () => skills(),
   agentCommands: p => agentCommands(p), // the prompt boxes' / menu
@@ -777,7 +785,7 @@ const remoteNo = (method: string, p: any) =>
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
   (method === 'settingsSet' && changes(p, REMOTE_KEYS)) ||
   (method === 'shareStart' && Number(p?.hours ?? 0) === 0) ||
-  (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined)) // F14: a project's auto-answer rules: the Mac's own
+  (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined || p?.alwaysAsk !== undefined)) // F14: a project's auto-answer rules, F15: its Always ask for: the Mac's own
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
@@ -1292,6 +1300,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'envAllow' in p.set) notAgent(p, "let secret-looking variables through to agents")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'wrap' in p.set) notAgent(p, "change a profile's wrapper sandbox")
   else if (method === 'projectSet' && p.allow !== undefined) notAgent(p, "change a project's auto-answer rules (what Laki allows for every agent: the user's, in Settings)")
+  else if (method === 'projectSet' && p.alwaysAsk !== undefined) notAgent(p, "change what a project always asks for (the user's, in Settings)")
   else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")

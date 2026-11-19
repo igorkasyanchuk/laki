@@ -308,3 +308,34 @@ export function hotkeyAnswer(t: { status?: string; ask?: Ask; secret?: unknown; 
 }
 // what Always allow in this project offers for an ask: its own command or path as the pattern, when one could be a rule
 export const ruleFrom = (a?: Ask) => (a?.tool && a.what && !a.what.endsWith('…') ? rulePattern(a.tool, a.what) : '')
+
+// ---------- F15: graduated autonomy. A project's Always ask for (project.alwaysAsk): path globs an ask that touches one
+// (an Edit, Write or MultiEdit of a matching path, a Bash command naming one) is never auto-answered for, whatever its
+// rules say, and its card says why. A glob with no / matches a name in any folder too (yarn.lock)
+const EDITS = /^(Edit|Write|MultiEdit|NotebookEdit)$/
+export const ALWAYS_ASK_EG = ['**/migrations/**', '.github/**', '**/auth/**', '**/*secret*', '.env*', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Gemfile.lock'] // Settings' suggestions; none saved unless you add them
+export function alwaysAskOf(globs: string[] | undefined, a: { tool?: string; what?: string }) {
+  const w = a.what?.trim()
+  if (!globs?.length || !w || !a.tool) return
+  const paths = (a.tool === 'Bash' ? w.split(/[\s'"=:(),;&|<>`]+/) : EDITS.test(a.tool) ? [w] : []).filter(Boolean).map(p => p.replace(/^\.\//, ''))
+  return globs.find(g => (re => paths.some(p => re.test(p) || (!g.includes('/') && re.test(p.split('/').pop()!))))(globRe(g.replace(/^\.\//, ''))))
+}
+// your Allows of one kind of ask in a row (the daemon's askStreak.ts) and the rule it would make: a Bash command's first
+// words (npm test, git status), a file's folder (src/ui/**); none for what no rule may take (the risky or chained, a path
+// outside the worktree, a file at the root: a rule of * is none) or what Always ask for holds
+export const STREAK_AT = 5
+export function streakOf(a: { tool?: string; what?: string }, globs?: string[]): { key: string; tool: string; pattern: string } | undefined {
+  const w = a.what?.trim()
+  if (!a.tool || !w || w.endsWith('…') || !RULE_TOOLS.includes(a.tool) || risky(w) || OUTSIDE.test(w) || alwaysAskOf(globs, a)) return
+  let pattern = ''
+  if (a.tool === 'Bash') {
+    if (CHAIN.test(w)) return
+    const words = w.split(' ')
+    pattern = words.slice(0, words[1] && /^[a-z][\w:.-]*$/i.test(words[1]) ? 2 : 1).join(' ')
+  } else {
+    if (w.split('/').includes('..') || !w.includes('/')) return
+    pattern = `${w.slice(0, w.lastIndexOf('/'))}/**`
+  }
+  const p = rulePattern(a.tool, pattern)
+  return p ? { key: `${a.tool} ${p}`, tool: a.tool, pattern: p } : undefined
+}

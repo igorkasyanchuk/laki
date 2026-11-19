@@ -7,7 +7,7 @@ import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templ
 import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
-import { type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
+import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
 
 const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
@@ -123,7 +123,7 @@ export function FolderField({ value, placeholder, label, onChange }: { value?: s
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[] }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[] }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Shell (a command)']]
@@ -330,6 +330,45 @@ function AllowRules({ rules, onSave }: { rules: AllowRule[]; onSave: (allow: All
   )
 }
 
+// F15: Always ask for: path globs no rule answers for (an Edit, Write or MultiEdit of a matching path, a command naming
+// one); the suggestions are only offered, none saved until you add it
+function AlwaysAsk({ globs, onSave }: { globs: string[]; onSave: (globs: string[]) => Promise<unknown> }) {
+  const [glob, setGlob] = useState('')
+  const [err, setErr] = useState('')
+  const save = (l: string[]) => onSave(l).then(() => (setErr(''), true), (e: Error) => (setErr(e.message), false))
+  const add = (g = glob.trim()) => g && !globs.includes(g) && void save([...globs, g]).then(ok => ok && setGlob(''))
+  const eg = ALWAYS_ASK_EG.filter(g => !globs.includes(g))
+  return (
+    <Group title="Always ask for" hint="Paths no auto-answer rule answers for: an edit of a matching file, or a command that names one, is always asked, and its card says which glob held it (* and ** as in a glob; one without / matches that name in any folder). Only you change them">
+      <div className="setting-box">
+        {globs.map(g => (
+          <div key={g} className="switch-row allow-rule">
+            <code className="grow">{g}</code>
+            <IconButton icon="x" title="Remove" onClick={() => void save(globs.filter(x => x !== g))} />
+          </div>
+        ))}
+        <div className="switch-row allow-rule">
+          <input className="mono grow" value={glob} aria-label="Path glob" placeholder="**/migrations/**" onChange={e => (setGlob(e.target.value), setErr(''))} onKeyDown={e => e.key === 'Enter' && add()} />
+          <button type="button" disabled={!glob.trim()} onClick={() => add()}>
+            Add
+          </button>
+        </div>
+        {eg.length > 0 && (
+          <div className="row-buttons">
+            <span className="muted small">Suggested:</span>
+            {eg.map(g => (
+              <button key={g} type="button" className="link small mono" onClick={() => add(g)}>
+                {g}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {err && <div className="warn small">{err}</div>}
+    </Group>
+  )
+}
+
 // F7: what keeps two workspaces of the project apart (shared/isolation.ts): the variables every tab, setup, run, Done
 // check and teardown gets, and examples to copy for common stacks; Teardown (Scripts) takes them down on archive
 const ISO_VARS: [string, string][] = [
@@ -382,6 +421,7 @@ export function ProjectSection(p: {
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
   onAllow?: (allow: AllowRule[]) => Promise<unknown> // F14: its auto-answer rules, the whole list (refused: the daemon says why)
+  onAlwaysAsk?: (globs: string[]) => Promise<unknown> // F15: its Always ask for, the whole list
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
 }) {
   const [name, setName] = useState(p.project.name)
@@ -457,6 +497,7 @@ export function ProjectSection(p: {
         </Group>
       )}
       {p.onAllow && <AllowRules rules={p.project.allow ?? []} onSave={p.onAllow} />}
+      {p.onAlwaysAsk && <AlwaysAsk globs={p.project.alwaysAsk ?? []} onSave={p.onAlwaysAsk} />}
       {!p.noNotes && (
         <Group title="Notes" hint="Markdown, yours: links, how to run it, who to ask. The project's ⋯ › Notes shows them; agents never see them">
           <textarea className="mono notes-field" rows={Math.min(16, Math.max(4, notes.split('\n').length + 1))} value={notes} aria-label="Notes" placeholder="# Links&#10;- Staging: https://…" onChange={e => setNotes(e.target.value)} />

@@ -350,6 +350,16 @@ selected workspace's PR is in the status bar.
   with `;`, `&&` or `|`, a redirect or `$(…)`, a path outside the worktree, a question, a plan or a secret. Settings ›
   the project › *Auto-answer rules* lists them with how often each answered, removes and adds them; the Reader says
   *allowed by rule* on the steps they answered, and `daemon.log` has each. Agents and remote access can't change them.
+- **Always ask for** (Settings › the project): path globs no rule answers for. An edit of a matching file, or a
+  command that names one, is always asked, and its card says *Asked because it touches `<glob>`*. A glob without `/`
+  matches that name in any folder (`yarn.lock`). Suggestions are offered (migrations, `.github/**`, auth and secrets
+  paths, lockfiles), none saved until you add it. Only you change the list, never an agent or a phone.
+- **Rule suggestions**: allow the same kind of ask 5 times in a row in a project (a command's first words, like `npm
+  run`, or a file's folder, like `src/ui/**`) and Laki asks once in its window: *You allowed npm run 5 times here: make
+  it a rule?* with *Make it a rule*, *No* and *Don't suggest again*. A Deny of it starts that count over; a failed Done
+  check, an Undo of a turn, a rewind or a revert in the project starts every count there over. Never for what no rule
+  may take (risky or chained commands, paths outside the worktree, what Always ask for holds); `daemon.log` has each
+  suggestion and your answer.
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message

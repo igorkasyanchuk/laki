@@ -9,7 +9,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { AGENT_NO, AGENT_OK, AGENT_OWN } from '../src/daemon/gates.ts'
 import { recorded, type View } from '../src/shared/types.ts'
-import { connect, fresh, seen, until } from './helpers.ts'
+import { connect, fresh, seen, sleep, until } from './helpers.ts'
 
 test("S2: an agent's rm asks the user; files and tabs are its own workspace's; no share, no file opened by its app; a sandboxed one: none of it", async t => {
   const rig = await fresh(t)
@@ -395,4 +395,62 @@ test("What its agents did: an agent's wsNew and a refused merge are logged with 
   // gone with the workspace
   await rig.rpc('wsRm', { id: one.id })
   assert.equal(existsSync(join(rig.data, 'agent-log', `${one.id}.jsonl`)), false)
+})
+
+// F15: Always ask for holds a matching ask from a rule (its card says why); five Allows of one kind in a row suggest a
+// rule once, a Deny or a failed Done check starts over, a risky command never; the globs and the pick are the user's
+test("F15: an always-ask glob beats a rule; five allows suggest one rule; a deny or a failed check starts over; never a risky one; never an agent's", async t => {
+  const rig = await fresh(t)
+  const app = await connect(rig)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id))
+  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
+  const from = { ws: ws.id, tab: tab.id }
+  const now = async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, alwaysAsk: ['x/**'], from }), /an agent can't change what a project always asks for/)
+  await rig.rpc('projectSet', { id: p.id, allow: [{ tool: 'Bash', pattern: 'npm test' }], alwaysAsk: ['**/migrations/**'] })
+  const ask = async (cmd: string, pick: 'first' | 'last') => {
+    await rig.rpc('send', { target: tab.id, text: `perm bash :: ${cmd}` })
+    await until(async () => (x => x.status === 'waiting' && x.ask?.what === cmd && x.ask.options.length > 0)(await now()), `${cmd} asked`)
+    await until(() => rig.rpc('answer', { tab: tab.id, pick }).then(() => true, (e: Error) => (/being answered/.test(e.message) ? false : Promise.reject(e))), 'answered')
+    await until(async () => (await now()).status !== 'waiting', `${cmd} over`)
+  }
+  // a rule's command naming a held path: asked, and its card says why
+  await rig.rpc('send', { target: tab.id, text: 'perm bash :: npm test db/migrations/001.sql' })
+  const held = await until(async () => (x => x.status === 'waiting' && x)(await now()), 'asked')
+  assert.equal(held.held, '**/migrations/**')
+  await sleep(1500) // past a rule's wait for the menu
+  assert.equal((await now()).status, 'waiting')
+  await rig.rpc('answer', { tab: tab.id, pick: 'last' })
+  await until(async () => (await now()).status !== 'waiting', 'answered No')
+  assert.equal((await now()).allowed, undefined, 'no rule answered it')
+  const notices = () => app.events.filter((e: any) => e.ev === 'notice')
+  // four allows, a deny, four more: none; a risky one five times: none
+  for (let i = 0; i < 4; i++) await ask('npm run lint', 'first')
+  await ask('npm run lint', 'last')
+  for (let i = 0; i < 4; i++) await ask('npm run lint', 'first')
+  for (let i = 0; i < 5; i++) await ask('rm -rf build', 'first')
+  assert.equal(notices().length, 0)
+  // a failed Done check starts it over: one more allow is the first again
+  await rig.rpc('projectSet', { id: p.id, config: { test: 'exit 1', check: { steps: ['test'] } } })
+  await rig.rpc('send', { target: tab.id, text: 'run echo hi > a.txt' }) // a turn that changed a file is checked
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.check?.status === 'failed', 'the check fails')
+  await rig.rpc('projectSet', { id: p.id, config: {} })
+  await until(async () => (await now()).status === 'idle', 'its sent-back turn over')
+  for (let i = 0; i < 4; i++) await ask('npm run lint', 'first')
+  assert.equal(notices().length, 0)
+  await ask('npm run lint', 'first')
+  const n = await seen(app, (e: any) => e.ev === 'notice', 'the suggestion')
+  assert.match(n.text, /You allowed npm run 5 times here: make it a rule\?/)
+  assert.deepEqual(n.choices, ['Make it a rule', 'No', "Don't suggest again"])
+  // the pick is the user's: an agent's is refused; the user's adds the rule, and the next one is answered by it
+  await assert.rejects(rig.rpc('alertAnswer', { id: n.id, choice: 'Make it a rule', from }), /an agent can't answer the user's alert/)
+  await rig.rpc('alertAnswer', { id: n.id, choice: 'Make it a rule' })
+  await until(async () => (await rig.rpc('state')).projects.find((x: any) => x.id === p.id).allow.some((r: any) => r.tool === 'Bash' && r.pattern === 'npm run'), 'the rule')
+  await rig.rpc('send', { target: tab.id, text: 'perm bash :: npm run build' })
+  await until(async () => (await now()).allowed?.some((a: any) => a.what === 'npm run build'), 'answered by the new rule', 15000)
+  assert.equal(notices().length, 1)
+  assert.match(rig.out, /rule suggestion \S+: Bash npm run: Make it a rule/)
+  app.close()
 })

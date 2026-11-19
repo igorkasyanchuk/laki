@@ -135,6 +135,12 @@ the worktree, a question, a plan to approve, a secret and an ask cut short are a
 `daemon.log` with its rule. A rule is only as narrow as you write it: `npm test` lets an agent run whatever the
 project's test script is, which the agent can edit.
 
+*Always ask for* (Settings › the project) lists path globs no rule answers for: an Edit, Write or MultiEdit of a
+matching path, or a Bash command that names one, is always asked, and its card says which glob held it. After 5 of
+your Allows in a row of one kind of ask, Laki suggests a rule once; it's added only if you pick *Make it a rule* (an
+agent's pick is refused), never for what the fixed list or the globs hold, and a Deny, a failed Done check, an Undo of
+a turn or a revert starts the count over. Only you change the globs; a phone can't.
+
 ## Known limits
 
 - *Hide secret-looking variables from agents* (on for new installs) keeps names like `…_TOKEN`, `…_SECRET`, `…_KEY`,
