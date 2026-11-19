@@ -211,3 +211,4 @@ needs no bump: `settingsSet` keeps any field.
 202: `flowWaitEnd` (W9: a wait block for a time, its run's `wait.kind` `timer` with `until`, Continue now and Cancel; the user's only); settings' `workHours`.
 203: `flowExport`, `flowImport`, `flowImportSave` (W10: a workflow shared as a clean file, its inputs; an import read before it's saved, saved yours and off; the user's only).
 204: `scheduleSet`'s `after` and `ws: 'parent'`, `scheduleRm`'s and archive's `dependents: 'off'` (T9: a task after another's run, done or any; the run's `after`; `schedule.after` cap).
+205: `goalSet`, `goalClear` (A1b: a goal Laki runs for an agent with no /goal, met when a project script passes; the view's `tab.goal` with `own`, `turns`, `maxTurns`, `spent`; the user's only, remote access may clear; `goals.own` cap).

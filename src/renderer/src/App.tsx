@@ -4121,7 +4121,7 @@ export function App() {
                           />
                         ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' && isCursor(view?.presets.find(x => x.name === t.profile)) ? ('cursor' as const) : undefined))}
                         <SignInStrip tab={t} onAct={act => void call('signIn', { tab: t.id, act }).catch(fail)} />
-                        <GoalStrip tab={t} onCmd={cmd => void call('send', { target: t.id, text: cmd }).catch(fail)} />
+                        <GoalStrip tab={t} onCmd={cmd => void call('send', { target: t.id, text: cmd }).catch(fail)} onOwn={a => void call(a === 'clear' ? 'goalClear' : 'goalSet', { tab: t.id, ...(a === 'resume' && { resume: true }) }).catch(fail)} />
                         {!hookHid.includes(t.id) && <HookStrip tab={t} onCopy={copy} onHide={() => setHookHid(h => [...h, t.id])} />}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
                         <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />

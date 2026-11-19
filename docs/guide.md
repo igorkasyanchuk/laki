@@ -2577,6 +2577,12 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   turn, the tab stays *running*: no *done* notification, Done check or next-step chip at each turn's end, only one when
   the goal stops, saying *Goal reached* (or *paused*, *out of budget*). The tab and its sidebar row show a small target,
   the goal's words on hover. A reached goal's band goes with your next prompt.
+- **A goal for any agent**: Gemini, OpenCode, Grok and other agents have no `/goal`, so Laki runs one: the tab's menu ›
+  *Set goal › Until test passes…* (or lint, format), and what it should get done. Laki sends it, runs that project
+  script after each of the agent's turns, and sends back what fails, until it passes (*Goal · reached*), 12 turns go by
+  or the same failure comes back 3 times (*can't be met*, with why). The band shows *turn 3 of 12* (and what it spent,
+  for an agent Laki can price); a message of yours pauses it, *Resume* sends it again, *Clear* ends it. You're told once,
+  as it ends, not at each turn.
 - **Signed out**: a turn that fails because Claude Code or Codex is signed out (*Not logged in · Please run /login*, an
   expired token) shows a band over the tab's box, *Claude Code is signed out · your message sends once you're in*, and
   the notification says *Signed out*. *Sign in* opens the agent's own login for that tab's account in a terminal tab

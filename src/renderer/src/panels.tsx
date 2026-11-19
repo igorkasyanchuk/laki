@@ -2422,9 +2422,10 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 // likely why (hookHealth.ts), Details (a file:line, the args, the command) to copy; Dismiss: this tab, until a reload
 // A1: the tab's /goal (claude's, codex's): its words and state, the buttons typing the agent's own /goal commands
 // (codex: pause, resume, clear; claude has Clear only)
-export function GoalStrip({ tab, onCmd }: { tab: TabView; onCmd: (cmd: string) => void }) {
+export function GoalStrip({ tab, onCmd, onOwn }: { tab: TabView; onCmd: (cmd: string) => void; onOwn?: (act: 'resume' | 'clear') => void }) {
   const g = tab.goal
   if (!g) return null
+  if (g.own) return <OwnGoal g={g} onAct={a => onOwn?.(a)} />
   const codex = tab.preset === 'codex'
   return (
     <div className={`queue-strip show-strip goal-strip ${g.state}`} data-dock="bottom" role="region" aria-label="Its goal">
@@ -2443,6 +2444,32 @@ export function GoalStrip({ tab, onCmd }: { tab: TabView; onCmd: (cmd: string) =
           </button>
         )}
         <button type="button" onClick={() => onCmd('/goal clear')} data-tip="Types /goal clear: the goal goes">
+          Clear
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// A1b: the goal Laki runs for an agent with no /goal: its words, turn n of m, what it spent, why it stopped; Resume, Clear
+function OwnGoal({ g, onAct }: { g: NonNullable<TabView['goal']>; onAct: (act: 'resume' | 'clear') => void }) {
+  const left = g.state === 'paused' || g.state === 'limit' || g.state === 'blocked'
+  return (
+    <div className={`queue-strip show-strip goal-strip ${g.state}`} data-dock="bottom" role="region" aria-label="Its goal">
+      <div className="queue-head">
+        <Icon name="target" size={13} />
+        <span className="goal-state">Goal · {GOAL_SAYS[g.state]}</span>
+        <span className="queue-what" data-tip={[g.text, g.why, `met when ${g.check} passes`].filter(Boolean).join(' · ')}>{g.text}</span>
+        <span className="muted small">
+          turn {g.turns} of {g.maxTurns}
+          {g.spent !== undefined && ` · $${g.spent.toFixed(2)}${g.maxUsd ? ` of $${g.maxUsd}` : ''}`}
+        </span>
+        {left && (
+          <button type="button" onClick={() => onAct('resume')} data-tip="Sends it the goal again">
+            Resume
+          </button>
+        )}
+        <button type="button" onClick={() => onAct('clear')} data-tip="The goal goes: Laki stops checking its turns">
           Clear
         </button>
       </div>

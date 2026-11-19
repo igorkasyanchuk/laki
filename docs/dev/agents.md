@@ -114,6 +114,23 @@ the hold; your next prompt (`UserPromptSubmit`) drops it and a reached or failed
 (panels.tsx `GoalStrip`) types `/goal pause`, `/goal resume` (codex) and `/goal clear` through `send`. ponytail: read
 with the meters (off when both the context meter and costs are off); Grok's goals aren't read.
 
+**Laki's own goals (A1b).** An agent with no `/goal` (gemini, opencode, grok, an ACP agent) gets one from Laki
+(verify.ts `goalSet`, the tab's menu › *Set goal › Until test passes…*): `tab.goalRun` (`TabGoal`, kept in state.json)
+holds its words, the project's script that says it's met (`check`: format, lint or test), `maxTurns` (unset
+`GOAL_TURNS`, 12), `maxUsd`, its turns so far and the chat's cost as it was set (`cost0`). It's sent as a prompt
+starting `Goal (Laki): ` (`GOAL_MARK`). Each turn end (`turnEnds`, not a limit or a failure: those stop it, `limit` and
+`blocked`) runs the script as the Done check runs one (`step`, not counted as the Done check's own: `own` false), once
+per end (`goalBusy`): exit 0 is `reached`; else, under `maxTurns`, `maxUsd` (the meter's cost, an agent Laki prices) and
+the same output (its sha-256, `outHash`) `SAME_MAX` (3) turns in a row, the goal and the output (fenced, untrusted)
+go back through `send` whenIdle; past one, `failed` or `budget` with `why`. The Done check skips a tab whose goal works
+(`wants`), and `checkHooks.will` holds the turn's notification: the goal's end is a `check` event (passed, over), with
+its bell and phone push. A prompt the agent takes (core's prompt hook, `checkHooks.prompt`) that doesn't start with
+the mark pauses it (`paused`, *you sent it a prompt*); `goalSet` `resume` sends it again. `goalOf` (meters.ts) and
+`meterView` give it as `tab.goal` (`ownGoal`: `own`, `turns`, `maxTurns`, `spent`), so the band (panels.tsx
+`OwnGoal`: turn n of m, its spend, Resume, Clear) and the tab's target mark draw it; core's `goalHold` never holds
+for it. ponytail: maxUsd needs an agent whose chat Laki can price (claude's and codex's meters); gemini's spend isn't
+read yet.
+
 `daemon/turns.ts` (main.ts imports it; core's `turnStarts`, claude's UserPromptSubmit, and `turnEnds`), core keeping
 what the view shows on the tab's runtime:
 - each turn's changes (`settings.turnChanges`, on unless false): the worktree as a tree through an index of its own,

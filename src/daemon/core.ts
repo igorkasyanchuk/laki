@@ -122,7 +122,7 @@ export const proofs = new Map<string, Proof>() // and the Proof card of its last
 export const annotAt = new Map<string, number>() // and when its extensions' notes on diff lines last changed (P6: widgets.ts annotate)
 // a path in a storage folder's proof/: Laki's own (the Proof card's), never another method's to write
 export const proofIn = (root: string, path: string) => relative(root, path).split(sep)[0] === 'proof'
-export const checkHooks: { will?: (tab: Tab) => boolean } = {} // verify.ts': a check follows this turn's end (the app waits for it to notify)
+export const checkHooks: { will?: (tab: Tab) => boolean; prompt?: (tab: Tab, prompt: unknown) => void } = {} // verify.ts': a check follows this turn's end (the app waits for it to notify); A1b: a prompt the agent took (yours pauses Laki's goal)
 // each turn's start (claude's UserPromptSubmit: its first hook, before any edit) and end
 export const turnStarts = new Set<(tab: Tab) => void>()
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
@@ -4241,6 +4241,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
         goalHeld.delete(tab.id) // A1: a prompt of yours: a turn of its own
         goalSeen(tab)
+        checkHooks.prompt?.(tab, pl.prompt) // A1b
         if (Date.now() - (keysAt.get(tab.id) ?? 0) < 5000 && !typedBy.has(tab.id) && !tab.flow) promptKeep(pl.prompt, tab.workspace) // typed there by you just now
         if (pl.hook_event_name === 'UserPromptSubmit')
           for (const f of turnStarts)
@@ -4368,7 +4369,7 @@ let goalTimer: NodeJS.Timeout | undefined
 function goalHold(tab: Tab, r: Runtime, p: Parameters<typeof turn>[0]) {
   const id = p.payload?.['thread-id'] // codex's chat, at its first turn's end: its transcript's name
   if (typeof id === 'string' && id && id !== tab.resumeId) ((tab.resumeId = id), save())
-  if (goalOf(tab)?.state !== 'working') return false
+  if (tab.goalRun || goalOf(tab)?.state !== 'working') return false // A1b: Laki's own goal holds nothing: it checks each end
   goalHeld.set(tab.id, p)
   r.status = 'running'
   r.done = false

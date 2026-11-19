@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
-import { type ChatHit, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
+import { type ChatHit, type Goal, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, chatFile, findWs, keptChat, keptOnly, openPath, presetOf, state } from './core.ts'
 import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
@@ -196,14 +196,21 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   return true
 }
 
-// A1: its /goal as its transcript says now (read on at once); a claude or codex tab's
-export function goalOf(tab: Tab) {
+// A1: its /goal as its transcript says now (read on at once); a claude or codex tab's. A1b: another agent's is the one
+// Laki runs (tab.goalRun: verify.ts), with its turns and what the chat spent since it was set
+export function goalOf(tab: Tab): Goal | undefined {
+  if (tab.goalRun) return ownGoal(tab, meterView(tab).usage?.cost)
   if (tab.preset !== 'claude' && tab.preset !== 'codex') return
   meterRead(tab, true)
   const r = meters.get(tab.id)
   return r?.file?.endsWith(`${tab.resumeId}.jsonl`) ? r.m.goal : undefined
 }
 // a reached or failed goal leaves the banner as you send the next prompt (a working or paused one stays)
+export const ownGoal = (t: Tab, cost?: number): Goal => {
+  const g = t.goalRun!
+  const spent = cost === undefined ? undefined : Math.max(0, cost - (g.cost0 ?? 0))
+  return { text: g.text, state: g.state, at: g.at, own: true, check: g.check, turns: g.turns, maxTurns: g.maxTurns, ...(spent !== undefined && { spent: Math.round(spent * 100) / 100 }), ...(g.maxUsd && { maxUsd: g.maxUsd }), ...(g.why && { why: g.why }) }
+}
 export function goalSeen(tab: Tab) {
   const m = meters.get(tab.id)?.m
   if (m?.goal && (m.goal.state === 'reached' || m.goal.state === 'failed')) m.goal = undefined
@@ -322,7 +329,9 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const used = live ?? m?.used
   const bg = m && r!.bg
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
-  return { ...(m?.goal && { goal: m.goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  const cost = m && m.tokens > 0 && m.priced ? Math.round(m.cost * 1e4) / 1e4 : undefined
+  const goal = t.goalRun ? ownGoal(t, cost) : m?.goal // A1b: Laki's
+  return { ...(goal && { goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to

@@ -487,7 +487,11 @@ export const againOnEnter = (t: { kind: TabKind; script?: RunScript }) => t.kind
 // A1: a tab's /goal (claude's goal_status, codex's thread goal: daemon/share.ts goalIn): its words and where it stands.
 // working holds the tab running between its turns (no done, Done check or next step until it stops: core's goalHold)
 export type GoalState = 'working' | 'paused' | 'budget' | 'limit' | 'blocked' | 'reached' | 'failed'
-export type Goal = { text: string; state: GoalState; at: number }
+export type Goal = { text: string; state: GoalState; at: number; own?: true; check?: string; turns?: number; maxTurns?: number; spent?: number; maxUsd?: number; why?: string } // own (A1b): Laki's, for an agent with no /goal (daemon/verify.ts goals): met when its project's check script passes, its turns so far of maxTurns, what the chat spent since it was set (its meter's, when the agent has one), why it stopped
+// A1b: the goal Laki runs for a tab whose agent has no /goal of its own, kept on the tab (state.json): the project's script
+// that says it's met (format, lint or test), at most maxTurns turns (unset 12) and maxUsd spent; turns so far, the chat's
+// cost as it was set, the last failure's hash and how many turns in a row it came back the same
+export type TabGoal = { text: string; check: 'format' | 'lint' | 'test'; maxTurns: number; maxUsd?: number; state: GoalState; at: number; turns: number; cost0?: number; outHash?: string; same?: number; why?: string }
 export const GOAL_SAYS: Record<GoalState, string> = { working: 'working', paused: 'paused', budget: 'out of budget', limit: 'at a usage limit', blocked: 'blocked', reached: 'reached', failed: "can't be met" }
 export type SignedOutView = { agent: string; step: 'out' | 'opened' | 'in'; account?: string; waiting?: boolean; at: number }
 export type Tab = {
@@ -503,6 +507,7 @@ export type Tab = {
   kept?: string // the chat (a resumeId) Laki kept a copy of as its workspace was archived (core's keepChats): <storage>/chats/<id>.jsonl
   forkOf?: string // claude session to fork on first start
   queue?: string[] // follow-ups for when the agent is idle
+  goalRun?: TabGoal // A1b: the goal Laki runs for it (an agent with no /goal of its own)
   queueHeld?: boolean // U8: Stop all agents stopped its turn: its queue waits for Resume queue (queueResume)
   color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
   muted?: boolean // no notifications from it
@@ -1406,7 +1411,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 204
+export const API = 205
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
