@@ -99,7 +99,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
   const checkout = () => join(ws.co.path, 'src/checkout.js')
   const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
-    ['projects', null, '.sidebar .ws'],
+    // a row's words all or nothing: none visible shows under 8 characters before its ellipsis (styles.css .need-row-line)
+    ['projects', null, async () => (await has('.sidebar .ws')) && js<boolean>("[...document.querySelectorAll('.need-row-last')].every(e => { const box = e.closest('.need-row-line')?.getBoundingClientRect(); const r = e.getBoundingClientRect(); return !box || !r.width || r.top >= box.bottom - 1 || e.scrollWidth <= e.clientWidth || e.clientWidth / (e.scrollWidth / e.textContent.length) >= 8 })")],
     ['switch-apart', null, () => apart('.reader-switch', '.pane.active .xterm-screen')], // U2: Terminal | Reader off the terminal's lines
     ['reader', click('.reader-switch button:last-child'), '.reader'],
     // the AI button: in the status bar by default; floated again from its right click, it's off the Reader's Send (U2);

@@ -1816,8 +1816,14 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 /* Needs you's finished turn as a row (Needs.tsx, Finished turns as rows): one line, its words giving way to Changes and
    Seen on hover or focus in the same room */
 .need.need-row { flex-direction: row; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); min-height: var(--h-l); }
-.need-row .need-ws { flex: 0 1 auto; }
-.need-row-mid { flex: 1 1 0; min-width: 0; display: grid; align-items: center; }
+/* its words all or nothing: the name and the words wrap in a box one line high, so words that would show under ~12
+   characters go to a second line it hides (never "Bu…"); the time stays at the right, outside it. Hover or focus: no
+   wrap, the buttons take the words' place and the name gives way */
+.need-row-line { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--sp-3); height: var(--h-s); line-height: var(--h-s); overflow: hidden; } /* each line as tall as the box: the second wholly out of it */
+.need-row .need-ws { flex: 0 0 auto; max-width: 100%; min-width: 0; } /* the name first: cut only where it alone is too long */
+.need-row-mid { flex: 1 1 12ch; min-width: 12ch; display: grid; align-items: center; }
+.app:not(.narrow) .need-row:is(:hover, :focus-within) .need-row-line { flex-wrap: nowrap; }
+.app:not(.narrow) .need-row:is(:hover, :focus-within) .need-ws { flex-shrink: 1; }
 .need-row-last, .need-row-acts { grid-area: 1 / 1; min-width: 0; }
 .need-row-last { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .need-row-acts { display: flex; justify-content: flex-end; gap: var(--sp-2); visibility: hidden; }

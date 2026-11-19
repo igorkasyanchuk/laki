@@ -14,6 +14,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Fixed on a phone: Needs you's counts (*3 to answer · 2 finished*) get a line of their own under its name instead of being cut beside Allow all, and the sidebar button sits at the left edge instead of 76px in.
 - A goal for Gemini, OpenCode, Grok and other agents with no `/goal`: the tab's menu › *Set goal › Until test passes…*; Laki runs the script after each turn and sends back what fails, until it passes, 12 turns go by or the same failure comes back 3 times.
 - A status mark moves once as it changes: a finished one ticks in, and with Motion: high one that needs you nods and one that failed shakes; never with Motion off or Reduce motion.
+- Needs you's finished rows never show a stub of the agent's last words (*Bu…*): where fewer than a dozen characters fit, the words don't show, and the name and time keep their room.
 
 ## 0.56.0 · Nov 19, 2026
 

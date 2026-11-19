@@ -165,14 +165,16 @@ function NeedCard({ t, w, api, next, stale, shown, show }: Need & { api: NeedsAp
     return (
       <div className="need need-done need-row" data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. ${api.phone ? 'Tap shows more, a swipe marks it seen' : 'Space shows more'}`} onClick={() => swipe.moved() || expand()} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))} {...(api.phone && api.seenUndo && swipe.props)}>
         <Glyph s="done" />
-        <b className="need-ws">
-          <MidText text={api.name(w)} />
-        </b>
-        <span className="need-row-mid">
-          <span className="need-row-last">{last ?? t.name}</span>
-          <span className="need-row-acts" onClick={stop}>
-            {!!w.branch && changed && <button type="button" onClick={() => api.review(t)}>Changes</button>}
-            <button type="button" onClick={() => api.seen(t)}>Seen</button>
+        <span className="need-row-line">
+          <b className="need-ws">
+            <MidText text={api.name(w)} />
+          </b>
+          <span className="need-row-mid">
+            <span className="need-row-last">{last ?? t.name}</span>
+            <span className="need-row-acts" onClick={stop}>
+              {!!w.branch && changed && <button type="button" onClick={() => api.review(t)}>Changes</button>}
+              <button type="button" onClick={() => api.seen(t)}>Seen</button>
+            </span>
           </span>
         </span>
         {t.needAt && <Elapsed since={t.needAt} />}

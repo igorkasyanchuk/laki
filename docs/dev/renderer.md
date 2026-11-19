@@ -403,10 +403,13 @@ are tested in `test/units-more.test.ts`.
   `needs-head`) Allow all and Deny all become an icon with the count; a card's agent name is whole, and under 170px
   (`need`) goes to a line of its own; the workspace's name is cut first.
 - **Needs you's finished turns as rows** (`Needs.tsx` `NeedCard`, `settings.finishedRows`, on unless false, never on a
-  phone): one line, `.need-row`: the done mark, the workspace (`MidText`), its last line muted, how long ago; Changes and
+  phone): one line, `.need-row`: the done mark, the workspace (`MidText`), its last line muted, how long ago (the name and
+  the line in `.need-row-line`, one line high with `flex-wrap`: the line, `flex: 1 1 12ch` and `min-width: 12ch`, wraps to
+  the hidden second line rather than show a stub; the name first, cut only where it alone is too long; test:ui's
+  `projects` checks none visible shows under 8 characters before its …); Changes and
   Seen in the same grid cell, shown on `:hover`/`:focus-within` (the height kept): the line goes (`display: none`) and the
   cell keeps the buttons' width (`min-width: max-content`), so the name is cut instead of the buttons reaching over it
-  (a layout change, not a cover: a see-through look hides nothing). A click or Space opens its card
+  (a layout change, not a cover: a see-through look hides nothing; no wrap then, the name shrinks). A click or Space opens its card
   (`opened`, by tab and `needAt`, until it leaves); Enter opens the tab as a card's does. An ask, an API error, a plan
   limit, a sandbox's stop or a failed Done check stay cards.
 - **Sticky project heads** (`.side-scroll .project-head`): each project is a section (`.project`), its head
