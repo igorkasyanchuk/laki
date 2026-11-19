@@ -8,12 +8,14 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { homedir } from 'node:os'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { VERSION } from '../shared/version.ts'
 import { fileURLToPath } from 'node:url'
 import { tabAgent } from '../shared/install.ts'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { queueOrder, type Span, SPANS_MAX, EACH_CAP, EACH_MAX, itemsOf, itemVars, ACTIONS, AGENT_TIMEOUT, leftWords, pauseText, waitEnd, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, type Span, SPANS_MAX, EACH_CAP, EACH_MAX, itemsOf, itemVars, ACTIONS, AGENT_TIMEOUT, leftWords, pauseText, waitEnd, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource, flowPortable, flowSummary, portableFill, portableInputs } from '../shared/workflow.ts'
 import { addTab, rtOf, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew, proofIn } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
@@ -1965,17 +1967,68 @@ function tally(r: FlowRun) {
 }
 
 // paused (on: false) or on again (on: true, its failures in a row forgotten); the app's, the CLI's laki flow on
-export function flowPause(o: Ref & { on: boolean }) {
+export function flowPause(o: Ref & { on: boolean }, why = 'you paused it') {
   on()
   const wf = flowFind(o)
   if (wf.source === 'builtin') throw template(wf.name)
   const k = agentKey(wf.source, wf.id, wf.project)
   const st = ((state.flowStats ??= {})[k] ??= { total: 0, recent: [], fails: 0 })
   if (o.on) (st.fails = 0), delete st.paused
-  else st.paused = { at: Date.now(), why: 'you paused it' }
+  else st.paused = { at: Date.now(), why }
   flowFiles.at = Date.now()
   touch()
   return flowFind({ id: wf.id, source: wf.source, project: wf.project })
+}
+
+// ---------- W10: share a workflow as a clean file (shared flowPortable: this Mac's projects, profiles, paths and secrets
+// as inputs), and import one. flowImport only reads it (its inputs, what it would do, the parser's error): nothing is
+// saved or run; flowImportSave fills its inputs, saves it as yours, turned off (paused: no event or schedule starts it
+// until you turn it on). All three the user's (AGENT_NO)
+export function flowExport(o: Ref) {
+  const wf = flowFind(o)
+  const proj = state.projects.find(p => p.id === (wf.project ?? o.project))
+  const r = flowPortable(wf, { laki: VERSION, home: homedir(), root: proj?.path, projects: state.projects.filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })), profiles: presets().map(p => ({ name: p.name, agent: p.agent })) })
+  return { name: wf.name, id: wf.id, ...r }
+}
+function imported(text: unknown, values?: Record<string, string>) {
+  const { inputs, body } = portableInputs(String(text ?? ''))
+  if (!body.trim()) throw new Error("an empty file: export one from a workflow's ⋯ › Share…")
+  if (Buffer.byteLength(body) > MAX_FILE) throw new Error('a workflow file is 256 KB at most')
+  const dummy = Object.fromEntries(inputs.map(i => [i.name, i.kind === 'profile' ? (i.agent ?? 'claude') : i.kind === 'root' ? '/x' : i.name]))
+  const filled = portableFill(body, inputs, values ?? dummy)
+  const { workflow, problems } = parse(filled, 'import')
+  if (problems.length) throw new Error(`not a workflow Laki reads: ${problems.slice(0, 3).join('; ')}`)
+  return { inputs, workflow, filled }
+}
+export function flowImport(o: { text?: unknown }) {
+  on()
+  const { inputs, workflow } = imported(o.text)
+  return { name: workflow.name, inputs, summary: flowSummary(workflow), problems: check(workflow) }
+}
+export function flowImportSave(o: { text?: unknown; inputs?: Record<string, unknown> }) {
+  on()
+  const { inputs } = imported(o.text)
+  const values: Record<string, string> = {}
+  for (const i of inputs) {
+    const v = String(o.inputs?.[i.name] ?? '').trim()
+    if (!v || /[\n\r]/.test(v)) throw new Error(`{{${i.name}}}: fill it in (one line)`)
+    if (i.kind === 'project') values[i.name] = findProject(v).name
+    else if (i.kind === 'profile') {
+      const p = presets().find(x => x.name === v)
+      if (!p) throw new Error(`{{${i.name}}}: no profile ${v}`)
+      if (i.agent && p.agent !== i.agent) throw new Error(`{{${i.name}}}: ${v} is a ${p.agent} profile; this one was ${i.agent}'s`)
+      values[i.name] = v
+    } else if (i.kind === 'root' && !isAbsolute(v)) throw new Error(`{{${i.name}}}: a folder's full path`)
+    else values[i.name] = v
+  }
+  const { workflow, filled } = imported(o.text, values)
+  const base = workflow.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36) || 'workflow'
+  let id = base
+  for (let n = 2; existsSync(join(yoursDir(), `${id}.md`)); n++) id = `${base}-${n}`
+  flowSave({ id, source: 'yours', text: filled })
+  flowPause({ id, source: 'yours', on: false }, 'imported: turn it on to let its events and schedules start it')
+  log(`workflow imported as ${id} (${workflow.name}), off`)
+  return flowFind({ id, source: 'yours' })
 }
 
 // when done: archive (unset: a worktree run's) archives the worktree the run made once it ended done with nothing

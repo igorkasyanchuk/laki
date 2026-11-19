@@ -94,6 +94,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow pause|resume <run>               pause after the block it's on (no next block starts) | go on from there
   laki flow on <workflow> [project]           turn on again one paused after 5 failed runs in a row (events and its schedules start it again)
   laki flow trash | restore <trash-id>        the workflows deleted in the last 30 days | put one back
+  laki flow export <workflow> [project]       a clean file to share (stdout): this Mac's projects, profiles, paths and secrets as inputs
+  laki flow import <file.md|-> [--set name=value…]  read one: what it does and its inputs; with every input set, saved as yours, off
   laki flow check [file.md… | folder]        check workflow files, no daemon (none given: ./.laki/workflows); exit 1 on a problem
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch (laki ext: the same, every widget command)
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on

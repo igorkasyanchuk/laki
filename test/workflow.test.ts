@@ -1250,3 +1250,42 @@ test('barsOf: the Time tab: sequential blocks abut, parallel children overlap un
   assert.deepEqual(t.rows.map(r => [r.block, r.depth]), [['k', 0]])
   assert.deepEqual(barsOf({ started: 5, spans: [] }, 5).rows, [])
 })
+
+// W10: a workflow as a clean file to share: this Mac's project, profile and token out as inputs; imported back it reads,
+// passes check() and is off; a broken file says the parser's words; saving an import is the user's
+test("workflow share: export puts the project, a profile and a token out as inputs; import fills them and saves it off; a broken file is refused; never an agent's", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'careful', add: true, set: { agent: 'claude' } })
+  const token = 'ghp_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8'
+  const text = `# Deploy it\nDeploys ${p.name}.\n\nruns in: worktree\n\n## start\ninput: task?\nnext: fix\n\n## fix\nagent: careful\n> Fix {{task}} in ${p.name}; read ${p.path}/README.md\nnext: push\n\n## push\nrun: curl -H "Authorization: Bearer ${token}" https://api.example.com/deploy\nok: done\n\n## done\nend: success\n`
+  await rig.rpc('flowSave', { id: 'deploy', source: 'project', project: p.id, text })
+  const ex = await rig.rpc('flowExport', { id: 'deploy', source: 'project', project: p.id })
+  assert.ok(!ex.text.includes(token), 'the token is out')
+  assert.ok(!ex.text.includes(p.path), 'the path is out')
+  assert.match(ex.text, /^<!-- Laki workflow, exported by Laki [^,]+, format 1\. Inputs to fill on import: \{\{secret_1\}\} \(a secret: GitHub token\), \{\{root\}\} \(the project's folder\), \{\{project\}\} \(a project\), \{\{profile\}\} \(a claude profile\) -->/)
+  assert.match(ex.text, /^agent: \{\{profile\}\}$/m)
+  assert.match(ex.text, /Bearer \{\{secret_1\}\}/)
+  assert.match(ex.text, /read \{\{root\}\}\/README\.md/)
+  assert.deepEqual(ex.inputs.map((i: { name: string }) => i.name), ['secret_1', 'root', 'project', 'profile'])
+  assert.ok(ex.changes.some((c: string) => /a GitHub token .* became \{\{secret_1\}\}/.test(c)) && !ex.changes.join(' ').includes(token), ex.changes.join('\n'))
+  // read first: what it does and its inputs, nothing saved
+  const look = await rig.rpc('flowImport', { text: ex.text })
+  assert.equal(look.name, 'Deploy it')
+  assert.ok(look.summary.some((l: string) => l.startsWith('Runs a command: curl')), look.summary.join('\n'))
+  assert.equal((await rig.rpc('flowList', {})).filter((w: { name: string }) => w.name === 'Deploy it').length, 1, 'only the original')
+  // saved with its inputs: yours, passes check(), off; an agent's save is refused, a missing input too
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const from = { ws: ws.id, tab: (await until(() => rig.tab(ws.id))).id }
+  const inputs = { secret_1: 'fake-secret', root: '/Users/you/app', project: p.id, profile: 'careful' }
+  await assert.rejects(rig.rpc('flowImportSave', { text: ex.text, inputs, from }), /an agent can't import a workflow/)
+  await assert.rejects(rig.rpc('flowImportSave', { text: ex.text, inputs: { ...inputs, profile: '' } }), /\{\{profile\}\}: fill it in/)
+  const saved = await rig.rpc('flowImportSave', { text: ex.text, inputs })
+  assert.deepEqual([saved.source, saved.id, saved.problems], ['yours', 'deploy-it', []])
+  assert.deepEqual(check(parse(saved.text, saved.id).workflow), [])
+  assert.match(saved.stats?.paused?.why ?? '', /imported/)
+  assert.match(saved.text, /Bearer fake-secret/)
+  assert.ok(!saved.text.includes('{{profile}}') && saved.text.includes('{{task}}'), 'its inputs filled, the run’s own variables kept')
+  // a broken file: the parser's words
+  await assert.rejects(rig.rpc('flowImport', { text: '# Broken\n\n## start\nnope nope\n' }), /not a workflow Laki reads: .*nope nope\?/)
+})

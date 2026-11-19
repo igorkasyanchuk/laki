@@ -209,3 +209,4 @@ needs no bump: `settingsSet` keeps any field.
 200: `dataBackup`, `dataRestore` (laki backup and restore: the user's data in a .tgz with its manifest, a restore's dry run, the daemon restarting on it; the user's only; `backup` cap).
 201: `projectSet`'s `alwaysAsk` (F15: path globs no auto-answer rule answers for; the view's `tab.held`; the user's only, never remote; `always.ask` cap); rule suggestions after 5 allows in a row (askStreak.ts, a notice with choices).
 202: `flowWaitEnd` (W9: a wait block for a time, its run's `wait.kind` `timer` with `until`, Continue now and Cancel; the user's only); settings' `workHours`.
+203: `flowExport`, `flowImport`, `flowImportSave` (W10: a workflow shared as a clean file, its inputs; an import read before it's saved, saved yours and off; the user's only).

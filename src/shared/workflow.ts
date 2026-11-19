@@ -6,6 +6,7 @@
 import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDGET_EVENTS } from './types.ts'
 import { fenced, plain, untrusted } from './fence.ts'
 import { parseAt } from './when.ts'
+import { SECRETS, secretsIn } from './secrets.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'parallel', 'each', 'call', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -1374,3 +1375,105 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - end: success|stopped|failed · notify: yes · phone: yes · popover: yes · modal: yes, its words as "> " lines ({{vars}}; none: the block's name). notify: a notification on the Mac (and the phone with phone: yes, when Settings › Phone pushes is set up) as the run ends there; popover: a card in the window's corner; modal: a window with them; a failed run always notifies.
 A workflow has ${MAX_BLOCKS} blocks at most. Exits are lines: "next: <block>", "ok: <block>", "fail: <block>"… "max: 3 → <block>" limits a block to 3 times, then goes there: every loop needs a max or an ask in it. Other variables: {{answer}}, {{pr.url}}, {{pr.number}}, {{ws.branch}}, {{base}}, {{project}}. "at: x,y" places a block on the canvas (optional).
 Examples: the templates that come with Laki (laki_workflows lists them with source builtin, their files whole with an id: fix-ci, review-pr, feature-to-pr, triage-issue, nightly-deps, release-notes, issue-labeled). They never run: write the user's own, changed for their task.`
+
+// ---------- W10: a workflow as a clean file to share (flowPortable) and back (portableInputs, portableFill). What's
+// this Mac's becomes an input to fill on import: a project's id or name ({{project}}, several: {{project_1}}…), a profile
+// of Settings' in an agent: line ({{profile}}, its agent kind kept), a path under the project's folder or the home
+// folder ({{root}}-relative), a secret by its shape (shared/secrets.ts, Ship's check's: {{secret_1}}…; a URL's token
+// whatever its strength). A header comment says the Laki that made it, the format and the inputs; an input's name is
+// never one the file uses already (its {{project}} is the run's own variable). Pure: no daemon, no disk
+export const PORTABLE_V = 1
+export type PortableInput = { name: string; kind: 'project' | 'profile' | 'root' | 'secret'; agent?: string; what?: string }
+export type PortableCtx = { laki: string; home?: string; root?: string; projects?: { id: string; name: string }[]; profiles?: { name: string; agent: string }[] }
+const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const INPUT_WORDS: Record<PortableInput['kind'], (i: PortableInput) => string> = { project: () => 'a project', profile: i => `a ${i.agent ?? 'agent'} profile`, root: () => "the project's folder", secret: i => `a secret: ${i.what ?? 'token'}` }
+export function flowPortable(flow: Workflow, ctx: PortableCtx): { text: string; changes: string[]; inputs: PortableInput[] } {
+  let text = toFile(flow)
+  const used = new Set([...text.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map(m => m[1]))
+  const free = (base: string, many = false) => {
+    let n = many ? 1 : 0
+    let k = many ? `${base}_1` : base
+    while (used.has(k)) k = `${base}_${++n}`
+    used.add(k)
+    return k
+  }
+  const changes: string[] = []
+  const inputs: PortableInput[] = []
+  // secrets: Ship's shapes, and any URL's token
+  const spans = [...secretsIn(text)]
+  const url = SECRETS.find(x => x[2] === 'token in a URL')![0]
+  for (const m of text.matchAll(new RegExp(url.source, url.flags))) {
+    const a = m.index! + m[1].length
+    const b = m.index! + m[0].length
+    if (!spans.some(x => a < x.end && b > x.start)) spans.push({ kind: 'token in a URL', start: a, end: b })
+  }
+  const named = spans.sort((x, y) => x.start - y.start).map(sp => ({ ...sp, name: free('secret', true) })) // in the file's order
+  for (const sp of [...named].reverse()) text = text.slice(0, sp.start) + `{{${sp.name}}}` + text.slice(sp.end)
+  for (const sp of named) {
+    const line = text.split('\n').find(l => l.includes(`{{${sp.name}}}`)) ?? '' // with every secret out: none shows in another's words
+    inputs.push({ name: sp.name, kind: 'secret', what: sp.kind })
+    changes.push(`a ${sp.kind} in “${clip(line.trim(), 70)}” became {{${sp.name}}}`)
+  }
+  // paths: under the project's folder (else the home folder), {{root}}-relative
+  const base = (ctx.root || ctx.home || '').replace(/\/+$/, '')
+  if (base) {
+    const root = free('root')
+    let n = 0
+    const swap = (from: string, to: string) => {
+      const re = new RegExp(`${reEsc(from)}(?=[/'"\\s)]|$)`, 'gm')
+      text = text.replace(re, () => (n++, to))
+    }
+    swap(base, `{{${root}}}`)
+    if (ctx.home && ctx.root && ctx.root.startsWith(`${ctx.home}/`)) swap(ctx.home.replace(/\/+$/, ''), `{{${root}}}/${ctx.root.slice(ctx.home.length + 1).split('/').map(() => '..').join('/')}`)
+    if (n) inputs.push({ name: root, kind: 'root' }), changes.push(`${n} path${n === 1 ? '' : 's'} under ${ctx.root ? "the project's folder" : 'the home folder'} became {{${root}}}-relative`)
+    else used.delete(root)
+  }
+  // projects: one by its id or its name, a whole word
+  for (const p of ctx.projects ?? []) {
+    // a word of its own: after a space, a quote or ( and before a space, a quote or a sentence's mark (never a host's,
+    // a path's or a variable's part: api in api.example.com)
+    const re = new RegExp(`(?<=^|[\\s"'(])(?:${[...new Set([p.id, p.name])].filter(Boolean).map(reEsc).join('|')})(?=$|[\\s"'),;!?]|[.:](?:\\s|$))`, 'gm')
+    if (!re.test(text)) continue
+    const name = free('project', inputs.some(i => i.kind === 'project'))
+    text = text.replace(re, `{{${name}}}`)
+    inputs.push({ name, kind: 'project' })
+    changes.push(`the project ${p.name} became {{${name}}}`)
+  }
+  // profiles: an agent: line's profile of Settings' (not a bare agent's own name), its agent kind kept
+  for (const pr of (ctx.profiles ?? []).filter(x => x.name !== x.agent)) {
+    const re = new RegExp(`^(\\s*agent: )${reEsc(pr.name)}(?=\\s*(?:·|$))`, 'gm')
+    if (!re.test(text)) continue
+    const name = free('profile', inputs.some(i => i.kind === 'profile'))
+    text = text.replace(re, `$1{{${name}}}`)
+    inputs.push({ name, kind: 'profile', agent: pr.agent })
+    changes.push(`the profile ${pr.name} (${pr.agent}) became {{${name}}}`)
+  }
+  const head = `<!-- Laki workflow, exported by Laki ${ctx.laki}, format ${PORTABLE_V}. Inputs to fill on import: ${inputs.length ? inputs.map(i => `{{${i.name}}} (${INPUT_WORDS[i.kind](i)})`).join(', ') : 'none'} -->`
+  return { text: `${head}\n${text}`, changes, inputs }
+}
+// an exported file's inputs (its header's) and its text without the header
+export function portableInputs(text: string): { inputs: PortableInput[]; body: string; format?: number } {
+  const m = /^\s*<!--\s*Laki workflow, exported by Laki [^,]*, format (\d+)\.([^]*?)-->\s*\n?/.exec(String(text ?? ''))
+  if (!m) return { inputs: [], body: String(text ?? '') }
+  const inputs: PortableInput[] = []
+  for (const x of m[2].matchAll(/\{\{([\w-]+)\}\} \(([^)]*)\)/g)) {
+    const w = x[2]
+    inputs.push(w === 'a project' ? { name: x[1], kind: 'project' } : w.endsWith(' profile') ? { name: x[1], kind: 'profile', agent: w.slice(2, -8) } : w.startsWith('a secret') ? { name: x[1], kind: 'secret', what: w.replace(/^a secret: /, '') } : { name: x[1], kind: 'root' })
+  }
+  return { inputs, body: String(text).slice(m[0].length), format: Number(m[1]) }
+}
+// its inputs filled: each {{name}} the header lists, and only those (the run's own variables stay)
+export const portableFill = (body: string, inputs: PortableInput[], values: Record<string, string>) =>
+  inputs.reduce((t, i) => t.split(`{{${i.name}}}`).join(values[i.name] ?? `{{${i.name}}}`), body)
+// what an imported workflow does, in plain words, before it's saved: its commands as written, PRs, merges, webhooks
+export function flowSummary(wf: Workflow): string[] {
+  const all = wf.blocks.flatMap(b => [b, ...(b.children ?? [])])
+  const out: string[] = []
+  const agents = all.filter(b => b.kind === 'agent')
+  if (agents.length) out.push(`Starts ${agents.length} agent turn${agents.length === 1 ? '' : 's'} (${[...new Set(agents.map(b => b.agent || 'claude'))].join(', ')})`)
+  for (const b of all.filter(b => b.kind === 'run')) out.push(`Runs a command: ${clip(b.cmd ?? '', 120)}`)
+  for (const b of all.filter(b => b.kind === 'webhook')) out.push(`Calls a webhook: ${b.method ?? 'POST'} ${(b.url ?? '').replace(/\?.*$/, '')}`)
+  for (const b of all.filter(b => b.kind === 'action')) out.push(`${ACTIONS[b.action ?? 'ship'] ?? b.action}${b.confirm === false ? ', without asking first' : ', after asking you'}`)
+  if (wf.on) out.push(`Starts on an event (${wf.on}) once you turn it on`)
+  return out.length ? out : ['Nothing that runs a command or reaches outside Laki']
+}

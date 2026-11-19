@@ -10,7 +10,7 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem, pauseKeys, pauseText, type WorkHours, WORK_HOURS, type Pause } from '../../shared/workflow'
+import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem, pauseKeys, pauseText, type WorkHours, WORK_HOURS, type Pause, type PortableInput } from '../../shared/workflow'
 import { tabAgent } from '../../shared/install'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
@@ -108,6 +108,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
   }, [list])
   const [want, setWant] = useState('') // With Laki AI's
   const [making, setMaking] = useState(false) // its box, open
+  const [sharing, setSharing] = useState<{ name: string; id: string; text: string; changes: string[] } | null>(null) // W10: Share…'s sheet
+  const [importing, setImporting] = useState(false) // W10: Import…'s sheet
   // asked Laki AI for one: the workflows there were then; the first new one opens as it's written
   const [awaiting, setAwaiting] = useState<Set<string> | null>(null)
   useEffect(() => {
@@ -160,11 +162,13 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
       },
       ...(templates.length ? [{ label: 'From a template…', sub: 'One that comes with Laki, to copy and change', icon: 'flow', items: [{ head: 'Templates' }, ...templates.map((t): MenuItem => ({ label: t.name, sub: t.desc, icon: 'flow', run: () => setAt({ kind: 'wf', sel: t }) }))] } as MenuItem] : []),
       ...(api.ai ? [{ label: 'With Laki AI…', sub: 'Say what it should do: it asks a few questions, then writes it', icon: 'ai', run: () => setMaking(true) } as MenuItem] : []),
+      { label: 'Import…', sub: 'A workflow someone shared: paste it or choose its file', icon: 'import', run: () => setImporting(true) },
     ])
   const wfMenu = (e: React.MouseEvent, w: WorkflowItem) =>
     openMenu(e, [
       ...(w.stats?.paused ? [{ label: 'Turn on again', sub: w.stats.paused.why, icon: 'run', run: () => turnOn(w) } as MenuItem, null] : []),
       { label: 'Make a copy', icon: 'copy', run: () => create(intoOf(w), w) },
+      ...(w.source !== 'builtin' ? [{ label: 'Share…', sub: 'A clean file: your projects, profiles, paths and secrets left out', icon: 'share', run: () => void api.call<{ name: string; id: string; text: string; changes: string[] }>('flowExport', { id: w.id, source: w.source, project: w.project }).then(setSharing, e => api.toast((e as Error).message)) } as MenuItem] : []),
       null,
       { label: 'Delete', icon: 'trash', danger: true, run: () => void removeWf(w) },
     ])
@@ -283,6 +287,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
               </form>
             </Modal>
           )}
+          {sharing && <ShareSheet s={sharing} toast={api.toast} onClose={() => setSharing(null)} />}
+          {importing && <ImportSheet api={api} projects={projects} presets={presets} onClose={() => setImporting(false)} onDone={w => (setImporting(false), setAt({ kind: 'wf', sel: w }))} />}
           {awaiting && !making && (
             <div className="wf-make wf-awaiting">
               <span className="ai-dots">
@@ -805,6 +811,118 @@ function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, on
 }
 
 // ---------- the editor: canvas and inspector, or the file
+
+// W10: Share…: what was changed to make it clean, then Save file (a download) or Copy
+function ShareSheet({ s, toast, onClose }: { s: { name: string; id: string; text: string; changes: string[] }; toast: (t: string) => void; onClose: () => void }) {
+  const save = () => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([s.text], { type: 'text/markdown' }))
+    a.download = `${s.id}.md`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+  return (
+    <Modal title={`Share · ${s.name}`} onClose={onClose}>
+      <div className="wf-make">
+        {s.changes.length ? (
+          <>
+            <p className="wf-hint">Changed so it works on another Mac; whoever imports it fills these in:</p>
+            <ul className="muted small">
+              {s.changes.map(c => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="wf-hint">Nothing of this Mac's in it: it goes as it is.</p>
+        )}
+        <div className="wf-start-foot">
+          <button type="button" className="btn" onClick={() => void navigator.clipboard.writeText(s.text).then(() => toast('Copied'))}>
+            <Icon name="copy" /> Copy
+          </button>
+          <button type="button" className="btn primary" onClick={save}>
+            <Icon name="download" /> Save file
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+// W10: Import…: paste it or choose its file; read (what it would do, its inputs) before anything is saved; a project and
+// a profile from pickers; saved as yours, off
+function ImportSheet({ api, projects, presets, onClose, onDone }: { api: WorkflowsApi; projects: Project[]; presets: Preset[]; onClose: () => void; onDone: (w: WorkflowItem) => void }) {
+  const [text, setText] = useState('')
+  const [look, setLook] = useState<{ name: string; inputs: PortableInput[]; summary: string[]; problems: string[] } | null>(null)
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [err, setErr] = useState('')
+  const read = (t: string) => (setText(t), setLook(null), setErr(''), t.trim() && void api.call<NonNullable<typeof look>>('flowImport', { text: t }).then(setLook, e => setErr((e as Error).message)))
+  const set = (k: string, v: string) => setVals(o => ({ ...o, [k]: v }))
+  const pick = (i: PortableInput, v: string) => {
+    set(i.name, v)
+    const root = look?.inputs.find(x => x.kind === 'root')
+    const p = projects.find(x => x.id === v)
+    if (i.kind === 'project' && root && p && !vals[root.name]) set(root.name, p.path) // its folder, from the project picked
+  }
+  const ready = !!look && look.inputs.every(i => vals[i.name]?.trim())
+  const save = () => void api.call<WorkflowItem>('flowImportSave', { text, inputs: vals }).then(onDone, e => setErr((e as Error).message))
+  return (
+    <Modal title="Import a workflow" onClose={onClose} wide>
+      <div className="wf-make">
+        {!look ? (
+          <label className="wf-field">
+            <span>Paste it, or choose its file</span>
+            <textarea autoFocus rows={8} value={text} placeholder="# A workflow…" onChange={e => read(e.target.value)} />
+            <input type="file" accept=".md,text/markdown,text/plain" onChange={e => void e.target.files?.[0]?.text().then(read)} />
+          </label>
+        ) : (
+          <>
+            <b>{look.name}</b>
+            <p className="wf-hint">What it does (nothing runs until you start it, and it's saved off):</p>
+            <ul className="muted small">
+              {look.summary.map(l => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+            {look.inputs.map(i => (
+              <label key={i.name} className="wf-field">
+                <span>
+                  {`{{${i.name}}}`} · {i.kind === 'project' ? 'a project' : i.kind === 'profile' ? `a ${i.agent ?? 'agent'} profile` : i.kind === 'root' ? "the project's folder" : `a secret: ${i.what ?? 'token'}`}
+                </span>
+                {i.kind === 'project' ? (
+                  <select value={vals[i.name] ?? ''} onChange={e => pick(i, e.target.value)}>
+                    <option value="">Pick one…</option>
+                    {projects.filter(p => !p.kind).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                ) : i.kind === 'profile' ? (
+                  <select value={vals[i.name] ?? ''} onChange={e => set(i.name, e.target.value)}>
+                    <option value="">Pick one…</option>
+                    {presets.filter(p => !i.agent || p.agent === i.agent).map(p => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input type={i.kind === 'secret' ? 'password' : 'text'} value={vals[i.name] ?? ''} placeholder={i.kind === 'root' ? '/Users/you/code/app' : ''} onChange={e => set(i.name, e.target.value)} />
+                )}
+              </label>
+            ))}
+            {look.problems.length > 0 && <p className="wf-hint">Its problems, as Laki checks it: {look.problems.slice(0, 3).join('; ')}</p>}
+          </>
+        )}
+        {err && <p className="field-err">{err}</p>}
+        <div className="wf-start-foot">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          {look && (
+            <button type="button" className="btn primary" disabled={!ready} onClick={save}>
+              Import it, off
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 function Editor({ item, all = [], onOpenFlow, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onSim, onOpenRun, onCopy, onTurnOn, onUse }: { all?: WorkflowItem[]; onOpenFlow?: (w: WorkflowItem) => void; item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onSim: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void; onUse: () => void }) {
   const ro = item.source === 'builtin' // a template: looked at here, changed in a copy (Use this…)

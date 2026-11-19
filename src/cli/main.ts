@@ -920,6 +920,31 @@ async function main() {
           ...(runs.length ? ['', ...runs.map(r => `${r.id}  ${status(r)}  ${r.name}: ${r.task}`)] : []),
         ].join('\n'))
       }
+      // W10: a workflow as a clean file to share (stdout; what changed on stderr), and one imported: read and said first,
+      // saved (yours, off) only with every input given by --set name=value
+      if (sub === 'export') {
+        if (!id) throw new Error('usage: laki workflow export <workflow> [project] > file.md')
+        const r = await rpc<{ text: string; changes: string[] }>('flowExport', { id, ...(words[0] && { project: words[0] }), from: caller() })
+        if (json) return out(r)
+        process.stdout.write(r.text)
+        if (r.changes.length) console.error(`Changed for sharing:\n${r.changes.map(c => `  ${c}`).join('\n')}`)
+        return
+      }
+      if (sub === 'import') {
+        if (!id) throw new Error('usage: laki workflow import <file.md> [--set name=value…]')
+        const text = readFileSync(id === '-' ? 0 : id, 'utf8')
+        type In = { name: string; kind: string; agent?: string; what?: string }
+        const look = await rpc<{ name: string; inputs: In[]; summary: string[]; problems: string[] }>('flowImport', { text, from: caller() })
+        const given = Object.fromEntries(sets.map(x => [x.slice(0, x.indexOf('=') < 0 ? x.length : x.indexOf('=')).trim(), x.includes('=') ? x.slice(x.indexOf('=') + 1) : '']))
+        const missing = look.inputs.filter(i => !given[i.name]?.trim())
+        const said = `${look.name}\n${look.summary.map(l => `  ${l}`).join('\n')}${look.inputs.length ? `\nInputs: ${look.inputs.map(i => `${i.name} (${i.kind === 'profile' ? `a ${i.agent} profile` : i.kind === 'secret' ? `a secret: ${i.what}` : i.kind === 'root' ? "a project's folder" : 'a project'})`).join(', ')}` : ''}`
+        if (missing.length) {
+          out(look, `${said}\n\nNot imported: ${missing.map(i => `--set ${i.name}=…`).join(' ')} to give ${missing.length === 1 ? 'it' : 'them'}`)
+          process.exit(1)
+        }
+        const r = await rpc<WorkflowItem>('flowImportSave', { text, inputs: given, from: caller() })
+        return out(r, `${said}\n\nImported as ${r.id}, off: laki flow on ${r.id} lets its events and schedules start it`)
+      }
       if (sub === 'run') {
         // --ws: a workspace you have (`.`: this tab's), its project unless one is named first
         const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : typeof flags.ws === 'string' ? flags.ws : undefined

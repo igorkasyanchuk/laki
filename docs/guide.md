@@ -1877,6 +1877,8 @@ that starts by itself (an event, a schedule) and fails 5 times in a row is pause
 its schedules no longer start it (a scheduled run shows as failed, saying why), and *Run* still does. *Turn on again*
 (the note, its row's ⋯, its settings, `laki flow on <workflow>`) starts it again. A dry run counts nothing.
 
+**Share a workflow**: its ⋯ › *Share…* makes a clean file: your projects become `{{project}}`, a profile of yours `{{profile}}` (its agent kept), paths under the project's folder `{{root}}`-relative, anything shaped like a secret `{{secret_1}}`…, and the sheet lists each change; *Save file* or *Copy*. *New workflow* › *Import…* takes one (pasted or a file), says what it would do (its commands as written, PRs, merges, webhooks) and asks for its inputs (a project and a profile from lists); nothing runs on import, and it's saved as yours, off, until you turn it on.
+
 `laki flow check` reads workflow files the way Laki does and
 names each problem, without Laki running, so a repo's pre-commit hook or CI can keep `.laki/workflows/` right; it
 exits 1 when one has a problem (an agent action's name and a preset's aren't known there: not checked).
@@ -1891,6 +1893,8 @@ laki flow again <run> [--from <block>]         # an ended run again; --from: fro
 laki flow run fix-ci app --simulate --answer test=fail --answer test=ok   # nothing runs: the path its blocks take (--from <run>: that run's ways)
 laki flow on <workflow>                        # turn on again one paused after 5 failed runs in a row
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
+laki flow export <workflow> > deploy.md         # a clean file to share: your projects, profiles, paths and secrets as inputs
+laki flow import deploy.md --set project=shop --set secret_1=…  # read it (what it does, its inputs); with every input set, saved as yours, off
 laki flow check .laki/workflows               # check workflow files (a folder: each .md), no app needed: CI, a hook
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 laki flow pause <run> | flow resume <run>      # pause after the block it's on | go on from there
