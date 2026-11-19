@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.56.0 · Nov 19, 2026
 
 - Goals: give Claude Code or Codex a `/goal` and the tab shows it with *Pause*, *Resume* and *Clear*; it stays running until the goal stops, with one notification then: *Goal reached*.
 - Signed out mid-turn? The tab says so in a band with *Sign in*, which runs Claude Code's or Codex's own login for that tab's account; once you're in (there or anywhere), your message goes by itself.
