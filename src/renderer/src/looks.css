@@ -2302,6 +2302,21 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 [data-look='frosted'] .status .sb-group { height: 26px; }
 [data-look='frosted'] .app[data-dz] .side-handle { transform: translateX(calc(-50% + 4px)); } /* in the gap (its left: App's at, the frame's padding too) */
 [data-look='frosted'] .app[data-dz] .side-scroll > .project { background: none; }
+/* V16: the floating sidebar (Frosted on the window's glass): the main area's background spans the window (.app's), and the
+   rail, the list and Terminals' strip float on it as one glass panel (a lift, a lit top, the window's corners less the
+   gap, each shadow cut where two meet). The main area's box stays where it was, its edge only transparent: xterm's
+   columns and the resize handle as before. A blur only where the desktop doesn't show through (html.vibrant: a
+   backdrop-filter over the native blur flickers, components.css): there the window's own blur is the frost. Reduce
+   transparency, or a window without glass: the cards as before */
+@media (prefers-reduced-transparency: no-preference) {
+  [data-look='frosted'].glass .app[data-dz] { background: var(--app-bg, var(--bg)); }
+  [data-look='frosted'].glass .app[data-dz] .main { border-color: transparent; border-radius: 0; background: none; box-shadow: none; }
+  [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar, .side-strip) { --f-r: var(--rs, calc(var(--r-window) - var(--sp-2))); box-shadow: inset 0 1px 0 var(--f-hi), var(--lift-2); }
+  [data-look='frosted'].glass .app[data-dz].rail-on:not(.list-off, .strip-right) .rail { clip-path: inset(-48px 0 -48px -48px); }
+  [data-look='frosted'].glass .app[data-dz].rail-on :is(.sidebar, .side-strip.left) { clip-path: inset(-48px -48px -48px 0); }
+  [data-look='frosted'].glass:not(.vibrant) .app[data-dz] :is(.rail, .sidebar, .side-strip) { backdrop-filter: blur(var(--sp-6)) saturate(1.6); }
+  @supports (corner-shape: squircle) { [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar, .side-strip) { corner-shape: squircle; } }
+}
 
 /* the rail: bare icons, a bar of the accent by the one you're on */
 [data-look='frosted'] .rail-kind { position: relative; }

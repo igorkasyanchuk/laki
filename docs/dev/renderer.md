@@ -1412,6 +1412,12 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Laki's own lines in a terminal** (`[process exited]`, *waiting for the setup script*, …) are bright black (SGR 90),
   not dim (SGR 2): xterm's WebGL renderer draws a dim glyph over an opaque cell, a dark patch on a gradient or glass
   panel (an agent's own dim text still can).
+- **Frosted's floating sidebar** (V16, looks.css, on the window's glass): the main area's background moves to `.app`, so it
+  spans the window; the rail, the list and Terminals' strip are one glass panel on it (`--lift-2`, a lit top, the window's
+  corners less `--sp-2`, squircle where `corner-shape` is, `clip-path` cutting each shadow where two meet). `.main` keeps
+  its box (its border transparent, not gone), so xterm's columns and the side handle's `at` are as before. A
+  `backdrop-filter` only without `html.vibrant` (over the native blur it flickers); Reduce transparency or no glass: the
+  cards as before.
 - **Frosted's status bar** (looks.css): no outline or fill of its own, its two groups the capsules (one level), an empty
   `.sb-foot` (the rail has the buttons) not drawn; the context meter's track `--fg` 18%, its fill green, amber past 70%,
   red past 90%.
