@@ -2075,6 +2075,12 @@ if (core.askSecrets.on) {
       .then(a => (a as { choice?: string; timedOut?: boolean }).timedOut || core.settingsSet({ hideSecretsAsked: true, ...((a as { choice?: string }).choice === 'Hide them' && { hideSecrets: true }) }))
       .catch(e => log(`hideSecrets: no notice (${(e as Error).message})`))
 }
+// R9: an install from before the pty host's default: asked once, as hideSecrets is (its terminals in the daemon meanwhile)
+if (core.askPty.on)
+  void Promise.resolve()
+    .then(() => alertShow({ title: 'Keep terminals alive when Laki restarts?', text: "Your agents' terminals then run in a process of their own: Laki's updates and restarts leave them running, and they come back as they were. New terminals from then on.", choices: ['Turn on', 'Not now'] }, 'notice', 'Laki'))
+    .then(a => (a as { timedOut?: boolean }).timedOut || core.settingsSet({ ptyHostAsked: true, ...((a as { choice?: string }).choice === 'Turn on' && { ptyHost: true }) }))
+    .catch(e => log(`ptyHost: no notice (${(e as Error).message})`))
 // T10: remote access about to turn itself off: a push with Keep and a line in the window; off: a notice with Turn on again
 remoteMod.remoteHooks.warn = text => (phoneMod.phoneRemoteIdle(text), broadcastApps({ ev: 'remoteIdle', text }))
 remoteMod.remoteHooks.off = (text, again) =>

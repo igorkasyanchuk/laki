@@ -627,8 +627,11 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   A host of another version is quit and started again only when it holds no live terminal; until then it keeps the
   terminals it has, and new ones run in the daemon (R9: `ptyTakes`, the host's own protocol only). One started anew
   that still speaks another (once: `up(false)`, no loop) is kept the same way.
-- **R9: the default and its fallback.** `load()` sets `ptyHost: true` for a new install (no state.json or backup:
-  test worlds too); one from before keeps what it had. A host that can't start (its log can't be opened, no socket in
+- **R9: the default and its fallback.** `load()` sets `ptyHost: true` and `ptyHostAsked` for a new install (no
+  state.json or backup: test worlds too); one from before keeps what it had and, with the key unset, is asked once
+  (`askPty`, main.ts: a notice, *Keep terminals alive when Laki restarts?*, *Turn on* or *Not now*; either sets
+  `ptyHostAsked`, a timeout neither; a test's daemon only with `LAKI_TEST_ASK_PTY=1`). `ptyHostAsked` is the user's
+  (gates.ts `AGENT_SETTINGS_NO`, `REMOTE_KEYS`). A host that can't start (its log can't be opened, no socket in
   5 s, turned away) or speaks another protocol: `ptyWhy()` says why, the view's `ptyHostOff` (only with the setting
   on), one line under the switch in Settings, and `## Pty host` in the diagnostics (on/off, running, pid, protocol,
   terminals kept; `ptyState`). New tabs then run in the daemon as before.

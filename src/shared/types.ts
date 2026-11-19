@@ -757,7 +757,8 @@ export type Settings = {
   copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
   cloneDeps?: boolean // F7: and the dependency folders at the repo's root (core.ts CLONE_DIRS), each cloned whole (unset: off)
-  ptyHost?: boolean // R6: terminals live in a pty host and outlive the daemon (unset: off)
+  ptyHost?: boolean // R6: terminals live in a pty host and outlive the daemon (a new install's on; one from before off, asked once: ptyHostAsked)
+  ptyHostAsked?: boolean // R9: the one notice for an install from before was answered. Never an agent's or a phone's
   spareWorktree?: boolean // F7: a spare worktree per project, ready for the next new workspace (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)

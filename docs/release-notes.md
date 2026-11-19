@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Terminals that outlive Laki's restarts and updates, for installs from before too: one notice asks *Keep terminals alive when Laki restarts?* (*Turn on* or *Not now*).
 - Start Laki at login: Settings › General › *Startup* starts it in the menu bar with no window, so scheduled tasks and reminders run after a restart; your first scheduled task asks once. [Try it](laki://settings/general?spot=Startup)
 - The Dock icon's menu: *New Task…*, the agents waiting (a click opens that tab) and *Quiet for an Hour*; its recent items are your projects, and opening one goes to its workspace.
 - The wrapper sandbox (macOS) has a *Network* too: *Listed hosts* lets a Gemini, Grok or OpenCode profile reach only the project's registries, GitHub, its model and what you allowed, through Laki; another host gets a card with *Allow this domain in this project*.

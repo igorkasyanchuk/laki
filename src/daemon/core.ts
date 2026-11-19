@@ -151,6 +151,7 @@ const readState = (p: string): State => {
 const NEW_DEFAULTS = { syncBase: 'origin', rowMarks: { step: true }, memoryCompact: { on: false }, notifyOn: { done: false }, wsTint: true, edgeGlow: true, hideFloats: true } as const // wsTint: a new install starts on Laki's theme (and Frosted on a Mac), where it's made to show
 // an install from before hideSecrets, not asked yet (load): main.ts' one notice
 export const askSecrets = { on: false }
+export const askPty = { on: false } // R9: an install from before the pty host's default, asked once (main.ts)
 // R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
 // state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
 // may not survive
@@ -253,8 +254,10 @@ export function load() {
   // a new install keeps its worktrees out of Time Machine and Spotlight (backup.ts); one from before keeps them in (the
   // Disk page says how much they take). A test's daemon only with LAKI_TEST_LEAN=1: tmutil isn't a test's to run
   if (!had && process.platform === 'darwin' && state.settings?.tmExclude === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, tmExclude: true, spotlightExclude: true }
-  // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had
-  if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true }
+  // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had (off) and is
+  // asked once (main.ts: askPty, ptyHostAsked). A test's daemon only with LAKI_TEST_ASK_PTY=1
+  if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true, ptyHostAsked: true }
+  askPty.on = had && state.settings?.ptyHost === undefined && !state.settings?.ptyHostAsked && (!inRig() || process.env.LAKI_TEST_ASK_PTY === '1')
   // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts:
   // askSecrets). A test's daemon neither, but with LAKI_TEST_LEAN=1 (a new install) or LAKI_TEST_ASK_SECRETS=1
   if (!had && state.settings?.hideSecrets === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, hideSecrets: true, hideSecretsAsked: true }

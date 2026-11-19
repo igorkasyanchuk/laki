@@ -2,14 +2,14 @@
 // holds no live terminal, and a daemon killed mid-command that finds its terminals still running when it starts again
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { connect, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { frame, PTY_PROTO, reader } from '../src/ptyhost/proto.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, seen, sleep, until } from './helpers.ts'
 
 const hostTs = fileURLToPath(new URL('../src/ptyhost/main.ts', import.meta.url))
 const running = (pid: number) => {
@@ -274,4 +274,36 @@ test('R9: a fresh world has the pty host on; one that fails to start or speaks a
   const tab2 = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === w2.id), 'its shell')
   await rig.rpc('input', { tab: tab2.id, data: 'echo still-ok\r' })
   await until(async () => (await rig.screen(`${w2.id}/${tab2.id}`)).includes('still-ok'), 'a terminal all the same')
+})
+
+// R9: an install from before the default (its state.json without ptyHost) keeps its terminals in the daemon until it
+// answers the one notice; a new data folder starts with it on and is never asked
+test("R9: an install from before keeps the pty host off until it answers its one notice: Turn on, then never asked again", async t => {
+  const rig = await fresh(t)
+  const s0 = (await rig.rpc('state')).settings
+  assert.deepEqual([s0.ptyHost, s0.ptyHostAsked], [true, true], 'a new data folder: on, nothing to ask')
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  delete st.settings.ptyHost
+  delete st.settings.ptyHostAsked
+  writeFileSync(file, JSON.stringify(st))
+  rig.env.LAKI_TEST_ASK_PTY = '1'
+  await rig.start()
+  assert.equal((await rig.rpc('state')).settings.ptyHost, undefined, 'off, as it was')
+  const app = await rig.connect()
+  const n = await seen(app, (e: any) => e.ev === 'notice' && /Keep terminals alive/.test(e.title), 'its notice')
+  assert.deepEqual(n.choices, ['Turn on', 'Not now'])
+  await rig.rpc('alertAnswer', { id: n.id, choice: 'Turn on' })
+  await until(async () => (await rig.rpc('state')).settings.ptyHost === true, 'on')
+  assert.equal((await rig.rpc('state')).settings.ptyHostAsked, true)
+  app.close()
+  // answered: the next start says nothing
+  await rig.stop()
+  await rig.start()
+  const again = await rig.connect()
+  await sleep(1500)
+  assert.ok(!again.events.some((e: any) => e.ev === 'notice' && /Keep terminals alive/.test(e.title)), 'asked once')
+  again.close()
+  delete rig.env.LAKI_TEST_ASK_PTY
 })

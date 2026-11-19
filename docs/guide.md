@@ -3252,7 +3252,7 @@ prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught half
 running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
 a log out). After a crash, shells start fresh, and nothing comes back over SSH.
 
-With *Terminals outlive the daemon* on (Settings › Git & worktrees › In the background; experimental), none of that is
+With *Terminals outlive the daemon* on (Settings › Git & worktrees › In the background; on for a new install, and an install from before is asked once), none of that is
 needed for tabs started since: their terminals run in a small process of their own, and a daemon that crashed, was
 restarted from the yellow bar or stopped with `laki stop --keep` finds agents and shells still running, mid-turn too,
 their screens as they were. A plain `laki stop` and *Quit Laki Completely* still end them.
