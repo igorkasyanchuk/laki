@@ -4182,6 +4182,16 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
   .capsule, .capsule :is(button, textarea) { corner-shape: round; }
 }
 
+/* V21: small labels trimmed to their capitals and baseline (text-box), so a badge's word or count sits in its middle,
+   not low: the line box loses 1lh - 1cap, given back as padding on both sides, so each keeps its height. Only one-line
+   labels laid out as blocks (a flex row's item, a positioned badge: an inline-flex one ignores the trim, an inline one
+   paints by its font's box); none of them has a look's own padding. The group badge's dot keeps its 1px lift */
+@supports (text-box: trim-both cap alphabetic) {
+  :where(.rail-count, .ws-pill, .ws-plan, .lp-state, .nw-send-n, .ws-sep.tinted .ws-name) { text-box: trim-both cap alphabetic; }
+  .rail-count, .ws-pill, .ws-plan, .lp-state, .nw-send-n { padding-block: calc((1lh - 1cap) / 2); }
+  .ws-sep.tinted .ws-name { padding-block: calc(var(--sp-1) + (1lh - 1cap) / 2); }
+}
+
 /* V13: view transitions that keep the place (ui.tsx morph, rowsMorph). The root has no name: only what's named is
    snapshotted, so the sidebar and a printing terminal stay live under it. A page over the main area cross-fades; a sheet
    that grows from its button is named 'morph' (inline, for the transition only); a row moving to Pinned, row-<n>. The
