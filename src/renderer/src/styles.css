@@ -1822,8 +1822,11 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .need-row-last { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .need-row-acts { display: flex; justify-content: flex-end; gap: var(--sp-2); visibility: hidden; }
 .need-row-acts button { height: var(--h-s); padding: 0 var(--sp-3); font-size: var(--fs-1); }
-.need-row:is(:hover, :focus-within) .need-row-acts { visibility: visible; }
-.need-row:is(:hover, :focus-within) .need-row-last { visibility: hidden; }
+/* hover or focus: the words give their place to the buttons, which keep their width; the name is cut (its ellipsis)
+   instead of the buttons reaching over it. A layout change, not a cover: a see-through look's row hides nothing */
+.app:not(.narrow) .need-row:is(:hover, :focus-within) .need-row-mid { min-width: max-content; }
+.app:not(.narrow) .need-row:is(:hover, :focus-within) .need-row-acts { visibility: visible; }
+.app:not(.narrow) .need-row:is(:hover, :focus-within) .need-row-last { display: none; }
 .need-row .elapsed { flex: none; color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
 .narrow .need-last { -webkit-line-clamp: 1; } /* a phone keeps the cards, their words on one line */
 /* a phone's Needs you (Needs.tsx phone): the head counts them, Mark all finished as seen under the rows; a finished row a
@@ -1831,8 +1834,7 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .needs-counts { margin-left: var(--sp-2); color: var(--muted); font-size: var(--fs-1); font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .needs-all-seen { align-self: stretch; min-height: 44px; font-size: var(--fs-2); color: var(--muted); background: none; border: 1px dashed var(--line); border-radius: var(--r-in, var(--r-l)); }
 .narrow .need.need-row { min-height: 44px; touch-action: pan-y; }
-.narrow .need-row:is(:hover, :focus-within) .need-row-acts { visibility: hidden; } /* no hover on a phone: a tap opens the card with them */
-.narrow .need-row:is(:hover, :focus-within) .need-row-last { visibility: visible; }
+/* a phone has no hover: a tap opens the card with them */
 .need-row[data-gone] { opacity: 0; pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) { .narrow .need-row:not([data-swiping]) { transition: transform var(--t-mid) var(--ease-pop), opacity var(--t-mid) var(--ease-out); } }
 .ws-step.t-ask { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 45%, transparent); }

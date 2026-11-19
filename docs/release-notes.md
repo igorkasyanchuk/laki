@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - Back up and restore: Settings › General › *Backup* (or `laki backup` and `laki restore <file.tgz>`) puts your projects, settings, notes, specs, workflows, extensions and Laki AI chats in one file, without keys, sign-ins or logs, and brings them back on another Mac; a restore says what changes first and keeps what was there. [Try it](laki://settings/general?spot=Backup)
+- Fixed: hovering a finished row in Needs you drew *Changes* and *Seen* over the workspace's name; the name now gives way (cut with …) and the buttons sit beside it.
 
 ## 0.56.0 · Nov 19, 2026
 
