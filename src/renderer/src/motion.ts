@@ -36,6 +36,9 @@ export function exits(root: Node) {
       for (const n of r.removedNodes) {
         if (!(n instanceof HTMLElement) || n.classList.contains('leaving') || !n.matches(LEAVES) || !r.target.isConnected) continue
         const g = n.cloneNode(true) as HTMLElement
+        // no view-transition name in the copy: a menu item that a page grows from is named morph (ui.tsx morph) as the menu
+        // goes, and a second morph in the page's new state aborts its transition (Chromium: "duplicate view-transition-name")
+        for (const e of [g, ...g.querySelectorAll<HTMLElement>('[style*="view-transition-name"]')]) e.style.viewTransitionName = ''
         g.classList.add('leaving')
         g.inert = true
         g.setAttribute('aria-hidden', 'true')
