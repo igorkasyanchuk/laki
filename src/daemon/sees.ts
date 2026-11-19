@@ -3,6 +3,7 @@
 // its own config files give it (env values and tokens masked). Nothing here writes: a change goes through the agent's
 // own CLI, typed in a terminal for the user to run (the page's Add a server… and Remove…). Never ~/.claude or ~/.codex
 // written (AGENTS.md)
+import { mcpFor } from '../shared/mcp.ts'
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -217,7 +218,7 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
     ...(proj && { project: proj.id, path: tilde(proj.path) }),
     rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
     memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
-    servers: agent === 'claude' ? claudeServers(path) : codexServers(path),
+    servers: [...mcpFor(proj?.config?.mcp, p.profile ?? agent).map(s => server(s.name, s, 'laki', "Laki: the project's settings")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))], // Laki's: passed by flags (shared/mcp.ts)
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
   }
 }

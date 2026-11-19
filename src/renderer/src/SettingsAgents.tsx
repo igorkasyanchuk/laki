@@ -838,7 +838,7 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
                   <b>{s.name}</b>
                   <span className="muted small">
                     {' '}
-                    · {s.transport} · {s.scope}
+                    · {s.transport} · {s.scope === 'laki' ? 'from Laki' : s.scope}
                     {s.off && ' · off'}
                   </span>
                   <span className="mono small sees-cmd" title={s.file}>
@@ -846,7 +846,9 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
                     {s.env && ` · env ${s.env.join(', ')}`}
                     {s.headers && ` · headers ${s.headers.join(', ')}`}
                   </span>
-                  {agent === 'claude' || s.scope === 'user' ? (
+                  {s.scope === 'laki' ? (
+                    <span className="muted small"> · in the project's settings: MCP servers</span>
+                  ) : agent === 'claude' || s.scope === 'user' ? (
                     <button className="ghost sm" onClick={() => onType(agent === 'claude' ? `claude mcp remove ${sh(s.name)} -s ${s.scope}` : `codex mcp remove ${sh(s.name)}`, at)}>
                       Remove…
                     </button>

@@ -428,6 +428,15 @@ status bar *.laki.json waits for you* and `cfgSheet`, also after the new-workspa
 daemon.log. `load` trusts projects from before (no `state.cfgTrust`) as their file is (a host's `as-read`: at its first
 read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: true`.
 
+A project's MCP servers (`config.mcp`, `shared/mcp.ts`; Settings › the project › *MCP servers*): each a name
+(`MCP_NAME`), a command with its args and env or an http(s) URL, and the profiles it's on for (`presets`: none is all).
+`projectSet` keeps them through `mcpOk` (a masked env value back is the same-named server's; refused whole otherwise);
+agents can't send `config` and remote access's page can't change `mcp` (main.ts `SCRIPT_KEYS`). `agentCmd` passes the
+ones on for the tab's profile (`mcpFor`) as it starts, this Mac's tabs only: claude one more `--mcp-config` of a 0600
+`<data>/mcp/<tab>.json` (`mcpFile`, gone with the tab), codex `-c mcp_servers.<name>.command|args|env|url` (`codexMcpArgs`:
+TOML strings quoted by `tomlString`); gemini, grok and opencode none yet (the page says so). What it sees lists them as
+`scope: 'laki'`, *from Laki*.
+
 ### Presets
 
 `settings.presets` (default: plain `claude` and `codex`) say how agents start: `agent` (claude, codex,

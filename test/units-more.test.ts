@@ -1347,3 +1347,19 @@ test("inAim: a submenu's safe triangle: toward it inside, straight down outside,
   assert.equal(inAim([100, 50], [130, 55], { left: 200, right: 200, top: 0, bottom: 300 }, 'right'), false, 'no width')
   assert.equal(inAim([100, 50], [130, 55], { left: 200, right: 360, top: 10, bottom: 10 }, 'right'), false, 'no height')
 })
+
+test("shared/mcp: TOML strings, codex's -c lines, a profile's servers, what projectSet keeps", async () => {
+  const { tomlString, codexMcpArgs, mcpFor, mcpOk, claudeMcpConfig } = await import('../src/shared/mcp.ts')
+  assert.equal(tomlString('a "b" \\ c\nd\te'), '"a \\"b\\" \\\\ c\\nd\\te"')
+  assert.equal(tomlString('\x01\x7f é 🙂'), '"\\u0001\\u007f é 🙂"')
+  assert.deepEqual(codexMcpArgs([{ name: 'my.srv', command: 'node', args: ['s.js'], env: { 'K': 'v"1' } }, { name: 'w', url: 'https://x.test' }]), ['-c', 'mcp_servers."my.srv".command="node"', '-c', 'mcp_servers."my.srv".args=["s.js"]', '-c', 'mcp_servers."my.srv".env={ K = "v\\"1" }', '-c', 'mcp_servers.w.url="https://x.test"'])
+  const list = [{ name: 'a', command: 'x' }, { name: 'b', command: 'y', presets: ['codex'] }]
+  assert.deepEqual(mcpFor(list, 'claude').map(s => s.name), ['a'])
+  assert.deepEqual(mcpFor(list, 'codex').map(s => s.name), ['a', 'b'])
+  assert.deepEqual(claudeMcpConfig([{ name: 'w', url: 'https://x.test' }]), { mcpServers: { w: { type: 'http', url: 'https://x.test' } } })
+  const ENV = /^[A-Za-z_][A-Za-z0-9_]*$/
+  assert.deepEqual(mcpOk([{ name: ' a ', command: ' x ', args: ['1'], env: { T: '•••', N: 'new' } }], [{ name: 'a', command: 'x', env: { T: 'real' } }], '•••', ENV), [{ name: 'a', command: 'x', args: ['1'], env: { T: 'real', N: 'new' } }])
+  assert.deepEqual(mcpOk([{ name: 'renamed', command: 'x', env: { T: '•••' } }], [{ name: 'a', command: 'x', env: { T: 'real' } }], '•••', ENV), [{ name: 'renamed', command: 'x' }]) // a mask with nothing behind it: dropped
+  assert.equal(mcpOk([], undefined, '•••', ENV), undefined)
+  for (const [bad, why] of [[[{ name: 'a', command: 'x' }, { name: 'a', command: 'y' }], /twice/], [[{ name: 'a', url: 'ftp://x' }], /http/], [[{ name: 'a', command: 'x', env: { 'BAD-NAME': '1' } }], /env/], [[{ name: 'x'.repeat(41), command: 'x' }], /name/], ['nope', /a list/]] as const) assert.throws(() => mcpOk(bad, undefined, '•••', ENV), why)
+})

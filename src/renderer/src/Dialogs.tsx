@@ -417,7 +417,7 @@ export function Pages({ app }: { app: AppCtx }) {
             saveSettings: o => call('projectSet', { id: p.id, ...o }).catch(() => {}),
             ...(aiOn(settings) && { compact: { run: () => call('memoryCompact', { project: p.id }), log: () => api.call<CompactLogLine[]>('memoryCompactLog', { project: p.id }) } }),
             file: id => api.call<ProjectConfig>('projectFile', { id }),
-            global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true, flows: flowsOn },
+            global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true, flows: flowsOn, profiles: view.presets.filter(x => !x.off).map(x => ({ name: x.name, agent: x.agent })) },
             onGlobal: sec => setDialog({ section: sec }),
             schedules: () => setDialog({ schedules: p.id }),
             setSchedule: (id, on) => call('scheduleSet', { id, on }),

@@ -60,6 +60,7 @@ import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 import { spotlightSet, tmSet } from './backup.ts'
 import { ownBoxOn, WRAP_NET, wrapProfile, wrapRefused } from '../shared/wrap.ts'
+import { claudeMcpConfig, codexMcpArgs, type McpServer, mcpFor, mcpOk } from '../shared/mcp.ts'
 import { proxyDrop, proxyFor, proxyUp } from './netProxy.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
@@ -1364,6 +1365,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       actions: actionsOk(o.config.actions),
       templates: templatesOk(o.config.templates),
       env: Object.keys(env).length ? env : undefined,
+      mcp: mcpOk(o.config.mcp, p.config?.mcp, MASK, ENV_KEY), // its MCP servers (shared/mcp.ts): main.ts refuses them to agents and remote access
       worktrees: typeof o.config.worktrees === 'string' && o.config.worktrees.trim() ? o.config.worktrees.trim().slice(0, 1000) : undefined,
       pr: prAllowOk(o.config.pr),
       check: checkOk(o.config.check),
@@ -1824,6 +1826,9 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // git folders git commit writes in writable too (gitWrites: a worktree's live in the main repo's .git)
   const sandbox = sandboxed(tab)
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
+  // the project's MCP servers on for this profile (shared/mcp.ts): by flags as it starts; a host's tab none (the file is
+  // this Mac's). ponytail: codex's -c values (an env's too) end up in its argv, which ps shows; claude's go in a file
+  const mcp = h === localHooks ? mcpFor(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp, tab.profile ?? tab.preset ?? '') : []
   if (tab.preset === 'claude') {
     const gated = existsSync(toolFlag())
     gated ? ungated.delete(tab.id) : ungated.add(tab.id) // S8: a gate turned on later doesn't reach it until it starts again
@@ -1831,11 +1836,13 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
+    if (mcp.length) argv.push('--mcp-config', mcpFile(tab, mcp)) // one more: a profile's own --mcp-config stays
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
     if (told && !pr?.args?.includes('developer_instructions') && !codexOwn()) argv.push('-c', 'developer_instructions=' + JSON.stringify(told)) // a JSON string is a TOML one
+    argv.push(...codexMcpArgs(mcp))
   } else if (tab.preset === 'gemini') {
     argv = again ? ['gemini', '--resume', again] : ['gemini']
     if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
@@ -1964,6 +1971,13 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // a sandboxed claude whose profile's network is its list (net: list): its settings file (the variant writeHooks wrote) with
 // sandbox.network.allowedDomains, netList's for its project, as <data>/net/<tab>.json (0600, written at each start; the
 // data folder is out of its sandbox's reach). Anything else: none (the variant as it is). ponytail: this Mac's tabs only
+// S13: a claude tab's project MCP servers (their env too) in a 0600 file of its own, the path in argv
+function mcpFile(tab: Tab, list: McpServer[]): string {
+  const file = join(dir, 'mcp', `${tab.id}.json`)
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
+  writeFileSync(file, JSON.stringify(claudeMcpConfig(list), null, 2), { mode: 0o600 })
+  return file
+}
 function netFile(tab: Tab, net: Net | undefined, variant: string): string | undefined {
   if (net !== 'list') return
   const ws = state.workspaces.find(w => w.id === tab.workspace)
@@ -2893,6 +2907,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   stopShares({ tab: id })
   statusGone(id)
   rmSync(join(dir, 'net', `${id}.json`), { force: true }) // its sandbox's settings file (netFile)
+  rmSync(join(dir, 'mcp', `${id}.json`), { force: true }) // its project's MCP servers (mcpFile)
   proxyDrop(id) // its proxy password (netProxy.ts)
   save()
   changed()

@@ -25,7 +25,7 @@ export type ProjectApi = {
   save(o: { notes?: string; memory?: Memory[]; inRepo?: boolean }): Promise<unknown>
   saveSettings(o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }): unknown
   file(id: string): Promise<ProjectConfig>
-  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean } // Settings' own, which go with the project's (flows: Workflows on)
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean; profiles?: { name: string; agent: string }[] } // Settings' own, which go with the project's (flows: Workflows on)
   onGlobal(sec: 'actions' | 'templates'): void
   schedules(): void // the Scheduled tasks page, at this project: making and changing them is there
   setSchedule(id: string, on: boolean): Promise<unknown>

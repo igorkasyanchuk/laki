@@ -2819,6 +2819,9 @@ Settings → *Project settings*, or ⋯ on a project then *Settings* (its page's
 tab). Saved as you type:
 - Name.
 - *Memory*: how many items are yours and how many agents learned; *Manage* opens the project page's *Memory* tab.
+- *MCP servers*: tools for this project's agents, each a command (its arguments one per line, its env) or a URL, on for
+  every profile or the ones you switch on. Claude Code and Codex get them by flags as a tab starts, never in their own
+  config; Gemini, Grok and OpenCode not yet. Their env shows as •••• once saved; agents can't add or change one.
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
   *Edit*; agents never see them (not in `laki ls --json` or MCP).
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:

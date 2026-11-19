@@ -1,4 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
+import type { McpServer } from './mcp.ts'
 import type { Collision } from './overlap.ts'
 import type { TabPlan } from './todos.ts'
 import type { Layout, SavedLayout } from './layout.ts'
@@ -171,7 +172,7 @@ export type ProofCheck = { name: string; ok: boolean; code: number; ms: number; 
 export type ProofFacts = { files: number; tests?: true; ci?: true; migrations?: true; lockfiles?: true }
 export type Proof = { turn: number; tab: string; checks: ProofCheck[]; shots: { before?: string; after?: string }; facts: ProofFacts; tree?: string } // tree: the worktree's tree it checked (Ship's proofMd: stale when another ships)
 export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' | 'over'; steps: CheckStep[]; review?: { agent: string; state: 'wait' | 'run' | 'pass' | 'note' | 'fail'; note?: string }; tries: number; at: number }
-export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; clone?: string[] /* F7: folders cloned whole into a new worktree */; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
+export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (daemon/tickets.ts) */; setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; mcp?: McpServer[] /* shared/mcp.ts: by flags, the user's alone */; copy?: string[]; clone?: string[] /* F7: folders cloned whole into a new worktree */; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean; revert?: boolean }
@@ -1211,7 +1212,7 @@ export type HookSeen = { at?: number; tabs: number; deaf: number; native?: Nativ
 // the file that @imports it), Laki's memory it gets (how many of each, its bytes), its MCP servers (env and headers by
 // name only, tokens masked; off: turned off in its config)
 export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
-export type AgentServer = { name: string; scope: 'user' | 'project' | 'local'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
+export type AgentServer = { name: string; scope: 'user' | 'project' | 'local' | 'laki'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
 export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string }; secrets?: { on: boolean; held: number }; backup?: { tm: boolean; spotlight: boolean; skipped?: string[] }; loose?: { project: string; loose: number }[]; starterEnv?: string[] } // starterEnv: the names this daemon's start left out of its environment (daemon/starterEnv.ts); loose (B8): projects whose git has over 20,000 loose objects; backup: worktrees out of Time Machine and Spotlight (backup.ts), skipped: why a folder wasn't marked; idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 // A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
@@ -1393,7 +1394,7 @@ export function maskSettings(s: Settings): Settings {
 export function masked(v: View): View {
   const { link: _, ...remote } = v.remote ?? ({} as Remote)
   // a project's env too (its settings'): projectSet keeps a value sent back as the mask
-  return { ...v, projects: v.projects?.map(p => (p.config?.env ? { ...p, config: maskEnv(p.config) } : p)), settings: maskSettings(v.settings ?? {}), presets: v.presets?.map(maskEnv), ...(v.remote && { remote: { ...remote, ...(remote.pin && { pin: MASK }) } }) }
+  return { ...v, projects: v.projects?.map(p => (p.config?.env || p.config?.mcp ? { ...p, config: { ...maskEnv(p.config), ...(p.config.mcp && { mcp: p.config.mcp.map(maskEnv) }) } } : p)), settings: maskSettings(v.settings ?? {}), presets: v.presets?.map(maskEnv), ...(v.remote && { remote: { ...remote, ...(remote.pin && { pin: MASK }) } }) }
 }
 // a settingsSet from a masked view (Settings saves every key): the masked ones are the ones it has, left as they are
 export function unmasked<T extends Record<string, any>>(p: T, now: Settings): T {
@@ -1421,7 +1422,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 207
+export const API = 208
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -541,3 +541,30 @@ test('wrapper sandbox: no sandbox-exec on this Mac: the tab does not start, and 
   const ws = (await rig.rpc('state')).workspaces.find((w: { id: string; name?: string }) => w.id === 'boxless' || w.name === 'boxless')
   assert.ok(ws, 'the workspace is made')
 })
+
+test("a project's MCP servers go in by flags: claude one more --mcp-config (a 0600 file), codex -c overrides; a profile not picked gets none", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'a b', command: 'x' }] } }), /a name of letters, digits, _ and -/)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'x', command: 'y', url: 'https://x.test' }] } }), /a command or a URL/)
+  await rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'docs', command: 'npx', args: ['-y', '@acme/docs mcp'], env: { DOCS_TOKEN: 'fake-secret' } }, { name: 'web', url: 'https://mcp.example.test/mcp', presets: ['codex'] }] } })
+  const shown = (await rig.rpc('state')).projects.find((x: any) => x.id === p.id).config
+  await rig.rpc('projectSet', { id: p.id, config: shown }) // the page saves the masked view back: the value stays
+
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().some(l => l.bin === 'claude'), 'claude')
+  const c = rig.fakeLog().find(l => l.bin === 'claude')
+  assert.equal(c.mcp.mode, 0o600)
+  assert.match(c.mcp.path, /\/mcp\/[\w-]+\.json$/)
+  assert.deepEqual(c.mcp.cfg, { mcpServers: { docs: { command: 'npx', args: ['-y', '@acme/docs mcp'], env: { DOCS_TOKEN: 'fake-secret' } } } }) // web is codex's only
+  assert.ok(!c.args.join(' ').includes('fake-secret'), 'the value in the file, never in argv')
+
+  await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'codex' })
+  await until(() => rig.fakeLog().some(l => l.bin === 'codex'), 'codex')
+  const x = rig.fakeLog().find(l => l.bin === 'codex').args.join('\n')
+  for (const l of ['mcp_servers.docs.command="npx"', 'mcp_servers.docs.args=["-y", "@acme/docs mcp"]', 'mcp_servers.docs.env={ DOCS_TOKEN = "fake-secret" }', 'mcp_servers.web.url="https://mcp.example.test/mcp"']) assert.ok(x.includes(l), l)
+
+  await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'gemini' })
+  await until(() => rig.fakeLog().some(l => l.bin === 'gemini'), 'gemini')
+  assert.ok(!rig.fakeLog().find(l => l.bin === 'gemini').args.join(' ').includes('mcp'), 'gemini: none yet')
+})

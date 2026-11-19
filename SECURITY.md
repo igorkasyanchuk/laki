@@ -186,6 +186,10 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   the agent's until you type there yourself.
 - A repo's extension isn't trusted as its `node_modules/` (its installed packages) or what widget.json's `state`
   names: code it runs from there can change without turning it off.
+- A project's MCP servers (its settings' *MCP servers*) are yours alone: an agent or remote access's page can't add,
+  change or remove one, and the view shows their env as `•••`. They reach Claude Code as one more `--mcp-config` (a
+  0600 file's path) and Codex as `-c mcp_servers.…` flags (which `ps` shows, its env values too), never in the agents'
+  own config.
 - An agent can change only how Laki looks and is laid out: the theme, fonts, the accent, corners, density, glass,
   icons, the sidebar's rows, the rail, where the tabs are, the status bar, saved layouts and the Reader's switch
   (`AGENT_SETTINGS_OK` in `src/daemon/gates.ts`). Every other setting is yours: Global memory, workflows' variables,

@@ -214,3 +214,4 @@ needs no bump: `settingsSet` keeps any field.
 205: `goalSet`, `goalClear` (A1b: a goal Laki runs for an agent with no /goal, met when a project script passes; the view's `tab.goal` with `own`, `turns`, `maxTurns`, `spent`; the user's only, remote access may clear; `goals.own` cap).
 206: `gitTidy`, `gitTidyTick` (B8: a project's git tidied weekly, Tidy now; `diskUsage`'s `projects[].git`, the doctor's `loose`; settings' `gitTidy`; `git.tidy` cap).
 207: `answer`'s `say` (No, and say why: with a no only; the agent's tell-why choice gets the words typed in once its menu is gone, a plain no sends them as the next message through the queue; refused at remote access's answer level; `answer.say` cap).
+208: `projectSet`'s `config.mcp` (a project's MCP servers, passed to claude by one more `--mcp-config` and to codex by `-c` flags as a tab starts; the user's only; the view masks their env; `agentContext`'s `scope: 'laki'`; `project.mcp` cap).

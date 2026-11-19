@@ -461,3 +461,18 @@ test("F15: an always-ask glob beats a rule; five allows suggest one rule; a deny
   assert.match(rig.out, /rule suggestion \S+: Bash npm run: Make it a rule/)
   app.close()
 })
+
+test("a project's MCP servers are the user's: an agent can't add one; the view shows their env masked", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const from = { ws: one.id, tab: (await until(() => rig.tab(one.id))).id }
+  const mcp = [{ name: 'docs', command: 'npx', env: { DOCS_TOKEN: 'fake-secret' } }]
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, config: { mcp }, from }), /an agent can't change a project's scripts, env and settings/)
+  await rig.rpc('projectSet', { id: p.id, config: { mcp } })
+  const shown = (await rig.rpc('state')).projects.find((x: any) => x.id === p.id).config.mcp
+  assert.deepEqual(shown, [{ name: 'docs', command: 'npx', env: { DOCS_TOKEN: '•••' } }])
+  await rig.rpc('projectSet', { id: p.id, config: { mcp: shown } }) // sent back as the view had it: the value kept
+  const sees = await rig.rpc('agentContext', { agent: 'claude', project: p.id })
+  assert.deepEqual(sees.servers.filter((s: any) => s.scope === 'laki').map((s: any) => [s.name, s.command, s.env]), [['docs', 'npx', ['DOCS_TOKEN']]]) // What it sees: names only
+})

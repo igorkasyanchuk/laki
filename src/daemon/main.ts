@@ -795,10 +795,11 @@ const CALL_KEYS = new Set(['from', 'caller', 'byClient', 'now', 'touchTicket', '
 const agentSettingsNo = (p: Record<string, unknown>) => changes(p, k => !AGENT_SETTINGS_OK.has(k) && !CALL_KEYS.has(k))
 // S11: and what puts something on the internet, or runs later or in every new workspace, as you: a tunnel, a share that
 // never ends, a project's scripts, a scheduled task. A shell tab stays (the phone's own terminal: it's the user, signed in)
-const SCRIPT_KEYS = ['setup', 'teardown', 'run', 'test', 'lint', 'format', 'deploy', 'ticket', 'check', 'actions', 'env']
+const SCRIPT_KEYS = ['setup', 'teardown', 'run', 'test', 'lint', 'format', 'deploy', 'ticket', 'check', 'actions', 'env', 'mcp'] // mcp: a server is a command agents run
 // a projectSet's config replaces the whole: a key left out clears it, an env value sent back masked (S3) is the one kept
 const norm = (k: string, v: unknown, cur: any): unknown => {
-  const x = typeof v === 'string' ? v.trim() || undefined : k === 'env' && v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([n, y]) => [n, y === MASK ? cur?.env?.[n] : y])) : (v ?? undefined)
+  const back = (env: object, was: Record<string, unknown> | undefined) => Object.fromEntries(Object.entries(env).map(([n, y]) => [n, y === MASK ? was?.[n] : y]))
+  const x = typeof v === 'string' ? v.trim() || undefined : k === 'env' && v && typeof v === 'object' ? back(v, cur?.env) : k === 'mcp' && Array.isArray(v) ? v.map(s => (s?.env && typeof s.env === 'object' ? { ...s, env: back(s.env, (cur?.mcp as { name?: string; env?: Record<string, unknown> }[] | undefined)?.find(c => c?.name === s.name)?.env) } : s)) : (v ?? undefined)
   return x && typeof x === 'object' && !Object.keys(x).length ? undefined : x // none and empty alike
 }
 const scriptsChange = (p: any) => !!p?.config && typeof p.config === 'object' && (cur => SCRIPT_KEYS.some(k => JSON.stringify(norm(k, p.config[k], cur)) !== JSON.stringify(norm(k, cur?.[k], cur))))((core.state.projects.find(x => x.id === p.id) as any)?.config)

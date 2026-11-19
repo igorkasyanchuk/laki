@@ -8,6 +8,7 @@ import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, t
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
 import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
+import { MCP_AGENTS, MCP_NAME, type McpServer } from '../../shared/mcp'
 
 const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
@@ -100,7 +101,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; check?: DoneCheck; workflows?: boolean } // workflows: Applicable for Workflows (its menus' Run workflow ›, off unless true); check: Done means checked; expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; mcp?: McpServer[]; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; check?: DoneCheck; workflows?: boolean } // workflows: Applicable for Workflows (its menus' Run workflow ›, off unless true); check: Done means checked; expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
 
 const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
@@ -124,6 +125,47 @@ export function FolderField({ value, placeholder, label, onChange }: { value?: s
   )
 }
 export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[] }
+
+// a project's MCP servers (shared/mcp.ts): each a name, a command (its args one per line) or a URL, its env, and the
+// profiles it's on for (all when none is picked); Claude Code and Codex take them by flags as a tab starts, the others
+// not yet. A name that isn't one yet (typing) is kept here and saved once it is: projectSet refuses the list otherwise
+function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; profiles: { name: string; agent: string }[]; onChange: (l: McpServer[]) => void }) {
+  const [rows, setRows] = useState<McpServer[]>(list)
+  const put = (l: McpServer[]) => (setRows(l), l.every(s => MCP_NAME.test(s.name) && (s.command?.trim() || s.url?.trim())) && new Set(l.map(s => s.name)).size === l.length && onChange(l))
+  const set = (i: number, x: Partial<McpServer>) => put(rows.map((s, n) => (n === i ? { ...s, ...x } : s)))
+  const not = [...new Set(profiles.filter(x => !MCP_AGENTS.includes(x.agent) && x.agent !== 'command').map(x => AGENT_NAMES[x.agent as Agent] ?? x.agent))]
+  return (
+    <Group title="MCP servers" hint={`Tools for this project's agents, given as they start; never written into their own config${not.length ? ` · not supported by ${not.join(', ')} yet` : ''}`}>
+      {rows.map((s, i) => (
+        <div key={i} className="setting-box mcp-server">
+          <div className="row">
+            <input value={s.name} aria-label="Name" placeholder="name" spellCheck={false} className={MCP_NAME.test(s.name) ? '' : 'bad'} onChange={e => set(i, { name: e.target.value.trim() })} />
+            <input className="mono grow" value={s.url ?? s.command ?? ''} aria-label="Command or URL" placeholder="npx -y @acme/mcp, or https://…" spellCheck={false} onChange={e => (v => set(i, /^https?:\/\//i.test(v) ? { url: v, command: undefined, args: undefined } : { command: v, url: undefined }))(e.target.value)} />
+            <IconButton icon="trash" title="Remove" onClick={() => put(rows.filter((_, n) => n !== i))} />
+          </div>
+          {!s.url && (
+            <>
+              <textarea className="mono" rows={2} value={(s.args ?? []).join('\n')} aria-label="Arguments" placeholder="Arguments, one per line" spellCheck={false} onChange={e => set(i, { args: e.target.value.split('\n').filter(Boolean) })} />
+              <EnvField value={s.env} placeholder="Its env: KEY=value, one per line (shown as •••• once saved)" onChange={env => set(i, { env })} />
+            </>
+          )}
+          {profiles.some(x => MCP_AGENTS.includes(x.agent)) && (
+            <div className="row wrap">
+              {profiles.filter(x => MCP_AGENTS.includes(x.agent)).map(x => (
+                <Switch key={x.name} on={!s.presets?.length || s.presets.includes(x.name)} onChange={on => set(i, { presets: (all => (all.length === profiles.filter(y => MCP_AGENTS.includes(y.agent)).length ? undefined : all))(profiles.filter(y => MCP_AGENTS.includes(y.agent) && (y.name === x.name ? on : !s.presets?.length || s.presets.includes(y.name))).map(y => y.name)) })}>
+                  {x.name}
+                </Switch>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <button type="button" onClick={() => setRows(l => [...l, { name: `server${l.length + 1}`, command: '' }])}>
+        <Icon name="plus" size={12} /> Add a server
+      </button>
+    </Group>
+  )
+}
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Shell (a command)']]
@@ -416,7 +458,7 @@ export function ProjectSection(p: {
   file?: (id: string) => Promise<ProjectConfig>
   rename?: boolean
   script?: keyof Scripts
-  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean } // Settings' own, which go with this project's (simulator: its switch, which this project's may override; flows: Workflows on)
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean; profiles?: { name: string; agent: string }[] } // Settings' own, which go with this project's (profiles: for MCP servers' switches) (simulator: its switch, which this project's may override; flows: Workflows on)
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
@@ -546,6 +588,7 @@ export function ProjectSection(p: {
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </Group>
+      <McpServers list={c.mcp} profiles={p.global?.profiles ?? []} onChange={mcp => setC(y => ({ ...y, mcp: mcp.length ? mcp : undefined }))} />
       <Isolation project={p.project.id} />
       {p.global?.flows !== false && (
         <Group title="Workflows">
