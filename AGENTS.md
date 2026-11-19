@@ -11,13 +11,13 @@ from it (limits, hooks).
 ```bash
 npm install
 npm run typecheck                 # tsc --noEmit
-npm run check                     # typecheck, then test:fast: before a commit that touches src/; `npm run dmg` runs it first
-npm test                          # node:test, every file, 4 at a time: ~5 min on an 8-core Mac (6 was no quicker there)
+npm run check                     # typecheck, then test:fast (~15 s): before a commit that touches src/; `npm run dmg` runs it first
+npm test                          # node:test, every file (158), 4 at a time: 10 to 15 min on an 8-core Mac, more beside running agents (14 min on 19 Nov 2026; 6 at a time was no quicker); cap a background run at 25 min
 npm run test:release              # npm test, then each file that failed run once more alone: flaky ones pass, twice fails (scripts/test-rerun.ts; release.sh's)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
-npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
+npm run test:fast                 # the files that start no daemon (never call fresh()): ~10 s
 npm run test:changed              # the tests for what changed against origin/main and isn't committed, each with why (a changed test, an import of a changed file directly or through one source file, a test named for it), then run as test:one runs them; none: test:fast (scripts/test-changed.ts; more args go to node --test)
-npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~25 s, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
+npm run test:ui                   # the real window, page by page, then the risky flows (scripts/ui-smoke.ts; npm run build first): ~1 min, screenshots in dist/ui-smoke; LAKI_DEMO_RICH=1: the README's stills instead, both themes, into docs/img
 npm run test:sheet                # a contact sheet: test:ui's pages in every look × dark and light (LAKI_SHEET_THEMES=all: every theme), 1440×900 and the phone's, into dist/ui-sheet/index.html with each page's layout facts, and against the last run's (moved to dist/ui-sheet/prev; main compares them by pixels, shared/pixelDiff.ts): Changed (n) first, before and after, new and removed pages, `changed: n of m` at the end (scripts/ui-sheet.ts; npm run build first): ~2.5 min, 197 pictures
 npm run test:report               # .test-history.jsonl (npm test and test:one add a line per file: time, pass or fail, its failed tests, SLOW, the load; the newest 5,000, gitignored): the 10 slowest files by median of the last 20 runs (over 60 s flagged), the flaky ones (passed and failed on one sha, or failed in under a third of the last 20); --json (scripts/test-report.ts; npm test ends with its slowest file and any likely flaky one)
 npm run test:cov                  # the tests with node's coverage of src/daemon and src/shared (daemons too), the 10 least covered (scripts/cov.ts; not a gate)

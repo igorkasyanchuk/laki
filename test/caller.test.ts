@@ -62,7 +62,7 @@ test("M5: an agent's call is its tab's with Origin: app://laki too; answers, key
     curl('remoteStart', { hours: 1, open: true }),
     curl('settingsSet', { env: { A: '1' } }),
     curl('memoryCompact', { project: p.id }),
-    curl('settingsSet', { prScan: 5 }),
+    curl('settingsSet', { fontSize: 14 }), // the look: an agent's to change (gates.ts AGENT_SETTINGS_OK)
     curl('prReview', { ws: 'x', comments: [] }),
     curl('prComment', { ws: 'x', path: 'a', line: 1, body: 'b' }),
     curl('prAct', { ws: 'x', act: 'approve' }),
