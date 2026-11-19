@@ -568,3 +568,22 @@ test("a project's MCP servers go in by flags: claude one more --mcp-config (a 06
   await until(() => rig.fakeLog().some(l => l.bin === 'gemini'), 'gemini')
   assert.ok(!rig.fakeLog().find(l => l.bin === 'gemini').args.join(' ').includes('mcp'), 'gemini: none yet')
 })
+
+// the wrapper sandbox keeps the data folder from the agent: a wrapped claude's own --mcp-config is read back out of it
+// (its file only); a workspace deleted takes its tabs' MCP files with it
+test("a wrapped claude reads its own MCP file, no other; a deleted workspace's tabs' MCP files go", { skip: process.platform !== 'darwin' }, async t => {
+  const rig = await fresh(t)
+  const args = join(rig.home, 'sandbox-exec.args')
+  writeFileSync(join(rig.home, 'bin', 'sandbox-exec'), `#!/bin/sh\nprintf '%s\\0' "$@" > '${args}'\nwhile [ $# -gt 0 ]; do case "$1" in -p|-D|-f) shift 2;; *) break;; esac; done\nexec "$@"\n`, { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'docs', command: 'npx', env: { DOCS_TOKEN: 'fake-secret' } }] } })
+  await rig.rpc('presetSave', { name: 'claude-box', add: true, set: { agent: 'claude', wrap: true } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude-box' })
+  const c = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'claude'), 'claude, through the wrapper')
+  const said = readFileSync(args, 'utf8').split('\0')
+  const mine = said.filter(a => /^P\d+=.*\/mcp\/[\w-]+\.json$/.test(a)) // the profile's parameters: what it reads back
+  assert.deepEqual(mine.map(a => a.split('/').pop()), [`${c.tab}.json`], 'its own file read back, no other')
+  assert.equal(realpathSync(c.mcp.path), realpathSync(mine[0].replace(/^[^=]*=/, '')))
+  await rig.rpc('wsRm', { id: ws.id })
+  await until(() => !existsSync(c.mcp.path), 'its MCP file gone with the workspace')
+})

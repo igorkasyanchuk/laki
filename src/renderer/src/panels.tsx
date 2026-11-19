@@ -882,7 +882,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
-      const prompt = withImages(answers.length ? `${filled.trimEnd()}\n\nAnswers:\n${answers.join('\n')}` : filled, images) || undefined // Ask me first's picks
+      const prompt = withImages(answers.length ? [filled.trimEnd(), `Answers:\n${answers.join('\n')}`].filter(Boolean).join('\n\n') : filled, images) || undefined // Ask me first's picks
       const own = (isAgent(starts) || acpPro) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
       await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, sandbox: own ? boxSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })

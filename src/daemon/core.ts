@@ -258,6 +258,10 @@ export function load() {
   // R9: a new install's terminals outlive the daemon (the pty host); one from before keeps what it had (off) and is
   // asked once (main.ts: askPty, ptyHostAsked). A test's daemon only with LAKI_TEST_ASK_PTY=1
   if (!had && state.settings?.ptyHost === undefined) state.settings = { ...state.settings, ptyHost: true, ptyHostAsked: true }
+  // a tab's MCP file whose tab is gone (a daemon that died first): its env out of the data folder
+  try {
+    for (const f of readdirSync(join(dir, 'mcp'))) if (!state.tabs.some(t => `${t.id}.json` === f)) rmSync(join(dir, 'mcp', f), { force: true })
+  } catch {}
   askPty.on = had && state.settings?.ptyHost === undefined && !state.settings?.ptyHostAsked && (!inRig() || process.env.LAKI_TEST_ASK_PTY === '1')
   // a new install hides secret-looking variables from agents (childEnv); one from before is asked once (main.ts:
   // askSecrets). A test's daemon neither, but with LAKI_TEST_LEAN=1 (a new install) or LAKI_TEST_ASK_SECRETS=1
@@ -2356,6 +2360,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
     spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt, cwd, resume: !!tab.resumeId })
   } catch (e) {
     state.tabs = state.tabs.filter(t => t !== tab)
+    tabFilesGone(tab.id)
     save()
     throw e
   }
@@ -2907,11 +2912,16 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   state.tabs = state.tabs.filter(x => x !== t)
   stopShares({ tab: id })
   statusGone(id)
-  rmSync(join(dir, 'net', `${id}.json`), { force: true }) // its sandbox's settings file (netFile)
-  rmSync(join(dir, 'mcp', `${id}.json`), { force: true }) // its project's MCP servers (mcpFile)
-  proxyDrop(id) // its proxy password (netProxy.ts)
+  tabFilesGone(id)
   save()
   changed()
+}
+// a tab gone (closed, its workspace deleted, its start failed): its sandbox's settings file (netFile), its project's MCP
+// servers with their env (mcpFile), its proxy password (netProxy.ts)
+function tabFilesGone(id: string) {
+  rmSync(join(dir, 'net', `${id}.json`), { force: true })
+  rmSync(join(dir, 'mcp', `${id}.json`), { force: true })
+  proxyDrop(id)
 }
 
 // why a running claude can't be switched to Bypass (undefined: it can): the managed policy, its sandbox, or that it wasn't
@@ -3653,6 +3663,7 @@ function dropWs(ws: Workspace) {
     sessions.delete(t.id)
     asleep.delete(t.id)
     rt.delete(t.id)
+    tabFilesGone(t.id)
   }
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id)
   state.workspaces = state.workspaces.filter(w => w !== ws)
