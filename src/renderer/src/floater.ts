@@ -9,7 +9,7 @@
 // The bar opens the other three (window.open): one renderer process for all four.
 import './floater.css'
 import { askScope, optLabel, permVerb } from '../../shared/ask'
-import { dotsText, pinWhat, plainLines, replyOf, tookText } from '../../shared/island'
+import { dotsText, pinWhat, plainLines, replyOf, tookText, turnRing } from '../../shared/island'
 import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
 import type { SpeechLine } from '../../shared/speech'
@@ -32,7 +32,7 @@ function scoped(b: HTMLElement, n: number, text: string, agent?: string) {
   b.title = text
   b.setAttribute('aria-label', text)
 }
-export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[]; agent?: string; at?: number; ask?: Ask; answer?: string; took?: number }
+export type Float = { started?: number; usual?: number /* a working one's turn (ms): its ring */; tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[]; agent?: string; at?: number; ask?: Ask; answer?: string; took?: number }
 type Colors = Record<string, string>
 type Drop = { text?: string; paths: string[] } // Q9: what was dropped on a bubble: text or a link, files' and pictures' paths
 type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean; at?: 'edge' | 'notch' }
@@ -170,7 +170,7 @@ if (mode === 'card') {
     if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
     card.style.setProperty('--c', `var(--${f.status})`)
     const meta = el('div', '', 'meta')
-    meta.append(el('i', WORDS[f.status] ?? f.status), ` · ${f.project} · click to open${f.status === 'done' ? ' · right click: seen' : ''}`)
+    meta.append(el('i', WORDS[f.status] ?? f.status), `${(r => (r && f.status === 'running' ? ` · ${r.words}` : ''))(turnRing(f.started, f.usual, Date.now()))} · ${f.project} · click to open${f.status === 'done' ? ' · right click: seen' : ''}`)
     const pr = f.pr && el('div', '', 'pr')
     if (pr && f.pr) pr.append(el('span', f.pr.state, `st ${/^[a-z]+$/.test(f.pr.state) ? f.pr.state : ''}`), el('span', f.pr.text, 'title'), ...(f.pr.meta ? [el('div', f.pr.meta, 'sub')] : []))
     card.replaceChildren(
@@ -326,6 +326,15 @@ else {
     render(shut)
   })
   // up: the + opened or closed, the drop grows or shrinks upward, leftward in a row (main); pop: its actions come in
+  // a working one's ring: how much of its usual turn has gone (--turn, 0 to 1), the waiting color once it runs long; one
+  // 5 s timer for them all, none while no bubble has one
+  let ringT: ReturnType<typeof setInterval> | undefined
+  function rings() {
+    const dots = [...bar.querySelectorAll<HTMLElement>('.fl-dot.ring')]
+    for (const d of dots) (r => r && (d.style.setProperty('--turn', r.p.toFixed(3)), d.classList.toggle('long', r.long)))(turnRing(Number(d.dataset.started), Number(d.dataset.usual), Date.now()))
+    if (!dots.length) (clearInterval(ringT), (ringT = undefined))
+    else ringT ??= setInterval(rings, 5000)
+  }
   function render(up = false, pop = false) {
     if (!cur) return
     tipped = '' // its buttons are made anew: a move names one again
@@ -349,6 +358,7 @@ else {
       d.dataset.tab = f.tab
       d.style.setProperty('--fl-d', phase(f.tab))
       if (f.color && /^[a-z]+$/.test(f.color)) d.style.setProperty('--ink', `var(--tc${f.color})`)
+      if (f.status === 'running' && f.started && f.usual) d.classList.add('ring'), (d.dataset.started = String(f.started)), (d.dataset.usual = String(f.usual))
       d.onmouseenter = () => !drag?.moved && hover(f.tab, along(d))
       d.onmouseleave = () => !drag?.moved && hover('')
       bar.append(d)
@@ -375,6 +385,7 @@ else {
       btns.append(p)
       bar.append(btns)
     }
+    rings()
     hot(was && [...bar.querySelectorAll<HTMLElement>('.fl-dot, .fl-btn')].find(x => (was.tab ?? was.act) === (x.dataset.tab ?? x.dataset.act)))
     // a card open across an update: its new text, beside where its circle is now (gone: it shuts)
     const still = hovered && [...bar.querySelectorAll<HTMLElement>('.fl-dot')].find(d => d.dataset.tab === hovered)

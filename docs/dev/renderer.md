@@ -1412,6 +1412,11 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Laki's own lines in a terminal** (`[process exited]`, *waiting for the setup script*, …) are bright black (SGR 90),
   not dim (SGR 2): xterm's WebGL renderer draws a dim glyph over an opaque cell, a dark patch on a gradient or glass
   panel (an agent's own dim text still can).
+- **A bubble's ring** (floater.ts `rings`, floater.css): App gives a running agent's float item `started` (its `runAt`)
+  and `usual` (its view's `usual`, in ms), main keeps them only when `guards.ts` `floatTimes` takes them; the dot gets
+  `.ring` and `--turn` (`island.ts` `turnRing`: the share of its usual turn gone, `long` past 2 × usual and 5 minutes:
+  the waiting color), one 5 s timer for all, none without a ring; its card's words: *about n min left*, *almost done*,
+  *running long*. The island (notch) pill: unchanged (more than a line there).
 - **Scroll edges** (ui.tsx `ScrollEdge`): a 1px sentinel first in a scroller sets its `data-scrolled` once it scrolls
   out (IntersectionObserver, no scroll listener); `end` puts it last and sets `data-more` while more is below. Top
   fades: the sidebar, the Reader, the Review tab's files, the side panel's Files (`.sp-tree`) and Commits

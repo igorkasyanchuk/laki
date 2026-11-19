@@ -138,3 +138,10 @@ export const dockMenu = (agents: DockAgent[], quiet: boolean): DockItem[] => [
 ]
 // a project's folder for the Dock's recent items: an absolute path on this Mac (an SSH host's is never sent)
 export const recentOk = (p: unknown): p is string => typeof p === 'string' && p.length > 1 && p.length <= 1024 && p.startsWith('/') && !p.includes('\0')
+// a working bubble's turn (the renderer's float item): started, when its turn began (ms, not later than a minute from
+// now), and usual, its project's and profile's usual turn (ms, up to a day); else neither (floater.ts draws no ring)
+export function floatTimes(x: unknown, now = Date.now()): { started?: number; usual?: number } {
+  const o = (x && typeof x === 'object' ? x : {}) as { started?: unknown; usual?: unknown }
+  const ok = (n: unknown, lo: number, hi: number): n is number => typeof n === 'number' && Number.isFinite(n) && n >= lo && n <= hi
+  return ok(o.started, 1, now + 60_000) && ok(o.usual, 1000, 86_400_000) ? { started: o.started, usual: o.usual } : {}
+}

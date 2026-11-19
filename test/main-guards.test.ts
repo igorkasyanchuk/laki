@@ -181,3 +181,16 @@ test("the Dock's menu: five agents at most, ids and names checked; New Task…, 
   for (const p of ['/Users/me/repo', '/a']) assert.ok(recentOk(p), p)
   for (const p of ['repo', '/', '', 3, '/x\0y', `/${'a'.repeat(1100)}`]) assert.ok(!recentOk(p), String(p))
 })
+
+test("a working bubble's turn: started and usual checked as main takes the list; the ring's share and words", async () => {
+  const { floatTimes } = await import('../src/main/guards.ts')
+  const { turnRing } = await import('../src/shared/island.ts')
+  const now = 1_800_000_000_000
+  assert.deepEqual(floatTimes({ started: now - 60_000, usual: 240_000 }, now), { started: now - 60_000, usual: 240_000 })
+  for (const bad of [{ started: now - 1, usual: 500 }, { started: now + 120_000, usual: 60_000 }, { started: 'x', usual: 60_000 }, { started: now, usual: Infinity }, { started: now, usual: 2 * 86_400_000 }, null, { usual: 60_000 }]) assert.deepEqual(floatTimes(bad, now), {}, JSON.stringify(bad))
+  assert.deepEqual(turnRing(now - 60_000, 240_000, now), { p: 0.25, long: false, words: 'about 3 min left' })
+  assert.deepEqual(turnRing(now - 230_000, 240_000, now), { p: 230 / 240, long: false, words: 'almost done' })
+  assert.deepEqual(turnRing(now - 500_000, 240_000, now), { p: 1, long: true, words: 'running long' }) // past 2 × usual and 5 min
+  assert.equal(turnRing(now - 250_000, 100_000, now)?.long, false) // past 2 × usual, under 5 min: not yet
+  assert.equal(turnRing(now, undefined, now), undefined) // no usual: no ring
+})

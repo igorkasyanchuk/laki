@@ -100,3 +100,12 @@ export function pinWhat(what: string, n = PIN_LINES, max = 400) {
   const shown = lines.slice(0, n).join('\n')
   return { shown: shown.length > max ? `${shown.slice(0, max - 1)}…` : shown, cut: lines.length > n || shown.length > max }
 }
+// a working bubble's ring (floater.ts) and its words: how much of its usual turn has gone (0 to 1), past 2 × usual and
+// 5 minutes as the tab's timer says it (long: the waiting color), and what its card says
+export function turnRing(started: number | undefined, usual: number | undefined, now: number): { p: number; long: boolean; words: string } | undefined {
+  if (!started || !usual) return
+  const took = Math.max(0, now - started)
+  const long = took > 2 * usual && took >= 300_000
+  const left = Math.round((usual - took) / 60_000)
+  return { p: Math.min(1, took / usual), long, words: long ? 'running long' : left >= 1 ? `about ${left} min left` : 'almost done' }
+}

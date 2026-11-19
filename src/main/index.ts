@@ -21,7 +21,7 @@ import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, ty
 import { type BrowseDid, keyEvent, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk, dockAgents, dockMenu, recentOk, showAtLaunch, type DockAgent } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk, dockAgents, dockMenu, recentOk, showAtLaunch, type DockAgent , floatTimes } from './guards.ts'
 import { updater } from './update.ts'
 
 // the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
@@ -1887,7 +1887,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   const o = (opts && typeof opts === 'object' ? opts : {}) as Partial<FloatOpts>
   const was = floats.at
   floats = {
-    items: Array.isArray(items) ? items.slice(0, 12) : [],
+    items: Array.isArray(items) ? items.slice(0, 12).map(x => (({ started: _s, usual: _u, ...rest }) => ({ ...rest, ...floatTimes(x) }))((x && typeof x === 'object' ? x : {}) as Float & { started?: unknown; usual?: unknown })) : [], // a turn's started and usual: checked (guards.ts)
     colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {},
     style: STYLES.includes(o.style as string) ? o.style! : 'glow',
     cards: o.cards !== false,

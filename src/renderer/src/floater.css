@@ -37,4 +37,9 @@
 /* floater.ts' --fl-d: each circle's own phase, so they don't pulse in step (after every animation shorthand above) */
 .fl-dot::before, .fl-dot::after { animation-delay: var(--fl-d, 0s) !important; }
 /* still: the ring, nothing moving */
-@media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::before, .fl-dot::after { animation: none !important; } }
+/* a working one's ring (floater.ts rings): its usual turn's share gone, round from the top in its color, the waiting color
+   once it runs long; none without a usual turn. Reduce motion: it still moves (it's information), with no transition */
+@property --turn { syntax: '<number>'; inherits: false; initial-value: 0; }
+body .fl-dot.running.ring { --ring: var(--c); border-color: transparent; background: linear-gradient(var(--bg), var(--bg)) padding-box, conic-gradient(var(--ring) calc(var(--turn) * 1turn), color-mix(in srgb, var(--c) 22%, transparent) 0) border-box; transition: --turn 1s linear; }
+body .fl-dot.running.ring.long { --ring: var(--waiting); }
+@media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::before, .fl-dot::after { animation: none !important; } body .fl-dot.running.ring { transition: none; } }
