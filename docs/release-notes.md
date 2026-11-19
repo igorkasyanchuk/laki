@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.57.0 · Nov 19, 2026
 
 - Back up and restore: Settings › General › *Backup* (or `laki backup` and `laki restore <file.tgz>`) puts your projects, settings, notes, specs, workflows, extensions and Laki AI chats in one file, without keys, sign-ins or logs, and brings them back on another Mac; a restore says what changes first and keeps what was there. [Try it](laki://settings/general?spot=Backup)
 - Workflows can wait: a *Wait* block for a time (*For* 2h, *Until* 18:00, or your *Hours*: until work starts or ends) holds no agent or budget meanwhile, shows hatched in the run's timeline with its end, and its row has *Continue now* and *Cancel*; a wait of more than a day shows in the Calendar.
