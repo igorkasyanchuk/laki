@@ -128,6 +128,7 @@ core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
 await core.ptyAdopt() // R6: terminals that outlived the last daemon (settings.ptyHost), before the rest start again
+await core.netProxyUp().catch((e: Error) => log(`wrapper sandbox's network proxy: ${e.message}`)) // its port and passwords: a kept terminal's go on
 core.restoreAll()
 flowResume() // workflow runs back at their blocks
 scanWidgets()

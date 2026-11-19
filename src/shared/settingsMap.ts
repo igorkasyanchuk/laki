@@ -376,9 +376,9 @@ export const HELP: Record<string, SettingHelp> = {
     cost: "Some commands need a yes or fail in it (a global install, a tool that writes in your home folder). Not with Bypass permissions, which turns the sandbox off.",
   },
   Network: {
-    what: "What a sandboxed agent's commands may reach: All (the agent's own default), Listed hosts (Claude Code: the project's package registries, GitHub, its model's host, this Mac and the hosts you allowed for the project), or Off (Codex).",
+    what: "What a sandboxed agent's commands may reach: All (the agent's own default), Listed hosts (Claude Code: the project's package registries, GitHub, its model's host, this Mac and the hosts you allowed for the project), or Off (Codex). With the wrapper sandbox, Listed hosts lets the agent reach only this Mac, the rest through Laki's proxy to the same list.",
     when: 'Listed hosts for a repo you trust less: a command can\'t send what it read to a host you never allowed without asking.',
-    cost: 'A command that needs another host asks first, or fails; Allow this domain on its card adds it for the project.',
+    cost: 'A command that needs another host asks first, or fails; Allow this domain on its card adds it for the project (with the wrapper, at once). A tool that ignores HTTPS_PROXY reaches nothing.',
   },
   'Warn about a pasted secret': {
     what: "A token, key or password in a prompt box (GitHub's, AWS's, Slack's, OpenAI's, Anthropic's, a private key, a JWT, password=…) gets a line under the box: Send as it is, or Pass as a secret, which puts it in a file only you and the agent read and its path in the prompt.",

@@ -2,7 +2,7 @@
 // fake gemini: records its args, runs the hooks in $GEMINI_CLI_SYSTEM_DEFAULTS_PATH (each must print JSON), echoes
 const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'gemini', tab: process.env.LAKI_TAB, args }) + '\n')
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'gemini', tab: process.env.LAKI_TAB, args, ...(process.env.HTTPS_PROXY && { proxy: process.env.HTTPS_PROXY }) }) + '\n')
 const hooks = (() => { try { return JSON.parse(fs.readFileSync(process.env.GEMINI_CLI_SYSTEM_DEFAULTS_PATH, 'utf8')).hooks } catch { return {} } })()
 const val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
 const session = val('--resume') ?? 'gem-' + Math.random().toString(36).slice(2, 8)

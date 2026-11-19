@@ -59,7 +59,8 @@ import { managedView, policy, policyAgent, policySettings, policyTick } from './
 import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 import { spotlightSet, tmSet } from './backup.ts'
-import { ownBoxOn, wrapProfile, wrapRefused } from '../shared/wrap.ts'
+import { ownBoxOn, WRAP_NET, wrapProfile, wrapRefused } from '../shared/wrap.ts'
+import { proxyDrop, proxyFor, proxyUp } from './netProxy.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
 
 export const run = promisify(execFile)
@@ -1909,9 +1910,11 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
     data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
     allowRead: [...wrapReads(), ...(account ? [account] : []), ...(p => (p ? [p.path] : []))(state.projects.find(p => p.id === ws.project))].map(realOf), // its project's checkout: a repo in the data folder (the sample) has its git config there
-    net: presetOf(tab)?.net, // ponytail: not applied yet: the network stays as it is
+    net: presetOf(tab)?.net,
   })
-  const out: Record<string, string> = { ...env, LAKI_SB_PROFILE: text, LAKI_SB_CMD: line, ...(daemonPort && { LAKI_DAEMON_PORT: String(daemonPort) }) }
+  const via = presetOf(tab)?.net === 'list' ? proxyFor(tab.id) : undefined // its hosts through Laki's proxy (netProxy.ts), nothing else out
+  const proxy: Record<string, string> = via ? { HTTPS_PROXY: via, HTTP_PROXY: via, https_proxy: via, http_proxy: via, NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1' } : {}
+  const out: Record<string, string> = { ...env, ...proxy, LAKI_SB_PROFILE: text, LAKI_SB_CMD: line, ...(daemonPort && { LAKI_DAEMON_PORT: String(daemonPort) }) }
   const ds: string[] = []
   for (let i = 1; i < params.length; i += 2) (out[`LAKI_SB_D${ds.length}`] = params[i]), ds.push(`-D "$LAKI_SB_D${ds.length}"`)
   return { cmd: `${q(bin)} -p "$LAKI_SB_PROFILE" ${ds.join(' ')} /bin/sh -c "$LAKI_SB_CMD"`, env: out }
@@ -1928,6 +1931,24 @@ function wrapSeen(tab: Tab, data: string) {
   r.boxed = { cmd: path, why: `The wrapper sandbox refused ${path}: it writes only in its worktree, its git folder, temp folders and its own config`, wrap: true }
   changed()
 }
+
+// the wrapper's network proxy (netProxy.ts), up before tabs start again (main.ts): a wrapped tab on a list gets its
+// project's hosts now (netList, the card's Allow this domain at once), a refused one its card (boxed, with the host)
+export const netProxyUp = () =>
+  proxyUp(join(dir, 'net-proxy.json'), {
+    list: id => {
+      const t = state.tabs.find(x => x.id === id)
+      const ws = t && state.workspaces.find(w => w.id === t.workspace)
+      if (!t || !ws || !wrapped(t) || presetOf(t)?.net !== 'list') return
+      return netList(f => existsSync(join(ws.path, f)), t.preset ?? '', state.projects.find(p => p.id === ws.project)?.netAllow)
+    },
+    refused: (id, host) => {
+      const r = rtOf(id)
+      if (r.boxed?.host === host) return
+      r.boxed = { cmd: host, why: `The wrapper sandbox's network refused ${host}: it reaches only this profile's listed hosts`, host, wrap: true }
+      changed()
+    },
+  })
 
 // codex's sandbox: workspace-write, unless its mode or its profile's flags pick a sandbox already (read-only is
 // stricter; an approval flag alone picks none); its network on, so laki (the daemon on 127.0.0.1), npm and git push
@@ -2735,8 +2756,9 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.wrap && pr.agent === 'command') throw new Error("the wrapper sandbox is for an agent's profile")
   if (pr.wrap && pr.sandbox && SANDBOX[pr.agent as Agent]) throw new Error("the wrapper and the agent's own sandbox: one or the other (sandbox-exec can't run inside another)")
   if (pr.wrap && ownBoxOn(pr.agent, pr.args, pr.env)) throw new Error("its flags turn the agent's own sandbox on: the wrapper can't run around it")
-  if (pr.net !== undefined && !NET_OK[pr.agent as Agent]) delete pr.net // no sandbox, no network of its own
-  if (pr.net !== undefined && !NET_OK[pr.agent as Agent]!.includes(pr.net)) throw new Error(NET_NO[pr.agent as Agent]?.[pr.net] ?? `net: ${NET_OK[pr.agent as Agent]!.join(', ')}`)
+  const nets = pr.wrap ? WRAP_NET : NET_OK[pr.agent as Agent] // the wrapper's (its proxy), else the agent's own sandbox's
+  if (pr.net !== undefined && !nets) delete pr.net // no sandbox, no network of its own
+  if (pr.net !== undefined && !nets!.includes(pr.net)) throw new Error((!pr.wrap && NET_NO[pr.agent as Agent]?.[pr.net]) || `net: ${nets!.join(', ')}`)
   return settingsSet({ presets: i >= 0 ? list.map((x, j) => (j === i ? pr : x)) : [...list, pr], ...(def && pr.name !== name && { agent: pr.name }) }).presets!
 }
 
@@ -2853,6 +2875,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   stopShares({ tab: id })
   statusGone(id)
   rmSync(join(dir, 'net', `${id}.json`), { force: true }) // its sandbox's settings file (netFile)
+  proxyDrop(id) // its proxy password (netProxy.ts)
   save()
   changed()
 }

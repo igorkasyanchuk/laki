@@ -487,7 +487,18 @@ settings, opencode's folder, statusline.sh, pasted `images/` and `files/`), its 
 checkout (a repo in the data folder, the sample: git reads its `.git`); then deny reads of
 `SECRET_HOME` and every other agent's folders (as `file-read*` and `file-read-data` both: macOS gives a `file-read-data`
 rule the win over a `file-read*` one, wherever it is); each path `realOf` (realpath, or its nearest folder's) and a
-`-D P<n>=<path>` (`test/units-more.test.ts` runs the profile under the real sandbox-exec). The network as it is (`net` not applied yet). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
+`-D P<n>=<path>` (`test/units-more.test.ts` runs the profile under the real sandbox-exec). Its network (`net`, `WRAP_NET`: `all`, unset,
+as it is; `list`): `(deny network-outbound)` but `(remote ip "localhost:*")`, a unix socket's denied too (DNS, ssh-agent),
+and the tab's env gets `HTTPS_PROXY`, `HTTP_PROXY` (and their lower case, curl's) as `daemon/netProxy.ts`' URL for it,
+`NO_PROXY=localhost,127.0.0.1`. netProxy: node:http on 127.0.0.1, one per daemon (`netProxyUp` before `restoreAll`,
+main.ts), a CONNECT or a plain http request answered only with the tab's own `Proxy-Authorization` (Basic, its id and a
+password new each start: `proxyFor`; another tab's or none: 407) to a host on its list now (core's hook: `netList` as
+claude's, its project's `netAllow` read at each request, `hostOn`: the name or a `*.`'s subdomain); else 403 and its
+card (`boxed` with `host`, `wrap`: *Allow this domain in this project*, `projectNetAllow`, the user's alone, AGENT_NO).
+Its port and passwords in `<data>/net-proxy.json` (0600, `DATA_SECRETS`): the next daemon listens on that port again and
+a kept terminal's URL (the pty host's) goes on; `proxyDrop` as a tab closes. `MODEL_HOST` has gemini's, grok's and
+codex's sign-in hosts for a wrapped one (OpenCode's provider: its card). `test/net-proxy.test.ts` (the proxy alone),
+`test/presets.test.ts` (a wrapped gemini's). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
 tab's token, daemon.json unread (conn.ts `daemonInfo`). No sandbox-exec (`sandboxBin` on PATH; a test's
 `LAKI_TEST_NO_SANDBOX_EXEC`): the tab doesn't start, a notice and the workspace's log say why. A write it refuses
 (`wrapRefused` in the tab's output: *Operation not permitted* for a path out of the worktree) is `boxed` with `wrap: true`:

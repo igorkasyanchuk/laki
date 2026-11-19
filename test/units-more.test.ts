@@ -1181,6 +1181,28 @@ test('wrapProfile under the real sandbox-exec: the data folder hidden whole, wha
   }
 })
 
+// a wrapped profile's net list: every connection out denied but this Mac's (its proxy's), in the text and as
+// sandbox-exec runs it; all, or unset: no network rule
+test("wrapProfile's net list: (deny network-outbound) but this Mac's loopback, nothing for all", async () => {
+  const { wrapProfile } = await import('../src/shared/wrap.ts')
+  const base = { agent: 'opencode' as const, worktree: '/Users/me/wt', home: '/Users/me', tmp: [] as string[] }
+  assert.match(wrapProfile({ ...base, net: 'list' }).text, /\(deny network-outbound\)\n\(allow network-outbound \(remote ip "localhost:\*"\)\)/)
+  for (const net of ['all', undefined] as const) assert.doesNotMatch(wrapProfile({ ...base, net }).text, /network/, String(net))
+  if (!existsSync('/usr/bin/sandbox-exec')) return // the rest: macOS's sandbox-exec
+  const { text, params } = wrapProfile({ ...base, worktree: tmpdir(), home: tmpdir(), net: 'list' })
+  const server = createServer((_q, r) => r.end('here'))
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  try {
+    const port = (server.address() as { port: number }).port
+    const { execFile } = await import('node:child_process')
+    const sh = (cmd: string) => new Promise<string>(ok => execFile('/usr/bin/sandbox-exec', ['-p', text, ...params, '/bin/sh', '-c', `${cmd} 2>/dev/null || echo NO`], { encoding: 'utf8' }, (_e, out) => ok(String(out).trim()))) // not execFileSync: the server is this process's
+    assert.equal(await sh(`/usr/bin/curl -s --noproxy '*' -m 5 http://127.0.0.1:${port}/`), 'here', 'this Mac')
+    assert.equal(await sh(`/usr/bin/curl -s --noproxy '*' -m 5 https://1.1.1.1/`), 'NO', 'the internet')
+  } finally {
+    server.close()
+  }
+})
+
 test("secretsIn: a prompt box's pasted secrets by kind, the value's span alone; UUIDs, git hashes, pictures and words don't match", async () => {
   const { maskSecret, maskSecrets, secretsIn } = await import('../src/shared/secrets.ts')
   const f = (...p: string[]) => p.join('') // shapes made here: no real token, nothing a scanner takes for one

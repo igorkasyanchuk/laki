@@ -3116,6 +3116,16 @@ export function SettingsPage(p: {
                             <Says title="Wrapper sandbox (macOS)" hint="Runs it under sandbox-exec: it writes only in its worktree, git's folder, temp folders and its own settings, and can't read ~/.ssh, ~/.aws, your keychains, other agents' settings or Laki's own data. Apple marks sandbox-exec deprecated" />
                           </Switch>
                         )}
+                        {pr.wrap === 'macos' && !(SANDBOX[pr.agent as Agent] && pr.sandbox) && (
+                          // the wrapper's network: only this Mac, the listed hosts through Laki's proxy (daemon/netProxy.ts)
+                          <label className="switch-row">
+                            <Says title="Network" hint="Listed hosts: it reaches only this Mac, and through Laki the registries the project uses, GitHub, its model and what you allowed for the project; another host gets a card" />
+                            <select value={pr.net === 'list' ? 'list' : 'all'} onChange={e => setPreset(i, { net: e.target.value === 'list' ? 'list' : undefined })}>
+                              <option value="all">All</option>
+                              <option value="list">Listed hosts</option>
+                            </select>
+                          </label>
+                        )}
                         {pr.sandbox && NET_OK[pr.agent as Agent] && !sandboxOff(pr.agent, pr.perm, pr.args) && (
                           // its sandbox's network: what this agent's sandbox can do, the rest shown off with why
                           <label className="switch-row">

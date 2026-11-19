@@ -91,10 +91,10 @@ const REGISTRIES: [string, string[]][] = [
   ['Cargo.toml', ['crates.io', 'index.crates.io', 'static.crates.io']],
   ['composer.json', ['repo.packagist.org']],
 ]
-const MODEL_HOST: Partial<Record<Agent, string>> = { claude: 'api.anthropic.com', codex: 'api.openai.com' }
+const MODEL_HOST: Partial<Record<Agent, string[]>> = { claude: ['api.anthropic.com'], codex: ['api.openai.com', 'chatgpt.com', 'auth.openai.com'], gemini: ['generativelanguage.googleapis.com', 'cloudcode-pa.googleapis.com', 'oauth2.googleapis.com'], grok: ['api.x.ai'] } // a wrapped one's too (netProxy.ts); OpenCode's: the provider you set up, by its card
 export function netList(has: (file: string) => boolean, agent: string, own: readonly string[] = []): string[] {
   const reg = REGISTRIES.filter(([f]) => has(f)).flatMap(([, h]) => h)
-  return [...new Set([...reg, 'github.com', 'api.github.com', ...(MODEL_HOST[agent as Agent] ? [MODEL_HOST[agent as Agent]!] : []), 'localhost', ...own])]
+  return [...new Set([...reg, 'github.com', 'api.github.com', ...(MODEL_HOST[agent as Agent] ?? []), 'localhost', ...own])]
 }
 // a command the agent's sandbox stopped (the view's boxed: its card offers a restart without it, tabUnbox): claude's
 // PostToolUseFailure whose error says so (macOS's "Operation not permitted", Linux's read-only mounts, the network

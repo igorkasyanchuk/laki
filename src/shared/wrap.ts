@@ -31,6 +31,8 @@ export const AGENT_WRITES: Record<Agent, string[]> = {
 // what no wrapped agent reads: keys and tokens, the Keychains, every other agent's config
 export const SECRET_HOME = ['.ssh', '.aws', '.gnupg', '.config/gh', 'Library/Keychains']
 
+// a wrapped profile's network (its net): all, or its listed hosts through Laki's proxy
+export const WRAP_NET: ('all' | 'list')[] = ['all', 'list']
 export type WrapIn = {
   agent: Agent
   worktree: string
@@ -41,12 +43,13 @@ export type WrapIn = {
   data?: string // Laki's data folder: no file in it read, nor its folders listed (its secrets, ones made later too), but
   // walked through (a stat, a realpath of its worktree in it), so file-read-data only: file-read* breaks the path to them
   allowRead?: string[] // read back out of it, never written: its hook and plugin files, pasted pictures (what it writes too)
-  net?: 'all' | 'list' | 'off' // not applied: the network stays as it is in this step
+  net?: 'all' | 'list' | 'off' // list: no network but this Mac's (the daemon, Laki's proxy: daemon/netProxy.ts, its HTTPS_PROXY); all, unset: as it is
 }
 // SBPL's last matching rule wins, of rules for the same operation (one for file-read-data wins over file-read*'s, as
 // macOS 26 runs it): everything allowed, then writes denied but where it works, then the data folder's files, then what
 // it works in and reads of it back, then reads denied of secrets (each a -D parameter: subpath for a folder, literal for
-// a file name: .claude.json); a worktree that holds ~/.ssh still can't read it
+// a file name: .claude.json); a worktree that holds ~/.ssh still can't read it. net list: every connection out denied
+// (a unix socket's too: DNS, ssh-agent) but to this Mac's loopback, so a host is reached through Laki's proxy or not at all
 export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
   const params: string[] = []
   const ref = (path: string, kind: 'subpath' | 'literal' = 'subpath') => {
@@ -71,6 +74,7 @@ export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
     ...(back.length ? [`(allow file-read-data\n  ${back.join('\n  ')})`] : []), // never one with none: that allows every read
     `(deny file-read*\n  ${reads.join('\n  ')})`,
     ...(data ? [`(deny file-read-data\n  ${reads.join('\n  ')})`] : []), // file-read* never wins over a file-read-data rule, before it or after
+    ...(o.net === 'list' ? ['(deny network-outbound)', '(allow network-outbound (remote ip "localhost:*"))'] : []),
     '',
   ].join('\n')
   return { text, params }

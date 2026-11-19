@@ -152,9 +152,12 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
 - The macOS wrapper sandbox (a profile's *Wrapper sandbox*) runs an agent that has no sandbox of its own, or has it
   off, under Apple's `sandbox-exec`: it writes only in its worktree, the git folder its commits write, temp folders, its
   storage folder and its own settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/gh`, your keychains,
-  other agents' settings or Laki's secret files. Every path goes in as a parameter, never into the profile's text. It
-  doesn't limit the network yet, and Apple marks `sandbox-exec` deprecated: a later macOS may drop it, and then the tab
-  doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone.
+  other agents' settings or Laki's secret files. Every path goes in as a parameter, never into the profile's text. Its
+  *Network* on *Listed hosts* denies every connection but this Mac's, and its `HTTPS_PROXY` is a proxy in the daemon
+  (127.0.0.1, a password per tab) that lets it reach only that list (the project's registries, GitHub, its model, what
+  you allowed: only you can allow a host); a program that ignores the proxy variables reaches nothing, and the proxy's
+  URL is in the agent's environment, readable by another program of yours. Apple marks `sandbox-exec` deprecated: a
+  later macOS may drop it, and then the tab doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone.
 
 - An agent's sandbox network (a profile's *Network*) is the agent's own: Claude Code's *Listed hosts* is its
   `sandbox.network.allowedDomains`, which pre-allows those hosts and still asks about others (a Yes there lets one

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { connect } from 'node:net'
 import { basename, dirname, join } from 'node:path'
 import { type TestContext, test } from 'node:test'
 import { sandboxStop } from '../src/shared/types.ts'
@@ -497,6 +498,37 @@ test('wrapper sandbox: a wrapped gemini starts through sandbox-exec; a missing o
   const tab = (await until(() => rig.tab(ws.id))).id
   await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { wrap: false }, from: { ws: ws.id, tab } }), /an agent can't change a profile's wrapper sandbox/)
   assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'gem-box').wrap, 'macos')
+})
+
+// its network on a list: sandbox-exec's profile denies all but this Mac, the agent's HTTPS_PROXY is Laki's proxy for its
+// tab, a host off the list gets the card (Allow this domain in this project), allowed at once once you do
+test("wrapper sandbox's network: listed hosts through Laki's proxy, another refused with a card, allowed by you only", { skip: process.platform !== 'darwin' }, async t => {
+  const rig = await fresh(t)
+  const args = join(rig.home, 'sandbox-exec.args')
+  writeFileSync(join(rig.home, 'bin', 'sandbox-exec'), `#!/bin/sh\nprintf '%s\\0' "$@" > '${args}'\nwhile [ $# -gt 0 ]; do case "$1" in -p|-D|-f) shift 2;; *) break;; esac; done\nexec "$@"\n`, { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true, net: 'off' } }), /net: all, list/)
+  await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true, net: 'list' } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini, through the wrapper')
+  const tab = run.tab as string
+  assert.match(run.proxy ?? '', new RegExp(`^http://${tab}:[0-9a-f]{36}@127\\.0\\.0\\.1:\\d+$`), 'its own proxy URL')
+  assert.match(readFileSync(args, 'utf8').split('\0')[1], /\(deny network-outbound\)/)
+  const u = new URL(run.proxy)
+  const connectTo = (host: string) =>
+    new Promise<string>((ok, fail) => {
+      const s = connect(Number(u.port), '127.0.0.1', () => s.write(`CONNECT ${host}:443 HTTP/1.1\r\nProxy-Authorization: Basic ${Buffer.from(`${u.username}:${u.password}`).toString('base64')}\r\n\r\n`))
+      s.once('data', d => (s.destroy(), ok(String(d).split('\r\n')[0])))
+      s.on('error', fail)
+    })
+  await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === tab)?.status === 'idle', 'its turn done') // a card shows on a tab that waits or is done
+  assert.match(await connectTo('evil.example'), / 403 /)
+  const boxed = await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === tab)?.boxed, 'its card')
+  assert.deepEqual([boxed.host, boxed.wrap], ['evil.example', true])
+  // Allow this domain in this project: yours, never its agent's; then at once (502: let through, and no such host)
+  await assert.rejects(rig.rpc('projectNetAllow', { project: p.id, host: 'evil.example', from: { ws: ws.id, tab } }), /an agent can't/)
+  await rig.rpc('projectNetAllow', { project: p.id, host: 'evil.example' })
+  assert.match(await connectTo('evil.example'), / 502 /)
 })
 
 test('wrapper sandbox: no sandbox-exec on this Mac: the tab does not start, and says why', { skip: process.platform !== 'darwin' }, async t => {
