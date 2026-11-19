@@ -64,6 +64,12 @@ async function firstRun(): Promise<{ steps: Step[]; shots: string }> {
       execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'bin/laki.js', 'stop'], { cwd: root, env: fenv, stdio: 'ignore', timeout: 10_000 })
     } catch {}
     await gone(pid)
+    // the app started it: it refuses this script's stop (its caller check knows only the app), so its own temp daemon
+    // is ended by its pid, or every run leaves one
+    try {
+      if (pid) process.kill(pid, 'SIGTERM')
+    } catch {}
+    await gone(pid)
     rmSync(at, { recursive: true, force: true })
     await new Promise(r => setTimeout(r, 1000)) // a fake its daemon started (an agent's version asked) may still write its HOME
     rmSync(at, { recursive: true, force: true })
