@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.58.0 · Nov 20, 2026
 
 - Extensions can sit in the sidebar foot's ⋯ menu, with Video, Meme and Timer (place `more`, or *Show in › ⋯ menu*): an item that runs an action, opens its full view or a link.
 - A tab's context line runs along its straight bottom edge as a faint track, filled as far as the chat's context is: no stray mark under a round tab.
