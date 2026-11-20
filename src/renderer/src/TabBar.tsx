@@ -73,6 +73,35 @@ export function layoutOf(app: AppBase) {
 }
 
 // the tabs: a tab per group of panes (its split's sessions), a drag moves them (Panes.tsx useTabDrag)
+// a tab's tooltip, a card (ui.tsx tipCard): its name the title, a "Label: value" row for each fact, the hints its foot.
+// A split's tabs: a head each, its rows under it
+type TabTipOf = { ctxOn: boolean; costsOn: boolean; key?: string; account: (t: TabView) => string | undefined }
+export function tabTip(ts: TabView[], o: TabTipOf) {
+  const rows = (t: TabView) =>
+    [
+      t.compacting && 'Now: compacting its chat (a long one takes a few seconds)',
+      retrying(t) && `Now: ${retryText(t.retry!)}`,
+      t.asleep && `Now: ${t.queued ? 'waits its turn after a restart, a look starts it' : 'asleep to free memory, a look resumes it'}`,
+      t.kind === 'agent' && t.status === 'exited' && 'Now: ended, ⏎ in it starts it again',
+      (t.model || t.effort) && `Model: ${[t.model, t.effort].filter(Boolean).join(', ')}`,
+      t.account && t.account !== HOME_ACCOUNT && `Account: ${o.account(t) ?? 'another account'}`,
+      o.ctxOn && t.context && `Context: ${ctxText(t.context)}`,
+      o.costsOn && t.usage && `Used: ${usageText(t.usage)} at API prices`,
+      t.progress && `Progress: ${t.progress.pct}% done, its own estimate${t.progress.note ? ` (${t.progress.note})` : ''}`,
+      t.usual && t.runAt && `Time: ${usualText((Date.now() - t.runAt) / 1000, t.usual)}`,
+      t.queue?.length && `Queued: ${t.queue.length}, sent as its turn ends`,
+      t.runs && `Runs: ${t.runs} in it (its status read off the screen)`,
+      t.alias && `Alias: @${t.alias}, how other agents reach it (laki ask, laki send)`,
+      t.share && `Shared: a live view${t.share.until ? `, ${timeLeft(t.share.until)} left` : ''} (right click: its link, stop)`,
+    ].filter((x): x is string => typeof x === 'string')
+  const one = ts.length === 1
+  return [
+    ts.map(t => t.name).join(' · '),
+    ...(one ? rows(ts[0]) : ts.flatMap(t => (r => (r.length ? [t.name, ...r] : []))(rows(t)))),
+    `${o.key ? `Go to it (${o.key}) · ` : ''}double click to rename · drag to reorder, or onto a pane to split · right click for more`,
+  ].join('\n')
+}
+
 export function TabList({ app }: { app: AppCtx }) {
   const { accountsOf, byId, call, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
@@ -138,7 +167,8 @@ export function TabList({ app }: { app: AppCtx }) {
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
             data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
-            data-tip={[...ts.filter(t => t.compacting).map(t => `${t.name} is compacting its chat: summing up a long one takes a few seconds`), ...ts.filter(retrying).map(t => `${t.name}: ${retryText(t.retry!)}`), ...ts.filter(t => t.usual && t.runAt).map(t => `${t.name}: ${usualText((Date.now() - t.runAt!) / 1000, t.usual!)}`), ...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip-card
+            data-tip={tabTip(ts, { ctxOn, costsOn, key: groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined, account: t => accountsOf(t.preset).find(a => a.id === t.account)?.name })}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <MidText text={ts.map(t => t.name).join(' · ')} />

@@ -1089,6 +1089,18 @@ export function inAim(prev: [number, number], cur: [number, number], rect: { lef
 export const TIP_WAIT = 350
 export const TIP_WARM = 1000
 export const tipDelay = (now: number, lastShown: number) => (now - lastShown < TIP_WARM ? 0 : TIP_WAIT)
+// a card tip's lines (ui.tsx tipCard): "Label: value" lines are rows ([label, value]; a label of 32 characters at most, no
+// colon); a last other line the foot (the hints), a first other one the title (a name with only its hints: both), any
+// other a section's head
+const TIP_ROW = /^([^:\n]{1,32}?): (.+)$/
+export function tipParts(text: string) {
+  const all = text.split('\n').filter(l => l.trim())
+  const row = (l: string) => TIP_ROW.test(l)
+  const foot = all.length > 1 && !row(all[all.length - 1]) ? all.pop() : undefined
+  const title = all.length > (foot ? 0 : 1) && !row(all[0]) ? all.shift() : undefined
+  const lines = all.map(l => (m => (m ? ([m[1], m[2]] as [string, string]) : l))(TIP_ROW.exec(l)))
+  return { title, lines, foot }
+}
 
 // ⌘F with text selected (Find.tsx' FindBar, Diff.tsx' DiffFind): what it starts with. One line, 1,000 characters at most,
 // trimmed; else nothing (the query stays)

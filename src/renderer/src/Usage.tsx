@@ -316,7 +316,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
     const n = srcName(x.src)
     const parts = agents.flatMap(a => (v => (v && v[by] > 0 ? [[a, v] as const] : []))(split.get(`${x.src}|${a}`))) // its agents, each its color
     return (
-      <li key={x.key} data-tip={[`${n.name} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`, ...(parts.length > 1 ? parts.map(([a, v]) => `${nameOfAgent(a)}: ${show(v)}`) : [])].join('\n')}>
+      <li key={x.key} data-tip-card data-tip={[`${n.name} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`, ...(parts.length > 1 ? parts.map(([a, v]) => `${nameOfAgent(a)}: ${show(v)}`) : [])].join('\n')}>
         <span className="usage-where-name">
           <span className="usage-where-label">{n.name}</span>
           <span className="muted">{n.kind}</span>
@@ -394,7 +394,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
                     const n = dayTotal(k)
                     const parts = shown.filter(a => m.get(a)?.[by])
                     return (
-                      <span key={k} className="usage-col" data-tip={[`${label(k)} · ${show({ tokens: [...m.values()].reduce((t, x) => t + x.tokens, 0), cost: [...m.values()].reduce((t, x) => t + x.cost, 0) })}`, ...parts.map(a => `${nameOfAgent(a)}: ${show(m.get(a)!)}`)].join('\n')}>
+                      <span key={k} className="usage-col" data-tip-card data-tip={[`${label(k)} · ${show({ tokens: [...m.values()].reduce((t, x) => t + x.tokens, 0), cost: [...m.values()].reduce((t, x) => t + x.cost, 0) })}`, ...parts.map(a => `${nameOfAgent(a)}: ${show(m.get(a)!)}`)].join('\n')}>
                         <span className="usage-stack" style={{ height: top ? `${Math.max(n ? 2 : 0, (n / top) * 100)}%` : 0 }}>
                           {parts.map(a => (
                             <i key={a} style={{ flexGrow: m.get(a)![by], background: COLOR[a] ?? 'var(--muted)' }} />

@@ -1,11 +1,11 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { Component, Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay } from './text'
+import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 
@@ -1099,10 +1099,11 @@ export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem
 
 // tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably). Warm, as
 // macOS's: within a second of one going, the next shows at once and doesn't fade in (data-warm; text.ts tipDelay). The
-// keyboard's focus (:focus-visible) shows its tip after TIP_FOCUS; any key, a press or leaving it hides it
+// keyboard's focus (:focus-visible) shows its tip after TIP_FOCUS; any key, a press or leaving it hides it. An element
+// with data-tip-card has its tip as a card (tipCard), its --tab-c color on the card's edge
 const TIP_FOCUS = 600
 export function Tips() {
-  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean; menu?: DOMRect; warm?: boolean } | null>(null)
+  const [tip, setTip] = useState<{ text: string; x: number; y: number; at: number; below: boolean; menu?: DOMRect; warm?: boolean; card?: boolean; color?: string } | null>(null)
   const box = useRef<HTMLDivElement>(null)
   // centered on the element, but kept inside the window (measured before it's painted); a menu item's beside its menu,
   // never over the items under it: on its left when there's room, else its right
@@ -1112,6 +1113,8 @@ export function Tips() {
     const w = el.offsetWidth
     const m = tip.menu
     el.style.left = `${m ? (m.left - w - 8 >= 8 ? m.left - w - 8 : Math.min(m.right + 8, window.innerWidth - w - 8)) : Math.max(8, Math.min(tip.x - w / 2, window.innerWidth - w - 8))}px`
+    // a card taller than the room under its element: above it
+    if (!m && tip.below && tip.y + el.offsetHeight > window.innerHeight - 8) (el.style.top = `${Math.max(8, tip.at - 6 - el.offsetHeight)}px`), (el.style.transform = '')
   }, [tip])
   useEffect(() => {
     let timer = 0
@@ -1132,9 +1135,10 @@ export function Tips() {
       const r = el.getBoundingClientRect()
       const menu = el.closest('.menu')?.getBoundingClientRect()
       showing = true
-      if (menu) return setTip({ text: el.dataset.tip, x: 0, y: r.top + r.height / 2, below: true, menu, warm })
+      if (menu) return setTip({ text: el.dataset.tip, x: 0, y: r.top + r.height / 2, at: r.top, below: true, menu, warm })
       const below = r.bottom + 30 < window.innerHeight
-      setTip({ text: el.dataset.tip, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below, warm })
+      const card = el.hasAttribute('data-tip-card')
+      setTip({ text: el.dataset.tip, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, at: r.top, below, warm, card, color: (card && getComputedStyle(el).getPropertyValue('--tab-c').trim()) || undefined })
     }
     const after = (el: HTMLElement, ms: number) => {
       cur = el
@@ -1178,11 +1182,41 @@ export function Tips() {
   }, [])
   if (!tip) return null
   return (
-    <div className={`tip ${tip.menu ? 'side' : ''}`} data-warm={tip.warm || undefined} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)' }}>
-      {tipText(tip.text)}
+    <div className={`tip ${tip.menu ? 'side' : ''} ${tip.card ? 'tip-card' : ''}`} data-warm={tip.warm || undefined} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)', ...(tip.color && ({ '--tip-c': tip.color } as CSSProperties)) }}>
+      {tip.card ? tipCard(tip.text) : tipText(tip.text)}
     </div>
   )
 }
+// a card tip (text.ts tipParts): its title with a dot in its color, "Label: value" rows in two columns (the label
+// muted), a section's head between them (a split's tab), the foot (the hints, muted); a context share at a value's end
+// (… · 71%) in its level's color
+export function tipCard(text: string) {
+  const { title, lines, foot } = tipParts(text)
+  return (
+    <>
+      {title && <div className="tip-title">{tipText(title)}</div>}
+      {lines.length > 0 && (
+        <div className="tip-rows">
+          {lines.map((l, i) =>
+            typeof l === 'string' ? (
+              <span key={i} className="tip-head">
+                {tipText(l)}
+              </span>
+            ) : (
+              <Fragment key={i}>
+                <span className="tip-k">{l[0]}</span>
+                <span className="tip-v">{tipValue(l[1])}</span>
+              </Fragment>
+            ),
+          )}
+        </div>
+      )}
+      {foot && <div className="tip-foot">{tipText(foot)}</div>}
+    </>
+  )
+}
+const tipValue = (v: string) =>
+  (m => (m ? <>{tipText(v.slice(0, m.index + 2))}<b className={`tip-pct ${+m[1] >= 90 ? 'high' : +m[1] >= 70 ? 'mid' : 'low'}`}>{m[1]}%</b></> : tipText(v)))(/· (\d{1,3})%$/.exec(v))
 // Settings › Keys' keys in use (App sets it as it draws), for keyTip outside App: a tooltip's keys are never hard-coded
 export const tipKeys: { map: Partial<Record<KeyId, string>> } = { map: {} }
 export const keyTip = (title: string, id: KeyId) => (tipKeys.map[id] ? `${title} (${keyShow(tipKeys.map[id]!)})` : title)

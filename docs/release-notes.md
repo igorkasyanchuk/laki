@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A tab's tooltip is a card now: its name in its color, one row per fact (model, context, what it used, queued, progress…) and the hints under a line, instead of one long line. The Usage page's chart and a workflow's runs show theirs the same way.
 - Duplicate a scheduled task: the copy button on its row or *Duplicate* in its form makes one with the same settings, off until you turn it on (`laki schedule copy`). A reminder's copy button opens a new one filled in.
 - ⌘F starts with the text you selected, in a terminal, a diff or the Reader.
 - A terminal shows its last 4 dropped or pasted pictures as chips at its top right: the picture on hover, *Open*, *Copy path*, *Reveal in Finder* (Settings › Terminal › *Recent pictures on a terminal*). A pasted screenshot is saved and its path typed in.

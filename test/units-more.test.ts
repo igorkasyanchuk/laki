@@ -20,7 +20,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, tipParts, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, aiFromOf, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -1398,4 +1398,18 @@ test("aiFromOf: a Laki AI call's from, else by the words its makers give its ask
   assert.equal(aiFromOf({ from: 'workflows', ask: 'extension x: y' }), 'workflows')
   const by = (ask: string) => aiFromOf({ ask })
   assert.deepEqual(['extension links: hi', "Compact shop's memory (4)", 'next prompt: claude', 'side chat: why', 'check review: ws', 'Ask me first', 'what are my agents doing?', 'Compact this'].map(by), ['extensions', 'memory', 'next', 'side', 'check', 'questions', 'chat', 'chat'])
+})
+
+test("tipParts: a card tip's title, Label: value rows, section heads and the foot", () => {
+  const tab = tipParts('claude\nModel: opus, high\nContext: 142K of 200K tokens · 71%\nShared: a live view (right click: its link, stop)\nGo to it (⌘2) · double click to rename')
+  assert.equal(tab.title, 'claude')
+  assert.deepEqual(tab.lines, [['Model', 'opus, high'], ['Context', '142K of 200K tokens · 71%'], ['Shared', 'a live view (right click: its link, stop)']])
+  assert.equal(tab.foot, 'Go to it (⌘2) · double click to rename')
+  // a plain shell: its name and the hints, both
+  assert.deepEqual(tipParts('shell\nGo to it (⌘3)'), { title: 'shell', lines: [], foot: 'Go to it (⌘3)' })
+  // a split: a head per tab
+  assert.deepEqual(tipParts('claude · codex\nclaude\nQueued: 2\ncodex\nNow: ended\nhints').lines, ['claude', ['Queued', '2'], 'codex', ['Now', 'ended']])
+  // rows alone: no title, no foot; a long label isn't one
+  assert.deepEqual(tipParts('a: 1\nb: 2'), { title: undefined, lines: [['a', '1'], ['b', '2']], foot: undefined })
+  assert.deepEqual(tipParts(`${'x'.repeat(40)}: y`).lines, [`${'x'.repeat(40)}: y`])
 })

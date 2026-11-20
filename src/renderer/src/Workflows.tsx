@@ -1116,7 +1116,7 @@ function Editor({ item, all = [], onOpenFlow, projects, presets, actions, exts, 
         )}
         <button className="btn" disabled={!dirty && !item.byAgent && !item.untrusted} onClick={save} data-tip={item.byAgent ? 'An agent wrote it: saving it here says you read it, and lets schedules, events and agents run it' : item.untrusted ? "From this repo: saving it here says you read it, and lets schedules, events and agents run it" : '⌘S'}>{dirty || item.byAgent || item.untrusted ? 'Save' : 'Saved'}</button>
         {runs.length > 0 && (
-          <button className="btn" onClick={() => onOpenRun(runs[0].id)} data-tip={runs.map(r => `${r.task || r.name}: ${statusWords(r)}`).join('\n')}>
+          <button className="btn" onClick={() => onOpenRun(runs[0].id)} data-tip-card data-tip={runs.map(r => `${r.task || r.name}: ${statusWords(r)}`).join('\n')}>
             <span className="wf-dot" /> {runs.length} running
           </button>
         )}

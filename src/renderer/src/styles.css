@@ -960,6 +960,23 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .swatch:first-child { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%); }
 .tip { position: fixed; z-index: var(--z-tip); pointer-events: none; margin: 6px 0; padding: var(--sp-2) var(--sp-4); color: var(--fg); border-radius: var(--r-s); font-size: var(--fs-2); width: max-content; white-space: pre-line; max-width: min(420px, calc(100vw - 16px)); overflow-wrap: anywhere; }
 .tip .ws-stat { display: inline; font: inherit; } /* a diff's +added −deleted, colored (ui.tsx tipText) */
+/* a card tip (ui.tsx tipCard, data-tip-card: a tab's, a chart's): a title with a dot, "label: value" rows in two columns,
+   a muted foot; the hovered element's color (--tab-c, else the accent) as a bar on its left edge */
+.tip.tip-card { white-space: normal; max-width: min(460px, calc(100vw - 16px)); padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-5); }
+html .tip.tip-card { background: var(--panel); } /* solid (over a look's glass too): rows over a terminal stay readable */
+.tip-card::before { content: ''; position: absolute; left: var(--sp-1); top: var(--sp-3); bottom: var(--sp-3); width: var(--sp-1); border-radius: var(--r-pill); background: var(--tip-c, var(--accent)); }
+.tip-title { display: flex; align-items: center; gap: var(--sp-2); font-weight: 600; }
+.tip-title::before { content: ''; flex: none; width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--tip-c, var(--accent)); }
+.tip-rows { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-1) var(--sp-4); }
+.tip-title + .tip-rows { margin-top: var(--sp-2); }
+.tip-k { color: var(--muted); white-space: nowrap; }
+.tip-v { min-width: 0; }
+.tip-head { grid-column: 1 / -1; font-weight: 600; }
+.tip-head:not(:first-child) { margin-top: var(--sp-2); }
+.tip-foot { margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--line); color: var(--muted); font-size: var(--fs-1); }
+.tip-pct { font-weight: 600; }
+.tip-pct.mid { color: var(--waiting); }
+.tip-pct.high { color: var(--error); }
 .status button.listen.port-main { color: var(--muted); }
 .menu-head { padding: var(--sp-2) var(--sp-4) var(--sp-1); font-size: var(--fs-1); text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
 .drop-overlay { position: fixed; inset: 8px; z-index: calc(var(--z-pop) + 10); pointer-events: none; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--accent); border-radius: var(--r-l); background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--fg); font-size: var(--fs-4); }
