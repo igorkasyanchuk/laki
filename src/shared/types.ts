@@ -637,6 +637,7 @@ export type Settings = {
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   presets?: Preset[] | null // null: the defaults
   hideSecrets?: boolean // Hide secret-looking variables from agents (shared/env.ts envSplit over the daemon's own environment, agent tabs only): a new install's on; one from before off, asked once (hideSecretsAsked). Never an agent's or a phone's
+  updateDot?: boolean // A9: a dot on the rail's Settings while a newer agent CLI is out (the view's agentUpdates; unset: off)
   hideSecretsAsked?: boolean // the one-time notice for an install from before was answered
   voiceNote?: string // Q5b: the note "Note: …" said first goes to (the one named Voice, made on first use); main keeps it
   secretHint?: boolean // a prompt box's warning as a secret is pasted in (renderer's secretHint.tsx: shared/secrets.ts secretsIn, in the window), on unless false. Never an agent's

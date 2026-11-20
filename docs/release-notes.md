@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The dot on the rail's Settings when a newer agent CLI is out is off now: Settings › Agents & profiles › Versions › *A dot on Settings when an agent update is out* turns it on (its tooltip says so either way). [Try it](laki://settings/presets?spot=A%20dot%20on%20Settings%20when%20an%20agent%20update%20is%20out)
 - Extensions can run in the background: *Show in › Nowhere* (`"place": "none"`) shows one nowhere, and what it prints can be a notification (`notify`) or a card on your screen over every app (`alert`), beside toasts and dialogs. `laki widget new --kind background` starts one.
 - Settings › Extensions › UI kit › *What it can do*: everything an extension can do (show where you work, run in the background, notify, dialogs, a card on your screen, control Laki, answer events, tools for agents, gates), each with what to write and *Try it*. [Try it](laki://uikit/can)
 - Usage (⌘K): each day's bar is stacked by agent, Laki AI among them, and *Where it went* shows what used the tokens: each workspace and Laki AI's chats, extensions, workflows, memory compaction and Done check reviews. Its table's figures line up again.

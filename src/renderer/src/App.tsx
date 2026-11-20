@@ -3747,7 +3747,7 @@ export function App() {
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
       {aiOn(settings) && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
-      {railButton('settings', 'gear', 'Settings', settingsOf(dialog), `${kt('Settings', 'settings')}${view?.agentUpdates?.length ? ` · an update is out: ${view.agentUpdates.join(', ')} (Agents & profiles)` : ''}`, toSettings, view?.agentUpdates?.length ? <span className="rail-dot" /> : undefined)}
+      {railButton('settings', 'gear', 'Settings', settingsOf(dialog), `${kt('Settings', 'settings')}${view?.agentUpdates?.length ? ` · an update is out: ${view.agentUpdates.join(', ')} (Agents & profiles)` : ''}`, toSettings, settings.updateDot === true && view?.agentUpdates?.length ? <span className="rail-dot" /> : undefined)}
     </nav>
   )
   // the status bar, full width (Zed's way): one bar under the sidebar and the main area, over every page too, the

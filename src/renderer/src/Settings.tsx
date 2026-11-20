@@ -176,6 +176,7 @@ export type AppSettings = Paint & {
   usageNote?: boolean // R4: Resources' one-time note
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   hideSecrets?: boolean // shared/types.ts Settings': secret-looking variables kept from agents
+  updateDot?: boolean // A9: a dot on the rail's Settings while a newer agent CLI is out (unset: off; its tooltip says so either way)
   hideSecretsAsked?: boolean
   secretHint?: boolean
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
@@ -3066,6 +3067,9 @@ export function SettingsPage(p: {
               </p>
               {p.versions && <Group title="Versions" hint="Each agent's CLI on this Mac: its version and the newest out. Update runs its own update (npm, Homebrew or its installer) in a terminal tab you can watch; tabs already running keep their version until restarted">
                 <AgentVersions openTab={p.openTab} />
+                <Switch className="switch-row" on={s.updateDot === true} onChange={on => set({ updateDot: on })}>
+                  <Says title="A dot on Settings when an agent update is out" hint="The rail's Settings gets a dot while a newer version of an installed agent's CLI is out; off, its tooltip still says so" />
+                </Switch>
               </Group>}
               <Switch className="switch-row" on={!!s.hideSecrets} onChange={on => set({ hideSecrets: on, hideSecretsAsked: true })}>
                 <Says title="Hide secret-looking variables from agents" hint="Names like …_TOKEN, …_SECRET, …_KEY from where Laki was started stay out of agents' environment; their own sign-in key and what you set here, in a project or a profile still go through" />

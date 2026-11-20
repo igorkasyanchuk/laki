@@ -2536,7 +2536,8 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   its version, the newest out and how it was installed (npm, Homebrew or its own installer). *Update* runs its own
   update in a terminal tab you can watch (*Show*), and the row says how it went; a failed one shows its exit code and
   *Retry*. Tick several for *Update selected*. Tabs already running keep their version until restarted. When an update
-  is out, Settings on the rail has a dot.
+  is out, Settings on the rail says so in its tooltip, and has a dot with *A dot on Settings when an agent update is
+  out* on (off by default).
 - *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
   profile is how it starts, grouped under its agent: a model and an effort, and for Claude Code and Codex a
   permission mode, *Fast mode* and *Sandbox* (a workspace that picks its own wins), an account (Claude Code and Codex), flags

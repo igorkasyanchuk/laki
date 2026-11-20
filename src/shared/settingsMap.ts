@@ -159,6 +159,7 @@ export const FIND: [string, string, string?][] = [
   ['presets', 'Network', "sandbox network hosts domains allow list allowedDomains registry offline internet"],
   ['presets', 'Wrapper sandbox (macOS)', 'sandbox-exec wrap seatbelt opencode gemini grok keys ssh aws keychain write read deny'],
   ['presets', 'Warn about a pasted secret', 'paste token key password prompt box warn pass as a secret file mask leak'],
+  ['presets', 'A dot on Settings when an agent update is out', 'agent cli version update newer out dot badge rail settings claude codex npm'],
   ['presets', 'Hide secret-looking variables from agents', 'env environment variables token secret api key password npm github aws hide keep pass let through'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],

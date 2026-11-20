@@ -36,7 +36,7 @@ the package and `npm install -g <pkg>@latest`…), Homebrew's `Cellar` or `Caskr
 else its installer (`claude update`, `opencode upgrade`, `cursor-agent update`; none known: no Update). The newest:
 npm's registry (`<pkg>/latest`, its package or the CLI's known one), kept 6 hours (`fresh` looks now; offline keeps the
 last); `LAKI_NPM_REGISTRY` is tests' fake, and the rig without it asks nothing. `outdated` (a CLI with a newer version
-out, not updating) is the view's `agentUpdates`: the rail's Settings has a dot and says which. `agentVersionsTick`
+out, not updating) is the view's `agentUpdates`: the rail's Settings says which in its tooltip, and has a dot with `settings.updateDot` (off unless set: Agents & profiles › Versions). `agentVersionsTick`
 (6 h, and a minute after start). `agentUpdate` runs the command as a `script` tab (it stays when it ends, with its exit
 code: a shell's would close) named `update <name>` in the Terminals workspace `update agents` (made once); one at a time
 per CLI. The row says running, done (and, with tabs of it running, that they keep their version until restarted) or
