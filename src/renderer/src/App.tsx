@@ -13,7 +13,7 @@ import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
-import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
+import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
 import { isCursor, notInstalled, tabAgent } from '../../shared/install'
@@ -3147,6 +3147,15 @@ export function App() {
           ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: `Approves it on ${F} as you, after you confirm`, run: () => prAct(w, 'approve') } as MenuItem]),
           { label: w.pr.draft ? 'Ready for review' : 'Convert to draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? `Out of draft on ${F}: reviewers are asked` : `Back to a draft on ${F}: it went ready too early`, run: () => prDraft(w) } as MenuItem,
           ...(allows(w, 'close') ? [{ label: `Close ${K}…`, icon: 'x', danger: true, tip: `Closes it on ${F} without merging, after you confirm`, run: () => prAct(w, 'close') } as MenuItem] : []),
+        ]
+      : []),
+    // the PR switches (Info's AutoChip, the status bar's Auto n/3): what goes to the agent on its own, for a PR on this
+    // workspace's own branch (a linked one's agent can't push to it)
+    ...(w.pr?.state === 'OPEN' && w.pr.forge !== 'gitlab' && !w.prLinked
+      ? [
+          null,
+          { head: 'Laki does on its own' } as MenuItem,
+          ...(['autoFix', 'autoReview', 'autoMerge', ...(allows(w, 'land') ? ['autoLand' as const] : [])] as const).map(k => ({ label: AUTO_LABEL[k], icon: k === 'autoLand' ? 'gitMerge' : 'agent', hint: w[k] ? ON : undefined, tip: AUTO_SAYS[k], run: () => void setAuto(w, k, !w[k]) }) as MenuItem),
         ]
       : []),
     ...(w.pr?.state === 'MERGED' && allows(w, 'revert') && hasCap(view, 'pr.revert') ? [null, { label: `Revert ${K}…`, icon: 'undo', key: 'v', tip: `A new ${K} on ${F} that undoes this one, after you confirm`, run: () => prAct(w, 'revert') } as MenuItem] : []),

@@ -101,7 +101,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›
   Achievements). An install from before keeps everything it had.
 - **PRs**: the workspace's PR and its CI in the status bar; the *Auto n/3* chip opens the switches that send failing CI, new review
-  comments or merge conflicts to the agent on their own; the side panel's *Info* (⌘I) with the PR and its checks;
+  comments or merge conflicts to the agent on their own, and so does the ⋯ beside the PR (its menu, also the right click
+  and the workspace's ⋯ › *PR #n*: *Laki does on its own*, a check by each one on, for a PR on the workspace's own
+  branch); the side panel's *Info* (⌘I) with the PR and its checks;
   a workspace archived once its PR merges (off by default).
 - **Side panel** (⌥⌘B): the workspace's info (⌘I), its files (search, preview, several open as tabs, new file or folder, changed files marked),
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks

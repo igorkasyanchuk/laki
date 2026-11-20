@@ -219,7 +219,8 @@ export function PrCard({ pr, linked, face = true, onOpen }: { pr: PRInfo; linked
 }
 
 // U3: the status bar's switches as one chip, Auto n/3: a click opens them over it, each with what it does, for this PR
-const AUTO_SAYS: Record<AutoKey, string> = { autoFix: 'Failing CI goes to the agent, with the logs', autoReview: 'New review comments go to the agent', autoMerge: 'Conflicts with the base: the agent merges it in', autoLand: 'Laki merges it once every check passes' }
+export const AUTO_LABEL: Record<AutoKey, string> = { autoFix: 'Fix failing CI', autoReview: 'Address new review comments', autoMerge: 'Fix merge conflicts', autoLand: 'Merge when green' } // the PR menu's (App's prMenu)
+export const AUTO_SAYS: Record<AutoKey, string> = { autoFix: 'Failing CI goes to the agent, with the logs', autoReview: 'New review comments go to the agent', autoMerge: 'Conflicts with the base: the agent merges it in', autoLand: 'Laki merges it once every check passes' }
 function AutoChip({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null)
   useEffect(() => {
@@ -267,7 +268,7 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
       {card && (
         <div className="ws-peek pr-peek" style={{ left: card.left, bottom: card.bottom }} onPointerEnter={() => clearTimeout(timer.current)} onPointerLeave={() => rest()}>
           <PrCard pr={pr} linked={w.prLinked} face={face} onOpen={onOpen} />
-          {onMenu && <div className="wp-line">Right click: refresh, merge, detach…</div>}
+          {onMenu && <div className="wp-line">⋯ or right click: refresh, merge, what Laki does on its own…</div>}
         </div>
       )}
       {pr.state === 'OPEN' && (
@@ -282,6 +283,11 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
           )}
           {pr.forge !== 'gitlab' && <AutoChip w={w} onToggle={onToggle} />}
         </>
+      )}
+      {onMenu && (
+        <button type="button" className="pr pr-more" aria-haspopup="menu" aria-label={`${prName(pr)}: more`} data-tip={`${prName(pr)}: refresh, merge, what Laki does on its own…`} onClick={onMenu}>
+          <Icon name="more" size={12} />
+        </button>
       )}
     </span>
   )

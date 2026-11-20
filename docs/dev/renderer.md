@@ -1063,7 +1063,8 @@ per `ACH_QUIET` (10 min), the rest count on the trophy (`+n`) until its page ope
 `upsOf` do nothing.
 
 The status bar (U3), left to right: the context meter, the branch, the codespace, the workflow run, the PR (number,
-checks, conflicts, Info.tsx `AutoChip`: *Auto n/3*, a click opens the switches with a line each), Artifacts; after the
+checks, conflicts, Info.tsx `AutoChip`: *Auto n/3*, a click opens the switches with a line each; `.pr-more`, its ⋯: App's
+`prMenu`, which has the switches too, `AUTO_LABEL` with `ON` when on, for an open GitHub PR that isn't linked), Artifacts; after the
 spacer the ports and the plan's limits (`UsageButton`), then Recording, remote access, the update, widgets, the trophy.
 
 The Board's columns (U5): nextStep.ts `boardCol`, from `nextStep` and `needsTab` (the sidebar's Needs you rule, App's
