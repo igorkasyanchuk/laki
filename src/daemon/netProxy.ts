@@ -44,7 +44,7 @@ function onConnect(req: IncomingMessage, sock: Socket, head: Buffer) {
   const at = /^(\[[0-9a-f:.]+\]|[^:[\]\s]+):(\d{1,5})$/i.exec(req.url ?? '')
   if (!at) return no(sock, 400, 'Bad Request')
   // a port net.connect takes (0 or past 65535 throws in this listener: the agent never answered, the daemon's trouble)
-  // ponytail: any port of a listed host: a list is hosts only (claude's allowedDomains, NET_HOST), host:port if one matters
+  // ponytail: every port of a listed host: a list is hosts only (claude's allowedDomains, NET_HOST), host:port if one matters
   const port = Number(at[2])
   if (!(port >= 1 && port <= 65535)) return no(sock, 400, 'Bad Request')
   const host = at[1].replace(/^\[|\]$/g, '')

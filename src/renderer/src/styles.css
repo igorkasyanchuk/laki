@@ -1799,6 +1799,13 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .fr-viewed { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4) var(--sp-4) var(--sp-2); font-family: var(--mono); font-size: var(--fs-1); }
 .fr-viewed .link { font-family: var(--ui-font, inherit); white-space: nowrap; }
 .fr-viewed.all { color: var(--done); }
+.fr-next { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: var(--fs-2); } /* FullReview's Next: every file viewed */
+.fr-next > .icon-svg { flex: none; color: var(--done); }
+.fr-next .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-next kbd { margin-left: var(--sp-3); opacity: 0.8; }
+.fr-viewed .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-shape button { display: inline-grid; place-items: center; height: var(--h-s); padding: 0 var(--sp-2); color: var(--muted); } /* the files column's List | Tree */
+.fr-shape button.on { color: var(--fg); }
 .fr-files .sp-row.fr-done .sp-name { opacity: 0.55; }
 .fr-files .sp-row > svg { color: var(--accent-ink); }
 .fr-diff { overflow: auto; padding-bottom: 40px; }

@@ -2,7 +2,7 @@
 // to you, a closed PR, conflicts, CI, a review, the radar, merge, look, ship; busy while an agent or CI works.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { nextStep, boardCol, needsTab, overUsual, usual, usualText, waitsElsewhere } from '../src/shared/nextStep.ts'
+import { nextStep, boardCol, needsTab, overUsual, reviewQueue, usual, usualText, waitsElsewhere } from '../src/shared/nextStep.ts'
 import type { TabView, WorkspaceView } from '../src/shared/types.ts'
 
 const ws = (o: object = {}) => ({ id: 'w', kind: 'worktree', ...o }) as unknown as WorkspaceView
@@ -95,4 +95,19 @@ test('waitsElsewhere: the edge glow, for an ask waiting in a tab that is not the
   assert.equal(waitsElsewhere(v({ workspaces: [ws({ id: 'b', project: 'p', muted: true })] }), 't1', true), false, 'muted')
   assert.equal(waitsElsewhere(v({ workspaces: [ws({ id: 'b', project: 'p', archived: true })] }), 't1', true), false, 'archived')
   assert.equal(waitsElsewhere(v({ tabs: [tab({ id: 't2', workspace: 'b', status: 'running' })] }), 't1', true), false, 'none waits')
+})
+
+test("reviewQueue: the other workspaces to review, a green PR first, then the oldest change; none archived, hidden or busy", () => {
+  const stat = { add: 1, del: 0, files: 2, dirty: 0 }
+  const w = (id: string, o: object = {}) => ({ id, kind: 'worktree', project: 'p', created: 100, stat, ...o }) as unknown as WorkspaceView
+  const done = (ws: string, needAt: number) => tab({ id: `t-${ws}`, workspace: ws, done: true, needAt })
+  const v = {
+    projects: [{ id: 'p' }, { id: 'q', private: true }, { id: 'f', git: false }],
+    settings: { recording: true },
+    workspaces: [w('cur'), w('old'), w('new'), w('green', { pr: pr() }), w('red', { pr: pr({ checks: 'fail' }) }), w('waits', { created: 7, pr: pr({ review: 'REVIEW_REQUIRED', checks: undefined }) }), w('ci', { pr: pr({ checks: 'pending' }) }), w('draft', { pr: pr({ draft: true }) }), w('gone', { archived: true }), w('hid', { private: true }), w('hidp', { project: 'q' }), w('folder', { project: 'f' }), w('busy')],
+    tabs: [done('cur', 1), done('old', 5), done('new', 9), done('gone', 1), done('hid', 1), done('hidp', 1), done('folder', 1), tab({ id: 't-busy', workspace: 'busy', status: 'running' })],
+  } as any
+  assert.deepEqual(reviewQueue(v, 'cur').map(x => x.id), ['green', 'old', 'waits', 'new']) // waits: no finish, by when it was made
+  // Recording mode off: the private ones are back
+  assert.deepEqual(reviewQueue({ ...v, settings: {} }, 'cur').map(x => x.id).sort(), ['green', 'hid', 'hidp', 'new', 'old', 'waits'])
 })

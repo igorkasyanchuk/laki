@@ -45,6 +45,7 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     // F5: the Preview's Pick, with the focus in it (its page's own press comes from main: force)
     previewPick: (force === 'previewPick' || !!document.activeElement?.closest('.web-tools, .web-body')) && (() => window.dispatchEvent(new CustomEvent('laki-preview-pick'))),
     diffSplit: !!document.querySelector('.sp-diff') && (() => window.dispatchEvent(new CustomEvent('laki-diff-split'))), // T18: a diff on screen
+    reviewNext: !field && !dialog && !!document.querySelector('.fr-next[data-go]') && (() => window.dispatchEvent(new CustomEvent('laki-review-next'))), // FullReview's Next bar, no comments waiting (⌘⏎ sends those)
     askFirst: !!document.querySelector('.new-ws') && (() => window.dispatchEvent(new CustomEvent('laki-ask-first'))), // the New workspace page's Ask me first
     layout: !dialog && (() => (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())), // its menu at ⋯, where it's a submenu
   }

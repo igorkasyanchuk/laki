@@ -38,7 +38,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
-import { badgeOf, needsTab, nextStep, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
+import { badgeOf, needsTab, nextStep, reviewQueue, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, hhmm, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
@@ -2476,6 +2476,8 @@ export function App() {
   const [reviewTight, setReviewTight] = useState(false) // U6: FullReview's diff had under 480px: the side panel is away until you leave the tab
   useEffect(() => void (reviewOn || setReviewTight(false)), [reviewOn])
   const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
+  // the Review tab's Next (shared/nextStep.ts reviewQueue): another workspace's Review tab, from its bar (⌘⏎) or ⌘K
+  const reviewGo = (w: WorkspaceView) => (setDialog(null), setReviewing(m => ({ ...m, [w.id]: true })), setWsId(w.id))
   useEffect(() => void (reviewOn && ws && setReviewSeen(m => (m[ws.id] === statKey ? m : { ...m, [ws.id]: statKey }))), [reviewOn, ws?.id, statKey])
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
   useEffect(() => {
@@ -3984,7 +3986,7 @@ export function App() {
     inViewer, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutsOn, layoutWait,
     listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
-    openInItems, openMenu, wsTabMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
+    openInItems, openMenu, wsTabMenu, openPort, openProject, openReview, reviewGo, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
     pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail,
     railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
@@ -4217,7 +4219,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} onGuest={g => (g ? guests.current.set(id, g) : guests.current.delete(id))} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
-            {reviewOn && ws && <Suspense fallback={null}><FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} /></Suspense>}
+            {reviewOn && ws && <Suspense fallback={null}><FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} next={(q => q[0] && { name: wsName(q[0]), files: q[0].stat?.files ?? 0, pr: q[0].pr?.state === 'OPEN' ? `${prNo(q[0].pr)} ${q[0].pr.checks === 'pass' ? 'checks pass' : q[0].pr.checks === 'fail' ? 'checks fail' : 'in review'}` : 'no PR', more: q.length - 1, key: kh('reviewNext'), go: () => reviewGo(q[0]) })(reviewQueue(view, ws.id))} /></Suspense>}
           </div>
           {tabsAt === 'right' && <TabStrip app={app} />}
           {previewed && ws && (

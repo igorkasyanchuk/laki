@@ -10,6 +10,7 @@ import { type Action, wsName } from './appCtx'
 import { aiOn, HOME_ACCOUNT, AGENT_NAMES, type View } from '../../shared/types'
 const LAB_PAGES = [['calendar', 'Calendar', 'calendar'], ['desk', 'My Desk', 'desk'], ['notes', 'Notes', 'note'], ['todoList', 'To-dos', 'listChecks'], ['specs', 'Specs & Brainstorms', 'spec'], ['workflows', 'Workflows', 'flow']] as const
 import { cmdMap, keyShow } from '../../shared/keys'
+import { reviewQueue } from '../../shared/nextStep'
 import { hasCap } from '../../shared/caps'
 import { LAYOUT_PRESETS } from '../../shared/layout'
 import { quietChoices } from '../../shared/tray'
@@ -194,7 +195,7 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
 
 // ⌘K's items: for the workspace you're in first, then every workspace, tab and action
 export function paletteItems(app: AppCtx): PaletteItem[] {
-  const { accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editLayout, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
+  const { reviewGo, accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editLayout, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
   const items: PaletteItem[] = []
   const cmds = cmdMap(settings.cmdKeys)
   const a = (x: Action & { id?: string; on?: string }) => items.push({ ...x, hint: (x.id && cmds[x.id] && keyShow(cmds[x.id])) || (x.hint ?? 'action') }) // id: a key can be given it (Settings › Keys)
@@ -218,6 +219,9 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
     if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, acts: { changes: () => (selectTab(t.id), showPanel('changes')), ship: () => (selectTab(t.id), setDialog('ship')) }, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
   }
+  // the Review tab's Next (shared/nextStep.ts reviewQueue): the next workspace to review, its Review tab open
+  const rq = settings.fullReview !== false ? reviewQueue(view!, ws?.id) : []
+  if (rq[0]) a({ label: `Review next: ${wsName(rq[0])}${rq.length > 1 ? ` (${rq.length - 1} more)` : ''}`, icon: 'review', hint: kh('reviewNext'), run: () => reviewGo(rq[0]) })
   if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
   for (const w of order) items.push({ kind: 'ws', ws: w.id, acts: { changes: () => (setWsId(w.id), showPanel('changes')), ship: () => (setWsId(w.id), setDialog('ship')) }, more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })
   for (const t of view?.tabs ?? []) {

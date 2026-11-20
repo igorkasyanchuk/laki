@@ -38,6 +38,7 @@ export const KEYS = [
   { id: 'allowAll', label: 'Allow all in Needs you (a card focused; it asks first)', key: '⇧A' },
   { id: 'previewPick', label: 'Pick an element in the Preview (it has the focus): to the agent', key: '⌥⌘P' }, // F5
   { id: 'diffSplit', label: 'Diffs: one column or two (Review, Changes)', key: '⇧⌘D' }, // T18: Diff.tsx useSplit
+  { id: 'reviewNext', label: 'Review next (the Review tab, every file viewed)', key: '⌘Enter' }, // FullReview's Next bar; with comments to send, ⌘⏎ sends them
   { id: 'askFirst', label: "Ask me first: Laki AI's questions on a new workspace's task", key: '⌥Enter' }, // panels.tsx NewWorkspace
 ] as const
 export type KeyId = (typeof KEYS)[number]['id']

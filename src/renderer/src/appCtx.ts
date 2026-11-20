@@ -244,6 +244,7 @@ export type AppBase = {
   openPort: (port: number) => void | Window | null
   openProject: () => Promise<void>
   openReview: () => void | null
+  reviewGo: (w: WorkspaceView) => void // another workspace's Review tab (its Next bar, ⌘K's Review next)
   order: WorkspaceView[]
   overlapsAt: { w: string; list?: Collision[] | undefined; err?: string | undefined } | null
   own: number

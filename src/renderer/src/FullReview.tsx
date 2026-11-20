@@ -78,7 +78,9 @@ type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key
 
 // U2: the review's keys, as its Keys popover lists them (the handler: onKey)
 const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent']]
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void }) {
+// next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
+type Next = { name: string; files: number; pr: string; more: number; key?: string; go: () => void }
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight, next }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: Next }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -106,16 +108,17 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       keepFor(PINS, ws, next.length ? next : undefined)
       return next
     })
+  // the files column by folder (text.ts fileTree; the pinned ones first, as they are), the last one picked (laki.diffTree,
+  // Changes' too; unset: a tree here). In a tree the diffs and j/k go in its order, folders' files together
+  const [tree, setTree] = useState(() => localStore('laki.diffTree') !== 'list')
+  const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
   const listed = useMemo(() => {
     const ls = files.filter(f => matches(f.path))
     const at = (p: string) => pins.indexOf(p)
-    return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...ls.filter(f => at(f.path) < 0)]
-  }, [files, matches, pins])
+    const rest = ls.filter(f => at(f.path) < 0)
+    return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...(tree ? fileTree(rest).flatMap(r => ('file' in r ? [r.file] : [])) : rest)]
+  }, [files, matches, pins, tree])
   const lastPin = listed.filter(f => pins.includes(f.path)).at(-1)?.path
-  // the files column by folder (text.ts fileTree; the pinned ones first, as they are), the last one picked (laki.diffTree,
-  // Changes' too)
-  const [tree, setTree] = useState(() => localStore('laki.diffTree') === 'tree')
-  const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
   const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
 
@@ -423,6 +426,13 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
+  const goNext = useRef(next?.go)
+  goNext.current = next?.go
+  useEffect(() => {
+    const f = () => goNext.current?.()
+    window.addEventListener('laki-review-next', f)
+    return () => window.removeEventListener('laki-review-next', f)
+  }, [])
   // the keyboard as it opens: the terminal behind it keeps it otherwise (Term only focuses), and j or c would go to its agent
   const root = useRef<HTMLDivElement>(null)
   useEffect(() => root.current?.focus({ preventScroll: true }), [])
@@ -532,10 +542,19 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
               onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), q ? setQ('') : e.currentTarget.blur())}
               data-tip="Words in a path, or a glob: spec/**, *.rb, **/*_test.go (no /: the file's name)"
             />
-            {files.length > 1 && <IconButton icon={tree ? 'list' : 'tree'} title={tree ? 'A list: every file with its folder' : 'A tree: the files by folder'} on={tree} onClick={() => pickTree(!tree)} />}
             <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
           </div>
           <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
+            {files.length > 1 && (
+              <span className="seg fr-shape">
+                <button type="button" className={tree ? '' : 'on'} aria-pressed={!tree} aria-label="List" data-tip="Every file with its folder" onClick={() => pickTree(false)}>
+                  <Icon name="list" size={12} />
+                </button>
+                <button type="button" className={tree ? 'on' : ''} aria-pressed={tree} aria-label="Tree" data-tip="The files by folder: a click folds one" onClick={() => pickTree(true)}>
+                  <Icon name="tree" size={12} />
+                </button>
+              </span>
+            )}
             <span className="grow">
               {nViewed} of {files.length} viewed{query && ` · ${listed.length} shown`}
             </span>
@@ -548,17 +567,21 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           {tree
             ? [
                 ...listed.filter(f => pins.includes(f.path)).map(f => fileRow(f)),
-                ...fileTree(listed.filter(f => !pins.includes(f.path)), dirsShut).map(r =>
-                  'dir' in r ? (
-                    <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} {...act(() => shutDir(r.dir))} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
+                ...fileTree(listed.filter(f => !pins.includes(f.path)), dirsShut).map(r => {
+                  if (!('dir' in r)) return fileRow(r.file, r.depth)
+                  const inDir = listed.filter(f => f.path.startsWith(`${r.dir}/`) && !pins.includes(f.path)).map(f => f.path)
+                  const seen = inDir.filter(viewed).length
+                  return (
+                    <div key={`dir:${r.dir}`} className={`sp-row sp-dir ${seen === inDir.length ? 'fr-done' : ''}`} style={{ paddingLeft: 8 + r.depth * 12 }} {...act(() => shutDir(r.dir))} onContextMenu={e => openMenu(e, [{ label: seen === inDir.length ? 'Not viewed' : 'Mark viewed', icon: 'eye', run: () => mark(inDir, seen !== inDir.length) }, { label: dirsShut.size ? 'Unfold every folder' : 'Fold every folder', icon: 'tree', run: () => setDirsShut(dirsShut.size ? new Set() : new Set(fileTree(listed).flatMap(x => ('dir' in x ? [x.dir] : [])))) }])} data-tip={`${r.dir}: ${seen} of ${inDir.length} viewed · right click: more`}>
                       <Icon name={dirsShut.has(r.dir) ? 'folder' : 'folderOpen'} size={12} />
                       <span className="sp-name">{r.name}</span>
-                      <span className="muted small">{r.n}</span>
+                      <span className="muted small">{seen ? `${seen}/${inDir.length}` : inDir.length}</span>
+                      <label className="sp-viewed" onClick={e => e.stopPropagation()} data-tip={`Every file in ${r.name} viewed`}>
+                        <input type="checkbox" checked={seen === inDir.length} ref={el => void (el && (el.indeterminate = seen > 0 && seen < inDir.length))} onChange={e => mark(inDir, e.target.checked)} aria-label={`${r.name}: every file viewed`} />
+                      </label>
                     </div>
-                  ) : (
-                    fileRow(r.file, r.depth)
-                  ),
-                ),
+                  )
+                }),
               ]
             : listed.map(f => fileRow(f))}
           {query && !listed.length && <div className="muted small pad">No file matches.</div>}
@@ -813,6 +836,19 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           </>
         )}
       </div>
+      {next && d && nViewed === files.length && (
+        // every file viewed (or none changed): the next one to review, ⌘⏎ (keydown.ts reviewNext) unless comments wait to go
+        <div className="fr-next" data-go={notes.length ? undefined : ''} role="status">
+          <Icon name="check" />
+          <span className="grow">
+            Next: <b>{next.name}</b> · {next.files} file{next.files === 1 ? '' : 's'} · {next.pr}
+            {next.more > 0 && <span className="muted"> · {next.more} more to review</span>}
+          </span>
+          <button type="button" className="primary sm" onClick={next.go} data-tip={notes.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
+            Review it{next.key && !notes.length && <kbd>{next.key}</kbd>}
+          </button>
+        </div>
+      )}
       {menu}
     </div>
   )

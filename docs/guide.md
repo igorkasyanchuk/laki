@@ -593,6 +593,12 @@ selected workspace's PR is in the status bar.
   you pinned them, until you unpin it; kept on this Mac per workspace. Keys: j / k the next or last file, v Viewed, b
   blame, p pin, c a comment on the line under the mouse, ⌘⏎ sends to the
   agent. It reads the diff again as the workspace's files change, keeping your place and comments.
+  The files show as a tree by folder unless you pick the list (the List | Tree switch over them, remembered): each
+  folder folds with a click, says how many of its files are viewed and has a *Viewed* box for all of them; its right
+  click folds or unfolds every folder. In a tree the diffs follow its order, and j / k too.
+  Once every file is viewed (or there are none), a bar at the bottom names the next workspace to review (*Next: <name> ·
+  n files · its PR*, and how many more): a PR with green checks first, then the change that has waited longest; *Review
+  it* or ⌘⏎ opens its Review tab (⌘K: *Review next*). Private workspaces stay out of it in Recording mode.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
@@ -2266,6 +2272,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ↑ ↓ ← → Home End (the sidebar's list focused) | move between projects, groups and workspaces; → opens a folded one, ← folds it or goes up; Enter opens, Space picks, ⇧F10 or the Menu key its menu (one Tab stop: the selected row) |
 | ⇧A (a Needs you card focused) | Allow all (it lists each first) |
 | ⌘G | the workspace's next step (first in its ⋯) |
+| ⌘⏎ | in the Review tab with every file viewed: the next workspace to review (its bar at the bottom; with comments waiting, ⌘⏎ sends them first) |
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
 | ⌥⌘F | search chats: what you and your agents said, in every workspace |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
