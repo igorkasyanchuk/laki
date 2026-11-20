@@ -301,8 +301,8 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.equal((await rig.cli('schedule', 'off', s.id)).out.trim(), `${s.id} off`)
   assert.equal(JSON.parse((await rig.cli('schedule', '--json')).out).find((x: any) => x.id === s.id).on, false)
   assert.equal((await rig.cli('schedule', 'rm', s.id)).out.trim(), `removed ${s.id}`)
-  r = await rig.cli('schedule', 'nope')
-  assert.match(r.err, /^laki: unknown schedule command nope\.\n  laki schedule \[ls\]/)
+  r = await rig.cli('schedule', 'xyzzy') // far from every command: no Did you mean
+  assert.match(r.err, /^laki: unknown schedule command xyzzy\.\n  laki schedule \[ls\]/)
 })
 
 test('cli: preset ls, add, set, off, rm; bad fields refused', async t => {

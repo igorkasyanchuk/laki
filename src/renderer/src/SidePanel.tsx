@@ -20,7 +20,7 @@ export type Commits = { base?: string; commits: Commit[]; more?: boolean } // ba
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
 export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
-export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true)
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[] } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
 // keeps it: a workspace switch doesn't lose it)
 export type Edit = { text: string; was: string }
@@ -1427,11 +1427,12 @@ export function actionMenu({ agent, terminal }: ReturnType<typeof actionsFor>, t
 }
 
 // a CSV file as a table, its first row the head; edit: a click on a cell edits it (Enter: the one below, Tab: the next,
-// Esc: as it was), + Row, + Column, × on a row's number. Each change is the whole file again (toCsv), as the text edit's
+// Esc: as it was), + Row, + Column, × on a row's number. Each change is the whole file again (toCsv), as the text edit's.
+// grid: rows as they are (an Excel sheet's), read only
 const CSV_MAX = 2000 // ponytail: rows shown; the rest is there, edited in Raw
-function CsvTable({ path, text, edit, onText }: { path: string; text: string; edit: boolean; onText: (t: string) => void }) {
+function CsvTable({ path, text, edit, onText, grid }: { path: string; text: string; edit: boolean; onText: (t: string) => void; grid?: string[][] }) {
   const sep = useMemo(() => csvSep(path, text), [path]) // the file's, not each edit's
-  const { rows, quoted } = useMemo(() => parseCsv(text, sep), [text, sep])
+  const { rows, quoted } = useMemo(() => (grid ? { rows: grid, quoted: [] } : parseCsv(text, sep)), [text, sep, grid])
   const cols = rows.reduce((n, r) => Math.max(n, r.length), 0)
   const [at, setAt] = useState<[number, number] | null>(null)
   useEffect(() => void (edit || setAt(null)), [edit])
@@ -1501,7 +1502,7 @@ function CsvTable({ path, text, edit, onText }: { path: string; text: string; ed
           ))}
         </tbody>
       </table>
-      {rows.length > CSV_MAX + 1 && <div className="muted small pad">Showing the first {CSV_MAX} rows of {rows.length - 1}: Raw has the rest.</div>}
+      {rows.length > CSV_MAX + 1 && !grid && <div className="muted small pad">Showing the first {CSV_MAX} rows of {rows.length - 1}: Raw has the rest.</div>}
       {edit && (
         <div className="row pad">
           <button className="small" onClick={() => (commit([...rows, Array(Math.max(cols, 1)).fill('')]), setAt([rows.length, 0]))}>
@@ -1587,6 +1588,10 @@ export function FilePreview(p: {
       setSaving(false)
     }
   }
+  const [sheet, setSheet] = useState(0) // an Excel workbook's sheet shown
+  useEffect(() => setSheet(0), [p.path])
+  const book = f?.sheets?.length ? f.sheets : undefined
+  const page = book?.[Math.min(sheet, book.length - 1)]
   const [saveSoon, setSaveSoon] = useState(0) // the table's ⌘S: after the render that has the cell it was typed in
   useEffect(() => void (saveSoon && save()), [saveSoon])
   // Markdown: Rendered or Raw (the last one picked; a jump to a line: Raw); CSV: Table or Raw, the same way (laki.csv)
@@ -1633,6 +1638,15 @@ export function FilePreview(p: {
             <button className={mode === 'raw' ? 'on' : ''} onClick={() => pickMode('raw')}>
               Raw
             </button>
+          </div>
+        )}
+        {book && book.length > 1 && (
+          <div className="seg small pv-sheets" role="tablist" aria-label="Sheets">
+            {book.map((x, i) => (
+              <button key={i} role="tab" aria-selected={x === page} className={x === page ? 'on' : ''} onClick={() => setSheet(i)}>
+                {x.name}
+              </button>
+            ))}
           </div>
         )}
         {md && rendered && (
@@ -1686,6 +1700,8 @@ export function FilePreview(p: {
           </div>
         )}
         {rendered && (table ? <CsvTable path={p.path} text={f.text!} edit={false} onText={() => {}} /> : <Markdown src={f.text!} html />)}
+        {page && (page.rows.length ? <CsvTable path={p.path} text="" grid={page.rows} edit={false} onText={() => {}} /> : <div className="muted small pad">{page.name} is empty.</div>)}
+        {page?.cut && <div className="muted small pad">Showing the start of this sheet ({page.rows.length - 1} rows). Open it in its app for the rest.</div>}
         {f?.text !== undefined &&
           lines.map((l, i) => (
             <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>
@@ -1694,7 +1710,7 @@ export function FilePreview(p: {
             </div>
           ))}
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
-        {f && f.text === undefined && !f.image && (
+        {f && f.text === undefined && !f.image && !book && (
           <FileCard
             path={p.path}
             meta={sizeText(f.size)}

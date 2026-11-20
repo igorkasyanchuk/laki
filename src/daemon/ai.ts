@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { helpFind, helpParts, type HelpPart } from '../shared/help.ts'
 import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
-import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, memoryOf, modelCheck, presets, prs, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -165,10 +165,49 @@ export const hasKey = () => !!readKey()
 const readKey = () => keyRead('openrouter', keyPath)
 export function aiKey(o: { key?: string | null }) {
   const key = o.key?.trim()
+  credits = undefined // Usage's credits: the next ask is the new key's, or none
   if (!key) return keyWrite('openrouter', keyPath, ''), { key: false }
   if (!/^[\x21-\x7e]{8,400}$/.test(key)) throw new Error('that does not look like an API key')
   keyWrite('openrouter', keyPath, key)
   return { key: true }
+}
+
+// Usage's OpenRouter part (aiCredits): the key's spend (GET /key: today, this week, this month, its own limit) and the
+// account's credits left (GET /credits, for a key that may read them), each shown when the other is refused; kept 5
+// minutes (a failure 1), the next ask then. No key: null
+const CREDITS_TTL = 5 * 60_000
+let credits: { at: number; ttl: number; p: Promise<AiCredits | null> } | undefined
+const num = (x: unknown): number | undefined => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
+export function aiCredits(now = Date.now()): Promise<AiCredits | null> {
+  if (credits && now - credits.at < credits.ttl) return credits.p
+  const key = readKey()
+  if (!key) return Promise.resolve(null)
+  const get = async (path: string) => {
+    const res = await fetch(`${api()}${path}`, { headers: { authorization: `Bearer ${key}`, 'x-title': 'Laki' }, signal: AbortSignal.timeout(15000) })
+    if (!res.ok) throw new Error(res.status === 401 ? 'OpenRouter refused the key' : `OpenRouter said ${res.status}`)
+    return ((await res.json()) as { data?: Record<string, unknown> })?.data ?? {}
+  }
+  const p = Promise.allSettled([get('/key'), get('/credits')]).then(([k, c]): AiCredits => {
+    const out: AiCredits = { at: Date.now() }
+    if (k.status === 'fulfilled') {
+      const d = k.value
+      out.key = { day: num(d.usage_daily) ?? 0, week: num(d.usage_weekly) ?? 0, month: num(d.usage_monthly) ?? 0, limit: num(d.limit), left: num(d.limit_remaining) }
+    }
+    if (c.status === 'fulfilled' && num(c.value.total_credits) !== undefined) out.credits = { total: num(c.value.total_credits)!, used: num(c.value.total_usage) ?? 0 }
+    if (!out.key && !out.credits) out.error = ((k.status === 'rejected' && k.reason) || (c.status === 'rejected' && c.reason) || new Error('no answer')).message
+    out.low = creditsLow(out)
+    return out
+  })
+  credits = { at: now, ttl: CREDITS_TTL, p }
+  p.then(r => {
+    if (r.error && credits?.p === p) credits.ttl = 60_000
+  })
+  return p
+}
+// low: under $1 or 10% left, of the credits bought (none bought: free models only, never low) or the key's own limit
+export function creditsLow(c: Pick<AiCredits, 'credits' | 'key'>) {
+  const low = (left: number, of: number) => left < 1 || (of > 0 && left / of < 0.1)
+  return (!!c.credits && c.credits.total > 0 && low(c.credits.total - c.credits.used, c.credits.total)) || (c.key?.left !== undefined && c.key.limit !== undefined && low(c.key.left, c.key.limit))
 }
 
 // ---------- voice (Settings › Voice, cloud): a recording, WAV in base64, written down by OpenRouter's speech-to-text

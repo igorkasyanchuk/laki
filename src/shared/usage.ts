@@ -83,7 +83,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date; --only-if: run only when there's something
                                               to do (a skip is logged); {{check}}: what it found
-  laki schedule on|off|run|archive|restore|rm <id> [--force]  turn one on or off, run it now, archive or restore it, delete it
+  laki schedule on|off|run|copy|archive|restore|rm <id> [--force]  turn one on or off, run it now, duplicate it (off, … (copy)), archive or restore it, delete it
   laki schedule release <run>                 start a run held for your click (a fork's PR, on an event)
   laki flow [ls]                             workflows and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…] [--budget "30 min, $2"]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs; --budget: its working time and AI cost, past either it asks)
@@ -330,7 +330,7 @@ Laki. In an agent's tab, only its own workspace's events.
   laki events --json --type turn.done | while read -r e; do echo "$e" | jq -r .ws.name; done
   laki events --ws fix-login --type turn.done --once --timeout 600 && say "fix-login is done"`,
   spend: `Where a workspace's tokens went, from its claude and codex tabs' transcripts: input by what entered the context (file reads by path and how often, command output by command, searches, MCP results, the conversation carried into each turn, the system prompt and rules) and output by kind (edits, messages, thinking). Every number is an estimate: the transcript's usage gives the totals, spread by content size. Up to three hints, each with its number (a file read again and again, a command that prints too much, a conversation to compact). An agent may read its own workspace's only.\n\nExample:\n  laki spend fix-cart --json`,
-  limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
+  limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. With an OpenRouter key (Laki AI), a line more: the account's credits left and the key's spend today, this week and this month, asked of openrouter.ai at most every 5 minutes (not with --agent or --json). Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
   client: `Trusted clients: an app outside Laki (a desktop app's MCP server, a script, a launchd job) that drives it with
 a token of its own, where a call from no tab and no terminal is refused ("couldn't tell who's calling"). From your own
 terminal, never an agent's tab: add and rotate wait for Allow in Laki's window, then print the token's file (0600). The

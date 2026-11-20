@@ -111,6 +111,7 @@ export type AppSettings = Paint & {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  termPictures?: boolean // a terminal's recent pictures as chips (unset: on)
   editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   fileClick?: 'preview' | 'editor' // a file path clicked in a terminal: Laki's preview (unset) or your editor
   lineHeight?: number
@@ -2721,6 +2722,9 @@ export function SettingsPage(p: {
                   {row('Scroll speed', 'With ⌥: three times that', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm\u2019s' : ''}`)}
                   <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
                     <Says title="Copy selected text" hint="What you select is on the clipboard, no ⌘C needed" />
+                  </Switch>
+                  <Switch className="switch-row" on={s.termPictures !== false} onChange={v => set({ termPictures: v })}>
+                    <Says title="Recent pictures on a terminal" hint="The last four pictures you pasted or dropped into a terminal, as chips at its top: resting on one shows it, its path, size and dimensions, with Open, Copy path and Reveal in Finder" />
                   </Switch>
                   <Switch className="switch-row" on={s.editKeys !== false} onChange={v => set({ editKeys: v })}>
                     <Says title="Mac editing keys" hint="⌘← ⌘→ to the line's start and end, ⌥← ⌥→ a word at a time, ⌘⌫ the line before the cursor" />

@@ -1446,6 +1446,7 @@ kbd { font-family: var(--mono); }
 @media (hover: none) { .info-facts .info-row > .ib { opacity: 1; } }
 .tag { padding: 0 var(--sp-3); border-radius: var(--r-l); font-size: var(--fs-1); line-height: 17px; border: 1px solid var(--line); color: var(--muted); }
 .tag-open, .tag-approved { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
+.tag-warn { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
 .tag-merged { color: var(--tc-purple); border-color: color-mix(in srgb, var(--tc-purple) 40%, transparent); }
 .tag.warn { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
 /* the side panel's Commits: each one's pushed mark (a cloud) or not (an arrow up, in the waiting color) */
@@ -1949,6 +1950,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .pv-head > svg { flex: none; }
 .pv-path { flex: 1; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: var(--fs-3); }
 .pv-head button.small { font-size: var(--fs-2); padding: var(--sp-1) var(--sp-4); flex: none; }
+.pv-head .pv-sheets { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; } /* an Excel workbook's sheets: scrolls when many */
 .pv-body { flex: 1; overflow: auto; font-family: var(--mono); font-size: var(--fs-2); line-height: 1.5; padding: var(--sp-3) 0 24px; user-select: text; -webkit-user-select: text; }
 .pv-body.pv-ext { font-family: inherit; font-size: inherit; padding: var(--sp-5); } /* a file opener's full view, in the file's place */
 .pv-head .seg, .sp-tools .seg { flex: none; }
@@ -2722,7 +2724,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-run b { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .sched-run > .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sched-run.skipped { opacity: 0.6; } /* T3: its condition said no */
-.sched-run.is-waiting .sched-run-dot { color: var(--warn); }
+.sched-run.is-waiting .sched-run-dot { color: var(--waiting); }
 .sched-missed { align-self: flex-start; }
 .sched-run-at { flex: none; margin-left: auto; color: var(--muted); font-size: var(--fs-3); font-variant-numeric: tabular-nums; }
 .sched-run.live { cursor: var(--cur-act); }
@@ -3185,6 +3187,9 @@ button.board-name:hover { background: none; }
 /* macOS's Reduce motion: no transitions, and animations end where they would (the per-component rules above too) */
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 
+/* the ring's amber dot: Laki AI's OpenRouter credits running low (Usage.tsx) */
+.usage-btn { position: relative; }
+.usage-low { position: absolute; top: 1px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--waiting); }
 /* the plan limits' popup with several accounts: the ones other than the default a little dimmer */
 .usage-agent.other .usage-row { opacity: 0.8; }
 /* the Usage page (Usage.tsx UsagePage): filters, tiles, a bar a day stacked by agent (each its --tc- color, a 2px gap,
@@ -3258,6 +3263,15 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .tab-compact { flex: none; margin-left: 4px; color: var(--muted); font-size: 0.9em; font-style: italic; } /* claude's PreCompact: summing up its chat */
 .ws-sched.ws-compact { flex: 0 100 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85em; font-style: italic; } /* gives way before the name does */
 .tab-alias { flex: none; margin-left: 4px; color: var(--accent-ink); font: 600 0.9em var(--mono); } /* a tab's @name (laki name) */
+.term-pics { position: absolute; top: var(--sp-3); right: 52px; z-index: 9; /* a terminal's recent pictures (Term.tsx TermPics): left of the scroll jump, over xterm's layers */ display: flex; gap: var(--sp-2); max-width: 60%; }
+.term-pic { display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--h-s); max-width: 160px; padding: 0 var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-pill); background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--muted); font-size: var(--fs-1); opacity: 0.8; }
+.term-pic span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-pic:hover, .term-pic.on, .term-pic:focus-visible { opacity: 1; color: var(--fg); }
+.term-pic-card { position: absolute; top: calc(100% + var(--sp-2)); right: 0; width: 280px; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); box-shadow: var(--lift-2); }
+.term-pic-thumb { display: grid; place-items: center; height: 150px; border-radius: var(--r-m); background: var(--bg); overflow: hidden; }
+.term-pic-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.term-pic-meta { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; } .term-pic-meta b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-1); }
+.term-pic-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .term-jump { position: absolute; top: 10px; right: 18px; z-index: 9; /* over xterm's layers (they go to 8) */ display: none; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: var(--lift-2); cursor: var(--cur-act); }
 .pane-body:hover > .term-jump, .term-jump.end, .term-jump:focus-visible { display: grid; } /* the scroll button: on hover; scrolled up (↓ back to the newest), always */
 .term-jump:hover { color: var(--fg); }

@@ -221,3 +221,5 @@ needs no bump: `settingsSet` keeps any field.
 212: `termList`, `termRevoke { key }` (S1's allowed terminals: tty, cmd, chain, `at`, `lastAt`, `start`; the app's window only; one with no call for 12 hours goes; `term.allow` cap).
 213: `usageDays`' rows name their workspace (`ws`), and `ai`: Laki AI's calls by day, `from` (`AI_FROM`: what made each, `aiFromOf`) and model; `AiCall.from` (`usage.where` cap).
 214: widgets' `none` place (shows nowhere, runs in the background: widgetSet takes it, `widget.none` cap), an action's JSON's `notify` and `alert` (widgets.ts `tell`), the `background` starter.
+215: `scheduleCopy { id }` (a scheduled task's Duplicate: its settings under a new id, named … (copy), off, no runs; `schedule.copy` cap).
+216: fileRead's `sheets` for an `.xlsx`/`.xlsm` (each sheet's name and rows, read only; `cut`), `aiCredits` (Usage's OpenRouter part: the account's credits and the key's spend today, this week and this month, its limit, `low`; null without a key; an agent's call refused; `ai.credits` cap).

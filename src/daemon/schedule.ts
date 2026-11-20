@@ -317,6 +317,14 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean; dependents?: '
   return s
 }
 
+// Duplicate (the page's, laki schedule copy): its settings and schedule under a new id, named … (copy), its group kept, no
+// runs, and off, so it never fires twice by surprise: you change the time or the prompt and turn it on
+export function scheduleCopy(id: string): Schedule {
+  const old = findSchedule(id)
+  const name = `${(old.name || old.prompt.split('\n')[0].trim() || old.widget || 'Task').slice(0, 70)} (copy)`
+  return scheduleSet({ ...Object.fromEntries(SCHEDULE_IN.filter(k => old[k] !== undefined).map(k => [k, structuredClone(old[k])])), name, on: false })
+}
+
 export function scheduleRm(id: string, dependents?: 'off') {
   const s = findSchedule(id)
   orphans(s, 'deleted', dependents) // T9

@@ -1,6 +1,7 @@
 // A diff's pieces that the side panel's Changes and Review and the full review (FullReview.tsx) share: the diff read
 // into each file's lines, a file's lines drawn in one column or two, a line's comment box, an image's before and
 // after, Revert's picked lines, GitHub's Viewed boxes, and review threads with their suggestions.
+import { seedOf } from './text'
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
@@ -942,7 +943,17 @@ export function DiffFind({ at, within = at, unfold }: { at: RefObject<HTMLElemen
     el?.addEventListener('laki-find', f)
     return () => el?.removeEventListener('laki-find', f)
   }, [])
-  useLayoutEffect(() => void (seq && (inp.current?.focus(), inp.current?.select())), [seq])
+  // each ⌘F: focused, with the page's selection in what it searches as the query (seedOf: one line, 1,000 characters)
+  const seeded = useRef('') // the seed set, to select once it's the field's value
+  useLayoutEffect(() => {
+    if (!seq) return
+    const sel = window.getSelection()
+    const s = sel?.anchorNode && within.current?.contains(sel.anchorNode) ? seedOf(sel.toString()) : ''
+    if (s && s !== q) (seeded.current = s), setQ(s)
+    inp.current?.focus()
+    inp.current?.select()
+  }, [seq])
+  useLayoutEffect(() => void (seeded.current && seeded.current === q && ((seeded.current = ''), inp.current?.select())), [q])
   const show = (i: number, scroll = true) => {
     const all = ranges.current
     cur.current = all.length ? (i + all.length) % all.length : 0

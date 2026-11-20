@@ -2980,6 +2980,16 @@ ipcMain.on('open-external', (e, url: string) => {
 // an artifact's goes through the daemon's sandboxed /artifact/ page instead), nor a bundle that runs or builds
 const DOCS = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|pdf|png|jpe?g|gif|webp|svg|heic|mp4|mov|webm|mp3|m4a|wav)$/i
 const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|action|saver|appex|xcodeproj|xcworkspace|playground)\/?$/i
+// a file shown in its folder in Finder (a terminal's recent picture's Reveal in Finder): the app's window or a floated
+// tab's, an absolute path that's there; it opens nothing
+ipcMain.handle('reveal', async (e, path: unknown) => {
+  const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender)
+  if (!from || typeof path !== 'string' || !path.startsWith('/')) return false
+  const real = await realpath(path).catch(() => '')
+  if (!real) return false
+  shell.showItemInFolder(real)
+  return true
+})
 ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender) // the app's window, or a floated tab's
   if (!from || typeof path !== 'string' || !path.startsWith('/')) return 'missing'

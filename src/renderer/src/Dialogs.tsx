@@ -8,7 +8,7 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type ChatHit, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
+import { type ChatHit, type Schedule, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageAi, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
@@ -573,6 +573,7 @@ export function Pages({ app }: { app: AppCtx }) {
             toast: (text, undo) => toast(text, undo),
             run: id => api.call('scheduleRun', { id }),
             release: run => api.call('scheduleRelease', { run }),
+            ...(hasCap(view, 'schedule.copy') && { copy: (id: string) => api.call<Schedule>('scheduleCopy', { id }) }),
             settings: o => api.call('settingsSet', o),
             flows: flowsOn ? () => api.call('flowList', {}) : undefined,
             branches: project => api.call('branches', { project }),

@@ -20,7 +20,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, tipDelay, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, aiFromOf, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -1374,6 +1374,16 @@ test("Shell (shared/shells.ts): a shell's kind by its file's name; a value as on
   // sh reads the POSIX word back as the value itself
   const { execFileSync } = await import('node:child_process')
   assert.equal(execFileSync('/bin/sh', ['-c', `printf %s ${shellWord(v)}`], { encoding: 'utf8' }), v)
+})
+
+test('seedOf: ⌘F starts with the selection: trimmed, one line, 1,000 characters at most; else nothing', () => {
+  assert.equal(seedOf('  cart.ts \n'), 'cart.ts')
+  assert.equal(seedOf('two\nlines'), '')
+  assert.equal(seedOf('a\r\nb'), '')
+  assert.equal(seedOf('   '), '')
+  assert.equal(seedOf(undefined), '')
+  assert.equal(seedOf('x'.repeat(1000)), 'x'.repeat(1000))
+  assert.equal(seedOf('x'.repeat(1001)), '')
 })
 
 test("tipDelay: 350 ms, none within a second of the last tip going (the warm-up)", () => {

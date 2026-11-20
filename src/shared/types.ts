@@ -610,6 +610,7 @@ export type Settings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  termPictures?: boolean // a terminal's last pictures pasted or dropped, as chips at its top (Term.tsx TermPics; unset: on)
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   fileClick?: 'preview' | 'editor' // a file path ⌘-clicked in a terminal (src/app.ts:42): Laki's preview (unset) or your editor; ⌘⌥: the other
   notify?: boolean
@@ -1095,6 +1096,9 @@ export type UsageWindow = { label: string; used: number; resets?: number; note?:
 // an agent's limits; error: why there are none (signed out…); at: when they were read
 // account: whose (an Account's id or HOME_ACCOUNT), name to tell them apart, default: the one new sessions use
 export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean; source?: 'own' | 'endpoint' } // source (R4): the agent's own numbers (its status line, its transcript) or its usage endpoint's // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
+// Usage's OpenRouter part (ai.ts aiCredits): the account's credits (total bought, used), the key's spend (today, this
+// week, this month, in dollars) and its own limit; low: under $1 or 10% left of either; error: neither was answered
+export type AiCredits = { at: number; credits?: { total: number; used: number }; key?: { day: number; week: number; month: number; limit?: number; left?: number }; low?: boolean; error?: string }
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
@@ -1434,7 +1438,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 214
+export const API = 216
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('laki', {
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
+  reveal: (path: string): Promise<boolean> => ipcRenderer.invoke('reveal', path), // a file in Finder (a terminal's recent picture)
   dragOut: (path: string, root: string) => ipcRenderer.send('drag-out', path, root), // C10: a file's row dragged to Finder or any app
   uninstalled: (cask: boolean) => ipcRenderer.send('uninstalled', cask), // B3: the daemon's uninstalled: the app quits (to the Trash on a yes)
   ...(process.platform === 'darwin' && { touchId: (): Promise<boolean> => ipcRenderer.invoke('touch-id'), confirm: (what: string): Promise<string | null> => ipcRenderer.invoke('confirm', what) }), // Touch ID (shared/confirm.ts): can this Mac ask; ask for one action, its ticket

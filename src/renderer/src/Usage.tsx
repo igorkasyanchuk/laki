@@ -5,7 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, IconButton, Page, act } from './ui'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -63,17 +63,19 @@ export function Ring({ p }: { p?: number }) {
 }
 
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
-// asks: Settings' usage, the agents whose endpoint is asked
-export function UsageButton({ load, onUse, onDays, today, models = [], asks }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; models?: string[]; asks?: Record<string, boolean> }) {
+// asks: Settings' usage, the agents whose endpoint is asked; credits: Laki AI's OpenRouter credits and spend (an amber
+// dot on the ring when low)
+export function UsageButton({ load, credits, onUse, onDays, today, models = [], asks }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; models?: string[]; asks?: Record<string, boolean> }) {
   const [got, setRows] = useState<AgentUsage[] | null>(null)
   const rows = got && got.map(r => byUse(r, models)) // models: what the Gemini tabs use
   const [at, setAt] = useState<DOMRect | null>(null)
-  const loader = useRef(load)
-  loader.current = load
+  const [or, setOr] = useState<AiCredits | null>(null)
+  const loader = useRef({ load, credits })
+  loader.current = { load, credits }
   useEffect(() => {
     let on = true
     // an older daemon has no usage: no ring; a failed ask (the daemon restarting) keeps the last answer
-    const get = () => loader.current().then(r => on && setRows(r), () => {})
+    const get = () => (loader.current.load().then(r => on && setRows(r), () => {}), loader.current.credits?.().then(c => on && setOr(c), () => {}))
     get()
     const t = setInterval(get, 60_000) // cheap: the daemon asks the servers at most every 5 minutes
     return () => {
@@ -88,13 +90,14 @@ export function UsageButton({ load, onUse, onDays, today, models = [], asks }: {
   const known = tops.filter(p => p !== undefined)
   if (!known.length) return null // no agent has given a reading yet (a first run, signed out): no empty ring that looks like a spinner
   const top = Math.max(...known)
-  const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}`
+  const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}${or?.low ? ' · OpenRouter credits low' : ''}`
   return (
     <>
       <button className="usage-btn" data-tip={tip} aria-label={tip} onClick={e => setAt(e.currentTarget.getBoundingClientRect())}>
         <Ring p={top} />
+        {or?.low && <i className="usage-low" />}
       </button>
-      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} asks={asks} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
+      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} or={or} asks={asks} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
     </>
   )
 }
@@ -120,7 +123,51 @@ function windowRow(w: UsageWindow, now: number) {
   )
 }
 
-function UsagePop({ anchor, rows, top, today, asks, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; asks?: Record<string, boolean>; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
+// Laki AI's OpenRouter: credits left (a bar of what's used), the key's spend, its own limit
+const usd = (n: number) => `$${n.toFixed(2)}`
+function creditsPart(c: AiCredits) {
+  const used = c.credits?.total ? Math.round((c.credits.used / c.credits.total) * 100) : 0 // none bought: an empty bar, not a red one
+  return (
+    <section className="usage-agent">
+      <div className="usage-name">
+        <b>OpenRouter</b>
+        <span className="muted">Laki AI</span>
+        <span className="grow" />
+        {c.low && <span className="tag tag-warn">running low</span>}
+      </div>
+      {c.credits && (
+        <div className="usage-row">
+          <span className="usage-label">Credits</span>
+          <span className={`usage-bar ${c.low ? 'high' : level(used)}`}>
+            <i style={{ width: `${Math.min(used, 100)}%` }} />
+          </span>
+          <span className="usage-pct">{usd(Math.max(0, c.credits.total - c.credits.used))}</span>
+          <span className="muted small usage-when">left of {usd(c.credits.total)}</span>
+        </div>
+      )}
+      {c.key &&
+        (
+          [
+            ['Today', c.key.day, 'this key spent'],
+            ['This week', c.key.week, ''],
+            ['This month', c.key.month, ''],
+            ...(c.key.limit !== undefined && c.key.left !== undefined ? [['Key limit', c.key.left, `left of ${usd(c.key.limit)}`] as const] : []),
+          ] as const
+        ).map(([label, n, note]) => (
+          <div key={label} className="usage-row usage-spent">
+            <span className="usage-label">{label}</span>
+            <span className="usage-pct">{usd(n)}</span>
+            <span className="muted small usage-when">{note}</span>
+          </div>
+        ))}
+      {c.error && <p className="muted small">{c.error}.</p>}
+      {c.key && !c.credits && <p className="muted small">Credits left: OpenRouter shows them only to a key that may read them.</p>}
+      {c.low && <p className="muted small">Add credits at openrouter.ai before Laki AI stops.</p>}
+    </section>
+  )
+}
+
+function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; or?: AiCredits | null; asks?: Record<string, boolean>; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
@@ -173,6 +220,7 @@ function UsagePop({ anchor, rows, top, today, asks, onUse, onDays, onClose }: { 
             {!r.error && r.windows.length > 0 && now - r.at > STALE && <p className="muted small">As of {hm(r.at)}: {r.source === 'own' ? 'the agent says them as it works' : 'not read again since'}.</p>}
           </section>
         ))}
+        {or && creditsPart(or)}
         {today && (
           <section className="usage-agent">
             <div className="usage-name">

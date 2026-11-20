@@ -141,6 +141,7 @@ export const FIND: [string, string, string?][] = [
   ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
+  ['terminal', 'Recent pictures on a terminal', 'image screenshot paste drop chips thumbnail picture reveal finder'],
   ['terminal', 'A file path clicked', 'file link open editor preview line'],
   ['terminal', 'Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫', 'cmd option arrow keys line start end word caret cursor home natural text editing iterm'],
   ['terminal', 'Inset panes', 'cards margins rounded nested panels gap'],

@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc, rpcAny } from '../shared/conn.ts'
-import { AGENTS, API, type AgentUsage, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, API, type AgentUsage, type AiCredits, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { appOf } from '../shared/helper.ts'
 import { hhmm } from '../shared/tray.ts'
@@ -468,6 +468,10 @@ async function main() {
         return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : d.toLocaleDateString([], { weekday: 'short' })
       }
       const rows = list.map(u => [u.agent, u.name ?? '-', u.error ? `error: ${u.error}` : ''].concat(u.windows.map(w => `${w.label} ${w.used}% used${w.resets ? ` · resets ${when(w.resets)}` : ''}${w.note ? ` (${w.note})` : ''}`)))
+      // Laki AI's OpenRouter credits and spend, a line of its own (not in --json's list; an agent's or an older daemon's: none)
+      const or: AiCredits | null = flags.agent || json ? null : await rpc('aiCredits', { from: caller() }).catch(() => null)
+      const usd = (n: number) => `$${n.toFixed(2)}`
+      if (or) rows.push(['openrouter', 'Laki AI', or.error ? `error: ${or.error}` : '', or.credits ? `credits ${usd(Math.max(0, or.credits.total - or.credits.used))} left of ${usd(or.credits.total)}` : '', or.key ? `this key ${usd(or.key.day)} today, ${usd(or.key.week)} this week, ${usd(or.key.month)} this month${or.key.limit !== undefined && or.key.left !== undefined ? `, ${usd(or.key.left)} of its ${usd(or.key.limit)} limit left` : ''}` : '', or.low ? 'running low' : ''])
       const wide = (i: number) => Math.max(...rows.map(r => r[i].length))
       return out(list, rows.map(r => [r[0].padEnd(wide(0)), r[1].padEnd(wide(1)), ...r.slice(2).filter(Boolean)].join('  ')).join('\n') || 'no plan limits to show')
     }
@@ -907,6 +911,7 @@ async function main() {
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'copy') return (s => out(s, `${line(s)}\n(a copy of ${id}: off until laki schedule on ${s.id})`))(await rpc('scheduleCopy', { id }))
       if (sub === 'archive' || sub === 'restore') return out(await rpc('scheduleSet', { id, archived: sub === 'archive', ...(flags.force && { dependents: 'off' }) }), `${id} ${sub === 'archive' ? 'archived' : 'restored'}`)
       if (sub === 'run') {
         const r = await rpc('scheduleRun', { id }, 120000)

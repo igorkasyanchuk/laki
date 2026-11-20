@@ -433,7 +433,12 @@ are tested in `test/units-more.test.ts`.
   resizes it). Over a plain terminal, no chat open and not a page, it fades to 55% (`.far`) while the pointer is over
   120px away (back on approach or focus; Motion off, never). Pages keep `--fab-room` at their bottom
   (`.page-body`, `.settings-main`). test:ui's README run checks it meets no `data-dock` element on the Done check's still.
-- **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own, an agent
+- **`Term.tsx`**: one xterm per pane. Recent pictures (`TermPics`, `pictures`: settings.termPictures unless false): the
+  last `PICS` (4) dropped or pasted pictures' paths as chips at the top right (`.term-pics`, hidden while find is open),
+  a hover card with the picture (LinkPeek's `image`, the daemon's `imageRead`), its path, size and time, *Open* (the big
+  view), *Copy path*, *Reveal in Finder* (main's `reveal` IPC: an absolute path that exists). A paste of a picture alone
+  (`onPasteCapture`, before xterm, which pastes text only) is saved by `savePicture` (App: `imageSave`) and its quoted
+  path typed in, as a drop's; a failure writes a dim line. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own, an agent
   tab or a shell running one; a plain shell has none): a pill (`.term-reply`) where the mouse let go of a selection, gone
   at a key, a press, a scroll or an empty selection; it opens panels.tsx' `ReplyPop` (the quote, your words, a pick of
   agents; ⏎ `send` `enter: false` into the prompt, ⌘⏎ `send` (`whenIdle` for an agent tab); ⌥ held (`alt`, `USES`,
@@ -667,7 +672,10 @@ are tested in `test/units-more.test.ts`.
   `.full-review`, each `data-find`), Diff.tsx' `DiffFind` instead: App's `findIn` sends `laki-find` to the `[data-find]`
   the pointer went down in last (`lastDown`), or the full review while it's shown; the lines' text found by a
   TreeWalker (not `.dl-n` or `.dl-blame`), marked by the CSS Custom Highlight API (`laki-find`, `laki-find-on`),
-  found again as the diff changes (a MutationObserver); a folded file's lines aren't drawn, so aren't found.
+  found again as the diff changes (a MutationObserver); a folded file's lines aren't drawn, so aren't found. The
+  Reader's `.reader-scroll` is a `data-find` too. ⌘F seeds the box with the selection (`text.ts` `seedOf`: one line, up
+  to 1,000 characters): the terminal's (`getSelection`, not the match the bar itself selected, `hit`), else the page's
+  inside the `[data-find]`.
 - **The edge glow** (settings.edgeGlow, on only if true: a new install's, core.ts `NEW_DEFAULTS`; Settings › General ›
   Notifications): App's root `.app` gets `data-glow` while nextStep.ts `waitsElsewhere(view, tab, front)`: an ask or a
   secret request waits in a tab that isn't the focused one, the window in use (`front`, as `html.away` goes), no Do not
@@ -741,7 +749,11 @@ are tested in `test/units-more.test.ts`.
 - **CSV** (`SidePanel.tsx` `CsvTable`, `text.ts` `csvSep`/`parseCsv`/`toCsv`): a `.csv`/`.tsv` preview's Table (or
   Raw, `laki.csv`); editing a cell rewrites the file through `toCsv` (`parseCsv`'s `quoted`, cell by cell: a quoted cell stays quoted, a
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
-  text edit. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
+  text edit. An Excel workbook (`.xlsx`, `.xlsm`): fileRead's `sheets` (the daemon's `sheet.ts` `readSheets`: the zip
+  through node's zlib, each sheet's values; dates by their cell's number format, the 1904 system too; `SHEET_ROWS`,
+  `SHEET_COLS`, `SHEET_CELLS`, 20 MB, a part inflated past 64 MB refused; one pass over each part's tags (`walk`), no
+  pattern that can run to the end per start; no table on a host: a file card), shown read only by
+  `CsvTable`'s `grid`, a `.seg` tab per sheet (`.pv-sheets`). ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
   (`securityLevel: strict`), each chart an `<img>` of its SVG (inline, a brainstorm's 50 were 18k nodes that every
   next chart laid out again), in `FONT` (an image has no web fonts), drawn once ui.tsx' `useNear` says it nears the
   screen, one at a time with a yield between (`turn`), kept by theme and text (`pics`, 200). `useNear` also holds back

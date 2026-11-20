@@ -9,7 +9,8 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
-import { type Big, LinkPeek, MD, type Peek, peekOf, TEXT } from './LinkPeek'
+import { type Big, IMAGE, LinkPeek, MD, type Peek, peekOf, TEXT } from './LinkPeek'
+import { ago } from './Info'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './settingsBase'
@@ -60,6 +61,8 @@ export function Term({
   text,
   cwd,
   readOnly = false,
+  pictures = true,
+  savePicture,
 }: {
   tab: string
   active?: boolean
@@ -79,6 +82,8 @@ export function Term({
   text?: (path: string) => Promise<string | undefined | null> // a hovered Markdown file's text (an absolute path); null: no card
   cwd?: string // the workspace's folder: a relative picture path's
   readOnly?: boolean // K1: an extension's terminal in a cell: shown, no keys
+  pictures?: boolean // its last pictures pasted or dropped, as chips at its top (Settings › Terminal: termPictures)
+  savePicture?: (f: File) => Promise<string> // a pasted picture kept (imageSave): its path, typed in as a drop's
 }) {
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
@@ -95,6 +100,12 @@ export function Term({
   // link stays (peekAt) and only a leave that lasts 500 ms ends it (time to move onto the card and click it)
   const [peek, setPeek] = useState<Peek | null>(null)
   const [big, setBig] = useState<Big | null>(null) // a hovered picture opened larger
+  const [pics, setPics] = useState<Pic[]>([]) // its last pictures pasted or dropped, the newest first
+  const picsAdd = (paths: string[], pasted = false) => {
+    const at = Date.now()
+    const got = paths.filter(p => IMAGE.test(p)).map(path => ({ path, at, pasted }))
+    if (got.length) setPics(was => [...got.reverse(), ...was.filter(x => !got.some(g => g.path === x.path))].slice(0, PICS))
+  }
   const showT = useRef(0)
   const hideT = useRef(0)
   const peekAt = useRef('')
@@ -380,10 +391,25 @@ export function Term({
         onDrop={e => {
           if (!bridge?.pathOf || !e.dataTransfer.files.length || !xt) return
           e.preventDefault()
-          xt.term.paste(`${[...e.dataTransfer.files].map(f => quote(bridge!.pathOf!(f))).join(' ')} `)
+          const paths = [...e.dataTransfer.files].map(f => bridge!.pathOf!(f))
+          xt.term.paste(`${paths.map(quote).join(' ')} `)
+          picsAdd(paths)
           xt.term.focus()
         }}
+        // a picture pasted (⌘V of a screenshot, no text with it): kept, its path typed in as a drop's, before xterm,
+        // which pastes text only, sees it
+        onPasteCapture={e => {
+          const f = [...e.clipboardData.files].find(x => x.type.startsWith('image/'))
+          if (!f || !savePicture || !xt || readOnly || e.clipboardData.getData('text/plain')) return
+          e.preventDefault()
+          e.stopPropagation()
+          void savePicture(f).then(
+            path => void (xt.term.element?.isConnected && (xt.term.paste(`${quote(path)} `), picsAdd([path], true))), // its tab closed meanwhile: nothing
+            err => xt.term.element?.isConnected && xt.term.write(`\r\n\x1b[2m(the picture was not pasted: ${String(err?.message ?? err).replace(/[\x00-\x1f]/g, ' ')})\x1b[0m\r\n`),
+          )
+        }}
       />
+      {pictures && pics.length > 0 && !find && <TermPics pics={pics} image={image} cwd={cwd} onOpen={setBig} />}
       {jump && xt && !find && (
         <button type="button" className={`term-jump ${jump}`} aria-label={jump === 'top' ? 'Scroll to the top' : 'Scroll to the end'} data-tip={jump === 'top' ? 'Scroll to the top' : 'Back to the end'} onMouseDown={e => e.preventDefault() /* the keyboard stays in the terminal */} onClick={() => (jump === 'top' ? xt.term.scrollToTop() : xt.term.scrollToBottom())}>
           <Icon name={jump === 'top' ? 'arrowUp' : 'arrowDown'} size={13} />
@@ -415,6 +441,58 @@ export function Term({
         </Modal>
       )}
     </>
+  )
+}
+
+// a terminal's recent pictures (pasted or dropped, PICS at most): chips at its top right, its name each; resting on one
+// shows its thumbnail, path, when, size and dimensions, with Open (larger, Term's modal), Copy path and Reveal in Finder
+const PICS = 4
+type Pic = { path: string; at: number; pasted: boolean }
+const sizeOf = (url: string) => (n => (n < 1 << 20 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / (1 << 20)).toFixed(1)} MB`))(Math.floor(((url.length - url.indexOf(',') - 1) * 3) / 4))
+const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+const picName = (p: Pic) => (p.pasted ? `Pasted image ${hhmm(p.at)}` : (p.path.split('/').pop() ?? p.path))
+function TermPics({ pics, image, cwd, onOpen }: { pics: Pic[]; image?: (path: string) => Promise<string | undefined | null>; cwd?: string; onOpen: (b: Big) => void }) {
+  const [on, setOn] = useState<Pic | null>(null)
+  const [src, setSrc] = useState<{ path: string; url?: string; dim?: string; err?: string }>()
+  const t = useRef(0)
+  useEffect(() => () => clearTimeout(t.current), [])
+  useEffect(() => {
+    const p = on?.path
+    if (!p || src?.path === p) return
+    setSrc({ path: p })
+    void (image?.(p) ?? Promise.resolve(undefined)).then(
+      url => setSrc(s => (s?.path === p ? { path: p, ...(url ? { url } : { err: 'No preview' }) } : s)),
+      e => setSrc(s => (s?.path === p ? { path: p, err: String(e?.message ?? e) } : s)),
+    )
+  }, [on?.path])
+  const rest = (pic: Pic | null) => (clearTimeout(t.current), (t.current = window.setTimeout(() => setOn(pic), pic ? (on ? 0 : 300) : 250)))
+  const shown = on && src?.path === on.path ? src : undefined
+  const rel = (p: string) => (cwd && p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : p.replace(/^\/Users\/[^/]+/, '~'))
+  return (
+    <div className="term-pics" onPointerLeave={() => rest(null)}>
+      {pics.map(p => (
+        <button key={p.path} type="button" className={`term-pic ${on?.path === p.path ? 'on' : ''}`} aria-label={`${picName(p)}: ${p.path}`} onPointerEnter={() => rest(p)} onFocus={() => rest(p)} onClick={() => shown?.url && onOpen({ src: shown.url, name: picName(p), size: [shown.dim, sizeOf(shown.url)].filter(Boolean).join(' · ') })}>
+          <Icon name="image" size={11} />
+          <span>{picName(p)}</span>
+        </button>
+      ))}
+      {on && (
+        <div className="term-pic-card" role="dialog" aria-label={picName(on)} onPointerEnter={() => clearTimeout(t.current)}>
+          <div className="term-pic-thumb">
+            {shown?.url ? <img src={shown.url} alt={picName(on)} onLoad={e => (img => setSrc(s => (s?.path === on.path ? { ...s, dim: `${img.naturalWidth}×${img.naturalHeight}` } : s)))(e.currentTarget)} /> : <span className="muted small">{shown?.err ?? 'Loading…'}</span>}
+          </div>
+          <div className="term-pic-meta">
+            <b className="mono" data-tip={on.path}>{rel(on.path)}</b>
+            <span className="muted small">{[`${on.pasted ? 'pasted' : 'dropped'} ${ago(on.at)}`, shown?.url && sizeOf(shown.url), shown?.dim].filter(Boolean).join(' · ')}</span>
+          </div>
+          <div className="term-pic-acts">
+            <button type="button" className="sm" disabled={!shown?.url} onClick={() => shown?.url && onOpen({ src: shown.url, name: picName(on), size: [shown.dim, sizeOf(shown.url)].filter(Boolean).join(' · ') })}>Open</button>
+            <button type="button" className="sm" onClick={() => void navigator.clipboard.writeText(on.path).catch(() => {})}>Copy path</button>
+            {bridge?.reveal && <button type="button" className="sm" onClick={() => void bridge!.reveal!(on.path)}>Reveal in Finder</button>}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

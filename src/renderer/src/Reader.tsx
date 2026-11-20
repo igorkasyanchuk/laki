@@ -5,7 +5,7 @@
 // an answer, a laki-ui block drawn with the UI kit (UiBlock). The terminal stays attached under it: Terminal brings
 // it back as it was
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AskDiff, Choice, choiceProps, useSayWhy } from './Diff'
+import { AskDiff, Choice, choiceProps, DiffFind, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
@@ -304,8 +304,9 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     <UiBlocks.Provider value={uiDraw}>
     <RunCode.Provider value={runCode}>
     <div className="reader">
-      <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
+      <div className="reader-scroll" ref={scroll} data-find onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <ScrollEdge />
+        <DiffFind at={scroll} /> {/* ⌘F: the chat's words, as a diff's (Diff.tsx), from the selection */}
         {/* a picture in a message opens large (one in a link stays the link's), zooming from where it was */}
         <div
           className="reader-col"

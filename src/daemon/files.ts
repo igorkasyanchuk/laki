@@ -14,6 +14,7 @@ import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git,
 import { dir } from './dir.ts'
 import { away, broken, hostUp, live, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
+import { readSheets, SHEET_MAX } from './sheet.ts'
 
 // ---------- the worktree as a tree
 
@@ -792,6 +793,14 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
   if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
   const av = MEDIA[extname(abs).slice(1).toLowerCase()]
   if (av) return { size: st.size, media: av.split('/')[0], ...(o.media && st.size <= MEDIA_MAX && { src: `data:${av};base64,${readFileSync(abs).toString('base64')}` }) }
+  if (/\.xls[xm]$/i.test(abs) && st.size <= SHEET_MAX) {
+    // an Excel workbook: its sheets as tables (sheet.ts); one it can't read, a file card as before
+    try {
+      return { size: st.size, sheets: readSheets(readFileSync(abs)) }
+    } catch {
+      return { size: st.size }
+    }
+  }
   let buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))
   const fd = openSync(abs, 'r')
   try {

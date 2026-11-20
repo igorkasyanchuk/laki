@@ -20,6 +20,7 @@ export type SchedulesApi = {
   flows?: () => Promise<WorkflowItem[]> // Workflows on: a task may run one instead of a prompt
   branches(project: string): Promise<{ branches: string[]; main: string; current: string }> // a new workspace's base: the new-workspace page's list
   release?(run: string): Promise<unknown> // T4: a fork's held run, started (Run it)
+  copy?(id: string): Promise<Schedule> // Duplicate: off, … (copy), no runs; the daemon's scheduleCopy (schedule.copy)
   settings?(s: Pick<Settings, 'scheduleMaxMinutes' | 'scheduleAtOnce'>): Promise<unknown> // T8: every task's time limit, runs at once
 }
 
@@ -339,6 +340,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const after = (s: Schedule) => (view.schedules ?? []).filter(x => x.after?.task === s.id && !x.archived)
   const offToo = (s: Schedule) => (n => (n.length ? ` ${n.map(titleOf).join(', ')} ${n.length > 1 ? 'run' : 'runs'} after it: ${n.length > 1 ? 'they turn' : 'it turns'} off.` : ''))(after(s))
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: `It and its settings go for good; its runs stay in the log.${offToo(s)}`, ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id, 'off').catch(fail))
+  // Duplicate: the copy opens in the form, off, to change its time or prompt and turn it on
+  const copy = (s: Schedule) => api.copy?.(s.id).then(c => (edit(c), api.toast?.(`Made ${titleOf(c)}: off until you turn it on`)), fail)
   // Archive: off the list and never run, until it's restored; the toast's Undo restores it
   const archive = async (s: Schedule, on: boolean) =>
     (!on || !after(s).length || (await ask(`Archive ${titleOf(s)}?`, { text: offToo(s).trim(), ok: 'Archive' }))) &&
@@ -482,6 +485,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   </button>
                   <span className="sched-acts">
                     {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
+                    {api.copy && <IconButton icon="copy" title="Duplicate: the same settings and schedule, named … (copy), off" onClick={() => void copy(s)} />}
                     <IconButton icon="archive" title="Archive: off the list, never runs; Archived below brings it back" onClick={() => void archive(s, true)} />
                   </span>
                   <Switch on={s.on} tip={s.on ? (s.after ? 'On: runs as the task above ends' : 'On: runs at its times') : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
@@ -721,6 +725,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             <div className="buttons">
               <span className="muted small">⌘⏎ {form.id ? 'saves' : 'schedules it'} · Esc closes the page, the form stays</span>
               <span className="spacer" />
+              {form.id && api.copy && (
+                <button type="button" disabled={changed} data-tip={changed ? 'Save or cancel your changes first' : 'A copy of it as saved, named … (copy), off: change it and turn it on'} onClick={() => (s => s && void copy(s))(schedules.find(x => x.id === form.id))}>
+                  Duplicate
+                </button>
+              )}
               <button type="button" onClick={() => open(null)}>
                 Cancel
               </button>

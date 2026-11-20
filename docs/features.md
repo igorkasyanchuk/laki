@@ -51,7 +51,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits (Gemini CLI's quota per model too). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
+  beside each plan's limits (Gemini CLI's quota per model too) and Laki AI's OpenRouter credits and spend (an amber dot when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Quiet**: no notifications, sounds, cards or phone pushes for 30 minutes, an hour or until 9:00 (the menu bar's
   menu, ⌘K, `laki quiet 1h`, Settings › Notifications); asks still show in Needs you and `laki alert` still comes. As it
@@ -83,7 +83,7 @@ time and AI money per run (`budget: 60 min, $5`).
   your home folder and a browser (any website, sign-ins kept, Google's too; a screenshot of what's in sight or the whole page, copied or saved) live in the sidebar too, from + at its top. A tab floats
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text in an agent's terminal and *Reply*: it
   goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
-  or issue link shows its card on hover, a picture's path the picture (a file's only, not a web link; a click opens it larger), a Markdown file's
+  or issue link shows its card on hover, the last pictures you dropped or pasted as chips at its top right, a picture's path the picture (a file's only, not a web link; a click opens it larger), a Markdown file's
   (the workspace's or its storage folder's) the page it's written to be; a file's path
   (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees), or let it sleep, lock or shut down once everything is done (a minute's countdown first, once). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
@@ -101,7 +101,7 @@ time and AI money per run (`budget: 60 min, $5`).
   number, and a right click on the PR in the status bar copies its link or `#number`. GitLab too, through `glab`: a
   merge request's state, its pipeline as checks, Ship, merge, approve, close, draft and issues (not yet review threads
   or the PR switches).
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too, with an outline of its headings; a changed HTML file as a page; CSV as a table you can edit), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too, with an outline of its headings; a changed HTML file as a page; CSV as a table you can edit, an Excel workbook's sheets as tables), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots to the agent, and a design mode: pick an element (⌥⌘P), say what to change, and its
   selector, text, styles, a screenshot and its likely source file go to the agent. Drag a file's row (Changes, Files,
@@ -116,7 +116,7 @@ time and AI money per run (`budget: 60 min, $5`).
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the side panel's Info. Deleting a workspace keeps them (Settings › Resources › *Artifacts of deleted workspaces*: open, start a workspace with one, delete) unless you tick *Also delete its artifacts*.
-- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore; or on a GitHub event: CI failing, a PR, an issue, a push; old run workspaces tidied, a failing task retried, then turned off with *Fix*),
+- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore, *Duplicate*; or on a GitHub event: CI failing, a PR, an issue, a push; old run workspaces tidied, a failing task retried, then turned off with *Fix*),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.

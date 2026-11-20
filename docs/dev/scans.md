@@ -514,6 +514,11 @@ changes sets `seenVersion`. A version with no section (a build between releases)
 
 ### Usage
 
+Laki AI's OpenRouter credits (ai.ts `aiCredits`, `Usage.tsx` `creditsPart`, the ring's `.usage-low` dot): `GET /key`
+(`usage_daily`, `usage_weekly`, `usage_monthly`, `limit`, `limit_remaining`) and `GET /credits` (`total_credits`,
+`total_usage`: a key that may read them) with the key, at most every 5 minutes as the ring asks (each minute); each part
+shown when the other is refused; `creditsLow`: under $1 or 10% left of the credits or of the key's own limit.
+
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when
 `settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default). Otherwise each
 account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line

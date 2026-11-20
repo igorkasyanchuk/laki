@@ -612,7 +612,11 @@ selected workspace's PR is in the status bar.
   side panel as it is; *Use for new workspaces in <project>* lays out each new workspace that way once its agent is up
   (starting its shell or Run tab first).
 - Drop files or folders from Finder on a terminal: their paths are typed in (quoted when they need it), for a
-  shell or an agent's prompt.
+  shell or an agent's prompt. A picture pasted (⌘V with an image on the clipboard: a screenshot) is saved and its path
+  typed in the same way.
+- **Recent pictures**: the last 4 pictures you dropped or pasted on a terminal show as small chips at its top right.
+  Move onto one for the picture, its path, size and when; *Open* shows it big, *Copy path*, *Reveal in Finder*.
+  Settings › Terminal › *Recent pictures on a terminal* turns them off.
 - When an agent asks something with numbered choices (a permission prompt, a question), they show as buttons
   under the terminal (not while the sidebar's Needs you list shows its card: the same buttons): a click picks one, as
   the arrows and ⏎ would. Its notification has a button per choice
@@ -646,7 +650,8 @@ and so is what it selects: hold ⌥ to select in Laki instead (⌥-double-click 
 down gets ↑ at its bottom right, back to the top.
 
 **Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow. In Changes or the Review
-tab (the last place you clicked), ⌘F finds words in the diff's lines instead: ⏎ next, ⇧⏎ previous, Esc closes.
+tab (the last place you clicked), ⌘F finds words in the diff's lines instead, and in the Reader in its chat: ⏎ next,
+⇧⏎ previous, Esc closes. With a word or a line selected there (up to 1,000 characters), ⌘F starts with it, found.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
@@ -976,7 +981,9 @@ run fails, saying so.
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or
   with no name after the date and the prompt's first words (*05-10 02:00 update the deps and*), and gets a clock
   in the sidebar. A name a workspace already has gets four random characters (*Nightly deps 05-10-k3x9*).
-- A task's row: its switch turns it off, a click on it edits it, ▷ runs it now, the box archives it: it leaves the list
+- A task's row: its switch turns it off, a click on it edits it, ▷ runs it now, the copy button (or *Duplicate* in its
+  form) makes a copy with the same settings, named *… (copy)* and off until you turn it on (`laki schedule copy <id>`),
+  the box archives it: it leaves the list
   and never runs (the toast's *Undo* brings it back). *Archived*, at the bottom when there are some, lists them: ↺
   restores one as it was (on ones run at their next time), the bin deletes it permanently (`laki schedule
   archive|restore|rm <id>`). *Runs* shows the
@@ -1031,6 +1038,12 @@ Laki AI's sources (its chats, Specs & Brainstorms, agents' `laki ai`, extensions
 check reviews, next prompt guesses, side chats, *Ask me first*), its bar split by agent; and each model's share. *All*
 or one agent, *All models* or one (a row's click too). Kept 90 days in `usage-days.json` and Laki AI's call log; your
 plan bills its own way.
+
+**OpenRouter credits**: with an OpenRouter key for Laki AI (Settings › AI), the plan limits' popup shows the
+account's credits left and what the key spent today, this week and this month (and its own limit, if it has one),
+read from openrouter.ai every 5 minutes. Credits show only to a key that may read them; the key's spend shows either
+way. Under $1 or 10% left, the ring gets an amber dot and the popup says *running low*. `laki limits` prints the same
+line. Laki AI's own call log (Settings › AI) stays as it is.
 
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to
@@ -1179,7 +1192,9 @@ worktree now, in a sandboxed frame, with the CSS, scripts and pictures beside it
 workspace only, not a Terminals one). A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
 row the head) or *Raw*: with the pencil, a click on a cell edits it (Enter: the cell below, Tab: the next, Esc: as it
 was), *+ Row*, *+ Column*, × on a row's number deletes it, ⌘S saves. Only the cells you change change in the file:
-its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest.
+its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest. An Excel workbook (`.xlsx`,
+`.xlsm`, up to 20 MB) shows as tables too, read only: a tab per sheet over it, each cell's value (a formula's last
+result, dates as dates), the first 2,000 rows and 100 columns (fewer rows for a wide one). Open it in its app to change it.
 
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
@@ -2141,7 +2156,8 @@ scheduled tasks at the times they'll run, the runs that happened, and your remin
 the right (every task, run and reminder that day), *Remind me this day* or *+ Reminder* to add one, in a dialog: what,
 when in your words (*in 30m*, *tomorrow at 9am*, *fri at 5pm*, read back as a date as you type; the calendar button
 picks one), and a workspace it's about if any. Words that repeat (*every weekday at 9:30*, *mondays at 10am*, *daily at
-8*) make a reminder that rings each time, shown at every time in the calendar; ticking it off stops it. Laki AI and agents add them too, when you ask
+8*) make a reminder that rings each time, shown at every time in the calendar; ticking it off stops it. A reminder's
+copy button opens a new one filled in with its words, time and workspace. Laki AI and agents add them too, when you ask
 (*remind me to check the release tomorrow at 10*; `laki remind "tomorrow at 10am" Check the release`, `laki remind
 "every weekday at 9:30" Standup`, MCP's
 `laki_reminder`). As one is due Laki notifies you (a toast too, *Open* goes to its workspace); one due while Laki was
@@ -2986,7 +3002,7 @@ laki preset ls | preset add claude-ask --perm auto | preset set claude-ask --mod
 laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the project's memory (Project memory)
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
-laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule archive|restore|rm <id>
+laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule copy <id> | schedule archive|restore|rm <id>
 laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki flow pause <run> | flow resume <run>               # pause a run after its block | go on

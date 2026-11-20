@@ -345,7 +345,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   `archived`: true archives it (`archived` its time, no `next`, never due), false restores it (its `next` again if on),
   no checks, as off and a group;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
-  `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock), `eventTick` (T4, `now`), `scheduleRelease` (`run`:
+  `scheduleRun` (now), `scheduleCopy` (`id`: its settings, `SCHEDULE_IN`, under a new id, named *… (copy)*, off, no
+  runs; an agent's refused), `scheduleTick` (`now`: tests move the clock), `eventTick` (T4, `now`), `scheduleRelease` (`run`:
   a held one, yours only); the CLI's `laki schedule`; T9: `scheduleSet`'s `after` (`{ task, when: 'done' | 'any',
   perDay? }`, or `when: "after <name>"`; not with `trigger` or times; `null` clears it) and `ws: 'parent'`; `scheduleRm`'s
   and archive's `dependents: 'off'` (the tasks after it turned off; without it a task others run after is refused);
@@ -495,7 +496,9 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
 - the agents' CLIs (A9, agentCli.ts): `agentVersions` (`fresh`: npm's newest now; each one's `AgentCli`), `agentUpdate`
   (`agent`: its update in a `script` tab of `update agents`; the user's only, not remote);
-- plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`, `pin`, `open`, `via`, `funnel`, `host`: My domain;
+- plan limits: `usage`; `aiCredits` (Laki AI's OpenRouter: `AiCredits`, its `/key` and `/credits` each on its own,
+  kept 5 minutes (a failure 1, a new key: asked again), `low` under $1 or 10% left; null without a key; an agent's
+  refused); remote access: `remoteStart` (`hours`, `mail`, `pin`, `open`, `via`, `funnel`, `host`: My domain;
   resolves once there's a link), `remoteStop`, `remoteTick` (`now`: tests move the clock), `remoteCheck` (D8: the self-check now, its `RemoteCheck`), `screenLock` (D9: `locked`, main's powerMonitor; the app's only), `remoteLog` (D9: the activity log, `n` newest first; the app's only), `remotePair` (Add a device: a
   new link for 10 minutes), `remoteDeviceRm` (`id`, or `all`: Revoke, Forget devices; the app's only, never remote's), `remoteDeviceSet`
   (`id`, `level`: `answer` or `full`, D7's Answer only; the app's only);

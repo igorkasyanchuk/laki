@@ -34,6 +34,7 @@ type Bridge = {
   pathOf?(f: File): string
   openExternal(url: string): void
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
+  reveal?(path: string): Promise<boolean> // a file shown in Finder (main's reveal): false when it isn't there
   dragOut?(path: string, root: string): void // C10: macOS's file drag of a file inside root, from its row (main's drag-out)
   uninstalled?(cask: boolean): void // B3: Laki was uninstalled: main quits the app (to the Trash on a yes)
   share?(url: string): void // U15: macOS's Share menu for a link, at the pointer (main's share-menu)

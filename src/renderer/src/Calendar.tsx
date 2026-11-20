@@ -129,6 +129,7 @@ export function CalendarPage({ schedules, runs, reminders, waits = [], workspace
       {i.r?.every && <Icon name="repeat" size={10} />}
       <span className="cal-text" {...act(() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules()))}>{i.text}</span>
       {i.kind === 'reminder' && <IconButton icon="alertCircle" title={i.r!.important ? 'Important: rings as a card on screen (a click: a notification again)' : 'Make it important: it rings as a card on screen, until you close it'} className={`cal-imp ${i.r!.important ? 'on' : ''}`} onClick={() => api.set({ id: i.r!.id, important: !i.r!.important }).catch(() => {})} />}
+      {i.kind === 'reminder' && <IconButton icon="copy" title="Duplicate: a new reminder with its words, its time to change" className="cal-rm" onClick={() => (r => (setErr(''), setForm({ at: r.every ?? local(r.at, ' '), text: r.text, ws: r.ws ?? '', ...(r.important && { important: true }) })))(i.r!)} />}
       {i.kind === 'reminder' && <IconButton icon="x" title="Remove the reminder" className="cal-rm" onClick={() => api.rm(i.r!.id).catch(() => {})} />}
     </div>
   )

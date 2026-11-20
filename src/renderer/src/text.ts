@@ -1089,3 +1089,7 @@ export function inAim(prev: [number, number], cur: [number, number], rect: { lef
 export const TIP_WAIT = 350
 export const TIP_WARM = 1000
 export const tipDelay = (now: number, lastShown: number) => (now - lastShown < TIP_WARM ? 0 : TIP_WAIT)
+
+// ⌘F with text selected (Find.tsx' FindBar, Diff.tsx' DiffFind): what it starts with. One line, 1,000 characters at most,
+// trimmed; else nothing (the query stays)
+export const seedOf = (sel?: string) => (s => (s && s.length <= 1000 && !/[\n\r]/.test(s) ? s : ''))(sel?.trim())
