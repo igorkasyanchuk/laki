@@ -43,10 +43,10 @@ function useFx(s: string) {
 }
 export function Glyph({ s }: { s: string }) {
   const fx = useFx(s)
-  if (s === 'running' || s === 'setup') return <span className={`glyph spin g-${s}`} role="img" aria-label={SAID[s]} title={s} />
+  if (s === 'running' || s === 'setup') return <span className={`glyph spin g-${s}`} role="img" aria-label={SAID[s]} />
   const [icon, size] = MARKS[s] ?? ['minus', 8]
   return (
-    <span className={`glyph g-${s || 'none'}`} data-fx={fx} role="img" aria-label={SAID[s] ?? 'a terminal'} title={s || 'shell'}>
+    <span className={`glyph g-${s || 'none'}`} data-fx={fx} role="img" aria-label={SAID[s] ?? 'a terminal'}>
       <Icon name={icon} size={size} />
     </span>
   )

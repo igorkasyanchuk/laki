@@ -238,6 +238,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         tabIndex={-1}
         data-keys={moves || undefined}
         data-group={pin ? 'pinned' : w.project}
+        data-peek={(!narrow && !view.projects.find(p => p.id === w.project)?.kind) || undefined /* its peek card names it: no native title on its cut name (ui.tsx MidText) */}
         onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
         onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
         onPointerLeave={() => peekAt()}

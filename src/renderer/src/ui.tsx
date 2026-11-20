@@ -192,6 +192,8 @@ export function MidText({ text, className = '', floor }: { text: string; classNa
   const whole = useRef<HTMLSpanElement>(null)
   const cut = useRef<HTMLSpanElement>(null)
   const [max, setMax] = useState(Infinity)
+  const [tipped, setTipped] = useState(false) // inside an element with Laki's tooltip or peek card (data-tip, data-peek): no native one beside it
+  useLayoutEffect(() => setTipped(!!box.current?.parentElement?.closest('[data-tip], [data-peek]')), [])
   // the estimate (characters by the whole name's average width) can be a little long: one fewer until the cut fits
   useLayoutEffect(() => {
     const c = cut.current
@@ -217,7 +219,7 @@ export function MidText({ text, className = '', floor }: { text: string; classNa
     return () => (midRo!.unobserve(el), void fits.delete(el))
   }, [text])
   return (
-    <span ref={box} className={`mid ${className}`} title={text}>
+    <span ref={box} className={`mid ${className}`} title={max !== Infinity && !tipped ? text : undefined /* the whole name, only when it's cut */}>
       <span ref={cut} className="mid-cut" aria-hidden>{midCut(text, max)}</span>
       <span ref={whole} className="mid-whole">{text}</span>
     </span>
