@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The keyboard's focus ring settles onto its control as macOS's does (not with Motion › None or Reduce motion).
 - Tooltips warm up as macOS's do: moving from one to the next shows it at once, and the keyboard's focus shows a control's tooltip too.
 - The Review tab says what to review next: once every file is viewed, a bar names the next workspace (a PR with green checks first, then the oldest change) and ⌘⏎ opens it; ⌘K has *Review next* too.
 - The Review tab's files show as a tree by folder (List | Tree over them): each folder says how many of its files are viewed and has a Viewed box for all of them; the diffs follow the tree's order.

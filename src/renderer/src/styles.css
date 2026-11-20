@@ -3783,7 +3783,13 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .leaving { pointer-events: none !important; animation: v-fade-out var(--t-fast) var(--ease-out) forwards !important; } /* !important: over an element's own (Motion: high's) */
 .leaving:is(.menu, .toast), .leaving :is(.menu, .modal) { animation: v-out var(--t-fast) var(--ease-out) forwards !important; }
 @keyframes v-stagger { from { opacity: 0; translate: 0 var(--sp-1); } }
+@keyframes focus-in { from { outline-offset: var(--sp-3); outline-color: transparent; } } /* "from" only: each control's own offset and color end it */
 @media (prefers-reduced-motion: no-preference) {
+  /* V21: the keyboard's focus ring settles on its control, as macOS's: wider and clear, then where its own rule puts it.
+     All in :where(), no specificity, and first in this block: a control's own animation (a selected segment's v-sel, a
+     row's, Motion high's, a listening mic's) wins, so none is replaced or replayed as the focus leaves. Not a text field
+     (the mouse focuses those too) nor a box-shadow ring (.swatch, .ob-themes): outlines only */
+  :where(html:not([data-motion='none']) :is(button, [role='button'], [role='switch'], [role='tab'], [role='menuitem'], a, summary, [tabindex]):not(input, textarea, select, .swatch, .ob-themes):focus-visible) { animation: focus-in var(--t-fast) var(--ease-out); }
   /* V19: a menu's items, ⌘K's first screen and Needs you's cards as it unfolds come in one after another (18 ms apart,
      up to the 8th): only as it opens (data-opening, its first 250 ms: ui.tsx Menu, Palette.tsx; html[data-unfold] as a
      click unfolds), not as a filter or a new card changes them; only opacity and place: clicks and keys at once */

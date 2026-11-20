@@ -1432,7 +1432,11 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   pointer, a submenu's item on the side it touches), as do LinkPeek (the pointer) and the sidebar's peek (its row's middle):
   their `transform-origin`. Menus' items and ⌘K's first screen stagger in (CSS `sibling-index()`) only while
   `data-opening` (their first 250 ms), Needs you's cards under `html[data-unfold]`. A switch's knob widens by half on a
-  pointer press (`--knob`, not from Space: `:focus-visible`); a segmented fill gives to 0.97.
+  pointer press (`--knob`, not from Space: `:focus-visible`); a segmented fill gives to 0.97. V21: a keyboard focus ring
+  (`:focus-visible` on a button, link, summary, `[tabindex]` or a button-like role; not a text field, `.swatch` or
+  `.ob-themes`, whose rings are box-shadows) settles in by `focus-in` (from `outline-offset: var(--sp-3)` and a clear
+  color: each control's own rule is the end), `--t-fast`; all in `:where()` and first in the reduced-motion block, so any
+  animation of the control's own wins (none replaced, none replayed on blur); off with Motion: None and Reduce motion.
 - **Frosted's floating sidebar** (V16, looks.css, on the window's glass): the main area's background moves to `.app`, so it
   spans the window; the rail, the list and Terminals' strip are one glass panel on it (`--lift-2`, a lit top, the window's
   corners less `--sp-2`, squircle where `corner-shape` is, `clip-path` cutting each shadow where two meet). `.main` keeps
