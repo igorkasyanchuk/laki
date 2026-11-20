@@ -1136,3 +1136,23 @@ test("B8: git tidy: a gone worktree folder's record pruned; a branch and a kept 
   const row = (await rig.rpc('diskUsage', { again: true })).projects.find((x: any) => x.id === p.id)
   assert.ok(row.git.bytes > 0 && row.git.loose >= 0 && row.git.packs >= 0 && row.git.tidied.at === done.at, JSON.stringify(row.git))
 })
+
+test('worktree changes in one repo one at a time: 10 new workspaces while 10 others are deleted, each call resolves and git worktree list is the state', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const old = []
+  for (let i = 0; i < 10; i++) old.push(await rig.rpc('wsNew', { project: p.id, preset: 'none', name: `old ${i}` }))
+  // an add reads every worktree's admin folder while a remove or prune deletes one: never both at once
+  const made = await Promise.all([...Array.from({ length: 10 }, (_, i) => rig.rpc('wsNew', { project: p.id, preset: 'none', name: `new ${i}` })), ...old.map(w => rig.rpc('wsRm', { id: w.id }))])
+  assert.equal(made.length, 20)
+  const v = await rig.rpc('state')
+  const paths = v.workspaces.filter((w: any) => w.project === p.id && w.kind !== 'local').map((w: any) => realpathSync(w.path)).sort()
+  assert.equal(paths.length, 10)
+  const listed = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: rig.repo, encoding: 'utf8' })
+    .split('\n')
+    .filter(l => l.startsWith('worktree '))
+    .map(l => realpathSync(l.slice(9)))
+    .filter(x => x !== realpathSync(rig.repo) && basename(x) !== '.spare')
+    .sort()
+  assert.deepEqual(listed, paths)
+})

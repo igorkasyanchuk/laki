@@ -1140,19 +1140,23 @@ const hasRef = (at: At, ref: string) => git(at, 'rev-parse', '--verify', '--quie
 // before 2.32 ignores the key) unless the project's own git config, here or on its host, sets checkout.workers
 // ponytail: read once per repo per daemon (by its host and path); a config changed meanwhile counts after a restart
 const ownWorkers = new Map<string, Promise<boolean>>()
-// one add at a time per repo: two at once race in git itself (an add reads every worktree's admin folder, another's
-// half written: "failed to read .git/worktrees/<id>/commondir"), as several workspaces made at once did
-const adding = new Map<string, Promise<unknown>>()
+// one git worktree change at a time per repo (by its host and path): two at once race in git itself (an add reads every
+// worktree's admin folder, .git/worktrees/<id>, while another add half writes one or a remove, move or prune deletes it:
+// "failed to read .git/worktrees/<id>/commondir"), as several workspaces made at once did. run: the git worktree call
+// alone (never a teardown script or a hook around it); a failed one never blocks the next. gitTidy's prune (under nice) too
+const worktreeQueue = new Map<string, Promise<unknown>>()
+export function worktreeDo<T>(proj: Pick<Project, 'host' | 'path'>, run: () => Promise<T>): Promise<T> {
+  const key = `${proj.host ?? ''}:${proj.path}`
+  const go = (worktreeQueue.get(key) ?? Promise.resolve()).then(run)
+  worktreeQueue.set(key, go.catch(() => {}))
+  return go
+}
 function worktreeAdd(proj: Project, ...args: string[]) {
   if (!proj.host) roomFor(args.find(a => isAbsolute(a)) ?? proj.path, 'make a worktree') // R4: where the worktree goes (the worktrees folder may be on another volume)
   const key = `${proj.host ?? ''}:${proj.path}`
   let own = ownWorkers.get(key)
   if (!own) ownWorkers.set(key, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
-  const go = (adding.get(key) ?? Promise.resolve())
-    .then(() => own)
-    .then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
-  adding.set(key, go.catch(() => {}))
-  return go
+  return worktreeDo(proj, async () => git(proj, ...((await own) ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
 }
 
 // Laki's own gh calls since the hour began, by kind (pr view, api graphql…): its log says how many each hour (ghHour),
@@ -3337,7 +3341,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is; by URL: a number
       // would be gh's default repo's
       await exec(at, 'gh', ['pr', 'checkout', pr.url, '--branch', local!], { timeout: 120000 }).catch(async e => {
-        await git(proj, 'worktree', 'remove', '--force', path).catch(() => {})
+        await worktreeDo(proj, () => git(proj, 'worktree', 'remove', '--force', path)).catch(() => {})
         throw new Error(`gh pr checkout ${pr.number}: ${ghSays(e, `PR ${pr.number}`)}`)
       })
       branch = (proj.host ? await git(at, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => '') : headOf(path)) || local! // as syncBranches reads it (rev-parse may say heads/<b> beside a remote's <b>)
@@ -3559,7 +3563,7 @@ const sparing = new Set<string>()
 export const spareBusy = () => sparing.size
 const onPower = () => (process.platform !== 'darwin' ? Promise.resolve(true) : run('pmset', ['-g', 'batt']).then(r => !/Battery Power/.test(r.stdout) || Number(/(\d+)%/.exec(r.stdout)?.[1] ?? 100) >= 20, () => true))
 export async function spareDrop(proj: Project) {
-  if (!proj.host && existsSync(sparePath(proj))) await git(proj, 'worktree', 'remove', '--force', sparePath(proj)).catch(() => rmSync(sparePath(proj), { recursive: true, force: true }))
+  if (!proj.host && existsSync(sparePath(proj))) await worktreeDo(proj, () => git(proj, 'worktree', 'remove', '--force', sparePath(proj))).catch(() => rmSync(sparePath(proj), { recursive: true, force: true }))
 }
 export async function spareMake(proj: Project) {
   const path = sparePath(proj)
@@ -3584,12 +3588,12 @@ async function spareTake(proj: Project, path: string, branch: string, base: stri
   const spare = sparePath(proj)
   if (!state.settings?.spareWorktree || proj.host || sparing.has(proj.id) || !existsSync(spare)) return false
   try {
-    await git(proj, 'worktree', 'move', spare, path)
+    await worktreeDo(proj, () => git(proj, 'worktree', 'move', spare, path))
     await git({ path }, 'switch', '-c', branch, ...(noTrack ? ['--no-track'] : []), base)
     return true
   } catch (e) {
     log(`spare worktree for ${proj.id} not taken: ${firstLine(e)}`)
-    await git(proj, 'worktree', 'remove', '--force', existsSync(path) ? path : spare).catch(() => {})
+    await worktreeDo(proj, () => git(proj, 'worktree', 'remove', '--force', existsSync(path) ? path : spare)).catch(() => {})
     return false
   }
 }
@@ -3673,14 +3677,14 @@ async function teardown(ws: Workspace) {
     await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, none), timeout: 60000 }).then(r => ran(0, ranOf(r)), e => ran(typeof e.code === 'number' ? e.code : null, ranOf(e)))
   if (ws.kind === 'worktree' && ws.codespace === undefined) {
     const proj = state.projects.find(p => p.id === ws.project)
-    if (proj) await git(proj, 'worktree', 'remove', '--force', ws.path).catch(() => {})
+    if (proj) await worktreeDo(proj, () => git(proj, 'worktree', 'remove', '--force', ws.path)).catch(() => {})
     // what git didn't remove: only a folder Laki made. An imported one's is git's alone to remove, which checks it's
     // that repo's worktree (its .git file points back): .git/worktrees/<x>/gitdir, which any agent can write, may name
     // any folder of yours (~/Documents), and git worktree list then shows it
     if (!ws.host) ws.imported || rmSync(ws.path, { recursive: true, force: true }) // ponytail: a locked one stays (git wants -f twice): your lock
     else if (ws.path.includes(`/.laki-host/${mac()}/worktrees/`)) await exec({ host: ws.host, path: '/' }, 'rm', ['-rf', '--', ws.path]).catch(() => {}) // only one Laki made
     // after the dir is gone: drops the registration a failed remove left, which would block re-adding the branch
-    if (proj) await git(proj, 'worktree', 'prune').catch(() => {})
+    if (proj) await worktreeDo(proj, () => git(proj, 'worktree', 'prune')).catch(() => {})
   }
   rmSync(setupMarker(ws), { force: true })
   if (ws.codespace !== undefined) {
@@ -3984,7 +3988,7 @@ export async function wsRepair(o: { ws: string; how?: unknown } & GateOpts) {
   if (o.how === 'forget') {
     stopWs(w)
     if (existsSync(w.path)) w.imported = true
-    await git(proj, ...SAFE_GIT, 'worktree', 'prune').catch(() => {})
+    await worktreeDo(proj, () => git(proj, ...SAFE_GIT, 'worktree', 'prune')).catch(() => {})
     broken.delete(w.id)
     wsLog(w, `broken worktree (${b.kind}): archived as it is`)
     archivedNow(w, o)
@@ -3992,14 +3996,14 @@ export async function wsRepair(o: { ws: string; how?: unknown } & GateOpts) {
   } else if (o.how === 'recreate') {
     if (existsSync(w.path)) throw new Error(`a folder is at ${w.path} now: Laki won't make the worktree over it`)
     if (!(await hasRef(proj, `refs/heads/${w.branch}`))) throw new Error(`its branch ${w.branch} is gone too: nothing to check out`)
-    await git(proj, ...SAFE_GIT, 'worktree', 'prune').catch(gitErr('prune'))
-    await git(proj, ...SAFE_GIT, 'worktree', 'add', w.path, w.branch).catch(gitErr('add'))
+    await worktreeDo(proj, () => git(proj, ...SAFE_GIT, 'worktree', 'prune')).catch(gitErr('prune'))
+    await worktreeDo(proj, () => git(proj, ...SAFE_GIT, 'worktree', 'add', w.path, w.branch)).catch(gitErr('add'))
     if (await archiveHas(proj.path, w.id)) await archiveBack(w).catch(e => (lost = `its saved files didn't come back (${(e as Error).message}): git has them at refs/laki/archived/${w.id}`))
     else lost = `uncommitted files, if it had any: it's back at ${w.branch}'s last commit`
   } else if (o.how === 'relink') {
     if (b.kind === 'gone') throw new Error('its folder is gone: recreate it')
     // it exits 1 as it says what it repaired (".git file broken"): the link, read again, says whether it worked
-    const said = await git(proj, ...SAFE_GIT, 'worktree', 'repair', w.path).then(() => '', e => String(e.stderr || e.message).trim())
+    const said = await worktreeDo(proj, () => git(proj, ...SAFE_GIT, 'worktree', 'repair', w.path)).then(() => '', e => String(e.stderr || e.message).trim())
     const still = brokenOf(w)
     if (still) throw new Error(`git worktree repair didn't fix it: ${said || still.detail}`)
   } else throw new Error('how? recreate, relink or forget')

@@ -11,7 +11,7 @@
 import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { GitFacts, Project } from '../shared/types.ts'
-import { changed, exec, git, log, projectArchived, save, settingUp, state, tabStatus } from './core.ts'
+import { changed, exec, git, log, projectArchived, save, settingUp, state, tabStatus, worktreeDo } from './core.ts'
 import { making } from './hosts.ts'
 import { du } from './resources.ts'
 
@@ -56,7 +56,7 @@ export async function gitTidy(o: { project: string; asked?: boolean }) {
     }
     // a live worktree of Laki's whose folder isn't there (an external volume unplugged): no prune, its record stays
     const gone = state.workspaces.find(w => w.project === p.id && !w.archived && w.kind === 'worktree' && !p.host && !existsSync(w.path))
-    if (!gone) await nice(p, ['worktree', 'prune'])
+    if (!gone) await worktreeDo(p, () => nice(p, ['worktree', 'prune'])) // in line with the workspaces' adds and removes
     await nice(p, ['-c', 'gc.reflogExpire=never', '-c', 'gc.reflogExpireUnreachable=never', 'maintenance', 'run', '--auto'])
     p.tidied = { at: Date.now(), ...(gone && { skipped: `worktree prune: ${gone.name ?? gone.id}'s folder isn't there` }) }
     log(`git tidy ${p.id}: done${gone ? ` (no prune: ${gone.path} is missing)` : ''}`)
