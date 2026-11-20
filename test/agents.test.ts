@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, sleep, until } from './helpers.ts'
 
 test('hooks drive status; queue delivered on Stop; done until viewed', async t => {
   const rig = await fresh(t)
@@ -328,6 +328,7 @@ test("No, and say why: the tell-why choice, then the words as its next prompt; a
   await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)?.status === 'idle', 'its turn done')
   await rig.rpc('send', { target: tab, text: 'menuno' })
   await until(async () => (await ask()).options.length === 2, 'the Yes / No menu')
+  await sleep(1000) // answer's hold (core's answering: a second after the last one): a built daemon gets here sooner
   assert.deepEqual(await rig.rpc('answer', { tab, n: 2, say: 'build it first' }), { picked: 'No' })
   await until(async () => /picked: No\r?\n[\s\S]*answer: build it first/.test(await screen()), 'the No, then the words')
 })
