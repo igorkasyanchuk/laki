@@ -218,38 +218,11 @@ export function PrCard({ pr, linked, face = true, onOpen }: { pr: PRInfo; linked
   )
 }
 
-// U3: the status bar's switches as one chip, Auto n/3: a click opens them over it, each with what it does, for this PR
+// the PR's switches in its ⋯ menu (App's prMenu): each one's words
 export const AUTO_LABEL: Record<AutoKey, string> = { autoFix: 'Fix failing CI', autoReview: 'Address new review comments', autoMerge: 'Fix merge conflicts', autoLand: 'Merge when green' } // the PR menu's (App's prMenu)
 export const AUTO_SAYS: Record<AutoKey, string> = { autoFix: 'Failing CI goes to the agent, with the logs', autoReview: 'New review comments go to the agent', autoMerge: 'Conflicts with the base: the agent merges it in', autoLand: 'Laki merges it once every check passes' }
-function AutoChip({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
-  const [at, setAt] = useState<{ left: number; bottom: number } | null>(null)
-  useEffect(() => {
-    if (!at) return
-    const off = (e: Event) => (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target as Element).closest?.('.auto-pop, .auto-chip')) && setAt(null)
-    addEventListener('pointerdown', off, true)
-    addEventListener('keydown', off, true)
-    return () => (removeEventListener('pointerdown', off, true), removeEventListener('keydown', off, true))
-  }, [!!at])
-  if (w.prLinked || !w.pr) return <AutoToggles w={w} onToggle={onToggle} /> // a linked PR: its words why none
-  const keys: AutoKey[] = w.allow?.land ? [...FIXES, 'autoLand'] : FIXES
-  const n = keys.filter(k => w[k]).length
-  return (
-    <>
-      <button className={`pr auto-chip ${n ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={!!at} data-tip={at ? undefined : `What Laki does for ${prName(w.pr)} on its own: ${n} of ${keys.length} on · click: change`} onClick={e => (r => setAt(a => (a ? null : { left: Math.max(8, Math.min(r.left, innerWidth - 328)), bottom: innerHeight - r.top + 6 })))(e.currentTarget.getBoundingClientRect())}>
-        Auto {n}/{keys.length}
-      </button>
-      {at && (
-        <div className="ws-peek auto-pop" role="dialog" aria-label={`On its own, for ${prName(w.pr)}`} style={at}>
-          <b>On its own, for {prName(w.pr)}</b>
-          <AutoToggles w={w} onToggle={onToggle} keys={keys} row={k => <span className="muted small">{AUTO_SAYS[k]}</span>} />
-        </div>
-      )}
-    </>
-  )
-}
-
-// the status bar's PR: number, CI, then the Auto chip; resting on its number: PrCard above it
-// onMenu: a right click (Refresh from GitHub)
+// the status bar's PR: number, CI, then its ⋯ (refresh, merge, the switches: what Laki does on its own); resting on its
+// number: PrCard above it. onMenu: the ⋯ and a right click
 export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; face?: boolean; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void }) {
   const pr = w.pr
   const [card, setCard] = useState<{ left: number; bottom: number } | null>(null)
@@ -260,6 +233,8 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
     timer.current = window.setTimeout(() => (r => setCard(r ? { left: Math.max(8, Math.min(r.left, innerWidth - 328)), bottom: innerHeight - r.top + 6 } : null))(el?.getBoundingClientRect()), el ? (card ? 0 : 450) : 200)
   }
   if (!pr) return null
+  const keys: AutoKey[] = w.allow?.land ? [...FIXES, 'autoLand'] : FIXES
+  const n = pr.state === 'OPEN' && pr.forge !== 'gitlab' && !w.prLinked ? keys.filter(k => w[k]).length : -1 // -1: no switches
   return (
     <span className="pr-status" onContextMenu={onMenu}>
       <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} aria-label={`${prName(pr)}: ${pr.title ?? ''}`} onPointerEnter={e => e.pointerType === 'mouse' && rest(e.currentTarget)} onPointerLeave={() => rest()} onPointerDown={() => (clearTimeout(timer.current), setCard(null))} onClick={() => onOpen(pr.url)}>
@@ -281,11 +256,11 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
               <Icon name="conflict" size={11} /> conflicts
             </button>
           )}
-          {pr.forge !== 'gitlab' && <AutoChip w={w} onToggle={onToggle} />}
+          {w.prLinked && <AutoToggles w={w} onToggle={onToggle} /> /* a linked PR: its words why none */}
         </>
       )}
       {onMenu && (
-        <button type="button" className="pr pr-more" aria-haspopup="menu" aria-label={`${prName(pr)}: more`} data-tip={`${prName(pr)}: refresh, merge, what Laki does on its own…`} onClick={onMenu}>
+        <button type="button" className={`pr pr-more ${n > 0 ? 'on' : ''}`} aria-haspopup="menu" aria-label={`${prName(pr)}: more`} data-tip={`${prName(pr)}: refresh, merge${n < 0 ? '…' : `, what Laki does on its own (${n} of ${keys.length} on)`}`} onClick={onMenu}>
           <Icon name="more" size={12} />
         </button>
       )}

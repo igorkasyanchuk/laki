@@ -3149,9 +3149,9 @@ export function App() {
           ...(allows(w, 'close') ? [{ label: `Close ${K}…`, icon: 'x', danger: true, tip: `Closes it on ${F} without merging, after you confirm`, run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
-    // the PR switches (Info's AutoChip, the status bar's Auto n/3): what goes to the agent on its own, for a PR on this
-    // workspace's own branch (a linked one's agent can't push to it), when it's yours (another's: its Auto chip still has them)
-    ...(w.pr?.state === 'OPEN' && w.pr.forge !== 'gitlab' && !w.prLinked && w.pr.mine !== false
+    // the PR switches (only here: the status bar's ⋯, its right click, the workspace's ⋯ › PR #n): what goes to the agent
+    // on its own, for a PR on this workspace's own branch (a linked one's agent can't push to it)
+    ...(w.pr?.state === 'OPEN' && w.pr.forge !== 'gitlab' && !w.prLinked
       ? [
           null,
           { head: 'Laki does on its own' } as MenuItem,

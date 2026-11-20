@@ -2985,7 +2985,7 @@ export function SettingsPage(p: {
             <>
               <h2>Pull requests</h2>
               <p className="muted small">
-                The status bar's <b>fix CI</b>, <b>review</b> and <b>fix conflicts</b> switches, on for a workspace with a PR, send these to its agent
+                The PR's ⋯ in the status bar has the <b>fix CI</b>, <b>review</b> and <b>fix conflicts</b> switches: on for a workspace with a PR, they send these to its agent
                 (when it's idle), and so do the side panel's Info send buttons. <code className="var">{'{{pr}}'}</code> is the PR's number, <code className="var">{'{{url}}'}</code> its link,{' '}
                 <code className="var">{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
