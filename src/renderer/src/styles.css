@@ -1804,8 +1804,9 @@ mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
 .fr-next .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fr-next kbd { margin-left: var(--sp-3); opacity: 0.8; }
 .fr-viewed .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fr-shape button { display: inline-grid; place-items: center; height: var(--h-s); padding: 0 var(--sp-2); color: var(--muted); } /* the files column's List | Tree */
-.fr-shape button.on { color: var(--fg); }
+.fr-shape { flex: none; } /* the files column's List | Tree, in its filter box */
+.fr-shape button, .fr-shape button:first-child, .fr-shape button:last-child { display: inline-grid; place-items: center; height: var(--h-s); margin: 0; padding: 0 var(--sp-2); border: none; border-radius: var(--r-s); background: none; color: var(--muted); }
+.fr-filter .fr-shape button.on { color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .fr-files .sp-row.fr-done .sp-name { opacity: 0.55; }
 .fr-files .sp-row > svg { color: var(--accent-ink); }
 .fr-diff { overflow: auto; padding-bottom: 40px; }

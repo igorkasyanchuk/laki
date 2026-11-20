@@ -79,7 +79,7 @@ type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key
 // U2: the review's keys, as its Keys popover lists them (the handler: onKey)
 const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent']]
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
-type Next = { name: string; files: number; pr: string; more: number; key?: string; go: () => void }
+type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
 export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight, next }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: Next }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
@@ -542,9 +542,6 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
               onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), q ? setQ('') : e.currentTarget.blur())}
               data-tip="Words in a path, or a glob: spec/**, *.rb, **/*_test.go (no /: the file's name)"
             />
-            <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
-          </div>
-          <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
             {files.length > 1 && (
               <span className="seg fr-shape">
                 <button type="button" className={tree ? '' : 'on'} aria-pressed={!tree} aria-label="List" data-tip="Every file with its folder" onClick={() => pickTree(false)}>
@@ -555,6 +552,9 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 </button>
               </span>
             )}
+            <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
+          </div>
+          <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
             <span className="grow">
               {nViewed} of {files.length} viewed{query && ` · ${listed.length} shown`}
             </span>
@@ -841,7 +841,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         <div className="fr-next" data-go={notes.length ? undefined : ''} role="status">
           <Icon name="check" />
           <span className="grow">
-            Next: <b>{next.name}</b> · {next.files} file{next.files === 1 ? '' : 's'} · {next.pr}
+            Next: <b>{next.name}</b>{next.files !== undefined && ` · ${next.files} file${next.files === 1 ? '' : 's'}`} · {next.pr}
             {next.more > 0 && <span className="muted"> · {next.more} more to review</span>}
           </span>
           <button type="button" className="primary sm" onClick={next.go} data-tip={notes.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
