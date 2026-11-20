@@ -63,6 +63,15 @@ test("the proxy: a tab's listed hosts only, by its own password; a refused host 
   let r = await ask(one, CONNECT(`localhost:${port}`, auth(one)), 'hi')
   assert.equal(r.status, 'HTTP/1.1 200 Connection Established')
   assert.equal(r.rest, 'hi!')
+  // a port net.connect won't take: 400, never thrown in the listener (the daemon's uncaughtException); the proxy answers on
+  let thrown: unknown
+  const caught = (e: unknown) => void (thrown = e)
+  process.once('uncaughtException', caught)
+  t.after(() => process.off('uncaughtException', caught))
+  for (const bad of ['99999', '0', '65536']) assert.match((await ask(one, CONNECT(`localhost:${bad}`, auth(one)))).status, /^HTTP\/1\.1 400/, bad)
+  assert.match((await ask(one, `GET http://localhost:99999/x HTTP/1.1\r\nHost: localhost\r\nProxy-Authorization: Basic ${auth(one)}\r\nConnection: close\r\n\r\n`)).status, /^HTTP\/1\.1 400/, "plain http's URL refuses the port itself")
+  assert.equal((await ask(one, CONNECT(`localhost:${port}`, auth(one)), 'still')).rest, 'still!')
+  assert.equal(thrown, undefined)
   // not listed: 403, and its card
   r = await ask(one, CONNECT('evil.example:443', auth(one)))
   assert.match(r.status, /^HTTP\/1\.1 403/)

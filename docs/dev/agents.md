@@ -504,6 +504,9 @@ main.ts), a CONNECT or a plain http request answered only with the tab's own `Pr
 password new each start: `proxyFor`; another tab's or none: 407) to a host on its list now (core's hook: `netList` as
 claude's, its project's `netAllow` read at each request, `hostOn`: the name or a `*.`'s subdomain); else 403 and its
 card (`boxed` with `host`, `wrap`: *Allow this domain in this project*, `projectNetAllow`, the user's alone, AGENT_NO).
+Any port of a listed host (a list is hosts only, `NET_HOST`); a CONNECT's port outside 1 to 65535 is 400 before
+`connect` (which throws there, synchronously: in the listener that was the daemon's uncaughtException), and any other
+throw of `connect` is a 502 (plain http's `new URL` refuses a bad port itself: 400).
 Its port and passwords in `<data>/net-proxy.json` (0600, `DATA_SECRETS`): the next daemon listens on that port again and
 a kept terminal's URL (the pty host's) goes on; `proxyDrop` as a tab closes. `MODEL_HOST` has gemini's, grok's and
 codex's sign-in hosts for a wrapped one (OpenCode's provider: its card). `test/net-proxy.test.ts` (the proxy alone),

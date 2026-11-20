@@ -43,16 +43,25 @@ function onConnect(req: IncomingMessage, sock: Socket, head: Buffer) {
   if (!who) return no(sock, 407, 'Proxy Authentication Required', AUTH)
   const at = /^(\[[0-9a-f:.]+\]|[^:[\]\s]+):(\d{1,5})$/i.exec(req.url ?? '')
   if (!at) return no(sock, 400, 'Bad Request')
+  // a port net.connect takes (0 or past 65535 throws in this listener: the agent never answered, the daemon's trouble)
+  // ponytail: any port of a listed host: a list is hosts only (claude's allowedDomains, NET_HOST), host:port if one matters
+  const port = Number(at[2])
+  if (!(port >= 1 && port <= 65535)) return no(sock, 400, 'Bad Request')
   const host = at[1].replace(/^\[|\]$/g, '')
   if (!hostOn(host, who.list)) return hooks.refused(who.tab, host), no(sock, 403, 'Forbidden', `x-laki: ${why(host)}\r\n`)
   let open = false
-  const up = connect(Number(at[2]), host, () => {
-    open = true
-    sock.write('HTTP/1.1 200 Connection Established\r\n\r\n')
-    if (head.length) up.write(head)
-    up.pipe(sock)
-    sock.pipe(up)
-  })
+  let up: Socket
+  try {
+    up = connect(port, host, () => {
+      open = true
+      sock.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+      if (head.length) up.write(head)
+      up.pipe(sock)
+      sock.pipe(up)
+    })
+  } catch {
+    return no(sock, 502, 'Bad Gateway') // any other throw of connect's (a host it won't take) answered here, not uncaught; no upstream to end
+  }
   up.on('error', () => (open ? sock.destroy() : no(sock, 502, 'Bad Gateway')))
   sock.on('close', () => up.destroy())
 }
