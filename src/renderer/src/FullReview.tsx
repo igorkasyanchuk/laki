@@ -79,8 +79,9 @@ type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key
 // U2: the review's keys, as its Keys popover lists them (the handler: onKey)
 const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent']]
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
+// (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight, next }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: Next }) {
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight, next }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -426,8 +427,9 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
-  const goNext = useRef(next?.go)
-  goNext.current = next?.go
+  const nx = d && nViewed === files.length ? next?.() : undefined
+  const goNext = useRef(nx?.go)
+  goNext.current = nx?.go
   useEffect(() => {
     const f = () => goNext.current?.()
     window.addEventListener('laki-review-next', f)
@@ -836,16 +838,16 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           </>
         )}
       </div>
-      {next && d && nViewed === files.length && (
+      {nx && (
         // every file viewed (or none changed): the next one to review, ⌘⏎ (keydown.ts reviewNext) unless comments wait to go
         <div className="fr-next" data-go={notes.length ? undefined : ''} role="status">
           <Icon name="check" />
           <span className="grow">
-            Next: <b>{next.name}</b>{next.files !== undefined && ` · ${next.files} file${next.files === 1 ? '' : 's'}`} · {next.pr}
-            {next.more > 0 && <span className="muted"> · {next.more} more to review</span>}
+            Next: <b>{nx.name}</b>{nx.files !== undefined && ` · ${nx.files} file${nx.files === 1 ? '' : 's'}`} · {nx.pr}
+            {nx.more > 0 && <span className="muted"> · {nx.more} more to review</span>}
           </span>
-          <button type="button" className="primary sm" onClick={next.go} data-tip={notes.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
-            Review it{next.key && !notes.length && <kbd>{next.key}</kbd>}
+          <button type="button" className="primary sm" onClick={nx.go} data-tip={notes.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
+            Review it{nx.key && !notes.length && <kbd>{nx.key}</kbd>}
           </button>
         </div>
       )}

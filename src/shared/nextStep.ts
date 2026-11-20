@@ -38,7 +38,8 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
 
 // the Review tab's Next (FullReview's bar, ⌘K's Review next): the other workspaces whose next step is a review, their
 // changes to look at (look) or an open PR ready to merge or waiting for its reviews; not archived, nor hidden by
-// Recording mode (veiled). A PR with green checks first, then the oldest change waiting (its agent's finish, else made)
+// Recording mode (veiled), and only one with a Review tab (as App's reviewTab: its diff scanned, with files or an open
+// PR). A PR with green checks first, then the oldest change waiting (its agent's finish, else made)
 export function reviewQueue(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | 'settings'>, current?: string | null): WorkspaceView[] {
   const w = veiled(v as View)
   const git = new Map(w.projects.map(p => [p.id, p.git !== false]))
@@ -49,7 +50,8 @@ export function reviewQueue(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | '
   }
   const since = (x: WorkspaceView) => (at => (at.length ? Math.min(...at) : (x.created ?? 0)))(w.tabs.filter(t => t.workspace === x.id && t.done && t.needAt).map(t => t.needAt!))
   const green = (x: WorkspaceView) => (x.pr?.state === 'OPEN' && x.pr.checks === 'pass' ? 0 : 1)
-  return w.workspaces.filter(x => x.id !== current && !x.archived && git.get(x.project) !== false && review(x)).sort((a, b) => green(a) - green(b) || since(a) - since(b))
+  const tab = (x: WorkspaceView) => !!x.stat && (x.stat.files > 0 || x.pr?.state === 'OPEN') && x.browser === undefined && !x.term
+  return w.workspaces.filter(x => x.id !== current && !x.archived && git.get(x.project) !== false && tab(x) && review(x)).sort((a, b) => green(a) - green(b) || since(a) - since(b))
 }
 
 // the edge glow (settings.edgeGlow): an ask or a secret request waits in a tab that isn't the focused one, the window

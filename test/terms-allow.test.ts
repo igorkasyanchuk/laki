@@ -15,13 +15,13 @@ test('S1: an allowed terminal is listed with its tty, what started it and its la
   const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
   const laki = `${process.execPath} --experimental-strip-types --no-warnings ${fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))}`
   const go = join(rig.home, 'go')
+  const app = await connect(rig) // first: a call from a terminal with no window open is refused at once
   // one terminal (sh under script, its session's leader) for two calls, the second once the test says go
   const c = spawn('script', ['-q', '/dev/null', 'sh', '-c', `${laki} rename ${ws.id} first; while [ ! -f ${go} ]; do sleep 0.1; done; ${laki} rename ${ws.id} second`], { env: rig.env, stdio: ['ignore', 'pipe', 'pipe'] })
   let out = ''
   c.stdout.on('data', d => (out += d))
   const ended = new Promise(ok => c.on('exit', ok))
   t.after(() => c.kill())
-  const app = await connect(rig)
   const name = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name
   let ask: any = await seen(app, (e: any) => e.ev === 'termAsk', 'the first call asks')
   await app.call('termAnswer', { req: ask.req, allow: true })

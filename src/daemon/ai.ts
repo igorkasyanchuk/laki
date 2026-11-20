@@ -7,6 +7,7 @@
 // event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { readFile as readFileAsync } from 'node:fs/promises'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { abortAfter, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { dirname, extname, join, sep } from 'node:path'
@@ -1532,9 +1533,16 @@ const PERM_WHY = 'It needs your OK: Laki AI may use only its laki tools unasked.
 // ponytail: the whole log is read for the page and the totals; keep only this month's lines if it ever gets slow
 // the Usage page's Laki AI rows (main.ts usageDays): a day (this Mac's), what made it (aiFromOf) and model each, from the
 // call log and the one before it (rotateLog's .1), since a time
-export function aiUsage(since: number) {
+export async function aiUsage(since: number) {
   const sum = new Map<string, { day: string; from: AiFrom; model: string; tokens: number; cost: number }>()
-  for (const c of [...readCalls(`${callsPath}.1`), ...readCalls()]) {
+  const text = (await Promise.all([`${callsPath}.1`, callsPath].map(f => readFileAsync(f, 'utf8').catch(() => '')))).join('\n') // off the event loop: up to two 10 MB logs
+  for (const l of text.split('\n')) {
+    let c: AiCall
+    try {
+      c = l && JSON.parse(l)
+    } catch {
+      continue
+    }
     if (!(c?.at >= since)) continue
     const t = new Date(c.at)
     const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
@@ -1546,9 +1554,9 @@ export function aiUsage(since: number) {
   }
   return [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 }))
 }
-function readCalls(path = callsPath): AiCall[] {
+function readCalls(): AiCall[] {
   try {
-    return readFileSync(path, 'utf8')
+    return readFileSync(callsPath, 'utf8')
       .split('\n')
       .flatMap(l => {
         try {

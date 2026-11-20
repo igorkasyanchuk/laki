@@ -1109,11 +1109,13 @@ export function Tips() {
     let timer = 0
     let cur: HTMLElement | null = null
     let showing = false
+    let byFocus = false // cur's tip is the keyboard focus's (focusout hides only that one: a pressed button's cur stays)
     let lastShown = -Infinity // when a tip was last on screen (performance.now()): the warm-up's
     const hide = () => {
       clearTimeout(timer)
       if (showing) lastShown = performance.now()
       showing = false
+      byFocus = false
       cur = null
       setTip(null)
     }
@@ -1146,8 +1148,9 @@ export function Tips() {
       if (!el?.dataset?.tip || el === cur || !el.matches(':focus-visible')) return
       hide()
       after(el, TIP_FOCUS)
+      byFocus = true
     }
-    const focusOut = (e: FocusEvent) => void (e.target === cur && hide())
+    const focusOut = (e: FocusEvent) => void (byFocus && e.target === cur && hide())
     // pressed: none, and none again until the pointer leaves it (over its icon, a child, would start one: a menu it
     // opens would have the tip over its first item)
     const down = (e: PointerEvent) => (hide(), (cur = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]') ?? null))

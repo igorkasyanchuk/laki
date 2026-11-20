@@ -104,8 +104,8 @@ test("reviewQueue: the other workspaces to review, a green PR first, then the ol
   const v = {
     projects: [{ id: 'p' }, { id: 'q', private: true }, { id: 'f', git: false }],
     settings: { recording: true },
-    workspaces: [w('cur'), w('old'), w('new'), w('green', { pr: pr() }), w('red', { pr: pr({ checks: 'fail' }) }), w('waits', { created: 7, pr: pr({ review: 'REVIEW_REQUIRED', checks: undefined }) }), w('ci', { pr: pr({ checks: 'pending' }) }), w('draft', { pr: pr({ draft: true }) }), w('gone', { archived: true }), w('hid', { private: true }), w('hidp', { project: 'q' }), w('folder', { project: 'f' }), w('busy')],
-    tabs: [done('cur', 1), done('old', 5), done('new', 9), done('gone', 1), done('hid', 1), done('hidp', 1), done('folder', 1), tab({ id: 't-busy', workspace: 'busy', status: 'running' })],
+    workspaces: [w('cur'), w('old'), w('new'), w('green', { pr: pr() }), w('red', { pr: pr({ checks: 'fail' }) }), w('waits', { created: 7, pr: pr({ review: 'REVIEW_REQUIRED', checks: undefined }) }), w('ci', { pr: pr({ checks: 'pending' }) }), w('draft', { pr: pr({ draft: true }) }), w('gone', { archived: true }), w('hid', { private: true }), w('hidp', { project: 'q' }), w('folder', { project: 'f' }), w('busy'), w('unscanned', { stat: undefined }), w('nothing', { stat: { add: 0, del: 0, files: 0, dirty: 0 } })],
+    tabs: [done('cur', 1), done('old', 5), done('new', 9), done('gone', 1), done('hid', 1), done('hidp', 1), done('folder', 1), done('unscanned', 1), done('nothing', 1), tab({ id: 't-busy', workspace: 'busy', status: 'running' })], // unscanned, nothing: no Review tab
   } as any
   assert.deepEqual(reviewQueue(v, 'cur').map(x => x.id), ['green', 'old', 'waits', 'new']) // waits: no finish, by when it was made
   // Recording mode off: the private ones are back

@@ -548,7 +548,7 @@ const api = {
   prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   mergeQueueStart: p => prMod.mergeQueueStart({ wss: p.wss }), // the user's only (gates.ts AGENT_NO): each PR's project allows merging, its merge gates apply
   mergeQueueStop: p => prMod.mergeQueueStop({ project: p.project }),
-  usageDays: () => (u => ({ ...u, ai: aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
+  usageDays: async () => (async u => ({ ...u, ai: await aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
   prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review
@@ -1972,6 +1972,8 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     let agent = !app && (far || !!core.state.settings?.recording)
     let known = far || app // a local one's first state waits for whose it is (hello below): none before it, masked then whole
     let mine = app // S3: its process is known and in no agent's tab (your window, your own listener): the view's secrets go to it
+    let wsTerm: core.Term | undefined // S1: a terminal of its own: the secrets only while it's allowed (Revoke, 12 hours idle: masked from the next state on)
+    const mineNow = () => mine && (!wsTerm || core.termOk(wsTerm))
     const c: core.Conn = {
       id: ++clientSeq,
       remote: far,
@@ -1986,16 +1988,17 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         // ponytail: the state only; a hidden workspace's events (its asks, its notices) still reach an agent that listens here
         const isState = typeof msg === 'string' ? msg.startsWith('{"ev":"state"') : (msg as any)?.ev === 'state'
         if (isState && !known) return
-        if (isState && (!mine || (agent && core.state.settings?.recording)))
-          msg = (m => ({ ...m, view: (v => (far && v.remote ? { ...v, remote: { ...v.remote, level: remoteMod.levelOf(c.device) } } : v))((v => (mine ? v : masked(v)))(agent ? recorded(m.view) : m.view)) }))(typeof msg === 'string' ? JSON.parse(msg) : msg) // D7: a remote page's own access
+        const yours = isState && mineNow() // a state only: termOk per message would run on every byte of a screen
+        if (isState && (!yours || (agent && core.state.settings?.recording)))
+          msg = (m => ({ ...m, view: (v => (far && v.remote ? { ...v, remote: { ...v.remote, level: remoteMod.levelOf(c.device) } } : v))((v => (yours ? v : masked(v)))(agent ? recorded(m.view) : m.view)) }))(typeof msg === 'string' ? JSON.parse(msg) : msg) // D7: a remote page's own access
         const text = typeof msg === 'string' ? msg : JSON.stringify(msg) // a string: JSON already (core's state, made once for all)
         ws.send(ch ? ch.seal(text) : text) // S14: remote access's, sealed
       },
     }
     // looked up as it opens: the app's first keys don't wait. In Recording mode the first state waits for it (S7)
     if (app) apps.add(c)
-    const who = c.remote ? undefined : (local.set(c, req.socket), app ? undefined : peerOf(req.socket).then(({ tab: t, term }) => void ((agent = !!t && !!core.agentCaller({ ws: t.workspace, tab: t.id })), (mine = !agent && (!term || core.termOk(term)))), () => void (agent = true))) // S1: a terminal not allowed yet: no secrets
-    own.set(c, () => mine)
+    const who = c.remote ? undefined : (local.set(c, req.socket), app ? undefined : peerOf(req.socket).then(({ tab: t, term }) => void ((agent = !!t && !!core.agentCaller({ ws: t.workspace, tab: t.id })), (mine = !agent), (wsTerm = term)), () => void (agent = true))) // S1: a terminal not allowed yet: no secrets
+    own.set(c, () => mineNow())
     core.clients.add(c)
     // the first state once it's known whose it is (S3: yours has the secrets, and it draws it once); remote's at once
     // a slow lookup (lsof under load): a masked one meanwhile, so the window isn't left with none

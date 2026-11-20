@@ -263,9 +263,10 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
   const active = days.filter(k => [...per.get(k)!.values()].some(x => x.tokens > 0)).length
   const whereTop = where.slice(0, WHERE_SHOWN)
   const whereRest = where.slice(WHERE_SHOWN)
+  const split = new Map(group(r => `${r.src}|${r.agent}`).map(y => [y.key, y])) // each source's agents, in one pass
   const whereRow = (x: (typeof where)[number]) => {
     const n = srcName(x.src)
-    const parts = agents.map(a => [a, sum(rows.filter(r => r.src === x.src && r.agent === a))] as const).filter(([, v]) => v[by] > 0) // its agents, each its color
+    const parts = agents.flatMap(a => (v => (v && v[by] > 0 ? [[a, v] as const] : []))(split.get(`${x.src}|${a}`))) // its agents, each its color
     return (
       <li key={x.key} data-tip={[`${n.name} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`, ...(parts.length > 1 ? parts.map(([a, v]) => `${nameOfAgent(a)}: ${show(v)}`) : [])].join('\n')}>
         <span className="usage-where-name">
