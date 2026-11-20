@@ -11,7 +11,7 @@ import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
-import { promptQuestions, agentChat, aiAnswer, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
+import { promptQuestions, agentChat, aiAnswer, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
@@ -548,7 +548,7 @@ const api = {
   prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   mergeQueueStart: p => prMod.mergeQueueStart({ wss: p.wss }), // the user's only (gates.ts AGENT_NO): each PR's project allows merging, its merge gates apply
   mergeQueueStop: p => prMod.mergeQueueStop({ project: p.project }),
-  usageDays: () => metersMod.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
+  usageDays: () => (u => ({ ...u, ai: aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
   prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review

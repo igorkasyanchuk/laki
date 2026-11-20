@@ -219,3 +219,4 @@ needs no bump: `settingsSet` keeps any field.
 210: `termShells` (`check`?: the shells Settings › Terminal › Shell offers, the login one, or one path checked); settings' `termShell` (what shell tabs start; the user's alone; `term.shell` cap).
 211: widgets' `more` place (an item in the sidebar foot's ⋯ menu, a button's click; `BUTTON_PLACES`): widgetSet takes it (`widget.more` cap).
 212: `termList`, `termRevoke { key }` (S1's allowed terminals: tty, cmd, chain, `at`, `lastAt`, `start`; the app's window only; one with no call for 12 hours goes; `term.allow` cap).
+213: `usageDays`' rows name their workspace (`ws`), and `ai`: Laki AI's calls by day, `from` (`AI_FROM`: what made each, `aiFromOf`) and model; `AiCall.from` (`usage.where` cap).

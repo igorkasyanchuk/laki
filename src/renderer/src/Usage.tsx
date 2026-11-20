@@ -5,7 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, IconButton, Page, act } from './ui'
 
-import { type AgentUsage, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -205,33 +205,85 @@ function UsagePop({ anchor, rows, top, today, asks, onUse, onDays, onClose }: { 
 }
 
 // the Usage page (the popup's Today › By day and model, ⌘K): what Laki's claude and codex tabs used each day, at the
-// API's list prices, from their transcripts (the daemon's usageDays: USAGE_KEEP days back), for one agent or model or all;
-// a bar a day, then each model's share. Single series in the accent: the filters pick what it is
-export type UsageDay = { day: string; agent: string; model: string; tokens: number; cost: number }
+// API's list prices, from their transcripts (the daemon's usageDays: USAGE_KEEP days back), and Laki AI's own calls (its
+// call log, by what made each: ai), for one agent or model or all. A bar a day, stacked by agent (each its own color, in
+// SERIES order: a filter never repaints one), then Where it went (each workspace's tabs and each of Laki AI's sources),
+// then each model's share
+export type UsageDay = { day: string; agent: string; model: string; ws?: string; tokens: number; cost: number }
+export type UsageAi = { day: string; from: AiFrom; model: string; tokens: number; cost: number }
+type Row = { day: string; agent: string; model: string; src: string; tokens: number; cost: number } // src: ws:<id> or ai:<from>
 const RANGES = [7, 30, 90]
+const LAKI = 'laki' // Laki AI's series
+const SERIES = ['claude', 'codex', 'gemini', 'grok', 'opencode', LAKI] // the stack's order and colors, fixed
+const COLOR: Record<string, string> = { claude: 'var(--tc-orange)', codex: 'var(--tc-blue)', gemini: 'var(--tc-green)', grok: 'var(--tc-yellow)', opencode: 'var(--tc-pink)', [LAKI]: 'var(--tc-purple)' }
+const nameOfAgent = (a: string) => (a === LAKI ? 'Laki AI' : (AGENT_NAMES[a as keyof typeof AGENT_NAMES] ?? NAMES[a] ?? a))
+const WHERE_SHOWN = 8 // Where it went's rows before More
 const dayKey = (t: Date) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
 const money = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleString()}`
-export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: number; rows: UsageDay[] }>; onClose: () => void }) {
-  const [d, setD] = useState<{ keep: number; rows: UsageDay[] } | null>(null)
+const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '')
+// what a workspace's id names: its name and project (gone: none)
+export type WsNames = (id: string) => { name: string; project?: string; archived?: boolean } | undefined
+export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames }) {
+  const [d, setD] = useState<{ keep: number; rows: Row[] } | null>(null)
   const [err, setErr] = useState('')
   const [range, setRange] = useState(30)
   const [agent, setAgent] = useState('')
   const [model, setModel] = useState('')
   const [by, setBy] = useState<'cost' | 'tokens'>('cost')
-  useEffect(() => void load().then(setD, e => setErr(String(e?.message ?? e))), [])
+  useEffect(
+    () =>
+      void load().then(
+        r => setD({ keep: r.keep, rows: [...r.rows.map(x => ({ ...x, src: `ws:${x.ws ?? ''}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
+        e => setErr(String(e?.message ?? e)),
+      ),
+    [],
+  )
   const days = Array.from({ length: range }, (_, i) => (t => dayKey(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (range - 1 - i))))(new Date())) // by the calendar: a DST day is still one
   const inRange = (d?.rows ?? []).filter(r => r.day >= days[0])
-  const agents = [...new Set(inRange.map(r => r.agent))]
+  const agents = SERIES.filter(a => inRange.some(r => r.agent === a)).concat([...new Set(inRange.map(r => r.agent))].filter(a => !SERIES.includes(a)))
   const models = [...new Set(inRange.filter(r => !agent || r.agent === agent).map(r => r.model))].sort()
   const rows = inRange.filter(r => (!agent || r.agent === agent) && (!model || r.model === model))
-  const per = new Map(days.map(k => [k, { tokens: 0, cost: 0 }]))
-  for (const r of rows) (x => x && ((x.tokens += r.tokens), (x.cost += r.cost)))(per.get(r.day))
-  const total = { tokens: rows.reduce((n, r) => n + r.tokens, 0), cost: rows.reduce((n, r) => n + r.cost, 0) }
-  const top = Math.max(...[...per.values()].map(x => x[by]), 0)
-  const byModel = [...rows.reduce((m, r) => (x => ((x.tokens += r.tokens), (x.cost += r.cost), m))(m.get(`${r.agent}|${r.model}`) ?? (m.set(`${r.agent}|${r.model}`, { agent: r.agent, model: r.model, tokens: 0, cost: 0 }), m.get(`${r.agent}|${r.model}`)!)), new Map<string, { agent: string; model: string; tokens: number; cost: number }>()).values()].sort((a, b) => b[by] - a[by])
+  const shown = agents.filter(a => rows.some(r => r.agent === a)) // the stack's series now, in SERIES order
+  const per = new Map(days.map(k => [k, new Map<string, { tokens: number; cost: number }>()]))
+  for (const r of rows) (m => m && (x => ((x.tokens += r.tokens), (x.cost += r.cost)))(m.get(r.agent) ?? (m.set(r.agent, { tokens: 0, cost: 0 }), m.get(r.agent)!)))(per.get(r.day))
+  const dayTotal = (k: string) => [...per.get(k)!.values()].reduce((n, x) => n + x[by], 0)
+  const sum = (rs: Row[]) => ({ tokens: rs.reduce((n, r) => n + r.tokens, 0), cost: rs.reduce((n, r) => n + r.cost, 0) })
+  const total = sum(rows)
+  const top = Math.max(...days.map(dayTotal), 0)
+  const group = <K extends string>(key: (r: Row) => K) => [...rows.reduce((m, r) => (x => ((x.tokens += r.tokens), (x.cost += r.cost), m))(m.get(key(r)) ?? (m.set(key(r), { key: key(r), agent: r.agent, model: r.model, src: r.src, tokens: 0, cost: 0 }), m.get(key(r))!)), new Map<K, { key: K; agent: string; model: string; src: string; tokens: number; cost: number }>()).values()].sort((a, b) => b[by] - a[by] || b.tokens - a.tokens)
+  const byModel = group(r => `${r.agent}|${r.model}`)
+  const where = group(r => r.src)
+  const srcName = (src: string) => {
+    if (src.startsWith('ai:')) return { name: AI_FROM[src.slice(3) as AiFrom] ?? src.slice(3), kind: 'Laki AI' }
+    const w = names(src.slice(3))
+    return w ? { name: w.name, kind: `${w.project ?? 'workspace'}${w.archived ? ' · archived' : ''}` } : { name: 'A deleted workspace', kind: src.slice(3) || 'no workspace' }
+  }
   const show = (x: { tokens: number; cost: number }) => (by === 'cost' ? money(x.cost) : `${tokensText(x.tokens)} tokens`)
   const label = (k: string) => new Date(`${k}T12:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-  const active = [...per.values()].filter(x => x.tokens > 0).length
+  const active = days.filter(k => [...per.get(k)!.values()].some(x => x.tokens > 0)).length
+  const whereTop = where.slice(0, WHERE_SHOWN)
+  const whereRest = where.slice(WHERE_SHOWN)
+  const whereRow = (x: (typeof where)[number]) => {
+    const n = srcName(x.src)
+    const parts = agents.map(a => [a, sum(rows.filter(r => r.src === x.src && r.agent === a))] as const).filter(([, v]) => v[by] > 0) // its agents, each its color
+    return (
+      <li key={x.key} data-tip={[`${n.name} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`, ...(parts.length > 1 ? parts.map(([a, v]) => `${nameOfAgent(a)}: ${show(v)}`) : [])].join('\n')}>
+        <span className="usage-where-name">
+          <span className="usage-where-label">{n.name}</span>
+          <span className="muted">{n.kind}</span>
+        </span>
+        <span className="usage-where-bar" aria-hidden>
+          <span style={{ width: total[by] ? `${Math.max(1, (x[by] / total[by]) * 100)}%` : 0 }}>
+            {parts.map(([a, v]) => (
+              <i key={a} style={{ flexGrow: v[by], background: COLOR[a] ?? 'var(--muted)' }} />
+            ))}
+          </span>
+        </span>
+        <span className="num">{show(x)}</span>
+        <span className="num muted">{pct(x[by], total[by])}</span>
+      </li>
+    )
+  }
   return (
     <Page title="Usage" onClose={onClose} wide>
       <div className="usage-page">
@@ -246,7 +298,7 @@ export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: numbe
           <span className="seg">
             {['', ...agents].map(a => (
               <button key={a} className={agent === a ? 'on' : ''} onClick={() => (setAgent(a), setModel(''))}>
-                {a ? (NAMES[a] ?? a) : 'All agents'}
+                {a ? nameOfAgent(a) : 'All'}
               </button>
             ))}
           </span>
@@ -272,51 +324,87 @@ export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: numbe
               <div><span className="muted small">{range} days</span><b>{show(total)}</b></div>
               <div><span className="muted small">A day it worked</span><b>{active ? show({ tokens: total.tokens / active, cost: total.cost / active }) : '–'}</b></div>
               <div><span className="muted small">{by === 'cost' ? 'Tokens' : '≈ API price'}</span><b>{by === 'cost' ? tokensText(total.tokens) : money(total.cost)}</b></div>
+              <div><span className="muted small">The most</span><b className="usage-tile-name">{where[0] ? srcName(where[0].src).name : '–'}</b></div>
             </div>
-            <div className="usage-chart" role="img" aria-label={`${by === 'cost' ? 'Cost' : 'Tokens'} a day, the last ${range} days`}>
-              <span className="usage-max muted small">{top ? show({ tokens: top, cost: top }) : ''}</span>
-              <div className="usage-bars">
-                {days.map(k => {
-                  const x = per.get(k)!
-                  return (
-                    <span key={k} className="usage-col" data-tip={`${label(k)} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`}>
-                      <i style={{ height: top ? `${Math.max(x[by] ? 2 : 0, (x[by] / top) * 100)}%` : 0 }} />
-                    </span>
-                  )
-                })}
-              </div>
-              <div className="usage-axis muted small">
-                <span>{label(days[0])}</span>
-                <span>Today</span>
-              </div>
-            </div>
-            {byModel.length ? (
-              <table className="usage-table">
-                <thead>
-                  <tr>
-                    <th>Model</th>
-                    <th>Agent</th>
-                    <th className="num">Tokens</th>
-                    <th className="num">≈ API price</th>
-                    <th className="num">Share</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byModel.map(m => (
-                    <tr key={`${m.agent}|${m.model}`} className={model === m.model ? 'on' : ''} {...act(() => setModel(model === m.model ? '' : m.model))} data-tip={model === m.model ? 'All models again' : 'Only this model'}>
-                      <td className="mono">{m.model}</td>
-                      <td>{NAMES[m.agent] ?? m.agent}</td>
-                      <td className="num">{tokensText(m.tokens)}</td>
-                      <td className="num">{money(m.cost)}</td>
-                      <td className="num">{total[by] ? `${Math.round((m[by] / total[by]) * 100)}%` : ''}</td>
-                    </tr>
+            <div className="usage-chart">
+              {shown.length > 0 && (
+                <ul className="usage-legend" aria-label="Agents">
+                  {shown.map(a => (
+                    <li key={a}>
+                      <span className="usage-swatch" style={{ background: COLOR[a] ?? 'var(--muted)' }} aria-hidden />
+                      {nameOfAgent(a)} <span className="muted num">{show(sum(rows.filter(r => r.agent === a)))}</span>
+                    </li>
                   ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code and Codex tabs, from their transcripts, as they work.</p>
+                </ul>
+              )}
+              <div className="usage-plot" role="img" aria-label={`${by === 'cost' ? 'Cost' : 'Tokens'} a day by agent, the last ${range} days`}>
+                <span className="usage-max muted small">{top ? show({ tokens: top, cost: top }) : ''}</span>
+                <div className="usage-bars">
+                  {days.map(k => {
+                    const m = per.get(k)!
+                    const n = dayTotal(k)
+                    const parts = shown.filter(a => m.get(a)?.[by])
+                    return (
+                      <span key={k} className="usage-col" data-tip={[`${label(k)} · ${show({ tokens: [...m.values()].reduce((t, x) => t + x.tokens, 0), cost: [...m.values()].reduce((t, x) => t + x.cost, 0) })}`, ...parts.map(a => `${nameOfAgent(a)}: ${show(m.get(a)!)}`)].join('\n')}>
+                        <span className="usage-stack" style={{ height: top ? `${Math.max(n ? 2 : 0, (n / top) * 100)}%` : 0 }}>
+                          {parts.map(a => (
+                            <i key={a} style={{ flexGrow: m.get(a)![by], background: COLOR[a] ?? 'var(--muted)' }} />
+                          ))}
+                        </span>
+                      </span>
+                    )
+                  })}
+                </div>
+                <div className="usage-axis muted small">
+                  <span>{label(days[0])}</span>
+                  <span>Today</span>
+                </div>
+              </div>
+            </div>
+            {where.length > 0 && (
+              <section className="usage-where">
+                <h3>Where it went</h3>
+                <ul>{whereTop.map(whereRow)}</ul>
+                {whereRest.length > 0 && (
+                  <details>
+                    <summary className="muted small">{whereRest.length} more · {show(sum(rows.filter(r => whereRest.some(x => x.src === r.src))))}</summary>
+                    <ul>{whereRest.map(whereRow)}</ul>
+                  </details>
+                )}
+              </section>
             )}
-            <p className="muted small">At the API's list prices, from each chat's transcript: your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
+            {byModel.length ? (
+              <section className="usage-where">
+                <h3>By model</h3>
+                <table className="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Agent</th>
+                      <th className="num">Tokens</th>
+                      <th className="num">≈ API price</th>
+                      <th className="num">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byModel.map(m => (
+                      <tr key={m.key} className={model === m.model ? 'on' : ''} {...act(() => setModel(model === m.model ? '' : m.model))} data-tip={model === m.model ? 'All models again' : 'Only this model'}>
+                        <td className="mono">{m.model}</td>
+                        <td>
+                          <span className="usage-swatch" style={{ background: COLOR[m.agent] ?? 'var(--muted)' }} aria-hidden /> {nameOfAgent(m.agent)}
+                        </td>
+                        <td className="num">{tokensText(m.tokens)}</td>
+                        <td className="num">{money(m.cost)}</td>
+                        <td className="num">{pct(m[by], total[by])}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            ) : (
+              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code and Codex tabs, from their transcripts, as they work, and Laki AI's calls.</p>
+            )}
+            <p className="muted small">At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price): your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
           </>
         )}
       </div>

@@ -9,7 +9,7 @@ import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
 import { type ChatHit, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
-import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
+import { type AgentUsage, UsagePage, type UsageAi, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
 import { DigestCard, NoticeCard, ShownDialog, ShownPops } from './Shown'
@@ -483,7 +483,7 @@ export function Pages({ app }: { app: AppCtx }) {
             />
           </Lazy>
         ))(flowsOf(dialog))}
-      {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[] }>('usageDays')} onClose={() => setDialog(null)} />}
+      {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>('usageDays')} names={id => (w => w && { name: wsName(w), project: view.projects.find(x => x.id === w.project)?.name, archived: w.archived })(view.workspaces.find(w => w.id === id))} onClose={() => setDialog(null)} />}
       {dialog === 'bird' && settings.birdView !== false && (
         <BirdPage
           view={view}

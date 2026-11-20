@@ -4,7 +4,7 @@
 // and pays, what it spent, what it can do. Off, or OpenRouter without a key: a note.
 import { sendKeyName, sendTip } from '../../shared/keys'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { AI_MODEL, type AiCall, type AiMsg, type AiPast, type AiSettings, type AiTotals } from '../../shared/types'
+import { AI_FROM, AI_MODEL, aiFromOf, type AiCall, type AiMsg, type AiPast, type AiSettings, type AiTotals } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import { ago } from './Info'
 import { linkWorkspaces, wsLink } from './links'
@@ -392,7 +392,7 @@ export function AiPage({
                       <span className="ai-ask">{c.ask || '(an image)'}</span>
                       {cost && <span className="mono">{c.backend === 'codex' ? 'plan' : money(c.cost)}</span>}
                       <span className="ai-meta">
-                        {BACKENDS[c.backend]} · <span className="mono">{c.model}</span> · {tokens(c.in)}{c.cachedIn ? ` (${tokens(c.cachedIn)} cached)` : ''} → {tokens(c.out)} tokens · {(c.ms / 1000).toFixed(1)}s
+                        {AI_FROM[aiFromOf(c)]} · {BACKENDS[c.backend]} · <span className="mono">{c.model}</span> · {tokens(c.in)}{c.cachedIn ? ` (${tokens(c.cachedIn)} cached)` : ''} → {tokens(c.out)} tokens · {(c.ms / 1000).toFixed(1)}s
                         · {ago(c.at)}
                       </span>
                     </div>

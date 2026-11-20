@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Usage (⌘K): each day's bar is stacked by agent, Laki AI among them, and *Where it went* shows what used the tokens: each workspace and Laki AI's chats, extensions, workflows, memory compaction and Done check reviews. Its table's figures line up again.
 - The PR's ⋯ in the status bar (and the workspace's ⋯ › *PR #n*) has the PR switches: fix failing CI, address new review comments, fix merge conflicts and merge when green, each checked when on.
 - The keyboard's focus ring settles onto its control as macOS's does (not with Motion › None or Reduce motion).
 - Tooltips warm up as macOS's do: moving from one to the next shows it at once, and the keyboard's focus shows a control's tooltip too.

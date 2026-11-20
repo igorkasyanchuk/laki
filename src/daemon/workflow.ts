@@ -1513,7 +1513,7 @@ function llmSend(b: Block, vars: Record<string, string>, ask: string, f: (text: 
   const prompt = [f(b.text ?? '', vars), b.out?.length && outAsk(b.out)].filter(Boolean).join('\n\n')
   return async (signal, say) => {
     say(`${blockName(b)}: asks ${b.model || 'Settings › AI’s model'}`, prompt)
-    const a = await aiComplete({ model: b.model, prompt, system: b.system && f(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask })
+    const a = await aiComplete({ model: b.model, prompt, system: b.system && f(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask, from: 'workflows' })
     say(`${a.model} answered${a.cost ? ` ($${a.cost.toFixed(4)})` : ''}`, a.text)
     return { exit: 'ok', why: `${a.model}: “${clip(a.text, 80)}”`, vars: { [`steps.${b.id}.answer`]: a.text.slice(-ANSWER_MAX) }, text: a.text, cost: a.cost }
   }

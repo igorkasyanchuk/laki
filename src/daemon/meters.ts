@@ -267,14 +267,15 @@ function keepDays(tab: Tab, m: Meter) {
   writeAtomic(daysPath, JSON.stringify(k))
 }
 // usageDays: the Usage page's rows, a day, agent and model each (YYYY-MM-DD, this Mac's day), every chat's added up
+// and its workspace's id (ws: the Usage page's Where it went names it, or says it's gone)
 export function usageDays() {
-  const sum = new Map<string, { day: string; agent: string; model: string; tokens: number; cost: number }>()
+  const sum = new Map<string, { day: string; agent: string; model: string; ws: string; tokens: number; cost: number }>()
   for (const c of Object.values(keptNow().chats))
     for (const [d, models] of Object.entries(c.days))
       for (const [model, v] of Object.entries(models)) {
         const day = (([y, m, dd]) => `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`)(d.split('-'))
-        const key = `${day}|${c.agent}|${model}`
-        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, tokens: 0, cost: 0 }), sum.get(key)!)
+        const key = `${day}|${c.agent}|${model}|${c.ws}`
+        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, ws: c.ws, tokens: 0, cost: 0 }), sum.get(key)!)
         x.tokens += v.tokens
         x.cost += v.cost
       }

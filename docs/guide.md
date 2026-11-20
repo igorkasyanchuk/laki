@@ -1024,9 +1024,13 @@ run fails, saying so.
   (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.
 
 **Usage** (the ring's popup › *By day and model*, or ⌘K): tokens and ≈ cost at the API's list prices a day, for the
-last 7, 30 or 90 days, from each Claude Code and Codex tab's transcript in Laki: a bar a day (*$* or *Tokens*), the
-total, a day's average, and each model's share. *All agents* or one, *All models* or one (a row's click too). Kept 90
-days in `usage-days.json`; your plan bills its own way.
+last 7, 30 or 90 days, from each Claude Code and Codex tab's transcript in Laki and Laki AI's own calls: a bar a day
+(*$* or *Tokens*) stacked by agent, each in its color with a legend (Laki AI is one); the total, a day's average, and
+what used the most; *Where it went*: each workspace (its project, or *archived*, or *A deleted workspace*) and each of
+Laki AI's sources (its chats, Specs & Brainstorms, agents' `laki ai`, extensions, workflows, memory compaction, Done
+check reviews, next prompt guesses, side chats, *Ask me first*), its bar split by agent; and each model's share. *All*
+or one agent, *All models* or one (a row's click too). Kept 90 days in `usage-days.json` and Laki AI's call log; your
+plan bills its own way.
 
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to

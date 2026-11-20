@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { helpFind, helpParts, type HelpPart } from '../shared/help.ts'
 import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
-import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, memoryOf, modelCheck, presets, prs, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -35,7 +35,7 @@ const pastDir = join(dir, 'ai-chats') // the AI page's earlier chats: <at>-<hex>
 const PAST_MAX = 100 // ponytail: the newest kept; older ones go as a new one is kept
 const PAST_ID = /^\d+-[0-9a-f]{6}$/
 const callsPath = join(dir, 'ai-calls.jsonl')
-const logCall = (call: AiCall) => (rotateLog(callsPath), appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })) // R7: past 10 MB, the older ones in .1
+const logCall = (call: AiCall) => (rotateLog(callsPath), appendFileSync(callsPath, JSON.stringify({ ...call, from: aiFromOf(call) }) + '\n', { mode: 0o600 })) // R7: past 10 MB, the older ones in .1
 const home = join(dir, 'ai') // the CLI agents' folder: no repo, no project's CLAUDE.md or AGENTS.md
 const KEEP = 200 // the conversation's messages kept
 const TOOL_TEXT = 4000 // what a tool's result may give the model; the page shows less
@@ -481,7 +481,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   const r: Run = { text: '', model: backend === 'endpoint' ? state.settings?.aiEndpoint?.model || backend : s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
   const where = typeof p.context === 'string' ? p.context.trim().slice(0, CONTEXT_MAX) : ''
   const o: Opts = { t, ask: where ? `${ask || 'See the image.'}\n\n[Where the user is in Laki as they ask this: ${where}]` : ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
-  const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120) }
+  const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120), from: t.id.startsWith('widget:') ? 'extensions' : AGENT_CHAT.test(t.id) ? 'agents' : t.id ? 'specs' : 'chat' }
   try {
     await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o)) // openrouter: Your endpoint's too
     call.ok = true
@@ -719,11 +719,11 @@ async function openrouter(o: Opts) {
 // one OpenRouter call (aiComplete, aiDecide: workflows' blocks, memory's compaction) waits 5 minutes at most, its
 // caller's stop too (LAKI_AI_WAIT_MS: tests' shorter)
 const waitOf = (signal?: AbortSignal) => abortAfter(Number(process.env.LAKI_AI_WAIT_MS) || 5 * 60_000, signal)
-export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string }) {
+export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string; from?: AiFrom }) {
   const at = target(state.settings?.ai?.backend === 'endpoint' ? 'endpoint' : 'openrouter') // Your endpoint when it's Laki AI's; else OpenRouter (claude and codex: aiOnce)
   if (at.or && !at.key) throw new Error('no OpenRouter API key: Settings › AI')
   const model = (at.or && o.model?.trim()) || at.model // a block's or compaction's model is an OpenRouter id: Your endpoint has its own
-  const call: AiCall = { at: Date.now(), backend: at.or ? 'openrouter' : 'endpoint', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  const call: AiCall = { at: Date.now(), backend: at.or ? 'openrouter' : 'endpoint', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120), ...(o.from && { from: o.from }) }
   try {
     const res = await fetch(`${at.url}/chat/completions`, {
       method: 'POST',
@@ -859,7 +859,7 @@ export function questionsOf(text: string): { q: string; choices: string[] }[] {
 export async function aiDecide(o: { model: string; state: unknown; questions: object; signal?: AbortSignal; ask: string }) {
   const key = readKey()
   if (!key) throw new Error('no OpenRouter API key: Settings › AI')
-  const call: AiCall = { at: Date.now(), backend: 'openrouter', model: o.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  const call: AiCall = { at: Date.now(), backend: 'openrouter', model: o.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120), from: 'workflows' } // a workflow's decide block's alone
   try {
     const res = await fetch(`${api().replace(/\/v1$/, '')}/alpha/decisions`, {
       method: 'POST',
@@ -1530,9 +1530,25 @@ const PERM_WHY = 'It needs your OK: Laki AI may use only its laki tools unasked.
 // ---------- the call log
 
 // ponytail: the whole log is read for the page and the totals; keep only this month's lines if it ever gets slow
-function readCalls(): AiCall[] {
+// the Usage page's Laki AI rows (main.ts usageDays): a day (this Mac's), what made it (aiFromOf) and model each, from the
+// call log and the one before it (rotateLog's .1), since a time
+export function aiUsage(since: number) {
+  const sum = new Map<string, { day: string; from: AiFrom; model: string; tokens: number; cost: number }>()
+  for (const c of [...readCalls(`${callsPath}.1`), ...readCalls()]) {
+    if (!(c?.at >= since)) continue
+    const t = new Date(c.at)
+    const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+    const from = aiFromOf({ from: c.from, ask: String(c.ask ?? '') })
+    const key = `${day}|${from}|${c.model}`
+    const x = sum.get(key) ?? (sum.set(key, { day, from, model: String(c.model ?? c.backend), tokens: 0, cost: 0 }), sum.get(key)!)
+    x.tokens += (Number(c.in) || 0) + (Number(c.out) || 0)
+    x.cost += Number(c.cost) || 0
+  }
+  return [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 }))
+}
+function readCalls(path = callsPath): AiCall[] {
   try {
-    return readFileSync(callsPath, 'utf8')
+    return readFileSync(path, 'utf8')
       .split('\n')
       .flatMap(l => {
         try {

@@ -21,7 +21,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, tipDelay, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
+import { type TabView, aiFromOf, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -1382,4 +1382,10 @@ test("tipDelay: 350 ms, none within a second of the last tip going (the warm-up)
   assert.equal(tipDelay(10_000, 9_001), 0)
   assert.equal(tipDelay(10_000, 9_000), 350)
   assert.equal(tipDelay(10_000, 2_000), 350)
+})
+
+test("aiFromOf: a Laki AI call's from, else by the words its makers give its ask; a chat's otherwise", () => {
+  assert.equal(aiFromOf({ from: 'workflows', ask: 'extension x: y' }), 'workflows')
+  const by = (ask: string) => aiFromOf({ ask })
+  assert.deepEqual(['extension links: hi', "Compact shop's memory (4)", 'next prompt: claude', 'side chat: why', 'check review: ws', 'Ask me first', 'what are my agents doing?', 'Compact this'].map(by), ['extensions', 'memory', 'next', 'side', 'check', 'questions', 'chat', 'chat'])
 })

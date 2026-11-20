@@ -1211,7 +1211,7 @@ export function Num({ value }: { value: number | string }) {
     return () => clearTimeout(t)
   }, [value])
   return (
-    <span className={`num${out ? ` num-${out.dir}` : ''}`}>
+    <span className={`num-roll${out ? ` num-${out.dir}` : ''}`}>
       {out && <span key={`o${out.k}`} className="num-out" aria-hidden>{out.text}</span>}
       <span key={`i${out?.k ?? 0}`} className="num-in">{value}</span>
     </span>

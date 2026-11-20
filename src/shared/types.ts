@@ -987,7 +987,15 @@ export const AI_ITEMS = 50
 export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; ids?: string[]; items?: AiItem[]; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
-export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string } // cachedIn: of in, the tokens read from the provider's prompt cache (A3)
+export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string; from?: AiFrom } // cachedIn: of in, the tokens read from the provider's prompt cache (A3); from: what made it
+// what made a Laki AI call (the Usage page's Where it went): a chat (the AI page's), a spec's or brainstorm's, an agent's
+// laki ai, an extension (its studio's chat, its AI source or action), a workflow's block, memory's compaction, the Done
+// check's review, the next prompt guessed, the side chat, Ask me first
+export const AI_FROM = { chat: 'Laki AI chats', specs: 'Specs & Brainstorms', agents: "Agents' laki ai", extensions: 'Extensions', workflows: 'Workflows', memory: 'Memory compaction', check: 'Done check reviews', next: 'Next prompt guesses', side: 'Side chats', questions: 'Ask me first' } as const
+export type AiFrom = keyof typeof AI_FROM
+// a call's from, or by its ask's words (the labels its makers give; a line logged before from). ponytail: an older
+// workflow block's call reads as a chat's
+export const aiFromOf = (c: Pick<AiCall, 'from' | 'ask'>): AiFrom => c.from ?? (/^extension /.test(c.ask) ? 'extensions' : /^Compact .*memory/.test(c.ask) ? 'memory' : c.ask.startsWith('next prompt: ') ? 'next' : c.ask.startsWith('side chat: ') ? 'side' : c.ask.startsWith('check review: ') ? 'check' : c.ask === 'Ask me first' ? 'questions' : 'chat')
 export type AiTotals = { today: AiSum; month: AiSum }
 export type AiSum = { calls: number; in: number; out: number; cost: number }
 // today's and this month's calls, on this Mac's clock
@@ -1424,7 +1432,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 212
+export const API = 213
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

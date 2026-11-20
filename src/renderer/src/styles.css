@@ -3186,22 +3186,43 @@ button.board-name:hover { background: none; }
 
 /* the plan limits' popup with several accounts: the ones other than the default a little dimmer */
 .usage-agent.other .usage-row { opacity: 0.8; }
-/* the Usage page (Usage.tsx UsagePage): filters, tiles, a bar a day in the accent (4px rounded tops, a 2px gap), the models */
+/* the Usage page (Usage.tsx UsagePage): filters, tiles, a bar a day stacked by agent (each its --tc- color, a 2px gap,
+   rounded tops) under its legend, Where it went (a bar per workspace or Laki AI source, split by agent), the models */
 .usage-page { display: flex; flex-direction: column; gap: var(--sp-6); max-width: 980px; }
 .usage-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); }
 .usage-filters select { width: auto; min-width: 160px; }
 .usage-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--sp-4); }
 .usage-tiles > div { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-5) var(--sp-5); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .usage-tiles b { font-size: var(--fs-5); font-weight: 600; font-variant-numeric: tabular-nums; }
-.usage-chart { position: relative; padding: var(--sp-6) var(--sp-5) var(--sp-4); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
-.usage-max { position: absolute; top: 4px; left: 14px; font-variant-numeric: tabular-nums; }
+.usage-chart { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-5); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.usage-legend { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); margin: 0; padding: 0; list-style: none; font-size: var(--fs-2); }
+.usage-legend li { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.usage-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: var(--r-xs); vertical-align: -1px; } /* an agent's color: beside its name, never the text's own */
+.usage-plot { position: relative; padding-top: var(--sp-6); }
+.usage-max { position: absolute; top: 0; left: 0; font-variant-numeric: tabular-nums; }
 .usage-bars { height: 180px; display: flex; align-items: flex-end; gap: var(--sp-1); border-bottom: 1px solid var(--line); }
-.usage-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; cursor: default; }
-.usage-col i { display: block; width: 100%; background: var(--accent); border-radius: var(--r-s) var(--r-s) 0 0; }
-.usage-col:hover i { filter: brightness(1.15); }
+.usage-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; cursor: default; border-radius: var(--r-s) var(--r-s) 0 0; }
+.usage-stack { display: flex; flex-direction: column-reverse; gap: var(--sp-1); width: 100%; border-radius: var(--r-s) var(--r-s) 0 0; overflow: hidden; } /* a day's agents, the first at the bottom, a 2px gap between */
+.usage-stack i { display: block; min-height: 1px; flex-basis: 0; }
+.usage-col:hover .usage-stack { filter: brightness(1.15); }
 .usage-col:hover { background: color-mix(in srgb, var(--fg) 5%, transparent); }
 .usage-axis { display: flex; justify-content: space-between; padding-top: var(--sp-2); }
+.usage-where { display: flex; flex-direction: column; gap: var(--sp-3); }
+.usage-where h3 { margin: 0; font-size: var(--fs-3); font-weight: 600; }
+.usage-where ul { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.usage-where li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(60px, 3fr) 9ch 5ch; align-items: center; gap: var(--sp-5); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); font-size: var(--fs-3); }
+.usage-where li:hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.usage-where-name { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; white-space: nowrap; }
+.usage-where-name > .muted { overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-2); }
+.usage-where-label { overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 70%; }
+.usage-where-bar { height: 6px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg) 7%, transparent); overflow: hidden; }
+.usage-where-bar > span { display: flex; gap: var(--sp-1); height: 100%; border-radius: var(--r-pill); overflow: hidden; } /* its agents side by side, a 2px gap between */
+.usage-where-bar i { display: block; height: 100%; flex-basis: 0; min-width: 1px; }
+.usage-where .num { text-align: right; font-variant-numeric: tabular-nums; }
+.usage-where details summary { padding: var(--sp-3) var(--sp-4); cursor: var(--cur-act); }
+.usage-tiles b.usage-tile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-4); }
 .usage-table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
+.usage-table td.mono { font-size: var(--fs-2); } /* a model's id: the mono face runs larger */
 .usage-table th { text-align: left; font-weight: 600; color: var(--muted); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
 .usage-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
 .usage-table .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -4267,8 +4288,8 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 :is(.rd-agent .md p, .rd-agent .md li, .note-page .bn-editor p, .switch-text .muted, .help-card) { text-wrap: pretty; }
 
 /* ui.tsx Num: a number sliding to its new value, old and new in one cell; none with Motion: None or Reduce motion */
-.num { display: inline-grid; height: 1lh; overflow: clip; vertical-align: bottom; font-variant-numeric: tabular-nums; }
-.num > * { grid-area: 1 / 1; }
+.num-roll { display: inline-grid; height: 1lh; overflow: clip; vertical-align: bottom; font-variant-numeric: tabular-nums; }
+.num-roll > * { grid-area: 1 / 1; } /* not .num: tables and rows use that for right-aligned figures */
 .num-up > .num-in { animation: num-in-up 250ms var(--spring) both; }
 .num-up > .num-out { animation: num-out-up 250ms var(--spring) both; }
 .num-down > .num-in { animation: num-in-down 250ms var(--spring) both; }

@@ -150,6 +150,8 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   assert.equal(d.keep, 90)
   assert.deepEqual(d.rows.map((r: any) => [r.day, r.agent, r.model, r.tokens]).sort(), [[key, 'claude', 'claude-opus-4-6', 447000], [key, 'codex', 'gpt-5-codex', 51000]])
   assert.ok(d.rows.every((r: any) => r.cost > 0))
+  assert.ok(d.rows.every((r: any) => r.ws === ws.id), JSON.stringify(d.rows)) // Where it went: each row's workspace
+  assert.deepEqual(d.ai, []) // no Laki AI calls
   assert.ok(JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1'].days)
 })
 
