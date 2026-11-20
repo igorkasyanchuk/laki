@@ -1083,3 +1083,9 @@ export function inAim(prev: [number, number], cur: [number, number], rect: { lef
   const neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0
   return !(neg && pos) && !(cur[0] === prev[0] && cur[1] === prev[1])
 }
+
+// a tooltip's wait (ui.tsx Tips): TIP_WAIT ms, none within TIP_WARM of the last one going (macOS's warm-up: moving along
+// a toolbar, each shows at once)
+export const TIP_WAIT = 350
+export const TIP_WARM = 1000
+export const tipDelay = (now: number, lastShown: number) => (now - lastShown < TIP_WARM ? 0 : TIP_WAIT)

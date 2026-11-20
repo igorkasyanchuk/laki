@@ -3732,7 +3732,7 @@ html[data-motion='high'] .settings-page { animation: m-in 0.24s cubic-bezier(0.2
 html[data-motion='high'] .overlay { animation: m-fade 0.16s ease-out; }
 html[data-motion='high'] .modal { animation: m-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
 html[data-motion='high'] .menu { animation: m-pop 0.14s ease-out; transform-origin: clamp(0px, var(--ox, 0px), 100%) clamp(0px, var(--oy, 0px), 100%); }
-html[data-motion='high'] .tip { animation: m-fade 0.14s ease-out; }
+html[data-motion='high'] .tip:not([data-warm]) { animation: m-fade 0.14s ease-out; } /* a warm one (ui.tsx Tips) is there at once */
 html[data-motion='high'] .toast { animation: m-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
 html[data-motion='high'] .side-panel { animation: m-side 0.22s ease-out; }
 html[data-motion='high'] .tab { animation: m-pop 0.2s ease-out; }
@@ -3814,7 +3814,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   :where(.menu, .link-peek, .ws-peek) { transform-origin: clamp(0px, var(--ox, 0px), 100%) clamp(0px, var(--oy, 0px), 100%); }
   :where(.ws-peek.pr-peek) { --oy: 100%; } /* held by its bottom, over its button */
   :where(.tip) { transition: opacity var(--t-fast) ease-out, display var(--t-fast) allow-discrete; }
-  @starting-style { :where(.tip):not(.leaving) { opacity: 0; } }
+  @starting-style { :where(.tip):not(.leaving, [data-warm]) { opacity: 0; } }
   :where(.needs-cards > div, .needs-cards > button) { animation: v-rise var(--t-spring) var(--spring), v-fade-in var(--t-mid) ease-out; }
   :where(.ws.sel:not(.needs), .seg button.on, .reader-switch button.on) { animation: v-sel var(--t-spring) var(--spring); }
   :where(.ws.needs) { animation: b-lit var(--t-slow) var(--ease-out); }

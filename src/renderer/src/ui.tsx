@@ -5,7 +5,7 @@ import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { inAim, menuKeys, midCut, snap, stackOrder } from './text'
+import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 
@@ -1089,9 +1089,12 @@ export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem
   return [slot, open]
 }
 
-// tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably)
+// tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably). Warm, as
+// macOS's: within a second of one going, the next shows at once and doesn't fade in (data-warm; text.ts tipDelay). The
+// keyboard's focus (:focus-visible) shows its tip after TIP_FOCUS; any key, a press or leaving it hides it
+const TIP_FOCUS = 600
 export function Tips() {
-  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean; menu?: DOMRect } | null>(null)
+  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean; menu?: DOMRect; warm?: boolean } | null>(null)
   const box = useRef<HTMLDivElement>(null)
   // centered on the element, but kept inside the window (measured before it's painted); a menu item's beside its menu,
   // never over the items under it: on its left when there's room, else its right
@@ -1105,10 +1108,28 @@ export function Tips() {
   useEffect(() => {
     let timer = 0
     let cur: HTMLElement | null = null
+    let showing = false
+    let lastShown = -Infinity // when a tip was last on screen (performance.now()): the warm-up's
     const hide = () => {
       clearTimeout(timer)
+      if (showing) lastShown = performance.now()
+      showing = false
       cur = null
       setTip(null)
+    }
+    const show = (el: HTMLElement, warm: boolean) => {
+      if (!el.isConnected || !el.dataset.tip) return
+      const r = el.getBoundingClientRect()
+      const menu = el.closest('.menu')?.getBoundingClientRect()
+      showing = true
+      if (menu) return setTip({ text: el.dataset.tip, x: 0, y: r.top + r.height / 2, below: true, menu, warm })
+      const below = r.bottom + 30 < window.innerHeight
+      setTip({ text: el.dataset.tip, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below, warm })
+    }
+    const after = (el: HTMLElement, ms: number) => {
+      cur = el
+      if (!ms) return show(el, true)
+      timer = window.setTimeout(() => show(el, false), ms)
     }
     const over = (e: PointerEvent) => {
       // a view transition's picture is the root's: the pointer "leaves" a button under it and comes back as it ends, and
@@ -1117,32 +1138,36 @@ export function Tips() {
       const el = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]') ?? null
       if (el === cur) return
       hide()
-      if (!el?.dataset.tip) return
-      cur = el
-      timer = window.setTimeout(() => {
-        const r = el.getBoundingClientRect()
-        const menu = el.closest('.menu')?.getBoundingClientRect()
-        if (menu) return setTip({ text: el.dataset.tip!, x: 0, y: r.top + r.height / 2, below: true, menu })
-        const below = r.bottom + 30 < window.innerHeight
-        setTip({ text: el.dataset.tip!, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below })
-      }, 350)
+      if (el?.dataset.tip) after(el, tipDelay(performance.now(), lastShown))
     }
+    // the keyboard's focus: a Tab's keydown hid the last one first (keydown comes before the focus moves)
+    const focusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement | null
+      if (!el?.dataset?.tip || el === cur || !el.matches(':focus-visible')) return
+      hide()
+      after(el, TIP_FOCUS)
+    }
+    const focusOut = (e: FocusEvent) => void (e.target === cur && hide())
     // pressed: none, and none again until the pointer leaves it (over its icon, a child, would start one: a menu it
     // opens would have the tip over its first item)
     const down = (e: PointerEvent) => (hide(), (cur = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]') ?? null))
     window.addEventListener('pointerover', over)
     window.addEventListener('pointerdown', down, true)
     window.addEventListener('keydown', hide, true)
+    window.addEventListener('focusin', focusIn)
+    window.addEventListener('focusout', focusOut)
     return () => {
       hide()
       window.removeEventListener('pointerover', over)
       window.removeEventListener('pointerdown', down, true)
       window.removeEventListener('keydown', hide, true)
+      window.removeEventListener('focusin', focusIn)
+      window.removeEventListener('focusout', focusOut)
     }
   }, [])
   if (!tip) return null
   return (
-    <div className={`tip ${tip.menu ? 'side' : ''}`} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)' }}>
+    <div className={`tip ${tip.menu ? 'side' : ''}`} data-warm={tip.warm || undefined} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)' }}>
       {tipText(tip.text)}
     </div>
   )

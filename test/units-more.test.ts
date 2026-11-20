@@ -20,7 +20,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, snap, splitRows, tipDelay, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -1374,4 +1374,12 @@ test("Shell (shared/shells.ts): a shell's kind by its file's name; a value as on
   // sh reads the POSIX word back as the value itself
   const { execFileSync } = await import('node:child_process')
   assert.equal(execFileSync('/bin/sh', ['-c', `printf %s ${shellWord(v)}`], { encoding: 'utf8' }), v)
+})
+
+test("tipDelay: 350 ms, none within a second of the last tip going (the warm-up)", () => {
+  assert.equal(tipDelay(10_000, -Infinity), 350) // none shown yet
+  assert.equal(tipDelay(10_000, 9_500), 0)
+  assert.equal(tipDelay(10_000, 9_001), 0)
+  assert.equal(tipDelay(10_000, 9_000), 350)
+  assert.equal(tipDelay(10_000, 2_000), 350)
 })
