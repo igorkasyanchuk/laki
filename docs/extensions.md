@@ -665,9 +665,10 @@ the daemon either way.
 | `panel` | a tab of the right panel (⌥⌘B), after Info, Files, Changes, Review and Preview | its full view, else its preview, the panel's width |
 | `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover, colored by its data's `tone` |
 | `turn` | a chip under each agent turn in the Reader and on Needs you's card (per workspace only) | its `label`, `badge` and `tip` from what its `turn.done` handler left, colored by `tone`; a click shows that turn's data |
+| `none` | nowhere: it runs [in the background](#in-the-background-place-none) | none; with another place, that one wins |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
-*Sidebar / Top bar / Status bar / Rail / Sidebar foot / ⋯ menu / Desk / Right panel / Workspace rows*, one or several). For the
+*Sidebar / Top bar / Status bar / Rail / Sidebar foot / ⋯ menu / Desk / Right panel / Workspace rows / Nowhere*, one or several). For the
 bars, design it ½ high: a number and a word, a few links. In a bar its width is its cells across, or *Auto* (its Size):
 as wide as its words need, 4 cells at most (a JS page: as wide as its content measures; its cells until it has loaded).
 
@@ -692,6 +693,25 @@ ticks): keep its fetch cheap and its `every` long. Its data's own `tone` colors 
 mark runs its `click` action in that workspace, else selects the workspace and opens its full view (with none, it only
 selects it). Hovering a row shows its marks in the workspace's card too. A `panel` one per workspace shows the workspace
 the panel is for.
+
+### In the background (`"place": "none"`)
+
+An extension needs no look: `"place": "none"` shows it nowhere, no `ui`, `widget.html` or `sample` needed. It still runs
+as any other that's on: its fetch every `every` minutes while the app is open (its `notify` template says what's new),
+its `on` handlers as Laki's events happen, its actions from ⌘K, a key, a schedule or a workflow. It speaks up only when
+it has something, with what an action or a handler prints:
+
+| print | what you see |
+|---|---|
+| `{"notify": "Deploy of web is done"}` | a notification (while you're in another app) and a toast in Laki; a click opens its page |
+| `{"toast": "Saved"}` | a toast in Laki's window |
+| `{"modal": {"title", "text", "ui", "data", "buttons"}}` | a dialog over Laki, its buttons running its actions ([dialogs](#dialogs)) |
+| `{"alert": "Prod is down"}`, or `{"alert": {"title", "text"}}` | the card on your screen over every app, as `laki alert`'s, until you close it; its first line, Laki's, names the extension; 5 a minute at most (the rest are dropped, its log saying so while it keeps one) |
+
+`notify` and `alert` work from any run (a click, an event, a schedule); none of them for a workspace Recording mode hides.
+Its scripts can also run the `laki` command as `$LAKI_CLI` (`"$LAKI_CLI" alert "…" --choice OK`, `send`, `new`, `ls
+--json`). `laki widget new <name> --kind background` starts one: a notification when a PR merges, an alert when its
+checks fail. Settings › Extensions › *UI kit* › *What it can do* shows each of these with a Try.
 
 ## Actions where you work (`show`, `key`)
 
@@ -829,6 +849,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `form` | fields and a button: an action gets them as JSON |
 | `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |
 | `workspace` | *This branch*: per workspace, its branch, PR, port and path, a link to its server |
+| `background` | *In the background*: shows nowhere; a notification when a PR merges, an alert on your screen when checks fail |
 | `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
 | `tool` | *A tool for agents*: notes your agents add with its `add` tool (asked once per workspace), a Clear button |
 | `pullmain` | *Pull main*: per workspace, a status bar button that merges the base branch in (below) |

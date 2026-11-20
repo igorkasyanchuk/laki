@@ -46,7 +46,7 @@ test('made-up variants: each starter with data has three more fixtures, My PRs t
   const rig = await fresh(t)
   await fixtureWidgets(rig)
   for (const kind of STARTER_KINDS) {
-    if (kind === 'launcher' || kind === 'onefile') continue // no data of its own, one file
+    if (kind === 'launcher' || kind === 'onefile' || kind === 'background') continue // no data of its own, one file
     const { id } = await rig.rpc('widgetNew', { kind, name: `v ${kind}` })
     const w = await find(rig, id)
     const more = (w.fixtures ?? []).filter((f: string) => f !== 'sample' && f !== 'empty')

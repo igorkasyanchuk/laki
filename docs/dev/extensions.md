@@ -3,7 +3,7 @@
 ### Widgets
 
 `daemon/widgets.ts` (the SDK for people: `docs/extensions.md`): every one off until turned on (`onOf`: the store's `on`). A widget is a folder with `widget.json` (`Manifest`: name, `place` (`WIDGET_PLACES`: side, top,
-status, rail, foot, more: an item in the foot's ⋯ menu, App's `footButtons`; the store's wins, `placeOf`), a button's `icon` (`iconOf`: a name, the renderer's `isIconName`, or an
+status, rail, foot, more: an item in the foot's ⋯ menu, App's `footButtons`, …, none: nowhere, alone (`placeList` drops it beside another; the renderer's `nowhere`, `flipPlace`); the store's wins, `placeOf`), a button's `icon` (`iconOf`: a name, the renderer's `isIconName`, or an
 emoji), `label`, `badge`, `tip` (templates over its data, `faceOf`: plain text, kept as the entry's `face`, filled at scan,
 after each fetch and settings change) and `click` (`clickOf`: one of its `actions`); the view's `button`: a
 `BUTTON_PLACES` place or no preview in widget.html (`preview`), size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
@@ -54,7 +54,7 @@ allow-scripts; default-src 'none'` (no network, an opaque origin), the theme's v
 `Widgets.tsx`: `WidgetStrip` (`place` top: the tab bar after its spacer; status: the status bar's end; each `Cell` as wide
 as its cells across, `--widget-cell`, a line high), `WidgetButtons` (rail: `rail-kind` buttons after the pins; foot: `ib`
 buttons after Timer, the rail's too without the rail; a `button` widget in a `Cell` is `CellButton`; a click: `click`'s
-action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` side or none: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
+action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` side or unset: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
@@ -156,6 +156,15 @@ K1 (`test/widget-terminal.test.ts`): widgetUi.ts' `term` (UI, its sample, uiChec
 M1 (`test/widget-store.test.ts`): widgets.ts `widgetStore` (`op` get, set, delete, keys, all; an on one's; `kvPath`: `widget-data/<id>.kv.json`, a per-workspace one's `widget-data/<id>/ws/<ws>.kv.json`; `KV_MAX`; `writeAtomic`; a key 1 to 200 characters, never `__proto__`; an agent's set or delete through `approve`, ask always; AGENT_OK, REMOTE_OK, FROM, ANSWER_NO; the `widget.store` cap, API 190). `RUN_JS`' `store` writes the same file (`$LAKI_WIDGET_KV`, envOf's and wsEnv's: a temp file of its own, then a rename). A JS page's `laki.store` (shared/widget.ts `stored`): a `store` message to the app, Widgets.tsx' handler (any time, its frame's own id; a sample's: reads only) calls `WidgetApi.store`, the answer back with its `req`. `laki widget store` (cli/main.ts: `$LAKI_WIDGET` or `--widget`, `$LAKI_WORKSPACE`). widgetFiles' `keptOf` takes it to the trash. Extension.tsx `StoreCard` (the Data tab: `storeAll`).
 
 P6 (`test/widget-annotate.test.ts`): widgets.ts `annotate` keeps an action's JSON `annotations` (in the action's workspace, else its ctx's) or a per-workspace fetch's data's (only when the key is there: `[]` clears, a run without it leaves them) in `annots` (workspace → extension), `annotOf` checking each (inside the workspace, an absolute path made relative; line ≥ 1; text; level; `fix`), `ANNOT_MAX`; turning it off drops its own. core's `annotAt` (the view's `annotAt`) changes with them; `widgetAnnotations { ws }` (AGENT_OK, REMOTE_OK, a read) lists the on ones' by extension. Renderer: PanelApi's `annots`/`annotAt` (App's panelApi, only with `annotAt`), Diff.tsx `useAnnots` (read again as `annotAt` changes, by file and new-side line), `annotsOn`, `annotClass` (the line's edge, its worst level), `AnnotRows` under the line; FullReview and Changes (not a PR's or a turn's diff), the Review tab's *Add to comments* and *Add N extension notes* (each a `ReviewNote`, `quote` its line). Manifest `annotates`: the Settings card's *diff notes* tag.
+
+Background (`test/widget-background.test.ts`): `"place": "none"` shows it nowhere (Extension.tsx' Preview says so, no
+*Everywhere*); it runs as any other. widgets.ts `tell`: an action's JSON's `notify` (a `widget-say` with `notify`, App's
+notification and toast) and `alert` (alerts.ts `alertShow` with the origin `the extension <name>`, its `limit` key
+`widget:<id>`: 5 a minute even though the daemon calls it), from widgetAction itself, so a click, an event (`Ev.of`: the
+event's workspace, a global one's too, for Recording mode's `hidden`), a schedule and a workflow all say it. UiKit.tsx'
+*What it can do* (`CAN`, `CanView`): each capability's snippet and a Try with made-up words (the app's toast, api.ts
+`notify`, a `Modal` with `KitBody`, an alert card through `notify`'s card with a `try-<n>` id), Make one through
+Dialogs' `start` (`widgetNew` `kind`). Starter `background`.
 
 P5 (`test/widget-turn.test.ts`): the `turn` place (per workspace, as `row`: widgetSet and manifestCheck refuse it otherwise; Check warns without a `turn.done` handler). widgetEvents' `Job` carries the event's tab and time; `handle` notes its data's `at` before a `turn.done` handler and, after it, `turnMark` keeps any newer data with its `faceOf` (none when hidden) in the tab's runtime (`rtOf(tab).marks`, by the event's `at`, the last `TURN_MARKS` turns), in memory as Proof cards are. The tab's view has them without their data (`marks`); `widgetRender`'s `turn` (`{ tab, at }`; a JS page's `&turn=<tab>:<at>`) draws one on its data, in the tab's workspace. The renderer: Widgets.tsx `TurnChips`; Reader.tsx puts each turn's under it (before the first prompt of yours said after it, `Said.at`; the rest at the end), Needs.tsx' finish card the last turn's; a click is the dialog `{ widget, turn }` (WidgetDialog, WidgetBody `turn`). Starter `turn`: `git diff --numstat HEAD` in awk.
 

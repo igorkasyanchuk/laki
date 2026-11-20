@@ -17,7 +17,7 @@ const errors = (ps: any[]) => ps.filter(p => p.level === 'error')
 
 test('starters: each kind made through the CLI is on, checks out with its fetch, and shows its fixture', async t => {
   const rig = await fresh(t)
-  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'turn' && k !== 'stream' && k !== 'launcher' && k !== 'pullmain' && k !== 'context' /* per workspace (turn: widget-turn), a stream: widget-ws and widget-events tests (Pull main, Context: below); the launcher: no data, below */)) {
+  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'turn' && k !== 'stream' && k !== 'launcher' && k !== 'pullmain' && k !== 'context' && k !== 'background' /* per workspace (turn: widget-turn), a stream: widget-ws and widget-events tests (Pull main, Context: below); the launcher: no data, below; background: widget-background */)) {
     const made = await rig.cli('widget', 'new', `My ${kind}`, '--kind', kind)
     assert.equal(made.code, 0, made.err)
     const id = `my-${kind}`

@@ -1451,7 +1451,7 @@ Extensions (`laki ext` or `laki widget` in the CLI, `widget.json` on disk: one a
 
 Settings › Extensions lists them: a search finds one by its name, id, place or project, and one that needs a look (its
 last fetch failed, a setting it needs is empty, its log has an error from the last hour) is first in its group, with a
-red dot. ⌘K has *UI kit*, *Icons* and *New extension from a starter…* too.
+red dot. ⌘K has *UI kit*, *Icons*, *What an extension can do* and *New extension from a starter…* too.
 
 Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
 *Sidebar foot*, *⋯ menu*, *My Desk*, *Side panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
@@ -1534,7 +1534,11 @@ sandboxed frame that can't reach the app, nor the network unless you turn on its
 fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
 Most draw with the **UI kit**: widget.json's `ui`, elements as JSON (stats, lists, tables, charts, forms, tabs…) that
 follow the theme and fit any size; Settings › Extensions › *UI kit* shows each with its sample and its JSON to copy
-(`laki widget kit` in a terminal), and its *Typography*, *Colors* and *Icons*. `laki widget` lists, reloads, fetches and renders them.
+(`laki widget kit` in a terminal), and its *What it can do*, *Typography*, *Colors* and *Icons*. `laki widget` lists, reloads, fetches and renders them.
+
+One can also show nowhere and work **in the background** (*Show in › Nowhere*, `"place": "none"`): its fetch and its
+event handlers run as any other's, and it speaks up with a notification (`{"notify": …}`), a toast, a dialog or a card on
+your screen over every app (`{"alert": …}`, 5 a minute at most). `laki widget new --kind background` starts one.
 
 Working on one of your own: `laki widget dev` in its folder links it (it's on, ahead of an installed one of the same
 id, and every save reloads it and fetches it again; a file that doesn't read keeps the last good version running and
@@ -2996,7 +3000,7 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, context, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, turn, background, stream, tool, pullmain, context, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki widget store get|rm <key> | set <key> [json | -] | keys   # its own store, from its commands ($LAKI_WIDGET; else --widget <id>)
@@ -3170,7 +3174,7 @@ give it the fewest scopes it needs (with `cmd` or `yolo` it's as good as a shell
 | `laki://board` | the Board |
 | `laki://achievements` | Achievements |
 | `laki://desk` | My Desk |
-| `laki://uikit[/icons]` | the extensions' UI kit, or its icons |
+| `laki://uikit[/icons|/can]` | the extensions' UI kit, its icons, or What it can do |
 | `laki://starters` | the extension starters to pick from (a pick makes one) |
 | `laki://settings/widgets/<id>[/inspect]` | an extension's page, or its inspector |
 | `laki://help` | Help |

@@ -15,7 +15,7 @@ export type Link =
   | { to: 'about' }
   | { to: 'onboard' }
   | { to: 'desk' }
-  | { to: 'uikit'; icons?: boolean } // laki://uikit[/icons]: the UI kit's page, or its icon gallery
+  | { to: 'uikit'; icons?: boolean; can?: boolean } // laki://uikit[/icons|/can]: the UI kit's page, its icon gallery, or What it can do
   | { to: 'toolbar' } // laki://toolbar: Customize toolbar (View › Customize Toolbar…)
   | { to: 'starters' } // laki://starters: the starter picker (New extension from a starter…); a pick makes one
 
@@ -65,7 +65,7 @@ export function parseLink(url: string): Link | null {
     case 'desk':
       return { to: 'desk' }
     case 'uikit':
-      return { to: 'uikit', ...(arg === 'icons' && { icons: true }) }
+      return { to: 'uikit', ...(arg === 'icons' && { icons: true }), ...(arg === 'can' && { can: true }) }
     case 'starters':
       return { to: 'starters' }
     case 'toolbar':

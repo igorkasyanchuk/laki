@@ -112,7 +112,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget kit [element|icons] [--json]    the UI kit (widget.json's "ui"): its elements, one's props and a sample, or every icon
   laki widget dev [folder]                    dev mode: link your extension's folder (on, watched), then its runs as they come
   laki widget dev --off <id|folder> | --list  unlink one | the linked folders
-  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, turn, stream, tool, pullmain, context, onefile), on
+  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, turn, background, stream, tool, pullmain, context, onefile), on
   laki widget push <id> [json | -] [--ws <ws>] [--merge]  its data from a cron job, a git hook, CI: no fetch (stdin with -)
   laki widget store get|rm <key> | set <key> [json | -] | keys [--widget <id>]  its own store, from its commands ($LAKI_WIDGET): JSON values, 1 MB
   laki widget tools [--json]                  the extensions' tools for agents: each one's input and when to use it
@@ -542,8 +542,9 @@ event or a schedule only once the user allows it as it is. answer is the user's 
   laki flow check .laki/workflows/ship.md`,
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network
-access); turning one on is the user's. Places: side, top, status, rail, foot, more (the foot's ⋯ menu), desk, panel, row (per workspace). To make
-one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
+access); turning one on is the user's. Places: side, top, status, rail, foot, more (the foot's ⋯ menu), desk, panel,
+row, turn (per workspace), none (in the background). To make one, use the laki-widget skill (/laki:extension in Laki's
+Claude Code tabs).
 
   laki widget set prs --place desk --size 3x2      a tile on My Desk, 3 cells across, 2 down
   laki widget set prs --every 10 repo=acme/api      fetch every 10 minutes, its repo setting

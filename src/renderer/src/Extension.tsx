@@ -9,7 +9,7 @@
 // back where it was opened from. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { sendKeyName, sendTip } from '../../shared/keys'
 import { type MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { type AiMsg, type AiSettings, BUTTON_PLACES, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
+import { type AiMsg, type AiSettings, BUTTON_PLACES, LOG_LEVELS, nowhere, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
@@ -27,7 +27,7 @@ import { extMenuItems } from './extMenu'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 import { bindable, Builder, DataTree } from './Builder'
 
-const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
+const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row', none: 'Nowhere: in the background' }
 const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
 export type ExtTab = 'overview' | 'build' | 'data' | 'runs' | 'logs' | 'env' | 'files' | 'check'
@@ -156,7 +156,7 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
             </span>
           )}
           {w && (
-            <button className={`ext-state ${w.on ? 'on' : ''}`} role="switch" aria-checked={w.on} data-tip={w.on ? 'On: it runs and shows where you picked. Click to turn it off' : 'Off: nothing of it runs and it shows nowhere. Click to turn it on'} onClick={() => (w.on ? void cfg.set(w.id, { on: false }).catch(e => setOops(String(e?.message ?? e))) : turnOn())}>
+            <button className={`ext-state ${w.on ? 'on' : ''}`} role="switch" aria-checked={w.on} data-tip={w.on ? `On: it runs ${nowhere(w) ? 'in the background' : 'and shows where you picked'}. Click to turn it off` : 'Off: nothing of it runs and it shows nowhere. Click to turn it on'} onClick={() => (w.on ? void cfg.set(w.id, { on: false }).catch(e => setOops(String(e?.message ?? e))) : turnOn())}>
               <i /> {w.on ? 'On' : 'Off'}
             </button>
           )}
@@ -645,9 +645,13 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
         <div className="ext-stage">
           <span className="ext-where muted small">
             {WHERE[place] ?? place}
-            {!button && !desk && !row && (bar && w.fit && !w.js ? ' · auto' : ` · ${w.size[0]}×${half(w.size[1])}`)}
+            {!button && !desk && !row && place !== 'none' && (bar && w.fit && !w.js ? ' · auto' : ` · ${w.size[0]}×${half(w.size[1])}`)}
           </span>
-          {row ? (
+          {place === 'none' ? (
+            <p className="muted small ext-bg">
+              It shows nowhere: it runs in the background ({w.every !== undefined ? `its fetch every ${w.every} minutes, ` : ''}its events) and says what it has with notifications, toasts, dialogs and alerts on your screen. To show it somewhere, pick a place in its settings.
+            </p>
+          ) : row ? (
             <div className="ext-row">
               <span className="ws-ext">
                 <Glyph w={w} size={10} />
@@ -683,7 +687,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
           </>
         )}
       </section>
-      <section className="ext-card">
+      {place !== 'none' && <section className="ext-card">
         <div className="ext-card-head">
           <b>Everywhere</b>
           <span className="muted small grow">how it looks in each place{sample ? ', with made-up data' : ''}</span>
@@ -729,7 +733,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
             <DeskTile w={w} api={api} sample={made} note={sample ? 'made-up data' : undefined} />
           </div>
         </div>
-      </section>
+      </section>}
     </>
   )
 }

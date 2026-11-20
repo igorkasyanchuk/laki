@@ -81,7 +81,7 @@ const LAUNCH = {
   ],
 }
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'turn', 'stream', 'tool', 'pullmain', 'context', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'turn', 'background', 'stream', 'tool', 'pullmain', 'context', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -267,6 +267,24 @@ END { printf "{%slist%s: [%s], %sfiles%s: %d, %sadd%s: %d, %sdel%s: %d, %stone%s
       'fixtures/empty.json': json({ list: [], files: 0, add: 0, del: 0, tone: 'muted' }),
       ...variants({ one: { list: [{ path: 'README.md', add: 1, del: 1 }], files: 1, add: 1, del: 1, tone: 'muted' }, big: { list: [{ path: 'src/api/orders.ts', add: 380, del: 120 }, { path: 'src/api/purchases.ts', add: 512, del: 0 }], files: 2, add: 892, del: 120, tone: 'warn' }, deletes: { list: [{ path: 'src/legacy/cart.js', add: 0, del: 840 }], files: 1, add: 0, del: 840, tone: 'warn' } }),
       'README.md': readme(id, name, ' Per workspace, it shows as a chip under each agent turn (the Reader, Needs you): its `turn.done` handler fetches, and that data stays with the turn.'),
+    }),
+  },
+  background: {
+    title: 'In the background',
+    blurb: 'Shows nowhere: a notification when a PR merges, an alert on your screen when checks fail',
+    files: (id, name) => ({
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Shows nowhere: it answers events and tells you', place: 'none', on: { 'pr.merged': 'merged', 'pr.checks.failed': 'failed' }, actions: { merged: 'sh merged.sh', failed: 'sh failed.sh' } }),
+      'merged.sh': `#!/bin/sh
+# On pr.merged (widget.json's on): a notification, and a toast. The event is JSON on stdin and in $LAKI_EVENT_FILE;
+# what this prints is what Laki shows: {"notify": …}, {"toast": …}, {"modal": {…}} or {"alert": …}.
+jq -c '{notify: ("#" + (.pr.number | tostring) + " merged: " + (.pr.title // ""))}' "$LAKI_EVENT_FILE" 2>/dev/null || echo '{"notify": "A PR merged"}'
+`,
+      'failed.sh': `#!/bin/sh
+# On pr.checks.failed: the card on your screen over every app (alert), for what can't wait; 5 a minute at most.
+# A dialog with buttons that run its actions instead: {"modal": {"title", "text", "buttons": [{"label", "run"}]}}
+jq -c '{alert: {title: "Checks failed", text: ((.ws.name // "A workspace") + ": " + ([.failing[]?.name] | join(", ")))}}' "$LAKI_EVENT_FILE" 2>/dev/null || echo '{"alert": "Checks failed on a PR"}'
+`,
+      'README.md': `# ${name}\n\nA Laki extension that shows nowhere (\`"place": "none"\`): it runs in the background and says what it has. Its \`on\` answers Laki's events (\`laki widget events\` lists the last ones); each handler prints JSON: \`notify\` (a notification and a toast), \`toast\`, \`modal\` (a dialog, its buttons running its actions) or \`alert\` (the card on your screen over every app). A \`fetch\` with \`every\` and a \`notify\` template works in the background too.\n\n- A real PR tries it (\`laki widget events\` lists what came and what it reached); its page's Runs show each handler's run; \`laki widget check ${id}\` says what's wrong.\n`,
     }),
   },
   pullmain: {

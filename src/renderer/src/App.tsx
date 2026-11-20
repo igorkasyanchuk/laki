@@ -1664,7 +1664,7 @@ export function App() {
     else if (l?.to === 'about') setDialog('about')
     else if (l?.to === 'onboard') (setOnboard(o => ({ ...o, off: false })), setDialog('onboard'))
     else if (l?.to === 'desk') settings.desk !== false ? setDialog('desk') : toast('My Desk is off: Settings › General › Pages')
-    else if (l?.to === 'uikit') setDialog({ uikit: true, ...(l.icons && { icons: true }) })
+    else if (l?.to === 'uikit') setDialog({ uikit: true, ...(l.icons && { icons: true }), ...(l.can && { can: true }) })
     else if (l?.to === 'starters') setDialog('starters')
     else if (l?.to === 'toolbar') setDialog('toolbar')
     else toast(`Laki can't open ${link.slice(0, 80)}`)
@@ -2858,6 +2858,7 @@ export function App() {
       return r
     },
     desk: settings.desk !== false,
+    nowhere: hasCap(view, 'widget.none'),
     agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
     agent: settings.widgetAgent,
     run: (id, ws) => call('widgetRun', { id, ws }),

@@ -18,13 +18,16 @@ export const PLACES: [WidgetPlace, string, string][] = [
   ['panel', 'Side panel', 'A tab of the side panel (⌥⌘B), beside Info and Files'],
   ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
   ['turn', 'Agent turns', 'A chip under each agent turn in the Reader and Needs you: what its turn.done handler found (per workspace only)'],
+  ['none', 'Nowhere', 'It runs in the background and says what it has with notifications, toasts, dialogs and alerts'],
 ]
+// a click on a place: on or off (the last one stays); Nowhere alone, any other ends it
+export const flipPlace = (places: WidgetPlace[], v: WidgetPlace) => (v === 'none' ? ['none' as const] : places.includes(v) ? places.filter(x => x !== v) : [...places.filter(x => x !== 'none'), v])
 export const BARS: WidgetPlace[] = ['side', 'top', 'status']
 
 export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
   const places = placesOf(w)
-  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && ((v !== 'row' && v !== 'turn') || w.scope === 'workspace'))
-  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(places.includes(v) ? places.filter(x => x !== v) : [...places, v])
+  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'none' || api.nowhere || places.includes('none')) && ((v !== 'row' && v !== 'turn') || w.scope === 'workspace'))
+  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(flipPlace(places, v))
   const size = w.size.join('x')
   return [
     { label: w.on ? 'Turn off' : 'Turn on', icon: 'power', sub: w.on ? 'nothing of it runs until you turn it on' : undefined, run: () => void api.set(w.id, { on: !w.on }) },

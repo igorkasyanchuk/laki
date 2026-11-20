@@ -70,9 +70,10 @@
             "desk",
             "panel",
             "row",
-            "turn"
+            "turn",
+            "none"
           ],
-          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)"
+          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only), turn (a chip under each agent turn: per workspace only), none (nowhere: it runs in the background, its fetch and events, and says what it has with notify, toasts, dialogs and alerts)"
         },
         {
           "type": "array",
@@ -87,9 +88,10 @@
               "desk",
               "panel",
               "row",
-              "turn"
+              "turn",
+              "none"
             ],
-            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)"
+            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only), turn (a chip under each agent turn: per workspace only), none (nowhere: it runs in the background, its fetch and events, and says what it has with notify, toasts, dialogs and alerts)"
           }
         }
       ],

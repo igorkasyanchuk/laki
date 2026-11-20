@@ -277,6 +277,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   if (hasCap(view, 'widget.order') && view?.widgets?.some(w => w.on)) a({ id: 'editLayout', label: "Edit extensions' layout: drag them between the sidebar, the bars, the rail and the foot", icon: 'panel', run: () => editLayout(true) })
   a({ id: 'uikit', label: 'UI kit: the elements an extension is made of, each with its JSON', icon: 'panel', run: () => setDialog({ uikit: true }) })
   a({ id: 'icons', label: 'Icons: every icon an extension can use, by name', icon: 'smile', run: () => setDialog({ uikit: true, icons: true }) })
+  a({ id: 'extCan', label: 'What an extension can do: run in the background, notify, dialogs, alerts, control Laki…', icon: 'puzzle', run: () => setDialog({ uikit: true, can: true }) })
   a({ id: 'resources', label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
   a({ label: 'Help: keys and commands', icon: 'help', hint: kh('help'), run: () => setDialog('help') })
   a({ id: 'about', label: 'About Laki', icon: 'info', run: () => setDialog('about') })

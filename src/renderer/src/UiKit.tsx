@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { ICON_GROUPS, ICON_PACKS, iconLook, iconOf, ICONS, type IconName, onIconLook } from '../../shared/icons'
 import { render } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
+import { bridge, notify } from './api'
 import { Modal } from './panels'
 import { CHARTS, colorCss, COLORS, DO, TONES, uiCheck, UI_EXAMPLES, UI_GROUPS, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
@@ -36,6 +37,7 @@ function lookOf(k: StarterKind): Look {
   const size: [number, number] = [Math.min(4, m.size?.[0] ?? 4), Math.min(3, m.size?.[1] ?? 2)]
   const one = !f['widget.json'] ? Object.values(f)[0] : undefined
   if (one) return { data, size, code: one.split('\n').slice(0, 9).join('\n') }
+  if (m.place === 'none') return { data, size, button: { icon: 'bell', label: 'In the background', badge: '' } }
   if (m.place === 'rail' || m.place === 'foot' || m.place === 'more' || (!m.ui && !f['widget.html'])) return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
   return m.ui ? { ui: m.ui, data, size, ws: m.scope === 'workspace' } : { data, size, js: true }
 }
@@ -390,16 +392,109 @@ function ColorView({ copy }: { copy: (text: string) => void }) {
   )
 }
 
-export function UiKitPage({ back, onClose, copy, icons, make }: { back: string; onClose: () => void; copy: (text: string) => void; icons?: boolean; make?: (name: string, ui: UiSpec, sample: unknown) => void }) {
-  const [view, setView] = useState<'kit' | 'type' | 'colors' | 'icons'>(icons ? 'icons' : 'kit')
+// What it can do: each thing an extension can do, what it writes for it (widget.json, or the JSON an action prints) and
+// Try: the real thing with made-up words (a toast, a notification, a dialog, the card on screen), or Make one from its
+// starter. Nothing runs: no extension is involved
+type Can = { icon: IconName; title: string; blurb: string; code: string; try?: 'background' | 'notify' | 'toast' | 'modal' | 'alert'; starter?: StarterKind; look?: UiSpec; data?: unknown }
+const DEPLOY: UiSpec = { type: 'list', each: 'commits', title: '{{msg}}', subtitle: '{{sha}} · {{when}}', icon: 'gitCommit' } as UiSpec
+const COMMITS = { commits: [{ msg: 'Fix the cart total rounding', sha: 'a1f3c9e', when: '2 h ago' }, { msg: 'Faster product search', sha: '7bd2e10', when: '5 h ago' }, { msg: 'Bump the API client', sha: 'c04e8a2', when: 'yesterday' }] }
+const CAN: Can[] = [
+  { icon: 'layout', title: 'Show where you work', blurb: 'A number, a list, a chart or a button: in the sidebar, the top or status bar, on the rail, in the ⋯ menu, on My Desk, in the side panel, on each workspace’s row or under each agent turn. A click opens its full view.', code: '{\n  "place": ["side", "status"],\n  "every": 5,\n  "fetch": "gh pr list --json number --jq \'{n: length}\'",\n  "ui": { "type": "stat", "value": "{{n}}", "label": "open PRs" }\n}', starter: 'number', look: { type: 'stat', value: '7', label: 'open PRs', tone: 'accent' } as UiSpec },
+  { icon: 'moon', title: 'Run in the background', blurb: '"place": "none" shows it nowhere. Its fetch still runs every few minutes while Laki is open, its handlers answer Laki’s events, and it speaks up only when it has something to say.', code: '{\n  "place": "none",\n  "every": 5,\n  "fetch": "sh health.sh",\n  "notify": "{{#unless ok}}api.acme.dev is down{{/unless}}",\n  "on": { "pr.checks.failed": "failed" },\n  "actions": { "failed": "sh failed.sh" }\n}', try: 'background', starter: 'background' },
+  { icon: 'bell', title: 'Notifications', blurb: 'A notification on your Mac, and a toast in Laki: its notify template after each fetch (said once each time it reads anew), or {"notify": …} printed by an action or an event’s handler.', code: '{ "notify": "Deploy of web is done: 3 commits" }', try: 'notify' },
+  { icon: 'message', title: 'Toasts', blurb: 'A short line at the bottom of Laki’s window that goes by itself: what an action printed last, or its toast.', code: '{ "toast": "Saved to Notes" }', try: 'toast' },
+  { icon: 'panel', title: 'Dialogs', blurb: 'A dialog over Laki: its words, a UI kit element over its own data and up to 6 buttons, each running one of its actions or opening a link. An id lets a later one update it (a progress dialog).', code: '{ "modal": {\n  "title": "Deploy web?",\n  "text": "3 commits since the last deploy",\n  "ui": { "type": "list", "each": "commits", "title": "{{msg}}", "subtitle": "{{sha}} · {{when}}" },\n  "data": { "commits": [{ "msg": "Fix the cart total rounding", "sha": "a1f3c9e", "when": "2 h ago" }, …] },\n  "buttons": [{ "label": "Deploy", "run": "deploy", "style": "primary" }, { "label": "Not now" }]\n} }', try: 'modal', look: DEPLOY, data: COMMITS },
+  { icon: 'monitor', title: 'A card on your screen', blurb: 'For what can’t wait: a card over every app, bottom right, until you close it. Its first line, from Laki, names the extension that sent it; 5 a minute at most.', code: '{ "alert": { "title": "Prod is down", "text": "api.acme.dev answers 502 since 10:42" } }', try: 'alert' },
+  { icon: 'run', title: 'Control Laki', blurb: 'Its buttons ask Laki to start a workspace with a prompt, message the workspace’s agent, ask Laki AI, open a terminal or a page (Laki shows what and asks first). Its scripts run the laki command as $LAKI_CLI: anything the CLI does.', code: '"$LAKI_CLI" new web "Fix the flaky cart test"\n"$LAKI_CLI" send "$LAKI_WORKSPACE" --when-idle "Run the tests"\n"$LAKI_CLI" alert "Release is tagged" --choice OK\n"$LAKI_CLI" ls --json', starter: 'launcher', look: { type: 'row', children: [{ type: 'button', label: 'Fix a flaky test', icon: 'agent', do: 'new', prompt: 'Find and fix the flakiest test' }, { type: 'button', label: 'Ask the agent', icon: 'run', do: 'send', prompt: 'Run the tests' }] } as UiSpec },
+  { icon: 'zap', title: 'Answer Laki’s events', blurb: 'An agent’s turn done or waiting, a PR opened, failing, reviewed or merged, a workspace made or archived, a port open, a webhook, your own (laki widget emit): each runs one of its actions, the event as JSON on stdin.', code: '"on": {\n  "turn.done": "note",\n  "pr.checks.failed": "failed",\n  "pr.merged": "refresh"\n}', starter: 'turn' },
+  { icon: 'wrench', title: 'Tools for your agents', blurb: 'An action with a tool: Claude Code and Laki AI can call it, with its input, asked first (or always allowed once you say so).', code: '"actions": { "add": {\n  "run": "sh add.sh",\n  "tool": { "description": "Add a note to the board", "input": { "text": "the note" } }\n} }', starter: 'tool' },
+  { icon: 'shield', title: 'Gates', blurb: 'Hold a ship, a merge or an archive until its check passes, or Claude Code’s tool calls (tool.call): its action’s exit says go or why not.', code: '"actions": { "lint": {\n  "run": "npm run lint",\n  "gate": ["ship", "merge"]\n} }' },
+]
+let tried = 0
+function CanView({ copy, toast, start }: { copy: (text: string) => void; toast?: (text: string) => void; start?: (k: StarterKind, name: string) => void }) {
+  const [modal, setModal] = useState(false)
+  const [soon, setSoon] = useState(false)
+  const say = (t: string) => (toast ? toast(t) : undefined)
+  const alert = () =>
+    bridge
+      ? notify('Prod is down', 'api.acme.dev answers 502 since 10:42', '', () => {}, undefined, [], { alert: `try-${++tried}`, origin: 'message from the extension Uptime (an example: the UI kit’s Try)' })
+      : say('Prod is down: api.acme.dev answers 502 since 10:42 (in the app, a card over every app)')
+  const go: Record<NonNullable<Can['try']>, () => void> = {
+    background: () => (setSoon(true), setTimeout(() => (setSoon(false), notify('Uptime', 'api.acme.dev is down', '', () => {}), say('Uptime: api.acme.dev is down')), 2500)),
+    notify: () => (notify('Deploys', 'Deploy of web is done: 3 commits', '', () => {}), say('Deploys: Deploy of web is done: 3 commits')),
+    toast: () => say('Saved to Notes'),
+    modal: () => setModal(true),
+    alert,
+  }
+  return (
+    <div className="kit">
+      <p className="muted">
+        An extension is a folder with a widget.json: what it fetches, when, and what it does with it. It can show in many places or in none at all. Each Try below shows the real thing with made-up words; Make one starts an extension of yours from a starter.
+      </p>
+      <div className="kit-grid kit-can">
+        {CAN.map(c => (
+          <section key={c.title} className="ext-card kit-card">
+            <div className="ext-card-head kit-card-head">
+              <Icon name={c.icon} size={16} />
+              <b>{c.title}</b>
+              <span className="muted small kit-blurb">{c.blurb}</span>
+            </div>
+            {c.look && (
+              <div className="ext-stage kit-can-look" inert>
+                <div className="widget ext-tile" style={{ width: 4 * CELL_W }}>
+                  <KitBody spec={c.look} data={c.data ?? {}} cells={[4, 2]} />
+                </div>
+              </div>
+            )}
+            <div className="kit-json">
+              <pre className="mono">{c.code}</pre>
+              <button type="button" className="sm" aria-label={`Copy: ${c.title}`} onClick={() => copy(c.code)}>
+                <Icon name="copy" size={12} />
+              </button>
+            </div>
+            {(c.try || (c.starter && start)) && (
+              <div className="kit-edit-acts">
+                {c.try && (
+                  <button type="button" className="sm primary" disabled={c.try === 'background' && soon} onClick={go[c.try]}>
+                    {c.try === 'background' ? (soon ? 'Running in the background…' : 'Try it: it speaks up in 2 s') : 'Try it'}
+                  </button>
+                )}
+                {c.starter && start && (
+                  <button type="button" className="sm" data-tip={`${STARTERS[c.starter].title}: ${STARTERS[c.starter].blurb}. Yours, on, its page opened`} onClick={() => start(c.starter!, STARTERS[c.starter!].title)}>
+                    Make one
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+      {modal && (
+        <Modal title="Deploy web?" onClose={() => setModal(false)}>
+          <p className="muted small">3 commits since the last deploy</p>
+          <KitBody spec={DEPLOY} data={COMMITS} cells={null} />
+          <div className="row">
+            <button onClick={() => setModal(false)}>Not now</button>
+            <button className="primary" onClick={() => (setModal(false), say('Deploying web… (an example: nothing ran)'))}>
+              Deploy
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+export function UiKitPage({ back, onClose, copy, icons, can, make, toast, start }: { back: string; onClose: () => void; copy: (text: string) => void; icons?: boolean; can?: boolean; make?: (name: string, ui: UiSpec, sample: unknown) => void; toast?: (text: string) => void; start?: (k: StarterKind, name: string) => void }) {
+  const [view, setView] = useState<'kit' | 'can' | 'type' | 'colors' | 'icons'>(icons ? 'icons' : can ? 'can' : 'kit')
   const [q, setQ] = useState('')
   const [only, setOnly] = useState<UiGroup | ''>('')
   const [size, setSize] = useState<Record<string, string>>({})
   const closeRef = useRef(onClose)
   closeRef.current = onClose
-  // Esc goes back, unless the filter has something typed (it clears first)
+  // Esc goes back, unless the filter has something typed (it clears first) or a dialog is over it (Try's: it closes)
   useEffect(() => {
-    const f = (e: KeyboardEvent) => escapes(e) && !(document.activeElement instanceof HTMLInputElement && document.activeElement.value) && closeRef.current()
+    const f = (e: KeyboardEvent) => escapes(e) && !(document.activeElement instanceof HTMLInputElement && document.activeElement.value) && !document.querySelector('.overlay .modal') && closeRef.current()
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
@@ -425,16 +520,16 @@ export function UiKitPage({ back, onClose, copy, icons, make }: { back: string; 
           <span className="muted">›</span>
           <b className="crumb here">UI kit</b>
           <div className="seg kit-view" role="tablist" aria-label="Show">
-            {(['kit', 'type', 'colors', 'icons'] as const).map(v => (
+            {(['kit', 'can', 'type', 'colors', 'icons'] as const).map(v => (
               <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
-                {{ kit: 'Elements', type: 'Typography', colors: 'Colors', icons: `Icons · ${NAMES.length}` }[v]}
+                {{ kit: 'Elements', can: 'What it can do', type: 'Typography', colors: 'Colors', icons: `Icons · ${NAMES.length}` }[v]}
               </button>
             ))}
           </div>
         </nav>
       }
     >
-      {view === 'icons' ? <IconGallery copy={copy} /> : view === 'type' ? <TypeView copy={copy} /> : view === 'colors' ? <ColorView copy={copy} /> : <div className="kit">
+      {view === 'icons' ? <IconGallery copy={copy} /> : view === 'can' ? <CanView copy={copy} toast={toast} start={start} /> : view === 'type' ? <TypeView copy={copy} /> : view === 'colors' ? <ColorView copy={copy} /> : <div className="kit">
         <div className="kit-head">
           <p className="muted">
             An extension's UI as JSON elements: widget.json's {m('"ui"')}, one element or {m('{ "preview", "full" }')}. Each element takes {m('if')}, {m('unless')}, {m('each')}, {m('tip')} and {m('tone')} too; its words are templates over the data ({m('{{field}}')}, {m('{{ago at}}')}, {m('{{num n}}')}). {m('laki widget kit')} prints the same.

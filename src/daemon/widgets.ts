@@ -20,6 +20,8 @@ import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { iconTurns } from '../shared/icons.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
+import { alertShow } from './alerts.ts'
+import { hidden } from './phone.ts'
 import { dir, realOf } from './dir.ts'
 import { agentCaller, annotAt, broadcast, sessions, git, ghSaid, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
 import { headOf } from './pr.ts'
@@ -713,7 +715,7 @@ const isSize = (v: unknown): v is WidgetSize => SIZES.includes(v as WidgetSize)
 const viewSize = (w: Entry): WidgetSize => [w.s.view, w.m.view].find(isSize) ?? 'm'
 const isPlace = (v: unknown): v is WidgetPlace => WIDGET_PLACES.includes(v as WidgetPlace)
 // its places: the user's (one, or a list), else widget.json's, else the sidebar; the first is its place
-const placeList = (v: unknown) => [...new Set((Array.isArray(v) ? v : [v]).filter(isPlace))]
+const placeList = (v: unknown) => (l => (l.length > 1 ? l.filter(p => p !== 'none') : l))([...new Set((Array.isArray(v) ? v : [v]).filter(isPlace))]) // none: alone, else the others
 export const placesOf = (w: Entry): WidgetPlace[] => [w.s.place, w.m.place].map(placeList).find(l => l.length) ?? ['side']
 const placeOf = (w: Entry): WidgetPlace => placesOf(w)[0]
 
@@ -1339,7 +1341,7 @@ try {
 export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream', 'workflow', 'facts'] // and action:<name>, event:<name>
 // an event handler's ($LAKI_EVENT, $LAKI_EVENT_FILE, the JSON on stdin) or a tool call's ($WIDGET_INPUT_<NAME>; why: who
 // called it and how it was allowed, for its run; full: all its stdout back)
-type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean; gone?: WsInfo } // gone: an archived or removed workspace's event, its info then
+type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean; gone?: WsInfo; of?: string; hid?: boolean } // gone: an archived or removed workspace's event, its info then; of: the event's workspace (a global one's handler too); hid: Recording mode hid it as the event came (a removed one is gone by now)
 const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 const INSERT_MAX = 16 << 10 // what an action puts in the prompt
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
@@ -1602,7 +1604,8 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     const open = typeof j?.open === 'string' ? j.open.trim().slice(0, 2000) : j?.open
     if (open !== undefined && !openOk(open)) wLog(w, `action ${o.action}: open refused, not an http(s), mailto or laki:// link: ${String(open).slice(0, 200)}`, 'warn')
     const files = j && 'files' in j && !ev ? filesOut(w, j.files, x ?? state.workspaces.find(v => v.id === ctx?.info.ws?.id), o.action) : undefined
-    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }), ...(typeof j?.send === 'string' && j.send.trim() && !ev && { send: j.send.trim().slice(0, INSERT_MAX) }) } // send: to the workspace's agent, the app asks first (widgetDo's send)
+    const told = j ? tell(w, x ?? state.workspaces.find(v => v.id === ev?.of), j, ev?.hid) : undefined
+    return { ok: true, ...(say ?? { out: told ?? lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }), ...(typeof j?.send === 'string' && j.send.trim() && !ev && { send: j.send.trim().slice(0, INSERT_MAX) }) } // send: to the workspace's agent, the app asks first (widgetDo's send)
   } catch (e) {
     const f = e as Failed
     const kind = f.changed ? undefined : failOf(f)
@@ -1720,6 +1723,29 @@ export function widgetPush(o: { id: string; data?: unknown; ws?: string; merge?:
   wLog(w, `pushed${o.merge ? ', merged' : ''}${x ? ` (${x.id})` : ''}`)
   changed()
   return { ok: true }
+}
+
+// an action's JSON's notify (a notification, and a toast) and alert (the card on screen over every app, laki alert's,
+// its origin line naming the extension; a few a minute): what one in the background says, from here whatever ran it (a
+// click, an event, a schedule, a workflow). Nothing about a workspace Recording mode hides
+// it returns the words it said (a click's note shows them, not the JSON)
+function tell(w: Entry, x: Workspace | undefined, j: Record<string, unknown>, hid?: boolean): string | undefined {
+  if (!('notify' in j || 'alert' in j)) return
+  const name = w.m.name || w.id
+  if (hid || hidden(x)) return void wLog(w, 'notify and alert: not shown, Recording mode hides its workspace')
+  const n = typeof j.notify === 'string' ? j.notify.trim().slice(0, 300) : ''
+  if (n) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, notify: n })
+  const a = typeof j.alert === 'string' ? { text: j.alert } : isObj(j.alert) ? j.alert : undefined
+  const said = (v: unknown) => ((typeof v === 'string' || typeof v === 'number') && String(v).trim() ? String(v) : undefined)
+  const text = a && (said(a.text) ?? said(a.title))
+  if (a)
+    try {
+      // a title alone: its words, under the extension's name
+      alertShow({ title: said(a.text) ? (said(a.title) ?? name) : name, text }, 'alert', `the extension ${name}`, `widget:${w.id}`)
+    } catch (e) {
+      wLog(w, `alert not shown: ${(e as Error).message}`, 'warn')
+    }
+  return n || text || undefined
 }
 
 // a widget's folder, for Open in (core's openIn)

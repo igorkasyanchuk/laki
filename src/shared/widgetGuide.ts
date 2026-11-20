@@ -71,7 +71,9 @@ number; put the words in \`tip\`. Add them only when the user asks.
   tab of the side panel, its full view as wide as the panel), \`row\` (per workspace only: a mark on each workspace's
   row in the sidebar, its \`badge\` (else \`label\`) filled from that workspace's data, its \`tip\` on hover, \`click\`
   runs there; every live workspace's is fetched, so keep it cheap), \`turn\` (per workspace: a chip under each agent turn
-  its \`"on": { "turn.done": "refresh" }\` gave data for, its label, badge and tone; a click shows that turn's data).
+  its \`"on": { "turn.done": "refresh" }\` gave data for, its label, badge and tone; a click shows that turn's data),
+  \`none\` (alone: nowhere, no ui needed; it runs in the background, its fetch and \`on\` events, and speaks with
+  \`notify\`, toasts, dialogs and alerts).
 - \`config\`: the settings the user fills in: a default (text, \`true\`/\`false\`, a number) or \`{ "type": text | number |
   bool | choice | list | secret, "label", "hint", "default", "choices", "required" }\`. Never hard-code a repo, login or token: make it a
   setting; a token, key or password is \`"type": "secret"\` (only its fetch and actions get it; its ui and page see it empty).
@@ -103,7 +105,9 @@ number; put the words in \`tip\`. Add them only when the user asks.
   its own data: \`"ui": {"type": "table", …}, "data": {…}, "size": "s|m|l"\`, its buttons running actions as in the
   full view. \`"id": "deploy"\`: a later modal with that id is drawn in its place (a progress dialog an action updates),
   and \`{"close": "deploy"}\` (or \`true\`: any of its own) closes it. \`{"send": "Fix the failing test"}\`: a message to the
-  workspace's agent (the app shows it and asks first; it's typed once the agent is idle).
+  workspace's agent (the app shows it and asks first; it's typed once the agent is idle). \`{"notify": "Deploy done"}\`: a
+  notification (and a toast); \`{"alert": "Prod is down"}\` (or \`{"title", "text"}\`): the card on the user's screen over
+  every app, for what can't wait (5 a minute at most). These two work from any run: a click, an \`on\` event, a schedule.
   An action may be an agent instead of a command: \`"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
   "mcp__slack__post_message" }\` (\`{{arg}}\`, \`{{config.x}}\`, its data's fields and \`{{workspace.branch}}\` filled in; the
   agent of Settings › Extensions, with the user's MCP servers; \`tools\`: claude's it may use unasked). Its answer shows

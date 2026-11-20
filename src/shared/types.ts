@@ -1335,7 +1335,7 @@ export type WidgetSize = 's' | 'm' | 'l'
 // right end), the rail (a button among its icons; without the rail, the sidebar's foot), the sidebar's foot (a button
 // beside Video, Meme and Timer) or the Desk (experimental: a page of tiles, each resized there). Any of them at once:
 // places (place is the first of them, for an older app)
-export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'more', 'desk', 'panel', 'row', 'turn'] as const // more: an item in the sidebar foot's ⋯ menu; panel: a right-panel tab; row: a mark on each workspace's row; turn: a chip under each agent turn its turn.done handler gave data for (both per workspace only)
+export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'more', 'desk', 'panel', 'row', 'turn', 'none'] as const // more: an item in the sidebar foot's ⋯ menu; panel: a right-panel tab; row: a mark on each workspace's row; turn: a chip under each agent turn its turn.done handler gave data for (both per workspace only); none: nowhere, it runs in the background (alone: with another place, that one)
 // P5: a turn place's chip: what its turn.done handler left for that turn (at: the event's time), its face then; data only in the daemon (widgetRender's turn)
 // P6: an extension's note on a line of a workspace's diff (its new side), from an action's JSON or a fetch's data
 export type Annotation = { file: string; line: number; level: 'info' | 'warn' | 'error'; text: string; fix?: string }
@@ -1344,6 +1344,7 @@ export type TurnMark = { widget: string; at: number; label?: string; badge?: str
 // a size typed as cells across x down (2x1, 3×0.5): the CLI's and MCP's; widgetSet clamps it
 export const cellsOf = (t: string): [number, number] | undefined => (m => (m ? [Number(m[1]), Number(m[2])] : undefined))(/^\s*(\d)\s*[x×]\s*(\d(?:\.5)?|0?\.5)\s*$/i.exec(t))
 export const placesOf = (w: { place?: WidgetPlace; places?: WidgetPlace[] }): WidgetPlace[] => (w.places?.length ? w.places : [w.place ?? 'side'])
+export const nowhere = (w: { place?: WidgetPlace; places?: WidgetPlace[] }) => placesOf(w).every(p => p === 'none') // runs in the background, shows nowhere
 export const BUTTON_PLACES: readonly WidgetPlace[] = ['rail', 'foot', 'more']
 export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 
@@ -1432,7 +1433,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 213
+export const API = 214
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -1,13 +1,13 @@
 // Settings › Extensions: the list, each one's card (where it shows, updates, its settings, its tools) and Laki AI's
 // extension chats where you left off. Settings.tsx re-exports it.
-import { placesOf, WHEN_AGENT, type WidgetWhen, type StudioChat, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
+import { nowhere, placesOf, WHEN_AGENT, type WidgetWhen, type StudioChat, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { ICONS } from '../../shared/icons'
 import { UI_TYPES, type UiProblem } from '../../shared/widgetUi'
 import { type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Icon, IconButton, type MenuItem, ON, Switch, useMenu } from './ui'
 import { Group, Says } from './SettingsKit'
-import { BARS, extMenuItems, fits, PLACES, SIZES } from './extMenu'
+import { BARS, extMenuItems, fits, flipPlace, PLACES, SIZES } from './extMenu'
 export { extMenuItems }
 import { ago } from '../../shared/widget'
 import { StarterPicker } from './UiKit'
@@ -20,6 +20,7 @@ export type WidgetsApi = {
   home?: string // Laki's own widgets folder
   set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[]; hours?: string; when?: WidgetWhen | null; order?: number | null }) => Promise<unknown> // when (P2): {} always, null widget.json's again; hours: its own working hours ('': Settings'); seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on: a place too
+  nowhere?: boolean // the daemon takes the none place (widget.none)
   ungated?: number // S8: claude tabs started before a tool gate was on
   gateRestart?: () => Promise<{ restarted: number; left: number }> // the idle ones again, their chats resumed
   hours?: string // Settings › Extensions' working hours (settings.widgetHours): an extension's own empty one says it
@@ -329,9 +330,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const [hot, setHot] = useState<WidgetPlace>() // the place pill under the mouse: lit brighter in the map
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
   const places = placesOf(w)
-  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && ((v !== 'row' && v !== 'turn') || w.scope === 'workspace'))
+  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'none' || api.nowhere || places.includes('none')) && ((v !== 'row' && v !== 'turn') || w.scope === 'workspace'))
   // a place each click turns on or off; the last one stays
-  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(places.includes(v) ? places.filter(x => x !== v) : [...places, v])
+  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(flipPlace(places, v))
   const fetches = w.every !== undefined
   const status = w.running ? 'Fetching…' : w.error ? `Last fetch failed: ${w.error}` : w.at ? `Fetched ${ago(w.at)}` : 'Not fetched yet'
   return (
@@ -365,7 +366,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             )}
             {w.scope === 'workspace' && <span className="tag-soft" data-tip="An instance per workspace, its own data">per workspace</span>}
           </span>
-          <span className={`wc-state small ${w.on ? 'on' : ''}`}>{w.on ? 'On: it runs and shows where you picked' : 'Off: nothing of it runs, and it shows nowhere'}</span>
+          <span className={`wc-state small ${w.on ? 'on' : ''}`}>{w.on ? (nowhere(w) ? 'On: it runs in the background' : 'On: it runs and shows where you picked') : 'Off: nothing of it runs, and it shows nowhere'}</span>
         </div>
         <div className="wc-acts">
           {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}

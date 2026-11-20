@@ -35,7 +35,7 @@ const SPEC: J = {
     },
   ],
 }
-const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only)' }
+const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), more (an item in the sidebar foot’s ⋯ menu), desk (My Desk), panel (a tab in the side panel), row (a mark on each workspace’s row: per workspace only), turn (a chip under each agent turn: per workspace only), none (nowhere: it runs in the background, its fetch and events, and says what it has with notify, toasts, dialogs and alerts)' }
 
 // an action offered where you work (its object form's menu fields; actionMenu reads them, manifestCheck checks them)
 export const ACTION_SHOWS = ['palette', 'workspace', 'tab', 'file', 'prompt'] as const
@@ -409,7 +409,9 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     if (!(WIDGET_PLACES as readonly string[]).includes(p as string)) say('error', 'widget.json place', `${JSON.stringify(p)} isn't a place: ${WIDGET_PLACES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(p), WIDGET_PLACES))}`)
   if (m.fetch && m.script) say('error', 'widget.json', 'fetch or script, not both')
   if (m.scope !== undefined && m.scope !== 'global' && m.scope !== 'workspace') say('error', 'widget.json scope', `global or workspace, not ${JSON.stringify(m.scope)}`)
-  if (needsSample(m) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
+  const places = m.place === undefined ? [] : Array.isArray(m.place) ? m.place : [m.place]
+  if (places.includes('none') && places.length > 1) say('warn', 'widget.json place', 'none shows it nowhere: alone, or leave it out (with another place, that one wins)')
+  if (needsSample(m) && m.sample === undefined && !(places.length && places.every(p => p === 'none'))) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
   if (m.source !== undefined) {
     const src = m.source as Record<string, unknown> | null
     if (!src || typeof src !== 'object' || !['fetch', 'static', 'file', 'url', 'ai'].includes(String(src.kind))) say('error', 'widget.json source', '{ "kind": "fetch" | "static" | "file" | "url" | "ai", "text" | "path" | "url" | "prompt" }')

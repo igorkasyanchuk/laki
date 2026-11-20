@@ -3493,6 +3493,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-card .widget-card { padding: 0; border: none; background: none; }
 .ext-stage { position: relative; display: grid; place-items: center; min-height: 180px; padding: 36px var(--sp-6) 20px; border-radius: var(--r-l); background: radial-gradient(color-mix(in srgb, var(--fg) 9%, transparent) 1px, transparent 1px) 0 0 / 14px 14px, var(--bg); }
 .ext-where { position: absolute; top: 10px; left: 12px; }
+.ext-bg { max-width: 460px; margin: var(--sp-5) 0 0; text-align: center; line-height: 1.5; }
 .ext-tile { max-width: 100%; margin: 0; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--side); box-shadow: var(--lift-2); }
 .ext-tile.in-bar { height: 30px; padding: 0 var(--sp-4); display: flex; align-items: center; }
 .narrow .ext-places > div { max-width: 100%; } .narrow .ext-tile { max-width: 100%; } /* a phone: a bar's line as wide as the page */
@@ -3614,6 +3615,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .kit-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-5); min-height: 0; padding: 20px var(--sp-6); }
 .kit-status { display: flex; align-items: center; gap: var(--sp-4); max-width: 100%; }
 .kit-json { position: relative; min-width: 0; }
+.kit-can .kit-card-head { gap: var(--sp-3); } .kit-can .ext-card-head > .kit-blurb { white-space: normal; line-height: 1.45; }
+.kit-can .kit-json pre { white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 40px; } .kit-can .ext-stage.kit-can-look { min-height: 0; padding: var(--sp-5); }
 .kit-type, .kit-colors { display: flex; flex-direction: column; gap: var(--sp-2); } .kit-type .kit-h, .kit-colors .kit-h { margin-bottom: 2px; } .kit-type p, .kit-colors p { margin: 0 0 8px; }
 .kit-type-rows { padding: 0; overflow: hidden; } .kit-type-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 0.9fr); align-items: center; gap: var(--sp-5); padding: var(--sp-4) var(--sp-5); } .kit-type-row + .kit-type-row { border-top: 1px solid var(--line); }
 .kit-type-s { min-width: 0; padding: 0; background: none; border: 0; } .kit-type-rows > .kit-type-s { padding: var(--sp-5) var(--sp-5); }

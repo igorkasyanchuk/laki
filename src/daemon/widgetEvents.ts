@@ -11,6 +11,7 @@ import { CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetEven
 import { actionCmd, gateOf } from '../shared/widgetSchema.ts'
 import { dataOf, type Entry, envOf, eventWs, exec, faceOf, placesOf, type Failed, find, guarded, inProj, instOk, isObj, keep, keyOf, lastLine, onOf, outside, ownFetch, ran, RUN_JS, scoped, shown, sourceOf, tail, trusted, where, widgetAction, widgetRun, widgets, wLog, wsEnv, wsInfo, type WsInfo } from './widgets.ts'
 import { agentIn, broadcast, callerAgent, changed, devLog, rtOf, state } from './core.ts'
+import { hidden } from './phone.ts'
 import { killGroup, own } from './resources.ts'
 import { filesHash } from './widgetTrust.ts'
 import { dir } from './dir.ts'
@@ -27,7 +28,7 @@ const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
 export const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
 const SENT_MAX = 50
-type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string; rec: EventSent; tab?: string; at: number } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always); rec: what laki widget events says of it
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string; hid?: boolean; rec: EventSent; tab?: string; at: number } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always); hid: Recording mode hid it then (widgets.ts tell); rec: what laki widget events says of it
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 // laki events (main.ts' events): the objects extensions get (tool.call's aside: every tool call), numbered, the newest
@@ -102,7 +103,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
       wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
       continue
     }
-    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent, of: x?.id, rec, tab: tab?.id, at: head.at })
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent, of: x?.id, hid: hidden(x), rec, tab: tab?.id, at: head.at })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`, 'warn')
     queues.set(w.id, q)
     rec.widgets.push(w.id)
@@ -337,7 +338,7 @@ async function handle(id: string, j: Job) {
   }
   const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
   writeFileSync(file, j.json, { mode: 0o600 })
-  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops), ...(j.agent && { LAKI_EVENT_AGENT: j.agent }) }, stdin: j.json, gone: j.gone }
+  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops), ...(j.agent && { LAKI_EVENT_AGENT: j.agent }) }, stdin: j.json, gone: j.gone, of: j.of, hid: j.hid }
   if (j.agent) handling.set(id, j.agent)
   const marks = j.name === 'turn.done' && !!j.tab && !!j.ws && placesOf(w).includes('turn') && scoped(w) // P5: a turn chip after it (turnMark: data newer than the turn's end)
   try {

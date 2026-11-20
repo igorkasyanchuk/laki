@@ -25,6 +25,7 @@ test('links: workspaces, tabs, pages; nothing else', () => {
   assert.deepEqual(parseLink('laki://desk'), { to: 'desk' })
   assert.deepEqual(parseLink('laki://uikit'), { to: 'uikit' })
   assert.deepEqual(parseLink('laki://uikit/icons'), { to: 'uikit', icons: true })
+  assert.deepEqual(parseLink('laki://uikit/can'), { to: 'uikit', can: true })
   assert.deepEqual(parseLink('laki://starters'), { to: 'starters' })
   assert.deepEqual(parseLink('laki://settings/widgets/icons'), { to: 'extension', id: 'icons' }) // an extension named icons is still yours
   assert.deepEqual(parseLink('laki://Help'), { to: 'help' }) // the host as typed: a non-special scheme keeps its case
