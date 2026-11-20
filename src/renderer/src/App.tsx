@@ -3155,8 +3155,7 @@ export function App() {
     ...(w.pr?.state === 'OPEN' && w.pr.forge !== 'gitlab' && !w.prLinked
       ? [
           null,
-          { head: 'Laki does on its own' } as MenuItem,
-          ...(['autoFix', 'autoReview', 'autoMerge', ...(allows(w, 'land') ? ['autoLand' as const] : [])] as const).map(k => ({ label: AUTO_LABEL[k], icon: k === 'autoLand' ? 'gitMerge' : 'agent', hint: w[k] ? ON : undefined, tip: AUTO_SAYS[k], run: () => void setAuto(w, k, !w[k]) }) as MenuItem),
+          ...(ks => [{ head: `Laki does on its own · ${ks.filter(k => w[k]).length} of ${ks.length} on` } as MenuItem, ...ks.map(k => ({ label: AUTO_LABEL[k], icon: k === 'autoLand' ? 'gitMerge' : 'agent', toggle: !!w[k], tip: `${AUTO_SAYS[k]}. ${w[k] ? 'On: click to turn it off' : 'Off: click to turn it on'}`, run: () => void setAuto(w, k, !w[k]) }) as MenuItem)])(['autoFix', 'autoReview', 'autoMerge', ...(allows(w, 'land') ? ['autoLand' as const] : [])] as AutoKey[]),
         ]
       : []),
     ...(w.pr?.state === 'MERGED' && allows(w, 'revert') && hasCap(view, 'pr.revert') ? [null, { label: `Revert ${K}…`, icon: 'undo', key: 'v', tip: `A new ${K} on ${F} that undoes this one, after you confirm`, run: () => prAct(w, 'revert') } as MenuItem] : []),

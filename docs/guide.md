@@ -102,7 +102,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   Achievements). An install from before keeps everything it had.
 - **PRs**: the workspace's PR and its CI in the status bar; the ⋯ beside the PR (also its right click and the workspace's
   ⋯ › *PR #n*) has the switches that send failing CI, new review comments or merge conflicts to the agent on their own
-  (*Laki does on its own*, a check by each one on; the ⋯ is brighter while one is), for a PR on the workspace's branch;
+  (*Laki does on its own · 1 of 3 on*, a switch on each; the ⋯ is brighter while one is on), for a PR on the workspace's branch;
   the side panel's *Info* (⌘I) with the PR and its checks;
   a workspace archived once its PR merges (off by default).
 - **Side panel** (⌥⌘B): the workspace's info (⌘I), its files (search, preview, several open as tabs, new file or folder, changed files marked),

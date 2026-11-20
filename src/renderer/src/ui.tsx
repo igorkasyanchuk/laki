@@ -826,7 +826,7 @@ export async function copyImage(img: HTMLImageElement) {
   const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
 }
-type ItemBase = { off?: boolean; label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string; font?: string } // font: its label drawn in it (a CSS font-family: the font pickers')
+type ItemBase = { toggle?: boolean /* on or off: a switch at its end (a menuitemcheckbox) */; off?: boolean; label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string; font?: string } // font: its label drawn in it (a CSS font-family: the font pickers')
 export type MenuItem =
   | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -1038,7 +1038,8 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     return (
       <button
         key={i}
-        role="menuitem"
+        role={it.toggle === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        aria-checked={it.toggle}
         aria-haspopup={it.items ? 'menu' : undefined}
         aria-expanded={it.items ? subOf?.it === it : undefined}
         className={`menu-item ${it.off ? 'off' : ''} ${it.danger ? 'danger' : ''} ${it.good ? 'good' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
@@ -1057,6 +1058,13 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         </span>
         {it.hint && !on && <span className={`menu-hint${long ? ' long' : ''}`}>{it.hint}</span>}
         {it.pill && <span className={`menu-pill ${it.tone ?? ''}`}>{it.pill}</span>}
+        {it.toggle !== undefined && (
+          <span className={`toggle menu-toggle ${it.toggle ? 'on' : ''}`} aria-hidden>
+            <span className="toggle-track">
+              <span className="toggle-knob" />
+            </span>
+          </span>
+        )}
         {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
         {it.items && <Icon name="chevronRight" size={12} />}
       </button>

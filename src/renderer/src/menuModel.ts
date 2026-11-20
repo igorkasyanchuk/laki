@@ -30,7 +30,7 @@ export function menuModel(items: MenuItem[]): { model: NativeItem[]; runs: Map<s
       }
       if (!('label' in it)) return // emojis, a filter: Laki's own
       const sublabel = it.hint && it.hint !== ON ? it.hint : it.sub
-      const base = { label: it.label, ...(sublabel && { sublabel }), ...(it.off && { enabled: false }), ...(it.hint === ON && { checked: true }) }
+      const base = { label: it.label, ...(sublabel && { sublabel }), ...(it.off && { enabled: false }), ...((it.hint === ON || it.toggle) && { checked: true }) }
       if (it.items) {
         const sub = walk(it.items)
         if (!sub) return

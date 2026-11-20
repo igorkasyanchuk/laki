@@ -918,6 +918,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu-label.mono { font-family: var(--mono); font-size: var(--fs-2); }
 .menu-label > svg { flex: none; }
 .menu-item.on .menu-label { color: var(--accent-ink); }
+.menu-toggle { flex: none; pointer-events: none; } .menu-item[aria-checked='true'] .menu-icon { color: var(--accent-ink); } /* a toggle item: its switch says on or off, its icon lit while on */
 .menu-sub { color: var(--muted); font-size: var(--fs-2); line-height: 1.35; overflow-wrap: anywhere; }
 .menu-hint { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-1); }
 .menu-hint.long { flex: 0 1000 auto; min-width: 0; } /* a long one (a path) gives way first: the label keeps its words; a key's stays whole */
