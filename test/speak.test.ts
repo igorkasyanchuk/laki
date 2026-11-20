@@ -8,6 +8,7 @@ test('speakable: two sentences of plain prose, no code, links, paths, URLs or se
   assert.equal(speakable('Set `PORT` in [the config](https://x.test/doc) and see /Users/me/app/.env or src/app.ts.'), 'Set in the config and see or.')
   assert.equal(speakable('Your key is sk-abcdefghijklmnopqrstuv1234 and it works. Second one.'), 'Your key is and it works. Second one.') // a token: never read out
   assert.equal(speakable('# Title\n- one item\n- two items'), 'Title one item two items')
+  assert.equal(speakable('Set max_retry_count to _three_ now.'), 'Set max retry count to three now.') // snake_case isn't emphasis
   const long = speakable(`${'word '.repeat(30)}ends here. ${'more '.repeat(60)}`)
   assert.equal(long, `${'word '.repeat(30)}ends here.`.replace(/\s+/g, ' ')) // cut at its sentence's end
   const one = speakable('x'.repeat(10) + ' ' + 'y '.repeat(200))

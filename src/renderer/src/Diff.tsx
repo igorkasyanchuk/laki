@@ -395,7 +395,7 @@ export function useSayWhy(ask: Ask | undefined, answer: (n: number, label: strin
   useEffect(() => setOpen(false), [which]) // another question now: the words were for the last one
   const on = (o: { n: number; label: string }) => ({
     onClick: (e: MouseEvent) => {
-      if (long.current && ((long.current = false), e.detail)) return // a long press's own release (a key's click, detail 0, after one let go elsewhere: answers)
+      if (long.current && ((long.current = false), e.detail && no && o.n === no.n)) return // a long press's own release (a key's click, detail 0, after one let go elsewhere: answers; another choice's click: answers)
       if (no && o.n === no.n && e.altKey) return void setOpen(true)
       answer(o.n, o.label)
     },

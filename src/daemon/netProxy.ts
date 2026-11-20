@@ -66,6 +66,7 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
   const { 'proxy-authorization': _a, 'proxy-connection': _c, ...headers } = req.headers
   const up = request(u, { method: req.method, headers }, r => (res.writeHead(r.statusCode ?? 502, r.headers), r.pipe(res)))
   up.on('error', () => (res.headersSent ? res.destroy() : res.writeHead(502).end()))
+  res.on('close', () => up.destroy()) // the agent gone (or done): nothing more pulled from the host
   req.pipe(up)
 }
 

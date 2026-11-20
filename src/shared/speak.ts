@@ -17,7 +17,8 @@ export function speakable(text: string, max = SPEAK_MAX): string {
     .replace(/(^|[\s(])[\w.-]+(?:\/[\w.-]+)+\.\w+/g, '$1 ') // relative paths with a file's name (src/app.ts)
     .replace(/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+[.)])\s+/gm, '') // heads, quotes, list marks
     .replace(/^\s*(?:[-*_]\s*){3,}$/gm, ' ') // rules
-    .replace(/(\*\*|__|~~|\*|_)(?=\S)([^\n]*?\S)\1/g, '$2') // emphasis: its words
+    .replace(/(\*\*|~~|\*)(?=\S)([^\n]*?\S)\1/g, '$2') // emphasis: its words
+    .replace(/(?<!\w)(__|_)(?=\S)([^\n]*?\S)\1(?!\w)/g, '$2') // _ only at a word's edge: snake_case stays a word (its _ a space below)
     .replace(/[|#*_~<>]/g, ' ') // what's left of tables and marks
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')

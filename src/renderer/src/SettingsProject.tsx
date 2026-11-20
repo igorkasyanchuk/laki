@@ -131,17 +131,20 @@ export type ProjectInfo = { id: string; name: string; path: string; git: boolean
 // not yet. A name that isn't one yet (typing) is kept here and saved once it is: projectSet refuses the list otherwise
 function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; profiles: { name: string; agent: string }[]; onChange: (l: McpServer[]) => void }) {
   const [rows, setRows] = useState<McpServer[]>(list)
-  const put = (l: McpServer[]) => (setRows(l), l.every(s => MCP_NAME.test(s.name) && (s.command?.trim() || s.url?.trim())) && new Set(l.map(s => s.name)).size === l.length && onChange(l.map(s => (s.args ? { ...s, args: s.args.map(a => a.trim()).filter(Boolean) } : s)))) // args' empty lines: kept while typing, never saved
+  // a key per card that survives removing one above it (EnvField keeps its own text: an index would hand it the next one)
+  const keys = useRef<number[]>([])
+  while (keys.current.length < rows.length) keys.current.push(Math.random())
+  const put =(l: McpServer[]) => (setRows(l), l.every(s => MCP_NAME.test(s.name) && (s.command?.trim() || s.url?.trim())) && new Set(l.map(s => s.name)).size === l.length && onChange(l.map(s => (s.args ? { ...s, args: s.args.map(a => a.trim()).filter(Boolean) } : s)))) // args' empty lines: kept while typing, never saved
   const set = (i: number, x: Partial<McpServer>) => put(rows.map((s, n) => (n === i ? { ...s, ...x } : s)))
   const not = [...new Set(profiles.filter(x => !MCP_AGENTS.includes(x.agent) && x.agent !== 'command').map(x => AGENT_NAMES[x.agent as Agent] ?? x.agent))]
   return (
     <Group title="MCP servers" hint={`Tools for this project's agents, given as they start; never written into their own config${not.length ? ` · not supported by ${not.join(', ')} yet` : ''}`}>
       {rows.map((s, i) => (
-        <div key={i} className="setting-box mcp-server">
+        <div key={keys.current[i]} className="setting-box mcp-server">
           <div className="row">
             <input value={s.name} aria-label="Name" placeholder="name" spellCheck={false} className={MCP_NAME.test(s.name) ? '' : 'bad'} onChange={e => set(i, { name: e.target.value.trim() })} />
             <input className="mono grow" value={s.url ?? s.command ?? ''} aria-label="Command or URL" placeholder="npx -y @acme/mcp, or https://…" spellCheck={false} onChange={e => (v => set(i, /^https?:\/\//i.test(v) ? { url: v, command: undefined, args: undefined } : { command: v, url: undefined }))(e.target.value)} />
-            <IconButton icon="trash" title="Remove" onClick={() => put(rows.filter((_, n) => n !== i))} />
+            <IconButton icon="trash" title="Remove" onClick={() => (keys.current.splice(i, 1), put(rows.filter((_, n) => n !== i)))} />
           </div>
           {!s.url && (
             <>
@@ -152,7 +155,8 @@ function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; pro
           {profiles.some(x => MCP_AGENTS.includes(x.agent)) && (
             <div className="row wrap">
               {profiles.filter(x => MCP_AGENTS.includes(x.agent)).map(x => (
-                <Switch key={x.name} on={!s.presets?.length || s.presets.includes(x.name)} onChange={on => set(i, { presets: (all => (all.length === profiles.filter(y => MCP_AGENTS.includes(y.agent)).length ? undefined : all))(profiles.filter(y => MCP_AGENTS.includes(y.agent) && (y.name === x.name ? on : !s.presets?.length || s.presets.includes(y.name))).map(y => y.name)) })}>
+                // the last one on stays on: an empty list is every profile's (remove the server instead)
+                <Switch key={x.name} on={!s.presets?.length || s.presets.includes(x.name)} disabled={(s.presets?.length || profiles.filter(y => MCP_AGENTS.includes(y.agent)).length) === 1 && (!s.presets?.length || s.presets.includes(x.name))} onChange={on => set(i, { presets: (all => (all.length === profiles.filter(y => MCP_AGENTS.includes(y.agent)).length ? undefined : all))(profiles.filter(y => MCP_AGENTS.includes(y.agent) && (y.name === x.name ? on : !s.presets?.length || s.presets.includes(y.name))).map(y => y.name)) })}>
                   {x.name}
                 </Switch>
               ))}
