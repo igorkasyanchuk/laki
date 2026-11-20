@@ -20,7 +20,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, tipParts, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, tipName, tipParts, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, aiFromOf, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -1412,4 +1412,6 @@ test("tipParts: a card tip's title, Label: value rows, section heads and the foo
   // rows alone: no title, no foot; a long label isn't one
   assert.deepEqual(tipParts('a: 1\nb: 2'), { title: undefined, lines: [['a', '1'], ['b', '2']], foot: undefined })
   assert.deepEqual(tipParts(`${'x'.repeat(40)}: y`).lines, [`${'x'.repeat(40)}: y`])
+  // a name with ': ' in it (a tab called fix: login) stays the title
+  assert.equal(tipParts(`${tipName('fix: login')}\nModel: opus\nhints`).title, 'fix:\u00a0login')
 })

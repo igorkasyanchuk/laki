@@ -1093,6 +1093,7 @@ export const tipDelay = (now: number, lastShown: number) => (now - lastShown < T
 // colon); a last other line the foot (the hints), a first other one the title (a name with only its hints: both), any
 // other a section's head
 const TIP_ROW = /^([^:\n]{1,32}?): (.+)$/
+export const tipName = (s: string) => s.replace(/: /g, ':\u00a0') // a name in a card tip: never read as a row
 export function tipParts(text: string) {
   const all = text.split('\n').filter(l => l.trim())
   const row = (l: string) => TIP_ROW.test(l)

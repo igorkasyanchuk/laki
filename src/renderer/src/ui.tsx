@@ -193,7 +193,6 @@ export function MidText({ text, className = '', floor }: { text: string; classNa
   const cut = useRef<HTMLSpanElement>(null)
   const [max, setMax] = useState(Infinity)
   const [tipped, setTipped] = useState(false) // inside an element with Laki's tooltip or peek card (data-tip, data-peek): no native one beside it
-  useLayoutEffect(() => setTipped(!!box.current?.parentElement?.closest('[data-tip], [data-peek]')), [])
   // the estimate (characters by the whole name's average width) can be a little long: one fewer until the cut fits
   useLayoutEffect(() => {
     const c = cut.current
@@ -202,6 +201,7 @@ export function MidText({ text, className = '', floor }: { text: string; classNa
   useLayoutEffect(() => {
     const el = box.current!
     const fit = () => {
+      setTipped(!!el.parentElement?.closest('[data-tip], [data-peek]')) // read as it fits: a row's peek comes and goes with the window's width
       const w = el.clientWidth
       const fw = whole.current!.offsetWidth
       const len = [...text].length
@@ -1115,8 +1115,12 @@ export function Tips() {
     const w = el.offsetWidth
     const m = tip.menu
     el.style.left = `${m ? (m.left - w - 8 >= 8 ? m.left - w - 8 : Math.min(m.right + 8, window.innerWidth - w - 8)) : Math.max(8, Math.min(tip.x - w / 2, window.innerWidth - w - 8))}px`
-    // a card taller than the room under its element: above it
-    if (!m && tip.below && tip.y + el.offsetHeight > window.innerHeight - 8) (el.style.top = `${Math.max(8, tip.at - 6 - el.offsetHeight)}px`), (el.style.transform = '')
+    // under its element, else above (a card taller than the room under it too), else centered on a menu item; kept in
+    // the window. Set here each time: the element is reused from one tip to the next
+    const h = el.offsetHeight
+    let top = m ? tip.y - h / 2 : tip.below ? tip.y : tip.y - h
+    if (!m && tip.below && top + h > window.innerHeight - 8) top = tip.at - 6 - h
+    el.style.top = `${Math.max(8, Math.min(top, window.innerHeight - h - 8))}px`
   }, [tip])
   useEffect(() => {
     let timer = 0
@@ -1184,13 +1188,13 @@ export function Tips() {
   }, [])
   if (!tip) return null
   return (
-    <div className={`tip ${tip.menu ? 'side' : ''} ${tip.card ? 'tip-card' : ''}`} data-warm={tip.warm || undefined} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)', ...(tip.color && ({ '--tip-c': tip.color } as CSSProperties)) }}>
+    <div className={`tip ${tip.menu ? 'side' : ''} ${tip.card ? 'tip-card' : ''}`} data-warm={tip.warm || undefined} ref={box} style={tip.color ? ({ '--tip-c': tip.color } as CSSProperties) : undefined}>
       {tip.card ? tipCard(tip.text) : tipText(tip.text)}
     </div>
   )
 }
 // a card tip (text.ts tipParts): its title with a dot in its color, "Label: value" rows in two columns (the label
-// muted), a section's head between them (a split's tab), the foot (the hints, muted); a context share at a value's end
+// muted), a section's head between them (a split's tab), the foot (the hints, muted); Context's share at its end
 // (… · 71%) in its level's color
 export function tipCard(text: string) {
   const { title, lines, foot } = tipParts(text)
@@ -1207,7 +1211,7 @@ export function tipCard(text: string) {
             ) : (
               <Fragment key={i}>
                 <span className="tip-k">{l[0]}</span>
-                <span className="tip-v">{tipValue(l[1])}</span>
+                <span className="tip-v">{l[0] === 'Context' ? tipShare(l[1]) : tipText(l[1])}</span>
               </Fragment>
             ),
           )}
@@ -1217,7 +1221,7 @@ export function tipCard(text: string) {
     </>
   )
 }
-const tipValue = (v: string) =>
+const tipShare = (v: string) =>
   (m => (m ? <>{tipText(v.slice(0, m.index + 2))}<b className={`tip-pct ${+m[1] >= 90 ? 'high' : +m[1] >= 70 ? 'mid' : 'low'}`}>{m[1]}%</b></> : tipText(v)))(/· (\d{1,3})%$/.exec(v))
 // Settings › Keys' keys in use (App sets it as it draws), for keyTip outside App: a tooltip's keys are never hard-coded
 export const tipKeys: { map: Partial<Record<KeyId, string>> } = { map: {} }

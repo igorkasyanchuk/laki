@@ -8,7 +8,7 @@ import { type TabView, GOAL_SAYS, HOME_ACCOUNT, creatorOf } from '../../shared/t
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
 import { timeLeft } from './Tunnel'
-import { retrying, retryText } from './text'
+import { retrying, retryText, tipName } from './text'
 import { Glyph, rollup } from './Glyph'
 import { type CSSProperties, Fragment, type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { capsulesOf, collapseOf, fitTabs, TOOLBAR_GROUPS, TOOLBAR_ITEMS, toolbarOf, type ToolbarItem } from './toolbar'
@@ -96,8 +96,8 @@ export function tabTip(ts: TabView[], o: TabTipOf) {
     ].filter((x): x is string => typeof x === 'string')
   const one = ts.length === 1
   return [
-    ts.map(t => t.name).join(' · '),
-    ...(one ? rows(ts[0]) : ts.flatMap(t => (r => (r.length ? [t.name, ...r] : []))(rows(t)))),
+    tipName(ts.map(t => t.name).join(' · ')),
+    ...(one ? rows(ts[0]) : ts.flatMap(t => (r => (r.length ? [tipName(t.name), ...r] : []))(rows(t)))),
     `${o.key ? `Go to it (${o.key}) · ` : ''}double click to rename · drag to reorder, or onto a pane to split · right click for more`,
   ].join('\n')
 }
