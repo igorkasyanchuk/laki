@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Settings › Security › *Terminals*: the terminals you allowed to run laki as you, with what started each and its last call; *Revoke* makes it ask again. One with no call for 12 hours asks again too. [Try it](laki://settings/security?spot=Terminals)
+
 ## 0.58.0 · Nov 20, 2026
 
 - Extensions can sit in the sidebar foot's ⋯ menu, with Video, Meme and Timer (place `more`, or *Show in › ⋯ menu*): an item that runs an action, opens its full view or a link.

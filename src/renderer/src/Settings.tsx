@@ -3,7 +3,7 @@
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
 import { speakable } from '../../shared/speak'
 import type { Call } from '../../shared/api'
-import { TrustedClients } from './SettingsClients'
+import { Terminals, TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
@@ -2786,6 +2786,7 @@ export function SettingsPage(p: {
             <>
               <h2>Security</h2>
               <TrustedClients showWorkspaces={p.clients.show} copy={p.clients.copy} />
+              <Terminals />
             </>
           )}
           {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} other={p.remote && (() => openSec('remote'))} />}

@@ -2,6 +2,8 @@
 // made, its last call and calls today, with Rotate (it asks on the Allow card, as laki client rotate does) and Revoke
 // (asks here first); its log (what it did, a filter for refusals); today's calls with a token Laki doesn't know; Add a
 // client… (the command to run in your own terminal: the Allow card follows); Show its workspaces (the sidebar's filter).
+// Terminals (S1): the terminals you allowed to act as you (core.ts termList), each with Revoke (its next call asks again);
+// the one Laki's daemon was started from shows as started Laki and stays.
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { Group } from './SettingsKit'
@@ -11,6 +13,7 @@ import { RECIPE_IDS, RECIPES } from '../../shared/clientRecipes'
 type Row = { id: string; label: string; scopes: string[]; projects?: string[]; at: number; lastAt?: number; calls?: number; today?: number; daysLeft?: number; unused?: boolean; file: string }
 type Did = { at: number; method: string; target?: string; ok: boolean; why?: string; n?: number }
 type Log = { lines: Did[]; unknown: { n: number; last?: number; by?: string } }
+type Term = { key: string; tty: string; cmd: string; chain: string[]; at: number; lastAt: number; start?: true }
 const when = (at?: number) => (at ? new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'never')
 
 export function TrustedClients({ showWorkspaces, copy }: { showWorkspaces: (label: string) => void; copy: (text: string) => void }) {
@@ -119,6 +122,51 @@ export function TrustedClients({ showWorkspaces, copy }: { showWorkspaces: (labe
           <IconButton icon="copy" title="Copy the command" onClick={() => copy(cmd)} />
         </div>
       </details>
+    </Group>
+  )
+}
+
+export function Terminals() {
+  const [rows, setRows] = useState<Term[] | null>(null)
+  const [err, setErr] = useState('')
+  const load = () => void api.call<Term[]>('termList').then(setRows, (e: Error) => setErr(e.message))
+  useEffect(load, [])
+  const revoke = (t: Term) => void api.call('termRevoke', { key: t.key }).then(load, (e: Error) => setErr(e.message)) // only takes away: no ask
+  if (/unknown method/.test(err)) return null // a daemon before API 212
+  return (
+    <Group title="Terminals" hint="Terminals outside Laki you allowed to run laki as you. One goes when it closes, or after 12 hours with no call">
+      {err && <p className="err small">{err}</p>}
+      {rows === null ? (
+        <p className="muted small">Loading…</p>
+      ) : rows.length ? (
+        <table className="clients">
+          <thead>
+            <tr>
+              <th>Terminal</th>
+              <th>Started by</th>
+              <th>Allowed</th>
+              <th>Last call</th>
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(t => (
+              <tr key={t.key}>
+                <td className="mono small">{t.tty}</td>
+                <td className="small" title={t.chain.join(' ‹ ')}>
+                  {t.cmd}
+                  {t.start && <span className="muted"> · started Laki</span>}
+                </td>
+                <td className="small">{when(t.at)}</td>
+                <td className="small">{when(t.lastAt)}</td>
+                <td className="row">{!t.start && <button className="ghost sm danger" onClick={() => revoke(t)}>Revoke</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="muted small">None allowed.</p>
+      )}
     </Group>
   )
 }

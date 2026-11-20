@@ -5113,14 +5113,27 @@ async function termOf(pid: number, tty: string, up: (p: number) => Promise<numbe
   const names = psRows((await run('/bin/ps', ['-o', 'pid=,comm=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout)
   return { key: `${tty}:${lead[1]}:${lead[3].replace(/\s+/g, ' ')}`, tty, leader: Number(lead[1]), cmd: base(lead[4]), chain: pids.map(p => base(names.get(p) ?? '?')) }
 }
-// the terminals you allowed (and the one the daemon was started from), in memory: gone with the daemon, and each with its leader
-const termsOk = new Map<string, number>()
+// the terminals you allowed (and the one the daemon was started from), in memory: gone with the daemon, with its leader
+// (gone when it exits), what the card showed, when it was allowed and its last call (termList, Settings › Security ›
+// Terminals). An allowed one with no call for 12 hours goes too (start: the daemon's own, kept: headless has no window to ask in)
+type TermOk = { leader: number; tty: string; cmd: string; chain: string[]; at: number; lastAt: number; start?: true }
+const termsOk = new Map<string, TermOk>()
+export const TERM_IDLE = 12 * 3600_000
 const alive = (pid: number) => { try { return process.kill(pid, 0) } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } } // EPERM: root's login
-export const termOk = (t: Term) => {
-  for (const [k, pid] of termsOk) if (!alive(pid)) termsOk.delete(k)
-  return termsOk.has(t.key)
+const termPrune = (now = Date.now()) => {
+  for (const [k, e] of termsOk) if (!alive(e.leader) || (!e.start && now - e.lastAt > TERM_IDLE)) termsOk.delete(k)
 }
-export const termAllow = (t: Term) => void termsOk.set(t.key, t.leader)
+export const termOk = (t: Term) => (termPrune(), termsOk.has(t.key))
+export const termSeen = (t: Term) => void (e => e && (e.lastAt = Date.now()))(termsOk.get(t.key)) // main.ts' termAsk: its call passed
+export const termAllow = (t: Term, start?: true) => void termsOk.set(t.key, { leader: t.leader, tty: t.tty, cmd: t.cmd, chain: t.chain, at: Date.now(), lastAt: Date.now(), ...(start && { start }) })
+export const termList = () => (termPrune(), [...termsOk].map(([key, e]) => ({ key, ...e })).sort((a, b) => b.lastAt - a.lastAt))
+export function termRevoke(key: unknown) {
+  const e = typeof key === 'string' ? termsOk.get(key) : undefined
+  if (!e) throw new Error('no such terminal (it closed, or was revoked)')
+  if (e.start) throw new Error('the terminal that started Laki stays allowed until it closes')
+  termsOk.delete(key as string)
+  return { ok: true }
+}
 // the terminal the daemon itself was started from (laki daemon, --headless, the CLI's first call: LAKI_START_PID): yours
 // from the start. ponytail: whoever starts the daemon names it; an agent that can start Laki's daemon is past this gate anyway
 export async function termStart(proc = process.platform === 'linux' ? '/proc' : '') {
@@ -5129,7 +5142,7 @@ export async function termStart(proc = process.platform === 'linux' ? '/proc' : 
     const tty = (await ttys([pid], proc)).get(pid)
     const up = proc ? (p: number) => procParent(p, proc) : async (p: number) => Number((await run('/bin/ps', ['-o', 'ppid=', '-p', String(p)]).catch(() => ({ stdout: '' }))).stdout) || 0
     const t = tty && (await termOf(pid, tty, up, proc).catch(() => undefined))
-    if (t) termAllow(t)
+    if (t) termAllow(t, true)
   }
 }
 async function peerInfo(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Peer> {

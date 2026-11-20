@@ -2704,7 +2704,7 @@ export function App() {
       const title = 'Allow this terminal to act as you?'
       const picks: Pick[] = [{ label: 'Allow this terminal', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
       notify(title, `${m.cmd} on ${m.tty}`, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `A laki command came from a terminal Laki hasn't seen: ${m.tty}, started by ${m.cmd} (${(m.chain ?? []).join(' ‹ ')}).\n\nAllow it if you just ran laki there. An agent that left its tab looks the same: Deny if you didn't. Asked once per terminal.`, picks, answer: allow => void api.call('termAnswer', { req: m.req, allow: allow === 'once' }).catch(() => {}) })
+      toolLine.add({ req: m.req, title, text: `A laki command came from a terminal Laki hasn't seen: ${m.tty}, started by ${m.cmd} (${(m.chain ?? []).join(' ‹ ')}).\n\nAllow it if you just ran laki there. An agent that left its tab looks the same: Deny if you didn't. Asked once per terminal, and again after 12 hours with no call (Settings › Security › Terminals).`, picks, answer: allow => void api.call('termAnswer', { req: m.req, allow: allow === 'once' }).catch(() => {}) })
       return toolShow()
     }
     if (m.ev === 'clientAsk') {

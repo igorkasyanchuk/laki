@@ -218,3 +218,4 @@ needs no bump: `settingsSet` keeps any field.
 209: `promptQuestions` (`project`, `prompt`: Laki AI's one-shot questions on a task, at most 3, each with 2 to 4 choices, `{ questions: [] }` when it's clear; logged as *Ask me first*; the user's and remote access's only, refused for agents and trusted clients; `prompt.questions` cap).
 210: `termShells` (`check`?: the shells Settings › Terminal › Shell offers, the login one, or one path checked); settings' `termShell` (what shell tabs start; the user's alone; `term.shell` cap).
 211: widgets' `more` place (an item in the sidebar foot's ⋯ menu, a button's click; `BUTTON_PLACES`): widgetSet takes it (`widget.more` cap).
+212: `termList`, `termRevoke { key }` (S1's allowed terminals: tty, cmd, chain, `at`, `lastAt`, `start`; the app's window only; one with no call for 12 hours goes; `term.allow` cap).

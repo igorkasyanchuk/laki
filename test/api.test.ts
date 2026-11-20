@@ -762,7 +762,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
   // what nobody had listed (gates.ts' REMOTE_NO): the clock, accounts, a reset of every setting, extensions' files, a clone
-  for (const [m, p] of [['archivedTidy', { now: 9e15 }], ['accountSet', { id: 'x', name: 'y' }], ['accountRm', { id: 'x' }], ['uiReset', {}], ['webhookTest', { url: 'https://example.com/x' }], ['widgetFileSave', { id: 'links', path: 'widget.json', text: '{}' }], ['widgetNew', { kind: 'number', name: 'Far' }], ['projectClone', { url: 'https://example.com/x.git' }], ['device', { op: 'shot' }]] as const)
+  for (const [m, p] of [['archivedTidy', { now: 9e15 }], ['accountSet', { id: 'x', name: 'y' }], ['accountRm', { id: 'x' }], ['uiReset', {}], ['webhookTest', { url: 'https://example.com/x' }], ['widgetFileSave', { id: 'links', path: 'widget.json', text: '{}' }], ['widgetNew', { kind: 'number', name: 'Far' }], ['projectClone', { url: 'https://example.com/x.git' }], ['device', { op: 'shot' }], ['termList', {}], ['termRevoke', { key: 'x' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   // S11: nor what goes on the internet, runs later or in every new workspace; a shell tab still opens (the phone's own)
   const pr = await rig.rpc('projectAdd', { path: rig.repo })

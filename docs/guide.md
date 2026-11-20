@@ -3054,6 +3054,13 @@ grok mcp add -s user laki -- laki mcp
 OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local", "command": ["laki", "mcp"] } }` in
 `~/.config/opencode/opencode.json`.
 
+### Terminals
+
+`laki` from a terminal outside Laki (one `script`, `expect` or a tmux server made, or your own Terminal's) asks once in
+Laki's window: *Allow this terminal* or *Deny*. Settings › Security › *Terminals* lists the ones you allowed (its tty,
+what started it, when, its last call) with *Revoke*: its next call asks again. One goes when its shell exits, or after 12
+hours with no call. The terminal Laki's daemon was started from shows as *started Laki* and stays.
+
 ### Trusted clients
 
 An app outside Laki (a desktop app's MCP server, a script, a launchd job) runs `laki` in no tab and with no terminal of

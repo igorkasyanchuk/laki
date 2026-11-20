@@ -155,6 +155,7 @@ export const FIND: [string, string, string?][] = [
   ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
   ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
   ['security', 'Trusted clients', 'client token app mcp script scopes rotate revoke log refused grok bot outside'],
+  ['security', 'Terminals', 'terminal tty allowed allow revoke laki command shell outside'],
   ['presets', 'Network', "sandbox network hosts domains allow list allowedDomains registry offline internet"],
   ['presets', 'Wrapper sandbox (macOS)', 'sandbox-exec wrap seatbelt opencode gemini grok keys ssh aws keychain write read deny'],
   ['presets', 'Warn about a pasted secret', 'paste token key password prompt box warn pass as a secret file mask leak'],

@@ -697,8 +697,11 @@ you (`if (!tab) return p`). Now only two kinds of caller in no tab are you.
   `ssh -T`: refused what asks who. A process with a terminal of its own that isn't a tab's (`script`, `expect`, a tmux
   server it starts, but your Terminal's too) is asked about once: core.ts `Term` (its tty and its session's leader: pid
   and start time; macOS: the `s` row of `ps -t`, Linux: `/proc/<pid>/stat`, peer.ts `procSession`), `termOk`/`termAllow`
-  (in memory, an entry gone with its leader), `termStart` (the daemon's own terminal and `LAKI_START_PID`'s, which
-  conn.ts sets as it spawns one: allowed from the start). main.ts `termAsk` (from `callerOf`, so only `FROM`/`CALLER`
+  (in memory: each entry's leader, tty, cmd, chain, `at`, `lastAt`, set by `termSeen` as `termAsk` passes it; gone with
+  its leader or after `TERM_IDLE`, 12 hours, with no call), `termStart` (the daemon's own terminal and `LAKI_START_PID`'s,
+  which conn.ts sets as it spawns one: allowed from the start, `start: true`, never timed out). `termList` (the entries,
+  last call first) and `termRevoke { key }` (not a `start` one: *started Laki stays*) are the app's window's alone, as
+  `termAnswer` (`AGENT_NO`, `REMOTE_NO`, `ANSWER_NO`, no client scope): Settings › Security › *Terminals*. main.ts `termAsk` (from `callerOf`, so only `FROM`/`CALLER`
   methods and a keyless hook): no app window, refused at once; else the event `termAsk { req, tty, cmd, chain }` to the
   app's windows only, the call held up to 60 s (`LAKI_TERM_WAIT`), calls from the same terminal sharing the one ask;
   `termAnswer { req, allow }` is the app's token's alone (checked in `call` before anyone is looked up; `AGENT_NO`,

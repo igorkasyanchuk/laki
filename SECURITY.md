@@ -155,7 +155,8 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   other agents' settings or Laki's secret files. Every path goes in as a parameter, never into the profile's text. Its
   *Network* on *Listed hosts* denies every connection but this Mac's, and its `HTTPS_PROXY` is a proxy in the daemon
   (127.0.0.1, a password per tab) that lets it reach only that list (the project's registries, GitHub, its model, what
-  you allowed: only you can allow a host); a program that ignores the proxy variables reaches nothing, and the proxy's
+  you allowed: only you can allow a host), on any port of a listed host (the list is hosts only; a port net.connect won't
+  take is refused, 400, before any connection); a program that ignores the proxy variables reaches nothing, and the proxy's
   URL is in the agent's environment, readable by another program of yours. Apple marks `sandbox-exec` deprecated: a
   later macOS may drop it, and then the tab doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone.
 
@@ -171,8 +172,11 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   agent starts that leaves its tab's tree and its terminal (`setsid`, `launchctl submit`) is refused what asks who calls;
   one that then gives itself a terminal of its own (`script`, `expect`, a tmux server it starts, `open x.command`)
   is no longer yours by that alone: a terminal Laki hasn't seen is held until you pick *Allow this terminal* in Laki's
-  window (once per terminal, until its shell exits; the card names the terminal and what started it), and refused when
-  no window is open or you say Deny. The terminal that started the daemon is allowed from the start. What's left: you
+  window (once per terminal, until its shell exits or 12 hours pass with no call from it; the card names the terminal
+  and what started it), and refused when no window is open or you say Deny. Settings › Security › *Terminals* lists the
+  allowed ones (tty, what started it, when, its last call) with *Revoke*: its next call asks again. The terminal that
+  started the daemon is allowed from the start (shown as *started Laki*, never revoked or timed out: headless has no
+  window to ask in). What's left: you
   can allow the wrong one (an agent's pty looks like a terminal you just opened: Deny when you ran nothing there), and
   with no window open (headless) only the starting terminal works. A double fork keeps the tab's terminal, so it's the
   tab's. A user per agent would close that.
