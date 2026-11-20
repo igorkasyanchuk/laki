@@ -77,7 +77,7 @@ type At = { path: string; line: DiffLine; from?: number; text: string } // the b
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
 // U2: the review's keys, as its Keys popover lists them (the handler: onKey)
-const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent']]
+const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent; none, every file viewed: review the next workspace']]
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
 // (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned

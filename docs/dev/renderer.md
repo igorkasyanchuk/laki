@@ -1016,7 +1016,12 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset, then
   *Today* (the view's `today`: Meters, above).
-  `USAGE_AGENTS` names the agents Settings › Appearance has switches for.
+  `USAGE_AGENTS` names the agents Settings › Appearance has switches for. `UsagePage` (⌘K, the popup's *By day and model*): the daemon's `usageDays` rows (each with its workspace) and `ai`
+  (Laki AI's by `from`), one `Row` each (`src`: `ws:<id>` or `ai:<from>`); a bar a day stacked by agent in `SERIES` order,
+  `COLOR`'s `--tc-*` (a filter never repaints one; Laki AI is `laki`), its legend; *Where it went* (`group` by `src`, a
+  bar split by agent; the `WHERE_SHOWN` biggest, the rest under *n more*; none from a daemon before API 213); the models'
+  table (`.usage-table .num`: right-aligned; the counters' rolling `Num` is `.num-roll`, a global `.num` turned cells into
+  inline grids).
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys (`keysOf`: Settings › Keys' in use, App's `kb`), status glyphs, where things are, the main CLI
   commands and recipes (`cli`: the app's command; `ship`: list `ship`), each section a `Sec` of `Item`s. Laid out
   like Settings (`.settings-nav`, `.help-nav`): a filter (focused as it opens, not on a touch screen; ⌘F or / goes to

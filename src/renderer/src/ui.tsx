@@ -1145,7 +1145,7 @@ export function Tips() {
     // the keyboard's focus: a Tab's keydown hid the last one first (keydown comes before the focus moves)
     const focusIn = (e: FocusEvent) => {
       const el = e.target as HTMLElement | null
-      if (!el?.dataset?.tip || el === cur || !el.matches(':focus-visible')) return
+      if (!el?.dataset?.tip || el === cur || !el.matches(':focus-visible') || el.matches('input, textarea, select, [contenteditable]')) return // a field: focused to type in (a key's, a page's own), its tip would cover it
       hide()
       after(el, TIP_FOCUS)
       byFocus = true

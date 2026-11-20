@@ -224,7 +224,7 @@ const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : 
 // what a workspace's id names: its name and project (gone: none)
 export type WsNames = (id: string) => { name: string; project?: string; archived?: boolean } | undefined
 export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames }) {
-  const [d, setD] = useState<{ keep: number; rows: Row[] } | null>(null)
+  const [d, setD] = useState<{ keep: number; rows: Row[]; where: boolean } | null>(null) // where: rows name their workspace (a daemon from API 213)
   const [err, setErr] = useState('')
   const [range, setRange] = useState(30)
   const [agent, setAgent] = useState('')
@@ -233,7 +233,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
   useEffect(
     () =>
       void load().then(
-        r => setD({ keep: r.keep, rows: [...r.rows.map(x => ({ ...x, src: `ws:${x.ws ?? ''}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
+        r => setD({ keep: r.keep, where: !!r.ai, rows: [...r.rows.map(x => ({ ...x, src: `ws:${x.ws ?? ''}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
         e => setErr(String(e?.message ?? e)),
       ),
     [],
@@ -252,7 +252,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
   const top = Math.max(...days.map(dayTotal), 0)
   const group = <K extends string>(key: (r: Row) => K) => [...rows.reduce((m, r) => (x => ((x.tokens += r.tokens), (x.cost += r.cost), m))(m.get(key(r)) ?? (m.set(key(r), { key: key(r), agent: r.agent, model: r.model, src: r.src, tokens: 0, cost: 0 }), m.get(key(r))!)), new Map<K, { key: K; agent: string; model: string; src: string; tokens: number; cost: number }>()).values()].sort((a, b) => b[by] - a[by] || b.tokens - a.tokens)
   const byModel = group(r => `${r.agent}|${r.model}`)
-  const where = group(r => r.src)
+  const where = d?.where ? group(r => r.src) : [] // an older daemon's rows name no workspace: no Where it went
   const srcName = (src: string) => {
     if (src.startsWith('ai:')) return { name: AI_FROM[src.slice(3) as AiFrom] ?? src.slice(3), kind: 'Laki AI' }
     const w = names(src.slice(3))

@@ -125,7 +125,11 @@ Both run in `<data>/ai` with `MCP_TOOL_TIMEOUT` 5 minutes (a `wsNew` takes a whi
 `ai.preset` (Settings › AI's *Your agent presets*: a claude or codex preset), that preset's env over it (an account of
 its own; its args are a tab's, not used); `resume` is kept per `sessionKey` (the agent and the preset). Each tool call is a `tool`
 message, shown in the conversation. `<data>/ai-chat.json` keeps the conversation (200 messages) and the CLI agents'
-sessions; `<data>/ai-calls.jsonl` a line per ask (`AiCall`: tokens, `cachedIn` (of them, read from the prompt cache: usage's `prompt_tokens_details.cached_tokens`, the Calls tab's and `laki ai log`'s *cached*), cost, tools, ms, ok, error; a failed ask keeps what
+sessions; `<data>/ai-calls.jsonl` a line per ask (`AiCall`: tokens, `cachedIn` (of them, read from the prompt cache: usage's `prompt_tokens_details.cached_tokens`, the Calls tab's and `laki ai log`'s *cached*), cost, tools, ms, ok, error, `from`: what made it, `AI_FROM`'s (a chat by its thread: the AI page's, a spec's, an agent's
+`agent:`, an extension's `widget:`; `aiComplete`'s `from`, workflows' blocks and `aiDecide`; else `aiFromOf` by the ask's
+words: `extension `, `Compact …memory`, `next prompt: `, `side chat: `, `check review: `, *Ask me first*), which the
+Calls tab shows and `aiUsage` (the Usage page's Laki AI rows, by day, from and model, both logs read off the event
+loop) sums; a failed ask keeps what
 it spent; a CLI agent's failure is its own words, not its exit code; shutdown stops an ask, else its `laki mcp`
 would start a daemon again), `aiTotals` (shared/types.ts) today's and this month's. Links: `SYSTEM` has it link each
 workspace or tab it names (`laki://ws/<id>?tab=<tab>`), and the page links the bold names it didn't (`links.ts`
