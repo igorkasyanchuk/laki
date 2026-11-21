@@ -4265,8 +4265,6 @@ button.proof-line:not(:disabled):hover .mono { text-decoration: underline; }
 .dl-annot-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 /* K1: an extension's terminal, in its term element's slot */
 .ext-term { display: block; position: relative; height: 100%; background: var(--term-bg); }
-/* K1: an extension's terminal, in its term element's slot */
-.ext-term { display: block; position: relative; height: 100%; background: var(--term-bg); }
 
 /* Where it went (Spend.tsx): a workspace's tokens by source, a bar each with its share; the hints under them */
 .spend { display: flex; flex-direction: column; gap: var(--sp-2); }

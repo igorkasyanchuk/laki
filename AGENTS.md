@@ -12,7 +12,7 @@ from it (limits, hooks).
 npm install                       # on Node 26.13.1 (.tool-versions: asdf); package.json's engines stay >=22.12
 npm run typecheck                 # tsc --noEmit
 npm run check                     # typecheck, then test:fast (~9 s): before a commit that touches src/; `npm run dmg` runs it first
-npm test                          # the build first (pretest, 2 s: the rig's daemon, CLI and hooks are out/main's, a third of the CPU; LAKI_TEST_SRC=1: from source), then node:test, every file (158), 4 at a time: ~8 min on an 8-core Mac (460 s on 19 Nov 2026; from source on Node 23: 14 min), more beside other heavy work (it's CPU-bound on the 4 performance cores; 6 at a time was no quicker); cap a background run at 20 min
+npm test                          # the build first (pretest, 2 s: the rig's daemon, CLI and hooks are out/main's, a third of the CPU; LAKI_TEST_SRC=1: from source), then node:test, every file, 4 at a time: ~8 min on an 8-core Mac (460 s on 19 Nov 2026; from source on Node 23: 14 min), more beside other heavy work (it's CPU-bound on the 4 performance cores; 6 at a time was no quicker); cap a background run at 20 min
 npm run test:release              # npm test, then each file that failed run once more alone: flaky ones pass, twice fails (scripts/test-rerun.ts; release.sh's)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~7 s
