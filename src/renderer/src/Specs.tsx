@@ -43,7 +43,8 @@ const KIND_SAYS: Record<PlanKind, string> = {
   spec: 'Requirements for a task, written like a Notion page: text, checklists, images, diagrams. Start a workspace from one, or point any agent at it.',
   brainstorm: 'An idea to explore: Laki AI writes options, diagrams, a mind map and clickable prototypes beside it.',
 }
-const ALL_SAYS = 'Specs and brainstorms, newest first. Each is a folder outside your repo with a README.md agents can read.'
+// the list's header: one text for every kind, so it doesn't jump as the kind changes
+const ALL_SAYS = 'Specs are requirements for a task, written like a Notion page; brainstorms are ideas Laki AI explores with options, diagrams and prototypes. Each is a folder outside your repo that any agent can read.'
 const kindIcon = (k: PlanKind) => (k === 'spec' ? 'spec' : 'bulb')
 
 // two levels, as breadcrumbs in the page's header: the list (both kinds in one, newest first: a filter, a kind, a
@@ -163,9 +164,9 @@ export function SpecsPage({ projects, at, api, onNav, onClose }: { projects: Pro
         <div className="plans-index">
           <header className="sched-hero">
             <span className="sched-hero-icon">
-              <Icon name={only ? kindIcon(only) : 'spec'} size={20} />
+              <Icon name="spec" size={20} />
             </span>
-            <p className="muted">{only ? KIND_SAYS[only] : ALL_SAYS}</p>
+            <p className="muted">{ALL_SAYS}</p>
           </header>
           <div className="plans-bar">
             <input className="grow" type="search" value={q} placeholder="Filter by title or project" aria-label="Filter" onChange={e => setQ(e.target.value)} />

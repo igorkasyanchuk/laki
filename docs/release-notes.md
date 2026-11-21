@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - Antigravity replaces Gemini CLI, which Google deprecated: the Gemini agent now runs `agy` (install: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), with its models, effort and permission modes, its status from what it tells the terminal, and its chat resumed. Your Gemini profiles and tabs carry over. Gemini CLI's plan-limit meter is gone.
+- Specs & Brainstorms: the list's header says one thing for every kind, so the page no longer jumps as you switch between All, Specs and Brainstorms.
 - A tab's tooltip is a card now: its name in its color, one row per fact (model, context, what it used, queued, progress…) and the hints under a line, instead of one long line. The Usage page's chart and a workflow's runs show theirs the same way.
 - Duplicate a scheduled task: the copy button on its row or *Duplicate* in its form makes one with the same settings, off until you turn it on (`laki schedule copy`). A reminder's copy button opens a new one filled in.
 - ⌘F starts with the text you selected, in a terminal, a diff or the Reader.
