@@ -121,6 +121,33 @@ test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resu
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args, ['--resume', tab.resumeId])
 })
 
+test('grok, agy and opencode: a scheduled task, a workflow agent block and sleep each work as for claude', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true, scheduleAtOnce: 0, sleepAfter: 60 })
+  for (const [a, bin] of [['grok', 'grok'], ['gemini', 'agy'], ['opencode', 'opencode']]) {
+    // a scheduled task: a new workspace with this agent and the prompt
+    const s = await rig.rpc('scheduleSet', { project: p.id, preset: a, ws: 'new', prompt: `nightly ${a}`, when: 'every day at 2am' })
+    const r = await rig.rpc('scheduleRun', { id: s.id })
+    const tab = await until(async () => (x => x?.preset === a && x)(await rig.tab(r.ws)), `${a}'s scheduled tab`)
+    await until(async () => (await rig.screen(tab.id)).includes(`answer: nightly ${a}`), `${a} got the scheduled prompt`)
+    // asleep once idle and unlooked at; a message resumes its chat (agy, its workspace's only one, by -c until it says its id)
+    await until(async () => (await rig.tab(r.ws)).status === 'idle', `${a} idle`, 15000)
+    const id = (await rig.tab(r.ws)).resumeId
+    assert.ok((await rig.rpc('sleepTick', { now: Date.now() + 2 * 3600e3 })).includes(tab.id), `${a} asleep`) // the last agent's workflow tab too
+    const starts = () => rig.fakeLog().filter(l => l.bin === bin && l.tab === tab.id)
+    const n = starts().length
+    await rig.rpc('send', { target: tab.id, text: 'again' })
+    await until(() => starts().length === n + 1, `${a} resumed`)
+    assert.deepEqual(starts().at(-1).args.slice(0, 2), a === 'grok' ? ['--resume', id] : a === 'opencode' ? ['--session', id] : id ? [`--conversation=${id}`] : ['-c'])
+    // a workflow's agent block: its turn's end goes on to the next block
+    await rig.rpc('flowSave', { id: `w-${a}`, text: `# W\nruns in: main\n\n## start\ninput: task\nnext: one\n\n## one\nagent: ${a}\n> do {{task}}\nnext: e\n\n## e\nend: success\n` })
+    const run = await rig.rpc('flowStart', { workflow: `w-${a}`, project: p.id, task: 'x' })
+    const done = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: run.id })), `${a}'s workflow done`, 20000)
+    assert.ok(done.log.some((l: string) => l.includes(`one: a new ${a} tab`)) && done.log.some((l: string) => /one → next: /.test(l)), done.log.join('\n'))
+  }
+})
+
 test("agy's exit line: the last conversation id on screen is its chat; agy typed in a shell is the gemini agent", () => {
   assert.equal(agyResume('Bye\r\nResume with -c (or command below): agy --conversation=4f1c2b9e-77aa-4d0e-9c1d-2b6f0e5a1c33\r\n'), '4f1c2b9e-77aa-4d0e-9c1d-2b6f0e5a1c33')
   assert.equal(agyResume('agy --conversation=old-one-1\nagy --conversation=new-one-2\n'), 'new-one-2')

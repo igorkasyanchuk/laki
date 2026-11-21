@@ -285,7 +285,7 @@ counts them. Tested in `test/reader.test.ts`.
 
 ### Sleep
 
-`resources.ts` `sleepTick`: an idle claude or codex tab (`sleepy`: `cantSleep` says nothing, no attached client, idle
+`resources.ts` `sleepTick`: an idle agent tab whose chat its next start resumes (`resumable`: claude, codex, grok, opencode and an ACP one by their id, agy by its id or as its workspace's only agy tab, `agy -c`; `sleepy`: `cantSleep` says nothing, no attached client, idle
 `settings.sleepAfter` minutes (unset: `SLEEP_AFTER`, 480; 0: never) by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
 listening ports (`procs`) in its tree) is put to sleep: `asleep` (in memory) and `Session.end`, which SIGHUPs the job
 (SIGKILL 5 s later if it's still there) but keeps the screen, the clients and a note instead of the exit line; `onExit`
