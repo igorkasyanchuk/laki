@@ -1124,7 +1124,7 @@ export type ShipPrimary = { label: string; act: 'pr' | 'push' | 'merge' | 'land'
 export function shipPrimary(pr: Pick<PR, 'state' | 'checks' | 'draft' | 'conflict' | 'ready'> | undefined, todo: boolean, can: { merge: boolean; land: boolean }, landOn = false): ShipPrimary {
   if (!pr || pr.state !== 'OPEN') return { label: 'Open PR', act: 'pr' }
   if (todo) return { label: 'Push to PR', act: 'push' }
-  if (!pr.draft && !pr.conflict && pr.checks === 'pass' && pr.ready !== false && can.merge) return { label: 'Merge', act: 'merge' }
+  if (!pr.draft && !pr.conflict && (pr.checks === 'pass' || (pr.checks === '' && pr.ready === true)) && pr.ready !== false && can.merge) return { label: 'Merge', act: 'merge' } // no checks at all (a repo without CI): GitHub's ready says
   if (!pr.draft && !pr.conflict && pr.checks === 'pending' && can.land && !landOn) return { label: 'Merge when green', act: 'land' }
   return { label: 'Push to PR', act: 'push' }
 }

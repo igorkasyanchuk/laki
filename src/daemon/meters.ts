@@ -16,7 +16,7 @@ import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCa
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 import { acpChat } from './acp.ts'
-import { agentDays, agentDaysGone } from './agentUsage.ts'
+import { agentDays, agentDaysTidy } from './agentUsage.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -290,7 +290,8 @@ export function meterTick() {
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini') && !archived.has(t.workspace)) otherRead(t)
-  for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id), agentDaysGone(id)
+  for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
+  agentDaysTidy(id => state.tabs.some(t => t.id === id)) // grok's and agy's, closed
   for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
 }

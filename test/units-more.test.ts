@@ -1493,6 +1493,9 @@ test("shipPrimary: the Ship sheet's primary by its PR: Open PR, Push to PR, Merg
   assert.deepEqual(shipPrimary(pr({ checks: 'pending' }), false, can), { label: 'Merge when green', act: 'land' })
   assert.equal(shipPrimary(pr({ checks: 'pending' }), false, can, true).act, 'push', 'already on')
   assert.equal(shipPrimary(pr({ checks: 'pending' }), false, { merge: true, land: false }).act, 'push')
+  // no checks at all (a repo without CI): Merge once GitHub says it's ready, not before
+  assert.equal(shipPrimary(pr({ checks: '', ready: true }), false, can).act, 'merge')
+  assert.equal(shipPrimary(pr({ checks: '' }), false, can).act, 'push')
 })
 
 test("toolSummary: a run of tool calls in a few words for the Reader's pill", () => {

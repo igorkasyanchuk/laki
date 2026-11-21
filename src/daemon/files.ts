@@ -726,7 +726,13 @@ function sheetWorker() {
   for (const p of [join(here, 'sheetWorker.js'), join(here, '../sheetWorker.js'), join(here, 'sheetWorker.ts')]) if (existsSync(p)) return p
   throw new Error('sheet worker not found')
 }
+let sheetLine: Promise<unknown> = Promise.resolve() // one workbook at a time: never several 256 MB workers at once
 export function sheetsOf(path: string) {
+  const p = sheetLine.then(() => sheetRead(path))
+  sheetLine = p.catch(() => {})
+  return p
+}
+function sheetRead(path: string) {
   return new Promise<Sheet[]>((res, rej) => {
     const w = new Worker(sheetWorker(), { workerData: { path }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
     const big = () => rej(new Error(TOO_BIG))

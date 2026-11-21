@@ -17,6 +17,7 @@ import { type ByModel, dayOf } from './share.ts'
 export type Days = Record<string, ByModel>
 const ID = /^[\w-]{1,80}$/
 const AGY_EVERY = 30_000 // agy's file is a few MB, copied each read: at most this often per tab
+const AGY_MAX = 256 << 20 // a conversation's DB past this isn't copied (the daemon's thread copies it)
 const seen = new Map<string, { key: string; days?: Days; at: number; id?: string }>() // by tab
 
 const add = (days: Days, at: number, model: string, tokens: number, cost: number) => {
@@ -132,15 +133,17 @@ function agyRead(db: string): Days | undefined {
     rmSync(tmp, { recursive: true, force: true })
   }
 }
+const AGY = () => join(homedir(), '.gemini', 'antigravity-cli')
+// agy's latest conversation in a folder (its cache/last_conversations.json), before it printed the id itself
+export function agyChat(cwd: string): string | undefined {
+  try {
+    const id = (JSON.parse(readFileSync(join(AGY(), 'cache', 'last_conversations.json'), 'utf8')) as Record<string, unknown>)[cwd]
+    return typeof id === 'string' && ID.test(id) ? id : undefined
+  } catch {}
+}
 function agyFile(tab: Tab, cwd: string): string | undefined {
-  const root = join(homedir(), '.gemini', 'antigravity-cli')
-  let id = tab.resumeId
-  if (!id) {
-    try {
-      id = (JSON.parse(readFileSync(join(root, 'cache', 'last_conversations.json'), 'utf8')) as Record<string, unknown>)[cwd] as string
-    } catch {}
-  }
-  return typeof id === 'string' && ID.test(id) ? join(root, 'conversations', `${id}.db`) : undefined
+  const id = tab.resumeId ?? agyChat(cwd)
+  return id && ID.test(id) ? join(AGY(), 'conversations', `${id}.db`) : undefined
 }
 
 // a grok or gemini tab's chat (id: its own, as its file names it) and days, read again only when its file changed
@@ -158,9 +161,9 @@ export function agentDays(tab: Tab, cwd: string, now = false): { id: string; day
   if (tab.preset === 'grok') {
     const s = statSync(f, { throwIfNoEntry: false })
     days = s && s.size < 8 << 20 ? grokParse(readFileSync(f, 'utf8')) : undefined
-  } else days = existsSync(f) ? agyRead(f) : undefined
+  } else days = (statSync(f, { throwIfNoEntry: false })?.size ?? Infinity) < AGY_MAX ? agyRead(f) : undefined // past AGY_MAX: not copied
   if (days) seen.set(tab.id, { key, days, at: Date.now(), id })
   else if (c) c.at = Date.now()
   return days ? { id, days } : was()
 }
-export const agentDaysGone = (id: string) => seen.delete(id)
+export const agentDaysTidy = (live: (id: string) => boolean) => { for (const id of seen.keys()) if (!live(id)) seen.delete(id) }

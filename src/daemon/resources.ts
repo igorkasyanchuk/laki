@@ -6,6 +6,7 @@ import { existsSync, lstatSync, statfsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { type DiskPart, type DiskTidyWhat, type DiskUsage, type DiskWs, type Proc, type ProcUse, type Resources, SLEEP_AFTER, type Tab } from '../shared/types.ts'
 import { dir } from './dir.ts'
+import { agyChat } from './agentUsage.ts'
 import { scanArtifacts } from './artifacts.ts'
 import { archivedTidy, bgTell, changed, CLONE_DIRS, findTab, findWs, log, ports, prs, procs, projectConfig, queued, restoreNow, rt, rtOf, run, save, sessions, spawnTab, state, storageFull, storageTrash, tabStatus } from './core.ts'
 import { syncBranches } from './pr.ts'
@@ -297,13 +298,16 @@ export async function sleepTick(now = Date.now()) {
     const s = sessions.get(t.id)!
     const pids = new Set(tree(s.pty.pid).map(r => r.pid))
     if (Object.values(procs.get(t.workspace) ?? {}).some(p => pids.has(p.pid))) continue
-    toSleep(t.id, s)
+    toSleep(t, s)
     slept.push(t.id)
   }
   if (slept.length) log(`asleep: ${slept.join(', ')}`), changed()
   return slept
 }
-function toSleep(id: string, s: Session) {
+function toSleep(t: Tab, s: Session) {
+  const id = t.id
+  // agy before it printed its id: its folder's latest now (another agy tab opened before it wakes would make -c a guess)
+  if (t.preset === 'gemini' && !t.resumeId) (c => c && ((t.resumeId = c), save()))(agyChat(state.workspaces.find(w => w.id === t.workspace)?.path ?? ''))
   asleep.add(id)
   s.end('\r\n\x1b[90m[asleep: ended to free memory · look at it, type or send it a message to resume it]\x1b[0m\r\n')
 }
@@ -315,7 +319,7 @@ export function sleepNow(id: string) {
   if (!s || s.exited || asleep.has(t.id)) return false
   const why = cantSleep(t)
   if (why) throw new Error(why)
-  toSleep(t.id, s)
+  toSleep(t, s)
   changed()
   return true
 }

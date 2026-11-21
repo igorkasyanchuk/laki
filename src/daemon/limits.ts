@@ -1,7 +1,7 @@
 // Usage limits: "You've hit your limit · resets 3pm (Europe/Kyiv)", codex: "Try again at 3:04 PM.", Grok's "You hit your weekly limit"
 // limitReset finds the agent's last such notice in text and when it resets (ported from wb's limits.go).
 
-const lineRe = /^[\s⎿■•●▪⚠│>*-]*(you(?:['’]ve)? hit (?:your|the)\b.*limit|usage limit reached)/i // Grok's: You hit your weekly limit, You've hit the credit limit
+const lineRe = /^[\s⎿■•●▪⚠│>*-]*(you(?:['’]ve)? hit your\b.*limit|you['’]ve hit the credit limit|usage limit reached)/i // Grok's: You hit your weekly limit, You've hit the credit limit (not any 'you hit the … limit' in an answer)
 const whenRe = /\b(?:resets|try again|continuing automatically)(?:\s+(?:at|in))?\s+([^·\n]+)/i
 const durRe = /(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/gi
 const timeRe = /^(?:([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?,?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)?$/i

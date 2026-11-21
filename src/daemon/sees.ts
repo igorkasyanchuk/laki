@@ -224,7 +224,7 @@ export function skillsAudit(project?: string): AgentSkill[] {
       const path = join(dir, d.name, 'SKILL.md')
       let fd: number
       try {
-        fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+        fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) // a FIFO never blocks the daemon (fstat then skips it)
       } catch {
         continue
       }

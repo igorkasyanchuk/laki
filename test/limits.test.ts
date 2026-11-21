@@ -18,6 +18,8 @@ test('limit notices and their reset times', () => {
   // Grok's words (no 've; the credit limit)
   assert.equal(iso(limitReset('You hit your weekly limit. Resets in 3 hours.', now)), '2026-10-03T13:00:00.000Z')
   assert.equal(iso(limitReset("You've hit the credit limit for your plan · resets 5pm (UTC)", now)), '2026-10-03T17:00:00.000Z')
+  // an answer that talks of another limit isn't a notice
+  assert.equal(limitReset('You hit the rate limit of the API, try again in 5 minutes', now), null)
   // wrapped onto the next line
   assert.equal(iso(limitReset("You've hit your limit ·\nresets 4pm (UTC)", now)), '2026-10-03T16:00:00.000Z')
   // an answer quoting one doesn't count; no notice, no limit

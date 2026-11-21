@@ -45,6 +45,7 @@ function unzip(buf: Buffer): Map<string, () => Buffer> {
       const raw = buf.subarray(from, from + size)
       if (method !== 0 && method !== 8) throw new Error(`zip method ${method}`)
       if (method === 8) inflates++
+      if (method === 8 && total >= ALL_MAX) throw new Error(TOO_BIG) // nothing left of the budget (maxOutputLength 0 is Node's RangeError)
       try {
         got = method === 0 ? raw : inflateRawSync(raw, { maxOutputLength: Math.min(PART_MAX, ALL_MAX - total) })
       } catch (e) {

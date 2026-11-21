@@ -85,6 +85,14 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     }
   }, [])
   const [said, setSaid] = useState<Said[]>()
+  // its turns fade in as they come (styles.css' .rd-live), not the ones there as it first paints a tab's chat
+  const [liveFor, setLiveFor] = useState('')
+  const fading = liveFor === tab.id
+  useEffect(() => {
+    if (!said || fading) return
+    const r = requestAnimationFrame(() => setLiveFor(tab.id))
+    return () => cancelAnimationFrame(r)
+  }, [said, fading, tab.id])
   const [bg, setBg] = useState<BgTask[]>([])
   const [apps, setApps] = useState<App[]>([])
   const [none, setNone] = useState(false)
@@ -306,7 +314,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   return (
     <UiBlocks.Provider value={uiDraw}>
     <RunCode.Provider value={runCode}>
-    <div className="reader">
+    <div className={fading ? 'reader rd-live' : 'reader'}>
       <div className="reader-scroll" ref={scroll} data-find onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <ScrollEdge />
         <DiffFind at={scroll} /> {/* ⌘F: the chat's words, as a diff's (Diff.tsx), from the selection */}

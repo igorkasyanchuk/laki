@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { basename, dirname, join, sep } from 'node:path'
-import { type Broken, type Project, type ProjectConfig, type Tab, type Workspace } from '../shared/types.ts'
+import { type Broken, nonLatin, type Project, type ProjectConfig, type Tab, taskTitle, type Workspace } from '../shared/types.ts'
 import * as cs from './codespace.ts'
 import { agentCmd, allocPort, type At, branchPrefix, cfgHash, changed, ENV_KEY, exec, fileCfg, findProject, firstLine, git, hookFiles, type Hooks, lakiEnv, log, type NewWs, q, run, runDir, save, slug, type SpawnOpts, state, uniqueWsId, wsLog } from './core.ts'
 import { dir } from './dir.ts'
@@ -320,9 +320,11 @@ export async function cloudNew(proj: Project, o: NewWs, base: string, step: (tex
   const ms = await cs.machines(repo)
   const machine = o.codespace?.trim() || ms[0]?.name
   if (!machine || !ms.some(m => m.name === machine)) throw new Error(`no machine type ${machine ?? ''} for ${repo}${ms.length ? `: ${ms.map(m => m.name).join(', ')}` : ''}`)
-  const id = await uniqueWsId(slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')), proj)
+  const words = o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')
+  const id = await uniqueWsId(slug(words), proj)
   base = base.replace(/^origin\//, '')
   const ws: Workspace = { id, project: proj.id, path: `${cs.CS_ROOT}/${repo.split('/')[1]}`, host: `laki-cs-${id}`, branch: `${branchPrefix()}${id}`, base, kind: 'worktree', port: allocPort(), created: Date.now(), codespace: '', csState: 'Creating' }
+  if (nonLatin(words)) (n => n && (ws.name = n))(o.name?.trim() ? Array.from(o.name.trim()).slice(0, 60).join('') : taskTitle(o.prompt ?? '')) // as makeWs: shown as written, its id in Latin
   step(`gh codespace create -R ${repo} -b ${base} -m ${machine}: in the background`)
   cs.sshConfig() // its tabs' ssh lines take -F from now
   making.set(id, csMake(ws, proj, repo, machine))
