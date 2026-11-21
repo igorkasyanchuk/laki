@@ -150,7 +150,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       const i = listed.findIndex(f => f.path === here)
       const to = ps.includes(here ?? '') ? (listed.slice(i + 1).find(f => !ps.includes(f.path) && !viewed(f.path)) ?? listed.slice(0, i).findLast(f => !ps.includes(f.path) && !viewed(f.path))) : undefined
       setLeaving(new Set(ps))
-      requestAnimationFrame(() => (setLeaving(new Set()), to && setCur(to.path)))
+      requestAnimationFrame(() => (setLeaving(new Set()), to && go(to.path)))
     }
     if (on && files.length && files.every(f => ps.includes(f.path) || viewed(f.path))) void wsApi.mark().catch(() => {}) // R11: the last one viewed: a review done
     setFlip(s => new Set([...s].filter(p => !ps.includes(p))))

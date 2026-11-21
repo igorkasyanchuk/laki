@@ -176,7 +176,11 @@ server.on('error', (e: NodeJS.ErrnoException) => {
 })
 server.on('listening', () => {
   chmodSync(path, 0o600)
-  writeAtomic(ptySecret(), secret, 0o600) // a daemon that dials meanwhile reads an old one, is turned away and tries again (ptyHost.ts' up)
+  try {
+    writeAtomic(ptySecret(), secret, 0o600) // a daemon that dials meanwhile reads an old one, is turned away and tries again (ptyHost.ts' up)
+  } catch (e) {
+    return quit(`its secret can't be written (${(e as Error).message}): no daemon could get in`)
+  }
   wrote = true
   log(`listening on ${path} (protocol ${VERSION}, pid ${process.pid})`)
 })

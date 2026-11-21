@@ -205,13 +205,15 @@ function tomlValue(v: string): unknown {
 
 // held: hideSecrets' names kept from this agent's profile (p.profile, else its agent's first): names only
 // the skills every agent loads (read only): skills/<name>/SKILL.md in each agent's folder (claude's and codex's the
-// account's they use) and a project's .claude/skills and .codex/skills, 100 at most; a plain file only (O_NOFOLLOW, a
+// account's they use) and a project's .claude/skills and .codex/skills, 100 at most a folder (a cap over all would hide the
+// later agents' and mark the first one's 'only'); a plain file only (O_NOFOLLOW, a
 // folder that's a link skipped), its first 256 KB read for its frontmatter
 const SKILL_HOMES: Record<string, string> = { gemini: '.gemini/config', grok: '.grok', opencode: '.config/opencode' } // skill.ts' AGENTS' homes
 const SKILLS_MAX = 100
 export function skillsAudit(project?: string): AgentSkill[] {
   const out: AgentSkill[] = []
   const scan = (agent: string, dir: string, scope: AgentSkill['scope']) => {
+    const from = out.length
     let names: import('node:fs').Dirent[]
     try {
       names = readdirSync(dir, { withFileTypes: true })
@@ -219,7 +221,7 @@ export function skillsAudit(project?: string): AgentSkill[] {
       return
     }
     for (const d of names.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (out.length >= SKILLS_MAX) return
+      if (out.length - from >= SKILLS_MAX) return
       if (!d.isDirectory()) continue
       const path = join(dir, d.name, 'SKILL.md')
       let fd: number

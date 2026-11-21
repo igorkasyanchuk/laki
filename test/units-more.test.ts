@@ -1475,6 +1475,7 @@ test('latin: Cyrillic transliterated for ids and branches (Ukrainian, with Russi
   assert.equal(latin('Перевірка ЛОГІНА'), 'perevirka lohina')
   assert.equal(latin('Їжак щука ґанок є'), 'yizhak shchuka ganok ye')
   assert.equal(latin('Ёлка, объём, эхо, мышь'), 'yolka, obyom, ekho, mysh')
+  assert.equal(latin("м'ята п’ять сімʼя, don't"), "myata pyat simya, don't") // an apostrophe in a Cyrillic word goes (Latin ones stay)
   assert.equal(latin('Café naïve'), 'cafe naive')
   assert.equal(latin('fix-login 42'), 'fix-login 42')
   assert.equal(nonLatin('Fix the café login 🚀'), false)
