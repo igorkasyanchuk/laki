@@ -594,12 +594,29 @@ function repoFile(root: string, rel: string): string | undefined {
   const not = (p: string, dir: boolean) => (s => !!s && !(dir ? s.isDirectory() : s.isFile() && s.nlink <= 1))(lstatSync(p, { throwIfNoEntry: false }))
   return not(join(root, dirname(rel)), true) || not(join(root, rel), false) ? undefined : join(root, rel)
 }
-const repoRead = (root: string, rel: string) => {
+// read as repoWrite writes: opened O_NOFOLLOW, then read only once it's still the file checked, a plain one in a folder
+// of its own (swapped for a link to ~/.ssh/id_rsa between the check and the open: refused, never an agent's memory);
+// over REPO_READ_MAX bytes, or grown as it's read: as if missing. ponytail: .laki itself swapped for a link and back
+// between the checks
+const REPO_READ_MAX = 1 << 20
+function repoRead(root: string, rel: string): string | undefined {
   const f = repoFile(root, rel)
+  if (!f) return undefined
+  let fd: number | undefined
   try {
-    return f && readFileSync(f, 'utf8')
+    fd = openSync(f, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+    const at = fstatSync(fd)
+    if (!at.isFile() || at.nlink > 1 || at.size > REPO_READ_MAX) return undefined
+    const now = lstatSync(f, { throwIfNoEntry: false })
+    if (!repoFile(root, rel) || !now || now.ino !== at.ino || now.dev !== at.dev) return undefined
+    const buf = Buffer.allocUnsafe(at.size + 1)
+    let n = 0
+    for (let r = 1; r && n < buf.length; n += r) r = readSync(fd, buf, n, buf.length - n, null)
+    return n > at.size ? undefined : buf.toString('utf8', 0, n)
   } catch {
     return undefined
+  } finally {
+    if (fd !== undefined) closeSync(fd)
   }
 }
 // opened without O_TRUNC, then emptied only once it's still the file checked in a folder of its own (.laki swapped for a

@@ -328,7 +328,9 @@ were: switching moves nothing). `memoryRoot`: an agent's workspace's own folder 
 `memoryAdd` and `memoryRm` (their `tab`), else the checkout; memory.ts' compaction and Laki AI read and write it too.
 `.laki` or a file in it as a link (a branch's `.laki/memory.md -> ~/.zshrc`) is never read or written through
 (`repoFile`, `repoWrite`: lstat, one link only (no hard link), then `O_NOFOLLOW` without `O_TRUNC`, emptied once the open
-file is still the one checked; a write says it isn't a plain file). `test/repo-memory.test.ts`.
+file is still the one checked; a write says it isn't a plain file; `repoRead` the same way: `O_RDONLY | O_NOFOLLOW`,
+the open file's fstat a plain one with one link and the same ino and dev as the path's lstat, 1 MB at most, else as if
+missing). `test/repo-memory.test.ts`.
 
 Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
