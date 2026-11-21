@@ -1877,7 +1877,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const sandbox = sandboxed(tab)
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   // the project's MCP servers on for this profile (shared/mcp.ts): by flags as it starts; a host's tab none (the file is
-  // this Mac's). ponytail: codex's -c values (an env's too) end up in its argv, which ps shows; claude's go in a file
+  // this Mac's). claude's in a 0600 file; codex's by -c, an env's values in its own environment (codexMcpArgs)
   const mcp = h === localHooks ? mcpFor(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp, tab.profile ?? tab.preset ?? '') : []
   if (tab.preset === 'claude') {
     const gated = existsSync(toolFlag())
@@ -1891,8 +1891,12 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
+    // ponytail: Laki's note (project memory too) goes on argv, which ps shows to every account: codex 0.171 takes
+    // developer_instructions from config only (model_instructions_file replaces its own prompt, not this); SECURITY.md
     if (told && !pr?.args?.includes('developer_instructions') && !codexOwn()) argv.push('-c', 'developer_instructions=' + JSON.stringify(told)) // a JSON string is a TOML one
-    argv.push(...codexMcpArgs(mcp))
+    const m = codexMcpArgs(mcp)
+    argv.push(...m.args)
+    Object.assign(env, m.env) // the servers' values: codex's environment, never its argv
   } else if (tab.preset === 'gemini') {
     // Antigravity CLI (agy, Gemini CLI's successor; the agent's id stays gemini): its chat by the id it printed as it
     // exited (agyResume), else its folder's latest (-c: the workspace's worktree is its own). No hooks: it reads them

@@ -439,8 +439,13 @@ A project's MCP servers (`config.mcp`, `shared/mcp.ts`; Settings › the project
 `projectSet` keeps them through `mcpOk` (a masked env value back is the same-named server's; refused whole otherwise);
 agents can't send `config` and remote access's page can't change `mcp` (main.ts `SCRIPT_KEYS`). `agentCmd` passes the
 ones on for the tab's profile (`mcpFor`) as it starts, this Mac's tabs only: claude one more `--mcp-config` of a 0600
-`<data>/mcp/<tab>.json` (`mcpFile`, gone with the tab), codex `-c mcp_servers.<name>.command|args|env|url` (`codexMcpArgs`:
-TOML strings quoted by `tomlString`); gemini, grok and opencode none yet (the page says so). What it sees lists them as
+`<data>/mcp/<tab>.json` (`mcpFile`, gone with the tab), codex `-c mcp_servers.<name>.command|args|url` (`codexMcpArgs`:
+TOML strings quoted by `tomlString`); an env's values never on argv: `codexMcpArgs` gives them back as `env`,
+`LAKI_MCP_<i>_<NAME>` (the server's index), which `agentCmd` puts in codex's environment, with `env_vars` naming them
+(codex 0.171: names forwarded from its environment, not renamed, so the server's command is `/bin/sh -c 'export
+NAME="$LAKI_MCP_<i>_<NAME>"; unset …; exec "$0" "$@"' <command> <args…>`, names only). Laki's note
+(`developer_instructions`) stays on argv: codex reads it from config only (`model_instructions_file` replaces its own
+prompt instead); SECURITY.md says so; gemini, grok and opencode none yet (the page says so). What it sees lists them as
 `scope: 'laki'`, *from Laki*.
 
 ### Presets

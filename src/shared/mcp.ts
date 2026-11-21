@@ -26,16 +26,22 @@ export function tomlString(s: string): string {
 // a bare TOML key when it's one, else a quoted one
 const tomlKey = (k: string) => (/^[A-Za-z0-9_-]+$/.test(k) ? k : tomlString(k))
 
-// codex's -c overrides: each a key=value its config parser takes as TOML (a URL server: url)
-export function codexMcpArgs(list: McpServer[]): string[] {
-  return list.flatMap(s => {
+// codex's -c overrides: each a key=value its config parser takes as TOML (a URL server: url). An env's values never go
+// on argv (ps shows any process's to every account): they go in codex's own environment as LAKI_MCP_<i>_<NAME> (env,
+// for the caller to set; the server's index: two servers' same name never collide), the server gets them by
+// env_vars (codex 0.171's: names forwarded from its environment, not renamed), and a launcher, /bin/sh -c with names
+// only, exports each under its own name and execs the server
+export function codexMcpArgs(list: McpServer[]): { args: string[]; env: Record<string, string> } {
+  const env: Record<string, string> = {}
+  const args = list.flatMap((s, i) => {
     const k = `mcp_servers.${tomlKey(s.name)}`
-    return [
-      ...(s.url ? ['-c', `${k}.url=${tomlString(s.url)}`] : ['-c', `${k}.command=${tomlString(s.command ?? '')}`]),
-      ...(s.args?.length ? ['-c', `${k}.args=[${s.args.map(tomlString).join(', ')}]`] : []),
-      ...(s.env && Object.keys(s.env).length ? ['-c', `${k}.env={ ${Object.entries(s.env).map(([n, v]) => `${tomlKey(n)} = ${tomlString(v)}`).join(', ')} }`] : []),
-    ]
+    if (s.url) return ['-c', `${k}.url=${tomlString(s.url)}`]
+    const vars = Object.entries(s.env ?? {}).map(([n, v]) => ((env[`LAKI_MCP_${i}_${n}`] = v), [n, `LAKI_MCP_${i}_${n}`]))
+    if (!vars.length) return ['-c', `${k}.command=${tomlString(s.command ?? '')}`, ...(s.args?.length ? ['-c', `${k}.args=[${s.args.map(tomlString).join(', ')}]`] : [])]
+    const sh = `export ${vars.map(([n, l]) => `${n}="$${l}"`).join(' ')}; unset ${vars.map(([, l]) => l).join(' ')}; exec "$0" "$@"`
+    return ['-c', `${k}.command="/bin/sh"`, '-c', `${k}.args=[${['-c', sh, s.command ?? '', ...(s.args ?? [])].map(tomlString).join(', ')}]`, '-c', `${k}.env_vars=[${vars.map(([, l]) => tomlString(l)).join(', ')}]`]
   })
+  return { args, env }
 }
 // claude's --mcp-config file
 export const claudeMcpConfig = (list: McpServer[]) => ({

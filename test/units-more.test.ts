@@ -1380,7 +1380,16 @@ test("shared/mcp: TOML strings, codex's -c lines, a profile's servers, what proj
   const { tomlString, codexMcpArgs, mcpFor, mcpOk, claudeMcpConfig } = await import('../src/shared/mcp.ts')
   assert.equal(tomlString('a "b" \\ c\nd\te'), '"a \\"b\\" \\\\ c\\nd\\te"')
   assert.equal(tomlString('\x01\x7f é 🙂'), '"\\u0001\\u007f é 🙂"')
-  assert.deepEqual(codexMcpArgs([{ name: 'my.srv', command: 'node', args: ['s.js'], env: { 'K': 'v"1' } }, { name: 'w', url: 'https://x.test' }]), ['-c', 'mcp_servers."my.srv".command="node"', '-c', 'mcp_servers."my.srv".args=["s.js"]', '-c', 'mcp_servers."my.srv".env={ K = "v\\"1" }', '-c', 'mcp_servers.w.url="https://x.test"'])
+  assert.deepEqual(codexMcpArgs([{ name: 'p', command: 'node', args: ['s.js'] }, { name: 'w', url: 'https://x.test' }]), { args: ['-c', 'mcp_servers.p.command="node"', '-c', 'mcp_servers.p.args=["s.js"]', '-c', 'mcp_servers.w.url="https://x.test"'], env: {} })
+  // an env's values: codex's environment by the server's index (two servers' K never collide), argv names only
+  const m = codexMcpArgs([{ name: 'my.srv', command: 'node', args: ['s.js'], env: { K: 'v"1' } }, { name: 'b', command: 'b', env: { K: 'two' } }])
+  assert.deepEqual(m.env, { LAKI_MCP_0_K: 'v"1', LAKI_MCP_1_K: 'two' })
+  assert.ok(!m.args.join(' ').includes('v\\"1') && !m.args.join(' ').includes('two'))
+  assert.deepEqual(m.args.slice(0, 6), ['-c', 'mcp_servers."my.srv".command="/bin/sh"', '-c', 'mcp_servers."my.srv".args=["-c", "export K=\\"$LAKI_MCP_0_K\\"; unset LAKI_MCP_0_K; exec \\"$0\\" \\"$@\\"", "node", "s.js"]', '-c', 'mcp_servers."my.srv".env_vars=["LAKI_MCP_0_K"]'])
+  // the launcher, run: the server sees K as its own, the namespaced one gone, its args as they were
+  const { execFileSync } = await import('node:child_process')
+  const sh = ['-c', 'export K="$LAKI_MCP_0_K"; unset LAKI_MCP_0_K; exec "$0" "$@"', '/bin/sh', '-c', 'printf "%s|%s|%s" "$K" "${LAKI_MCP_0_K-gone}" "$1"', 'x', 'a b']
+  assert.equal(execFileSync('/bin/sh', sh, { env: { PATH: process.env.PATH, LAKI_MCP_0_K: 'v"1 $(no)' }, encoding: 'utf8' }), 'v"1 $(no)|gone|a b')
   const list = [{ name: 'a', command: 'x' }, { name: 'b', command: 'y', presets: ['codex'] }]
   assert.deepEqual(mcpFor(list, 'claude').map(s => s.name), ['a'])
   assert.deepEqual(mcpFor(list, 'codex').map(s => s.name), ['a', 'b'])

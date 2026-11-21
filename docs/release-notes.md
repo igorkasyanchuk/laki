@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Safety fix: a project's MCP server secrets no longer show in Codex's command line (`ps`): they go in its environment instead.
 - The quick bar and the new-workspace window are see-through glass on a Mac (solid with Reduce transparency), and a double click on the tab bar's empty room zooms or minimizes the window as macOS's setting says. The window's glass dims when it's in the background, as macOS's own windows do.
 - Switching the theme, its look or light and dark (yours or the system's) cross-fades instead of flashing the whole window (not with Motion › None or Reduce motion).
 - A workspace named in Cyrillic (or from a Cyrillic prompt) shows its name as you wrote it in the sidebar, and its branch and folder get it in Latin letters (`laki/perevirka-lohina`) instead of `ws-k3x9`.

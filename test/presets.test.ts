@@ -546,7 +546,7 @@ test('wrapper sandbox: no sandbox-exec on this Mac: the tab does not start, and 
   assert.ok(ws, 'the workspace is made')
 })
 
-test("a project's MCP servers go in by flags: claude one more --mcp-config (a 0600 file), codex -c overrides; a profile not picked gets none", async t => {
+test("a project's MCP servers go in by flags: claude one more --mcp-config (a 0600 file), codex -c overrides with an env's values in its environment, never argv; a profile not picked gets none", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await assert.rejects(rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'a b', command: 'x' }] } }), /a name of letters, digits, _ and -/)
@@ -565,8 +565,11 @@ test("a project's MCP servers go in by flags: claude one more --mcp-config (a 06
 
   await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'codex' })
   await until(() => rig.fakeLog().some(l => l.bin === 'codex'), 'codex')
-  const x = rig.fakeLog().find(l => l.bin === 'codex').args.join('\n')
-  for (const l of ['mcp_servers.docs.command="npx"', 'mcp_servers.docs.args=["-y", "@acme/docs mcp"]', 'mcp_servers.docs.env={ DOCS_TOKEN = "fake-secret" }', 'mcp_servers.web.url="https://mcp.example.test/mcp"']) assert.ok(x.includes(l), l)
+  const cx = rig.fakeLog().find(l => l.bin === 'codex')
+  const x = cx.args.join('\n')
+  for (const l of ['mcp_servers.docs.command="/bin/sh"', 'mcp_servers.docs.args=["-c", "export DOCS_TOKEN=\\"$LAKI_MCP_0_DOCS_TOKEN\\"; unset LAKI_MCP_0_DOCS_TOKEN; exec \\"$0\\" \\"$@\\"", "npx", "-y", "@acme/docs mcp"]', 'mcp_servers.docs.env_vars=["LAKI_MCP_0_DOCS_TOKEN"]', 'mcp_servers.web.url="https://mcp.example.test/mcp"']) assert.ok(x.includes(l), l)
+  assert.ok(!x.includes('fake-secret'), "the value never in codex's argv")
+  assert.equal(cx.env.LAKI_MCP_0_DOCS_TOKEN, 'fake-secret', "it's in codex's environment")
 
   await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'gemini' })
   await until(() => rig.fakeLog().some(l => l.bin === 'agy'), 'agy')

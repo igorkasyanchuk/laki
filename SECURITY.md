@@ -198,8 +198,13 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   names: code it runs from there can change without turning it off.
 - A project's MCP servers (its settings' *MCP servers*) are yours alone: an agent or remote access's page can't add,
   change or remove one, and the view shows their env as `•••`. They reach Claude Code as one more `--mcp-config` (a
-  0600 file's path) and Codex as `-c mcp_servers.…` flags (which `ps` shows, its env values too), never in the agents'
-  own config.
+  0600 file's path) and Codex as `-c mcp_servers.…` flags (which `ps` shows), never in the agents' own config. An env's
+  values never go in those flags: they're in Codex's own environment (readable only by you), and a small `/bin/sh`
+  launcher hands them to the server under their own names.
+- Laki's note to Codex at its start (what Laki is, your global and project memory) goes as `-c developer_instructions=…`
+  on its command line, which `ps` shows to every account on the machine (Codex takes it from no file); on a shared Mac,
+  keep secrets out of memory, or turn the note off in the profile (*Tell it about Laki*). Claude gets it the same way
+  (`--append-system-prompt`). A project on an SSH host gets neither.
 - An agent can change only how Laki looks and is laid out: the theme, fonts, the accent, corners, density, glass,
   icons, the sidebar's rows, the rail, where the tabs are, the status bar, saved layouts and the Reader's switch
   (`AGENT_SETTINGS_OK` in `src/daemon/gates.ts`). Every other setting is yours: Global memory, workflows' variables,
