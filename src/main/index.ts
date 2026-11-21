@@ -13,7 +13,7 @@ import { pixelDiff } from '../shared/pixelDiff.ts'
 import { speakable } from '../shared/speak.ts'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
 import { appOf, helperBin } from '../shared/helper.ts'
-import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
+import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, hasNotch, islandDisplay, lifeStep, type Pin, type PinEv, pillRect, pinStep, type Rect } from '../shared/island.ts'
 import { AI_TO, DROP_IMG, DROP_NO, DROP_TEXT_MAX, type DropFile, dropPayload, NOTE_TO, plainText, SEL_SKIP, selectionOf, selLabel, TODO_TO, talkDefault, talkShot, withSelection } from '../shared/talk.ts'
 import { speechLine } from '../shared/speech.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
@@ -1955,6 +1955,7 @@ const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, x.status])
 // 6 s after unless the pointer is on it, or as the pointer leaves it after being on it. A hover on the pill with no
 // card: the session list, until the pointer is on neither
 let pill: Rect | null = null
+let flush = false // the island's screen has a notch: its card grows out of the pill, one shape (cardRect)
 let isl: { tab: string; life: CardLife; list?: boolean; i: number } | null = null // the card that shows
 let islTick: NodeJS.Timeout | undefined
 let islSent = '' // what the shown card was last sent: the same again isn't (its reply box keeps what you type)
@@ -1965,10 +1966,11 @@ const islSeen = new Map<string, string>() // each float's status at the last lis
 function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay())) {
   if (!floater) return
   pill = pillRect(d)
+  flush = hasNotch(d)
   barAt = { x: pill.x, y: pill.y }
   floater.setBounds(pill)
   floater.webContents.send('floater-side', 'notch')
-  if (card && !card.isDestroyed() && card.isVisible() && isl) card.setBounds(cardRect(pill, card.getBounds().height)) // the screen changed under it
+  if (card && !card.isDestroyed() && card.isVisible() && isl) card.setBounds(cardRect(pill, card.getBounds().height, flush)) // the screen changed under it
 }
 function fold() {
   clearInterval(islTick)
@@ -1992,7 +1994,7 @@ function island(tab: string, list = false) {
   islSent = JSON.stringify(msg)
   clearInterval(islTick)
   islTick = setInterval(() => islandEv('tick'), 500)
-  card.webContents.send('island', msg, floats.colors)
+  card.webContents.send('island', msg, floats.colors, flush && pill ? pill.height : 0) // flush: the room its top keeps for the notch
 }
 function islandEv(ev: CardEvent | 'next' | 'prev') {
   if (!isl) return
@@ -2037,7 +2039,7 @@ ipcMain.on('island-size', (e, h: unknown) => {
   if (!card || e.sender !== card.webContents || !isl || !pill || typeof h !== 'number' || !(h > 0 && h < 900)) return
   card.setIgnoreMouseEvents(false)
   card.setFocusable(true)
-  card.setBounds(cardRect(pill, h))
+  card.setBounds(cardRect(pill, h, flush))
   if (!card.isVisible()) card.showInactive()
 })
 ipcMain.on('island-ev', (e, ev: unknown) => {

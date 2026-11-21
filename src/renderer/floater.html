@@ -150,6 +150,11 @@
       .isl-n:not(:empty)::before { content: '●'; margin-right: 5px; font-size: 9px; vertical-align: 1px; }
       #island { box-sizing: border-box; width: 400px; padding: 12px 14px; background: #000; color: #e8eaf0; border-radius: 0 0 18px 18px; display: flex; flex-direction: column; gap: 8px; user-select: text; -webkit-user-select: text; }
       body:not([data-mode='card']) #island, body[data-mode='card'] #island:empty { display: none; }
+      /* with a notch the card grows out of the pill (main's cardRect flush): one deep black shape from the screen's top,
+         its top padding clearing the notch, a hairline at its bottom, a spring down from the top */
+      #island.flush { padding-top: calc(12px + var(--top, 0px)); background: #050608; border-radius: 0 0 22px 22px; corner-shape: squircle; box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08); transform-origin: top center; animation: isl-grow 0.32s linear(0, 0.18 10%, 0.45 20%, 0.67 30%, 0.83 40%, 0.93 50%, 0.98 60%, 1.01 70%, 1.005 85%, 1); }
+      @keyframes isl-grow { from { scale: 1 0.7; opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { #island.flush { animation: none; } }
       body[data-mode='card'] #card:empty { display: none; }
       /* Q4: a waiting circle's card pinned to answer from: clickable, its options and a reply line as the island's */
       #card.pinned { width: 320px; display: flex; flex-direction: column; gap: 7px; user-select: text; -webkit-user-select: text; }

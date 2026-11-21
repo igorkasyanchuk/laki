@@ -27,6 +27,12 @@ test('island: a notch from the menu bar, the pill in it or under the menu bar, t
   assert.equal(c.width, 400)
   assert.equal(c.x + c.width / 2, p.x + p.width / 2)
   assert.equal(c.y, p.y + p.height + 4)
+  // a notch: the card grows out of the pill, flush with the screen's top (its padding clears the notch); no notch: under it
+  const f = cardRect(p, 180, hasNotch(macbook))
+  assert.ok(hasNotch(macbook))
+  assert.deepEqual([f.y, f.height, f.x + f.width / 2], [p.y, 180, p.x + p.width / 2])
+  const g = cardRect(q, 180, hasNotch(external))
+  assert.equal(g.y, q.y + q.height + 4)
 })
 
 test('island: asks first, then finished ones, each newest first; the dots', () => {

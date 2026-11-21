@@ -25,9 +25,10 @@ export function pillRect(d: Display): Rect {
   const width = 2 * WING + 40
   return { x: Math.round(cx - width / 2), y: d.workArea.y, width, height: 28 }
 }
-// the card under it: the pill's width or 400, centered on it
+// the card: the pill's width or 400, centered on it; under it (4 points down), or with a notch (flush) one black shape
+// with it, from the screen's top: the card's own padding clears the notch (floater.ts' --top, the pill's height)
 export const CARD_W = 400
-export const cardRect = (pill: Rect, h: number): Rect => (w => ({ x: Math.round(pill.x + pill.width / 2 - w / 2), y: pill.y + pill.height + 4, width: w, height: Math.round(h) }))(Math.max(CARD_W, pill.width))
+export const cardRect = (pill: Rect, h: number, flush = false): Rect => (w => ({ x: Math.round(pill.x + pill.width / 2 - w / 2), y: flush ? pill.y : pill.y + pill.height + 4, width: w, height: Math.round(h) }))(Math.max(CARD_W, pill.width))
 
 // the cards to show, one at a time: those that ask first, then the finished ones, each newest first (at: since when)
 export type Needs = { tab: string; status?: string; at?: number }

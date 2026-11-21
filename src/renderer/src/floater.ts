@@ -79,7 +79,7 @@ type Bridge = {
     menuTab: (tab: string) => void
     reply: (tab: string) => void
     answer: (tab: string, n: number, label: string) => Promise<{ error?: string }>
-    onIsland: (cb: (c: IslandCard, colors: Colors) => void) => void
+    onIsland: (cb: (c: IslandCard, colors: Colors, top: number) => void) => void
     islandSize: (h: number) => void
     islandEv: (ev: string) => void
     onTalk: (cb: (c: Talk) => void) => void
@@ -524,8 +524,10 @@ function islandPage() {
   }
   const btn = (text: string, cls: string, on: () => void) => Object.assign(el('button', text, cls) as HTMLButtonElement, { onclick: on })
   const say = (to: HTMLElement, text: string) => ((to.textContent = text), to.classList.add('bad'), fit())
-  bridge?.onIsland((c, colors) => {
+  bridge?.onIsland((c, colors, top) => {
     paint(colors)
+    box.classList.toggle('flush', top > 0) // a notch: one shape with the pill, its top clear of the notch
+    box.style.setProperty('--top', `${top}px`)
     card.replaceChildren() // the edge's hover card, from before a switch to the island: never above it
     const draft = c.f && shown?.f?.tab === c.f.tab ? (box.querySelector('textarea')?.value ?? '') : '' // the same one again: what you typed stays
     shown = c

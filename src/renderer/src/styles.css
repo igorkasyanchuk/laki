@@ -4001,7 +4001,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
    Opaque as before under Reduce transparency and in the looks marked opaque; in glass (the window's own blur) nearly
    opaque, no backdrop-filter (components.css: it flickers there); never a blur over a terminal (its WebGL canvas
    would repaint the blur every frame it prints). Its own name, not .glass: that's html's, the window's glass mode */
-:root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(20px) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); }
+:root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(20px) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); --cap-spec: color-mix(in srgb, var(--glass-hi) 60%, var(--cap-hi)); } /* --cap-spec: a capsule's one specular top edge (the glass's and the capsule's own, once) */
 /* its depth (Liquid Glass): a lit top edge inside, a shade along the bottom, a hairline rim, and a soft light under the
    pointer (ui.tsx sets --mx, --my on the capsule it's over). All off where it's drawn flat or still: the opaque looks,
    Reduce transparency, Motion: None, and while the window is behind another app (html.away) */
@@ -4027,7 +4027,7 @@ html[data-motion='none'] { --glass-light: transparent; }
 html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
 html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
-.capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-hi), inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
+.capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-spec), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
 .capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle var(--sp-6) at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent); opacity: 0; transition: opacity 0.2s; }
 .capsule[data-lit]::after { opacity: 1; }
 .term-wrap .capsule { --cap-blur: none; background: var(--panel); }
@@ -4042,11 +4042,16 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
 .rd-box.capsule { width: calc(100% - 40px); max-width: 720px; margin: 0 auto var(--sp-5); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); align-items: center; border-radius: min(var(--r-pill), 23px); }
 .rd-box.capsule textarea { border: none; background: transparent; padding: var(--sp-3) var(--sp-2); }
 .rd-box.capsule textarea:focus-visible { box-shadow: none; }
-.rd-box.capsule:focus-within { border-color: var(--accent); box-shadow: inset 0 1px 0 var(--cap-hi), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.rd-box.capsule:focus-within { border-color: var(--accent); box-shadow: inset 0 1px 0 var(--cap-spec), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 .rd-box.capsule button[type='submit'] { border-radius: var(--r-pill); }
 /* the status bar: no strip of its own, its two groups capsules over the window (no outer shadow: the bar clips it) */
 .status { background: transparent; border-top-color: transparent; gap: var(--sp-3); padding: 0 var(--sp-2); }
-.status .sb-group { display: inline-flex; align-items: center; gap: var(--sp-4); flex: 0 1 auto; min-width: 0; height: var(--h-s); padding: 0 var(--sp-4); overflow: hidden; box-shadow: inset 0 1px 0 var(--cap-hi), inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px var(--glass-rim); }
+.status .sb-group { display: inline-flex; align-items: center; gap: var(--sp-4); flex: 0 1 auto; min-width: 0; height: var(--h-s); padding: 0 var(--sp-4); overflow: hidden; box-shadow: inset 0 1px 0 var(--cap-spec), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px var(--glass-rim); }
+/* the status bar stays quiet under the terminal: its groups' edge and fill soft at rest, as they are on a hover or
+   the keyboard; its numbers in even columns */
+.status { font-variant-numeric: tabular-nums; }
+.status .sb-group.capsule { border-color: color-mix(in srgb, var(--surface-edge) 55%, transparent); background: color-mix(in srgb, var(--ws) var(--ws-mix), color-mix(in srgb, var(--panel) calc(var(--surface-a) * 0.7), transparent)); transition: border-color var(--t-mid) var(--ease-out), background-color var(--t-mid) var(--ease-out); }
+.status .sb-group.capsule:is(:hover, :focus-within) { border-color: var(--surface-edge); background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); }
 .status .sb-group:empty { display: none; }
 /* the scroll edge (ui.tsx ScrollEdge): a list scrolled under its header fades into it instead of a line */
 .scroll-edge { display: block; height: 1px; margin-bottom: -1px; flex: none; pointer-events: none; }

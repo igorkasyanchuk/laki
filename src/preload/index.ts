@@ -146,7 +146,7 @@ contextBridge.exposeInMainWorld('laki', {
     answer: (tab: string, n: number, label: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-answer', tab, n, label),
     // the island (floaterAt notch): a card or the session list in, its height out; the pointer and keys (enter, leave,
     // esc, next, prev; focus: its keys; pill: a hover on the pill)
-    onIsland: (cb: (c: object, colors: Record<string, string>) => void) => ipcRenderer.on('island', (_e, c, colors) => cb(c, colors)),
+    onIsland: (cb: (c: object, colors: Record<string, string>, top: number) => void) => ipcRenderer.on('island', (_e, c, colors, top) => cb(c, colors, Number(top) || 0)),
     islandSize: (h: number) => ipcRenderer.send('island-size', h),
     islandEv: (ev: string) => ipcRenderer.send('island-ev', ev),
     // Q2: the talk pill (#talk): who it may go to and the mic's state in, the key's second press, the recording written
