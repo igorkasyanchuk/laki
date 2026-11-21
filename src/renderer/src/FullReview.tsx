@@ -21,7 +21,7 @@ import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act, ScrollEdge } from './ui'
-import { fileTree, prName, prNo } from './text'
+import { fileTree, hunkNext, prName, prNo, reviewList } from './text'
 import './review.css'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
@@ -46,6 +46,7 @@ const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
 const DIFF_MIN = 480 // U6: the diff's least width
 const HEAD_MIN = 720 // under it the head's count is +a −d alone
 const NOTES_OFF = 'laki.reviewNotesOff' // true: the comments hidden to a strip
+const UNVIEWED = 'laki.reviewUnviewed' // true: only the files not viewed yet
 const FILES_OFF = 'laki.reviewFilesOff' // true: the files hidden to a strip, likewise
 const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
 const PINS = 'laki.reviewPins' // each workspace's pinned files, in the order pinned
@@ -78,7 +79,7 @@ type At = { path: string; line: DiffLine; from?: number; text: string } // the b
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
 // U2: the review's keys, as its Keys popover lists them (the handler: onKey)
-const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent; none, every file viewed: review the next workspace']]
+const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous file'], [']', 'Next change'], ['[', 'Previous change'], ['v', 'Mark the file viewed'], ['b', 'Blame'], ['p', 'Pin the file to the top'], ['c', 'Comment on the line under the mouse'], ['⌘⏎', 'Send the comments to the agent; none, every file viewed: review the next workspace']]
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
 // (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
@@ -114,13 +115,12 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   // Changes' too; unset: a tree here). In a tree the diffs and j/k go in its order, folders' files together
   const [tree, setTree] = useState(() => localStore('laki.diffTree') !== 'list')
   const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
-  const listed = useMemo(() => {
+  const matched = useMemo(() => {
     const ls = files.filter(f => matches(f.path))
     const at = (p: string) => pins.indexOf(p)
     const rest = ls.filter(f => at(f.path) < 0)
     return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...(tree ? fileTree(rest).flatMap(r => ('file' in r ? [r.file] : [])) : rest)]
   }, [files, matches, pins, tree])
-  const lastPin = listed.filter(f => pins.includes(f.path)).at(-1)?.path
   const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
 
@@ -132,6 +132,13 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const viewed = (p: string) => (gh.viewedOf(p) !== undefined ? gh.viewedOf(p) === 'VIEWED' : local[p] === hashOf(p))
   const [flip, setFlip] = useState<Set<string>>(new Set()) // folded or not, against what Viewed says
   const shown = (p: string) => viewed(p) === flip.has(p)
+  // Unviewed: only the files not viewed yet (the filter's among them); one just marked stays a frame, then the next
+  // takes its place
+  const [only, setOnly] = useState(() => load(UNVIEWED, false))
+  const pickOnly = (on: boolean) => (setOnly(on), store(UNVIEWED, on))
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const listed = reviewList(matched, viewed, only, leaving)
+  const lastPin = listed.filter(f => pins.includes(f.path)).at(-1)?.path
   const setShown = (ps: string[], open: boolean) =>
     setFlip(s => {
       const n = new Set(s)
@@ -139,6 +146,12 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       return n
     })
   const mark = (ps: string[], on: boolean) => {
+    if (only && on) {
+      const i = listed.findIndex(f => f.path === here)
+      const to = ps.includes(here ?? '') ? (listed.slice(i + 1).find(f => !ps.includes(f.path) && !viewed(f.path)) ?? listed.slice(0, i).findLast(f => !ps.includes(f.path) && !viewed(f.path))) : undefined
+      setLeaving(new Set(ps))
+      requestAnimationFrame(() => (setLeaving(new Set()), to && setCur(to.path)))
+    }
     if (on && files.length && files.every(f => ps.includes(f.path) || viewed(f.path))) void wsApi.mark().catch(() => {}) // R11: the last one viewed: a review done
     setFlip(s => new Set([...s].filter(p => !ps.includes(p))))
     gh.mark(ps.filter(p => gh.viewedOf(p) !== undefined && viewed(p) !== on), on)
@@ -336,6 +349,22 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   }
   const go = (p: string) => (setCur(p), body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(p)}"]`)?.scrollIntoView({ block: 'start' }))
   const pinGo = (p: string) => (pin(p), setTimeout(() => go(p), 0)) // the lists move: the file stays in view
+  // ] and [: the next or previous change (a hunk's @@ head) below its file's sticky head, into the next or previous file
+  // at a file's end; only the files near are asked where theirs are (.sp-change's content-visibility: R10)
+  const hunk = (dir: 1 | -1) => {
+    const box = body.current
+    if (!box) return
+    const top = box.getBoundingClientRect().top
+    const secs = [...box.querySelectorAll<HTMLElement>('section.fr-file')]
+    for (const s of dir > 0 ? secs : secs.reverse()) {
+      const r = s.getBoundingClientRect()
+      if (dir > 0 ? r.bottom <= top : r.top >= top) continue // wholly above the top (going back: below it)
+      const head = s.querySelector<HTMLElement>('[data-file]')?.offsetHeight ?? 0
+      const tops = [...s.querySelectorAll<HTMLElement>('[data-hunk]')].map(h => h.parentElement!.getBoundingClientRect().top - top - head)
+      const i = hunkNext(tops, dir)
+      if (i >= 0) return void box.scrollTo({ top: box.scrollTop + tops[i], behavior: document.documentElement.dataset.motion === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    }
+  }
   // a line of a file (a comment's, a thread's), unfolded and lit; the filter let go when it hides the file
   const goLine = (path: string, n?: number, side: 'LEFT' | 'RIGHT' = 'RIGHT') => {
     if (!matches(path)) setQ('')
@@ -411,6 +440,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     if (e.shiftKey) return
     const k = e.key.toLowerCase()
     if (k === 'j' || k === 'k') listed[i + (k === 'j' ? 1 : -1)] && go(listed[i + (k === 'j' ? 1 : -1)].path)
+    else if (k === ']' || k === '[') hunk(k === ']' ? 1 : -1)
     else if (k === 'v' && here) mark([here], !viewed(here))
     else if (k === 'b' && here && !all) blame(here)
     else if (k === 'p' && here) pinGo(here)
@@ -558,6 +588,13 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
           </div>
           <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
+            {files.length > 0 && (
+              <span className="seg fr-only">
+                <button type="button" className={only ? 'on' : ''} aria-pressed={only} onClick={() => pickOnly(!only)} data-tip={only ? 'Only the files not viewed yet · click: every file' : 'Show only the files not viewed yet'}>
+                  Unviewed {files.length - nViewed} / {files.length}
+                </button>
+              </span>
+            )}
             <span className="grow">
               {nViewed} of {files.length} viewed{query && ` · ${listed.length} shown`}
             </span>
@@ -587,7 +624,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 }),
               ]
             : listed.map(f => fileRow(f))}
-          {query && !listed.length && <div className="muted small pad">No file matches.</div>}
+          {query && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
+          {only && !query && files.length > 0 && !listed.length && <div className="muted small pad">Every file viewed.</div>}
         </div>
         )}
         {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
@@ -637,6 +675,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                       row={l => (l.ctx ? ctxAttrs(f.path, l) : lineAttrs(f.path, l))}
                       head={l => (
                         <>
+                          <span data-hunk hidden />
                           {l.hunk !== undefined && xp.expander(f.path, fd, l.hunk)}
                           {rv.hunkHead(f.path, l, fd.cut)}
                         </>

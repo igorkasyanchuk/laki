@@ -592,9 +592,11 @@ selected workspace's PR is in the status bar.
   *Send to <agent>* gives them all to the workspace's agent as one message when its turn ends (▾: another agent);
   *Post on #n* posts them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing
   goes. A file's pin (p, or its right click's *Pin to the top*) keeps it first in the list and in the diff, in the order
-  you pinned them, until you unpin it; kept on this Mac per workspace. Keys: j / k the next or last file, v Viewed, b
-  blame, p pin, c a comment on the line under the mouse, ⌘⏎ sends to the
-  agent. It reads the diff again as the workspace's files change, keeping your place and comments.
+  you pinned them, until you unpin it; kept on this Mac per workspace. Keys: j / k the next or last file, ] / [ the next or
+  last change (into the next or last file at a file's end), v Viewed, b blame, p pin, c a comment on the line under the
+  mouse, ⌘⏎ sends to the agent. *Unviewed n / m* over the files shows only the ones not viewed yet (with the filter
+  too): one you mark viewed leaves and the next takes its place; with all viewed, the bar names the next workspace.
+  Kept on this Mac. It reads the diff again as the workspace's files change, keeping your place and comments.
   The files show as a tree by folder unless you pick the list (the List | Tree switch over them, remembered): each
   folder folds with a click, says how many of its files are viewed and has a *Viewed* box for all of them; its right
   click folds or unfolds every folder. In a tree the diffs follow its order, and j / k too.

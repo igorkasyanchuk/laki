@@ -300,6 +300,15 @@ export const browserUrl = (s: string) => {
   return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`
 }
 
+// the Review tab's files with Unviewed on (only): those not viewed yet, and one just marked (leaving) until the next frame
+export const reviewList = <T extends { path: string }>(files: T[], viewed: (p: string) => boolean, only: boolean, leaving: ReadonlySet<string> = new Set()) => (only ? files.filter(f => !viewed(f.path) || leaving.has(f.path)) : files)
+// ] and [ in the Review tab: the change (a hunk's @@ head) after or before the one at the top, by each head's top in
+// the scroll box less its file's sticky head (0: at the top), in order; -1: none that way
+export function hunkNext(tops: number[], dir: 1 | -1, slop = 4) {
+  if (dir > 0) return tops.findIndex(t => t > slop)
+  return tops.findLastIndex(t => t < -slop)
+}
+
 // changed files as a tree (Changes' and the full review's tree view): a folder's row, then what's in it a level down,
 // folders first; a folder that holds one folder and no file is one row with it (src/renderer/src); a folded one's
 // insides left out. n: how many files are under a folder

@@ -189,6 +189,10 @@ are tested in `test/units-more.test.ts`.
       `.sp-diff` shows); a cell's `data-side`, and a press in one sets its grid's `data-pick`, so the other side is
       `user-select: none` and a selection copies one side. test:ui's `review-split`.
     - `laki.changesScope`, `laki.reviewScope`: Changes' and the Review tab's *Branch* or *Uncommitted* (Diff.tsx `useScope`).
+    - `laki.reviewUnviewed`: the Review tab's *Unviewed n / m* (`text.ts` `reviewList`: the filter's files not viewed,
+      one just marked kept a frame (`leaving`), then the cursor on the next); its `]` / `[` (`hunk`: each hunk head's
+      `<span data-hunk hidden>` in `head`, only the sections near asked, `text.ts` `hunkNext`; smooth unless Motion none
+      or Reduce motion).
     - `since` (R11): Changes' *Since I reviewed · n files*, never kept; only while the workspace has a `reviewed` mark.
     - *Since ▾* (ChangesTab's `from`, never kept): Branch narrowed to what changed after a commit of the branch (`PanelApi.commits`' list; `commitChanges`: `diff { since: <sha> }`, files.ts `diff`'s `since`, a commit HEAD has behind it); read only as `since`; `prHeadOf` marks another workspace's PR head.
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.

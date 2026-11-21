@@ -23,3 +23,5 @@
 .fr-reply { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-3); margin-top: 10px; padding-bottom: 56px; } /* room for the floating Laki AI button: scrolled down, Comment is clear of it */
 .fr-reply textarea { resize: vertical; min-height: 64px; font: inherit; }
 html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-soft) var(--spring-soft); }
+.fr-only { flex: none; } /* the files column's Unviewed n / m toggle */
+.fr-only button { font-family: var(--ui-font, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }

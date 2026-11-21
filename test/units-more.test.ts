@@ -12,7 +12,7 @@ import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
-import { bgDoneOf, foldersOf, fuzzyFiles, midCut, pickProject, readerShown, retrying, retryText, triggerAt } from '../src/renderer/src/text.ts'
+import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -1442,4 +1442,22 @@ test("tipParts: a card tip's title, Label: value rows, section heads and the foo
   assert.deepEqual(tipParts(`${'x'.repeat(40)}: y`).lines, [`${'x'.repeat(40)}: y`])
   // a name with ': ' in it (a tab called fix: login) stays the title
   assert.equal(tipParts(`${tipName('fix: login')}\nModel: opus\nhints`).title, 'fix:\u00a0login')
+})
+
+test("the Review tab's Unviewed: the files not viewed yet, one just marked kept a frame; ] and [ go to the change after or before the top", () => {
+  const files = ['a.ts', 'b.ts', 'c.ts', 'd.ts'].map(path => ({ path }))
+  const seen = new Set(['b.ts', 'd.ts'])
+  const viewed = (p: string) => seen.has(p)
+  assert.deepEqual(reviewList(files, viewed, false), files, 'off: every file')
+  assert.deepEqual(reviewList(files, viewed, true).map(f => f.path), ['a.ts', 'c.ts'])
+  assert.deepEqual(reviewList(files, viewed, true, new Set(['b.ts'])).map(f => f.path), ['a.ts', 'b.ts', 'c.ts'], 'just marked: stays a frame')
+  assert.deepEqual(reviewList(files.filter(f => f.path !== 'a.ts'), viewed, true).map(f => f.path), ['c.ts'], "the filter's among them")
+  assert.deepEqual(reviewList(files, () => true, true), [], 'every file viewed')
+  // the heads' tops less the sticky head: 0 is the one at the top
+  const tops = [-300, -2, 0, 3, 120, 900]
+  assert.equal(hunkNext(tops, 1), 4, 'the next below the top (one a few pixels off is the one at the top)')
+  assert.equal(hunkNext(tops, -1), 0, 'the one before')
+  assert.equal(hunkNext([-50, -10], 1), -1, 'none after')
+  assert.equal(hunkNext([10, 40], -1), -1, 'none before')
+  assert.equal(hunkNext([], 1), -1)
 })
