@@ -1203,7 +1203,7 @@ export const OPAQUE_LOOKS = new Set(['brutal', 'blueprint', 'classic', 'retro', 
 // macOS's accent (Settings' System, a new Mac install's default) only where it shows as a control's fill and its focus
 // ring: 3:1 against the theme's background and panel (WCAG's for a control), else the theme's own (yellow, graphite on
 // a light theme). Its label is onAccent's, which always reads
-export const accentFits = (c: string, bgs: string[]) => bgs.every(b => contrast(c, b) >= 3)
+export const accentFits = (c: string, bgs: string[]) => bgs.every(b => !/^#[\da-f]{6}$/i.test(b) || contrast(c, b) >= 3) // one not known as a color (no stylesheet): no say
 export const onAccent = (hex: string) => (contrast(hex, '#000000') >= contrast(hex, '#ffffff') ? '#000000' : '#ffffff')
 // a color as text on these backgrounds: darker on a light one (lighter on a dark one), its hue kept, until it reads (4.5:1)
 export function readable(c: string, bgs: string[], min = 4.5) {

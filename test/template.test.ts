@@ -155,7 +155,9 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   const { setSystemAccent } = await import('../src/renderer/src/themes.ts')
   applyTheme({ theme: 'kraft', accent: 'system' })
   assert.equal(props.get('--accent'), kraft.c!.accent)
-  setSystemAccent('#ff2d55') // paints again, as the system's changes
+  setSystemAccent('#ff2d55') // paints again, as the system's changes; under 3:1 on kraft's tan (accentFits): the theme's
+  assert.equal(props.get('--accent'), kraft.c!.accent)
+  applyTheme({ accent: 'system' }) // the default dark theme: it reads there
   assert.deepEqual([props.get('--accent'), props.get('--accent-fg')], ['#ff2d55', '#000000'])
   setSystemAccent('#007aff')
   assert.equal(props.get('--accent'), '#007aff')
