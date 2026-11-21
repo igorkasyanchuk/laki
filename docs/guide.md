@@ -298,7 +298,9 @@ npm link
      moves your base branch up to origin's first, when it can. Turn off the *worktree* switch to work in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
    - The workspace is named after what it's for: the name you give, else its prompt's words. One started with neither
-     takes its agent's first prompt's words (never the folder's name), until you rename it.
+     takes its agent's first prompt's words (never the folder's name), until you rename it. One named in Cyrillic (or
+     another script) shows the name as you wrote it; its folder and branch get it in Latin letters (*Перевірка логіна*:
+     `laki/perevirka-lohina`).
    - A name you give it (typed as you make it, or a rename) stays: agents may name a workspace after its task, but not
      one you named, unless you ask them to (`laki rename . "…" --asked`). A Browsers page's title doesn't rename it either.
 

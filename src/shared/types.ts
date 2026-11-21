@@ -542,6 +542,14 @@ export const ALIAS = /^[a-z][a-z0-9-]{0,23}$/ // an agent's @name: a word, lower
 
 // a few words of what a prompt asks, for a tab's name: its first line less links (a GitHub PR's or issue's is #n), flags,
 // Markdown, a leading "please" and a trailing "the"; a path is its file's name; "" when nothing's left
+// a name in Latin letters for ids, branches and folders: Cyrillic by Ukraine's national romanization (with Russian's
+// own letters too: ы, э, ё, ъ), accents dropped (café: cafe). ponytail: Cyrillic and Latin only; another script stays
+// as it is (slug then drops it)
+const CYR: Record<string, string> = { а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ye', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'yi', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ь: '', ю: 'yu', я: 'ya', ё: 'yo', ы: 'y', э: 'e', ъ: '' }
+export const latin = (s: string) => Array.from(s.toLowerCase(), c => CYR[c] ?? c).join('').normalize('NFKD').replace(/\p{M}/gu, '')
+// words in another script than Latin's (Cyrillic, CJK…): a workspace named by them shows them, its id and branch in Latin
+export const nonLatin = (s: string) => /[^\p{Script=Latin}\p{Script=Common}\p{M}]/u.test(s)
+
 export function taskTitle(prompt: string, words = 6) {
   let s = (prompt.split('\n').find(l => l.trim()) ?? '')
     .replace(/https?:\/\/github\.com\/[^\s/]+\/[^\s/]+\/(?:pull|issues)\/(\d+)\S*/g, '#$1')

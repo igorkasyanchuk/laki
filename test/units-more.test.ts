@@ -22,7 +22,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, saidAt, seedOf, snap, splitRows, tipDelay, tipName, tipParts, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, aiFromOf, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
+import { type TabView, aiFromOf, latin, nonLatin, browseSays, fillTemplate, keyEvent, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -1460,4 +1460,14 @@ test("the Review tab's Unviewed: the files not viewed yet, one just marked kept 
   assert.equal(hunkNext([-50, -10], 1), -1, 'none after')
   assert.equal(hunkNext([10, 40], -1), -1, 'none before')
   assert.equal(hunkNext([], 1), -1)
+})
+
+test('latin: Cyrillic transliterated for ids and branches (Ukrainian, with Russian letters), accents dropped; nonLatin tells a name to show as written', () => {
+  assert.equal(latin('Перевірка ЛОГІНА'), 'perevirka lohina')
+  assert.equal(latin('Їжак щука ґанок є'), 'yizhak shchuka ganok ye')
+  assert.equal(latin('Ёлка, объём, эхо, мышь'), 'yolka, obyom, ekho, mysh')
+  assert.equal(latin('Café naïve'), 'cafe naive')
+  assert.equal(latin('fix-login 42'), 'fix-login 42')
+  assert.equal(nonLatin('Fix the café login 🚀'), false)
+  assert.ok(nonLatin('Фікс логіна') && nonLatin('修复登录'))
 })

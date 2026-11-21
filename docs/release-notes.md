@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A workspace named in Cyrillic (or from a Cyrillic prompt) shows its name as you wrote it in the sidebar, and its branch and folder get it in Latin letters (`laki/perevirka-lohina`) instead of `ws-k3x9`.
 - The Review tab: *Unviewed n / m* over the files shows only the ones you haven't viewed (the filter works among them), and ] and [ jump to the next and last change, across files.
 - *What will this do?* on a command over 2,000 characters says *Not the whole command was read* (in red) and never that it can be undone, and the same command in another workspace is read again.
 - Antigravity replaces Gemini CLI, which Google deprecated: the Gemini agent now runs `agy` (install: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), with its models, effort and permission modes, its status from what it tells the terminal, and its chat resumed. Your Gemini profiles and tabs carry over. Gemini CLI's plan-limit meter is gone.

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { AGENT_NAMES, agentBin, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { AGENT_NAMES, agentBin, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, latin, nonLatin, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -1226,8 +1226,7 @@ export async function branches(projectRef: string) {
 }
 
 export const slug = (s: string) =>
-  s
-    .toLowerCase()
+  latin(s) // Cyrillic transliterated, accents dropped: перевірка логіна is perevirka-lohina
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 32)
@@ -3333,7 +3332,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     if (called) ws.name = called
     else ws.untitled = true
   } else {
-    const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
+    const words = o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')
+    const want = slug(words)
     const id = await uniqueWsId(want, proj)
     const path = proj.host ? `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}` : join(worktreesOf(proj), id)
     const at: At = { path, host: proj.host }
@@ -3370,6 +3370,11 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       if (!(await has(`refs/heads/${base}`)) && (await has(`refs/remotes/origin/${base}`))) base = `origin/${base}`
     }
     ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }), ...(!want && { untitled: true }) } // untitled: ws-<tail>, named by its first prompt
+    if (nonLatin(words)) {
+      // named in Cyrillic (or another script): the sidebar shows it as written, its id and branch transliterated
+      const shown = o.name?.trim() ? Array.from(o.name.trim()).slice(0, 60).join('') : taskTitle(o.prompt ?? '')
+      if (shown) (ws.name = shown), delete ws.untitled
+    }
     if (!proj.host) await copyIncludes(proj, ws) // before setup and the agent: they may read .env. ponytail: not on a host (setup can copy them from $LAKI_PROJECT_PATH)
   }
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports
