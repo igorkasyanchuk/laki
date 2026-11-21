@@ -7,6 +7,7 @@ import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDG
 import { fenced, plain, untrusted } from './fence.ts'
 import { parseAt } from './when.ts'
 import { SECRETS, secretsIn } from './secrets.ts'
+import { lineDiff } from './ask.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'parallel', 'each', 'call', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -1479,4 +1480,36 @@ export function flowSummary(wf: Workflow): string[] {
   for (const b of all.filter(b => b.kind === 'action')) out.push(`${ACTIONS[b.action ?? 'ship'] ?? b.action}${b.confirm === false ? ', without asking first' : ', after asking you'}`)
   if (wf.on) out.push(`Starts on an event (${wf.on}) once you turn it on`)
   return out.length ? out : ['Nothing that runs a command or reaches outside Laki']
+}
+
+// the trust sheet's diff (flowTrustDiff's was and now): each line with its numbers, a changed one in a command (run:)
+// or an agent's prompt (its > lines) risky; how many command blocks and agents' prompts changed. No was (never allowed,
+// or before its text was kept): every line new. Pure: test/workflow.test.ts
+export type TrustLine = { text: string; old?: number; new?: number; risky?: boolean }
+export function trustLines(was: string | undefined, now: string): { lines: TrustLine[]; cmds: number; prompts: number } {
+  // each line's block (its ## heading's id) and whether it's a command's or an agent's prompt's
+  const marks = (t: string) => {
+    let block = ''
+    let agent = false
+    return t.split('\n').map(l => {
+      if (l.startsWith('## ')) (block = l.slice(3).trim()), (agent = false)
+      else if (/^agent:/.test(l)) agent = true
+      return { block, kind: /^run:/.test(l) ? 'cmd' : agent && l.startsWith('>') ? 'prompt' : undefined }
+    })
+  }
+  const a = marks(was ?? ''), b = marks(now)
+  const diff = was === undefined ? now.split('\n').map(l => `+${l}`) : lineDiff(was, now)
+  const lines: TrustLine[] = []
+  const cmds = new Set<string>(), prompts = new Set<string>()
+  let i = 0, j = 0
+  for (const d of diff) {
+    const text = d.slice(1)
+    if (d[0] === ' ') lines.push({ text: ` ${text}`, old: ++i, new: ++j })
+    else {
+      const m = d[0] === '-' ? a[i] : b[j]
+      if (m?.kind) (m.kind === 'cmd' ? cmds : prompts).add(m.block)
+      lines.push({ text: d, ...(d[0] === '-' ? { old: ++i } : { new: ++j }), ...(m?.kind && { risky: true }) })
+    }
+  }
+  return { lines, cmds: cmds.size, prompts: prompts.size }
 }

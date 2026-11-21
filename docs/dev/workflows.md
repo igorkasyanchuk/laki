@@ -220,12 +220,20 @@ to see them on, and only runs started before the daemon (`boot`) come back. Agen
 'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` refuses those unless
 `editor` (StartRun's, the app's; never with `by: 'agent'`): schedules, events, Run again, Run from here, the CLI and MCP
 can't; `flowRm` keeps the mark in `trash.json` (`byAgent`), `flowRestore` puts it back. A project's (`.laki/workflows`,
-the repo's) is trusted by its text's sha256 (`state.flowTrust`, by `agentKey`), set by `flowSave` (not `by: 'agent'`,
+the repo's) is trusted by its text's sha256 (`state.flowTrust`, by `agentKey`; the text itself, 0600, in
+`<data>/flow-trust/<sha256 of the key>.md`, `dir.ts` `flowTrustFile`, in `BACKUP_KEEP` and `DATA_SECRETS`, dropped with
+the trust as the workflow is deleted or its project removed: `flowTrustDrop`), set by `flowSave` (not `by: 'agent'`,
 main.ts maps an agent's tab to it) and `flowTrust` (`text`: the file as the sheet showed it, else refused; never from `agentCaller`, main.ts' `CALLER`);
 `item`'s `untrusted` otherwise (`changed`: trusted once, another text now): `flowStart` refuses it for `by: 'agent'`, an `event` and a `schedule ` trigger, `eventHooks.flows`
 says so in `refused` (reading a project's file again at each event, not the 10 s list); the editor's banner (the `on:`
-event it starts on, or that it changed; *Allow…*: `choose` with the file), the index's *not allowed* / *changed* tag,
-StartRun's note. `refused(wf, on)` (only at the listener's `untrusted` refusal, with the event's name, and `flowStart`'s
+event it starts on, or that it changed; *Allow…*: the trust sheet, below), the index's *not allowed* / *changed* tag,
+StartRun's note. The trust sheet (Workflows.tsx' `trust`): `flowTrustDiff { source, id, project }` gives `was` (the
+kept text, only when its hash is still the trusted one; none for one never allowed, or allowed before 218) and `now`;
+`trustLines` (shared/workflow.ts, `lineDiff`) marks each changed line in a `run:` or an agent block's `>` prompt
+`risky` (the warn color) and counts the command blocks and agents' prompts that changed for the header (*1 command
+changed*; no was: *First time: read it all*), drawn by Diff.tsx' `DiffRows`, no model asked; *Allow this workflow* is
+`flowTrust` as before (an older daemon: the plain dialog). `flowTrustDiff` is the user's (AGENT_NO: an agent would
+shape its change to it), remote access's at the answer level. StartRun's note. `refused(wf, on)` (only at the listener's `untrusted` refusal, with the event's name, and `flowStart`'s
 for a `schedule ` trigger, `'schedule'`; never for other reasons, an agent's `flowStart` or a try) counts the skip in
 `skipped` (in memory, by `agentKey`; `item` gives an untrusted one's as `WorkflowItem.skipped`, the index's *n events
 skipped*; `flowStart` drops it from `r.flow`) and, once per file version (`told`: its `textHash`), broadcasts `flow`

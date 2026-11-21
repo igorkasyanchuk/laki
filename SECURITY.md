@@ -50,7 +50,9 @@ Out of scope:
 - malware already running as your user: it can read `daemon.json`. Laki shouldn't hand it new privacy grants
   (camera, screen, Accessibility), though;
 - an agent doing what its own permission mode allows;
-- a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
+- a repo's `.laki.json`, workflows and extensions after you trust (allow) them. For a repo's workflow Laki keeps the
+  text you allowed (`<data>/flow-trust/`, 0600, in backups), so when the file changes its sheet shows what changed, the
+  commands and agents' prompts marked, before you allow it again; agents can't read that copy.
 
 ### Workflows: text from outside in an agent's prompt
 

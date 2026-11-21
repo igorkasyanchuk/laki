@@ -23,7 +23,7 @@ import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../s
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
-import { DATA_SECRETS, dir, inRig } from './dir.ts'
+import { DATA_SECRETS, dir, flowTrustDrop, inRig } from './dir.ts'
 import { STARTER_DROPPED } from './starterEnv.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
@@ -1785,6 +1785,7 @@ export function projectRm(ref: string) {
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
+  flowTrustDrop(Object.keys(state.flowTrust ?? {}).filter(k => k.startsWith(`project:${p.id}:`)), state.flowTrust) // its workflows' trust and trusted texts (workflow.ts' agentKey)
   if (state.settings?.railPlans) state.settings.railPlans = state.settings.railPlans.filter(x => x.project !== p.id) // and its specs' rail pins
   if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last
   save()

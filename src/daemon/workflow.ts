@@ -17,7 +17,7 @@ import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeA
 import { stamp } from '../shared/when.ts'
 import { queueOrder, type Span, SPANS_MAX, EACH_CAP, EACH_MAX, itemsOf, itemVars, ACTIONS, AGENT_TIMEOUT, leftWords, pauseText, waitEnd, apiQuestions, budgetOf, budgetText, CALL_DEPTH, type Calls, filesFinder, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, fillData, outsideVar, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource, flowPortable, flowSummary, portableFill, portableInputs } from '../shared/workflow.ts'
 import { addTab, rtOf, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, unsavedWhy, wsArchive, wsNew, proofIn } from './core.ts'
-import { dir } from './dir.ts'
+import { dir, flowTrustDrop, flowTrustFile } from './dir.ts'
 import { flowFiles, flowHooks, scheduleFlowEnded } from './schedule.ts'
 import { ciLogs, prAct, scanPRs } from './pr.ts'
 import { isLive, killGroup } from './resources.ts'
@@ -136,6 +136,7 @@ function trust(source: WorkflowSource, id: string, project: string | undefined, 
   if (source !== 'project') return
   const k = agentKey(source, id, project)
   state.flowTrust = { ...state.flowTrust, [k]: textHash(text) }
+  writeAtomic(flowTrustFile(k), text, 0o600) // what you allowed, for the next change's diff (flowTrustDiff)
   skipped.delete(k)
   told.delete(k)
 }
@@ -163,6 +164,18 @@ export function flowTrust(o: Ref & { text: string }) {
   flowFiles.at = Date.now()
   changed()
   return { ...wf, untrusted: undefined }
+}
+// the trust sheet's diff: the text you allowed (was: none for one never allowed, or allowed before its text was kept)
+// and the file as it is now. The user's (gates.ts: an agent would read it to shape its change); no model asked
+export function flowTrustDiff(o: Ref) {
+  on()
+  const wf = flowFind({ ...o, source: 'project' })
+  const k = agentKey('project', wf.id, wf.project)
+  let was: string | undefined
+  try {
+    was = readFileSync(flowTrustFile(k), 'utf8')
+  } catch {}
+  return { ...(was !== undefined && textHash(was) === state.flowTrust?.[k] && { was }), now: wf.text } // a file that isn't the hash's: not what you allowed
 }
 
 function readDir(d: string, source: WorkflowSource, project?: string): WorkflowItem[] {
@@ -265,6 +278,7 @@ export function flowRm(o: Ref & { by?: 'agent' }) {
   writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...((byAgent(k) || o.by === 'agent') && { byAgent: true }) } satisfies Trashed))
   markAgent(k, false)
   if (state.flowStats?.[k]) delete state.flowStats[k], save() // its runs' tally goes with it (a restore starts over)
+  if (state.flowTrust?.[k]) flowTrustDrop([k], state.flowTrust), save() // a project's: its trust too (restored, it's asked again)
   lastEvents.delete(k), skipped.delete(k), told.delete(k)
   flowFiles.at = Date.now()
   changed()

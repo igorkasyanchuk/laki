@@ -10,13 +10,14 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem, pauseKeys, pauseText, type WorkHours, WORK_HOURS, type Pause, type PortableInput } from '../../shared/workflow'
+import { queueOrder, barsOf, EACH_BODY, EACH_CAP, EACH_KINDS, EACH_MAX, ACTIONS, AGENT_TIMEOUT, askMinutes, askWait, leftWords, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, type Calls, hints, PAR_KINDS, PAR_MAX, PAR_MIN, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, trustLines, type TrustLine, whenProblem, pauseKeys, pauseText, type WorkHours, WORK_HOURS, type Pause, type PortableInput } from '../../shared/workflow'
 import { tabAgent } from '../../shared/install'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
 import { Modal } from './panels'
+import { DiffRows, lineClass } from './Diff'
 import { Ghosts, ask, choose, Icon, IconButton, type MenuItem, Page, Switch, useMenu, ScrollEdge } from './ui'
 import './workflows.css'
 
@@ -993,10 +994,35 @@ function Editor({ item, all = [], onOpenFlow, projects, presets, actions, exts, 
   }
   const save = () => ro ? undefined : api.call<WorkflowItem>('flowSave', { id: item.id, source: item.source, project: item.project, text }).then(onSaved, e => api.toast((e as Error).message))
   // a repo's (.laki/workflows) not allowed as it is: the file, then Allow (or Save it here: you've read it)
+  // the sheet: what changed since you allowed it (flowTrustDiff), commands and agents' prompts in the warn color; an
+  // older daemon's: the file in a plain dialog, as before
+  const [sheet, setSheet] = useState<{ was?: string; now: string } | null>(null)
+  const allow = () => api.call<WorkflowItem>('flowTrust', { id: item.id, project: item.project, text: item.text }).then(onSaved, e => api.toast((e as Error).message))
   const trust = async () => {
+    const got = await api.call<{ was?: string; now: string }>('flowTrustDiff', { id: item.id, source: 'project', project: item.project }).catch(() => null)
+    if (got && got.now === item.text) return setSheet(got)
     const say = `Events, schedules and agents start it only once you allow it as it is (an edit asks again). Its commands, webhooks and agents run on this Mac.\n\n${item.text}`
-    if ((await choose(`Allow ${item.name}?`, say, [{ label: 'Not now' }, { label: 'Allow this workflow', primary: true }])) === 1) api.call<WorkflowItem>('flowTrust', { id: item.id, project: item.project, text: item.text }).then(onSaved, e => api.toast((e as Error).message))
+    if ((await choose(`Allow ${item.name}?`, say, [{ label: 'Not now' }, { label: 'Allow this workflow', primary: true }])) === 1) allow()
   }
+  const trustSheet = sheet && (
+    <Modal title={`Allow ${item.name}?`} onClose={() => setSheet(null)} wide>
+      {(t => (
+        <div className="flow-trust">
+          <p className="muted small">Events, schedules and agents start it only once you allow it as it is (an edit asks again). Its commands, webhooks and agents run on this Mac.</p>
+          <p className={t.cmds || t.prompts ? 'warn small' : 'small'}>
+            {sheet.was === undefined ? 'First time: read it all.' : [t.cmds && `${t.cmds} command${t.cmds === 1 ? '' : 's'} changed`, t.prompts && `${t.prompts} agent prompt${t.prompts === 1 ? '' : 's'} changed`].filter(Boolean).join(' · ') || 'No command or agent prompt changed.'}
+          </p>
+          <div className="sp-diff flow-trust-diff">
+            <DiffRows fd={{ lines: t.lines, hunks: [] }} split={false} cls={l => lineClass(l) + ((l as TrustLine).risky ? ' risky' : '')} row={() => ({})} head={() => null} />
+          </div>
+          <div className="row end">
+            <button type="button" onClick={() => setSheet(null)}>Not now</button>
+            <button type="button" className="primary" onClick={() => (setSheet(null), allow())}>Allow this workflow</button>
+          </div>
+        </div>
+      ))(trustLines(sheet.was, sheet.now))}
+    </Modal>
+  )
   // ⌘S saves
   const saveRef = useRef(save)
   saveRef.current = save
@@ -1189,6 +1215,7 @@ function Editor({ item, all = [], onOpenFlow, projects, presets, actions, exts, 
       )}
       {menu}
       {hist && <HistoryDialog item={item} dirty={dirty} api={api} onClose={() => setHist(false)} onBack={w => (replace(w.text), onSaved(w))} />}
+      {trustSheet}
     </div>
   )
 }
