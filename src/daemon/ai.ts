@@ -584,9 +584,11 @@ async function runTool(t: Thread, list: Tool[], name: string, args: unknown) {
 
 // A8: the earlier asks and answers, for a model that keeps no session of its own (OpenRouter): whole turns (an ask and
 // what answered it), newest first while they fit HISTORY_CHARS, the newest always; older ones left out. The tools'
-// calls and results never go (the chat keeps no results; it looks again). Nothing stored or shown changes.
-// ponytail: a summary of the turns left out if it forgets too much
+// calls and results never go (the chat keeps no results; it looks again). Nothing stored or shown changes. The turns
+// left out go as one short note (leftOut: each ask's and answer's first words, 1,500 characters), so a long Specs or
+// extension studio chat keeps what was decided. ponytail: words cut, not summed up by a model
 const HISTORY_CHARS = 60_000
+const LEFT_MAX = 1500
 function earlier(chat: AiMsg[]) {
   const msgs = chat.filter(m => m.role === 'user' || m.role === 'ai')
   let from = msgs.length
@@ -602,6 +604,19 @@ function earlier(chat: AiMsg[]) {
   return msgs.slice(from)
 }
 const history = (t: Thread) => earlier(t.chat.slice(0, -1)).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text || '(an image)' }))
+export function leftOut(chat: AiMsg[]) {
+  const all = chat.filter(m => m.role === 'user' || m.role === 'ai')
+  const gone = all.slice(0, all.length - earlier(chat).length)
+  if (!gone.length) return undefined
+  const line = (m: AiMsg) => `${m.role === 'ai' ? '  Answer' : '- Asked'}: ${(t => (t.length > 140 ? `${t.slice(0, 139)}…` : t))((m.text || '(an image)').replace(/\s+/g, ' ').trim())}`
+  let out = 'Earlier in this chat (left out of what you see; their first words, for what was decided):'
+  for (const m of gone) {
+    const l = `\n${line(m)}`
+    if (out.length + l.length > LEFT_MAX) return `${out}\n…`
+    out += l
+  }
+  return out
+}
 // the first message the model sees with the next ask (its at), when older ones are left out: the page marks it.
 // OpenRouter's only: claude and codex keep their own session
 const seenFrom = (t: Thread) => {
@@ -612,8 +627,9 @@ const seenFrom = (t: Thread) => {
 
 // A3: Anthropic's models on OpenRouter cache a prompt only up to a cache_control breakpoint (others cache on their own):
 // one after the tools (tools come first in its prefix: cached even when the system prompt changes) and one after the
-// system prompt, so each round and the next ask read them back at a tenth of the price. ponytail: none on the history,
-// which grows each round (a moving breakpoint on the last message would save the tool rounds' too)
+// system prompt, so each round and the next ask read them back at a tenth of the price. With history the second one moves
+// to its last message before the ask (a rolling breakpoint: the tool rounds and the next ask read the whole chat back;
+// the system prompt is in that prefix): two at most. Never on Your endpoint's (at.or)
 const EPHEMERAL = { type: 'ephemeral' }
 export const cachesByMark = (model: string) => model.startsWith('anthropic/')
 // the cached tokens of a reply's usage (OpenRouter's prompt_tokens_details)
@@ -689,7 +705,15 @@ async function openrouter(o: Opts) {
   const fns = list.map((t, i) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema }, ...(mark && i === list.length - 1 && { cache_control: EPHEMERAL }) }))
   const pics = o.images.map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))
   const sys = system(o.t)
-  const messages: object[] = [{ role: 'system', content: mark ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
+  const hist = history(o.t)
+  const left = leftOut(o.t.chat.slice(0, -1))
+  const rolling = mark && hist.length > 0
+  const messages: object[] = [
+    { role: 'system', content: mark && !rolling ? [{ type: 'text', text: sys, cache_control: EPHEMERAL }] : sys },
+    ...(left ? [{ role: 'system', content: left }] : []),
+    ...hist.map((m, i) => (rolling && i === hist.length - 1 ? { ...m, content: [{ type: 'text', text: m.content, cache_control: EPHEMERAL }] } : m)),
+    { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask },
+  ]
   const r = o.r
   r.cost = at.or ? 0 : undefined // Your endpoint's: not priced
   // the text so far to the page (its partial, under the chat until the message comes), 10 a second at most. ponytail:

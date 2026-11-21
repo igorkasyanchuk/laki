@@ -81,7 +81,8 @@ Q14: several in one question, and more of the Mac.
   message comes. A JSON reply (an error, one that doesn't stream) is read whole. The 2 minutes are a quiet limit, reset
   by each chunk (`QUIET_MS`, `LAKI_AI_QUIET_MS`: tests'), not a total; `aiStop` aborts the stream; the
   earlier asks and answers go with each ask (`history`, A8: `earlier`'s whole turns, newest first, while they fit
-  `HISTORY_CHARS`, 60 KB, the newest always), never the tools' calls or results; `seenFrom` (in `aiState` and the `ai`
+  `HISTORY_CHARS`, 60 KB, the newest always), never the tools' calls or results; the turns left out go as one more
+  system message (`leftOut`: each ask's and answer's first 140 characters, 1,500 in all, no model asked); `seenFrom` (in `aiState` and the `ai`
   event, OpenRouter's only) is the first message it still sees, where the page draws *Laki AI sees the chat from here
   on* with New chat. What's stored and shown is the same. A pasted image (only from
   `<data>/images`, `imageOk`: nothing else of the Mac goes to a model) as a data URL. The key: the Keychain or `<data>/ai-key`, 0600
@@ -89,7 +90,9 @@ Q14: several in one question, and more of the Mac.
   `AI_MODEL`. Prompt caching (A3): an `anthropic/*` model (`cachesByMark`) caches only up to a `cache_control`
   breakpoint, so its last tool definition and its system prompt (sent as one text part) each carry
   `{ type: 'ephemeral' }`: the tools and instructions are read back from the cache each round and on the next ask
-  within 5 minutes. Other models cache on their own: their request is unchanged. The history has no breakpoint;
+  within 5 minutes. With history, the system prompt's breakpoint rolls to the last message before the ask (a text part
+  with it: the tool rounds and the next ask read the whole chat back), two breakpoints at most; Your endpoint gets none.
+  Other models cache on their own: their request is unchanged;
 - `claude`: `claude -p --output-format stream-json --verbose --mcp-config <laki mcp, LAKI_HOME> --strict-mcp-config
   --tools Read --allowedTools mcp__laki --permission-prompt-tool mcp__laki__laki_permission --append-system-prompt …`
   (a Read outside its folder: `laki mcp`'s `laki_permission`, `LAKI_AI_PERM` only (claude's), waits on `aiPermission`: a chat message

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki AI on an Anthropic model reads a long chat back from its cache each round (cheaper and quicker), and in a chat too long to send whole it still sees the first words of what was left out.
 - The island on a MacBook with a notch: its card grows out of the pill as one black shape instead of floating under it.
 - The status bar is quieter: its groups' edges and fills soften at rest and come up on a hover, its numbers line up, and capsules have one crisp top edge instead of two.
 - The Reader: a run of tool calls is one pill that says what it did (*Read 2 files · Edit auth.ts*) and shimmers while it runs; a code block has a head with its language, lines and Copy; new turns fade in, and long answers keep a readable line length.

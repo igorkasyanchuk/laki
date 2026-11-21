@@ -1176,6 +1176,7 @@ test("A3: an Anthropic model's request marks the tools and the system prompt for
   const or = await openrouter(t, [
     reply({ content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'laki_state', arguments: '{}' } }] }, usage),
     reply({ content: 'Done.' }, usage),
+    reply({ content: 'Again.' }, usage),
     { ...reply({ content: 'Plain.' }), model: 'openai/gpt-5.6-sol' },
   ])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
@@ -1191,14 +1192,22 @@ test("A3: an Anthropic model's request marks the tools and the system prompt for
   let calls = (await rig.rpc('aiState')).calls
   assert.equal(calls.at(-1).cachedIn, 16000, 'both rounds')
   assert.equal(calls.at(-1).in, 18000)
+  // the next ask: the breakpoint rolls to the last message before it (the system prompt's moves there: two at most)
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'and now?' }), { text: 'Again.' })
+  const b2 = or.hits[2].body
+  assert.equal(typeof b2.messages[0].content, 'string', "the system prompt's breakpoint moved")
+  const prior = b2.messages.at(-2)
+  assert.deepEqual([prior.role, prior.content[0].text, prior.content[0].cache_control], ['assistant', 'Done.', { type: 'ephemeral' }])
+  assert.equal(JSON.stringify(b2).match(/cache_control/g)!.length, 2, 'the last tool and the last message: two')
+  assert.equal(b2.messages.at(-1).content, 'and now?')
 
   await rig.rpc('settingsSet', { ai: { on: true, models: { openrouter: 'openai/gpt-5.6-sol' } } })
-  assert.deepEqual(await rig.rpc('aiAsk', { text: 'and now?' }), { text: 'Plain.' })
-  const b = or.hits[2].body
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'and then?' }), { text: 'Plain.' })
+  const b = or.hits[3].body
   assert.equal(typeof b.messages[0].content, 'string', 'caches on its own: the system prompt as it was')
   assert.equal(JSON.stringify(b).includes('cache_control'), false)
   calls = (await rig.rpc('aiState')).calls
-  assert.equal('cachedIn' in calls.find((c: any) => c.ask === 'and now?'), false, 'nothing cached: no count')
+  assert.equal('cachedIn' in calls.find((c: any) => c.ask === 'and then?'), false, 'nothing cached: no count')
 })
 
 test('A7: OpenRouter streams: its text as it comes (partial), tool calls in pieces, usage from the last chunk; the answer as a whole reply gives it; a stream that goes quiet ends', async t => {
@@ -1247,7 +1256,11 @@ test("A8: a long chat's history goes by size: whole turns, newest first, under t
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
   for (let i = 0; i < N; i++) await rig.rpc('aiAsk', { text: `ask ${i}` })
   const body = or.hits.at(-1)!.body
-  const hist = body.messages.slice(1, -1)
+  // the note of what was left out (a system message), then the turns; the last one's content a part with its breakpoint
+  assert.equal(body.messages[1].role, 'system')
+  assert.match(body.messages[1].content, /^Earlier in this chat \(left out of what you see/)
+  assert.ok(body.messages[1].content.length <= 1500)
+  const hist = body.messages.slice(2, -1).map((m: any) => (Array.isArray(m.content) ? { ...m, content: m.content[0].text } : m))
   const size = hist.reduce((n: number, m: any) => n + m.content.length, 0)
   assert.ok(size <= 60_000, `history ${size} chars`)
   assert.ok(hist.length >= 20, 'still a good part of it')
@@ -1413,4 +1426,21 @@ test("Explain an ask: a command past 2,000 characters says it was cut (the promp
   // a short one: as before, no cut line
   assert.deepEqual(await ask('three', 'perm bash :: ls'), { does: 'Lists the files', outside: false, undo: 'yes' })
   assert.ok(!JSON.stringify(or.hits[2].body.messages).includes('was cut'))
+})
+
+test("A8: the turns left out of a long chat go as one short note of their first words (1,500 characters at most)", async () => {
+  const { leftOut } = await import('../src/daemon/ai.ts')
+  const big = 'x'.repeat(30_000)
+  const chat = [
+    { role: 'user', text: 'Pick Postgres or SQLite?', at: 1 },
+    { role: 'ai', text: 'SQLite: one file, no server.', at: 2 },
+    { role: 'user', text: big, at: 3 },
+    { role: 'ai', text: big, at: 4 },
+    { role: 'user', text: big, at: 5 },
+    { role: 'ai', text: 'ok', at: 6 },
+  ] as any[]
+  const n = leftOut(chat)!
+  assert.match(n, /- Asked: Pick Postgres or SQLite\?\n  Answer: SQLite: one file, no server\./)
+  assert.ok(n.length <= 1500)
+  assert.equal(leftOut(chat.slice(0, 2)), undefined, 'nothing left out: no note')
 })
