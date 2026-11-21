@@ -144,7 +144,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number; waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; permCmd?: string; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; permCmd: a Bash ask's whole command (2,000 characters at most; perm's what is a line of 300), with it, for askExplain; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -4356,7 +4356,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   if (!late) {
     if (p.state !== 'start') r.bg = undefined
     r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
-    if (p.state !== 'waiting') r.perm = r.held = undefined // answered (its tool runs), refused or over
+    if (p.state !== 'waiting') r.perm = r.held = r.permCmd = undefined // answered (its tool runs), refused or over
   }
   switch (p.state) {
     case 'compacting':
@@ -4417,6 +4417,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (pl.hook_event_name === 'PermissionRequest') {
         const w = state.workspaces.find(w => w.id === tab.workspace)
         r.perm = permOf(pl, w?.path, homedir(), priorOf(pl, w))
+        r.permCmd = pl.tool_name === 'Bash' && typeof pl.tool_input?.command === 'string' ? pl.tool_input.command.slice(0, 2000) : undefined
         r.held = alwaysAskOf(projectOfTab(tab)?.alwaysAsk, r.perm ?? {}) // F15: never a rule's, its card says why
         if (r.held && r.perm) log(`always-ask ${tab.workspace} ${tab.name}: ${r.perm.tool} ${r.perm.what} touches ${r.held}: asked`)
         if (sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
@@ -4835,7 +4836,7 @@ function interrupted(id: string, s: Session) {
       const lastOf = (re?: RegExp) => (re ? lines.findLastIndex(l => re.test(l)) : -1)
       if (lastOf(ESC_ENDED) <= lastOf(busy) || (r.status === 'waiting' && s.ask())) return
       r.status = 'idle'
-      r.escAt = r.perm = r.held = undefined // the ask is over, as every hook but a wait says (turn)
+      r.escAt = r.perm = r.held = r.permCmd = undefined // the ask is over, as every hook but a wait says (turn)
       changed()
     }, ms)
 }

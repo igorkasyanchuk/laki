@@ -1,19 +1,21 @@
 // Cards on screen (ask.html; what's marked important: a workspace's asks and finishes, a timer, a reminder): main's
 // panel at the bottom right of the screen, a card each, the newest on top. Each: its title, its words, an Edit's or Write's diff, a button
 // per choice, Open, ×; its edge's color by tone (an ask amber, a finish green, a limit red); Close all over two or more.
-// Keys once it's clicked: 1-9 the top card's choices, Esc its ×.
+// Keys once it's clicked: 1-9 the top card's choices, E a command's ? (Laki AI's words for it), Esc its ×.
 // A laki alert's words as Markdown (links open in the browser: main's window-open handler), a line break kept as one
 // ?window=inbox: the menu bar's Inbox (main's inboxOpen): the same cards under the tray, no ×, then New task… (the
 // quick bar with what's typed); Esc closes it, nothing waiting says so
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 import { askScope } from '../../shared/ask'
 type Action = { text: string; scope?: string } // scope: a standing permission's choice in full (askScope): its rule drawn whole
-type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string }
+type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string }
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string; explain?: boolean; said?: Said }
 type Bridge = {
   ask: {
     onCards(cb: (cards: Card[], colors: Record<string, string>) => void): void
     size(h: number): void
     act(key: string, i: number): Promise<void>
+    explain(key: string): Promise<void>
     close(key: string): void
     closeAll(): void
     open(key: string): void
@@ -55,6 +57,28 @@ function scoped(b: HTMLElement, text?: string, agent?: string) {
   b.setAttribute('aria-label', text)
 }
 
+// a command ask's ? (E): Laki AI's words for what it will do (main's ask-explain), under the command; it answers nothing
+function explainEl(c: Card) {
+  const row = el('div', '', 'explain')
+  const s = c.said
+  if (!s || (typeof s === 'object' && 'err' in s)) {
+    const b = el('button', '?', 'q')
+    b.title = 'What will this do? Laki AI says it in a line (E)'
+    b.setAttribute('aria-label', 'What will this do?')
+    b.onclick = () => void bridge?.explain(c.key)
+    row.append(b)
+  }
+  if (s === 'loading') row.append(el('span', 'Laki AI is reading the command…', 'said loading'))
+  else if (s && 'err' in s) row.append(el('span', s.err, 'said err'))
+  else if (s) {
+    const t = el('span', s.does, 'said')
+    if (s.undo === 'no') t.append(el('span', " Can't be undone.", 'danger'))
+    if (s.outside) t.append(el('span', ' Reaches outside this workspace.', 'warn'))
+    row.append(t)
+  }
+  return row
+}
+
 function cardEl(c: Card) {
   const box = el('div', '', `card ${c.tone}${seen.has(id(c)) ? '' : ' new'}`)
   const x = el('button', '×', 'x')
@@ -69,6 +93,7 @@ function cardEl(c: Card) {
   // a laki alert's words as Markdown (markdownHtml escapes every word); any other card's as written: an ask's command
   // next to its Allow must read as it runs (no * or backslash taken as formatting)
   if (c.body) box.append(c.key.startsWith('alert:') ? Object.assign(el('div', '', 'what md'), { innerHTML: imgsAsLinks(markdownHtml(lineBreaks(c.body))) }) : el('pre', c.body, 'what'))
+  if (c.explain) box.append(explainEl(c))
   if (c.diff) box.append(diffEl(c.diff))
   if (c.actions.length) {
     const opts = el('div', '', 'opts')
@@ -114,6 +139,7 @@ addEventListener('keydown', e => {
   const top = shown[0]
   if (!top || !bridge) return
   if (e.key === 'Escape') return bridge.close(top.key)
+  if ((e.key === 'e' || e.key === 'E') && top.explain) return void bridge.explain(top.key)
   const i = Number(e.key) - 1
   if (i >= 0 && i < top.actions.length) document.querySelector('.card')?.querySelectorAll<HTMLButtonElement>('button.opt')[i]?.click()
 })

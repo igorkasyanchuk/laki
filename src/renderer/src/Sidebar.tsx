@@ -5,7 +5,7 @@ import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
-import { GOAL_SAYS } from '../../shared/types'
+import { aiOn, GOAL_SAYS } from '../../shared/types'
 import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
@@ -141,6 +141,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), around
   // the Needs you list's cards: answered as main's notification actions do (answer refuses a menu that changed)
   const needsApi: NeedsApi = {
+    explain: aiOn(view.settings) && hasCap(view, 'ask.explain') ? t => call('askExplain', { tab: t.id }) : undefined, // a command ask's ?: Laki AI's words for it
     keep: t => void call('send', { target: t.id, text: 'continue' }).catch(() => {}),
     dismiss: t => void call('failDismiss', { tab: t.id }).catch(() => {}),
     open: t => (setDialog(null), selectTab(t), narrow && setSideOpen(false)),

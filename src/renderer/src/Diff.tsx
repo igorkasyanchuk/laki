@@ -9,7 +9,7 @@ import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewe
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
 import { askScope, denyOf, diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
-import type { Annotation, Annotations, Ask } from '../../shared/types'
+import type { Annotation, Annotations, Ask, AskExplained } from '../../shared/types'
 
 // what load gives, again every few seconds while the window is in front, and on reload()
 export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
@@ -453,21 +453,68 @@ export function AskDiff({ diff }: { diff: string }) {
 }
 
 // the bar under the terminal (App's ask-bar): a +N −M chip in it opens AskDiff over it (its terminal shows one too)
-export function AskWrap({ diff, children }: { diff?: string; children: (chip: ReactNode) => ReactNode }) {
+// explain (a command ask's ?: useExplain) gives the bar its button, and its line over the bar
+export function AskWrap({ diff, tab, ask, explain, children }: { diff?: string; tab?: string; ask?: Ask; explain?: () => Promise<AskExplained>; children: (chip: ReactNode, why: ReactNode) => ReactNode }) {
   const [open, setOpen] = useState(false)
-  if (!diff) return <>{children(null)}</>
-  const { add, del } = diffCounts(diff)
-  const chip = (
+  const x = useExplain(tab ?? '', ask, explain)
+  if (!diff && !x.button) return <>{children(null, null)}</>
+  const { add, del } = diff ? diffCounts(diff) : { add: 0, del: 0 }
+  const chip = diff && (
     <button type="button" className="ask-chip mono" aria-expanded={open} data-tip={open ? 'Hide the change' : 'Show the change it asks to make'} onClick={() => setOpen(o => !o)}>
       <span className="add">+{add}</span> <span className="del">−{del}</span>
     </button>
   )
   return (
     <div className="ask-wrap">
-      {open && <AskDiff diff={diff} />}
-      {children(chip)}
+      {open && diff && <AskDiff diff={diff} />}
+      {x.line}
+      {children(chip, x.button)}
     </div>
   )
+}
+
+// the ? on a command ask (claude's Bash) and E on its card: Laki AI's plain words for what it will do (the daemon's
+// askExplain, kept per command), a shimmer line while it reads it. Only on the click or the key: it never runs on its
+// own, answers nothing and moves no choice or focus. explain: none (Laki AI off, an older daemon): no button. Kept here
+// per tab and ask, so the ask bar, the Reader and Needs you show the same line
+const explained = new Map<string, AskExplained | { err: string } | 'loading'>()
+export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Promise<AskExplained>) {
+  const [, redo] = useState(0)
+  useEffect(() => {
+    const f = () => redo(n => n + 1)
+    addEventListener('laki-explained', f)
+    return () => removeEventListener('laki-explained', f)
+  }, [])
+  const k = `${tab}\n${ask?.what ?? ''}`
+  const can = !!explain && ask?.tool === 'Bash'
+  const got = can ? explained.get(k) : undefined
+  const go = () => {
+    if (!can || (got && !(typeof got === 'object' && 'err' in got))) return // asked once: its line stays; a failure asks again
+    explained.set(k, 'loading')
+    dispatchEvent(new Event('laki-explained'))
+    explain!().then(
+      r => void explained.set(k, r),
+      (e: Error) => void explained.set(k, { err: e.message }),
+    ).finally(() => dispatchEvent(new Event('laki-explained')))
+  }
+  const button = can ? (
+    <button type="button" className="ask-explain" aria-label="What will this do?" aria-keyshortcuts="E" data-tip="What will this do? Laki AI says it in a line (E)" onClick={e => (e.stopPropagation(), go())}>
+      ?
+    </button>
+  ) : null
+  const line = !got ? null : got === 'loading' ? (
+    <div className="ask-explained muted ai-shimmer" aria-busy="true">Laki AI is reading the command…</div>
+  ) : 'err' in got ? (
+    <div className="ask-explained err">{got.err}</div>
+  ) : (
+    <div className="ask-explained" role="note">
+      {got.does}
+      {got.undo === 'no' && <span className="danger"> Can't be undone.</span>}
+      {got.outside && <span className="warn"> Reaches outside this workspace.</span>}
+    </div>
+  )
+  const key = (e: KeyEvent) => can && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'e' || e.key === 'E') && (e.preventDefault(), go(), true)
+  return { button, line, key }
 }
 
 export const MORE = 20 // an expand arrow's lines

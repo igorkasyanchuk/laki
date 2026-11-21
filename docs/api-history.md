@@ -223,3 +223,4 @@ needs no bump: `settingsSet` keeps any field.
 214: widgets' `none` place (shows nowhere, runs in the background: widgetSet takes it, `widget.none` cap), an action's JSON's `notify` and `alert` (widgets.ts `tell`), the `background` starter.
 215: `scheduleCopy { id }` (a scheduled task's Duplicate: its settings under a new id, named … (copy), off, no runs; `schedule.copy` cap).
 216: fileRead's `sheets` for an `.xlsx`/`.xlsm` (each sheet's name and rows, read only; `cut`), `aiCredits` (Usage's OpenRouter part: the account's credits and the key's spend today, this week and this month, its limit, `low`; null without a key; an agent's call refused; `ai.credits` cap).
+217: `askExplain { tab }` (an ask's ? and E: what its Bash command does in a sentence, `outside` and `undo`, by Laki AI's aiOnce, kept per command; the user's and remote access's at the answer level, never an agent's; `ask.explain` cap).

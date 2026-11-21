@@ -1087,7 +1087,7 @@ const notes = new Set<Notification>()
 // card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
 // its edge's color
-type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown; origin?: unknown }
+type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown; origin?: unknown; explain?: unknown }
 ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[], card?: CardOpts) => {
   if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
@@ -1102,7 +1102,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
     // S10: a laki alert has a tone of its own, never an ask's (a permission prompt's), and its origin line from the daemon
     const tone = alert ? 'alert' : ask ? 'ask' : ['ok', 'bad'].includes(card.tone as string) ? (card.tone as Card['tone']) : 'info'
     const origin = alert && typeof card.origin === 'string' ? card.origin.slice(0, 200) : undefined
-    return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), ...(origin && { origin }), actions })
+    return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), ...(origin && { origin }), ...(ask && card.explain === true && { explain: true }), actions })
   }
   // U15: an agent's free-text question (no menu, not Allow/Deny): a Reply field (macOS), its text sent to the tab as one
   // typed in the window would be (the daemon's send: its rules, Recording mode, the policy), then its card on screen goes
@@ -1138,7 +1138,8 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 // no focus taken, a click lands at once), stacked, the newest on top. key: one per tab (its ask, its finish: the newer
 // replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
 // waiting), any card until it's opened or closed (×, Close all)
-type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string }
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
+type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string }
 const CARD_W = 380
 let cards: Card[] = []
 let cardN = 0
@@ -1236,6 +1237,22 @@ ipcMain.handle('ask-act', async (e, key: unknown, i: unknown) => {
     if (inboxSender(e)) sendInbox()
     else sendCards()
   }
+})
+// a command ask's ? (or E): Laki AI's words for it, from the daemon (askExplain: kept per command), on the card; it
+// answers nothing
+ipcMain.handle('ask-explain', async (e, key: unknown) => {
+  const c = cardOf(e, key)
+  if (!c?.explain || (c.said && !(typeof c.said === 'object' && 'err' in c.said))) return
+  const send = () => (inboxSender(e) ? sendInbox() : sendCards())
+  c.said = 'loading'
+  send()
+  try {
+    const r = (await rpc('askExplain', { tab: c.tab })) as { does?: unknown; outside?: unknown; undo?: unknown }
+    c.said = typeof r?.does === 'string' ? { does: r.does.slice(0, 200), outside: r.outside === true, undo: String(r.undo) } : { err: 'no answer' }
+  } catch (err) {
+    c.said = { err: (err as Error).message }
+  }
+  send()
 })
 // closed: a laki alert that waits hears it (no choice)
 const closed = (c: Card) => c.key.startsWith('alert:') && void rpc('alertAnswer', { id: c.key.slice(6) }).catch(() => {})

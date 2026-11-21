@@ -1472,7 +1472,7 @@ export function App() {
           const cut = !noteWhole(told) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: scopes.has(o) ? 'Allow always' : `${o.n}. ${o.label}`, n: o.n, label: o.label, ...(scopes.has(o) && { scope: optLabel(t.ask!, o) }) })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
-          const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' || m.kind === 'signedout' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
+          const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }), ...(perm?.tool === 'Bash' && aiOn(s) && hasCap(viewRef.current, 'ask.explain') && { explain: true }) } : { tone: m.kind === 'limit' || m.kind === 'signedout' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
@@ -3201,6 +3201,7 @@ export function App() {
     spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
+    ...(aiOn(view?.settings) && hasCap(view, 'ask.explain') && { explain: tab => call('askExplain', { tab }) }), // a command ask's ?: Laki AI's words for it
     answer: (tab, n, label, say) => void call('answer', { tab, n, label, ...(say && { say }) }).catch(() => {}), // say: No, and say why; label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
     undo: t =>
@@ -4336,13 +4337,14 @@ export function App() {
         </div>
         {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && !(app.needsShown && sideOpen && !video && !listOff) /* the sidebar's Needs you card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
-          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff}>{chip => (
+          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff} tab={tab.id} ask={tab.ask} explain={aiOn(settings) && hasCap(view, 'ask.explain') ? () => call('askExplain', { tab: tab.id }) : undefined}>{(chip, explain) => (
           <div className="ask-bar" data-dock="bottom">
             {tab.ask!.tool ? (
               // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)
               <>
                 <span className="tag ask-tool">{tab.ask!.tool}</span>
                 <span className="ask-what mono" data-tip={tab.ask!.what}>{tab.ask!.what}</span>
+                {explain}
                 {chip}
               </>
             ) : (

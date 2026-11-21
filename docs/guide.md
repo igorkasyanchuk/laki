@@ -634,6 +634,12 @@ selected workspace's PR is in the status bar.
   the notification (over 200 characters) is cut there with … and gets no buttons, as does one with an invisible or
   right-to-left character in it (the floating bubbles' card and reply window too): you answer it in the tab, where it
   shows as it is.
+- *What will this do?*: the ? beside a command Claude Code asks to run (or E on its card), on the ask bar, in the
+  Reader, Needs you and the cards on screen, has Laki AI say in a sentence what the command does, then *Can't be undone*
+  (in red) when what it changes can't be put back and *Reaches outside this workspace* when it touches more than the
+  workspace's folder or the network. It never runs on its own, answers nothing and leaves the choices as they were; the
+  same command asks once (AI page › Calls: *Explain an ask*). It shows while Laki AI is on (Settings › AI). Its words
+  are a reading, not a verdict: what runs is the command above them.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex
   teal, gemini blue, grok purple and opencode green, unless you pick another color (or none).
@@ -1035,7 +1041,7 @@ last 7, 30 or 90 days, from each Claude Code and Codex tab's transcript in Laki 
 (*$* or *Tokens*) stacked by agent, each in its color with a legend (Laki AI is one); the total, a day's average, and
 what used the most; *Where it went*: each workspace (its project, or *archived*, or *A deleted workspace*) and each of
 Laki AI's sources (its chats, Specs & Brainstorms, agents' `laki ai`, extensions, workflows, memory compaction, Done
-check reviews, next prompt guesses, side chats, *Ask me first*), its bar split by agent; and each model's share. *All*
+check reviews, next prompt guesses, side chats, *Ask me first*, *Explain an ask*), its bar split by agent; and each model's share. *All*
 or one agent, *All models* or one (a row's click too). Kept 90 days in `usage-days.json` and Laki AI's call log; your
 plan bills its own way.
 

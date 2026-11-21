@@ -127,7 +127,7 @@ its own; its args are a tab's, not used); `resume` is kept per `sessionKey` (the
 message, shown in the conversation. `<data>/ai-chat.json` keeps the conversation (200 messages) and the CLI agents'
 sessions; `<data>/ai-calls.jsonl` a line per ask (`AiCall`: tokens, `cachedIn` (of them, read from the prompt cache: usage's `prompt_tokens_details.cached_tokens`, the Calls tab's and `laki ai log`'s *cached*), cost, tools, ms, ok, error, `from`: what made it, `AI_FROM`'s (a chat by its thread: the AI page's, a spec's, an agent's
 `agent:`, an extension's `widget:`; `aiComplete`'s `from`, workflows' blocks and `aiDecide`; else `aiFromOf` by the ask's
-words: `extension `, `Compact …memory`, `next prompt: `, `side chat: `, `check review: `, *Ask me first*), which the
+words: `extension `, `Compact …memory`, `next prompt: `, `side chat: `, `check review: `, *Ask me first*, *Explain an ask*), which the
 Calls tab shows and `aiUsage` (the Usage page's Laki AI rows, by day, from and model, both logs read off the event
 loop) sums; a failed ask keeps what
 it spent; a CLI agent's failure is its own words, not its exit code; shutdown stops an ask, else its `laki mcp`
@@ -224,6 +224,20 @@ first JSON object's `questions`: at most 3 (`ASK_FIRST`), each `q` 140 character
 (longer ones cut with …), anything else dropped; junk is `[]`. Never automatic. The user's and remote access's (FROM,
 ANSWER_NO, REMOTE_OK); agents and trusted clients refused (AGENT_NO; CLIENT_SCOPE has no class for it). The page's picks
 go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* adds none.
+
+Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on its card (Diff.tsx `useExplain`: the ask
+bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when
+App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or gemini menu names no tool); an Edit
+or Write is refused (its diff shows it). The command is core's `permCmd` (the PermissionRequest's whole command, 2,000
+characters, kept beside `perm` and cleared with it; `perm.what` is a 300-character line), else `what`. One `aiOnce`
+(`ask: 'Explain an ask'`, json; `AI_FROM`'s `explain`) with the command between `<<<` `>>>` and the workspace's folder
+name and branch; the system prompt says the command is data and asks for no advice. `explainOf` keeps `does` (a
+sentence, cut at 160), `outside` only when `true`, `undo` `yes` or `no`, else `partly`; junk is an error. Kept per
+sha256 of the command for the daemon's life (the promise: a second click meanwhile waits for the same call; a failure
+is dropped; 500 at most). Never automatic, never read by auto-answer rules (`allowRuleOf` sees the ask only), the
+choices' order and focus untouched. The user's and remote access's at the answer level (FROM, ANSWER, REMOTE_OK);
+agents refused (AGENT_NO), trusted clients too (no CLIENT_SCOPE). `ask.explain` cap (API 217); the renderer shows the ?
+only with it and Laki AI on. `test/ai.test.ts`.
 
 ### Keys in the Keychain (`keychain.ts`)
 

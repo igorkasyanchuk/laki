@@ -2250,6 +2250,13 @@ html[data-kb] { --safe-b: 0px; }
    the warning color with what it covers in words. Last so it wins over each list's one-line buttons */
 .need-opts button[data-scope], .ask-bar button[data-scope], .rd-opts button[data-scope] { height: auto; white-space: normal; text-overflow: clip; overflow: visible; padding-block: var(--sp-2); max-width: 100%; }
 .ask-bar button[data-scope] { flex: 0 1 auto; min-width: 0; }
+/* a command ask's ? (Diff.tsx useExplain): Laki AI's line on what it will do, over the ask bar, in the Reader and Needs you */
+button.ask-explain { flex: none; width: var(--h-s); height: var(--h-s); padding: 0; border-radius: 50%; font-weight: 600; color: var(--muted); }
+button.ask-explain:hover { color: var(--fg); }
+.ask-explained { font-size: var(--fs-2); color: var(--fg); overflow-wrap: anywhere; } .ask-explained.err { color: var(--muted); }
+.ask-explained .danger { color: var(--error); } .ask-explained .warn { color: var(--waiting); }
+.ask-wrap > .ask-explained { padding: var(--sp-3) var(--pane-r) 0 var(--pane-x); }
+.need-cmd { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; margin-top: var(--sp-2); } .need-cmd > .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .choice { display: inline-flex; flex-direction: column; gap: var(--sp-1); min-width: 0; text-align: left; vertical-align: top; }
 .choice-rule { font: var(--fs-1)/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5.6em; overflow-y: auto; }
 .choice-plain { font-size: var(--fs-1); }

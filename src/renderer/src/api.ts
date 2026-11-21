@@ -428,7 +428,7 @@ export const openKeptLink = async (url: string) => {
 // card: something you marked important (a workspace, a timer, a reminder) or a laki alert, as a card on screen instead
 // (main's addCard; the app only): ask, a waiting agent's (its diff with it); alert, laki alert's id; tone, the edge's
 // color (ok: a finish, bad: a limit)
-type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' | 'info'; origin?: string }
+type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' | 'info'; origin?: string; explain?: boolean } // explain: a command ask's ? (Laki AI on)
 // U8: Quiet (the view's dnd, App sets it): nothing is sent, no sound, but an important workspace's ask and a laki alert
 // (their cards: tray.ts quietLets)
 let quiet = false

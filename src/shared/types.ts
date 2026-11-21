@@ -969,6 +969,9 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex' | 'endpoint' // endpoi
 export type AiSettings = { show?: boolean; on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean; alerts?: boolean } // alerts: it may send laki_alert on its own (off: only when you ask in the chat or Your instructions name alerts: ai.ts aiMayAlert); efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const aiOn = (s?: { ai?: AiSettings }) => s?.ai?.on !== false // Settings › AI: on unless turned off
+// an ask's command in plain words (the daemon's askExplain, the ? on an ask's card): what it does, a sentence; outside:
+// it reaches past the workspace's folder or the network; undo: whether what it changes can be put back
+export type AskExplained = { does: string; outside: boolean; undo: 'yes' | 'no' | 'partly' }
 export const AI_STEPS = 20
 export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
 // the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure
@@ -992,12 +995,12 @@ export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; ids?: string[]
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cachedIn?: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string; from?: AiFrom } // cachedIn: of in, the tokens read from the provider's prompt cache (A3); from: what made it
 // what made a Laki AI call (the Usage page's Where it went): a chat (the AI page's), a spec's or brainstorm's, an agent's
 // laki ai, an extension (its studio's chat, its AI source or action), a workflow's block, memory's compaction, the Done
-// check's review, the next prompt guessed, the side chat, Ask me first
-export const AI_FROM = { chat: 'Laki AI chats', specs: 'Specs & Brainstorms', agents: "Agents' laki ai", extensions: 'Extensions', workflows: 'Workflows', memory: 'Memory compaction', check: 'Done check reviews', next: 'Next prompt guesses', side: 'Side chats', questions: 'Ask me first' } as const
+// check's review, the next prompt guessed, the side chat, Ask me first, an ask explained
+export const AI_FROM = { chat: 'Laki AI chats', specs: 'Specs & Brainstorms', agents: "Agents' laki ai", extensions: 'Extensions', workflows: 'Workflows', memory: 'Memory compaction', check: 'Done check reviews', next: 'Next prompt guesses', side: 'Side chats', questions: 'Ask me first', explain: 'Explain an ask' } as const
 export type AiFrom = keyof typeof AI_FROM
 // a call's from, or by its ask's words (the labels its makers give; a line logged before from). ponytail: an older
 // workflow block's call reads as a chat's
-export const aiFromOf = (c: Pick<AiCall, 'from' | 'ask'>): AiFrom => c.from ?? (/^extension /.test(c.ask) ? 'extensions' : /^Compact .*memory/.test(c.ask) ? 'memory' : c.ask.startsWith('next prompt: ') ? 'next' : c.ask.startsWith('side chat: ') ? 'side' : c.ask.startsWith('check review: ') ? 'check' : c.ask === 'Ask me first' ? 'questions' : 'chat')
+export const aiFromOf = (c: Pick<AiCall, 'from' | 'ask'>): AiFrom => c.from ?? (/^extension /.test(c.ask) ? 'extensions' : /^Compact .*memory/.test(c.ask) ? 'memory' : c.ask.startsWith('next prompt: ') ? 'next' : c.ask.startsWith('side chat: ') ? 'side' : c.ask.startsWith('check review: ') ? 'check' : c.ask === 'Ask me first' ? 'questions' : c.ask === 'Explain an ask' ? 'explain' : 'chat')
 export type AiTotals = { today: AiSum; month: AiSum }
 export type AiSum = { calls: number; in: number; out: number; cost: number }
 // today's and this month's calls, on this Mac's clock
@@ -1438,7 +1441,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 216
+export const API = 217
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

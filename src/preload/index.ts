@@ -169,6 +169,7 @@ contextBridge.exposeInMainWorld('laki', {
     onCards: (cb: (cards: object[], colors: Record<string, string>) => void) => ipcRenderer.on('ask-cards', (_e, cards, colors) => cb(cards, colors)),
     size: (h: number) => ipcRenderer.send('ask-size', h),
     act: (key: string, i: number): Promise<void> => ipcRenderer.invoke('ask-act', key, i),
+    explain: (key: string): Promise<void> => ipcRenderer.invoke('ask-explain', key), // a command ask's ? (Laki AI's words, on the card)
     close: (key: string) => ipcRenderer.send('ask-close', key),
     closeAll: () => ipcRenderer.send('ask-close-all'),
     open: (key: string) => ipcRenderer.send('ask-open', key),

@@ -7,9 +7,9 @@
 // detail (open but for a stale one); anywhere else on a card opens the tab, whatever its state. With a card focused,
 // 1–9 answer and Enter opens.
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { TabView, WorkspaceView } from '../../shared/types'
+import type { AskExplained, TabView, WorkspaceView } from '../../shared/types'
 import { bulkOk, optLabel } from '../../shared/ask'
-import { AskDiff, Choice, choiceProps, useSayWhy } from './Diff'
+import { AskDiff, Choice, choiceProps, useExplain, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
@@ -41,6 +41,7 @@ export type NeedsApi = {
   // time) and a swipe marks seen (seenUndo: its 4 s Undo); the head counts them, with Mark all finished as seen
   phone?: boolean
   seenUndo?: (t: TabView) => void
+  explain?: (t: TabView) => Promise<AskExplained> // a command ask's ? and E (Laki AI on): what it will do (Diff.tsx useExplain)
 }
 
 // a phone's order and groups: asks (waiting), failures (a turn ended on an error, a limit, a sandbox's stop, a failed
@@ -145,9 +146,10 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api:
   const allow = waiting && !opts.length && api.permission(t)
   const stop = (e: MouseEvent) => (e.target as HTMLElement).closest('button') && e.stopPropagation() // a button's own click; the row's room around it opens the tab
   const why = useSayWhy(waiting ? t.ask : undefined, (n, label, say) => api.answer(t, n, label, say)) // ⌥-click, a long press or N: No, and say why
+  const x = useExplain(t.id, waiting ? t.ask : undefined, api.explain && (() => api.explain!(t))) // ? or E: what its command will do
   const key = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return // a button of its own has the key
-    if (why.key(e)) return
+    if (why.key(e) || x.key(e)) return
     const o = opts.find(o => String(o.n) === e.key)
     if (o) e.preventDefault(), api.answer(t, o.n, o.label)
     else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && waiting && t.ask?.steps && api.keys) e.preventDefault(), api.keys(t, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C') // its other questions
@@ -204,6 +206,14 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api:
           {t.held && <div className="muted small">Asked because it touches {t.held}</div>}
           {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} netAllow={api.netAllow} />}
           {t.ask?.steps && api.keys && <div className="need-steps muted small">One of several questions: ← → (the card focused) go between them</div>}
+          {x.button && (
+            // a command: as it runs, and the ? for Laki AI's words on it
+            <div className="need-cmd" onClick={stop}>
+              <span className="mono small muted" data-tip={t.ask!.what}>{t.ask!.what}</span>
+              {x.button}
+            </div>
+          )}
+          {x.line}
           {t.ask?.diff && (
             // an Edit's or Write's change, before its Yes
             <div className="need-diff" onClick={stop}>

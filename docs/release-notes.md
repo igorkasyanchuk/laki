@@ -21,6 +21,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - The Review tab says what to review next: once every file is viewed, a bar names the next workspace (a PR with green checks first, then the oldest change) and ⌘⏎ opens it; ⌘K has *Review next* too.
 - The Review tab's files show as a tree by folder (List | Tree over them): each folder says how many of its files are viewed and has a Viewed box for all of them; the diffs follow the tree's order.
 - Settings › Security › *Terminals*: the terminals you allowed to run laki as you, with what started each and its last call; *Revoke* makes it ask again. One with no call for 12 hours asks again too. [Try it](laki://settings/security?spot=Terminals)
+- *What will this do?*: the ? beside a command an agent asks to run (or E on its card) has Laki AI say in a sentence what it does, and whether it can't be undone or reaches outside the workspace. Only on your click; it answers nothing.
 - Safety fix: a project's notes and memory kept in its repo (`.laki/`) are read only when the file is still a plain one as it's opened, and at 1 MB at most, so a file swapped for a link to one elsewhere (your SSH key) is never read and handed to agents.
 
 ## 0.58.0 · Nov 20, 2026

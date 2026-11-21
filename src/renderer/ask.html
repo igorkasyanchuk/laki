@@ -37,6 +37,11 @@
       .diff > div { padding: 0 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
       .diff .a { color: #9ece6a; background: rgb(158 206 106 / 0.1); } .diff .d { color: #f7768e; background: rgb(247 118 142 / 0.1); } .diff .m { color: var(--muted); }
       .opts { display: flex; flex-direction: column; gap: 4px; }
+      /* a command ask's ?: Laki AI's line on what it will do, under the command */
+      .explain { display: flex; align-items: baseline; gap: 7px; font-size: 12px; line-height: 1.4; }
+      .explain .q { flex: none; width: 20px; height: 20px; font: inherit; font-weight: 600; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; }
+      .explain .q:hover { color: var(--fg); border-color: var(--accent); }
+      .explain .said.loading, .explain .said.err { color: var(--muted); } .explain .danger { color: var(--error); } .explain .warn { color: var(--waiting); }
       button.opt { font: inherit; color: var(--fg); text-align: left; padding: 5px 10px; background: color-mix(in srgb, #000 22%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       button.opt:hover { border-color: var(--accent); }
       button.opt.first { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
