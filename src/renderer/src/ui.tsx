@@ -8,7 +8,7 @@ import { createPortal, flushSync } from 'react-dom'
 import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
-import { morphOk } from './themes'
+import { morphOk } from './motion'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {

@@ -4,6 +4,7 @@
 // <html data-look>). Glass makes the window see-through, as much as its sliders say.
 import { lookOf, setIconLook } from '../../shared/icons.ts'
 import { p3Boost } from './color.ts'
+import { morphOk } from './motion.ts'
 
 type Colors = {
   bg: string
@@ -1316,8 +1317,6 @@ export const themeKey = (p: string | Paint, dark: boolean) => {
   const t = THEMES.find(x => x.id === themeFor(o, dark)) ?? THEMES[0]
   return `${t.id} ${o.design === 'frosted' ? 'frosted' : (t.look ?? '')}`
 }
-// ui.tsx' morph's test too: view transitions, a window that draws, not under Reduce motion, Motion: Off or ui-smoke
-export const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches
 // a theme that really changes (you pick one, a look or light or dark; the system turns) cross-fades in 200 ms (styles.css'
 // html.theme-fade: the root snapshotted only then; its new state is live, so a terminal repainting meanwhile isn't
 // frozen); the first paint, a hover's preview (applyTheme) and the same theme again paint at once. A call while one is

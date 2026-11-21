@@ -49,3 +49,7 @@ export function exits(root: Node) {
       }
   }).observe(root, { childList: true, subtree: true })
 }
+
+// whether a view transition may run (ui.tsx' morph, themes.ts' paintTheme): the API there, a window that draws, not
+// under Reduce motion, Motion: Off or ui-smoke. Here, not in themes.ts: its table stays out of ui.tsx' first load
+export const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && !still()
