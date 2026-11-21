@@ -687,7 +687,9 @@ working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach t
   title and body (from the workspace's name, its first prompt and the agent's last answer, no model asked), its base
   branch and reviewers, and *Draft*, *Merge when green*, *Send CI failures to the agent*. A line on top says how the
   Done check went, the Collision radar's overlaps and how far behind its base it is. *Commit only*, *Push* (commit and
-  push) or *Open PR* (⌘↵). Before the commit it looks for secrets (API keys, private keys, passwords in URLs, a
+  push) or the main button (⌘↵), which follows the PR: *Open PR* with none, *Push to PR* when one is open and there's
+  something to send, *Merge* when it's green and mergeable with nothing to send (the same merge as ⌘K's, its confirm,
+  Touch ID and extension gates included), *Merge when green* while its checks run (turns that switch on). Before the commit it looks for secrets (API keys, private keys, passwords in URLs, a
   `TOKEN=` value) in the lines it adds, lockfiles, binary files and files over 1 MB aside: each found shows its file,
   line and itself masked, and stops the ship; *Untick* leaves the file out, *Not a secret* ships it and remembers that
   one for the workspace (`laki ship` exits 1 unless `--allow-secrets`; an agent can't pass it);

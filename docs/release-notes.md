@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Ship's main button follows the PR: *Push to PR* when one is open, *Merge* once it's green with nothing left to send, *Merge when green* while checks run; ⌘↵ does the same.
 - A repo's workflow that changed since you allowed it shows what changed before you allow it again: a line diff with changed commands and agent prompts marked and counted.
 - Safety fix: a project's MCP server secrets no longer show in Codex's command line (`ps`): they go in its environment instead.
 - The quick bar and the new-workspace window are see-through glass on a Mac (solid with Reduce transparency), and a double click on the tab bar's empty room zooms or minimizes the window as macOS's setting says. The window's glass dims when it's in the background, as macOS's own windows do.

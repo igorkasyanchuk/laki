@@ -21,7 +21,7 @@ import type { KeyId, KeyMap } from '../../shared/keys'
 import type { NewWsParams, Shot } from './panels'
 import type { Collision } from '../../shared/overlap'
 import type { Notice, ShownPop, ShownWin } from './Shown'
-import type { FixWhat, PRAct } from './Info'
+import type { AutoKey, FixWhat, PRAct } from './Info'
 import type { WidgetApi } from './Widgets'
 import type { menusOf } from './menus'
 import type { layoutOf } from './TabBar'
@@ -269,6 +269,7 @@ export type AppBase = {
   answerNotice: (n: Notice, choice?: string) => void
   pops: ShownPop[]
   prAct: (w: WorkspaceView, act: PRAct, method?: MergeMethod) => Promise<void | false>
+  setAuto: (w: WorkspaceView, k: AutoKey, v: boolean) => Promise<void>
   previewed: Opened | null
   prFix: (w: WorkspaceView, what: FixWhat, job?: string) => Promise<boolean>
   prMenu: (w: WorkspaceView) => MenuItem[]

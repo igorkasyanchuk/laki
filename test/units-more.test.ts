@@ -12,7 +12,7 @@ import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
-import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
+import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, shipPrimary, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -1479,4 +1479,18 @@ test('latin: Cyrillic transliterated for ids and branches (Ukrainian, with Russi
   assert.equal(latin('fix-login 42'), 'fix-login 42')
   assert.equal(nonLatin('Fix the café login 🚀'), false)
   assert.ok(nonLatin('Фікс логіна') && nonLatin('修复登录'))
+})
+
+test("shipPrimary: the Ship sheet's primary by its PR: Open PR, Push to PR, Merge on a green one, Merge when green while checks run", () => {
+  const can = { merge: true, land: true }
+  const pr = (o = {}) => ({ state: 'OPEN', checks: 'pass' as const, ...o })
+  assert.deepEqual(shipPrimary(undefined, true, can), { label: 'Open PR', act: 'pr' })
+  assert.equal(shipPrimary(pr({ state: 'MERGED' }), true, can).act, 'pr', 'a merged one: a new PR')
+  assert.deepEqual(shipPrimary(pr(), true, can), { label: 'Push to PR', act: 'push' }, 'something to send first')
+  assert.deepEqual(shipPrimary(pr(), false, can), { label: 'Merge', act: 'merge' })
+  for (const o of [{ draft: true }, { conflict: true }, { ready: false }, { checks: 'fail' }]) assert.equal(shipPrimary(pr(o), false, can).act, 'push', JSON.stringify(o))
+  assert.equal(shipPrimary(pr(), false, { merge: false, land: true }).act, 'push', "the project doesn't allow merging")
+  assert.deepEqual(shipPrimary(pr({ checks: 'pending' }), false, can), { label: 'Merge when green', act: 'land' })
+  assert.equal(shipPrimary(pr({ checks: 'pending' }), false, can, true).act, 'push', 'already on')
+  assert.equal(shipPrimary(pr({ checks: 'pending' }), false, { merge: true, land: false }).act, 'push')
 })

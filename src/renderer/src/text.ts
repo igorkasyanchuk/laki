@@ -1115,3 +1115,16 @@ export function tipParts(text: string) {
 // ⌘F with text selected (Find.tsx' FindBar, Diff.tsx' DiffFind): what it starts with. One line, 1,000 characters at most,
 // trimmed; else nothing (the query stays)
 export const seedOf = (sel?: string) => (s => (s && s.length <= 1000 && !/[\n\r]/.test(s) ? s : ''))(sel?.trim())
+
+// the Ship sheet's primary button (⌘↵ too), from the workspace's PR as the view has it: none (or not open) Open PR; one
+// open with something to commit or push (todo) Push to PR; nothing to send, green, mergeable, not a draft, merging
+// allowed: Merge (App's prAct, as ⌘K's); checks running and Merge when green allowed and off: Merge when green (its
+// switch); else Push to PR (nothing to push: off). Pure: test/units-more.test.ts
+export type ShipPrimary = { label: string; act: 'pr' | 'push' | 'merge' | 'land' }
+export function shipPrimary(pr: Pick<PR, 'state' | 'checks' | 'draft' | 'conflict' | 'ready'> | undefined, todo: boolean, can: { merge: boolean; land: boolean }, landOn = false): ShipPrimary {
+  if (!pr || pr.state !== 'OPEN') return { label: 'Open PR', act: 'pr' }
+  if (todo) return { label: 'Push to PR', act: 'push' }
+  if (!pr.draft && !pr.conflict && pr.checks === 'pass' && pr.ready !== false && can.merge) return { label: 'Merge', act: 'merge' }
+  if (!pr.draft && !pr.conflict && pr.checks === 'pending' && can.land && !landOn) return { label: 'Merge when green', act: 'land' }
+  return { label: 'Push to PR', act: 'push' }
+}

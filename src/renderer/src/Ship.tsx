@@ -6,13 +6,14 @@ import { useEffect, useState } from 'react'
 import type { SecretFound, WorkspaceView } from '../../shared/types'
 import { DiffRows, diffByFile, type FileDiff, lineClass, NO_DIFF } from './Diff'
 import { Modal } from './panels'
+import { shipPrimary } from './text'
 
 type Draft = { title: string; message: string; body: string; files: { path: string; status: string; add: number; del: number }[]; ahead: number; base: string; branch: string; secrets?: SecretFound[]; proof?: 'yes' | 'stale'; checked?: string }
 export type ShipMode = 'commit' | 'push' | 'pr'
 const withProof = (body: string, md: string) => (md && !body.includes(md) ? [body.trimEnd(), md].filter(Boolean).join('\n\n') : body) // the section at the end, once
 export type ShipAsk = { message: string; files?: string[]; title?: string; body?: string; draft: boolean; base?: string; reviewers?: string[]; mode: ShipMode; autoLand: boolean; autoFix: boolean; allowSecrets?: string[]; proof?: boolean }
 
-export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws: WorkspaceView; title: string; busy?: string; land: boolean; call: Call; onClose: () => void; onShip: (a: ShipAsk) => Promise<unknown> }) {
+export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip, onMerge, onLand }: { ws: WorkspaceView; title: string; busy?: string; land: boolean; merge: boolean; call: Call; onClose: () => void; onShip: (a: ShipAsk) => Promise<unknown>; onMerge: () => void; onLand: () => void }) {
   const [d, setD] = useState<Draft | null>(null)
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
@@ -46,6 +47,11 @@ export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws
   const picked = all.filter(f => on.has(f.path))
   const nothing = !picked.length && !d?.ahead
   const shown = found.filter(f => on.has(f.file) && !ok.has(f.hash)) // an unticked file's aren't committed
+  // the primary (and ⌘↵): Open PR, Push to PR, Merge (App's prAct: its confirm, Touch ID, an extension's gate) or Merge
+  // when green (its switch, asked as it's turned on), by the PR as the view has it
+  const first = shipPrimary(ws.pr, !!picked.length || !!d?.ahead, { merge, land }, !!ws.autoLand)
+  const primary = () => (first.act === 'merge' ? (onClose(), onMerge()) : first.act === 'land' ? (onClose(), onLand()) : void go(first.act))
+  const primaryOff = !!going || (first.act === 'pr' || first.act === 'push' ? nothing || !msg.trim() : false)
   const go = async (mode: ShipMode, allow = ok) => {
     if (!msg.trim() || going || nothing) return
     setGoing(mode)
@@ -77,7 +83,7 @@ export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws
   const warn = c === 'failed' || c === 'over' || !!ws.overlaps?.length || !!ws.stat?.behind
   return (
     <Modal title={title} onClose={onClose} wide>
-      <div className="ship" onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), void go('pr'))}>
+      <div className="ship" onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), !primaryOff && primary())}>
         <div className={`ship-banner small ${warn ? 'warn' : 'muted'}`}>{notes.join(' · ')}</div>
         {err && <div className="warn small">{err}</div>}
         {!!shown.length && (
@@ -170,8 +176,8 @@ export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws
           <button type="button" disabled={!!going || nothing} onClick={() => go('push')}>
             {going === 'push' ? 'Pushing…' : 'Push'}
           </button>
-          <button type="button" className="primary" disabled={!!going || nothing || !msg.trim()} onClick={() => go('pr')} title="⌘↵">
-            {going === 'pr' ? 'Shipping…' : 'Open PR'}
+          <button type="button" className="primary" disabled={primaryOff} onClick={primary} title="⌘↵">
+            {going === first.act ? (first.act === 'push' ? 'Pushing…' : 'Shipping…') : first.label}
           </button>
         </div>
       </div>
