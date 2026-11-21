@@ -3208,6 +3208,8 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-more { display: block; margin-top: 4px; font-size: var(--fs-2); }
 .rd-agent { overflow-wrap: anywhere; } .rd-agent .md { padding: 0; max-width: none; } .rd-agent .md > :first-child { margin-top: 0; } .rd-agent .md > :last-child { margin-bottom: 0; }
 .rd-tool { font-size: var(--fs-2); color: var(--muted); }
+.rd-tool-pill { display: inline-block; max-width: calc(100% - 40px); vertical-align: middle; padding: 1px var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-pill); background: color-mix(in srgb, var(--panel) 70%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a run of tool calls in a few words; the live one shimmers */
+.rd-tool-fail { color: var(--error); }
 .rd-tool .rd-skill { margin-left: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--fg); } /* B7: a turn that loaded a skill */ .rd-tool summary { cursor: var(--cur-act); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rd-tool pre { margin: 4px 0 0; padding: var(--sp-3) var(--sp-4); max-height: 240px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m); font: var(--fs-1)/1.45 var(--mono); white-space: pre-wrap; }
 .rd-working { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-3); }
@@ -3221,9 +3223,10 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-time { margin-top: -6px; font-size: var(--fs-1); font-variant-numeric: tabular-nums; user-select: text; }
 .rd-time.you { align-self: flex-end; }
 .md-code { position: relative; }
-.md-code-acts { position: absolute; top: 4px; right: 6px; display: flex; gap: var(--sp-4); opacity: 0; transition: opacity .12s; }
-.md-code:hover .md-code-acts, .md-code-acts:focus-within { opacity: 1; }
-.md-code-acts .link { background: var(--panel); padding: 1px var(--sp-3); border-radius: var(--radius); }
+.md-code-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line); border-bottom: none; border-radius: var(--r-m) var(--r-m) 0 0; background: color-mix(in srgb, var(--fg) 4%, var(--panel)); font-size: var(--fs-1); }
+.md-code-head + pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.md-code-lang { padding: 0 var(--sp-2); border-radius: var(--r-pill); background: var(--sel); color: var(--fg); font-family: var(--mono); }
+.md-code-head .md-copy { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .rd-failed { align-self: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); max-width: 100%; color: var(--error); }
 .rd-failed-why { min-width: 0; overflow-wrap: anywhere; }
 .rd-retry { align-self: flex-start; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill); color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
@@ -3672,8 +3675,14 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid::before { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring), scale var(--t-fast) var(--ease-out); }
   html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid:active::before, html:not([data-motion='none']) .seg > button.on:active { scale: 0.97; }
   .menu-item, .palette-item { transition: scale var(--t-fast) var(--ease-out); } /* the highlight moves at once, as in a native menu: a fade left the last one lit beside the new */
-  :where(.side-panel) { animation: m-side var(--t-mid) var(--ease-out); }
-  :where(.sidebar) { animation: m-row var(--t-mid) var(--ease-out); }
+  :where(.side-panel) { animation: m-side var(--t-spring-soft) var(--spring-soft); }
+  :where(.sidebar) { animation: m-row var(--t-spring-soft) var(--spring-soft); }
+  /* macOS 26's sheet: the window behind an open dialog sinks a little (panels.tsx' Modal sets html[data-sheet]); the
+     sidebar toward its right edge, the main area toward its left, so no gap opens between them */
+  html:not([data-motion='none']) .app > :is(aside, main) { transition: scale var(--t-spring-soft) var(--spring-soft), filter var(--t-mid) var(--ease-out); }
+  html:not([data-motion='none']) .app > aside { transform-origin: right center; }
+  html:not([data-motion='none']) .app > main { transform-origin: left center; }
+  html[data-sheet]:not([data-motion='none']) .app > :is(aside, main) { scale: 0.992; filter: brightness(0.92); }
   :where(.overlay) { animation: v-fade-in var(--t-mid) var(--ease-out); }
   /* V14: floats come in by @starting-style (no keyframes, no JS): a fade on a plain ease, a scale on the soft spring;
      a display flip (allow-discrete) goes out the same way. What React removes leaves through motion.ts' exits (a copy:
@@ -4274,3 +4283,11 @@ html.theme-fade::view-transition-group(*), html.theme-fade::view-transition-old(
    gives the window macOS's popover material (panelWin), the page a tint over it and a lit top edge */
 html.panel-glass, html.panel-glass body { background: transparent; }
 html.panel-glass .quick-bar, html.panel-glass.new-window .settings-page { background: color-mix(in srgb, var(--panel) 62%, transparent); box-shadow: inset 0 1px 0 var(--f-hi, color-mix(in srgb, var(--fg) 9%, transparent)); }
+
+/* the Reader's prose at a comfortable measure (code, tables and pictures keep the column) */
+.rd-agent .md :is(p, li, blockquote, h1, h2, h3, h4) { max-width: 68ch; }
+/* a new turn in the Reader comes in, 180 ms (not with Motion › None or Reduce motion) */
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='none']) :is(.rd-agent, .rd-you) { transition: opacity 180ms var(--ease-out), translate 180ms var(--ease-out); }
+  @starting-style { html:not([data-motion='none']) :is(.rd-agent, .rd-you) { opacity: 0; translate: 0 6px; } }
+}

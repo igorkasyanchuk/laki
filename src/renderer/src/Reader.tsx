@@ -18,7 +18,7 @@ import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { useSecretHint } from './secretHint'
-import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, withMentions } from './text'
+import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, toolSummary, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
 import { optLabel, ruleFrom } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
@@ -253,8 +253,10 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     ) : x.who === 'tool' ? (
       <details key={i} data-i={i} className={x.fail ? 'rd-tool fail' : 'rd-tool'}>
         <summary>
-          {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}
-          {x.fail ? ` · ${x.fail} failed` : ''} · {x.text.split('\n').at(-1)}
+          <span className={`rd-tool-pill ${running && i === said!.length - 1 ? 'ai-shimmer' : ''}`} data-tip={`${(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}: click for each`}>
+            {toolSummary(x.text) || x.text.split('\n').at(-1)}
+          </span>
+          {x.fail ? <span className="rd-tool-fail"> · {x.fail} failed</span> : ''}
           {[...x.text.matchAll(/^Skill: (.+)$/gm)].map(m => (
             <span key={m[1]} className="rd-skill" data-tip={`It loaded the ${m[1]} skill`}>
               skill · {m[1]}

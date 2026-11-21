@@ -12,7 +12,7 @@ import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
 import { debtOf } from '../scripts/debt.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
-import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, shipPrimary, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
+import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, shipPrimary, toolSummary, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -1493,4 +1493,13 @@ test("shipPrimary: the Ship sheet's primary by its PR: Open PR, Push to PR, Merg
   assert.deepEqual(shipPrimary(pr({ checks: 'pending' }), false, can), { label: 'Merge when green', act: 'land' })
   assert.equal(shipPrimary(pr({ checks: 'pending' }), false, can, true).act, 'push', 'already on')
   assert.equal(shipPrimary(pr({ checks: 'pending' }), false, { merge: true, land: false }).act, 'push')
+})
+
+test("toolSummary: a run of tool calls in a few words for the Reader's pill", () => {
+  assert.equal(toolSummary('Read: /a/b/cart.ts\nRead: /a/c.ts\nEdit: /a/src/auth.ts'), 'Read 2 files · Edit auth.ts')
+  assert.equal(toolSummary('Bash: npm test\nBash: git status'), 'Bash 2 times')
+  assert.equal(toolSummary('Bash: npm run build:all --workspaces --if-present'), 'Bash npm run build:all --workspa…')
+  assert.equal(toolSummary('mcp__github__create_issue: x'), 'create_issue x')
+  assert.equal(toolSummary('A\nB\nC\nD\nE'), 'A · B · C · +2 more')
+  assert.equal(toolSummary('TodoWrite'), 'TodoWrite')
 })

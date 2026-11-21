@@ -1128,3 +1128,23 @@ export function shipPrimary(pr: Pick<PR, 'state' | 'checks' | 'draft' | 'conflic
   if (!pr.draft && !pr.conflict && pr.checks === 'pending' && can.land && !landOn) return { label: 'Merge when green', act: 'land' }
   return { label: 'Push to PR', act: 'push' }
 }
+
+// a run of tool calls (the Reader's folded row; share.ts' toolLine: "Read: /a/b.ts") in a few words: each tool once, in
+// order, with how many or, alone, its file's name or what it ran ("Read 2 files · Edit auth.ts · Bash npm test"), three
+// at most then +n more; an MCP tool by its own name
+const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'apply_patch'])
+export function toolSummary(text: string) {
+  const by = new Map<string, string[]>()
+  for (const l of text.split('\n')) {
+    const m = /^([\w.-]+)(?::\s*(.*))?$/.exec(l.trim())
+    if (!m) continue
+    const name = m[1].replace(/^mcp__[^_]+(?:_[^_]+)*?__/, '')
+    by.set(name, [...(by.get(name) ?? []), m[2] ?? ''])
+  }
+  const one = (name: string, what: string) => {
+    const w = FILE_TOOLS.has(name) ? what.split(/[\\/]/).pop()! : what
+    return w ? `${name} ${w.length > 28 ? `${w.slice(0, 27)}…` : w}` : name
+  }
+  const parts = [...by].map(([name, ws]) => (ws.length === 1 ? one(name, ws[0]) : `${name} ${ws.length} ${FILE_TOOLS.has(name) ? 'files' : 'times'}`))
+  return parts.length > 3 ? `${parts.slice(0, 3).join(' · ')} · +${parts.length - 3} more` : parts.join(' · ')
+}

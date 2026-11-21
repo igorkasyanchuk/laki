@@ -1522,3 +1522,14 @@ on a control, a tab or a field) sends `titlebar-dblclick` (main, `from(e)`: the 
 macOS's *Double-click a window's title bar to* says (`AppleActionOnDoubleClick`, guards.ts `dblClickAction`: Minimize,
 None, else zoom); off a Mac, zoom. ponytail: the talk pill keeps its solid pill: vibrancy fills the window's rectangle,
 and its 39px-round pill would show it as a frame.
+
+### Sheets, the Reader's polish
+
+- **A sheet's push-back**: `panels.tsx` `Modal` counts the open ones in `sheets` and sets `html[data-sheet]` (not for a
+  Modal inside `.app > aside` or `main`: it would sink with them); styles.css scales `.app > aside` (toward its right
+  edge) and `.app > main` (toward its left) to 0.992 with `brightness(0.92)` on `--spring-soft`, inside the
+  no-preference media and off with Motion none. The side panel's and the sidebar's entrances take `--spring-soft` too.
+- **The Reader**: a folded run of tool calls is `.rd-tool-pill` (`text.ts` `toolSummary`: each tool once, a count or
+  its file's name, three at most), `ai-shimmer` on the last row while the tab runs; a chat's code block
+  (`MarkdownView.tsx` `Code` with `InChat`) has `.md-code-head` (its language, lines, ▷ Run, Copy with a check); a new
+  `.rd-agent` or `.rd-you` comes in by `@starting-style` (180 ms); prose keeps 68ch (`.rd-agent .md` p, li…).

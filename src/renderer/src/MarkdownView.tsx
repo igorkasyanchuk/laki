@@ -5,7 +5,7 @@ import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, 
 import { openExternal } from './api'
 import { highlight } from './highlight'
 import { canRun, proposalOf, runText } from './text'
-import { type MenuItem, useNear } from './ui'
+import { Icon, type MenuItem, useNear } from './ui'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
@@ -48,19 +48,26 @@ function Code({ text, lang }: { text: string; lang?: string }) {
     </pre>
   )
   if (!chat) return pre
+  const n = text.replace(/\n$/, '').split('\n').length
+  // a chat's block: a head with its language and lines, Copy (a check a moment after) and Run
   return (
     <div className="md-code">
-      {pre}
-      <div className="md-code-acts">
-        <button type="button" className="link small" onClick={() => void navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)), () => {})}>
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+      <div className="md-code-head">
+        <span className="md-code-lang">{lang || 'text'}</span>
+        <span className="muted">
+          {n} line{n === 1 ? '' : 's'}
+        </span>
+        <span className="grow" />
         {run && canRun(lang, text) && (
           <button type="button" className="link small" data-tip="A new shell tab with it typed: press ⏎ there to run it. ⌥-click: into the last shell tab" onClick={e => run(runText(text), e.altKey)}>
             ▷ Run
           </button>
         )}
+        <button type="button" className="link small md-copy" aria-label={copied ? 'Copied' : 'Copy the code'} onClick={() => void navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)), () => {})}>
+          <Icon name={copied ? 'check' : 'copy'} size={12} /> {copied ? 'Copied' : 'Copy'}
+        </button>
       </div>
+      {pre}
     </div>
   )
 }

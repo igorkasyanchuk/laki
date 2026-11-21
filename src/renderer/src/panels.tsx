@@ -19,9 +19,19 @@ import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, File
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
+// macOS 26's sheet: the window behind an open one sinks a little (styles.css' html[data-sheet]), counted so two open
+// at once leave it set; never for one inside the sidebar or the main area (a page's: they'd sink with it)
+let sheets = 0
 export function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
   const typed = useRef(false)
   const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (box.current?.closest('.app > :is(aside, main)')) return
+    const root = document.documentElement
+    sheets++
+    root.dataset.sheet = ''
+    return () => void (--sheets || delete root.dataset.sheet)
+  }, [])
   useEffect(() => {
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
     window.addEventListener('keydown', f)

@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Reader: a run of tool calls is one pill that says what it did (*Read 2 files · Edit auth.ts*) and shimmers while it runs; a code block has a head with its language, lines and Copy; new turns fade in, and long answers keep a readable line length.
+- An open dialog sinks the window behind it a little, as macOS 26's sheets do, and the side panel and sidebar come in on a soft spring.
 - A new install on a Mac takes macOS's accent color (Settings › Appearance › Accent color › System); where it wouldn't show against the theme (yellow on a light one), the theme's own stays.
 - Ship's main button follows the PR: *Push to PR* when one is open, *Merge* once it's green with nothing left to send, *Merge when green* while checks run; ⌘↵ does the same.
 - A repo's workflow that changed since you allowed it shows what changed before you allow it again: a line diff with changed commands and agent prompts marked and counted.
