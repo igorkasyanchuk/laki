@@ -4,10 +4,10 @@
 // own CLI, typed in a terminal for the user to run (the page's Add a server… and Remove…). Never ~/.claude or ~/.codex
 // written (AGENTS.md)
 import { mcpFor } from '../shared/mcp.ts'
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { closeSync, constants, existsSync, fstatSync, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { type AgentContext, type AgentRule, type AgentServer, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
+import { type AgentContext, type AgentRule, type AgentServer, type AgentSkill, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
 import { findProject, memoryNote, memoryOf, openPath, state, heldFrom, presets } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
 import { redact } from './share.ts'
@@ -204,6 +204,49 @@ function tomlValue(v: string): unknown {
 }
 
 // held: hideSecrets' names kept from this agent's profile (p.profile, else its agent's first): names only
+// the skills every agent loads (read only): skills/<name>/SKILL.md in each agent's folder (claude's and codex's the
+// account's they use) and a project's .claude/skills and .codex/skills, 100 at most; a plain file only (O_NOFOLLOW, a
+// folder that's a link skipped), its first 256 KB read for its frontmatter
+const SKILL_HOMES: Record<string, string> = { gemini: '.gemini/config', grok: '.grok', opencode: '.config/opencode' } // skill.ts' AGENTS' homes
+const SKILLS_MAX = 100
+export function skillsAudit(project?: string): AgentSkill[] {
+  const out: AgentSkill[] = []
+  const scan = (agent: string, dir: string, scope: AgentSkill['scope']) => {
+    let names: import('node:fs').Dirent[]
+    try {
+      names = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const d of names.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (out.length >= SKILLS_MAX) return
+      if (!d.isDirectory()) continue
+      const path = join(dir, d.name, 'SKILL.md')
+      let fd: number
+      try {
+        fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+      } catch {
+        continue
+      }
+      try {
+        const st = fstatSync(fd)
+        if (!st.isFile()) continue
+        const buf = Buffer.alloc(Math.min(st.size, 256 << 10))
+        const text = buf.subarray(0, readSync(fd, buf, 0, buf.length, 0)).toString('utf8')
+        const fm = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0] ?? ''
+        const name = /^name:\s*(.+)$/m.exec(fm)?.[1]?.trim().replace(/^["']|["']$/g, '') || d.name
+        out.push({ name, agent, path, at: tilde(path), scope, bytes: st.size, approxTokens: Math.ceil(st.size / 4), frontmatterBytes: Buffer.byteLength(fm) })
+      } finally {
+        closeSync(fd)
+      }
+    }
+  }
+  for (const agent of ['claude', 'codex'] as const) scan(agent, join(configDir(agent), 'skills'), 'home')
+  for (const [agent, rel] of Object.entries(SKILL_HOMES)) scan(agent, join(homedir(), rel, 'skills'), 'home')
+  if (project) for (const agent of ['claude', 'codex']) scan(agent, join(project, `.${agent}`, 'skills'), 'project')
+  return out
+}
+
 export function agentContext(p: { agent?: string; project?: string; profile?: string }): AgentContext {
   const agent = p.agent
   if (agent !== 'claude' && agent !== 'codex') throw new Error('agent: claude or codex')
@@ -220,13 +263,14 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
     memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
     servers: [...mcpFor(proj?.config?.mcp, p.profile ?? agent).map(s => server(s.name, s, 'laki', "Laki: the project's settings")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))], // Laki's: passed by flags (shared/mcp.ts)
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
+    skills: skillsAudit(path),
   }
 }
 
 // Open file: one of the rule files agentContext lists for it (no other path), in the user's editor
 export async function agentContextOpen(p: { agent?: string; project?: string; path?: string }) {
   const c = agentContext(p)
-  const r = c.rules.find(x => x.path === p.path)
-  if (!r) throw new Error('not one of its rule files')
+  const r = c.rules.find(x => x.path === p.path) ?? c.skills?.find(x => x.path === p.path)
+  if (!r) throw new Error('not one of its rule files or skills')
   await openPath(r.path, 'editor', c.project)
 }

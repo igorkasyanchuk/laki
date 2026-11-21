@@ -132,6 +132,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki restore <file.tgz> [--dry-run] [--force]
                                               put a backup back: what's here goes aside first, then Laki restarts;
                                               --dry-run: what would change; --force: while agents work (their turns end)
+  laki skills audit [--project <name>] [--json]
+                                              the skills every agent loads (~/.claude/skills, ~/.codex/skills, Antigravity's,
+                                              Grok's, OpenCode's, a project's): size, ~tokens, large ones, ones only one agent has
   laki uninstall [--yes] [--data] [--worktrees] [--json]
                                               what Laki put outside its app (the laki command, agent skills, the daemon);
                                               --yes removes them and stops the daemon; --data: your data too, --worktrees: the worktrees Laki made
@@ -440,6 +443,14 @@ per kind (here → in the backup). The user's only: refused in an agent's tab.
 
   laki restore ~/laki-backup.tgz --dry-run
   laki restore ~/laki-backup.tgz`,
+  skills: `Reads every agent's skills, nothing changed: each skills/<name>/SKILL.md in Claude Code's and Codex's folders
+(the account each uses), Antigravity's, Grok's and OpenCode's, and with --project that project's .claude/skills and
+.codex/skills; 100 at most, plain files only. A line each: the agent, the skill's name, its size and about how many
+tokens it costs when it loads, its path, and what to look at: large (over 8 KB), or only one agent has it.
+
+Examples:
+  laki skills audit
+  laki skills audit --project shop --json`,
   uninstall: `Lists what Laki put outside its app, a line each: the laki command on PATH, the agent skills in each
 agent's folder, the background daemon and the terminals it kept, the worktrees Laki made (only with --worktrees: their
 uncommitted changes go too), your data (only with --data). A launcher or skill that drives another Laki's data folder

@@ -69,6 +69,12 @@ Settings › Agents & profiles › Claude Code or Codex › *What it sees*, and 
 dialog `{ sees, in }`); *Add a server…*, *Remove…* and *Check health…* open a terminal in the project with the agent's
 `mcp add`, `mcp remove <name> -s <scope>` or `mcp list` typed, not run (App's `termType`, Welcome's way). Never a write
 to `~/.claude` or `~/.codex`. Tested in `test/agents.test.ts` (fake files under the test's HOME).
+`skills` (`skillsAudit`): every agent's skills, read only: each `skills/<name>/SKILL.md` under claude's and codex's
+folders (`configDir`: the account each uses), Antigravity's (`~/.gemini/config`), Grok's, OpenCode's, and with a project
+its `.claude/skills` and `.codex/skills`; a link or anything but a plain file skipped (`O_NOFOLLOW`, fstat), 100 at
+most, 256 KB read each: its bytes, ~tokens (bytes / 4), its frontmatter's bytes. `skillNotes` (types.ts) marks one over
+`SKILL_BIG` (8 KB: it loads whole each time it triggers) and one only one agent has. Settings' *What it sees* lists them
+(*Skills*, Open); `laki skills audit [--project p] [--json]` prints them. Tested in `test/cli.test.ts`.
 
 ### Layouts
 

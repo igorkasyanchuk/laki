@@ -1246,7 +1246,16 @@ export type HookSeen = { at?: number; tabs: number; deaf: number; native?: Nativ
 // name only, tokens masked; off: turned off in its config)
 export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
 export type AgentServer = { name: string; scope: 'user' | 'project' | 'local' | 'laki'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean }
-export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[] }
+export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[]; skills?: AgentSkill[] /* every agent's (sees.ts skillsAudit): what each loads, by size, for drift between them */ }
+// an agent's skill (its skills/<name>/SKILL.md in its folder, or a project's .claude/skills, .codex/skills): approxTokens
+// its size over 4; frontmatterBytes what every session reads of it (the rest loads when it's used)
+export type AgentSkill = { name: string; agent: string; path: string; at: string; scope: 'home' | 'project'; bytes: number; approxTokens: number; frontmatterBytes: number }
+// what to look at in a skill: over 8 KB, or only one agent has it while others have skills (drift between them)
+export const SKILL_BIG = 8 << 10
+export const skillNotes = (all: AgentSkill[]) => {
+  const agents = new Set(all.map(s => s.agent))
+  return (s: AgentSkill) => [s.bytes > SKILL_BIG && 'large', agents.size > 1 && all.every(x => x.name !== s.name || x.agent === s.agent) && `only ${AGENT_NAMES[s.agent as Agent] ?? s.agent}`].filter((x): x is string => !!x)
+}
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean; signedIn?: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string }; secrets?: { on: boolean; held: number }; backup?: { tm: boolean; spotlight: boolean; skipped?: string[] }; loose?: { project: string; loose: number }[]; starterEnv?: string[] } // starterEnv: the names this daemon's start left out of its environment (daemon/starterEnv.ts); loose (B8): projects whose git has over 20,000 loose objects; backup: worktrees out of Time Machine and Spotlight (backup.ts), skipped: why a folder wasn't marked; idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 // A9: the doctor as lines (laki doctor's, the diagnostics' too): ✓ fine, ● optional or worth a look, ✗ broken, a fix for each not fine
 export function doctorRows(d: Doctor, mac = typeof process !== 'undefined' && process.platform === 'darwin'): [string, string, string?][] {

@@ -1,6 +1,6 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, type AgentCli, type AgentContext, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
+import { type Account, type AccountAgent, type AccountView, type Agent, type AgentCli, type AgentContext, AGENT_NAMES, skillNotes, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { heardText, micTest, TEST_MS, useLevel } from './voice'
 import { SILENCES } from '../../shared/talk'
@@ -829,6 +829,37 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
                 ))}
               </ul>
             </>
+          )}
+          {!!c.skills?.length && (
+            // every agent's skills, read only: what each costs as it loads, large ones and ones only one agent has
+            <details className="sees-skills">
+              <summary>
+                <h4>Skills · {c.skills.length}</h4>
+                {(n => n > 0 && <span className="warn-soft small"> · {n} to look at</span>)(c.skills.filter(s => skillNotes(c.skills!)(s).length).length)}
+              </summary>
+              <ul className="sees-list">
+                {c.skills.map(s => (
+                  <li key={s.path}>
+                    <span className="mono" title={s.path}>
+                      {s.name}
+                    </span>
+                    <span className="muted small">
+                      {' '}
+                      · {AGENT_NAMES[s.agent as Agent] ?? s.agent} · {s.scope === 'project' ? 'the project' : 'its folder'} · {kb(s.bytes)} · ~{s.approxTokens} tokens
+                    </span>
+                    {skillNotes(c.skills!)(s).map(n => (
+                      <span key={n} className="warn-soft small">
+                        {' '}
+                        · {n}
+                      </span>
+                    ))}
+                    <button className="ghost sm" onClick={() => void api.call('agentContextOpen', { agent, project: at, path: s.path }).catch((e: Error) => setErr(e.message))}>
+                      Open
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           <h4>MCP servers</h4>
           {c.servers.length ? (

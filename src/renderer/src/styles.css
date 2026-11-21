@@ -4296,3 +4296,4 @@ html.panel-glass .quick-bar, html.panel-glass.new-window .settings-page { backgr
   html:not([data-motion='none']) :is(.rd-agent, .rd-you) { transition: opacity 180ms var(--ease-out), translate 180ms var(--ease-out); }
   @starting-style { html:not([data-motion='none']) :is(.rd-agent, .rd-you) { opacity: 0; translate: 0 6px; } }
 }
+.sees-skills > summary { cursor: var(--cur-act); } .sees-skills > summary > h4 { display: inline; }

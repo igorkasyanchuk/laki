@@ -2985,6 +2985,7 @@ laki --version                                          # this CLI's version, an
 laki doctor                                             # git, gh, the agents, hooks: ✓ ● ✗ and a fix each; exit 1 on a ✗
 laki doctor --bundle | pbcopy                           # diagnostics for a bug report (redacted): Help › Copy diagnostics too
 laki doctor --disk                                      # what each workspace takes on disk, and the free space (Settings › Resources › Disk)
+laki skills audit [--project shop]                      # every agent's skills: size, ~tokens, the large ones and ones only one agent has
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
 laki alert "Ship it?" --choice Ship --choice Wait       # an important card on your screen; prints your pick

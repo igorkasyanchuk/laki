@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc, rpcAny } from '../shared/conn.ts'
-import { AGENTS, API, type AgentUsage, type AiCredits, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, API, type AgentContext, skillNotes, type AgentUsage, type AiCredits, type Doctor, doctorRows, doctorText, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type DiskUsage, type EventSent, type GateHeld, type Preset, type SecretFound, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { FLAGS, helpFor, nearest, nearFlag, subsOf, USAGE } from '../shared/usage.ts'
 import { appOf } from '../shared/helper.ts'
 import { hhmm } from '../shared/tray.ts'
@@ -33,7 +33,7 @@ const opens: string[] = [] // laki show's --open <folder|file|url>, again and ag
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
-const VALUED = new Set(['after', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const VALUED = new Set(['after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
 const BOOL = new Set(['any', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
@@ -317,6 +317,15 @@ async function main() {
     }
     case 'stop':
       return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
+    case 'skills': {
+      // the skills every agent loads, by size, with what to look at: large ones, ones only one agent has (read only)
+      if (rest[0] !== 'audit') throw new Error('usage: laki skills audit [--project <name>]')
+      const c = await rpc<AgentContext>('agentContext', { agent: 'claude', ...(typeof flags.project === 'string' && { project: flags.project }), from: caller() })
+      const list = c.skills ?? []
+      const notes = skillNotes(list)
+      const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`
+      return out(list.map(s => ({ ...s, notes: notes(s) })), list.length ? list.map(s => `${s.agent.padEnd(9)} ${s.name.padEnd(24)} ${kb(s.bytes).padStart(9)}  ~${String(s.approxTokens).padStart(6)} tokens  ${s.at}${(n => (n.length ? `  (${n.join(', ')})` : ''))(notes(s))}`).join('\n') : 'No skills in any agent.')
+    }
     case 'backup': {
       if (!rest[0]) throw new Error('usage: laki backup <file.tgz>')
       const r = await rpc<{ file: string; bytes: number; manifest: { counts: Record<string, number> } }>('dataBackup', { file: resolve(rest[0]), from: caller() })
