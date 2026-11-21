@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
+import { createServer as createUnixServer } from 'node:net'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AGENT_KEY_ENV, envAllowOf, envSplit, secretLooking } from '../src/shared/env.ts'
@@ -1188,7 +1189,34 @@ test("wrapProfile's net list: (deny network-outbound) but this Mac's loopback, n
   const base = { agent: 'opencode' as const, worktree: '/Users/me/wt', home: '/Users/me', tmp: [] as string[] }
   assert.match(wrapProfile({ ...base, net: 'list' }).text, /\(deny network-outbound\)\n\(allow network-outbound \(remote ip "localhost:\*"\)\)/)
   for (const net of ['all', undefined] as const) assert.doesNotMatch(wrapProfile({ ...base, net }).text, /network/, String(net))
+  // the data folder's unix sockets (the pty host's) and the pty host's own, whatever its net, after the allow so it wins
+  for (const net of ['all', 'list', undefined] as const) {
+    const { text, params } = wrapProfile({ ...base, net, data: '/Users/me/.laki', ptySock: '/private/var/folders/x/T/laki-pty-1.sock' })
+    const k = (path: string) => params.find(x => x.endsWith(`=${path}`))!.split('=')[0]
+    const deny = text.indexOf(`(deny network-outbound (remote unix-socket (subpath (param "${k('/Users/me/.laki')}"))))`)
+    assert.ok(deny > text.lastIndexOf('(allow'), String(net))
+    assert.ok(text.includes(`(deny network-outbound (remote unix-socket (path-literal (param "${k('/private/var/folders/x/T/laki-pty-1.sock')}"))))`), String(net))
+  }
   if (!existsSync('/usr/bin/sandbox-exec')) return // the rest: macOS's sandbox-exec
+  {
+    // under the real sandbox: a unix socket in the data folder refused, one outside it reached
+    const root = realpathSync(mkdtempSync('/tmp/lkw-'))
+    const sock = (p: string) => new Promise<ReturnType<typeof createUnixServer>>(r => (s => s.listen(p, () => r(s)))(createUnixServer(c => c.end('hi'))))
+    mkdirSync(join(root, 'data'))
+    const inside = await sock(join(root, 'data', 'pty.sock'))
+    const outside = await sock(join(root, 'o.sock'))
+    try {
+      const { text, params } = wrapProfile({ ...base, worktree: root, home: root, net: 'all', data: join(root, 'data') })
+      const { execFile } = await import('node:child_process')
+      const nc = (p: string) => new Promise<string>(ok => execFile('/usr/bin/sandbox-exec', ['-p', text, ...params, '/bin/sh', '-c', `/usr/bin/nc -U '${p}' </dev/null || echo NO`], { encoding: 'utf8' }, (_e, out) => ok(String(out).trim())))
+      assert.equal(await nc(join(root, 'data', 'pty.sock')), 'NO')
+      assert.equal(await nc(join(root, 'o.sock')), 'hi')
+    } finally {
+      inside.close()
+      outside.close()
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
   const { text, params } = wrapProfile({ ...base, worktree: tmpdir(), home: tmpdir(), net: 'list' })
   const server = createServer((_q, r) => r.end('here'))
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))

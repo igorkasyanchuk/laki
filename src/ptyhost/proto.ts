@@ -1,13 +1,14 @@
 // R6: what the pty host and the daemon say to each other over <data>/pty.sock: frames of a 4-byte length (big endian)
 // and that many bytes of JSON. The daemon's ops: hello, list, spawn, attach, write, resize, kill, forget, quit; the
 // host's events: hello, list, attached (replies, by `re`), spawned, data (`at`: its offset in the pty's output), exit.
-// PTY_PROTO changes only when an older host can't serve a newer daemon: ops are added, never changed
+// PTY_PROTO changes only when an older host can't serve a newer daemon: ops are added, never changed. 2: the first frame
+// is hello with the host's secret (ptySecret), else the connection is closed before any op runs
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { dataDir } from '../shared/conn.ts'
 
-export const PTY_PROTO = 1
+export const PTY_PROTO = 2
 const MAX = 64 << 20
 
 // a unix socket's path holds about 100 bytes: a data folder deeper than that gets one in the temp folder, by its hash
@@ -15,6 +16,10 @@ export function ptySock() {
   const p = join(dataDir(), 'pty.sock')
   return Buffer.byteLength(p) < 100 ? p : join(tmpdir(), `laki-pty-${createHash('sha256').update(p).digest('hex').slice(0, 16)}.sock`)
 }
+
+// the host's secret: 32 random bytes as hex, 0600, made as it starts listening and removed as it quits. Always in the
+// data folder (a wrapped agent can't read it: wrap.ts), even when the socket is in the temp folder
+export const ptySecret = () => join(dataDir(), 'pty.secret')
 
 export function frame(m: unknown) {
   const body = Buffer.from(JSON.stringify(m))

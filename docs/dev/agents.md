@@ -635,8 +635,11 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
 - **Protocol** (`src/ptyhost/proto.ts`): a unix socket `<data>/pty.sock` (0600; in the temp folder by the data folder's
   hash when that path is too long for a socket), frames of a 4-byte length and JSON. Ops: `hello`, `list`, `spawn`,
   `attach { id, from }`, `write`, `resize`, `kill { id, signal }`, `forget`, `quit`; events: `spawned`, `data` (`at`: its
-  offset in that pty's output), `exit`, and the replies by `re`. Anything else is nothing. One daemon at a time: while one
-  is connected every other connection is closed at once. A daemon turned away (its `hello` answered with no version) tries again for 3 s (`up`'s tries): the one before it, on its way out (`laki stop --keep`, an update, a crash), lets go a moment after its `daemon.json` goes, and the data folder's lock never has two live.
+  offset in that pty's output), `exit`, and the replies by `re`. Anything else is nothing. A connection's first frame
+  must be `hello { token }`, the host's secret (`ptySecret`: `<data>/pty.secret`, 32 random bytes as hex, 0600, written
+  atomically as it starts listening, removed as it quits; always in the data folder), compared with `timingSafeEqual`;
+  anything else, a wrong token or 64 KB or 5 s without it, closes it before any op runs, and one not in yet holds no
+  place. One daemon at a time: while one is connected every other connection is closed at once. A daemon turned away (its `hello` answered with no version) tries again for 3 s (`up`'s tries): the one before it, on its way out (`laki stop --keep`, an update, a crash), lets go a moment after its `daemon.json` goes, and the data folder's lock never has two live.
 - **The daemon's side.** `Session` takes a `Pty` (node-pty's, or `HostPty`): `spawnTab` gives it a `HostPty` when the
   setting is on and the host is up; a `HostPty`'s pid is -1 until the host says, and the host signals the job (`group`).
   A host that goes ends its terminals with a line saying so, and is started again for the next ones.
@@ -662,10 +665,11 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   5 s, turned away) or speaks another protocol: `ptyWhy()` says why, the view's `ptyHostOff` (only with the setting
   on), one line under the switch in Settings, and `## Pty host` in the diagnostics (on/off, running, pid, protocol,
   terminals kept; `ptyState`). New tabs then run in the daemon as before.
-- **Security.** The socket and pty.json are the user's alone, and a sandboxed claude can't read either (its settings'
-  deny rules, with daemon.json). ponytail: with no daemon connected, the first process of the user to connect is taken
-  for it, as any of them can read daemon.json.
-- **Tests.** `test/ptyhost.test.ts`: the protocol; a host that ends when idle; one of another version started again
+- **Security.** The socket, pty.secret and pty.json are the user's alone, and a sandboxed claude can't read them (its
+  settings' deny rules, with daemon.json). A wrapped agent can't read the data folder nor connect to a unix socket in
+  it or to the pty host's in the temp folder, whatever its net (wrap.ts' last rules). PTY_PROTO 2 added the secret: a
+  daemon meets a host of 1 as any older one (above); a daemon of 1 is turned away by a host of 2.
+- **Tests.** `test/ptyhost.test.ts`: the protocol (no hello, a wrong secret: closed, nothing answered); a host that ends when idle; one of another version started again
   only when idle; a daemon killed mid-command and started again (the shell's output whole, an agent's hooks still
   heard, the tab's token still good), `laki stop --keep`, a plain stop.
 - **Not built.** A turn's state across the restart (an adopted agent reads idle until its next hook); resizes in the

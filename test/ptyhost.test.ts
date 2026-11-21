@@ -23,14 +23,16 @@ const running = (pid: number) => {
 function host(home: string, env: Record<string, string> = {}) {
   return spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', hostTs], { env: { ...process.env, LAKI_HOME: home, LAKI_TEST_PARENT: String(process.pid), ...env }, stdio: 'ignore' })
 }
-async function client(home: string) {
+// token: the hello it starts with (the host's secret unless given; false: none)
+async function client(home: string, token?: string | false) {
   const path = join(home, 'pty.sock')
-  await until(() => existsSync(path), 'the socket')
+  await until(() => existsSync(path) && existsSync(join(home, 'pty.secret')), 'the socket and its secret')
   const s = (await until(() => new Promise<Socket | false>(r => (c => (c.once('connect', () => r(c)), c.once('error', () => r(false))))(connect(path))), 'a connection')) as Socket
   const got: any[] = []
   s.on('data', reader(m => got.push(m)))
   let seq = 0
   const post = (m: object) => void s.write(frame(m))
+  if (token !== false) post({ op: 'hello', token: token ?? readFileSync(join(home, 'pty.secret'), 'utf8') })
   const ask = async (m: object) => (re => (post({ ...m, re }), until(() => got.find(x => x.re === re), `a reply to ${JSON.stringify(m)}`)))(++seq)
   const text = (id: string) => got.filter(x => x.ev === 'data' && x.id === id).map(x => x.d).join('')
   return { s, got, post, ask, text }
@@ -44,8 +46,21 @@ test('the pty host: a socket of the user alone; spawn, write, resize, attach fro
   const home = mkdtempSync(join(tmpdir(), 'laki-pty-'))
   const h = host(home)
   t.after(() => (h.kill('SIGKILL'), rmSync(home, { recursive: true, force: true })))
+  // no hello, or a wrong secret: closed before any op runs (it can't list, spawn or write), and it holds no place
+  for (const [token, first] of [[false, { op: 'list', re: 1 }], ['0'.repeat(64), { op: 'list', re: 1 }], [false, { op: 'spawn', id: 'x', file: '/usr/bin/touch', args: [join(home, 'pwned')], cwd: home, env: {} }]] as const) {
+    const bad = await client(home, token)
+    bad.post(first)
+    bad.post({ op: 'write', id: 'x', data: 'echo hi\r' })
+    await new Promise(r => bad.s.once('close', r))
+    assert.deepEqual(bad.got, [], `nothing answered (${token})`)
+  }
+  const idle = await client(home, false) // one that never says hello doesn't keep the daemon out
   const a = await client(home)
   assert.equal(statSync(join(home, 'pty.sock')).mode & 0o777, 0o600)
+  assert.equal(statSync(join(home, 'pty.secret')).mode & 0o777, 0o600)
+  assert.match(readFileSync(join(home, 'pty.secret'), 'utf8'), /^[0-9a-f]{64}$/)
+  assert.ok(!existsSync(join(home, 'pwned')))
+  idle.s.destroy()
   assert.deepEqual((({ version, pid }) => ({ version, pid }))(await a.ask({ op: 'hello' })), { version: PTY_PROTO, pid: h.pid })
   a.post({ op: 'spawn', id: 'one', file: '/bin/sh', args: ['-c', 'echo hello; echo "mask $(umask)"; read x; echo "got $x"; stty size; sleep 30'], cwd: home, env: { PATH: process.env.PATH ?? '' }, cols: 90, rows: 20 })
   const pid = (await until(() => a.got.find(x => x.ev === 'spawned' && x.id === 'one'), 'spawned')).pid
@@ -89,7 +104,7 @@ test('the pty host: a socket of the user alone; spawn, write, resize, attach fro
   b.post({ op: 'spawn', id: 'two', file: '/bin/sleep', args: ['30'], cwd: home, env: {} })
   const two = (await until(() => b.got.find(x => x.ev === 'spawned' && x.id === 'two'), 'spawned')).pid
   b.post({ op: 'quit' })
-  await until(() => !running(h.pid!) && !running(two) && !existsSync(join(home, 'pty.sock')), 'the host and its terminal gone')
+  await until(() => !running(h.pid!) && !running(two) && !existsSync(join(home, 'pty.sock')) && !existsSync(join(home, 'pty.secret')), 'the host, its terminal and its secret gone')
 })
 
 test('the pty host: with no terminal and no daemon it ends by itself; one of another version is started again only when it holds no live terminal', async t => {

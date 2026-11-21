@@ -1978,6 +1978,7 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
     allowRead: [...wrapReads(), join(dir, 'mcp', `${tab.id}.json`), ...(account ? [account] : []), ...(p => (p ? [p.path] : []))(state.projects.find(p => p.id === ws.project))].map(realOf), // its project's checkout: a repo in the data folder (the sample) has its git config there; its own --mcp-config (mcpFile)
     net: presetOf(tab)?.net,
+    ptySock: realOf(ptySock()),
   })
   const via = presetOf(tab)?.net === 'list' ? proxyFor(tab.id) : undefined // its hosts through Laki's proxy (netProxy.ts), nothing else out
   const proxy: Record<string, string> = via ? { HTTPS_PROXY: via, HTTP_PROXY: via, https_proxy: via, http_proxy: via, NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1' } : {}

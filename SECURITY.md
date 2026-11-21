@@ -158,7 +158,7 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   you allowed: only you can allow a host), on any port of a listed host (the list is hosts only; a port net.connect won't
   take is refused, 400, before any connection); a program that ignores the proxy variables reaches nothing, and the proxy's
   URL is in the agent's environment, readable by another program of yours. Apple marks `sandbox-exec` deprecated: a
-  later macOS may drop it, and then the tab doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone.
+  later macOS may drop it, and then the tab doesn't start rather than run without it. *Restart without the wrapper* on a refused write is yours alone. Whatever its *Network*, it can't connect to a unix socket in Laki's data folder, nor to the pty host's.
 
 - An agent's sandbox network (a profile's *Network*) is the agent's own: Claude Code's *Listed hosts* is its
   `sandbox.network.allowedDomains`, which pre-allows those hosts and still asks about others (a Yes there lets one
@@ -168,6 +168,12 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
 - Remote access end to end stops a tunnel's provider from reading and logging what's said, not from changing it: the
   page's own code is still served through the tunnel, so a provider that rewrites that script could read what the page
   sees. A paired device's page that came from a link before S14 has no key of its own: Add a device again.
+- The pty host (the process that keeps terminals alive across a restart) listens on a unix socket of yours alone
+  (`<data>/pty.sock`, 0600, or one in the temp folder when the data folder's path is long). A connection's first frame
+  must carry the host's secret: 32 random bytes it writes as it starts to `<data>/pty.secret` (0600, always in the data
+  folder, removed as it quits), compared in constant time; anything else is closed before any op runs. So a process that
+  connects while the daemon restarts can't type into a terminal or start one unless it can read the data folder: a
+  wrapped agent can't (nor reach the socket at all), an agent in no sandbox can, as it can read daemon.json.
 - Any program running as your user can read daemon.json's token (`ponytail:` in `src/daemon/main.ts`). A process an
   agent starts that leaves its tab's tree and its terminal (`setsid`, `launchctl submit`) is refused what asks who calls;
   one that then gives itself a terminal of its own (`script`, `expect`, a tmux server it starts, `open x.command`)

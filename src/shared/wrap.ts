@@ -44,15 +44,17 @@ export type WrapIn = {
   // walked through (a stat, a realpath of its worktree in it), so file-read-data only: file-read* breaks the path to them
   allowRead?: string[] // read back out of it, never written: its hook and plugin files, pasted pictures (what it writes too)
   net?: 'all' | 'list' | 'off' // list: no network but this Mac's (the daemon, Laki's proxy: daemon/netProxy.ts, its HTTPS_PROXY); all, unset: as it is
+  ptySock?: string // the pty host's socket (proto.ts' ptySock: in the temp folder when the data folder's path is long)
 }
 // SBPL's last matching rule wins, of rules for the same operation (one for file-read-data wins over file-read*'s, as
 // macOS 26 runs it): everything allowed, then writes denied but where it works, then the data folder's files, then what
 // it works in and reads of it back, then reads denied of secrets (each a -D parameter: subpath for a folder, literal for
 // a file name: .claude.json); a worktree that holds ~/.ssh still can't read it. net list: every connection out denied
-// (a unix socket's too: DNS, ssh-agent) but to this Mac's loopback, so a host is reached through Laki's proxy or not at all
+// (a unix socket's too: DNS, ssh-agent) but to this Mac's loopback, so a host is reached through Laki's proxy or not at all.
+// Whatever its net: no unix socket in the data folder (the pty host's: every terminal) nor the pty host's own, last so it wins
 export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
   const params: string[] = []
-  const ref = (path: string, kind: 'subpath' | 'literal' = 'subpath') => {
+  const ref = (path: string, kind: 'subpath' | 'literal' | 'path-literal' = 'subpath') => {
     const k = `P${params.length / 2}`
     params.push('-D', `${k}=${path}`)
     return `(${kind} (param "${k}"))`
@@ -75,6 +77,8 @@ export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
     `(deny file-read*\n  ${reads.join('\n  ')})`,
     ...(data ? [`(deny file-read-data\n  ${reads.join('\n  ')})`] : []), // file-read* never wins over a file-read-data rule, before it or after
     ...(o.net === 'list' ? ['(deny network-outbound)', '(allow network-outbound (remote ip "localhost:*"))'] : []),
+    ...(data ? [`(deny network-outbound (remote unix-socket ${data}))`] : []),
+    ...(o.ptySock ? [`(deny network-outbound (remote unix-socket ${ref(o.ptySock, 'path-literal')}))`] : []),
     '',
   ].join('\n')
   return { text, params }

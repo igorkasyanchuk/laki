@@ -2,13 +2,17 @@
 // daemon that crashes, stops or is updated finds them still running: it lists them, attaches and replays the buffer.
 // No state.json, no git, no hooks: it reads no file and takes only proto.ts' ops, on a socket of the user's alone
 // (0600, no TCP). The daemon starts it when settings.ptyHost is on (daemon/ptyHost.ts); it ends with `quit`, or with
-// no live terminal and no daemon for 10 minutes, or no daemon at all for 3 days, or (tests) once LAKI_TEST_PARENT is gone.
+// no live terminal and no daemon for 10 minutes, or no daemon at all for 3 days, or (tests) once LAKI_TEST_PARENT is gone. A connection's
+// first frame is hello with the secret it wrote to the data folder (ptySecret), else it's closed: any process of the
+// user can reach the socket, only one that reads the data folder gets in (a wrapped agent can't: wrap.ts).
 // ponytail: a resize isn't kept in the buffer: a replay is drawn at the size the pty has now, and one cut at 2 MB may
 // start inside an escape sequence
 import pty from '@lydell/node-pty'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, rmSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
-import { frame, PTY_PROTO, ptySock, reader } from './proto.ts'
+import { writeAtomic } from '../shared/conn.ts'
+import { frame, PTY_PROTO, ptySecret, ptySock, reader } from './proto.ts'
 
 const RING = 2 << 20 // characters of output kept per terminal
 const IDLE = Number(process.env.LAKI_PTY_IDLE_MS) || 600_000
@@ -22,6 +26,9 @@ const socks = new Set<Socket>()
 let quiet = Date.now() // when the last daemon left or the last terminal ended
 let alone = Date.now() // when the last daemon left
 const path = ptySock()
+const secret = Buffer.from(randomBytes(32).toString('hex'))
+let wrote = false // the secret's file is this host's: removed as it quits (one that lost the race to listen never wrote it)
+const known = (t: unknown) => typeof t === 'string' && t.length === secret.length && timingSafeEqual(Buffer.from(t), secret)
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'ptyhost', ...a)
 // ponytail: no bound on what waits for a daemon that stopped reading (a hung one): dropping it would end its terminals
 // once it's back (ptyHost.ts' lost); a cap with a re-attach from the ring if a hung daemon is ever seen to cost memory
@@ -43,6 +50,7 @@ function quit(why: string) {
   for (const p of live()) signal(p, 'SIGHUP')
   server.close()
   rmSync(path, { force: true })
+  if (wrote) rmSync(ptySecret(), { force: true })
   setTimeout(() => process.exit(0), 200)
 }
 
@@ -129,12 +137,21 @@ const listen = () => {
 }
 const server = createServer(s => {
   // one daemon at a time: while it's connected nothing else gets in (an agent's process could otherwise type into any
-  // terminal past the daemon's gates). ponytail: with no daemon up, the first to connect is taken for it, as any
-  // process of the user can read daemon.json's token
+  // terminal past the daemon's gates). One not in yet isn't counted (it holds no place): its first frame is hello with
+  // the secret, else it's closed before any op runs; 5 s to send it
   if (socks.size) return void s.destroy()
-  socks.add(s)
-  const feed = reader(m => (typeof m?.op === 'string' && Object.hasOwn(ops, m.op) ? ops[m.op](s, m) : undefined))
+  let ok = false
+  let got = 0 // bytes before its hello: a few KB at most
+  const t = setTimeout(() => s.destroy(), 5000)
+  const feed = reader(m => {
+    if (!ok) {
+      if (m?.op !== 'hello' || !known(m.token) || socks.size) return void s.destroy()
+      ;(ok = true), clearTimeout(t), socks.add(s)
+    }
+    if (!s.destroyed && typeof m?.op === 'string' && Object.hasOwn(ops, m.op)) ops[m.op](s, m)
+  })
   s.on('data', d => {
+    if (!ok && (got += d.length) > 65536) return void s.destroy()
     try {
       feed(d)
     } catch (e) {
@@ -144,7 +161,8 @@ const server = createServer(s => {
   })
   s.on('error', () => {})
   s.on('close', () => {
-    socks.delete(s)
+    clearTimeout(t)
+    if (!socks.delete(s)) return
     quiet = alone = Date.now()
     for (const p of ptys.values()) p.subs.delete(s)
   })
@@ -156,7 +174,12 @@ server.on('error', (e: NodeJS.ErrnoException) => {
   probe.once('connect', () => process.exit(0))
   probe.once('error', () => (rmSync(path, { force: true }), listen()))
 })
-server.on('listening', () => (chmodSync(path, 0o600), log(`listening on ${path} (protocol ${VERSION}, pid ${process.pid})`)))
+server.on('listening', () => {
+  chmodSync(path, 0o600)
+  writeAtomic(ptySecret(), secret, 0o600) // a daemon that dials meanwhile reads an old one, is turned away and tries again (ptyHost.ts' up)
+  wrote = true
+  log(`listening on ${path} (protocol ${VERSION}, pid ${process.pid})`)
+})
 listen()
 
 const parent = Number(process.env.LAKI_TEST_PARENT)

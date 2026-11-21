@@ -2,11 +2,11 @@
 // terminal that Session uses as it uses node-pty's. Only with settings.ptyHost on (core's spawnTab, ptyAdopt).
 // No core import: nothing here reads the model
 import { spawn } from 'node:child_process'
-import { existsSync, openSync } from 'node:fs'
+import { existsSync, openSync, readFileSync } from 'node:fs'
 import { connect, type Socket } from 'node:net'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { frame, PTY_PROTO, ptySock, reader } from '../ptyhost/proto.ts'
+import { frame, PTY_PROTO, ptySecret, ptySock, reader } from '../ptyhost/proto.ts'
 import { dir } from './dir.ts'
 
 export type PtyInfo = { id: string; pid: number; cols: number; rows: number; exit?: number; start: number; end: number; last: number }
@@ -21,6 +21,15 @@ const waits = new Map<number, (m: any) => void>()
 const open = new Map<string, HostPty>()
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'pty host:', ...a)
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+// the host's secret, read anew at each hello (a new host writes a new one); none yet: '' (turned away, tried again)
+const token = () => {
+  try {
+    return readFileSync(ptySecret(), 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+const hello = () => ({ op: 'hello', version: PTY_PROTO, token: token() })
 const post = (m: object) => void sock?.write(frame(m))
 const ask = <T>(m: object) =>
   new Promise<T>((res, rej) => {
@@ -166,10 +175,11 @@ async function up(again = true, tries = 0): Promise<void> {
   }
   if (!s) throw new Error("the pty host didn't start: see ptyhost.log")
   wire(s)
-  const h = await ask<{ version?: number; pid?: number }>({ op: 'hello', version: PTY_PROTO })
+  const h = await ask<{ version?: number; pid?: number }>(hello())
   if (h.version === undefined) {
     // another daemon still connected: the one before this, on its way out (laki stop --keep, an update, a crash), whose
-    // connection ends a moment after its daemon.json goes; two never live at once (the data folder's lock), so 3 s of tries
+    // connection ends a moment after its daemon.json goes; two never live at once (the data folder's lock), so 3 s of
+    // tries. Or a host that just started and hasn't written its secret yet: the next try reads it
     if (tries < 30) return void ((sock = undefined), s.destroy()), sleep(100).then(() => up(again, tries + 1))
     throw new Error('the pty host turned this daemon away (another one is connected)')
   }
@@ -193,7 +203,7 @@ export async function ptyGone() {
   why = undefined
   if (sock) return ptyQuit()
   const s = existsSync(ptySock()) ? await dial().catch(() => undefined) : undefined
-  s?.end(frame({ op: 'quit' }))
+  s?.end(Buffer.concat([frame(hello()), frame({ op: 'quit' })]))
 }
 let upping: Promise<void> | undefined
 export const ptyUp = () =>
