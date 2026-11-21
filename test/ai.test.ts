@@ -127,7 +127,9 @@ test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 
 
   // the next ask carries the conversation so far (asks and answers, not the tools)
   await rig.rpc('aiAsk', { text: 'and now?' })
-  assert.deepEqual(or.hits[2].body.messages.slice(1).map((m: any) => [m.role, m.content]), [['user', 'what are my agents doing?'], ['assistant', 'One project, no workspaces.'], ['user', 'and now?']])
+  // a message's words (the rolling cache marker makes history's last one a text part)
+  const words = (c: any) => (typeof c === 'string' ? c : c.map((p: any) => p.text).join(''))
+  assert.deepEqual(or.hits[2].body.messages.slice(1).map((m: any) => [m.role, words(m.content)]), [['user', 'what are my agents doing?'], ['assistant', 'One project, no workspaces.'], ['user', 'and now?']])
 
   // a failure is said in the chat and logged
   await assert.rejects(rig.rpc('aiAsk', { text: 'again' }), /OpenRouter: no more answers/)

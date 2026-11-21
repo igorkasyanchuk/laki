@@ -12,6 +12,9 @@ const manifest = (name: string) =>
   JSON.stringify({ name, every: 5, size: [3, 2], fetch: 'echo \'{"prs": [{"title": "Live one", "ci": "passing"}]}\'', ui: { type: 'list', each: 'prs', title: '{{title}}', accessories: [{ tag: '{{ci}}' }] }, sample: { prs: [{ title: 'Fix the date picker', ci: 'failing' }] } })
 const files = (name: string) => ({ 'widget.json': manifest(name), 'fixtures/sample.json': '{"prs": [{"title": "Fix the date picker", "ci": "failing"}]}', 'fixtures/empty.json': '{"prs": []}' })
 
+// the system prompt's words: a text part while it's the cache breakpoint, a string once history holds it (ai.ts' rolling one)
+const sysText = (c: any): string => (typeof c === 'string' ? c : c.map((p: any) => p.text).join(''))
+
 test('studio: its chat writes one off with fixtures, Undo, Try it live once, Remix, a new id, its chat goes with it', async t => {
   const hits: any[] = []
   const answers: object[] = []
@@ -51,8 +54,8 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   // the next ask sees its files; a second write, then Undo back to the first, then to none
   answers.push(reply({ content: '', tool_calls: [call('c3', 'laki_extension_write', { id, files: { 'widget.json': manifest('PRs v2') } })] }), reply({ content: 'Renamed.' }))
   await rig.rpc('aiAsk', { chat: `widget:${id}`, text: 'Call it PRs v2' })
-  assert.match(hits[3].messages[0].content[0].text, /<file name="widget\.json">[\s\S]*Open PRs/)
-  assert.match(hits[3].messages[0].content[0].text, /Its last check/)
+  assert.match(sysText(hits[3].messages[0].content), /<file name="widget\.json">[\s\S]*Open PRs/)
+  assert.match(sysText(hits[3].messages[0].content), /Its last check/)
   w = await view(id)
   assert.equal(w.name, 'PRs v2')
   assert.equal(w.history.length, 2)
