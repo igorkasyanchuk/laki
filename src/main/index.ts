@@ -1139,7 +1139,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 // replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
 // waiting), any card until it's opened or closed (×, Close all)
 type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
-type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string }
+type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string; cut?: boolean }
 const CARD_W = 380
 let cards: Card[] = []
 let cardN = 0
@@ -1247,8 +1247,8 @@ ipcMain.handle('ask-explain', async (e, key: unknown) => {
   c.said = 'loading'
   send()
   try {
-    const r = (await rpc('askExplain', { tab: c.tab })) as { does?: unknown; outside?: unknown; undo?: unknown }
-    c.said = typeof r?.does === 'string' ? { does: r.does.slice(0, 200), outside: r.outside === true, undo: String(r.undo) } : { err: 'no answer' }
+    const r = (await rpc('askExplain', { tab: c.tab })) as { does?: unknown; outside?: unknown; undo?: unknown; cut?: unknown }
+    c.said = typeof r?.does === 'string' ? { does: r.does.slice(0, 200), outside: r.outside === true, undo: String(r.undo), cut: r.cut === true } : { err: 'no answer' }
   } catch (err) {
     c.said = { err: (err as Error).message }
   }

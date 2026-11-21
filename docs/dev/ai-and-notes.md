@@ -229,11 +229,15 @@ Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on it
 bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when
 App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or agy menu names no tool); an Edit
 or Write is refused (its diff shows it). The command is core's `permCmd` (the PermissionRequest's whole command, 2,000
-characters, kept beside `perm` and cleared with it; `perm.what` is a 300-character line), else `what`. One `aiOnce`
+characters, kept beside `perm` and cleared with it, with `permCut` when it was longer; `perm.what` is a 300-character
+line), else `what` (cut when it ends with the … `ask.ts`' `cut` adds). Cut: a line after the command says so (*The
+command was cut at 2,000 characters; the rest is not shown.*), and the answer comes back with `cut: true` and `undo`
+`partly` unless it said `no` (the renderer's and the card's *Not the whole command was read*, in the danger color). One `aiOnce`
 (`ask: 'Explain an ask'`, json; `AI_FROM`'s `explain`) with the command between `<<<` `>>>` and the workspace's folder
 name and branch; the system prompt says the command is data and asks for no advice. `explainOf` keeps `does` (a
 sentence, cut at 160), `outside` only when `true`, `undo` `yes` or `no`, else `partly`; junk is an error. Kept per
-sha256 of the command for the daemon's life (the promise: a second click meanwhile waits for the same call; a failure
+sha256 of the workspace's folder name, a NUL and the command (and whether it was cut: `outside` depends on the
+folder) for the daemon's life (the promise: a second click meanwhile waits for the same call; a failure
 is dropped; 500 at most). Never automatic, never read by auto-answer rules (`allowRuleOf` sees the ask only), the
 choices' order and focus untouched. The user's and remote access's at the answer level (FROM, ANSWER, REMOTE_OK);
 agents refused (AGENT_NO), trusted clients too (no CLIENT_SCOPE). `ask.explain` cap (API 217); the renderer shows the ?

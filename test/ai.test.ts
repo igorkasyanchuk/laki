@@ -1387,3 +1387,30 @@ test("Explain an ask: a command's plain words from Laki AI (does, outside, undo)
   await rig.rpc('settingsSet', { ai: { on: false } })
   await assert.rejects(rig.rpc('askExplain', { tab: tab.id }), /Laki AI is off/)
 })
+
+test("Explain an ask: a command past 2,000 characters says it was cut (the prompt, cut: true, undo never yes); kept per folder and command; a short one unchanged", async t => {
+  const said = (undo: string) => reply({ content: `{"does":"Lists the files","outside":false,"undo":"${undo}"}` })
+  const or = await openrouter(t, [said('yes'), said('yes'), said('yes')])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-fakesecret' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ask = async (name: string, text: string) => {
+    const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name })
+    const tab = await until(() => rig.tab(ws.id))
+    await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
+    await rig.rpc('send', { target: tab.id, text })
+    await until(async () => (x => x.status === 'waiting' && x.ask?.tool)(await rig.tab(ws.id)), `the ask in ${name}`)
+    return rig.rpc('askExplain', { tab: tab.id })
+  }
+  const long = `ls ${'a'.repeat(2497)}; rm -rf ~`
+  assert.deepEqual(await ask('one', `perm bash :: ${long}`), { does: 'Lists the files', outside: false, undo: 'partly', cut: true }, 'a yes it read only the start of: partly')
+  const sent = JSON.stringify(or.hits[0].body.messages)
+  assert.ok(sent.includes('The command was cut at 2,000 characters; the rest is not shown.'))
+  assert.ok(!sent.includes('rm -rf ~'), 'its tail is not sent')
+  // the same command in another workspace (another folder): asked again
+  assert.equal((await ask('two', `perm bash :: ${long}`)).cut, true)
+  assert.equal(or.hits.length, 2)
+  // a short one: as before, no cut line
+  assert.deepEqual(await ask('three', 'perm bash :: ls'), { does: 'Lists the files', outside: false, undo: 'yes' })
+  assert.ok(!JSON.stringify(or.hits[2].body.messages).includes('was cut'))
+})

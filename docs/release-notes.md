@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- *What will this do?* on a command over 2,000 characters says *Not the whole command was read* (in red) and never that it can be undone, and the same command in another workspace is read again.
 - Antigravity replaces Gemini CLI, which Google deprecated: the Gemini agent now runs `agy` (install: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), with its models, effort and permission modes, its status from what it tells the terminal, and its chat resumed. Your Gemini profiles and tabs carry over. Gemini CLI's plan-limit meter is gone.
 - Specs & Brainstorms: the list's header says one thing for every kind, so the page no longer jumps as you switch between All, Specs and Brainstorms.
 - A tab's tooltip is a card now: its name in its color, one row per fact (model, context, what it used, queued, progress…) and the hints under a line, instead of one long line. The Usage page's chart and a workflow's runs show theirs the same way.

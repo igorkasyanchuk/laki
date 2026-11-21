@@ -978,7 +978,7 @@ export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const aiOn = (s?: { ai?: AiSettings }) => s?.ai?.on !== false // Settings › AI: on unless turned off
 // an ask's command in plain words (the daemon's askExplain, the ? on an ask's card): what it does, a sentence; outside:
 // it reaches past the workspace's folder or the network; undo: whether what it changes can be put back
-export type AskExplained = { does: string; outside: boolean; undo: 'yes' | 'no' | 'partly' }
+export type AskExplained = { does: string; outside: boolean; undo: 'yes' | 'no' | 'partly'; cut?: true } // cut: the model read only the command's start (past 2,000 characters), so undo is never yes
 export const AI_STEPS = 20
 export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
 // the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure

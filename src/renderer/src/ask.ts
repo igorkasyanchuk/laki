@@ -8,7 +8,7 @@
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 import { askScope } from '../../shared/ask'
 type Action = { text: string; scope?: string } // scope: a standing permission's choice in full (askScope): its rule drawn whole
-type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string }
+type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string; cut?: boolean }
 type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string; explain?: boolean; said?: Said }
 type Bridge = {
   ask: {
@@ -74,6 +74,7 @@ function explainEl(c: Card) {
     const t = el('span', s.does, 'said')
     if (s.undo === 'no') t.append(el('span', " Can't be undone.", 'danger'))
     if (s.outside) t.append(el('span', ' Reaches outside this workspace.', 'warn'))
+    if (s.cut) t.append(el('span', ' Not the whole command was read.', 'danger'))
     row.append(t)
   }
   return row

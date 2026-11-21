@@ -264,6 +264,8 @@ fetches. One more is on by default: with Laki AI able to answer (an OpenRouter k
 backend), each project's memories learned by agents (never yours) go to that model every 7 days, or as the list fills,
 to be compacted (Settings › Global memory › *On its own*; turn it off there, or Laki AI off in Settings › AI).
 *What will this do?* on a command an agent asks to run sends Laki AI's model that command (2,000 characters at most) and
-its workspace's folder name and branch, only on your click (or E), fenced as data it's told never to follow; its answer
+its workspace's folder name and branch, only on your click (or E), fenced as data it's told never to follow. A longer
+command is cut there and the model is told so; its answer then says *Not the whole command was read* (in red) and never
+that it can be undone, since the part it didn't see could do anything. Its answer
 is a sentence beside the ask: it answers nothing, moves no choice and never feeds auto-answer rules. An agent can't ask
 it (it would spend your Laki AI on its own asks).

@@ -638,7 +638,8 @@ selected workspace's PR is in the status bar.
   Reader, Needs you and the cards on screen, has Laki AI say in a sentence what the command does, then *Can't be undone*
   (in red) when what it changes can't be put back and *Reaches outside this workspace* when it touches more than the
   workspace's folder or the network. It never runs on its own, answers nothing and leaves the choices as they were; the
-  same command asks once (AI page › Calls: *Explain an ask*). It shows while Laki AI is on (Settings › AI). Its words
+  same command in the same folder asks once (AI page › Calls: *Explain an ask*). A command over 2,000 characters is
+  read only to there: the line then says *Not the whole command was read* (in red) and never that it can be undone. It shows while Laki AI is on (Settings › AI). Its words
   are a reading, not a verdict: what runs is the command above them.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex

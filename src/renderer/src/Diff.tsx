@@ -511,6 +511,7 @@ export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Pr
       {got.does}
       {got.undo === 'no' && <span className="danger"> Can't be undone.</span>}
       {got.outside && <span className="warn"> Reaches outside this workspace.</span>}
+      {got.cut && <span className="danger"> Not the whole command was read.</span>}
     </div>
   )
   const key = (e: KeyEvent) => can && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'e' || e.key === 'E') && (e.preventDefault(), go(), true)
