@@ -1200,6 +1200,10 @@ export const pickTint = (accent: string, raised: string, fg: string, min = 4.5) 
 // looks that draw solid things (paper, print, a bitmap screen): their floats stay solid (html.opaque)
 export const OPAQUE_LOOKS = new Set(['brutal', 'blueprint', 'classic', 'retro', 'eink', 'receipt', 'gazette', 'greenbar', 'notebook', 'manuscript', 'kraft', 'riso', 'comic', 'chalk', 'pellet', 'overworld', 'bauhaus'])
 // text on an accent: black or white, whichever reads better
+// macOS's accent (Settings' System, a new Mac install's default) only where it shows as a control's fill and its focus
+// ring: 3:1 against the theme's background and panel (WCAG's for a control), else the theme's own (yellow, graphite on
+// a light theme). Its label is onAccent's, which always reads
+export const accentFits = (c: string, bgs: string[]) => bgs.every(b => contrast(c, b) >= 3)
 export const onAccent = (hex: string) => (contrast(hex, '#000000') >= contrast(hex, '#ffffff') ? '#000000' : '#ffffff')
 // a color as text on these backgrounds: darker on a light one (lighter on a dark one), its hue kept, until it reads (4.5:1)
 export function readable(c: string, bgs: string[], min = 4.5) {
@@ -1392,7 +1396,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
   // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); circles stay, pills too unless it's
   // square (styles.css' --r-pill), and the design's cards take it when smaller (--d-r)
-  const pick = o.accent === 'system' ? sysAccent : o.accent
+  const pick = o.accent === 'system' ? (sysAccent && accentFits(sysAccent, [t.c?.bg ?? rootVar('--bg'), t.c?.panel ?? rootVar('--panel')]) ? sysAccent : null) : o.accent
   if (pick && /^#[\da-f]{6}$/i.test(pick)) st.setProperty('--accent', pick), st.setProperty('--accent-fg', onAccent(pick))
   if (o.radius) st.setProperty('--radius', o.radius), st.setProperty('--rs', o.radius)
   // the accent as text (links, a picked item): a light theme's bright accent made darker where it wouldn't read; fills keep it

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A new install on a Mac takes macOS's accent color (Settings › Appearance › Accent color › System); where it wouldn't show against the theme (yellow on a light one), the theme's own stays.
 - Ship's main button follows the PR: *Push to PR* when one is open, *Merge* once it's green with nothing left to send, *Merge when green* while checks run; ⌘↵ does the same.
 - A repo's workflow that changed since you allowed it shows what changed before you allow it again: a line diff with changed commands and agent prompts marked and counted.
 - Safety fix: a project's MCP server secrets no longer show in Codex's command line (`ps`): they go in its environment instead.

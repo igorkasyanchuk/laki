@@ -302,7 +302,7 @@ export function load() {
   // test's daemon, as with Labs below, only with LAKI_TEST_LEAN=1: the rest of the tests are of agents without one
   if (!had && state.settings?.sandboxNew === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, sandboxNew: true }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
-    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted' }), ...NEW_DEFAULTS }) } // B2: and Laki's own theme pair, light or dark as the system is
+    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted', accent: 'system' }), ...NEW_DEFAULTS }) } // macOS's accent color (themes.ts: the theme's where it wouldn't show); B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
 }
 

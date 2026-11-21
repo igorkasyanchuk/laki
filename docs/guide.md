@@ -2405,7 +2405,8 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), *Interface* (a preview of a tab, a menu, a tooltip and the status bar, then the font: SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Laki's own, Inter, Geist, IBM Plex Sans, Roboto and more, then the developer fonts (the terminal's monospace ones), then every other font on this Mac, the sidebar's and the project names' pickers too; and *Text size*: 9 to 16 px for tabs, menus and dropdowns, the status bar, tooltips and the side panel's tabs as one, theirs by default), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads; on a Mac, *System* follows macOS's own
-  accent color as you change it; behind another app the accent's fills and the selected row go grey, as in macOS's own
+  accent color as you change it, and a new install on a Mac starts on it; one that wouldn't show against the theme's
+  background (yellow or graphite on a light theme) leaves the theme's own; behind another app the accent's fills and the selected row go grey, as in macOS's own
   apps, the status colors don't), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Icons* (Tabler by default, Lucide, or Laki's own; *Line width* 0.5 to 2.5, each pack's own 2; *Size* 12 to 18, 14 as
   it comes, the rest of the app's icons scaled with it; an icon you pick for a project, a Desk tab or an extension is a

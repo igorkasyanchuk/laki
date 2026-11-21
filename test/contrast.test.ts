@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
+import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, accentFits, onAccent, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
 
 // what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
 // 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
@@ -145,4 +145,27 @@ test('contrast: selected text reads over the accent selection in every theme', (
   assert.ok(full > THEMES.length / 2, 'most themes keep the full strength')
   assert.equal(selAlpha('#ffffff', ['#000000'], '#000000'), 8, 'none reads: the least')
   assert.equal(selAlpha('var(--x)', ['#000000'], '#ffffff'), SEL_A, 'not hex: as the stylesheet says')
+})
+
+// macOS's accent colors (System Settings › Appearance; light and dark appearances' controlAccentColor) on Laki's theme
+// pair, a new Mac install's: one that fits is a fill with a readable label and a focus ring that shows (3:1); one that
+// doesn't (yellow, graphite on Laki Light) falls back to the theme's own, which the test above checks
+test("contrast: macOS's accent on Laki and Laki Light: its label reads and its ring shows, else the theme's accent", () => {
+  const MAC = { blue: ['#007aff', '#0a84ff'], purple: ['#953d96', '#a550a7'], pink: ['#e3407f', '#f74f9e'], red: ['#e0383e', '#ff5257'], orange: ['#f7821b', '#fc8a2b'], yellow: ['#ffc600', '#ffd60a'], green: ['#62ba46', '#32d74b'], graphite: ['#8c8c8c', '#989898'] }
+  const fell: string[] = []
+  for (const id of ['laki', 'laki-light']) {
+    const t = THEMES.find(x => x.id === id)!
+    const bgs = [t.c!.bg, t.c!.panel]
+    for (const [name, [light, dark]] of Object.entries(MAC)) {
+      const c = t.light ? light : dark
+      if (!accentFits(c, bgs)) {
+        fell.push(`${id} ${name}`)
+        continue
+      }
+      assert.ok(ratio(onAccent(c), c) >= 4.5, `${id} ${name}: its label`)
+      for (const b of bgs) assert.ok(ratio(c, b) >= 3, `${id} ${name}: its ring on ${b}`)
+    }
+  }
+  assert.ok(fell.includes('laki-light yellow'), `yellow falls back on Laki Light (fell back: ${fell.join(', ')})`)
+  assert.ok(!fell.includes('laki blue') && !fell.includes('laki-light blue'), 'blue fits both')
 })
