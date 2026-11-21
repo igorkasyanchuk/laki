@@ -4478,7 +4478,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         writeFileSync(join(runDir, `${tab.id}.last`), r.last)
       }
       const err = pl.error_details ?? pl.error ?? '' // a message as it is: quoted, a limit notice isn't read
-      if (p.state === 'failed' || tab.preset === 'codex') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}` : '')
+      if (p.state === 'failed' || tab.preset !== 'claude') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}` : '')
       // a model the installed claude is too old for (the API's claude_code_version_too_old): kept, said in words
       const refused = p.state === 'failed' && tab.preset === 'claude' ? modelRefused(tab.model || presetOf(tab)?.model?.trim(), `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`) : undefined
       if (refused) r.last = refused
@@ -4879,8 +4879,8 @@ function checkLimit(tab: Tab, text: string) {
   const r = rtOf(tab.id)
   const now = new Date()
   let t = limitReset(text, now)
-  // codex: a notice at the bottom of its screen, below the one handled already
-  if (!t && tab.preset === 'codex' && s && (t = limitReset(s.screenText(8, r.seen), now))) r.seen = s.lineCount()
+  // codex, grok, agy, opencode: a notice at the bottom of its screen, below the one handled already
+  if (!t && tab.preset !== 'claude' && s && (t = limitReset(s.screenText(8, r.seen), now))) r.seen = s.lineCount()
   // a time gone by: "9am" at noon is tomorrow's, but "3pm" read at 15:00:01 has just reset
   if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
   if (!t) return

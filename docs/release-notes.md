@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Usage page and Today count Grok's and Antigravity's tabs too: tokens by day and model (Grok's with its own price), with their own filters; a Grok or Antigravity tab that hits its plan's limit shows when it resets, as Claude's and Codex's do.
 - What it sees lists every agent's skills with their size and rough tokens, marking the large ones and ones only one agent has; `laki skills audit` prints the same.
 - Laki AI on an Anthropic model reads a long chat back from its cache each round (cheaper and quicker), and in a chat too long to send whole it still sees the first words of what was left out.
 - The island on a MacBook with a notch: its card grows out of the pill as one black shape instead of floating under it.

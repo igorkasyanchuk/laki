@@ -582,7 +582,16 @@ folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<nam
 in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
 per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
-(`todayView`: tokens, cost, the 5 workspaces that used most). The renderer (`settings.contextMeter`, `settings.costs`,
+(`todayView`: tokens, cost, the 5 workspaces that used most). Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
+their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
+`endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
+worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else
+`cache/last_conversations.json`'s for the worktree; copied to a temp folder with its WAL, read with node's own sqlite,
+at most every 30 s per tab: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
+and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). Tested in `test/meter.test.ts`. ponytail: agy's
+field numbers are read off its files (Nov 2026); their plan limits aren't read (no endpoint without their sign-in), only
+a limit notice on their screen (core's `checkLimit` for every agent but claude: limits.ts' `lineRe` takes Grok's *You
+hit your weekly limit*). The renderer (`settings.contextMeter`, `settings.costs`,
 on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): TabBar.tsx' `TabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line
 along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and tooltip lines, the status bar's `.sb-ctx` (the focused tab's,
 `.usage-bar`), `UsageButton`'s `today` (*Today*, *≈ API price*); `Usage.tsx` `level` (amber past 70, red past 90),

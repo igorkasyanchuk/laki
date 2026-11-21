@@ -16,6 +16,7 @@ import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCa
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 import { acpChat } from './acp.ts'
+import { agentDays, agentDaysGone } from './agentUsage.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -248,7 +249,7 @@ type Kept = { chats: Record<string, { ws: string; agent: string; days: Record<st
 let kept: Kept | undefined
 const keptNow = () => (kept ??= (k => (k && typeof k.chats === 'object' ? k : { chats: {} }))(readJson<Kept>(daysPath)))
 const timeOf = (day: string) => (([y, m, d]) => new Date(y, m - 1, d).getTime())(day.split('-').map(Number))
-function keepDays(tab: Tab, m: Meter) {
+function keepDays(tab: Tab, m: Pick<Meter, 'days'>) {
   if (!tab.resumeId || !m.days) return
   const k = keptNow()
   const c = (k.chats[tab.resumeId] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
@@ -288,9 +289,22 @@ export function meterTick() {
   let any = false
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
-  for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
+  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini') && !archived.has(t.workspace)) otherRead(t)
+  for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id), agentDaysGone(id)
   for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
+}
+// Grok's and Antigravity's chats (agentUsage.ts): their days for the Usage page, today's for Today. This Mac's only
+function otherRead(t: Tab) {
+  const ws = state.workspaces.find(w => w.id === t.workspace)
+  if (!ws || ws.host) return
+  const r = agentDays(t, ws.path)
+  if (!r) return
+  const { id, days } = r
+  keepDays({ ...t, resumeId: id }, { days })
+  const today = Object.values(days[dayOf(Date.now())] ?? {}).reduce((a, v) => ({ tokens: a.tokens + v.tokens, cost: a.cost + v.cost }), { tokens: 0, cost: 0 })
+  const s = spentNow()
+  if (today.tokens > (s.chats[id]?.tokens ?? 0)) (s.chats[id] = { ws: t.workspace, ...today }), writeAtomic(todayPath, JSON.stringify(s))
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
 // claude's own settings, as it reads them (the workspace's local, then its project's, then yours: its account's folder):

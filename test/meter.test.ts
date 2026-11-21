@@ -155,6 +155,48 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   assert.ok(JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1'].days)
 })
 
+// a protobuf message: [field, varint or bytes]…
+const pb = (...fs: [number, number | Uint8Array][]) => {
+  const vi = (n: number) => { const b: number[] = []; do { const x = n % 128; n = Math.floor(n / 128); b.push(n ? x | 128 : x) } while (n); return b }
+  return new Uint8Array(fs.flatMap(([f, v]) => (typeof v === 'number' ? [...vi(f * 8), ...vi(v)] : [...vi(f * 8 + 2), ...vi(v.length), ...v])))
+}
+test("meter: Grok's and Antigravity's chats by day and model for the Usage page and Today, from their own files", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'grok' })
+  const g = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat id')
+  // Grok's usage.json, in a folder of its own naming: each turn's, its cost in xAI's ticks (1e-10 USD)
+  const gd = join(rig.home, '.grok/sessions/some-folder', g.resumeId)
+  mkdirSync(gd, { recursive: true })
+  const turn = (ago: number, tokens: number, ticks: number) => ({ endedAt: new Date(Date.now() - ago).toISOString(), modelUsage: { 'grok-4.7-build': { totalTokens: tokens, costUsdTicks: ticks } } })
+  writeFileSync(join(gd, 'usage.json'), JSON.stringify({ turns: [turn(2 * 864e5, 1000, 1e9), turn(0, 5000, 3e10)] }))
+  // Antigravity: its conversation (named by cache/last_conversations.json for the worktree), steps' time and usage
+  const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'gemini' })
+  const wsPath = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).path
+  const root = join(rig.home, '.gemini/antigravity-cli')
+  mkdirSync(join(root, 'cache'), { recursive: true })
+  mkdirSync(join(root, 'conversations'))
+  writeFileSync(join(root, 'cache/last_conversations.json'), JSON.stringify({ [wsPath]: 'conv-1' }))
+  const { DatabaseSync } = await import('node:sqlite')
+  const db = new DatabaseSync(join(root, 'conversations/conv-1.db'))
+  db.exec('CREATE TABLE steps (idx integer, metadata blob); CREATE TABLE gen_metadata (idx integer, data blob)')
+  const sec = Math.floor(Date.now() / 1000)
+  const step = (usage?: Uint8Array) => pb([1, pb([1, sec])], ...(usage ? [[9, usage] as [number, Uint8Array]] : []))
+  db.prepare('INSERT INTO steps VALUES (?, ?)').run(0, step()) // a step with no model call
+  db.prepare('INSERT INTO steps VALUES (?, ?)').run(1, step(pb([1, 1532], [2, 600], [3, 100], [5, 300])))
+  db.prepare('INSERT INTO gen_metadata VALUES (?, ?)').run(0, pb([1, pb([3, 1532], [19, new TextEncoder().encode('gemini-4-neon')])]))
+  db.close()
+  const d0 = new Date()
+  const key = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`
+  const rows = await until(async () => (r => (r.some((x: any) => x.agent === 'gemini') && r.filter((x: any) => x.agent === 'grok').length === 2 ? r : undefined))((await rig.rpc('usageDays')).rows), 'their days')
+  const mine = rows.filter((r: any) => r.day === key).map((r: any) => [r.agent, r.model, r.tokens, r.cost, r.ws]).sort()
+  assert.deepEqual(mine, [['gemini', 'gemini-4-neon', 1000, 0, ws.id], ['grok', 'grok-4.7-build', 5000, 3, ws.id]])
+  assert.equal(rows.find((r: any) => r.agent === 'grok' && r.day !== key).tokens, 1000) // two days ago, its own day
+  const today = await until(async () => (x => x?.tokens === 6000 && x)((await rig.rpc('state')).today), 'today’s')
+  assert.deepEqual([today.cost, today.ws.map((w: any) => w.ws)], [3, [ws.id]])
+  assert.ok(ag.id)
+})
+
 test('meter: each day by model, for the Usage page; a day past and a model of its own each', () => {
   const m = meterNew(now)
   const u = (output: number) => ({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output })

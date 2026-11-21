@@ -1051,7 +1051,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `COLOR`'s `--tc-*` (a filter never repaints one; Laki AI is `laki`), its legend; *Where it went* (`group` by `src`, a
   bar split by agent; the `WHERE_SHOWN` biggest, the rest under *n more*; none from a daemon before API 213); the models'
   table (`.usage-table .num`: right-aligned; the counters' rolling `Num` is `.num-roll`, a global `.num` turned cells into
-  inline grids).
+  inline grids). Grok's and Antigravity's tabs are rows too (the daemon's `agentUsage.ts`: Grok's `usage.json` per turn
+  at its own price, agy's conversation DB's steps, tokens only), so their filters and colors show once they've worked.
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys (`keysOf`: Settings › Keys' in use, App's `kb`), status glyphs, where things are, the main CLI
   commands and recipes (`cli`: the app's command; `ship`: list `ship`), each section a `Sec` of `Item`s. Laid out
   like Settings (`.settings-nav`, `.help-nav`): a filter (focused as it opens, not on a touch screen; ⌘F or / goes to

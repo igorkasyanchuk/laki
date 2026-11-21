@@ -15,6 +15,9 @@ test('limit notices and their reset times', () => {
   assert.equal(iso(limitReset("You've hit your limit · resets 9am (UTC)", new Date('2026-10-03T23:30:00Z'))), '2026-10-04T09:00:00.000Z')
   // a reset just before midnight read just after it: last night's, not tonight's
   assert.equal(iso(limitReset("You've hit your limit · resets 11:59pm (UTC)", new Date('2026-10-04T00:00:30Z'))), '2026-10-03T23:59:00.000Z')
+  // Grok's words (no 've; the credit limit)
+  assert.equal(iso(limitReset('You hit your weekly limit. Resets in 3 hours.', now)), '2026-10-03T13:00:00.000Z')
+  assert.equal(iso(limitReset("You've hit the credit limit for your plan · resets 5pm (UTC)", now)), '2026-10-03T17:00:00.000Z')
   // wrapped onto the next line
   assert.equal(iso(limitReset("You've hit your limit ·\nresets 4pm (UTC)", now)), '2026-10-03T16:00:00.000Z')
   // an answer quoting one doesn't count; no notice, no limit

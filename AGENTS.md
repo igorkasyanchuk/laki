@@ -206,6 +206,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
 | `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links, kept in its `.laki-links.json` (`.url` files moved in) |
 | `src/daemon/meters.ts` | transcripts read as they grow: the context and usage meters, today's spend; the Reader's chat (`chatRead`), its background tasks and MCP calls |
+| `src/daemon/agentUsage.ts` | Grok's and Antigravity's chats by day and model, read only from their own files (Grok's `usage.json`, agy's conversation DB through node's sqlite): the Usage page's and Today's rows |
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |

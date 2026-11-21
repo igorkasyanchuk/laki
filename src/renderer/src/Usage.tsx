@@ -242,8 +242,8 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
   )
 }
 
-// the Usage page (the popup's Today › By day and model, ⌘K): what Laki's claude and codex tabs used each day, at the
-// API's list prices, from their transcripts (the daemon's usageDays: USAGE_KEEP days back), and Laki AI's own calls (its
+// the Usage page (the popup's Today › By day and model, ⌘K): what Laki's claude, codex, grok and gemini (Antigravity)
+// tabs used each day, at the API's list prices, from their transcripts (Grok's own price, agy's tokens: agentUsage.ts) (the daemon's usageDays: USAGE_KEEP days back), and Laki AI's own calls (its
 // call log, by what made each: ai), for one agent or model or all. A bar a day, stacked by agent (each its own color, in
 // SERIES order: a filter never repaints one), then Where it went (each workspace's tabs and each of Laki AI's sources),
 // then each model's share
@@ -441,9 +441,9 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
                 </table>
               </section>
             ) : (
-              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code and Codex tabs, from their transcripts, as they work, and Laki AI's calls.</p>
+              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code, Codex, Grok and Antigravity tabs, from their own files, as they work, and Laki AI's calls.</p>
             )}
-            <p className="muted small">At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price): your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
+            <p className="muted small">At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's at its own price, Antigravity's tokens only: your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
           </>
         )}
       </div>
