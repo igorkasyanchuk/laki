@@ -522,7 +522,9 @@ test('laki mcp: resources (a diff, a plan, memory) and prompts (the templates); 
   assert.deepEqual(by[6].result.resourceTemplates.map((x: any) => x.uriTemplate), ['laki://ws/{id}/diff', 'laki://ws/{id}/plan', 'laki://project/{id}/memory'])
   const fix = by[7].result.prompts.find((x: any) => x.name === 'Fix it')
   assert.deepEqual(fix.arguments.map((a: any) => a.name), ['prompt', 'branch']) // a date is stamped, not asked
-  assert.deepEqual(by[8].result.messages, [{ role: 'user', content: { type: 'text', text: `Fix the flaky test on main by ${new Date().toISOString().slice(0, 10)}` } }])
+  const d = new Date() // the local date, as when.ts' stamp writes it (the UTC one is another day near midnight)
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  assert.deepEqual(by[8].result.messages, [{ role: 'user', content: { type: 'text', text: `Fix the flaky test on main by ${today}` } }])
   assert.match(by[9].error.message, /no resource/)
   // an agent's tab: its own workspace listed; Recording mode keeps a private one's diff from it, the tool's way
   await rig.rpc('wsSet', { id: other.id, private: true })
