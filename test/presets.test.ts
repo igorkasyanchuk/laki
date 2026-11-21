@@ -161,7 +161,7 @@ test('a model and effort go into the agent\'s flags (a wrong one makes nothing);
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', model: 'opus; rm -rf ~' }), /model opus; rm -rf ~\?/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', effort: 'huge' }), /effort huge\? low, medium, high, xhigh, max/)
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', effort: 'high' }), /gemini takes no effort/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'grok', effort: 'high' }), /grok takes no effort/)
   assert.equal(execFileSync('git', ['branch', '--list', 'laki/m'], { cwd: rig.repo, encoding: 'utf8' }), '')
 
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', model: ' opus ', effort: 'high' })
@@ -242,9 +242,13 @@ test("a permission mode and fast mode go into the agent's flags, kept for restar
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', perm: 'yolo' }), /permission mode yolo\? auto, acceptEdits, plan, bypassPermissions/)
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', perm: 'auto' }), /gemini has no permission modes/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'grok', perm: 'auto' }), /grok has no permission modes/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', fast: true }), /gemini has no fast mode/)
   assert.equal(execFileSync('git', ['branch', '--list', 'laki/m'], { cwd: rig.repo, encoding: 'utf8' }), '')
+  // agy's: --mode, --model, --effort
+  await rig.rpc('wsNew', { project: p.id, name: 'agy', preset: 'gemini', perm: 'acceptEdits', model: 'gemini-3-pro', effort: 'high' })
+  const agy = (await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy up')).args.join(' ')
+  for (const f of ['--mode accept-edits', '--model gemini-3-pro', '--effort high']) assert.ok(agy.includes(f), `${f} in ${agy}`)
 
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', perm: 'plan', fast: true })
   const tab = await rig.tab(ws.id)
@@ -476,7 +480,7 @@ test("an agent's models: none said, or a failure, asked again after a while; a l
 
 // the macOS wrapper sandbox (shared/wrap.ts): a fake sandbox-exec first on PATH, recording its arguments, then running
 // what it was given
-test('wrapper sandbox: a wrapped gemini starts through sandbox-exec; a missing one stops the tab and says why; an agent cannot turn it off', { skip: process.platform !== 'darwin' }, async t => {
+test('wrapper sandbox: a wrapped agy starts through sandbox-exec; a missing one stops the tab and says why; an agent cannot turn it off', { skip: process.platform !== 'darwin' }, async t => {
   const rig = await fresh(t)
   const args = join(rig.home, 'sandbox-exec.args')
   writeFileSync(join(rig.home, 'bin', 'sandbox-exec'), `#!/bin/sh\nprintf '%s\\0' "$@" > '${args}'\nwhile [ $# -gt 0 ]; do case "$1" in -p|-D|-f) shift 2;; *) break;; esac; done\nexec "$@"\n`, { mode: 0o755 })
@@ -484,7 +488,7 @@ test('wrapper sandbox: a wrapped gemini starts through sandbox-exec; a missing o
   await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true } })
   assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'gem-box').wrap, 'macos')
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello' })
-  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini, through the wrapper')
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy, through the wrapper')
   assert.ok(run.args.includes('hello'))
   const said = readFileSync(args, 'utf8').split('\0')
   assert.equal(said[0], '-p')
@@ -493,7 +497,7 @@ test('wrapper sandbox: a wrapped gemini starts through sandbox-exec; a missing o
   assert.ok(said.some(x => x.endsWith(`=${realpathSync(ws.path)}`) && /^P\d+=/.test(x)), 'its worktree, realpath-ed, a parameter')
   assert.deepEqual(said.slice(-4, -1), ['/bin/sh', '-c', said.at(-2)!]) // the agent's line, run by sh
   // not with its own sandbox on, nor around claude's; an agent's call can't change it
-  await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { args: '-s' } }), /agent's own sandbox on/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { args: '--sandbox' } }), /agent's own sandbox on/)
   await assert.rejects(rig.rpc('presetSave', { name: 'cl-box', add: true, set: { agent: 'claude', sandbox: true, wrap: true } }), /one or the other/)
   const tab = (await until(() => rig.tab(ws.id))).id
   await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { wrap: false }, from: { ws: ws.id, tab } }), /an agent can't change a profile's wrapper sandbox/)
@@ -510,7 +514,7 @@ test("wrapper sandbox's network: listed hosts through Laki's proxy, another refu
   await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true, net: 'off' } }), /net: all, list/)
   await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true, net: 'list' } })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello' })
-  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini, through the wrapper')
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy, through the wrapper')
   const tab = run.tab as string
   assert.match(run.proxy ?? '', new RegExp(`^http://${tab}:[0-9a-f]{36}@127\\.0\\.0\\.1:\\d+$`), 'its own proxy URL')
   assert.match(readFileSync(args, 'utf8').split('\0')[1], /\(deny network-outbound\)/)
@@ -537,7 +541,7 @@ test('wrapper sandbox: no sandbox-exec on this Mac: the tab does not start, and 
   await rig.rpc('presetSave', { name: 'gem-box', add: true, set: { agent: 'gemini', wrap: true } })
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello', name: 'boxless' }), /sandbox-exec .* isn't on this Mac/)
   await sleep(500)
-  assert.ok(!rig.fakeLog().some(l => l.bin === 'gemini'), 'never without the sandbox')
+  assert.ok(!rig.fakeLog().some(l => l.bin === 'agy'), 'never without the sandbox')
   const ws = (await rig.rpc('state')).workspaces.find((w: { id: string; name?: string }) => w.id === 'boxless' || w.name === 'boxless')
   assert.ok(ws, 'the workspace is made')
 })
@@ -565,8 +569,8 @@ test("a project's MCP servers go in by flags: claude one more --mcp-config (a 06
   for (const l of ['mcp_servers.docs.command="npx"', 'mcp_servers.docs.args=["-y", "@acme/docs mcp"]', 'mcp_servers.docs.env={ DOCS_TOKEN = "fake-secret" }', 'mcp_servers.web.url="https://mcp.example.test/mcp"']) assert.ok(x.includes(l), l)
 
   await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'gemini' })
-  await until(() => rig.fakeLog().some(l => l.bin === 'gemini'), 'gemini')
-  assert.ok(!rig.fakeLog().find(l => l.bin === 'gemini').args.join(' ').includes('mcp'), 'gemini: none yet')
+  await until(() => rig.fakeLog().some(l => l.bin === 'agy'), 'agy')
+  assert.ok(!rig.fakeLog().find(l => l.bin === 'agy').args.join(' ').includes('mcp'), 'agy: none yet')
 })
 
 // the wrapper sandbox keeps the data folder from the agent: a wrapped claude's own --mcp-config is read back out of it

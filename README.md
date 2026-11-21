@@ -10,7 +10,7 @@
 
 <p align="center"><b>Run a dozen coding agents at once without losing track: Laki shows which one needs you, checks
 what each did, and gets it merged.</b><br>
-Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Apple silicon) · MIT · <a href="https://laki.sh">laki.sh</a></p>
+Claude Code · Codex · Antigravity · Grok · OpenCode · any command · macOS (Apple silicon) · MIT · <a href="https://laki.sh">laki.sh</a></p>
 
 ### One inbox for every agent
 
@@ -57,7 +57,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | | Laki | Agents in terminal tabs (tmux, iTerm) |
 |---|---|---|
 | A git worktree per task | Made, set up and cleaned up for you | By hand (`git worktree add`) |
-| Any CLI agent | Claude Code, Codex, Gemini, Grok, OpenCode, any command | Any |
+| Any CLI agent | Claude Code, Codex, Antigravity, Grok, OpenCode, any command | Any |
 | A second agent checks the work | Done check, as each turn ends | No |
 | Conflicts between parallel tasks | Collision radar, while they work | At merge |
 | Account needed | None | None |

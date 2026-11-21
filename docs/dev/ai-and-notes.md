@@ -227,7 +227,7 @@ go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* ad
 
 Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on its card (Diff.tsx `useExplain`: the ask
 bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when
-App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or gemini menu names no tool); an Edit
+App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or agy menu names no tool); an Edit
 or Write is refused (its diff shows it). The command is core's `permCmd` (the PermissionRequest's whole command, 2,000
 characters, kept beside `perm` and cleared with it; `perm.what` is a 300-character line), else `what`. One `aiOnce`
 (`ask: 'Explain an ask'`, json; `AI_FROM`'s `explain`) with the command between `<<<` `>>>` and the workspace's folder

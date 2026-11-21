@@ -1,5 +1,5 @@
 // The agent skill: SKILL.md and a launcher for the CLI in each agent's skills folder (~/.claude/skills/laki,
-// ~/.codex/…, ~/.gemini/…, ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
+// ~/.codex/…, ~/.gemini/config/… (agy's), ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
 // when the user asks (Settings), and again as a daemon starts when a Laki update changed one installed for it
 import { chmodSync, closeSync, type Dirent, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -7,17 +7,17 @@ import { join, sep } from 'node:path'
 import { BRAINSTORM_METHOD, BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { groupRule } from '../shared/tools.ts'
 import { USAGE } from '../shared/usage.ts'
-import { cliArgv, cliEnv, findProject, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
+import { cliArgv, cliEnv, findProject, LAKI_CLI, log, pluginFiles, q, STORAGE_NOTE } from './core.ts'
 import { dir } from './dir.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 
-// home: the agent's folder in ~ (its skills/ is where it looks); add: its `mcp add` for the user's scope, before the
-// command (gemini's takes no --: the command's arguments follow its name)
+// home: the agent's folder in ~ (its skills/ is where it looks; agy's: its global customization root); add: its `mcp add`
+// for the user's scope, before the command
 const AGENTS = {
   claude: { name: 'Claude Code', home: '.claude', add: 'claude mcp add -s user laki --' },
   codex: { name: 'Codex', home: '.codex', add: 'codex mcp add laki --' },
-  gemini: { name: 'Gemini', home: '.gemini', add: 'gemini mcp add -s user laki' },
+  gemini: { name: 'Antigravity', home: '.gemini/config', add: 'agy mcp add laki --' },
   grok: { name: 'Grok', home: '.grok', add: 'grok mcp add -s user laki --' },
   opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
   cursor: { name: 'Cursor', home: '.cursor', add: '' }, // C6: cursor-agent reads ~/.cursor/skills; its MCP servers are ~/.cursor/mcp.json's (no mcp add)
@@ -54,13 +54,13 @@ function files(at: string, k: SkillName, a: SkillAgent): Record<string, string> 
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki${START_TOLD.includes(a) ? '' : ', and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work'}. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki${START_TOLD.includes(a) ? '' : ', and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work'}. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
 ---
 
 # Laki
 
 Laki runs each task in a **workspace**: a git worktree on its own branch (\`laki/<id>\`), or the repo itself
-(\`--local\`), with tabs for agents (claude, codex, gemini, grok, opencode), shells and a dev server. A **project** is a repo (or a
+(\`--local\`), with tabs for agents (claude, codex, gemini: Antigravity CLI, grok, opencode), shells and a dev server. A **project** is a repo (or a
 folder) added to Laki; \`Terminals\` and \`Browsers\` (\`kind\` shells or browsers in \`ls --json\`) are the user's own terminals and web pages,
 not for new workspaces. The app shows all of it live; the CLI drives the same daemon.
 
@@ -584,6 +584,18 @@ export function refreshSkills() {
   const ours = q(`LAKI_HOME=${dir}`)
   const launcher = (at: string) => (existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : '')
   for (const r of skills()) if (r.state === 'outdated' && launcher(r.path).includes(` ${ours} `)) skillSet({ agent: r.agent, on: true, skill: r.skill })
+  // the gemini agent is agy now: ours in Gemini CLI's ~/.gemini/skills go to agy's ~/.gemini/config/skills, only our files
+  for (const k of SKILLS) {
+    const old = join(homedir(), '.gemini', 'skills', k)
+    if (!launcher(old).includes(` ${ours} `)) continue
+    try {
+      skillSet({ agent: 'gemini', on: true, skill: k })
+      for (const f of Object.keys(files(old, k, 'gemini'))) rmSync(join(old, f), { force: true })
+      if (!readdirSync(old).length) rmdirSync(old)
+    } catch (e) {
+      log(`skills: ${old} not moved to agy's folder: ${(e as Error).message}`)
+    }
+  }
 }
 
 // install (or update) a skill (laki unless said) for an agent, or remove it: only our files, and the folder if that

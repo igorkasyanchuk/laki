@@ -370,7 +370,7 @@ function StorageUse({ api, dir }: { api: () => Promise<{ dir: string; bytes: num
     </div>
   )
 }
-// a new profile of an agent Laki turns no sandbox on for (gemini, grok, opencode), on a Mac: the wrapper sandbox
+// a new profile of an agent Laki turns no sandbox on for (gemini: agy, grok, opencode), on a Mac: the wrapper sandbox
 // suggested on (shared/wrap.ts); off for every profile you had
 const wrapNew = (agent: string) => (/Mac/.test(navigator.userAgent) && ['gemini', 'grok', 'opencode'].includes(agent) ? { wrap: 'macos' as const } : {})
 const UI_SIZES = [9, 10, 11, 12, 13, 14, 15, 16] // Appearance › Interface › Text size, px
@@ -2467,7 +2467,7 @@ export function SettingsPage(p: {
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] === true} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={`Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. ${a === 'gemini' ? 'Off: no Gemini limits' : `Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`}`} />
+                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={`Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
                   </Switch>
                 ))}
                 <label className="switch-row">
@@ -3164,7 +3164,7 @@ export function SettingsPage(p: {
                         )}
                         {pr.agent === 'command' && (s.labs || pr.acp) && (
                           <Switch className="switch-row" on={!!pr.acp} onChange={on => setPreset(i, { acp: on || undefined })}>
-                            <Says title="Speaks ACP (Labs)" hint="The Agent Client Protocol on its stdio (gemini --experimental-acp, an ACP adapter): its tabs open in the Reader, with no terminal. Laki's permission modes and sandbox aren't applied to it yet: it asks as its own settings say" />
+                            <Says title="Speaks ACP (Labs)" hint="The Agent Client Protocol on its stdio (agy acp, an ACP adapter): its tabs open in the Reader, with no terminal. Laki's permission modes and sandbox aren't applied to it yet: it asks as its own settings say" />
                           </Switch>
                         )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />

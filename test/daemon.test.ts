@@ -1,7 +1,7 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, sleep, until } from './helpers.ts'
@@ -122,9 +122,9 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   // the others' folders, and how each adds Laki's MCP server (opencode: lines for its config)
   const all = await rig.rpc('skillSet', { agent: 'opencode', on: true })
   assert.ok(existsSync(join(rig.home, '.config/opencode/skills/laki/SKILL.md')))
-  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)).slice(0, 7), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki', '/.cursor/skills/laki', '/.claude/skills/laki-widget'])
+  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)).slice(0, 7), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/config/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki', '/.cursor/skills/laki', '/.claude/skills/laki-widget'])
   const mcp = Object.fromEntries(all.filter((x: { skill: string }) => x.skill === 'laki').map((x: { agent: string; mcp: string }) => [x.agent, x.mcp]))
-  assert.match(mcp.gemini, /^gemini mcp add -s user laki '\/usr\/bin\/env' /)
+  assert.match(mcp.gemini, /^agy mcp add laki -- '\/usr\/bin\/env' /)
   assert.match(mcp.grok, /^grok mcp add -s user laki -- '\/usr\/bin\/env' /)
   assert.equal(JSON.parse(mcp.opencode).mcp.laki.command.at(-1), 'mcp')
   assert.equal(all[4].mcpIn, '~/.config/opencode/opencode.json')
@@ -191,11 +191,20 @@ test('A1, A2: each SKILL.md under 8 KB, its reference files beside it and named 
   const laki = readFileSync(join(rig.home, '.claude/skills/laki/SKILL.md'), 'utf8')
   assert.doesNotMatch(laki.split('\n---\n')[0], /LAKI_PROGRESS/)
   await rig.rpc('skillSet', { agent: 'gemini', on: true }) // told nothing at its start: its skill still loads for it
-  assert.match(readFileSync(join(rig.home, '.gemini/skills/laki/SKILL.md'), 'utf8').split('\n---\n')[0], /whenever \$LAKI_PROGRESS is 1/)
+  assert.match(readFileSync(join(rig.home, '.gemini/config/skills/laki/SKILL.md'), 'utf8').split('\n---\n')[0], /whenever \$LAKI_PROGRESS is 1/)
   assert.match(laki, /## Start work[\s\S]*## Rules/)
   assert.match(readFileSync(join(rig.home, '.claude/skills/laki/commands.md'), 'utf8'), /laki new <project/)
   assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/ui-kit.md'), 'utf8'), /`chart` \(/)
   assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/widget-json.md'), 'utf8'), /`sample` \(\*\*required\*\*/)
+  // ours in Gemini CLI's ~/.gemini/skills (from before agy): moved to agy's folder as the daemon starts, a file of yours kept
+  const old = join(rig.home, '.gemini/skills/laki')
+  mkdirSync(join(rig.home, '.gemini/skills'), { recursive: true })
+  renameSync(join(rig.home, '.gemini/config/skills/laki'), old)
+  writeFileSync(join(old, 'notes.md'), 'mine')
+  await rig.stop()
+  await rig.start()
+  assert.equal((await rig.rpc('skills')).find((x: { skill: string; agent: string }) => x.skill === 'laki' && x.agent === 'gemini').state, 'installed')
+  assert.deepEqual(readdirSync(old), ['notes.md'])
 })
 
 test('ports of the workspace process tree, their names, stopping one; PR from gh, dev server', async t => {

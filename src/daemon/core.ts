@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { AGENT_NAMES, agentBin, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -138,7 +138,7 @@ export const firstLine = (e: unknown) => String((e as { stderr?: string }).stder
 let found: Preset[] | undefined
 export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
 // a new install's (settings.sandboxNew) start claude and codex in their sandbox, claude's network to its list (netList)
-export const presets = (): Preset[] => state.settings?.presets ?? (found ??= [...AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a }) as Preset), ...(onPath('cursor-agent') ? [{ ...CURSOR }] : [])]).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= [...AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(agentBin(a))).map(a => ({ name: a, agent: a }) as Preset), ...(onPath('cursor-agent') ? [{ ...CURSOR }] : [])]).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
 export const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
@@ -280,7 +280,7 @@ export function load() {
   // tests being of those pages, unless LAKI_TEST_LEAN=1
   // R4: plan limits no longer ask the agents' usage endpoints unless set to true: an install from before that left one
   // unset hears it once (Settings › Resources' note), a new one never
-  if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex', 'gemini'].some(a => state.settings?.usage?.[a] === undefined) }
+  if (state.settings?.usageNote === undefined) state.settings = { ...state.settings, usageNote: had && ['claude', 'codex'].some(a => state.settings?.usage?.[a] === undefined) }
   // U13: What's new shows once a version (App's WhatsNew): a new install has seen its own, one from before U13 none
   if (state.settings?.seenVersion === undefined) state.settings = { ...state.settings, seenVersion: had ? '' : VERSION }
   // a new install keeps its worktrees out of Time Machine and Spotlight (backup.ts); one from before keeps them in (the
@@ -381,7 +381,7 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // the daemon on 127.0.0.1) and nothing asked for a sandboxed command
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
-// how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
+// how an agent's hooks reach `laki hook`: claude's settings files, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
   const local = h === localHooks
@@ -408,9 +408,6 @@ export function hookFiles(h: Hooks): Record<string, string> {
     // statusLine (--settings wins); this Mac's only: a host can't reach the daemon's files
     ...(h === localHooks && statusOn() && { statusLine: { type: 'command', command: q(statusSh), padding: 0 } }),
   })
-  // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
-  const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
-  const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
   // S12, S6: Laki's data folder isn't a sandboxed claude's to read (daemon.json's token, the phone's tap-key, Laki AI's
   // key, state.json, accounts, the pty host's pty.json and socket): its Bash commands (denyRead, the narrower allowRead
   // wins) and its Read tool (deny rules: an allow can't carve one out, so each entry but the allowed by name). Allowed
@@ -427,7 +424,6 @@ export function hookFiles(h: Hooks): Record<string, string> {
   const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && boxed(gated)) }, null, 2)]))))
   return {
     ...claude,
-    'gemini-settings.json': JSON.stringify(gemini, null, 2),
     'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
   }
 }
@@ -853,17 +849,17 @@ export const tabStatus = (id: string): Status => rt.get(id)?.status ?? 'idle'
 
 // an agent whose turns Laki follows: by its hooks (HOOKED), or by its screen (sweepRunning)
 export const tracked = (t: Tab) => t.kind === 'agent' && (isAgent(t.preset) || t.preset === 'acp')
-// a hook, notify or plugin says when a turn ends; gemini's do in versions that have hooks (Runtime.hooked: one came)
+// a hook, notify or plugin says when a turn ends (Runtime.hooked: one came); the rest by OSC 7501 or their screen
 const HOOKED = new Set(['claude', 'codex', 'opencode'])
 // what an agent shows while it works, on screen or in its window title: a quiet screen without it means the turn is over
 const BUSY: Record<string, RegExp> = {
   claude: /esc to interrupt/i,
   codex: /esc to interrupt/i,
-  gemini: /esc to cancel|working…/i,
+  gemini: /esc to (cancel|interrupt)|thinking\.\.\./i, // agy's
   grok: /^[^\n]* - (thinking|responding|running|compacting|waiting)\b/i, // its title (the first line): "⠋ - Thinking - <session> - grok"
   opencode: /esc (again to )?interrupt/i,
 }
-const ASKS = /action required/i // gemini's and grok's title while a permission prompt waits
+const ASKS = /action required/i // grok's title while a permission prompt waits
 const QUIET = 4000
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time (none run from source)
@@ -1845,7 +1841,6 @@ export function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> =
     ...(storage && { LAKI_STORAGE_FOLDER: storage }), // its files for the user to keep: every tab's the same
     // ponytail: these replace one the user set
     ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: join(hooks, 'opencode') }), // Laki's plugin, on top of the user's config
-    ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: join(hooks, 'gemini-settings.json') }), // the lowest layer; hooks add up
     ...(tab.preset === 'claude' && !ws.host && statusLineEnv(ws, tab)), // its status line's JSON kept, yours run after (meters.ts)
     ...extra,
   }
@@ -1900,8 +1895,14 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     if (told && !pr?.args?.includes('developer_instructions') && !codexOwn()) argv.push('-c', 'developer_instructions=' + JSON.stringify(told)) // a JSON string is a TOML one
     argv.push(...codexMcpArgs(mcp))
   } else if (tab.preset === 'gemini') {
-    argv = again ? ['gemini', '--resume', again] : ['gemini']
-    if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
+    // Antigravity CLI (agy, Gemini CLI's successor; the agent's id stays gemini): its chat by the id it printed as it
+    // exited (agyResume), else its folder's latest (-c: the workspace's worktree is its own). No hooks: it reads them
+    // only from ~/.gemini/config or the repo's .agents, files Laki doesn't write; it says what it's doing over OSC 7501
+    // ponytail: -c only for the workspace's one agy tab (two would both open the latest); a chat changed after the
+    // exit line was read (agy's /resume) is resumed as the old one
+    const solo = !state.tabs.some(t => t.id !== tab.id && t.workspace === tab.workspace && t.preset === 'gemini')
+    argv = again ? ['agy', `--conversation=${again}`] : resume && solo ? ['agy', '-c'] : ['agy']
+    if (ask.length) ask = ['-i', ...ask] // -p would answer it and exit
   } else if (tab.preset === 'grok') {
     // grok takes the id of a new chat, so the tab knows its chat from the start
     if (!again) (tab.resumeId = randomUUID()), save()
@@ -1926,7 +1927,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     } catch {}
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
   }
-  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' || tab.preset === 'gemini' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' || tab.preset === 'gemini' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   const line = [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' ')
   // S12: the values emptied for the agent itself (sh, bash, zsh: an assignment before a command takes effect after its
@@ -1958,7 +1959,7 @@ function realOf(p: string): string {
     return up === p ? p : join(realOf(up), basename(p))
   }
 }
-// what a wrapped agent and its hooks read in the data folder: claude's settings and plugin, gemini's settings, opencode's
+// what a wrapped agent and its hooks read in the data folder: claude's settings and plugin, opencode's
 // config folder, the status line's script, pasted pictures and files (laki hook's tool-gates: a stat, so not here).
 // ponytail: every workspace's images/ and files/, as claude's own sandbox gives them
 const wrapReads = () => [...new Set([...Object.keys(hookFiles(localHooks)), ...Object.keys(claudePlugin())].map(f => f.split('/')[0]))].map(f => join(dir, f)).concat(statusSh, join(dir, 'images'), join(dir, 'files'))
@@ -2248,6 +2249,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     if (tab.kind !== 'agent' && tab.kind !== 'dev' && tab.kind !== 'script' && !(ws.host && tab.kind === 'shell')) return
     s.term.write('', () => {
       wsLog(ws, () => `${tab.name}: ended with code ${code} after ${Math.round((Date.now() - born) / 1000)} s: ${s.screenText(4).trim().slice(-300)}`) // why a chat didn't come back (development mode)
+      if (tab.preset === 'gemini') (id => id && id !== tab.resumeId && ((tab.resumeId = id), save()))(agyResume(s.screenText(12))) // agy's chat: the id it printed as it exited
       // a chat id claude/codex don't have (e.g. one with no message was never saved): Enter starts a new one. Only as it
       // starts (RESUME_FAIL): later, a chat's own words on the screen ("session not found") don't drop its id; an adopted
       // one (R6) started long before `born`
@@ -4376,11 +4378,11 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         r.turnFrom ??= now
         if (r.waitFrom !== undefined) (r.waited = (r.waited ?? 0) + Math.max(0, now - r.waitFrom)), (r.waitFrom = undefined) // an ask answered
       }
-      if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
+      if (pl.hook_event_name === 'UserPromptSubmit') {
         if (!late) (r.turnFrom = now), (r.waited = r.waitFrom = undefined) // a turn of its own (an Esc ended the last with no hook)
         if (r.contSent) r.contSent = false // the continue it was sent: still that turn's one
         else r.autoContinued = false
-        titleFrom(tab, pl.prompt) // claude's, gemini's
+        titleFrom(tab, pl.prompt) // claude's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
         goalHeld.delete(tab.id) // A1: a prompt of yours: a turn of its own
         goalSeen(tab)
@@ -4457,7 +4459,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         tab.resumeId = id
         save()
       }
-      const last = pl.last_assistant_message ?? pl['last-assistant-message'] ?? pl.prompt_response // claude's, codex's, gemini's
+      const last = pl.last_assistant_message ?? pl['last-assistant-message'] // claude's, codex's
       if (last) {
         r.last = String(last)
         writeFileSync(join(runDir, `${tab.id}.last`), r.last)
@@ -4648,9 +4650,17 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
     }
   }
   typeInto(s, textFor(tab, p.text))
+  promptTyped(tab, p.text)
   if (tracked(tab)) r.status = 'running'
   changed()
   return { tab: tab.id, sent: true }
+}
+// an agent with no hooks (agy, grok) says no prompt it took: what Laki types into it stands for its UserPromptSubmit
+// (the workspace's title, A1b's goal paused by yours). ponytail: one typed in its terminal by hand isn't seen
+function promptTyped(tab: Tab, text: string) {
+  if (!tracked(tab) || HOOKED.has(tab.preset!) || tab.preset === 'acp' || rtOf(tab.id).hooked) return
+  titleFrom(tab, text)
+  checkHooks.prompt?.(tab, text)
 }
 
 function deliver(id: string) {
@@ -4663,6 +4673,7 @@ function deliver(id: string) {
   save()
   wsLog({ id: tab.workspace }, `to ${tab.name}: a queued message typed in${tab.queue?.length ? ` (${tab.queue.length} more waiting)` : ''}: ${msg.split('\n')[0].slice(0, 120)}`)
   typeInto(s, textFor(tab, msg))
+  promptTyped(tab, msg)
   r.status = 'running'
   changed()
   return true
@@ -4944,7 +4955,11 @@ export function sweepRunning(now = Date.now()) {
       if (m ? r.mode !== m || r.modeUnknown : !r.modeUnknown) (m ? ((r.mode = m), (r.modeUnknown = undefined)) : (r.modeUnknown = true), changed())
     }
     const screen = tracked(t) && !HOOKED.has(t.preset!) && !r?.hooked // no hooks: the screen and title are all it says
-    if (screen && s && !s.exited && r && r.status !== 'idle') {
+    // unless it says over OSC 7501 (programSeen): working or asking is its word; idle, done or error with the tab still
+    // running (a send it took no turn for: a /command) ends as a quiet screen does
+    const native = screen && t.preset !== 'acp' ? s?.program.root()?.state : undefined
+    if (native === 'working' || native === 'blocked') continue
+    if (screen && !native && s && !s.exited && r && r.status !== 'idle') {
       const asks = ASKS.test(s.title)
       if (asks && r.status === 'running') turn({ tab: t.id, state: 'waiting' })
       else if (!asks && r.status === 'waiting') turn({ tab: t.id, state: 'running' }) // answered
@@ -4952,7 +4967,7 @@ export function sweepRunning(now = Date.now()) {
     if (!s || s.exited || r?.status !== 'running' || !tracked(t) || t.preset === 'acp' || now - s.lastOutput < QUIET) continue // an ACP agent's turn ends with its prompt's answer
     if (r.bg && now - r.bg < BG_MAX) continue // its subagents work (turn): its next turn says when it's done
     if (r.compacting && now - r.compacting < COMPACT_MAX) continue // summing up a long chat may print nothing for a while
-    if (BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue
+    if (!native && BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue // its report outranks what's left on screen
     if (screen && now - (r.since ?? 0) > 2 * QUIET) {
       turn({ tab: t.id, state: 'idle' })
       continue
@@ -4966,7 +4981,7 @@ export function sweepRunning(now = Date.now()) {
 // Hooks not heard: an agent whose hooks say as a turn starts (HEARS; codex's notify comes only as one ends), on this Mac,
 // started DEAF_AFTER ago, given a prompt (a send, Enter, its start's) its screen answered, and not one hook since: the
 // tab's view has hookless, the likely why (hookHealth.ts), until a hook comes (hook). Every 30 s (main.ts)
-const HEARS = new Set(['claude', 'gemini', 'opencode'])
+const HEARS = new Set(['claude', 'opencode'])
 const DEAF_AFTER = 2 * 60_000
 const prompted = new WeakMap<Session, number>() // a session's first prompt: a new start asks again
 const deaf = new WeakMap<Session, HookWhy>()
@@ -4997,24 +5012,35 @@ function hookWhy(t: Tab, ws: Workspace) {
   return hookCause({ agent: t.preset!, cwd: ws.path, files, args: pr?.args, env: own && { where: own[0], dir: own[1]!.CLAUDE_CONFIG_DIR! }, argv: hookArgv })
 }
 // Settings › Agents & profiles: each agent's last hook, its live tabs and how many of them aren't heard
-// OSC 7501 in shadow (program.ts): the root's report against the status from hooks, counted per agent since the daemon started
+// OSC 7501 (program.ts): the root's report against the status from hooks, counted per agent since the daemon started.
+// An agent outside HOOKED that sent no hook from the tab (agy) is followed by it, as its screen is otherwise: working
+// runs a turn, blocked waits (its ask still read off the screen), idle or done ends one, error fails it. Status only:
+// never an answer
 const natives = new Map<string, NativeSeen>()
 function programSeen(tab: Tab, s: Session) {
   const root = s.program.root()
   if (!root || !tab.preset || !tracked(tab) || asleep.has(tab.id) || s.exited) return
   const n = natives.get(tab.preset) ?? { agree: 0, differ: 0 }
   natives.set(tab.preset, n)
-  const hook = rtOf(tab.id).status
+  const r = rtOf(tab.id)
+  const hook = r.status
   if (nativeAgrees(root.state, hook)) n.agree++
   else (n.differ++, (n.last = { at: Date.now(), native: root.state, hook, ...(root.app && { app: root.app }) }))
+  if (HOOKED.has(tab.preset) || r.hooked || tab.preset === 'acp') return
+  const st = root.state
+  if (st === 'blocked' && hook !== 'waiting') turn({ tab: tab.id, state: 'waiting' })
+  else if (st === 'working' && hook !== 'running') turn({ tab: tab.id, state: 'running' })
+  else if ((st === 'idle' || st === 'done' || st === 'error') && (hook === 'running' || hook === 'waiting')) turn({ tab: tab.id, state: st === 'error' ? 'failed' : 'idle', ...(st === 'error' && { payload: { error: `${AGENT_NAMES[tab.preset as Agent] ?? tab.preset} said its turn failed` } }) })
 }
+// agy's chat id, from what it prints as it exits ("Resume with -c (or command below): agy --conversation=<id>"): the last one on screen
+export const agyResume = (screen: string) => [...screen.matchAll(/\bagy --conversation=([A-Za-z0-9-]{6,64})\b/g)].at(-1)?.[1]
 export const hooksSeen = () =>
   Object.fromEntries(AGENTS.map(a => [a, { ...(natives.has(a) && { native: natives.get(a) }), ...(heard.has(a) && { at: heard.get(a) }), tabs: state.tabs.filter(t => t.preset === a && tracked(t) && isLive(t)).length, deaf: state.tabs.filter(t => t.preset === a && deafOf(t.id)).length }]))
 
 // a command line that runs an agent: its program (or a node/bun/deno/python script's) named as one, a path or not
 // ponytail: by name; an agent under another name (an alias to a wrapper script) still spins
 export const agentRuns = (args: string): Agent | undefined => {
-  const [a = '', b = ''] = args.trim().split(/\s+/).map(x => basename(x))
+  const [a = '', b = ''] = args.trim().split(/\s+/).map(x => (basename(x) === 'agy' ? 'gemini' : basename(x))) // agy: the gemini agent's
   return isAgent(a) ? a : /^(node|bun|deno|python3?)$/.test(a) && isAgent(b) ? b : undefined
 }
 
@@ -5490,7 +5516,7 @@ export async function doctor(): Promise<Doctor> {
   // its token's codespace scope (cloud workspaces'): optional, said where it's missing
   const agents = await Promise.all(
     AGENTS.map(async id => {
-      const found = onPath(id)
+      const found = onPath(agentBin(id))
       const s = found ? await signedIn(id) : undefined
       return { id, found, ...(s !== undefined && { signedIn: s }) }
     }),
@@ -5501,7 +5527,7 @@ export async function doctor(): Promise<Doctor> {
 // R6: what a bug report needs, as text (laki doctor --bundle, Copy diagnostics): versions, the doctor, each agent's
 // version, counts, the Labs on, the logs' last lines; redacted (diagRedact)
 export async function diagnostics(): Promise<string> {
-  const [d, versions] = await Promise.all([doctor(), Promise.all(AGENTS.map(id => (onPath(id) ? run(id, ['--version'], { timeout: 5000, env: { ...process.env, ...state.settings?.env } }).then(r => /\d+\.\d+[\w.+-]*/.exec(r.stdout)?.[0] ?? '?', () => '?') : Promise.resolve('not found')).then(v => `${id} ${v}`)))])
+  const [d, versions] = await Promise.all([doctor(), Promise.all(AGENTS.map(id => (onPath(agentBin(id)) ? run(agentBin(id), ['--version'], { timeout: 5000, env: { ...process.env, ...state.settings?.env } }).then(r => /\d+\.\d+[\w.+-]*/.exec(r.stdout)?.[0] ?? '?', () => '?') : Promise.resolve('not found')).then(v => `${id} ${v}`)))])
   const s = state.settings ?? {}
   const labs = LABS.filter(k => (s as Record<string, unknown>)[k] !== false)
   const live = state.workspaces.filter(w => !w.archived)
@@ -5576,13 +5602,13 @@ export function troubled(e: unknown) {
 }
 
 // U4: whether a found agent is signed in, by where it keeps its sign-in being there (never read): claude's credentials
-// file or Keychain item (security without -w: the item's attributes, not its secret), codex's auth.json, Gemini CLI's
-// oauth_creds.json, or the API key in the environment. undefined: no cheap way to tell (grok, opencode)
+// file or Keychain item (security without -w: the item's attributes, not its secret), codex's auth.json, or the API key
+// in the environment. undefined: no cheap way to tell (grok, opencode; agy's sign-in, Antigravity's: where it keeps it isn't said)
 async function signedIn(id: Agent): Promise<boolean | undefined> {
   const env = process.env
   if (id === 'claude') return !!env.ANTHROPIC_API_KEY || existsSync(join(env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), '.credentials.json')) || (process.platform === 'darwin' && (await run('security', ['find-generic-password', '-s', 'Claude Code-credentials'], { timeout: 3000 }).then(() => true, () => false)))
   if (id === 'codex') return !!env.OPENAI_API_KEY || existsSync(join(env.CODEX_HOME || join(homedir(), '.codex'), 'auth.json'))
-  if (id === 'gemini') return !!env.GEMINI_API_KEY || existsSync(join(env.GEMINI_CLI_HOME || homedir(), '.gemini', 'oauth_creds.json'))
+  if (id === 'gemini') return env.GEMINI_API_KEY ? true : undefined
   return undefined
 }
 

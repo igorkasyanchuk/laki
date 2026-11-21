@@ -191,8 +191,8 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `sampleNew` (U4: Welcome's *Try it on a sample repo*: a tiny JS project with a failing test made once in `<data>/sample`, a project with `sample`; again: that one) and `sampleRm` (it and its folder; its worktrees first); agents refused both;
 - tabs and agents: `tabNew`/`tabClose` (a tab's name: `addTab`, `freeName` numbers it; an agent tab after the
   workspace's first, with a prompt, is `<agent>: <taskTitle(prompt)>` (`shared/types.ts`: its first words, no URLs, paths,
-  flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit and
-  gemini's BeforeAgent `prompt`, codex's first notify `input-messages`, never a bare /command; in an untitled workspace
+  flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit `prompt`,
+  codex's first notify `input-messages`, never a bare /command; in an untitled workspace
   (a workspace's `untitled`: made with no name or prompt, a Local one or a worktree's `ws-<tail>`; or a folder's own from
   before, its project's id; `wsSet` `name` sets it false; a workspace's `named`: you named it, `wsSet` `name` not from an
   agent (`wsSet` in `FROM`) or `wsNew` `named` with no `from` (the page's typed name, the CLI's `--name`): an agent's
@@ -380,7 +380,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   the turn ended); `settings.progress` puts `LAKI_PROGRESS=1` in agents' env (`lakiEnv`) and
   claude and codex on this Mac are told at every start (`agentCmd`'s `PROGRESS_NOTE`: `--append-system-prompt`, `-c
   developer_instructions`), and claude's settings allow its `progress` command; A2: their skill's description no longer
-  names `$LAKI_PROGRESS` (skill.ts `START_TOLD`: it would load the whole skill into every session), gemini's, grok's and
+  names `$LAKI_PROGRESS` (skill.ts `START_TOLD`: it would load the whole skill into every session), agy's, grok's and
   opencode's still does (nothing tells them at their start), and the skill's own section stays for any that loads it;
 - Laki AI (below): `aiAsk` (from an agent: main.ts `byAgent` marks the text as the agent's and takes it out of the queue, `asAgent` runs each tool call through `agentNo` with the agent's `from`, in a chat of that tab's own (ai.ts `agentChat`, `ai-agent-<tab>.json`: never your chat's history; `aiState`, `aiNew`, `aiStop` from an agent are that chat's; your chats' `aiChats`, `aiOpen`, `aiChatRm`, `aiUnqueue`, `aiContinue`, `studioChatRm` and `voiceText` refused); claude -p's and codex exec's `laki mcp` gets that tab's `LAKI_TAB_TOKEN` (`asTab`), so its calls are the agent's too; `text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
   conversation, `busy`, `ended`, `key`: one is saved, the last 100 calls,

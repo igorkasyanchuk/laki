@@ -524,7 +524,7 @@ Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below ar
 account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line
 `rate_limits`, Codex's transcripts' `token_count` `rate_limits` (share.ts' `meterOf` keeps the newest as `Meter.limits`,
 `codexRateWindows`), of any age: `at` says when, Usage.tsx shows *As of HH:MM* past 20 minutes), `source: 'own'`;
-none yet: a row with `SAYS`' error; Gemini has none, so it isn't listed. Asked, `source: 'endpoint'`. An install from
+none yet: a row with `SAYS`' error. Asked, `source: 'endpoint'`. An install from
 before (state.json there, an agent's `usage` unset) gets `settings.usageNote` true once: Settings › Resources' note,
 OK sets it false. A delayed start's *after the plan limit* (schedule.ts `pendingTick`) reads the same: an own window
 whose reset has passed starts it. With the endpoint on, `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
@@ -541,15 +541,7 @@ status line within `STATUS_FRESH` (meters.ts' `statusLimits`, below; main.ts pas
 its 5-hour and weekly windows (`claudeWindows`' labels), the endpoint's others and plan as `last` had them; the endpoint
 is still asked on its TTL (`ask`): only it has the per-model weeks (`limits[]`' `weekly_scoped`: Fable's). The endpoint
 off, the popup says so (Usage.tsx' `asks`, Settings' `usage`).
-Gemini CLI (`gemini`, CodeNomad's way): only once `~/.gemini/oauth_creds.json` is there (`GEMINI_CLI_HOME`;
-`geminiSigned`, accounts.ts' `usageWho`: one `Who`), read only; an expired `access_token` is refreshed at
-`oauth2.googleapis.com/token` with Gemini CLI's own client, read from its install (`geminiClient`), the new token in memory
-(`geminiToken`, by the refresh token's hash; never the answer's refresh token), nothing written under `~/.gemini`; the
-project `GOOGLE_CLOUD_PROJECT`, else `cloudcode-pa`'s `v1internal:loadCodeAssist` (once); then `retrieveUserQuota`
-(`{ project }`): each bucket's `remainingFraction` and `resetTime` a window labelled by its model (`geminiWindows`). Its
-`settings.json` picking an API key (`gemini-api-key`, `vertex-ai`), or any failure: `Unknown: …`; a 429 as the others.
-Kept 5 minutes; one base URL for all of Google's (`base`, `LAKI_USAGE_API`). Usage.tsx sorts its windows by the models
-Gemini tabs use (`byUse`; the ring's is the first) and folds all but `MODELS_SHOWN` under *More*.
+Gemini CLI's quota went with it (its successor, Antigravity's `agy`, says nothing of its limits): claude and codex only.
 
 ### Meters
 

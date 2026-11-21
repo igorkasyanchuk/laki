@@ -4,7 +4,7 @@
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
-// OSC 7501's root against the status hooks gave (shadow: core's programSeen only counts it)
+// OSC 7501's root against the status hooks gave (core's programSeen counts it; a hookless agent's status)
 export const nativeAgrees = (native: string, status: string) => status === (native === 'working' ? 'running' : native === 'blocked' ? 'waiting' : 'idle')
 
 export type HookWhy = { why: string; detail?: string } // detail: what to look at, to copy (a file:line, the args, the command)
@@ -14,8 +14,7 @@ const said = (p: string, cwd?: string) => (cwd && p.startsWith(cwd + '/') ? p.sl
 
 // the first that holds: (1) a settings file turns hooks off; (2) the profile's args bring their own --settings (claude
 // takes one); (3) CLAUDE_CONFIG_DIR set in an env of yours; (4) Laki's hook command doesn't run (the node or Electron it
-// names gone: a moved or updated app under a daemon that outlived it); (5) the agent's own: gemini's trusted folders, or
-// too old for hooks
+// names gone: a moved or updated app under a daemon that outlived it); (5) the agent's own: too old for hooks
 export function hookCause(o: { agent: string; cwd?: string; files?: string[]; args?: string; env?: { where: string; dir: string }; argv: string[] }): HookWhy {
   for (const f of o.files ?? []) {
     let text = ''
@@ -42,6 +41,5 @@ export function hookCause(o: { agent: string; cwd?: string; files?: string[]; ar
     return { why: `Laki's hook command doesn't run: ${bin} isn't executable`, detail: cmd }
   }
   if (!existsSync(script)) return { why: `Laki's hook command doesn't run: ${script} is gone (the app moved or was updated: restart Laki)`, detail: cmd }
-  if (o.agent === 'gemini') return { why: 'gemini runs hooks only in versions that have them, in a folder it trusts', detail: o.cwd }
   return { why: `unknown: ${o.agent} may be too old for hooks` }
 }

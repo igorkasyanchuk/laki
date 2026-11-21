@@ -186,7 +186,7 @@ const ACTION_EG: Record<RunAction['target'], string> = {
 export const ARGS_EG: Record<Agent, string> = {
   claude: '--add-dir ../shared', // a permission mode: its own picker
   codex: '--search',
-  gemini: '--approval-mode auto_edit',
+  gemini: '--settings agy-work.json',
   grok: '--permission-mode acceptEdits',
   opencode: '--agent build',
 }

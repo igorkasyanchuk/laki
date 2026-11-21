@@ -87,7 +87,7 @@ export async function askAgent(rpc: Rpc, target: string, question: string, me = 
     else if (t.status === 'running' || t.status === 'waiting') ran = true
     else if (t.status === 'exited') throw new Error(`${target} ended before it answered`)
     else if (ran || t.last !== was) {
-      // an agent with no end-of-turn hook (grok; gemini without hooks) keeps its last answer: never hand that back as this one's
+      // an agent with no end-of-turn hook (grok, agy) keeps its last answer: never hand that back as this one's
       const said = t.last !== was ? (t.last ?? '') : `(no reply text came back: laki screen ${target} shows it)`
       return t.limit ? `(${target} hit its usage limit) ${said}`.trim() : said
     }
@@ -285,8 +285,8 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: "laki_limits",
-    description: "How much of each agent's plan is used and when each limit resets: Claude's, Codex's and Gemini's, per signed-in account. Read only, from what Laki keeps (no extra requests). An agent whose numbers can't be read has its own error; the others still come back. Before long work: pick the account or agent with room left, or wait for a reset.",
-    inputSchema: obj({ agent: str('only this agent: claude, codex or gemini') }),
+    description: "How much of each agent's plan is used and when each limit resets: Claude's and Codex's, per signed-in account. Read only, from what Laki keeps (no extra requests). An agent whose numbers can't be read has its own error; the others still come back. Before long work: pick the account or agent with room left, or wait for a reset.",
+    inputSchema: obj({ agent: str('only this agent: claude or codex') }),
     run: a => rpc('limits', { agent: a.agent, from: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB } }),
   },
   {

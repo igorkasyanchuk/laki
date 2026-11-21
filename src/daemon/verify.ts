@@ -294,7 +294,7 @@ turnEnds.add((tab, o) => {
   if (tab.goalRun?.state === 'working') void goalEnd(tab, o).catch(e => wsLog({ id: tab.workspace }, `goal: ${(e as Error).message}`))
 })
 
-// ---------- A1b: a goal Laki runs for an agent with no /goal of its own (gemini, opencode, grok, an ACP agent…): its
+// ---------- A1b: a goal Laki runs for an agent with no /goal of its own (agy, opencode, grok, an ACP agent…): its
 // words as a prompt, then at each of its turn's ends the project's script (format, lint or test, as the Done check runs
 // one): passing, it's reached; failing, the goal and the script's output go back to it (send whenIdle, as the Done check's
 // failures; once per end: goalBusy), until maxTurns turns, maxUsd spent (its meter's, an agent Laki can price) or the same

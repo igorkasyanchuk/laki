@@ -15,7 +15,7 @@ brew upgrade --cask laki                        # a new version (or Settings ›
 What it needs:
 
 - git;
-- the agents you use, on the PATH your login shell gives: `claude`, `codex`, `gemini`, `grok`, `opencode`;
+- the agents you use, on the PATH your login shell gives: `claude`, `codex`, `agy` (Antigravity: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), `grok`, `opencode`;
 - optional: `gh`, signed in (`gh auth login`), for pull requests, checks and reviews; `cloudflared` or Tailscale for
   Expose to the world and remote access.
 

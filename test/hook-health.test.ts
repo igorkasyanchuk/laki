@@ -86,5 +86,4 @@ test('hookCause: the first likely why', t => {
   assert.match(hookCause({ agent: 'claude', argv: [process.execPath, join(d, 'hook.ts')] }).why, /hook\.ts is gone/)
   // else the agent's own
   assert.equal(hookCause({ agent: 'claude', argv: node }).why, 'unknown: claude may be too old for hooks')
-  assert.deepEqual(hookCause({ agent: 'gemini', cwd: ws, argv: node }), { why: 'gemini runs hooks only in versions that have them, in a folder it trusts', detail: ws })
 })

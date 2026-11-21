@@ -1,6 +1,6 @@
 // A shared tab (remote.ts' shareStart, the app's Share live view): a view-only page anyone with its link opens, kept up to date. Here: what it
 // shows, as Markdown (Copy, Download) and as the page. An agent's chat from its transcript (claude's, codex's): your
-// prompts, its answers, its tool calls a line each; anything else (a shell, gemini…): the terminal's text.
+// prompts, its answers, its tool calls a line each; anything else (a shell, agy…): the terminal's text.
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'

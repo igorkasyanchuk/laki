@@ -1,8 +1,9 @@
-// Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, gemini's hooks, opencode's plugin.
+// Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, agy's OSC 7501, opencode's plugin.
 import assert from 'node:assert/strict'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { agentRuns, agyResume } from '../src/daemon/core.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 test('hooks drive status; queue delivered on Stop; done until viewed', async t => {
@@ -120,20 +121,48 @@ test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resu
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args, ['--resume', tab.resumeId])
 })
 
-test('gemini: its hooks (from Laki\'s system settings) give the session and the answer; a restart resumes it', async t => {
+test("agy's exit line: the last conversation id on screen is its chat; agy typed in a shell is the gemini agent", () => {
+  assert.equal(agyResume('Bye\r\nResume with -c (or command below): agy --conversation=4f1c2b9e-77aa-4d0e-9c1d-2b6f0e5a1c33\r\n'), '4f1c2b9e-77aa-4d0e-9c1d-2b6f0e5a1c33')
+  assert.equal(agyResume('agy --conversation=old-one-1\nagy --conversation=new-one-2\n'), 'new-one-2')
+  assert.equal(agyResume('agy --conversation=x\nno id here'), undefined) // under 6 characters: not one
+  assert.equal(agyResume('Goodbye'), undefined)
+  assert.equal(agentRuns('/Users/me/.local/bin/agy -c'), 'gemini')
+  assert.equal(agentRuns('gemini -i hi'), 'gemini')
+})
+
+test('agy (the gemini agent): no hooks, its OSC 7501 says each turn and ask; the chat it printed as it exited resumes', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', prompt: 'hello gemini' })
-  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini up')
-  assert.deepEqual(run.args, ['-i', 'hello gemini']) // interactive: a bare prompt would answer and exit
-  await until(async () => (await rig.tab(ws.id)).last === 'answer: hello gemini', 'AfterAgent hook')
+  assert.ok((await rig.rpc('state')).presets.some((x: any) => x.name === 'gemini'), 'agy on PATH: a default preset')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', prompt: 'hello agy' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy up')
+  assert.deepEqual(run.args, ['-i', 'hello agy']) // interactive: -p would answer and exit
   const tab = await rig.tab(ws.id)
-  assert.equal(tab.status, 'idle')
-  assert.match(tab.resumeId, /^gem-/)
-  await rig.stop()
-  await rig.start()
-  await until(() => rig.fakeLog().filter(l => l.bin === 'gemini').length === 2, 'gemini restarted')
-  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'gemini')[1].args, ['--resume', tab.resumeId])
+  await until(async () => (await rig.screen(tab.id)).includes('answer: hello agy'), 'its answer')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle: state=done', 3000) // not 8 s of a quiet screen
+  // blocked: waiting, and it stays so while the screen sweep (2 s) would read a quiet title as answered
+  await rig.rpc('input', { tab: tab.id, data: 'ask to edit\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting: state=blocked')
+  await sleep(2500)
+  assert.equal((await rig.tab(ws.id)).status, 'waiting')
+  await rig.rpc('input', { tab: tab.id, data: '1\r' })
+  await until(async () => (await rig.screen(tab.id)).includes('answer: allowed ask to edit'), 'answered')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle again')
+  // state=error: a failed turn, said on the tab
+  await rig.rpc('send', { target: tab.id, text: 'fail please' })
+  await until(async () => /Antigravity said its turn failed/.test((await rig.tab(ws.id)).failed ?? ''), 'failed: state=error')
+  // a send it takes no turn for (a /command: no report): running, then idle once its screen is quiet
+  await rig.rpc('send', { target: tab.id, text: '/help' })
+  assert.equal((await rig.tab(ws.id)).status, 'running')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle: a quiet screen, its last report done', 10000)
+  // it exits: the id on its last line is the tab's chat, and a restart opens it
+  await rig.rpc('input', { tab: tab.id, data: 'exit\r' })
+  await until(async () => /^agy-/.test((await rig.tab(ws.id)).resumeId ?? ''), 'its conversation id')
+  const id = (await rig.tab(ws.id)).resumeId
+  await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id).status === 'exited', 'exited')
+  await rig.rpc('input', { tab: tab.id, data: '\r' }) // Enter on an ended agent starts it again
+  await until(() => rig.fakeLog().filter(l => l.bin === 'agy').length === 2, 'agy again')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'agy')[1].args, [`--conversation=${id}`])
 })
 
 test('opencode: Laki\'s plugin reports its session and turns (not a subagent\'s), a restart resumes the session', async t => {

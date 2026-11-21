@@ -13,7 +13,7 @@ test("B3: Uninstall Laki: the laki command and this Laki's skills removed, anoth
   await rig.rpc('skillSet', { agent: 'claude', on: true })
   await rig.rpc('skillSet', { agent: 'codex', on: true, skill: 'laki-widget' })
   // gemini's skill drives another data folder's daemon (a dev build's): kept
-  const theirs = join(rig.home, '.gemini/skills/laki')
+  const theirs = join(rig.home, '.gemini/config/skills/laki')
   await rig.rpc('skillSet', { agent: 'gemini', on: true })
   writeFileSync(join(theirs, 'laki'), readFileSync(join(theirs, 'laki'), 'utf8').replace(/LAKI_HOME=[^']*/, 'LAKI_HOME=/elsewhere'))
 
@@ -21,7 +21,7 @@ test("B3: Uninstall Laki: the laki command and this Laki's skills removed, anoth
   const look = await rig.rpc('uninstall', {})
   const by = (rows: any[], id: string) => rows.find(r => r.id === id)
   assert.deepEqual(look.rows.map((r: any) => [r.id, r.state]), [['cli', 'todo'], ['skills', 'todo'], ['daemon', 'todo'], ['worktrees', 'none'], ['data', 'kept'], ['next', 'todo']])
-  assert.match(by(look.rows, 'skills').detail, /^Claude Code, Codex; Gemini: another Laki's, kept$/)
+  assert.match(by(look.rows, 'skills').detail, /^Claude Code, Codex; Antigravity: another Laki's, kept$/)
   assert.equal(by(look.rows, 'next').detail, 'Quit Laki and move it to the Trash')
   assert.equal(by((await rig.rpc('uninstall', { data: true })).rows, 'data').state, 'todo')
   // laki uninstall without --yes off a terminal: the list and how, nothing removed

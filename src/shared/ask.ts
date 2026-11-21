@@ -1,6 +1,6 @@
 import type { Ask } from './types.ts'
 
-// a waiting agent's numbered menu at the bottom of its screen (claude's, codex's, gemini's permission prompts and
+// a waiting agent's numbered menu at the bottom of its screen (claude's, codex's, agy's permission prompts and
 // questions): the last run of "1. …", "2. …" lines, one of them highlighted (❯ › > ● before its number; a menu always
 // has one, a numbered list in an answer doesn't); box borders (│) aside. cursor: the line the terminal's cursor is on,
 // when it shows: at or below the menu's first line it's a prompt being typed ("› 1. production" in codex's box, the
@@ -151,8 +151,8 @@ export const optLabel = (a: Ask, o: Ask['options'][number]) => (a.rule && o === 
 // can't be told apart ("for this command", "for this session"). broad: a wildcard, a folder or a whole tool; plain: what
 // it covers in words, only where that can be said safely. Per agent: claude's "Yes, and don't ask again for: npm init *",
 // "Yes, and always allow access to src/ from this project", "Yes, allow all edits during this session"; codex's "Yes,
-// and don't ask again for this command" (its command is the question above: no rule here); gemini's "Allow always …",
-// "Yes, always allow tool …"; an unknown agent: all of them
+// and don't ask again for this command" (its command is the question above: no rule here); an "Allow always …" or
+// "Yes, always allow tool …" (Gemini CLI's; ponytail: agy's, the gemini agent's now, read the same way, unverified); an unknown agent: all of them
 export type Scope = { label: string; rule: string; broad?: true; plain?: string }
 const SCOPE_CLAUDE = [/^(.*?\bdon['’]t ask again for):?\s+(.+)$/i, /^(.*?\balways allow access to)\s+(.+)$/i, /^(.*?\ballow)\s+(all edits\b.*)$/i]
 const SCOPE_GEMINI = [/^(.*?\b(?:allow always|always allow)(?: for)?):?\s+(.+)$/i]

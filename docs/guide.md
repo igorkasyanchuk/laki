@@ -2,7 +2,7 @@
 
 Everything Laki does, how to use it, and where it keeps things. The short version is the [README](../README.md).
 
-A macOS app for running coding agents (Claude Code, Codex, Gemini, Grok, OpenCode, or any command) side by side, each in its own
+A macOS app for running coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command) side by side, each in its own
 git worktree. You get a sidebar of projects and workspaces, tabs per workspace, real terminals you can split
 into panes, and live agent status (running, waiting for you, finished). It also has a follow-up queue, a
 side panel (files, changes, review), a Run button, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app;
@@ -36,7 +36,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   its own (`$PORT`, `$PORT_1`…`$PORT_9`), a number (`$LAKI_SLOT`), a database suffix (`$LAKI_DB_SUFFIX`, `_ws<n>`) and
   a compose project (`$COMPOSE_PROJECT_NAME`, `<project>-ws<n>`) in every tab, setup, run, Done check and teardown, with
   examples to copy; a server listening on another workspace's port shows ⚠ and the port on both rows. Files git ignores that a worktree needs (`.env`…) are copied in (`.worktreeinclude`).
-- **Agents**: Claude Code, Codex, Gemini, Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
+- **Agents**: Claude Code, Codex, Antigravity (Google's `agy`, Gemini CLI's successor), Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
   workspace; notifications and a count on the Dock icon and in the menu bar; pushes to your phone; a follow-up queue; resume after a restart; usage limits wait
   and continue; a model and effort per workspace; turn timers (off by default); ⌘J jumps to the next tab that
   needs you. An agent's numbered choices (a permission prompt, a question) are buttons under the terminal and on its
@@ -63,8 +63,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   size, line height, weight, cursor and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots and any other file; the agent
   gets the text and their paths. Prompt templates wrap it (`{{prompt}}`).
-- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans (and Gemini CLI's
-  quota); click it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
+- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans;
+  click it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
 - **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
   Settings › Layout › *Context meter*), and a bar in the status bar, fill as
   its chat's context does (amber past 70%, red past 90%), so you `/compact` or start fresh in time; its tooltip has
@@ -208,7 +208,7 @@ To build it yourself, you need:
 - Node 22.12+ (23 recommended) and npm
 - git
 
-Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PATH: `claude`, `codex`, `gemini`,
+Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PATH: `claude`, `codex`, `agy`,
 `grok`, `opencode`. Each one found there is a preset; Claude Code and Codex always are.
 
 ```bash
@@ -287,7 +287,7 @@ npm link
    Again…* brings it back); *Don't show again* too.
 3. Add a project: **⌘O**, + at the top of the sidebar › *Project folder…*, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
-4. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
+4. The new-workspace page opens. Pick an agent (claude, codex, gemini: Antigravity's `agy`, grok, opencode, shell, or a custom command) and,
    optionally, a first prompt.
    - For a git repository, also pick a base branch (the repo's main one, `main` or `master`, unless you pick
      another; ⌄ lists them all, or type any ref). The workspace gets a worktree in
@@ -696,7 +696,7 @@ working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach t
   *Test*, *Lint*, *Format* and *Deploy* scripts (when set) are in ▾ too, each in a tab named as it (run again, the
   last one's tab goes; Deploy asks first); Enter in its ended tab runs it again (a deploy's: only Run ▾ › Deploy, which asks). ⌘K has *Run the test script*…
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
-  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
+  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Antigravity, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
   - *Shell actions*: a command (an action whose target is *Shell*), run in the focused shell if it's at its prompt,
     else the workspace's first shell at its prompt, else a new one.
@@ -965,7 +965,7 @@ its own: Esc doesn't close it (its ✕, or another page, does). The agent picker
 extensions instead: *Fetch it* (its data now, on top of its own schedule) or one of its actions (the prompt, optional,
 is its `$WIDGET_ARG`); a per-workspace one runs in a workspace you pick. Only one that's turned on runs: an off one's
 run fails, saying so.
-- Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
+- Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Antigravity, Grok,
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *A new workspace, then the same one each run*: its first run
   makes a worktree, every run after goes there (one archived or deleted: the next run makes another; `--where same`);
   *In its folder, a new session each run*: the
@@ -1054,12 +1054,10 @@ line. Laki AI's own call log (Settings › AI) stays as it is.
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
-the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows; Gemini CLI's quota per model (the models your
-Gemini tabs use first, the rest under *More*). Each shows when it resets. They come from what the agents report
+the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows. Each shows when it resets. They come from what the agents report
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
 once a tab of that agent has run, with *As of* when they're older than 20 minutes. Laki asks no server for them unless
-you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex, Google's for Gemini CLI:
-the only way to get Gemini's) in Settings › Layout: undocumented endpoints that may break. Then the daemon
+you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex) in Settings › Layout: undocumented endpoints that may break. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in
@@ -1897,7 +1895,7 @@ run's, a dry run's, and a workspace it was given stay, and the run's log says wh
 A budget (its settings' *Budget*, `budget: 60 min, $5` in the head, either part) caps a run's working time (not while
 it waits for you, a usage limit or its turn in the queue) and what it costs: its AI calls and decisions, and its
 Claude and Codex agents' turns, each turn's own (read from their chats, at API prices, as the cost meters: on a plan,
-what it would have cost). Gemini, Grok and OpenCode turns have no cost Laki can read: the run's *Cost* says *+ agents
+what it would have cost). Antigravity, Grok and OpenCode turns have no cost Laki can read: the run's *Cost* says *+ agents
 not counted*, and the editor says so for a $ budget. Past either, it asks you, as 30 agent turns do: *Give it 30 min
 more* (half its budget, this run only; the file stays) or *Stop the run*. A time budget lets an agent's turn under way
 finish first (it asks at the next block); a $ budget asks during the turn as soon as it's past, the agent working on
@@ -2390,8 +2388,7 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   the night, not for good), *Each turn's changes* (on: the Reader's card of what each turn changed, [Reader
   view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays), *Archive workspace when its PR merges* (off) and *Archive workspaces untouched for* (off).
-- *Appearance*: what the window shows (*Ask Anthropic for Claude's plan limits*, OpenAI's for Codex's, Google's for
-  Gemini CLI's: off by default, the agents' own numbers then; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
+- *Appearance*: what the window shows (*Ask Anthropic for Claude's plan limits*, OpenAI's for Codex's: off by default, the agents' own numbers then; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),
   *Sidebar rows* (what a row shows after its name, each on or off, as a right click › *Show ›* does: *Next step* (off
   by default), *Pull request* (GitHub's mark), *Author's picture* with *Your picture on your PRs*, ✓, ✓✓ and 👀,
@@ -2554,13 +2551,13 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   hotkeys, *Pick an element*, a fixed key like ⌘C, or ⌃ alone: the terminal's). The menu bar and Help show the keys
   you set; the old ones do nothing.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
-- *Agents & profiles* › *Versions*: each agent CLI on this Mac (Claude Code, Codex, Gemini, Grok, OpenCode, Cursor) with
+- *Agents & profiles* › *Versions*: each agent CLI on this Mac (Claude Code, Codex, Antigravity, Grok, OpenCode, Cursor) with
   its version, the newest out and how it was installed (npm, Homebrew or its own installer). *Update* runs its own
   update in a terminal tab you can watch (*Show*), and the row says how it went; a failed one shows its exit code and
   *Retry*. Tick several for *Update selected*. Tabs already running keep their version until restarted. When an update
   is out, Settings on the rail says so in its tooltip, and has a dot with *A dot on Settings when an agent update is
   out* on (off by default).
-- *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
+- *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command); a
   profile is how it starts, grouped under its agent: a model and an effort, and for Claude Code and Codex a
   permission mode, *Fast mode* and *Sandbox* (a workspace that picks its own wins), an account (Claude Code and Codex), flags
   (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
@@ -2576,13 +2573,13 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   sandbox can do: *Off* isn't Claude Code's, *Listed hosts* isn't Codex's. When the sandbox refuses a host, its card in
   Needs you offers *Allow this domain in this project*; agents started from then on reach it. `laki preset set <name>
   --net all|list|off` does the same. *Wrapper sandbox (macOS)*, for an agent with no sandbox of its own on (OpenCode;
-  Gemini CLI and Grok with theirs off; Claude Code or Codex with *Sandbox* off), starts it under macOS's
+  Antigravity and Grok with theirs off; Claude Code or Codex with *Sandbox* off), starts it under macOS's
   `sandbox-exec`: it writes only in its worktree, git's folder, the temp folders, its storage folder and its own
   settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `gh`'s config, your keychains, other agents' settings or
   Laki's own data but what it works in. Its *Network*: *All* (as it is), or *Listed hosts*: it reaches only this Mac, and
   through Laki's proxy the same list as Claude Code's (the project's registries, GitHub, its model, what you allowed); a
   host off it gets the card's *Allow this domain in this project*, which works at once. A tool that ignores `HTTPS_PROXY`
-  reaches nothing. A new Gemini, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
+  reaches nothing. A new Antigravity, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
   in Needs you with *Restart without the wrapper* (the profile keeps it). `laki preset set <name> --wrap` (`--no-wrap`)
   does the same. Apple marks `sandbox-exec` deprecated. *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
@@ -2628,7 +2625,7 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   turn, the tab stays *running*: no *done* notification, Done check or next-step chip at each turn's end, only one when
   the goal stops, saying *Goal reached* (or *paused*, *out of budget*). The tab and its sidebar row show a small target,
   the goal's words on hover. A reached goal's band goes with your next prompt.
-- **A goal for any agent**: Gemini, OpenCode, Grok and other agents have no `/goal`, so Laki runs one: the tab's menu ›
+- **A goal for any agent**: Antigravity, OpenCode, Grok and other agents have no `/goal`, so Laki runs one: the tab's menu ›
   *Set goal › Until test passes…* (or lint, format), and what it should get done. Laki sends it, runs that project
   script after each of the agent's turns, and sends back what fails, until it passes (*Goal · reached*), 12 turns go by
   or the same failure comes back 3 times (*can't be met*, with why). The band shows *turn 3 of 12* (and what it spent,
@@ -2789,8 +2786,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   *Voice* (made the first time), and "To-do in Shop: update deps" (*Todo*, *Справа*) adds it to that project's Backlog,
   or the last project you talked to; only at the very start, the word not kept. The pill says *Goes to Notes › Voice*
   or *Backlog · Shop* first; *Undo* takes the line or the item out again.
-- *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
-  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
+- *Agent skill*: installs a skill for Claude Code, Codex, Antigravity, Grok or OpenCode in your home folder
+  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/config/…` (Antigravity's), `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   *Extension creator* (`skills/laki-widget`, installed on its own) teaches them to make extensions: the files, the
   template language, JS extensions, actions, and checking one with `laki widget`. *Orchestrator*
@@ -2873,7 +2870,7 @@ tab). Saved as you type:
 - *Memory*: how many items are yours and how many agents learned; *Manage* opens the project page's *Memory* tab.
 - *MCP servers*: tools for this project's agents, each a command (its arguments one per line, its env) or a URL, on for
   every profile or the ones you switch on. Claude Code and Codex get them by flags as a tab starts, never in their own
-  config; Gemini, Grok and OpenCode not yet. Their env shows as •••• once saved; agents can't add or change one.
+  config; Antigravity, Grok and OpenCode not yet. Their env shows as •••• once saved; agents can't add or change one.
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
   *Edit*; agents never see them (not in `laki ls --json` or MCP).
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
@@ -3059,7 +3056,7 @@ a spot in the picture is where to tap. MCP's `laki_device` does the same.
 
 ### MCP
 
-`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. It lists its core
+`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Antigravity, Grok, OpenCode or any MCP client. It lists its core
 tools (state, a new workspace, send, screen, wait, diff, ask, alert, progress, limits) and `laki_more`, which adds a group
 to the list (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings): less of an agent's context goes
 to tools it won't use (an agent calls `laki_more` first for a tool it doesn't have yet); `laki mcp --all` (or `LAKI_MCP_ALL=1`) lists every one,
@@ -3087,7 +3084,7 @@ typing to, or reading the screen of, a tab in another workspace asks you first i
 ```bash
 claude mcp add -s user laki -- laki mcp
 codex mcp add laki -- laki mcp
-gemini mcp add -s user laki laki mcp
+agy mcp add laki -- laki mcp
 grok mcp add -s user laki -- laki mcp
 ```
 
@@ -3304,7 +3301,7 @@ the code, rebuild (`npm run pack`) and reopen the app.
 Either way, the running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
-come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`), a
+come back resumed (`claude --resume`, `codex resume`, `agy --conversation=<id>` (the id it printed as it exited, else `agy -c`), `grok --resume`, `opencode --session`), a
 few seconds apart so the Mac stays quick; the rest wait dimmed (*asleep*), and the workspace you open starts at once.
 An agent unused for longer than Settings › Resources' *Sleep idle agents after* (8 hours unless you change it; *Never*: all come
 back) stays asleep: it resumes as you open it, type in it, or something is sent to it (a message, *fix CI*, a workflow).
@@ -3358,7 +3355,7 @@ Laki starts agents and what Laki does itself, not what you type in a shell tab: 
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute (one that hasn't changed and has nothing
   running, every 10 minutes; none while GitHub's quota for your gh is nearly spent).
-- **A tab says "Laki isn't hearing from this agent"**: its hooks (how Claude Code, Gemini and OpenCode tell Laki they
+- **A tab says "Laki isn't hearing from this agent"**: its hooks (how Claude Code and OpenCode tell Laki they
   ask or finish) haven't come since its prompt, so Laki reads its screen instead: no reliable done or waiting, no
   notifications or phone pushes, no Done check. Its *Likely* line names the cause, and *Details* the file and line (or
   the command) to look at: `"disableAllHooks": true` in `.claude/settings.local.json`, `.claude/settings.json` or
@@ -3381,10 +3378,10 @@ Laki starts agents and what Laki does itself, not what you type in a shell tab: 
 - **Daemon**: if it dies, its terminals end. Agents come back resumed. Shells start fresh, without what ran in them (a stop brings that back too, see Updating).
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).
 - **How Laki follows the other agents**: OpenCode through a plugin of Laki's (`OPENCODE_CONFIG_DIR`, on top of your
-  config), Gemini through hooks in a settings file of Laki's (`GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, added to yours;
-  Gemini versions with hooks, in folders Gemini trusts). Grok's terminal UI takes no hooks from outside `~/.grok`,
+  config). Antigravity (`agy`) reads hooks only from its own files, so it says what it's doing over OSC 7501 instead
+  (working, waiting on you, done: the terminal status it sends Laki's terminals). Grok's terminal UI takes no hooks from outside `~/.grok`,
   so Laki reads its screen and window title: Enter or a prompt starts a turn, *Action Required* is waiting, a few
-  quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Gemini without hooks works the same way. Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
+  quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
 - **Snapshots** keep 5,000 lines of scrollback.
 - **Sleeping agents** live in the daemon's memory: a daemon restart resumes every tab used within *Sleep idle agents after*, asleep or not. A process that
   left its tab's tree (a double fork) shows nowhere in Resources.

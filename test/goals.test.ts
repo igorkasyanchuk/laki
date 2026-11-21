@@ -7,14 +7,14 @@ import { fresh, until } from './helpers.ts'
 type Rig = Awaited<ReturnType<typeof fresh>>
 const goal = async (rig: Rig, tab: string) => ((await rig.rpc('state')).tabs as any[]).find(t => t.id === tab)?.goal
 
-test('A1b: a gemini goal reached as its test passes on the third run (three turns); maxTurns 2 fails; yours pauses it; refused for claude and for an agent', async t => {
+test('A1b: an agy (gemini) goal reached as its test passes on the third run (three turns); maxTurns 2 fails; yours pauses it; refused for claude and for an agent', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   // passes on its third run (a count in the worktree); its output differs each run
   await rig.rpc('projectSet', { id: p.id, config: { test: 'n=$(cat .goal-n 2>/dev/null || echo 0); n=$((n+1)); echo $n > .goal-n; echo "run $n"; [ "$n" -ge 3 ]', lint: 'echo "lint $(date +%N)"; exit 1' } })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', name: 'g' })
-  const tab = (await until(() => rig.tab(ws.id), 'its gemini tab')).id
-  await until(async () => /fake gemini[^]*> $/.test((await rig.rpc('screen', { target: tab, lines: 10 })).trimEnd() + ' '), 'gemini at its prompt') // reading its box: a prompt typed sooner is lost
+  const tab = (await until(() => rig.tab(ws.id), 'its agy tab')).id
+  await until(async () => /fake agy[^]*> $/.test((await rig.rpc('screen', { target: tab, lines: 10 })).trimEnd() + ' '), 'agy at its prompt') // reading its box: a prompt typed sooner is lost
   await assert.rejects(rig.rpc('goalSet', { tab, text: 'x', check: 'deploy' }), /met when which script passes\? format, lint, test/)
   await assert.rejects(rig.rpc('goalSet', { tab, text: 'x', check: 'format' }), /the project has no format script/)
   await assert.rejects(rig.rpc('goalSet', { tab, text: 'x', check: 'test', from: { ws: ws.id, tab } }), /an agent can't set or raise an agent's goal/)
@@ -24,7 +24,7 @@ test('A1b: a gemini goal reached as its test passes on the third run (three turn
   const g = await goal(rig, tab)
   assert.equal(g.turns, 3)
   assert.match(g.why, /test passes, after 3 turns/)
-  assert.match((await rig.tab(ws.id)).last ?? '', /^answer: Goal \(Laki\): make the tests pass/)
+  assert.match(await rig.screen(tab), /answer: Goal \(Laki\): make the tests pass/) // no hooks: no last answer
 
   // at most 2 turns, never passing: failed with why
   await rig.rpc('goalSet', { tab, text: 'lint clean', check: 'lint', maxTurns: 2 })

@@ -1122,7 +1122,7 @@ test('triggerAt (T17): @ at a word start, not in an email or inside code; a spac
 test('wrapProfile: the worktree and its git folder writable, ~/.ssh unreadable, every path a parameter (a quote or a parenthesis never in the text)', async () => {
   const { wrapProfile, wrapRefused, ownBoxOn } = await import('../src/shared/wrap.ts')
   const odd = '/Users/me/wt "x") (allow file-write* (subpath "/"))'
-  const { text, params } = wrapProfile({ agent: 'gemini', worktree: odd, home: '/Users/me', gitDirs: ['/Users/me/repo/.git/worktrees/wt'], tmp: ['/private/tmp'], data: '/Users/me/.laki', allowRead: ['/Users/me/.laki/gemini-settings.json'] })
+  const { text, params } = wrapProfile({ agent: 'gemini', worktree: odd, home: '/Users/me', gitDirs: ['/Users/me/repo/.git/worktrees/wt'], tmp: ['/private/tmp'], data: '/Users/me/.laki', allowRead: ['/Users/me/.laki/status.sh'] })
   const value = (path: string) => params.find(x => x.endsWith(`=${path}`))!.split('=')[0]
   const writes = text.slice(text.indexOf('(allow file-write*'), text.indexOf('(deny file-read*'))
   const reads = text.slice(text.indexOf('(deny file-read*'))
@@ -1131,7 +1131,7 @@ test('wrapProfile: the worktree and its git folder writable, ~/.ssh unreadable, 
   assert.match(text, new RegExp(`\\(deny file-read-data \\(subpath \\(param "${value('/Users/me/.laki')}"\\)\\)\\)`)) // the whole data folder, walkable
   const back = text.slice(text.indexOf('(allow file-read-data'), text.indexOf('(deny file-read*'))
   const inBack = (p: string) => params.filter(x => x.endsWith(`=${p}`)).some(x => back.includes(`(param "${x.split('=')[0]}")`))
-  assert.ok(inBack('/Users/me/.laki/gemini-settings.json'), 'its hook file, read back')
+  assert.ok(inBack('/Users/me/.laki/status.sh'), 'a file of the data folder it reads, read back')
   assert.ok(!inBack(odd), 'a worktree out of the data folder: nothing to read back')
   assert.ok(!reads.includes(`"${value('/Users/me/.gemini')}"`), 'its own folder is its to read')
   assert.ok(!text.includes('/Users/me'), 'no path in the text: each is -D NAME=path')
@@ -1143,9 +1143,9 @@ test('wrapProfile: the worktree and its git folder writable, ~/.ssh unreadable, 
   assert.equal(wrapRefused("Error: EPERM: operation not permitted, open '/Users/me/.npm/_cacache/x'"), '/Users/me/.npm/_cacache/x')
   assert.equal(wrapRefused('all good'), undefined)
   // an agent's own sandbox on by its flags or env: no wrapper around it
-  assert.equal(ownBoxOn('gemini', '-s'), true)
+  assert.equal(ownBoxOn('gemini', '--sandbox'), true) // agy's
   assert.equal(ownBoxOn('gemini', '--sandbox=false'), false)
-  assert.equal(ownBoxOn('gemini', '', { GEMINI_SANDBOX: 'sandbox-exec' }), true)
+  assert.equal(ownBoxOn('gemini', '-s', { GEMINI_SANDBOX: 'sandbox-exec' }), false) // Gemini CLI's, not agy's
   assert.equal(ownBoxOn('grok', '--sandbox workspace'), true)
   assert.equal(ownBoxOn('grok', '--sandbox off'), false)
   assert.equal(ownBoxOn('opencode', '-s'), false) // it has none
@@ -1162,14 +1162,14 @@ test('wrapProfile under the real sandbox-exec: the data folder hidden whole, wha
     const data = join(home, '.laki')
     const wt = join(data, 'worktrees', 'ws')
     for (const d of [join(data, 'clients'), wt, join(home, '.ssh')]) mkdirSync(d, { recursive: true })
-    for (const [f, t] of [[join(data, 'clients', 'c.token'), 'tok'], [join(data, 'gemini-settings.json'), '{}'], [join(wt, 'a'), 'mine'], [join(home, '.ssh', 'id'), 'key'], [join(data, 'tool-gates'), '']]) writeFileSync(f, t)
+    for (const [f, t] of [[join(data, 'clients', 'c.token'), 'tok'], [join(data, 'status.sh'), '{}'], [join(wt, 'a'), 'mine'], [join(home, '.ssh', 'id'), 'key'], [join(data, 'tool-gates'), '']]) writeFileSync(f, t)
     // a worktree in the data folder, then one that holds it all (a project at ~)
     for (const worktree of [wt, home]) {
-      const { text, params } = wrapProfile({ agent: 'gemini', worktree, home, tmp: [], data, allowRead: [join(data, 'gemini-settings.json')] })
+      const { text, params } = wrapProfile({ agent: 'gemini', worktree, home, tmp: [], data, allowRead: [join(data, 'status.sh')] })
       const sh = (cmd: string) => execFileSync('/usr/bin/sandbox-exec', ['-p', text, ...params, '/bin/sh', '-c', `${cmd} 2>&1 || echo NO`], { encoding: 'utf8' }).trim().split('\n').at(-1)
       assert.equal(sh(`cat '${join(data, 'clients', 'c.token')}'`), 'NO', `a client's token (${worktree})`)
       assert.equal(sh(`ls '${data}' >/dev/null`), 'NO', 'its names')
-      assert.equal(sh(`cat '${join(data, 'gemini-settings.json')}'`), '{}', 'its hook file')
+      assert.equal(sh(`cat '${join(data, 'status.sh')}'`), '{}', 'a file it reads')
       assert.equal(sh(`cat '${join(home, '.ssh', 'id')}'`), 'NO', '~/.ssh')
       assert.equal(sh(`test -e '${join(data, 'tool-gates')}' && echo yes`), 'yes', "laki hook's stat")
       if (worktree !== wt) continue

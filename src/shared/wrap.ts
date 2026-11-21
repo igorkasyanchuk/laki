@@ -2,24 +2,24 @@
 // /usr/bin/sandbox-exec with a profile made here. Each agent's own sandbox, as its documentation says (Nov 2026):
 // - Claude Code: its own (settings' sandbox: Seatbelt on macOS, for its Bash commands); Laki's profile Sandbox switch.
 // - Codex: its own (-s workspace-write: Seatbelt on macOS); Laki's profile Sandbox switch.
-// - Gemini CLI: its own, off by default (-s / --sandbox, GEMINI_SANDBOX, settings' tools.sandbox: sandbox-exec on
-//   macOS, profile permissive-open by SEATBELT_PROFILE); Laki doesn't turn it on (geminicli.com/docs/cli/sandbox).
+// - Antigravity CLI (agy, the gemini agent): its own, off by default (--sandbox: terminal restrictions); Laki doesn't
+//   turn it on (agy --help).
 // - Grok Build: its own, off by default (--sandbox workspace, GROK_SANDBOX, [sandbox] profile in ~/.grok/config.toml:
 //   Seatbelt on macOS); Laki doesn't turn it on (docs.x.ai/build/features/sandbox).
 // - OpenCode: none; permission rules only, its shell "runs with the host user's … authority" (opencode.ai/docs/permissions).
-// So the wrapper is for OpenCode, and Gemini, Grok, Claude or Codex with their own off (one sandbox inside another:
+// So the wrapper is for OpenCode, and Antigravity, Grok, Claude or Codex with their own off (one sandbox inside another:
 // sandbox-exec can't nest). Pure: the daemon (core.ts wrapCmd) realpaths every path first and passes them as -D
 // parameters: a path is never written into the profile's text
 import type { Agent } from './types.ts'
 
 // an agent's own sandbox, turned on by its profile's flags or env (Laki's switch for claude and codex: core's sandboxed)
-const OWN: Partial<Record<Agent, { args: RegExp; env: string }>> = {
-  gemini: { args: /(^|\s)(-s|--sandbox)(?=[\s=]|$)(?![\s=]+(false|off)\b)/, env: 'GEMINI_SANDBOX' },
+const OWN: Partial<Record<Agent, { args: RegExp; env?: string }>> = {
+  gemini: { args: /(^|\s)--sandbox(?=[\s=]|$)(?![\s=]+(false|off)\b)/ }, // agy's: a flag only
   grok: { args: /(^|\s)--sandbox[\s=]+(?!off\b)\S/, env: 'GROK_SANDBOX' },
 }
-export const ownBoxOn = (agent: string, args = '', env: Record<string, string> = {}) => (o => !!o && (o.args.test(args) || (!!env[o.env] && !/^(0|false|off)$/i.test(env[o.env]))))(OWN[agent as Agent])
+export const ownBoxOn = (agent: string, args = '', env: Record<string, string> = {}) => (o => !!o && (o.args.test(args) || (!!o.env && !!env[o.env] && !/^(0|false|off)$/i.test(env[o.env]))))(OWN[agent as Agent])
 // the folders under home an agent writes as it runs (its docs: Claude Code's ~/.claude and ~/.claude.json, Codex's
-// CODEX_HOME ~/.codex, Gemini's ~/.gemini, Grok's ~/.grok "stays writable … so sessions can persist", OpenCode's
+// CODEX_HOME ~/.codex, agy's ~/.gemini (antigravity-cli, config), Grok's ~/.grok "stays writable … so sessions can persist", OpenCode's
 // ~/.local/share/opencode (its log and database), ~/.local/state/opencode, ~/.config/opencode, ~/.opencode/plan)
 export const AGENT_WRITES: Record<Agent, string[]> = {
   claude: ['.claude', '.claude.json'],

@@ -1,6 +1,6 @@
 # Laki: what we're building
 
-Laki is a macOS desktop app for running several coding agents at once (Claude Code, Codex, Gemini, Grok, OpenCode, or any command
+Laki is a macOS desktop app for running several coding agents at once (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command
 line program), each task in its own git worktree, in real terminals. You see every agent's state at a
 glance, step in when one needs you, and ship its branch as a PR. It's the successor of **wb**,
 a tmux + iTerm workbench with the same goal.
@@ -26,10 +26,10 @@ cmux.
 
 ## Principles
 
-- **Agents stay real CLIs.** `claude`, `codex`, `gemini`, `grok` and `opencode` run in real PTYs, exactly as in a
-  terminal. Status comes from the agents' own hooks (Claude's `--settings` hooks, Codex's `notify`, Gemini's hooks
+- **Agents stay real CLIs.** `claude`, `codex`, `agy` (Antigravity), `grok` and `opencode` run in real PTYs, exactly as in a
+  terminal. Status comes from the agents' own hooks (Claude's `--settings` hooks, Codex's `notify`
   and an OpenCode plugin, all given through flags or env, never the user's config), not from screen scraping;
-  only Grok, which takes no hooks from outside its home, is read from its screen and window title.
+  Antigravity says it over OSC 7501, and only Grok, which takes no hooks from outside its home, is read from its screen and window title.
   A headless mode (stream-json, codex app-server) may come later.
 - **A daemon owns the sessions.** The app is a client: closing it never stops an agent. Background work
   (PR checks, usage-limit waits, the follow-up queue) runs in the daemon, with the app open or not.
@@ -58,14 +58,14 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - **Workspace**: one task. A git worktree on branch `<prefix><id>` (default `laki/`), or the repo itself
   (*local*), or the folder (*plain*). Has a `$PORT`, a color, a name, and maybe a PR.
 - **Tab**: holds one terminal or several panes (split, stacked). Kinds: agent, shell, setup, dev (Run), ship.
-- **Preset**: how an agent starts: Claude Code, Codex, Gemini, Grok, OpenCode or any command, with args and env.
+- **Preset**: how an agent starts: Claude Code, Codex, Antigravity, Grok, OpenCode or any command, with args and env.
   The defaults: Claude Code, Codex and the others found on PATH.
 - **Status**: running, waiting (a permission prompt), done while you weren't looking, idle, usage limit,
   ended (ok / failed). A workspace shows its most urgent tab.
 - **Queue**: follow-ups typed into an agent when its turn ends (`send --when-idle`).
 - **Scripts**: setup, teardown and run per project, in the app or in the repo's `.laki.json`.
 - **Agent skill**: `SKILL.md` and a CLI launcher in each agent's skills folder (`~/.claude/skills/<cli>`,
-  `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so agents know Laki and can start workspaces,
+  `~/.codex/…`, `~/.gemini/config/…`, `~/.grok/…`, `~/.config/opencode/…`), so agents know Laki and can start workspaces,
   message other agents and read their screens; and what adds Laki as each one's MCP server (a command to run, or
   OpenCode's config lines).
 
@@ -103,7 +103,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
   notification. Mark as unread on a tab or workspace.
 - Files dropped on a terminal type their paths. A workspace from a GitHub issue (`laki new --issue`).
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
-- Resume after a daemon restart: `claude --resume`, `codex resume`, `gemini --resume`, `grok --resume` (Laki picks
+- Resume after a daemon restart: `claude --resume`, `codex resume`, `agy --conversation=<id>`, `grok --resume` (Laki picks
   its chat id), `opencode --session`. The app menu's *Quit … Completely*
   stops the daemon too (asking first when an agent is working). A daemon older than the app (it outlives
   updates) gets a restart button in the status bar.
@@ -183,7 +183,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 ## Quality bar
 
 - macOS on Apple silicon first; Intel builds too (`npm run pack:x64`).
-- End-to-end tests with fake `claude`, `codex`, `gemini`, `grok`, `opencode` and `gh`, temp homes and their own daemons; never the real
+- End-to-end tests with fake `claude`, `codex`, `agy`, `grok`, `opencode` and `gh`, temp homes and their own daemons; never the real
   data folders. Coverage of daemon and CLI code: 90%+.
 - Typing latency and screen replay fidelity are the main risks for a terminal app; both are checked by hand
   on each big change.

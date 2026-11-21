@@ -232,10 +232,10 @@ test('workflow permission modes: perm and fast per agent block and the head’s 
   // a bad mode, a mode the agent hasn't, two blocks in one tab with different modes
   const bad = (s: string) => check(parse(MODES.replace('agent: claude · perm: plan · fast: yes · session: new', s)).workflow)
   assert.deepEqual(bad('agent: claude · perm: yolo · session: new'), ['plan: permission mode yolo? auto, acceptEdits, plan, bypassPermissions'])
-  assert.deepEqual(bad('agent: gemini · perm: auto · fast: yes'), ['plan: gemini has no permission modes', 'plan: gemini has no fast mode'])
+  assert.deepEqual(bad('agent: grok · perm: auto · fast: yes'), ['plan: grok has no permission modes', 'plan: grok has no fast mode'])
   assert.deepEqual(bad('agent: claude · perm: plan'), ["build shares plan's tab, which starts in plan mode: give build session: new for accept edits"])
   assert.deepEqual(check(parse(MODES.replace('perm: acceptEdits', 'perm: yolo')).workflow), ["the workflow's permission mode yolo? auto, acceptEdits, plan, bypassPermissions"])
-  assert.deepEqual(bad('agent: gemini'), [], 'the head’s mode skips an agent that has none')
+  assert.deepEqual(bad('agent: grok'), [], 'the head’s mode skips an agent that has none')
 
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -256,10 +256,10 @@ test('workflow permission modes: perm and fast per agent block and the head’s 
   assert.ok(r.log.some((l: string) => /plan: a new claude tab, .* \(plan mode · fast\)/.test(l)), r.log.join('\n'))
 
   // a preset whose agent hasn't the mode: refused before any workspace
-  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'gem', agent: 'gemini' }] })
-  await rig.rpc('flowSave', { id: 'gem', text: MODES.replace('agent: claude · perm: plan · fast: yes · session: new', 'agent: gem · perm: plan') })
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'gk', agent: 'grok' }] })
+  await rig.rpc('flowSave', { id: 'gk', text: MODES.replace('agent: claude · perm: plan · fast: yes · session: new', 'agent: gk · perm: plan') })
   const before = (await rig.rpc('state')).workspaces.length
-  await assert.rejects(rig.rpc('flowStart', { workflow: 'gem', project: p.id, task: 'x' }), /Modes can't run: plan: gemini has no permission modes/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'gk', project: p.id, task: 'x' }), /Modes can't run: plan: grok has no permission modes/)
   assert.equal((await rig.rpc('state')).workspaces.length, before, 'no workspace made')
 
   // bypass: an agent (MCP, Laki AI) can't start it; you can; a dry run says it

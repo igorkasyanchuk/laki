@@ -32,6 +32,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
   with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. A `/goal` (Claude Code, Codex): a band with its state and *Pause*, *Resume*, *Clear*, the tab running until the goal stops and one *Goal reached* then. Signed out mid-turn: a band with *Sign in* (the agent's own login, for that tab's account), and the message goes once you're in, wherever you signed in. Cursor as a ready-made profile (`cursor-agent acp`): its models and effort in the new-workspace menus, its chats resumed after a restart. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+- **Antigravity** (Google's `agy`, Gemini CLI's successor) as the gemini agent: its model, effort and permission modes (`--mode`), its status from what it tells the terminal (OSC 7501), its chat resumed by the id it prints as it exits.
 - **Notes and memory in the repo**: a project's switch keeps its notes and memory in `.laki/notes.md` and `.laki/memory.md`, shared through git; a worktree's agent reads its own branch's.
 - **Uninstall Laki**: Settings › General › Developer or `laki uninstall` removes the `laki` command, the agent skills and the daemon in one go (the worktrees and your data only when ticked), each a row; then the app to the Trash.
 - **Skills loaded**: a click on the status bar's context meter lists the skills a Claude Code or Codex chat loaded, in order; one opens its SKILL.md.
@@ -51,7 +52,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits (Gemini CLI's quota per model too) and Laki AI's OpenRouter credits and spend (an amber dot when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
+  beside each plan's limits and Laki AI's OpenRouter credits and spend (an amber dot when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Quiet**: no notifications, sounds, cards or phone pushes for 30 minutes, an hour or until 9:00 (the menu bar's
   menu, ⌘K, `laki quiet 1h`, Settings › Notifications); asks still show in Needs you and `laki alert` still comes. As it

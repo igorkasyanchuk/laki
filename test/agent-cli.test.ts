@@ -26,38 +26,39 @@ test('A9: Settings › Versions: each CLI, the newest from the registry, a dot i
   const asked: string[] = []
   const reg = createServer((q, r) => {
     asked.push(decodeURIComponent(q.url ?? ''))
-    const v = { '/@anthropic-ai/claude-code/latest': '2.2.0', '/@google/gemini-cli/latest': '0.9.0' }[decodeURIComponent(q.url ?? '')]
+    const v = { '/@anthropic-ai/claude-code/latest': '2.2.0', '/opencode-ai/latest': '0.9.0' }[decodeURIComponent(q.url ?? '')]
     r.writeHead(v ? 200 : 404, { 'content-type': 'application/json' }).end(v ? JSON.stringify({ version: v }) : '{}')
   })
   await new Promise<void>(ok => reg.listen(0, '127.0.0.1', ok))
   t.after(() => reg.close())
   const rig = await fresh(t, { env: { LAKI_NPM_REGISTRY: `http://127.0.0.1:${(reg.address() as AddressInfo).port}` } })
-  // gemini installed by npm (its command a link into a global node_modules), npm itself a fake that fails
-  const pkg = join(rig.home, 'lib/node_modules/@google/gemini-cli/bin')
+  // opencode installed by npm (its command a link into a global node_modules), npm itself a fake that fails
+  const pkg = join(rig.home, 'lib/node_modules/opencode-ai/bin')
   mkdirSync(pkg, { recursive: true })
-  writeFileSync(join(pkg, 'gemini'), '#!/bin/sh\n[ "$1" = --version ] && echo 0.8.1 && exit 0\nexit 0\n')
-  chmodSync(join(pkg, 'gemini'), 0o755)
+  writeFileSync(join(pkg, 'opencode'), '#!/bin/sh\n[ "$1" = --version ] && echo 0.8.1 && exit 0\nexit 0\n')
+  chmodSync(join(pkg, 'opencode'), 0o755)
   mkdirSync(join(rig.home, 'bin'), { recursive: true })
-  symlinkSync(join(pkg, 'gemini'), join(rig.home, 'bin/gemini'))
+  symlinkSync(join(pkg, 'opencode'), join(rig.home, 'bin/opencode'))
   writeFileSync(join(rig.home, 'bin/npm'), '#!/bin/sh\necho "npm ERR! no network"\nexit 3\n')
   chmodSync(join(rig.home, 'bin/npm'), 0o755)
 
   const list = await rig.rpc('agentVersions', { fresh: true })
   const by = (id: string) => list.find((a: any) => a.id === id)
   assert.deepEqual([by('claude').version, by('claude').newest, by('claude').how, by('claude').cmd], ['2.1.200', '2.2.0', 'its installer', 'claude update'])
-  assert.deepEqual([by('gemini').version, by('gemini').newest, by('gemini').how, by('gemini').cmd], ['0.8.1', '0.9.0', 'npm', 'npm install -g @google/gemini-cli@latest'])
+  assert.deepEqual([by('opencode').version, by('opencode').newest, by('opencode').how, by('opencode').cmd], ['0.8.1', '0.9.0', 'npm', 'npm install -g opencode-ai@latest'])
+  assert.deepEqual([by('gemini').name, by('gemini').how, by('gemini').cmd], ['Antigravity', 'its installer', 'agy update'], 'agy: its own script, not npm')
   assert.match(by('cursor').path, /fakes\/cursor-agent$/, 'C6: the fake on PATH')
-  assert.ok(asked.includes('/@google/gemini-cli/latest'))
-  assert.deepEqual((await rig.rpc('state')).agentUpdates, ['Claude Code', 'Gemini'], 'the dot: newer ones out')
+  assert.ok(asked.includes('/opencode-ai/latest'))
+  assert.deepEqual((await rig.rpc('state')).agentUpdates, ['Claude Code', 'OpenCode'], 'the dot: newer ones out')
 
   // Update: its command in a script tab of "update agents"; npm's exit 3: failed, with its code
-  const u = await rig.rpc('agentUpdate', { agent: 'gemini' })
-  assert.equal(u.cmd, 'npm install -g @google/gemini-cli@latest')
+  const u = await rig.rpc('agentUpdate', { agent: 'opencode' })
+  assert.equal(u.cmd, 'npm install -g opencode-ai@latest')
   const v = await rig.rpc('state')
   assert.equal(v.workspaces.find((w: any) => w.id === u.ws)?.name, 'update agents')
-  assert.deepEqual((({ name, kind }) => [name, kind])(v.tabs.find((x: any) => x.id === u.tab)), ['update Gemini', 'script'])
+  assert.deepEqual((({ name, kind }) => [name, kind])(v.tabs.find((x: any) => x.id === u.tab)), ['update OpenCode', 'script'])
   assert.deepEqual(v.agentUpdates, ['Claude Code'], 'updating: no dot for it')
-  const failed = await until(async () => (await rig.rpc('agentVersions')).find((a: any) => a.id === 'gemini' && a.update?.state === 'failed'), 'the update fails')
+  const failed = await until(async () => (await rig.rpc('agentVersions')).find((a: any) => a.id === 'opencode' && a.update?.state === 'failed'), 'the update fails')
   assert.equal(failed.update.code, 3)
   await assert.rejects(rig.rpc('agentUpdate', { agent: 'nope' }), /no agent CLI nope/)
   await assert.rejects(rig.rpc('agentUpdate', { agent: 'grok' }), /doesn't know how it was installed/) // (every CLI's fake is on PATH, Cursor's too: none here isn't installed)

@@ -33,5 +33,5 @@ if [ -n "$master" ]; then
   rm -f "$ctl"
   exit 0
 fi
-for v in $(env | sed -nE 's/^(LAKI_[A-Za-z0-9_]*|PORT|TERM_PROGRAM|COLORTERM|OPENCODE_CONFIG_DIR|GEMINI_CLI_SYSTEM_DEFAULTS_PATH|TEST_[A-Za-z0-9_]*)=.*/\1/p'); do unset "$v"; done
+for v in $(env | sed -nE 's/^(LAKI_[A-Za-z0-9_]*|PORT|TERM_PROGRAM|COLORTERM|OPENCODE_CONFIG_DIR|TEST_[A-Za-z0-9_]*)=.*/\1/p'); do unset "$v"; done
 exec /bin/sh -c "$*"

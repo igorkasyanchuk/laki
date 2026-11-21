@@ -80,7 +80,7 @@ export async function aiEndpointTest() {
   return { model: j.model || t.model, text: text.slice(0, 200) }
 }
 
-const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
+const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
 Do what the user asks with the laki tools, at once, without asking first: look things up with laki_state (workspaces, their PRs with titles, each tab's status and last answer), laki_screen and laki_diff; start work with laki_new_workspace (a PR to review: its pr field and a prompt saying what to do), laki_new_tab (another agent in a workspace that exists), laki_send (a message to a running agent), laki_attach_pr; laki_schedules and laki_schedule_add when asked to schedule work.
 ${groupRule("laki_state's groups; laki_new_workspace's group")} Look at the project's groups before laki_new_workspace. A group with a prompt template (laki_state's groupTemplates) starts its workspaces with it on its own; otherwise, when one of the user's prompt templates (laki_templates) plainly fits the task, give it as laki_new_workspace's template; none fits, none.
 Find workspaces by name, branch, PR number or PR title. You never archive or delete a workspace yourself (with Laki's skill you ask the user, and Laki does it at their Yes), and never ship or merge: say so if asked.
@@ -899,7 +899,7 @@ export function questionsOf(text: string): { q: string; choices: string[] }[] {
 // run on its own, never read by auto-answer rules. The command (2,000 characters at most), the workspace's folder name
 // and branch go to the model as data. Kept per command for the daemon's life (a second click, another tab's same
 // command: no call). The user's alone (gates.ts: it spends their AI money). ponytail: claude's Bash asks only (its
-// PermissionRequest names the tool); a codex or gemini menu has no tool to tell a command by
+// PermissionRequest names the tool); a codex or agy menu has no tool to tell a command by
 const explained = new Map<string, Promise<AskExplained>>()
 export async function askExplain(p: { tab?: unknown }): Promise<AskExplained> {
   if (!aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')

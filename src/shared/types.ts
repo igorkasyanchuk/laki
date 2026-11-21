@@ -9,16 +9,17 @@ import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
 // the coding agents Laki starts by name (a preset's agent; the command is the id), and what they're called
 export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
 export type Agent = (typeof AGENTS)[number]
-export const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini', grok: 'Grok', opencode: 'OpenCode' }
+export const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Antigravity', grok: 'Grok', opencode: 'OpenCode' } // gemini: Antigravity CLI (agy), Gemini CLI's successor; its id stays, so profiles and tabs keep it
 export const isAgent = (s?: string): s is Agent => (AGENTS as readonly string[]).includes(s ?? '')
-// how hard an agent thinks, for those that take it (claude --effort, codex model_reasoning_effort); models: names to
+export const agentBin = (a: Agent) => (a === 'gemini' ? 'agy' : a) // its command: the id but for agy's
+// how hard an agent thinks, for those that take it (claude and agy --effort, codex model_reasoning_effort); models: names to
 // suggest (any other goes too: a full name, provider/model for opencode)
-export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'] }
+export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'], gemini: ['low', 'medium', 'high', 'xhigh', 'max'] }
 // a model an agent says it has (accounts.ts agentModels): its id for --model, its name and words, its efforts
 export type AgentModel = { id: string; name: string; sub?: string; efforts?: string[]; def?: boolean }
 export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opus', 'sonnet', 'haiku'] }
 // how freely an agent acts (unset: its own default, which asks): claude's --permission-mode; codex's sandbox and
-// approvals in the same spirit. Each with what the new-workspace page says of it
+// approvals, agy's --mode in the same spirit. Each with what the new-workspace page says of it
 export const PERMS: Partial<Record<Agent, [id: string, label: string, sub: string, args: string[]][]>> = {
   claude: [
     ['auto', 'Auto mode', 'Acts on what looks safe, asks about the rest', ['--permission-mode', 'auto']],
@@ -31,6 +32,12 @@ export const PERMS: Partial<Record<Agent, [id: string, label: string, sub: strin
     ['acceptEdits', 'Accept edits', 'Writes in the workspace, never asks', ['-s', 'workspace-write', '-a', 'never']],
     ['plan', 'Read only', 'Reads; changes nothing', ['-s', 'read-only']],
     ['bypassPermissions', 'Bypass permissions', 'No sandbox, never asks: anything goes', ['--dangerously-bypass-approvals-and-sandbox']],
+  ],
+  gemini: [
+    ['auto', 'Auto mode', 'Acts on what looks safe, asks about the rest', ['--mode', 'auto']],
+    ['acceptEdits', 'Accept edits', 'Edits files without asking; asks before commands', ['--mode', 'accept-edits']],
+    ['plan', 'Plan mode', 'Reads and plans; changes nothing', ['--mode', 'plan']],
+    ['bypassPermissions', 'Bypass permissions', 'Never asks: anything goes', ['--dangerously-skip-permissions']],
   ],
 }
 // a running claude's permission modes, as the Reader's chip and a tab's menu offer them (tabMode): 'default' asks
@@ -50,7 +57,7 @@ export const claudeMode = (screen: string): string | undefined => (m => (m ? MOD
 export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
 // a profile's flags that set how freely it acts already: then no mode of Laki's goes in (agentCmd), and one that never
 // asks counts as bypassPermissions
-const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
+const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, gemini: /(^|\s)--(mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
 export const permInArgs = (agent?: string, args?: string) => !!args && !!PERM_FLAGS[agent as Agent]?.test(args)
 export const bypassArgs = (args?: string) => !!args && /(^|\s)(--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--permission-mode[\s=]+['"]?bypassPermissions)\b/.test(args)
 // codex's approvals off: -a / --ask-for-approval never, -c approval_policy=never
@@ -92,7 +99,7 @@ const REGISTRIES: [string, string[]][] = [
   ['Cargo.toml', ['crates.io', 'index.crates.io', 'static.crates.io']],
   ['composer.json', ['repo.packagist.org']],
 ]
-const MODEL_HOST: Partial<Record<Agent, string[]>> = { claude: ['api.anthropic.com'], codex: ['api.openai.com', 'chatgpt.com', 'auth.openai.com'], gemini: ['generativelanguage.googleapis.com', 'cloudcode-pa.googleapis.com', 'oauth2.googleapis.com'], grok: ['api.x.ai'] } // a wrapped one's too (netProxy.ts); OpenCode's: the provider you set up, by its card
+const MODEL_HOST: Partial<Record<Agent, string[]>> = { claude: ['api.anthropic.com'], codex: ['api.openai.com', 'chatgpt.com', 'auth.openai.com'], gemini: ['antigravity.google', 'generativelanguage.googleapis.com', 'cloudcode-pa.googleapis.com', 'oauth2.googleapis.com'], grok: ['api.x.ai'] } // a wrapped one's too (netProxy.ts); OpenCode's: the provider you set up, by its card
 export function netList(has: (file: string) => boolean, agent: string, own: readonly string[] = []): string[] {
   const reg = REGISTRIES.filter(([f]) => has(f)).flatMap(([, h]) => h)
   return [...new Set([...reg, 'github.com', 'api.github.com', ...(MODEL_HOST[agent as Agent] ?? []), 'localhost', ...own])]
@@ -506,7 +513,7 @@ export type Tab = {
   preset?: string // an Agent or custom: what the agent is (hooks, resume)
   profile?: string // the preset (Settings) it started from: its args and env
   cmd?: string // custom command
-  resumeId?: string // the agent's chat: claude session_id, codex thread-id, gemini/opencode session, grok's (Laki picks it)
+  resumeId?: string // the agent's chat: claude session_id, codex thread-id, opencode session, agy's conversation (what it printed as it exited), grok's (Laki picks it)
   kept?: string // the chat (a resumeId) Laki kept a copy of as its workspace was archived (core's keepChats): <storage>/chats/<id>.jsonl
   forkOf?: string // claude session to fork on first start
   queue?: string[] // follow-ups for when the agent is idle
@@ -669,7 +676,7 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
-  usage?: Record<string, boolean> // R4: claude, codex, gemini: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
+  usage?: Record<string, boolean> // R4: claude, codex: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
   usageNote?: boolean // R4: the one-time note in Settings › Resources that plan limits moved to the agents' own numbers
   seenVersion?: string // U13: the version whose What's new card was closed (a new install: its own; '': from before U13, the next version's shows)
   labs?: boolean // Settings › General › Pages' Labs switch: LABS' pages and buttons all at once (core.ts load: a new install starts with false and each of them off)

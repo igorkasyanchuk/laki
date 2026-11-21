@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// fake agy (Antigravity CLI, the gemini agent): records its args, no hooks: says what it does over OSC 7501 once the
+// terminal answers its query (as agy does), shows "esc to cancel" while it works; "ask…" blocks on a permission menu
+// until 1; a /command takes no turn (no report); on exit prints its resume line, agy --conversation=<id>
+const fs = require('fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'agy', tab: process.env.LAKI_TAB, args, ...(process.env.HTTPS_PROXY && { proxy: process.env.HTTPS_PROXY }) }) + '\n')
+const conv = (args.find(a => a.startsWith('--conversation=')) ?? '').slice(15) || (args.includes('-c') ? 'agy-latest' : 'agy-' + Math.random().toString(36).slice(2, 8))
+let osc = false
+const say = st => osc && process.stdout.write(`\x1b]7501;state=${st}\x07`)
+let asking = ''
+const turn = t => {
+  if (t.startsWith('/')) return void process.stdout.write(`${t}: done here, no turn\r\n> `) // a command of its own: no OSC 7501
+  say('working')
+  process.stdout.write('⠋ Thinking... (esc to cancel)\r\n')
+  if (t.startsWith('ask')) return void setTimeout(() => ((asking = t), say('blocked:kind=permission'), process.stdout.write('Allow this command?\r\n❯ 1. Allow once\r\n  2. Deny\r\n')), 200)
+  if (t.startsWith('fail')) return void setTimeout(() => (process.stdout.write('Error: the model is overloaded\r\n> '), say('error')), 300)
+  setTimeout(() => (process.stdout.write(`answer: ${t}\r\n> `), say('done')), 300)
+}
+const bye = code => (process.stdout.write(`\r\nResume with -c (or command below): agy --conversation=${conv}\r\n`), process.exit(code))
+process.stdout.write(`\x1b[?2004hfake agy ${args.join(' ')}\r\n`)
+process.stdin.setRawMode(true)
+let line = ''
+let started = false
+const start = () => {
+  if (started) return
+  started = true
+  const i = args.indexOf('-i')
+  if (i >= 0) turn(args[i + 1])
+  else (process.stdout.write('> '), say('idle'))
+}
+process.stdout.write('\x1b]7501;?\x07') // does the terminal speak it? (agy asks first)
+const wait = setTimeout(start, 1000)
+process.stdin.on('data', d => {
+  let str = d.toString()
+  const reply = /\x1b\]7501;\?:states=[^\x07\x1b]*(\x07|\x1b\\)/.exec(str)
+  if (reply) (str = str.replace(reply[0], ''), (osc = true), clearTimeout(wait), start())
+  for (const ch of str.replace(/\x1b\[20[01]~/g, '')) {
+    if (ch === '\r') {
+      process.stdout.write('\r\n')
+      const t = line
+      line = ''
+      if (t === 'exit' || t === '/quit') bye(0)
+      if (asking) { const a = asking; asking = ''; turn(t === '1' ? `allowed ${a}` : `denied ${a}`) }
+      else turn(t)
+    } else if (ch === '\x03') bye(130)
+    else { line += ch; process.stdout.write(ch) }
+  }
+})

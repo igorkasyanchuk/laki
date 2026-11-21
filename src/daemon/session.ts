@@ -80,7 +80,7 @@ export class Session {
   readonly born = Date.now()
   lastOutput = this.born // when the program last printed (born until it does: whenPrompt waits for a change)
   lookedAt = 0 // when a client last stopped looking (detach): a sleep counts from then too
-  title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask
+  title = '' // the window title it set (OSC 0/2): grok's says whether it works or asks
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
   onHook: (data: string) => void = () => {} // OSC 7717: a hook on an SSH host reports through the tab's own terminal (core.ts)

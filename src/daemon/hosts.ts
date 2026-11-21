@@ -141,7 +141,7 @@ export function sshIn(host: string, cmd: string, input: string | Buffer, timeout
 }
 
 // the hook on a host: a turn's state as OSC 7717 on its tab's terminal (LAKI_TTY, LAKI_HOOK: hostTab's), which the
-// daemon reads off the stream; as `laki hook`, the payload is an argument (codex, opencode) or stdin (claude, gemini)
+// daemon reads off the stream; as `laki hook`, the payload is an argument (codex, opencode) or stdin (claude)
 const HOST_HOOK = `#!/bin/sh
 # Laki's hook (Laki on your Mac writes it): an agent's turn, as an escape code on its tab's terminal, where Laki reads it
 [ "$1" = hook ] && shift

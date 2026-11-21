@@ -2493,8 +2493,7 @@ export function App() {
     if (to) setWsId(to.id)
   }
   useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, settings.videoButton, settings.timerButton, settings.statusBar, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
-  const tracked = Object.keys(USAGE_AGENTS).filter(a => a !== 'gemini' || settings.usage?.[a] === true) // the status bar's plan limits (R4: Gemini's only from its endpoint)
-  const geminiModels = [...new Set((view?.tabs ?? []).filter(t => t.preset === 'gemini').flatMap(t => (m => (m ? [m] : []))(t.model ?? view?.presets.find(p => p.name === t.profile)?.model)))] // their quotas first
+  const tracked = Object.keys(USAGE_AGENTS) // the status bar's plan limits
   // a plan limit past settings.usageAt as Usage.tsx reads them: a toast, and a notification unless you're looking (or
   // notify is off); once per window per reset (laki.limitsTold), told or not as it crosses (seen: each window's last %)
   // ponytail: only while the app is open with the ring on screen; the daemon doesn't watch usage on its own
@@ -3925,7 +3924,7 @@ export function App() {
               ))}
             </>
           )}
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} asks={settings.usage} load={() => api.call<AgentUsage[]>('usage').then(limits)} credits={hasCap(view, 'ai.credits') ? () => api.call<AiCredits | null>('aiCredits') : undefined} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} asks={settings.usage} load={() => api.call<AgentUsage[]>('usage').then(limits)} credits={hasCap(view, 'ai.credits') ? () => api.call<AiCredits | null>('aiCredits') : undefined} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {view.dnd && ( // U8: Quiet: until when; a click ends it now (its digest shows)
             <button className="sb-rec" data-tip="Quiet: no notifications, sounds, cards or phone pushes, but an important workspace's ask and laki alert's · click: end now, and see what happened meanwhile" onClick={() => void call('dndSet', { off: true }).catch(() => {})}>
               <Icon name="moon" size={11} />

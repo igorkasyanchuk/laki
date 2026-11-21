@@ -9,11 +9,9 @@ import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOM
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
-export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' }
-export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com', gemini: 'Google' } // R4: who its usage endpoint asks
+export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' }
+export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com' } // R4: who its usage endpoint asks
 const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
-// Gemini's windows are its models' quotas: the models its tabs use first (the ring's is the first), the rest under More
-const byUse = (r: AgentUsage, models: string[]) => (r.agent !== 'gemini' ? r : { ...r, windows: [...r.windows].sort((a, b) => Number(!models.some(m => a.label.startsWith(m))) - Number(!models.some(m => b.label.startsWith(m)))) })
 const NAMES = USAGE_AGENTS
 
 // a window whose reset has passed starts over
@@ -65,9 +63,8 @@ export function Ring({ p }: { p?: number }) {
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
 // asks: Settings' usage, the agents whose endpoint is asked; credits: Laki AI's OpenRouter credits and spend (an amber
 // dot on the ring when low)
-export function UsageButton({ load, credits, onUse, onDays, today, models = [], asks }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; models?: string[]; asks?: Record<string, boolean> }) {
-  const [got, setRows] = useState<AgentUsage[] | null>(null)
-  const rows = got && got.map(r => byUse(r, models)) // models: what the Gemini tabs use
+export function UsageButton({ load, credits, onUse, onDays, today, asks }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; asks?: Record<string, boolean> }) {
+  const [rows, setRows] = useState<AgentUsage[] | null>(null)
   const [at, setAt] = useState<DOMRect | null>(null)
   const [or, setOr] = useState<AiCredits | null>(null)
   const loader = useRef({ load, credits })
@@ -108,7 +105,6 @@ const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent
 // today's, its workspaces by name
 export type Spent = Omit<Today, 'ws'> & { ws: { name: string; tokens: number; cost: number }[] }
 
-const MODELS_SHOWN = 2 // Gemini's: the first (its tabs' models), the rest under More
 function windowRow(w: UsageWindow, now: number) {
   const p = live(w, now)
   return (
@@ -209,13 +205,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
                   )
                 ))}
             </div>
-            {(r.agent === 'gemini' ? r.windows.slice(0, MODELS_SHOWN) : r.windows).map(w => windowRow(w, now))}
-            {r.agent === 'gemini' && r.windows.length > MODELS_SHOWN && (
-              <details className="usage-more">
-                <summary className="muted small">More ({r.windows.length - MODELS_SHOWN})</summary>
-                {r.windows.slice(MODELS_SHOWN).map(w => windowRow(w, now))}
-              </details>
-            )}
+            {r.windows.map(w => windowRow(w, now))}
             {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
             {!r.error && r.windows.length > 0 && now - r.at > STALE && <p className="muted small">As of {hm(r.at)}: {r.source === 'own' ? 'the agent says them as it works' : 'not read again since'}.</p>}
           </section>

@@ -114,7 +114,7 @@ the hold; your next prompt (`UserPromptSubmit`) drops it and a reached or failed
 (panels.tsx `GoalStrip`) types `/goal pause`, `/goal resume` (codex) and `/goal clear` through `send`. ponytail: read
 with the meters (off when both the context meter and costs are off); Grok's goals aren't read.
 
-**Laki's own goals (A1b).** An agent with no `/goal` (gemini, opencode, grok, an ACP agent) gets one from Laki
+**Laki's own goals (A1b).** An agent with no `/goal` (agy, opencode, grok, an ACP agent) gets one from Laki
 (verify.ts `goalSet`, the tab's menu › *Set goal › Until test passes…*): `tab.goalRun` (`TabGoal`, kept in state.json)
 holds its words, the project's script that says it's met (`check`: format, lint or test), `maxTurns` (unset
 `GOAL_TURNS`, 12), `maxUsd`, its turns so far and the chat's cost as it was set (`cost0`). It's sent as a prompt
@@ -382,26 +382,30 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
 
 Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
-say as a turn starts (`HEARS`: claude, gemini, opencode; codex's notify comes only as one ends), its session started
+say as a turn starts (`HEARS`: claude, opencode; codex's notify comes only as one ends), its session started
 `DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its
 start's) that its screen answered (`Session.lastOutput` since), and no hook from this start (`heardIn`, per Session: a restart under a moved app is checked anew): its view's `hookless`
 is `hookCause`'s first that holds: `disableAllHooks` or `allowManagedHooksOnly` true in the worktree's
 `.claude/settings.local.json`, `.claude/settings.json`, its config folder's (an account's, or `CLAUDE_CONFIG_DIR` from
 an env), `~/.claude/settings.json` or the managed one (read only; the file and line as `detail`); the profile's args with
 their own `--settings`; `CLAUDE_CONFIG_DIR` in the profile's, project's, Settings' or the daemon's env (no account);
-`hookArgv`'s node or script gone or not executable (a moved app under a daemon that outlived it); gemini's trusted
-folders; else unknown. Any hook clears it (`hook`, `heard`: each agent's last, `hooksSeen`). panels.tsx `HookStrip` at
+`hookArgv`'s node or script gone or not executable (a moved app under a daemon that outlived it); else unknown. Any hook clears it (`hook`, `heard`: each agent's last, `hooksSeen`). panels.tsx `HookStrip` at
 the pane's foot (Details, Copy; Dismiss: App's `hookHid`, per tab, in memory); `doctor`'s `hooks` runs `hookArgv` `hook
 ping` (hook.ts exits 0 before any RPC) and `hookFiles` reads `hookFiles(localHooks)`' files back: Welcome's rows. Tested
 in `test/hook-health.test.ts` (the fake claude runs no hook with `disableAllHooks` in `$HOME/.claude/settings.json`).
 
-The other agents (`AGENTS` in `shared/types.ts`: the command is the id; `presets()` defaults to claude, codex and
-those on PATH):
-- **Gemini**: `gemini -i <prompt>` (0.4.1 answers a bare prompt and exits), `--resume <id>`. Hooks (versions that
-  have them, in a folder Gemini trusts) in `<data>/gemini-settings.json`, given as `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`
-  (the lowest layer; hook lists add up with the user's): SessionStart (session_id), BeforeAgent/AfterTool (running),
-  Notification (waiting), AfterAgent (idle, `prompt_response`); each prints `{}` (gemini wants JSON back). Superset
-  puts the same hooks in `~/.gemini/settings.json`; Laki may not. Laki doesn't trust folders for it.
+The other agents (`AGENTS` in `shared/types.ts`: the command is the id, `agentBin`, but gemini's `agy`; `presets()` defaults to claude,
+codex and those on PATH):
+- **Antigravity** (the `gemini` agent, Gemini CLI's successor; the id stays for saved profiles and tabs): `agy -i
+  <prompt>` (`-p` answers and exits), `--conversation=<id>` after: the id it prints as it exits (*Resume with -c …: agy
+  --conversation=<id>*, `agyResume` on the last 12 lines as the session ends), else `agy -c` (its folder's latest: the
+  worktree is the workspace's own). `--model`, `--effort`, permission modes as `--mode accept-edits|auto|plan` and
+  `--dangerously-skip-permissions` (`PERMS`). Hooks only from `~/.gemini/config` or the repo's `.agents` (files Laki
+  doesn't write), so none: it sends OSC 7501 once the terminal answers its query (Session does), and `programSeen`
+  makes the root's state the tab's status (working: running, blocked: waiting, idle, done or error: idle), for any
+  agent with no hooks (not `HOOKED`, no `Runtime.hooked`, not an ACP one); `sweepRunning` leaves a tab with a root
+  record alone. Its ask's menu is read off the screen. Its version: `agy --version`, its update `agy update` (no npm).
+  No plan-limit meter (Gemini CLI's quota went with it).
 - **OpenCode**: `opencode --prompt <p>`, `--session <id>`; a model in `OPENCODE_CONFIG_CONTENT` (`{"model": …}` over a
   profile's own of it), never `-m` (some versions' TUI refuses it). `OPENCODE_CONFIG_DIR=<data>/opencode` (on top of the
   user's config) loads `plugin/laki.js` (`OPENCODE_PLUGIN`): session.created (not a subagent's: `parentID`) →
@@ -411,8 +415,8 @@ those on PATH):
 - **Grok**: `grok --session-id <uuid> <prompt>`: Laki picks the chat's id, `--resume <id>` after. Its TUI takes hooks
   only from `~/.grok` (or `~/.claude/settings.json`), so it has none: Enter or a prompt sets running; `sweepRunning`
   reads its window title (`Session.title`: `BUSY` while it works, `ASKS` "Action Required": waiting) and ends the
-  turn after `QUIET` with no `BUSY` text, as a hook would (a done notification; a turn started by Enter only after 8s, `Runtime.since`: likely a menu). Gemini without
-  hooks too (`Runtime.hooked`: a hook came from the tab; `turn` is `hook` without marking it).
+  turn after `QUIET` with no `BUSY` text, as a hook would (a done notification; a turn started by Enter only after 8s, `Runtime.since`: likely a menu). An agent whose
+  hooks never come too, unless it speaks OSC 7501 (`Runtime.hooked`: a hook came from the tab; `turn` is `hook` without marking it).
 
 ### Projects
 
@@ -486,15 +490,15 @@ first, then `tabUnbox` (the user's: AGENT_NO, REMOTE_NO) sets the tab's `sandbox
 starts it again, its chat resumed. ponytail: codex's denials reach no hook, so it gets no card.
 The macOS wrapper sandbox (a profile's `wrap: 'macos'`, `shared/wrap.ts`; Settings' *Wrapper sandbox (macOS)*, `laki
 preset set <name> --wrap|--no-wrap`): for an agent whose own sandbox is off or that has none (wrap.ts' header lists each
-agent's, from its docs: OpenCode has none; Gemini's `-s` and Grok's `--sandbox` are theirs, off unless a profile's flags or
-env turn them on, `ownBoxOn`). core's `wrapped(tab)` (a Mac, this Mac's workspace, not `sandboxed`, not `ownBoxOn`, the tab's
+agent's, from its docs: OpenCode has none; agy's `--sandbox` and Grok's are theirs, off unless a profile's flags (Grok's env too) turn them
+on, `ownBoxOn`). core's `wrapped(tab)` (a Mac, this Mac's workspace, not `sandboxed`, not `ownBoxOn`, the tab's
 `wrap` not false) makes `agentCmd` return `wrapCmd`: `<sandbox-exec> -p "$LAKI_SB_PROFILE" -D "$LAKI_SB_D0" … /bin/sh -c
 "$LAKI_SB_CMD"`, the profile and every path in the tab's env, never in the line. `wrapProfile`: allow default, deny writes
 but the worktree, `gitWrites`' folders, /tmp and $TMPDIR's folder, the agent's own (`AGENT_WRITES`), its storage folder, its
 account's folder, claude's status line folder; deny reads of Laki's whole data folder (`file-read-data` only: its files
 and listings, never a stat, so a worktree or storage folder in it is still walked to; trusted clients' tokens and any
-secret added later too), read back what it works in that's in it and `wrapReads` (claude's settings and plugin, gemini's
-settings, opencode's folder, statusline.sh, pasted `images/` and `files/`), its account's folder and its project's
+secret added later too), read back what it works in that's in it and `wrapReads` (claude's settings and plugin,
+opencode's folder, statusline.sh, pasted `images/` and `files/`), its account's folder and its project's
 checkout (a repo in the data folder, the sample: git reads its `.git`); then deny reads of
 `SECRET_HOME` and every other agent's folders (as `file-read*` and `file-read-data` both: macOS gives a `file-read-data`
 rule the win over a `file-read*` one, wherever it is); each path `realOf` (realpath, or its nearest folder's) and a
@@ -512,7 +516,7 @@ throw of `connect` is a 502 (plain http's `new URL` refuses a bad port itself: 4
 Its port and passwords in `<data>/net-proxy.json` (0600, `DATA_SECRETS`): the next daemon listens on that port again and
 a kept terminal's URL (the pty host's) goes on; `proxyDrop` as a tab closes. `MODEL_HOST` has gemini's, grok's and
 codex's sign-in hosts for a wrapped one (OpenCode's provider: its card). `test/net-proxy.test.ts` (the proxy alone),
-`test/presets.test.ts` (a wrapped gemini's). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
+`test/presets.test.ts` (a wrapped agy's). `LAKI_DAEMON_PORT` in its env: its laki calls go with its
 tab's token, daemon.json unread (conn.ts `daemonInfo`). No sandbox-exec (`sandboxBin` on PATH; a test's
 `LAKI_TEST_NO_SANDBOX_EXEC`): the tab doesn't start, a notice and the workspace's log say why. A write it refuses
 (`wrapRefused` in the tab's output: *Operation not permitted* for a path out of the worktree) is `boxed` with `wrap: true`:

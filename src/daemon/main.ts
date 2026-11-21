@@ -1182,7 +1182,7 @@ function boxNo(method: string, p: any) {
   if (method === 'wsNew' && (p.preset || core.state.settings?.agent) === 'shell') no('open a terminal') // a race's: refused as no agent (wsFan)
   if (method === 'quickNew' && p.kind !== 'browsers') no('open a terminal') // S5: a Terminals workspace's
   if (method === 'openIn' && p.file && fileApp(p.app)) no('open a file in a browser or with its default app') // S7
-  if ((method === 'tabNew' || method === 'wsNew' || method === 'wsFan') && p.sandbox !== false) p.sandbox = true // false: agentNo's refusal; an agent without one (gemini…): modelCheck's
+  if ((method === 'tabNew' || method === 'wsNew' || method === 'wsFan') && p.sandbox !== false) p.sandbox = true // false: agentNo's refusal; an agent without one (grok…): modelCheck's
   if (method === 'run') no('start a Run ▾ action')
   if (method === 'wsUpdate') no('update a branch through Laki (the merge and its git hooks run outside its sandbox)')
   if (method === 'projectAdd') no('add a project (a repo it made, its hooks and config run as you once a workspace starts there)')
@@ -1242,7 +1242,7 @@ const newOk = (tab: boolean) => (p: any) => {
   return p?.sandbox === false ? 'no sandbox' : ''
 }
 // a message to an agent: whole (no keys without Enter, which could build one in pieces), and not its shell mode (a line
-// that starts with ! runs as a command in claude, codex and gemini, with no ask)
+// that starts with ! runs as a command in claude, codex and agy, with no ask)
 const sendOk = (p: any) => {
   let t: Tab
   try {

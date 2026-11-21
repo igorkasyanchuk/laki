@@ -287,7 +287,7 @@ export const varsFill = (own?: Record<string, string>, global?: Record<string, s
 const clip = (s: string, n = 120) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 export const blockName = (b: Block) => b.name || (b.kind === 'start' ? 'Start' : b.id)
 
-// an agent block's permission mode: its own, else the workflow's (none for an agent that has no modes: gemini, grok,
+// an agent block's permission mode: its own, else the workflow's (none for an agent that has no modes: grok,
 // opencode); agent: its preset's agent where that's known (the daemon's), else the preset's name
 export const PERM_IDS = [...new Set(Object.values(PERMS).flatMap(l => (l ?? []).map(p => p[0])))]
 export const permOf = (wf: Pick<Workflow, 'perm'>, b: Block, agent = b.agent || 'claude') => b.perm ?? (isAgent(agent) && !PERMS[agent] ? undefined : wf.perm)

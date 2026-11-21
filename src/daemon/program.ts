@@ -1,7 +1,7 @@
 // OSC 7501, the Program Status Protocol: an agent says what it's doing through its own terminal (idle, working, blocked,
-// done, error; a record for the program, the root, and one per child id). Shadow for now: Session answers the query and
-// keeps the records, core compares the root's with the status from hooks (Settings › Agents & profiles' line), and
-// nothing else reads them. A hint from a terminal's output: never an approval, never what a tab shows.
+// done, error; a record for the program, the root, and one per child id). Session answers the query and keeps the
+// records; core compares the root's with the status from hooks (Settings › Agents & profiles' line), and for an agent
+// with no hooks (agy) the root's state is its tab's status (programSeen). A hint from a terminal's output: never an approval.
 // ponytail: msg and title are checked (a bad one drops the report) but not kept, and a child's app isn't inherited: nothing shows either
 import type { ProgramState } from '../shared/types.ts'
 

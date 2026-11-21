@@ -7,7 +7,7 @@ import { type Agent, AGENTS } from './types.ts'
 export const INSTALL: Record<Agent, { cmd?: string; docs?: string }> = {
   claude: { cmd: 'curl -fsSL https://claude.ai/install.sh | bash', docs: 'https://docs.claude.com/en/docs/claude-code/setup' },
   codex: { cmd: 'npm install -g @openai/codex', docs: 'https://github.com/openai/codex' },
-  gemini: { cmd: 'npm install -g @google/gemini-cli', docs: 'https://github.com/google-gemini/gemini-cli' },
+  gemini: { cmd: 'curl -fsSL https://antigravity.google/cli/install.sh | bash', docs: 'https://antigravity.google/docs/cli' }, // Antigravity CLI (agy), Gemini CLI's successor
   grok: {},
   opencode: { cmd: 'curl -fsSL https://opencode.ai/install | bash', docs: 'https://opencode.ai/docs' },
 }

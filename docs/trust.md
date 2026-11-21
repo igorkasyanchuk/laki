@@ -24,7 +24,7 @@ The daemon listens on 127.0.0.1 only, behind its token and an Origin check ([SEC
 
 ## Every network destination
 
-What Laki itself connects to. The agents you run (Claude Code, Codex, Gemini CLI, Grok, OpenCode) talk to their own
+What Laki itself connects to. The agents you run (Claude Code, Codex, Antigravity CLI, Grok, OpenCode) talk to their own
 providers on their own; Laki starts them and reads their screens, it doesn't relay their traffic.
 
 ### With nothing set up
@@ -45,13 +45,12 @@ providers on their own; Laki starts them and reads their screens, it doesn't rel
 | Your own endpoint (Settings › AI › Your endpoint) | Laki AI's chat, an AI call block's prompt, memories for compaction, *Guess my next prompt*'s last answer: what goes to OpenRouter otherwise (Voice and decision blocks stay OpenRouter's) | Only with *Runs with: Your endpoint*, as each of those runs; https, or http on this Mac only | Pick another backend; Laki AI off; each feature's own switch |
 | `api.anthropic.com` | Claude Code's own sign-in token, asking for your plan's limits (an undocumented endpoint) | At most every 7.5 minutes, only with *Ask api.anthropic.com for Claude Code's plan limits* on (Settings › Appearance) | That switch (off unless you turn it on) |
 | `chatgpt.com` | Codex's own sign-in token, asking for your plan's limits (an undocumented endpoint); `api.openai.com` is only a claim name read from that token, never contacted | At most every 5 minutes, only with *Ask chatgpt.com for Codex's plan limits* on | That switch |
-| `oauth2.googleapis.com`, `cloudcode-pa.googleapis.com` | Gemini CLI's own sign-in (its token renewed, then its quota asked) | At most every 5 minutes, only with *Ask Google for Gemini CLI's plan limits* on | That switch |
 | Your phone push URL: `ntfy.sh` (or your own ntfy server), `api.telegram.org`, `hooks.slack.com`, any JSON webhook | A push's title, its workspace's name, the question and its choices (secrets masked); ntfy and Telegram are also read for your answer taps | When an agent or a workflow needs you, a run ends, a reminder is due (Settings › Phone pushes) | Clear the webhook |
 | Your phone's push service: `fcm.googleapis.com` (Chrome), `web.push.apple.com` (Safari), `updates.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Edge) | A notification encrypted on your Mac for that phone alone (RFC 8291): the service sees its size and time, not its words | Only with Phone pushes set to *This phone (Web Push)*, for paired phones that turned notifications on | Phone pushes' format, or the phone's own notification settings |
 | Cloudflare (`cloudflared`: `*.trycloudflare.com` quick tunnels, or your named tunnel) | Remote access's page and its traffic, a tunnel to a dev server, a shared tab's view | Only while remote access, a tunnel or a share runs | Stop it (it ends on its own when its time is up) |
 | Apple's Handoff | Remote access's address (never its link's token or PIN) to your nearby Apple devices on the same Apple Account, while Laki is in front | Only with Settings › Remote access › *Offer on my nearby devices* on, at a Tailscale or My domain address (never a quick tunnel's), not in Recording mode | That switch |
 | Tailscale (`tailscale serve` or `funnel`) | The same, on your tailnet (`tailscale.com` is only the install link) | Only while remote access over Tailscale runs | Stop it |
-| `registry.npmjs.org` | A request for the latest version of each agent CLI's npm package you have installed (`@anthropic-ai/claude-code`, `@openai/codex`, `@google/gemini-cli`, `opencode-ai`, or the one it was installed from): your IP address, nothing else | Every 6 hours, and when Settings › Agents & profiles › *Versions* opens | Don't open it; the daemon asks every 6 hours while it runs (a dot on Settings when one is out) |
+| `registry.npmjs.org` | A request for the latest version of each agent CLI's npm package you have installed (`@anthropic-ai/claude-code`, `@openai/codex`, `opencode-ai`, or the one it was installed from): your IP address, nothing else | Every 6 hours, and when Settings › Agents & profiles › *Versions* opens | Don't open it; the daemon asks every 6 hours while it runs (a dot on Settings when one is out) |
 | `www.reddit.com`, `meme-api.com` | A request for r/memes, r/ProgrammerHumor or r/wholesomememes' hot posts; then the picture's own host | Only when you click for a meme | Don't click it |
 | `www.youtube-nocookie.com` | The video you add to the sidebar, with `https://dev.laki.app/` as its Referer (YouTube's rule for apps: Laki sends nothing to that name) | Only while that video shows | Remove the video |
 | `duckduckgo.com` | Words you type into a Browsers page's address bar that aren't an address | Only then | Type an address |
@@ -67,7 +66,7 @@ These appear in Laki's source as links you click, text shown to you, samples or 
 
 - Links that open in your browser when you click them: `laki.sh` (About), `github.com` (the repo, issues, PRs),
   `raw.githubusercontent.com` (the widget schema's address for editors), `tailscale.com` (its download page),
-  `docs.claude.com`, `claude.ai`, `opencode.ai`, `cursor.com` (an agent's install command and docs, shown for you to run),
+  `docs.claude.com`, `claude.ai`, `antigravity.google`, `opencode.ai`, `cursor.com` (an agent's install command and docs, shown for you to run),
   `www.youtube.com`, `youtu.be` (forms of a video's address), `openfontlicense.org` (the fonts' licence).
 - `dev.laki.app`: only a name in the Referer header YouTube's embed asks of apps; nothing is sent to it.
 - Push formats' placeholders in Settings: `ntfy.sh`, `api.telegram.org`, `hooks.slack.com`, `example.com`.
