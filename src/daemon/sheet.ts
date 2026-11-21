@@ -1,7 +1,9 @@
 // An Excel workbook (.xlsx, .xlsm) as tables for the side panel's Files (fileRead's `sheets`): the zip read with node's
 // zlib, each sheet's cells from its XML, shared strings, booleans, errors, and dates by their cell's number format.
 // Values only: no formulas, styles, merged cells or charts. The XML is read in one pass over its tags (walk): no
-// pattern that can run to the end for each start, so a crafted part can't stall the daemon. Pure (test/sheet.test.ts)
+// pattern that can run to the end for each start, so a crafted part can't stall the daemon. Each part is inflated and
+// read once per call, 96 MB inflated in all (a zip bomb: SheetTooBig), shared strings no more than cells can show.
+// Pure (test/sheet.test.ts); the daemon runs it in a worker (sheetWorker.ts)
 import { inflateRawSync } from 'node:zlib'
 
 export type Sheet = { name: string; rows: string[][]; cut?: boolean } // cut: more rows or columns than shown
@@ -11,9 +13,13 @@ export const SHEET_CELLS = 60_000 // the table's cells at most, a wide sheet's f
 export const SHEET_MAX = 20 << 20 // the file
 const SHEETS = 20
 const PART_MAX = 64 << 20 // one part inflated: past it, no table (a zip bomb)
+const ALL_MAX = 96 << 20 // every part inflated, together
+export const TOO_BIG = 'Too big to show as a table'
+export let inflates = 0 // tests': how many parts were inflated
 
 // the zip's parts by name, from its central directory (no ZIP64: a workbook under 4 GB)
 function unzip(buf: Buffer): Map<string, () => Buffer> {
+  let total = 0
   let end = -1
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 0xffff); i--)
     if (buf.readUInt32LE(i) === 0x06054b50) {
@@ -31,13 +37,21 @@ function unzip(buf: Buffer): Map<string, () => Buffer> {
     const local = buf.readUInt32LE(at + 42)
     const name = buf.toString('utf8', at + 46, at + 46 + nameLen)
     at += 46 + nameLen + buf.readUInt16LE(at + 30) + buf.readUInt16LE(at + 32)
+    let got: Buffer | undefined
     parts.set(name, () => {
+      if (got) return got // once per call, however many sheets point at it
       if (buf.readUInt32LE(local) !== 0x04034b50) throw new Error('a broken zip')
       const from = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28)
       const raw = buf.subarray(from, from + size)
-      if (method === 0) return raw
-      if (method === 8) return inflateRawSync(raw, { maxOutputLength: PART_MAX })
-      throw new Error(`zip method ${method}`)
+      if (method !== 0 && method !== 8) throw new Error(`zip method ${method}`)
+      if (method === 8) inflates++
+      try {
+        got = method === 0 ? raw : inflateRawSync(raw, { maxOutputLength: Math.min(PART_MAX, ALL_MAX - total) })
+      } catch (e) {
+        throw (e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE' ? new Error(TOO_BIG) : e
+      }
+      if ((total += got.length) > ALL_MAX) throw new Error(TOO_BIG)
+      return got
     })
   }
   return parts
@@ -77,16 +91,19 @@ function walk(xml: string, f: (name: string, attrs: string, kind: Kind, text: st
   }
 }
 
-// shared strings: each item's text, its runs' <t> joined, phonetic hints (rPh) left out
-function stringsOf(xml: string) {
+// shared strings: each item's text, its runs' <t> joined, phonetic hints (rPh) left out; max: no more than a table's
+// cells can show
+function stringsOf(xml: string, max = SHEET_CELLS) {
   const out: string[] = []
   let cur = ''
   let inT = false
   let rph = false
   walk(xml, (name, _, kind, text) => {
     if (inT && !rph) cur += unxml(text)
-    if (name === 'si') kind === 'open' ? (cur = '') : out.push(kind === 'self' ? '' : cur)
-    else if (name === 't') inT = kind === 'open'
+    if (name === 'si') {
+      if (kind === 'open') cur = ''
+      else if (out.push(kind === 'self' ? '' : cur) >= max) return false
+    } else if (name === 't') inT = kind === 'open'
     else if (name === 'rPh') rph = kind === 'open'
   })
   return out
@@ -176,7 +193,8 @@ function rowsOf(xml: string, strings: string[], dates: boolean[], shift: number)
 
 export function readSheets(buf: Buffer): Sheet[] {
   const parts = unzip(buf)
-  const text = (name: string) => parts.get(name)?.().toString('utf8') ?? ''
+  const texts = new Map<string, string>()
+  const text = (name: string) => texts.get(name) ?? (t => (texts.set(name, t), t))(parts.get(name)?.().toString('utf8') ?? '')
   const book = text('xl/workbook.xml')
   if (!book) throw new Error('not an Excel workbook')
   const sheets: { name: string; id: string }[] = []
@@ -190,9 +208,11 @@ export function readSheets(buf: Buffer): Sheet[] {
   walk(text('xl/_rels/workbook.xml.rels'), (name, attrs, kind) => void (name === 'Relationship' && kind !== 'close' && rels.set(attr(attrs, 'Id'), attr(attrs, 'Target'))))
   const strings = stringsOf(text('xl/sharedStrings.xml'))
   const dates = dateStyles(text('xl/styles.xml'))
+  const read = new Map<string, ReturnType<typeof rowsOf>>() // sheets that point at one part: read once
   return sheets.map((s, i) => {
     const target = rels.get(s.id) ?? ''
-    const { rows, cut } = rowsOf(target ? text(target.startsWith('/') ? target.slice(1) : `xl/${target}`) : '', strings, dates, shift)
+    const part = target ? (target.startsWith('/') ? target.slice(1) : `xl/${target}`) : ''
+    const { rows, cut } = read.get(part) ?? (r => (read.set(part, r), r))(rowsOf(part ? text(part) : '', strings, dates, shift))
     return { name: s.name || `Sheet ${i + 1}`, rows, ...(cut && { cut }) }
   })
 }

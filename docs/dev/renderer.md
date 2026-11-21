@@ -757,8 +757,12 @@ are tested in `test/units-more.test.ts`.
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
   text edit. An Excel workbook (`.xlsx`, `.xlsm`): fileRead's `sheets` (the daemon's `sheet.ts` `readSheets`: the zip
   through node's zlib, each sheet's values; dates by their cell's number format, the 1904 system too; `SHEET_ROWS`,
-  `SHEET_COLS`, `SHEET_CELLS`, 20 MB, a part inflated past 64 MB refused; one pass over each part's tags (`walk`), no
-  pattern that can run to the end per start; no table on a host: a file card), shown read only by
+  `SHEET_COLS`, `SHEET_CELLS`, 20 MB, a part inflated past 64 MB refused, 96 MB inflated in all; each part inflated and
+  read once per call (20 sheets that point at one part: one read), shared strings no more than `SHEET_CELLS`; one pass
+  over each part's tags (`walk`), no pattern that can run to the end per start; no table on a host: a file card). It
+  runs in a worker (`files.ts` `sheetsOf`, the entry `sheetWorker.ts`, `out/main/sheetWorker.js`): 256 MB of heap, 3 s,
+  past either or a limit a file card with *Too big to show as a table* (`why`), so a crafted workbook never stalls the
+  daemon, shown read only by
   `CsvTable`'s `grid`, a `.seg` tab per sheet (`.pv-sheets`). ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
   (`securityLevel: strict`), each chart an `<img>` of its SVG (inline, a brainstorm's 50 were 18k nodes that every
   next chart laid out again), in `FONT` (an image has no web fonts), drawn once ui.tsx' `useNear` says it nears the

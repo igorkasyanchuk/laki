@@ -20,7 +20,7 @@ export type Commits = { base?: string; commits: Commit[]; more?: boolean } // ba
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
 export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
-export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[] } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[]; why?: string } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
 // keeps it: a workspace switch doesn't lose it)
 export type Edit = { text: string; was: string }
@@ -1713,7 +1713,7 @@ export function FilePreview(p: {
         {f && f.text === undefined && !f.image && !book && (
           <FileCard
             path={p.path}
-            meta={sizeText(f.size)}
+            meta={f.why ? `${sizeText(f.size)} · ${f.why}` : sizeText(f.size)}
             media={f.media}
             src={f.src}
             big={!!f.media && !f.src}

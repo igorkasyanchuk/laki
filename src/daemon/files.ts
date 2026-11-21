@@ -7,6 +7,8 @@ import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync,
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Worker } from 'node:worker_threads'
 import { writeAtomic } from '../shared/conn.ts'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Broken, type Stat, type Workspace } from '../shared/types.ts'
@@ -14,7 +16,7 @@ import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git,
 import { dir } from './dir.ts'
 import { away, broken, hostUp, live, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
-import { readSheets, SHEET_MAX } from './sheet.ts'
+import { type Sheet, SHEET_MAX, TOO_BIG } from './sheet.ts'
 
 // ---------- the worktree as a tree
 
@@ -716,6 +718,25 @@ export const MAX_TEXT = 512 << 10
 export const MEDIA: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg' }
 export const MEDIA_MAX = 25 << 20
 
+// a workbook's sheets, read in a worker (sheetWorker.ts): a crafted one (a zip bomb of shared parts) never stalls the
+// daemon; 256 MB of heap and 3 s at most, past either TOO_BIG
+const SHEET_MS = 3000
+function sheetWorker() {
+  const here = dirname(fileURLToPath(import.meta.url))
+  for (const p of [join(here, 'sheetWorker.js'), join(here, '../sheetWorker.js'), join(here, 'sheetWorker.ts')]) if (existsSync(p)) return p
+  throw new Error('sheet worker not found')
+}
+export function sheetsOf(path: string) {
+  return new Promise<Sheet[]>((res, rej) => {
+    const w = new Worker(sheetWorker(), { workerData: { path }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
+    const big = () => rej(new Error(TOO_BIG))
+    const t = setTimeout(() => (big(), void w.terminate()), SHEET_MS)
+    w.once('message', (m: { sheets?: Sheet[]; err?: string }) => (m.sheets ? res(m.sheets) : rej(new Error(m.err))))
+    w.once('error', (e: NodeJS.ErrnoException) => (e.code === 'ERR_WORKER_OUT_OF_MEMORY' ? big() : rej(e)))
+    w.once('exit', () => (clearTimeout(t), big())) // a settled promise ignores it
+  })
+}
+
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), audio or video (`media`, its
 // kind; `src`, its data URL, only asked for: media true, MEDIA_MAX), or only its size. base: an image as it was where
 // the workspace's changes start (diff's base, through git show), for Changes' before and after
@@ -794,11 +815,12 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
   const av = MEDIA[extname(abs).slice(1).toLowerCase()]
   if (av) return { size: st.size, media: av.split('/')[0], ...(o.media && st.size <= MEDIA_MAX && { src: `data:${av};base64,${readFileSync(abs).toString('base64')}` }) }
   if (/\.xls[xm]$/i.test(abs) && st.size <= SHEET_MAX) {
-    // an Excel workbook: its sheets as tables (sheet.ts); one it can't read, a file card as before
+    // an Excel workbook: its sheets as tables (sheet.ts, in a worker); one it can't read, a file card as before; one
+    // past its limits or its time, a file card that says why
     try {
-      return { size: st.size, sheets: readSheets(readFileSync(abs)) }
-    } catch {
-      return { size: st.size }
+      return { size: st.size, sheets: await sheetsOf(abs) }
+    } catch (e) {
+      return { size: st.size, ...((e as Error).message === TOO_BIG && { why: TOO_BIG }) }
     }
   }
   let buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))

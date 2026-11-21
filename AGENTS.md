@@ -199,7 +199,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/pr.ts` | branches followed, PR scans, `autoPR` and the PR switches' messages, merge when green, the side panel's PR calls |
 | `src/daemon/gitlab.ts` | GitLab through glab: `forgeOf` (a project's origin), its MR as a `PR` (`forge: 'gitlab'`), pipeline jobs as checks, the MR actions, issues, Ship's `shipMr` |
 | `src/daemon/files.ts` | the diff against the base and its size, Changes' revert and redo, the side panel's files |
-| `src/daemon/sheet.ts` | an Excel workbook's sheets as tables (fileRead's `sheets`): the zip through node's zlib, values, dates by their style; pure |
+| `src/daemon/sheet.ts` | an Excel workbook's sheets as tables (fileRead's `sheets`): the zip through node's zlib, values, dates by their style, each part once and 96 MB in all; pure; run in a worker (`sheetWorker.ts`, files.ts' `sheetsOf`: 3 s, 256 MB) |
 | `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
 | `src/daemon/agentLog.ts` | what agents did through Laki's API, per workspace (main.ts call's `agentLine`): kept and capped, `agentLog` reads it |
 | `src/daemon/e2e.ts` | S14, remote access end to end: HKDF-SHA-256 keys, AES-256-GCM frames with per-direction counters (`channel`, `first`), a device key wrapped by its cookie (`wrap`, `unwrap`); the page's half is `src/renderer/src/e2e.ts` (WebCrypto, IndexedDB) |

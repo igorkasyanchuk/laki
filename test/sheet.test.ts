@@ -6,8 +6,9 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { crc32, deflateRawSync } from 'node:zlib'
-import { readSheets, SHEET_CELLS, SHEET_COLS } from '../src/daemon/sheet.ts'
-import { fresh } from './helpers.ts'
+import * as sheet from '../src/daemon/sheet.ts'
+import { readSheets, SHEET_CELLS, SHEET_COLS, TOO_BIG } from '../src/daemon/sheet.ts'
+import { fresh, SLOW } from './helpers.ts'
 
 // a zip of these parts: each deflated, but ones named in stored kept as they are
 function zip(parts: Record<string, string>, stored: string[] = []) {
@@ -108,4 +109,49 @@ test("fileRead: an .xlsx's sheets; one it can't read: its size only (a file card
   writeFileSync(join(path, 'bad.xlsx'), 'not a workbook')
   assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'data.xlsx' }), { size: (await rig.rpc('fileRead', { ws: ws.id, path: 'data.xlsx', stat: true })).size, sheets: [{ name: 'Data', rows: [['hi']] }] })
   assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'bad.xlsx' }), { size: 14 })
+})
+
+// a crafted workbook (314 KB) that blocked the daemon for 2 s: 20 sheets that all point at one 63 MB part, and a 63 MB
+// sharedStrings
+const MB63 = 63 << 20
+const repeat = (unit: string, bytes: number) => unit.repeat(Math.floor(bytes / unit.length))
+const bomb = (strings = true) =>
+  zip(
+    {
+      'xl/workbook.xml': `<workbook xmlns:r="r"><sheets>${Array.from({ length: 20 }, (_, i) => `<sheet name="S${i}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
+      'xl/_rels/workbook.xml.rels': `<Relationships>${Array.from({ length: 20 }, (_, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet1.xml"/>`).join('')}</Relationships>`,
+      'xl/worksheets/sheet1.xml': `<worksheet><sheetData>${repeat('x', MB63)}</sheetData></worksheet>`,
+      ...(strings && { 'xl/sharedStrings.xml': `<sst>${repeat('<si><t>a</t></si>', MB63)}</sst>` }),
+    },
+    ['xl/_rels/workbook.xml.rels'],
+  )
+test('readSheets: a zip bomb of shared parts: each part inflated once, 96 MB in all, then too big; quick either way', () => {
+  const quiet = bomb(false)
+  const loud = bomb(true)
+  assert.ok(loud.length < 1 << 20, `small on disk: ${loud.length} bytes`)
+  // no strings: the one part read once, every sheet empty
+  const was = sheet.inflates
+  const t0 = Date.now()
+  const r = readSheets(quiet)
+  assert.equal(r.length, 20)
+  assert.ok(r.every(x => x.rows.length === 0))
+  assert.equal(sheet.inflates - was, 2, 'workbook.xml and the shared part, once each')
+  // with 63 MB of strings too: past 96 MB in all
+  assert.throws(() => readSheets(loud), new RegExp(TOO_BIG))
+  assert.ok(Date.now() - t0 < 1500 * SLOW, `quick: ${Date.now() - t0} ms`)
+})
+
+test("fileRead: a crafted workbook in a worker: the file card says it's too big, and the daemon answers meanwhile", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const path = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).path
+  writeFileSync(join(path, 'bomb.xlsx'), bomb())
+  const read = rig.rpc('fileRead', { ws: ws.id, path: 'bomb.xlsx' })
+  const t0 = Date.now()
+  await rig.rpc('ping')
+  assert.ok(Date.now() - t0 < 200 * SLOW, `ping answered in ${Date.now() - t0} ms`)
+  const r = await read
+  assert.equal(r.why, TOO_BIG)
+  assert.equal(r.sheets, undefined)
 })
