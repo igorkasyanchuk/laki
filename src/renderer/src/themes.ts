@@ -1303,12 +1303,46 @@ export function setSystemAccent(c: string | null) {
   b?.accent?.().then(setSystemAccent, () => {})
   b?.onAccent?.(setSystemAccent)
 }
-if (typeof matchMedia === 'function') matchMedia(DARK).addEventListener('change', () => last && typeof last[0] !== 'string' && last[0].themeAuto && applyTheme(...last))
+if (typeof matchMedia === 'function') matchMedia(DARK).addEventListener('change', () => last && typeof last[0] !== 'string' && last[0].themeAuto && paintTheme(...last))
+
+// a theme and its look, as painted: what tells a real change (a cross-fade) from the same theme painted again (a font,
+// glass, the accent: none). Pure
+export const themeKey = (p: string | Paint, dark: boolean) => {
+  const o = paintOf(typeof p === 'string' ? { theme: p } : p)
+  const t = THEMES.find(x => x.id === themeFor(o, dark)) ?? THEMES[0]
+  return `${t.id} ${o.design === 'frosted' ? 'frosted' : (t.look ?? '')}`
+}
+// ui.tsx' morph's test too: view transitions, a window that draws, not under Reduce motion, Motion: Off or ui-smoke
+export const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+// a theme that really changes (you pick one, a look or light or dark; the system turns) cross-fades in 200 ms (styles.css'
+// html.theme-fade: the root snapshotted only then; its new state is live, so a terminal repainting meanwhile isn't
+// frozen); the first paint, a hover's preview (applyTheme) and the same theme again paint at once. A call while one is
+// about to paint gives it what to paint
+let painted = ''
+let pend: [string | Paint, boolean] | undefined
+export function paintTheme(p: string | Paint = '', solid = false) {
+  if (pend) return void (pend = [p, solid])
+  const k = themeKey(p, asked(DARK))
+  if (!painted || k === painted || !morphOk()) return applyTheme(p, solid)
+  pend = [p, solid]
+  const root = document.documentElement
+  root.classList.add('theme-fade')
+  const done = () => root.classList.remove('theme-fade')
+  try {
+    document.startViewTransition(() => (a => ((pend = undefined), applyTheme(...a)))(pend!)).finished.then(done, done)
+  } catch {
+    done()
+    const a = pend
+    pend = undefined
+    applyTheme(...a)
+  }
+}
 
 export function applyTheme(p: string | Paint = '', solid = false) {
   last = [p, solid]
   const o: Paint = { ...paintOf(typeof p === 'string' ? { theme: p } : p), ...((solid || asked(LESS_CLEAR)) && { glass: false, sideClear: 0, translucent: false }) }
   const t = THEMES.find(x => x.id === themeFor(o, asked(DARK))) ?? THEMES[0]
+  painted = themeKey(o, asked(DARK))
   const root = document.documentElement
   const st = root.style
   for (const k of Array.from(st)) if (k.startsWith('--')) st.removeProperty(k)

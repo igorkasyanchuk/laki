@@ -8,6 +8,7 @@ import { createPortal, flushSync } from 'react-dom'
 import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
+import { morphOk } from './themes'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -65,7 +66,6 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // elsewhere) and ui-smoke (main marks the page data-smoke): fn at once. One whose change hasn't run in 400 ms is skipped
 // (its change runs then)
 let grewFrom: HTMLElement | null = null
-const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && document.documentElement.dataset.motion !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches
 const sheetOf = () => [...document.querySelectorAll<HTMLElement>('.overlay .modal, .main > .settings-page')].at(-1) ?? null
 export function morph(fn: () => void, grow?: 'open' | 'close') {
   if (!morphOk()) return fn()

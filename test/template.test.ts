@@ -58,6 +58,19 @@ test('the Frosted design is always glass', async () => {
   assert.equal(paintOf({ theme: 'kraft', design: 'cards' }).glass, undefined)
 })
 
+test("themeKey: a theme's id and look, so the same theme painted again (a font, glass, the accent) doesn't cross-fade; another, a look or the system's turn does", async () => {
+  const { themeKey, THEMES } = await import('../src/renderer/src/themes.ts')
+  const looked = THEMES.find(t => t.look)!
+  assert.equal(themeKey({ theme: 'kraft' }, true), themeKey({ theme: 'kraft', uiFont: 'Inter', glass: true, accent: '#ff0000' }, true))
+  assert.equal(themeKey('kraft', false), themeKey({ theme: 'kraft' }, false))
+  assert.notEqual(themeKey({ theme: 'kraft' }, true), themeKey({ theme: 'paper' }, true))
+  assert.notEqual(themeKey({ theme: 'kraft' }, true), themeKey({ theme: 'kraft', design: 'frosted' }, true), 'a look')
+  assert.ok(themeKey({ theme: looked.id }, true).endsWith(` ${looked.look}`))
+  const auto = { themeAuto: true, themeLight: 'paper', themeDark: 'default' }
+  assert.notEqual(themeKey(auto, true), themeKey(auto, false), 'following the system: its turn')
+  assert.equal(themeKey({ theme: 'kraft' }, true), themeKey({ theme: 'kraft' }, false), 'a fixed theme: the system turning changes nothing')
+})
+
 test('themes: unique ids, and every look has rules in looks.css', async () => {
   const { THEMES } = await import('../src/renderer/src/themes.ts')
   const css = (await import('node:fs')).readFileSync(new URL('../src/renderer/src/looks.css', import.meta.url), 'utf8')

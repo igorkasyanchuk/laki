@@ -709,7 +709,11 @@ are tested in `test/units-more.test.ts`.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
   Go used; `default` leaves the stylesheet's; then `gateRules`: a rule whose every selector starts with another look's
   or motion's `[data-look="x"]` gets the selector `#laki-off` until that one's picked, its own text kept: Chrome tried
-  all 500 on every element, `[data-look] :is(…)` can't be filed under a class), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
+  all 500 on every element, `[data-look] :is(…)` can't be filed under a class), `paintTheme` (a theme that really
+  changes, by `themeKey`: its id and look, cross-fades in a view transition of 200 ms while `html.theme-fade` gives the
+  root its snapshot; Settings' `paint`, App's paint and the system's light/dark turn; `morphOk` as ui.tsx' morph (it
+  lives here now); not the first paint, a hover's preview (`applyTheme`) or the same theme again; a call while one
+  waits joins it), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
   transparent `--term-bg` (xterm runs with `allowTransparency`). A theme after a game or film has an evocative name
   and its `aka` (the game's or film's words), which Settings' theme finder also matches. `--accent-ink` is the accent as text (every `color:`
   of it; fills and borders keep `--accent`): `readable` darkens it (lightens, on a dark theme) to 4.5:1 on the theme's

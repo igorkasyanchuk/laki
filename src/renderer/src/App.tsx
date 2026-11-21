@@ -54,7 +54,7 @@ import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
 import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, DARK, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
+import { applyTheme, blurred, paintTheme, css, DARK, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
@@ -1114,7 +1114,7 @@ export function App() {
     const side = blur && !paint.glass // V5: macOS's sidebar material, not glass's whole-window one
     if (glassed.current !== `${blur} ${light} ${float} ${side}`) (glassed.current = `${blur} ${light} ${float} ${side}`), bridge?.glass?.(blur, light, float, side)
     painted.current = theme
-    applyTheme(paint)
+    paintTheme(paint) // a real change (Settings', the system's) cross-fades: a call while one waits joins it
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
   userCss(view?.settings.customCss) // Appearance › Custom CSS

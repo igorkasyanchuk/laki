@@ -16,7 +16,7 @@ import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
+import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, paintTheme, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
@@ -1110,7 +1110,7 @@ export function SettingsPage(p: {
       </label>
     ))
   // theme, glass, interface font: painted now (the app paints again once saved)
-  const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
+  const paint = (k: Partial<AppSettings>) => (paintTheme({ ...s, ...k }), set(k)) // a theme, look or light/dark picked: a cross-fade (one shown by a hover's preview already: none)
   const glassy = !!paintOf(s).glass // Glass on, or the Frosted design's
   const [longTyped, setLongTyped] = useState(false) // Custom picked: its field stays while a typed number passes through a preset's (30 on the way to 300)
   const longOwn = longTyped || !LONG_TURN.some(([m]) => m === (s.longTurn ?? 0))

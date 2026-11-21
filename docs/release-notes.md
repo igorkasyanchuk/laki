@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Switching the theme, its look or light and dark (yours or the system's) cross-fades instead of flashing the whole window (not with Motion › None or Reduce motion).
 - A workspace named in Cyrillic (or from a Cyrillic prompt) shows its name as you wrote it in the sidebar, and its branch and folder get it in Latin letters (`laki/perevirka-lohina`) instead of `ws-k3x9`.
 - The Review tab: *Unviewed n / m* over the files shows only the ones you haven't viewed (the filter works among them), and ] and [ jump to the next and last change, across files.
 - *What will this do?* on a command over 2,000 characters says *Not the whole command was read* (in red) and never that it can be undone, and the same command in another workspace is read again.
