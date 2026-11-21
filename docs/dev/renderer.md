@@ -1234,7 +1234,9 @@ Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent
 
 Main's `quickWin` (its global hotkey `quick`: `bindKey`, Settings' `quickOn` and `quickKey`, off until turned on,
 `QUICK_KEY` ⌥Space suggested, `quick-hotkey` IPC; the menu bar's *New Task…*; the bubbles' New task; `laki://quick`,
-which main opens itself): `panelWin({ window: 'quick' }, …, down 0.16)`, a `type: 'panel'` near the top of the screen
+which main opens itself): `panelWin({ window: 'quick' }, …, down 0.16)` (it and the new-workspace window get macOS's
+`popover` vibrancy, `visualEffectState: 'active'` and rounded corners unless Reduce transparency; NewWindow.tsx sets
+`html.panel-glass`: the page a 62% tint of `--panel` with a lit top edge), a `type: 'panel'` near the top of the screen
 with the mouse, one at a time. `NewWindow.tsx` `QuickWindow`: `targetsOf(view)`: a new workspace in `LAST_NEW`'s project
 (else the first), each agent tab that waits or is idle (`send` with `whenIdle`, `agent`), Laki AI when `aiOn`; Tab or ⇧Tab
 in the box, or `@word ` at the start, turns the chip; `PromptInput` (⏎ sends: `wsNew` with the last picks when it's
@@ -1511,3 +1513,12 @@ its pages in every look × the dark and light defaults (`LAKI_SHEET_THEMES=all`:
 phone's 390×844 for `PHONE`'s pages; no flows. `dist/ui-sheet/<look>-<theme>-<page>.png` and `index.html`: looks as
 columns, pages as rows, lazy thumbnails, a click for full size, arrows to step, a filter by page, and each picture's
 layout facts (`facts`: words cut short under `text-overflow: clip`, boxes past the window's sides), a report, not a gate.
+
+### The title bar (main window)
+
+The main window's material follows it (`visualEffectState: 'followWindow'`: inactive with the window, as macOS's own);
+the floating panels' stay `active`. A double click on the tab bar's or a page head's empty room (ui.tsx `titleDbl`: not
+on a control, a tab or a field) sends `titlebar-dblclick` (main, `from(e)`: the app window only), which does what
+macOS's *Double-click a window's title bar to* says (`AppleActionOnDoubleClick`, guards.ts `dblClickAction`: Minimize,
+None, else zoom); off a Mac, zoom. ponytail: the talk pill keeps its solid pill: vibrancy fills the window's rectangle,
+and its 39px-round pill would show it as a frame.

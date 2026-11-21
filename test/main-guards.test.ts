@@ -194,3 +194,10 @@ test("a working bubble's turn: started and usual checked as main takes the list;
   assert.equal(turnRing(now - 250_000, 100_000, now)?.long, false) // past 2 × usual, under 5 min: not yet
   assert.equal(turnRing(now, undefined, now), undefined) // no usual: no ring
 })
+
+test("dblClickAction: a title bar's double click as macOS's setting says (Minimize, None, else zoom)", async () => {
+  const { dblClickAction } = await import('../src/main/guards.ts')
+  assert.equal(dblClickAction('Minimize'), 'minimize')
+  assert.equal(dblClickAction('None'), 'none')
+  for (const v of ['Maximize', 'Fill', '', undefined, 42]) assert.equal(dblClickAction(v), 'zoom', String(v))
+})

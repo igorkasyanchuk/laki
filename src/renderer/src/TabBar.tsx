@@ -3,7 +3,7 @@
 import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
-import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText } from './ui'
+import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText, titleDbl } from './ui'
 import { type TabView, GOAL_SAYS, HOME_ACCOUNT, creatorOf } from '../../shared/types'
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
@@ -307,7 +307,7 @@ export function TabBar({ app }: { app: AppCtx }) {
     openMenu(e, [{ label: 'Customize toolbar…', icon: 'settings', run: () => setDialog('toolbar') }])
   }
   return (
-    <div className="tabbar drag" data-tabbar ref={bar} onContextMenu={customize}>
+    <div className="tabbar drag" data-tabbar ref={bar} onContextMenu={customize} onDoubleClick={titleDbl}>
       {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
       {tabsAt === 'top' && <TabList app={app} />}
       {ws && !narrow && (f => f && (by => (

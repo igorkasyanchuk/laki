@@ -67,6 +67,12 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // (its change runs then)
 let grewFrom: HTMLElement | null = null
 const sheetOf = () => [...document.querySelectorAll<HTMLElement>('.overlay .modal, .main > .settings-page')].at(-1) ?? null
+// a double click on a bar's empty room (the tab bar, a page's head) does what a native title bar's does: main reads macOS's
+// setting (zoom, minimize or nothing); one on a control, a tab or a field is that one's own
+export const titleDbl = (e: MouseEvent) => {
+  if ((e.target as HTMLElement).closest('button, a, input, textarea, select, [role=tab], [role=button], [contenteditable=true], .tab, .nodrag')) return
+  ;(window as { laki?: { titlebarDblClick?: () => void } }).laki?.titlebarDblClick?.()
+}
 export function morph(fn: () => void, grow?: 'open' | 'close') {
   if (!morphOk()) return fn()
   const named: HTMLElement[] = []
@@ -559,7 +565,7 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true, 
   const el = usePageMark()
   return (
     <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
-      <div className="settings-head edge-blur">
+      <div className="settings-head edge-blur" onDoubleClick={titleDbl}>
         {head ?? <b>{title}</b>}
         <span className="grow" />
         {tools}

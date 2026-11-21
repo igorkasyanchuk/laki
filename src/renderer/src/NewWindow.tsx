@@ -15,7 +15,7 @@ import { DeviceTab } from './SidePanel'
 import { FONT_SIZE, termLook } from './settingsBase'
 import { Term } from './Term'
 import { setSendKey } from '../../shared/keys'
-import { applyTheme, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
+import { applyTheme, LESS_CLEAR, macApp, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
 import { ask, AskHost, askText, Icon, IconButton, load, Tips } from './ui'
 import { handOff } from './tell'
 import { cloudVoice, voiceStart } from './voice'
@@ -30,6 +30,8 @@ if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim' || w
   paint(typeof last === 'string' ? { theme: last } : last)
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
   if (which === 'quick') document.documentElement.classList.add('quick-window') // the quick bar's: .quick-* rules
+  // main gives these two macOS's popover material (panelWin) but under Reduce transparency: a tint over it
+  if ((which === 'quick' || which === 'new') && macApp() && !matchMedia(LESS_CLEAR).matches) document.documentElement.classList.add('panel-glass')
 }
 
 // the state, and the theme as it changes; an extension's or Laki AI's https pictures through the daemon's /img, as the

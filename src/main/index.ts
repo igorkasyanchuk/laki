@@ -21,7 +21,7 @@ import { hhmm, quietChoices, TRAY_PX, TRAY_STATES, trayBitmap, type TrayInfo, ty
 import { type BrowseDid, keyEvent, pageChanges, urlIs, veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk, dockAgents, dockMenu, recentOk, showAtLaunch, type DockAgent , floatTimes } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, handoffUrl, fromApp as senderOk, fromTokenPage, local, menuModelOk, type NativeItem, pageIs, PREVIEW, protectedKind, web, webviewOk, dockAgents, dockMenu, recentOk, showAtLaunch, type DockAgent , floatTimes } from './guards.ts'
 import { updater } from './update.ts'
 
 // the app's binary doesn't run as node (its runAsNode fuse is off: docs/dev/helper.md), so a start that asks for it
@@ -855,7 +855,7 @@ function create(hidden = false) {
     minWidth: 700,
     minHeight: 400,
     backgroundColor: '#0e1014',
-    visualEffectState: 'active', // glass keeps its blur when the window isn't focused
+    visualEffectState: 'followWindow', // as macOS's own windows: its material goes inactive with the window (the floating panels' stay active)
     // a see-through window from the start (macOS: the `glass` IPC's blur comes later, with a clear background): an opaque
     // one never clears what it drew where the page is see-through, so the sidebar kept copies of its earlier rows and of
     // the page that was over it, a translucent tint redrawn piled up to solid, and a view transition's fade took the
@@ -1545,6 +1545,13 @@ ipcMain.on('full-screen', (e, on: boolean) => {
 })
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through; the translucent
 // sidebar's (side): the sidebar material under the sidebar and the rail, the main area a card over it
+// the title bar's empty room double clicked (the tab bar's, a page's head): what macOS's setting says, as a native title bar does
+ipcMain.on('titlebar-dblclick', e => {
+  if (!from(e) || !win || win.isDestroyed()) return
+  const act = dblClickAction(mac ? systemPreferences.getUserDefault('AppleActionOnDoubleClick', 'string') : undefined)
+  if (act === 'minimize') win.minimize()
+  else if (act === 'zoom') win.isMaximized() ? win.unmaximize() : win.maximize()
+})
 ipcMain.on('glass', (e, on: boolean, light?: boolean | null, frosted?: boolean, side?: boolean) => {
   if (!from(e)) return
   float = !!frosted
@@ -2457,7 +2464,9 @@ function panelWin(query: Record<string, string>, width: number, height: number, 
     ...more,
     type: 'panel', // an NSPanel: it takes the keyboard without bringing Laki forward
     frame: false, // the page's head is its title bar (a drag region)
-    backgroundColor: '#0e1014',
+    // the quick bar and the new-workspace window: macOS's popover material behind the page's tint (NewWindow.tsx'
+    // panel-glass), as the inbox's; solid under Reduce transparency and off a Mac
+    ...(mac && !nativeTheme.prefersReducedTransparency && (query.window === 'quick' || query.window === 'new') ? { transparent: true, backgroundColor: '#00000000', vibrancy: 'popover', visualEffectState: 'active', roundedCorners: true } : { backgroundColor: '#0e1014' }),
     minimizable: false,
     maximizable: false,
     fullscreenable: false,

@@ -4270,3 +4270,7 @@ button.proof-line:not(:disabled):hover .mono { text-decoration: underline; }
    (the root has no snapshot otherwise: a printing terminal never freezes); its new state is live */
 html.theme-fade { view-transition-name: root; }
 html.theme-fade::view-transition-group(*), html.theme-fade::view-transition-old(*), html.theme-fade::view-transition-new(*) { animation-duration: var(--t-mid); animation-timing-function: ease-out; }
+/* the quick bar and the new-workspace window on a Mac without Reduce transparency (NewWindow.tsx' panel-glass): main
+   gives the window macOS's popover material (panelWin), the page a tint over it and a lit top edge */
+html.panel-glass, html.panel-glass body { background: transparent; }
+html.panel-glass .quick-bar, html.panel-glass.new-window .settings-page { background: color-mix(in srgb, var(--panel) 62%, transparent); box-shadow: inset 0 1px 0 var(--f-hi, color-mix(in srgb, var(--fg) 9%, transparent)); }

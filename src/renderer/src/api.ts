@@ -46,6 +46,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean, light?: boolean, float?: boolean, side?: boolean): void // side: V5's sidebar material
+  titlebarDblClick?(): void // the title bar's empty room double clicked: main does what macOS's setting says
   fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
   dockMenu?(list: { ws: string; tab: string; name: string }[]): void // the Dock's menu: up to five agents waiting (names only)
   recent?(path: string): void // a project's folder for the Dock's recent items (this Mac's only)

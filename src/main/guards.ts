@@ -36,6 +36,9 @@ export const fromTokenPage = (s: Sender, devOrigin = '') => fromApp(s, devOrigin
 // small window, a webview or a frame, and only for one of CONFIRM's actions (main says its words, not the page)
 export const confirmAsk = (s: Sender, isWin: boolean, what: unknown, devOrigin = '') => fromApp(s, devOrigin) && isWin && confirmKnown(what)
 // one of the app's other pages by name: its ?window= (new, ai, tab, sim)
+// a double click on the title bar's empty room, as macOS's own (System Settings › Desktop & Dock › Double-click a
+// window's title bar to): AppleActionOnDoubleClick's Minimize, None, else zoom (Maximize, Fill, unset)
+export const dblClickAction = (pref: unknown): 'minimize' | 'none' | 'zoom' => (pref === 'Minimize' ? 'minimize' : pref === 'None' ? 'none' : 'zoom')
 export const pageIs = (url: string | undefined, page: string) => !!url && URL.canParse(url) && new URL(url).searchParams.get('window') === page
 
 // C10: a file dragged out of the app (main's drag-out): its real path (links followed) inside one of roots (a

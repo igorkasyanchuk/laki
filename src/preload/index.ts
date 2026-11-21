@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('laki', {
   accent: (): Promise<string | null> => ipcRenderer.invoke('accent'), // V9: macOS's accent color, #rrggbb (null off a Mac)
   onAccent: (cb: (c: string | null) => void) => void ipcRenderer.on('accent', (_e, c: string | null) => cb(c)), // as it changes
   glass: (on: boolean, light?: boolean, float?: boolean, side?: boolean) => ipcRenderer.send('glass', on, light, float, side), // the window's blur behind see-through backgrounds
+  titlebarDblClick: () => ipcRenderer.send('titlebar-dblclick'), // the title bar's empty room double clicked: macOS's own action (zoom, minimize, none)
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
