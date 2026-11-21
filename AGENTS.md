@@ -333,6 +333,8 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
   `rpcAny` / `callAny`, held to `RPC_ANY_MAX` (test/docs.test.ts); `test/types/api.test-d.ts` is the typecheck's own test.
 - **A type from another module is `import type`**, not `import { type X }`: with `verbatimModuleSyntax` the latter keeps
   the module in the bundle, and a lazy page (Dialogs.tsx' `PRELOAD`) lands back in the window's first load.
+- **CSS only a lazy page draws** goes in that page's own file (`ai.css`, `uikit.css`…: `docs/dev/renderer.md`), out of
+  the first load (`npm run size`); it loads after looks.css, so never one a rule of equal specificity after it also styles.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **Sizes** too (V2): space `--sp-1…6`, corners `--r-xs…xl` and `--r-pill` (a look sets its own), elevation `--lift-1…3`,
   control heights `--h-s/m/l`, stacking `--z-*`, type `--fs-1…5`; `test/css.test.ts` keeps styles.css on them (a raw px only

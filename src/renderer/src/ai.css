@@ -1,0 +1,48 @@
+/* The AI page's (Ai.tsx): out of the window's first load, it loads with the page (npm run size) */
+.page-body > .ai-page.ai-split { flex-direction: row; } /* the earlier chats on the left, the chat beside them */
+.ai-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ai-chats-head { padding: var(--sp-3) var(--sp-4) var(--sp-2); font-size: var(--fs-1); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.ai-chat-row > .ai-chat { flex: 1; }
+.ai-chat { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 1px; padding: var(--sp-3) var(--sp-4); background: none; border: none; border-radius: var(--r-m); text-align: left; color: var(--muted); }
+.ai-chat-at { font-size: var(--fs-1); color: var(--muted); }
+.ai-chat-row:hover .ai-chat-rm, .ai-chat-rm:focus-visible { opacity: 1; }
+.ai-chats-none { padding: var(--sp-3) var(--sp-4); }
+.ai-thumb:hover { border-color: var(--accent); }
+.ai-bar { flex: none; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) 20px; border-bottom: 1px solid var(--line); }
+.ai-hello h2 { margin: 6px 0 0; font-size: var(--fs-5); font-weight: 600; }
+.ai-examples > button > svg { flex: none; opacity: 0; transform: translateX(-4px); transition: opacity 0.15s, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.ai-note { padding: var(--sp-5) var(--sp-6); border: 1px solid color-mix(in srgb, var(--waiting) 45%, var(--line)); border-radius: calc(var(--radius) + var(--r-s)); background: color-mix(in srgb, var(--waiting) 8%, var(--panel)); font-size: var(--fs-3); line-height: 1.5; }
+.ai-answer { display: flex; align-items: flex-start; gap: var(--sp-5); }
+.ai-answer > .ai-body { flex: 1; min-width: 0; padding-top: 1px; }
+.ai-body > .md { padding: 0; } /* beside the mark: no inset of its own */
+.ai-item:hover:not(.done) { background: var(--hover); }
+.ai-item input { flex: none; align-self: center; width: auto; margin: 0; accent-color: var(--accent); }
+.ai-options.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, max-content)); }
+.ai-look:not([style]) { width: 280px; max-height: 220px; }
+.ai-opt { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.ai-tools > summary > span:not(.btn-spin) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ai-tools > summary > svg { flex: none; }
+.ai-tools > summary > svg:last-child { opacity: 0.7; transition: transform 0.15s; }
+.ai-tools[open] > summary > svg:last-child { transform: rotate(90deg); }
+.ai-tools > summary::-webkit-details-marker { display: none; }
+/* A8: where the model's view of the chat starts: a line across with its words */
+.ai-seen-from { display: flex; align-items: center; gap: var(--sp-4); color: var(--muted); font-size: var(--fs-2); }
+.ai-seen-from::before, .ai-seen-from::after { content: ''; flex: 1; border-top: 1px dashed var(--line); }
+.ai-stop { display: inline-flex; align-items: center; gap: var(--sp-3); height: 24px; padding: 0 var(--sp-4); border-radius: var(--r-pill); font-size: var(--fs-2); }
+.ai-foot { color: var(--muted); }
+.ai-window.busy::before { opacity: 1; }
+.ai-window > .ai-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ai-window .ai-thread { padding: var(--sp-5) var(--sp-6) var(--sp-6); } /* the bottom no shorter than the fade */
+.ai-window .ai-dock { padding: var(--sp-2) var(--sp-5) var(--sp-5); }
+.ai-window .ai-examples { grid-template-columns: minmax(0, 1fr); }
+/* answers without the mark: the head has it, the width goes to the words */
+.ai-window .ai-answer > .ai-mark { display: none; }
+.ai-float .ai-window { position: relative; flex: 1; min-width: 0; background: var(--bg); }
+.ai-float > .ai-window { overflow: hidden; border-radius: calc(var(--r-l) + var(--r-s)); }
+/* Info: how it runs and pays, what it spent, what it can do */
+.ai-info { gap: 26px; font-size: var(--fs-3); line-height: 1.5; }
+.ai-info ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ai-info li > svg { color: var(--done); }
+.narrow .ai-examples { grid-template-columns: minmax(0, 1fr); }
+.ai-call { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-1) var(--sp-5); padding: var(--sp-4) var(--sp-5); font-size: var(--fs-3); }
+.ai-ok { display: grid; place-items: center; }

@@ -11,6 +11,7 @@ import { Modal } from './panels'
 import { CHARTS, colorCss, COLORS, DO, TONES, uiCheck, UI_EXAMPLES, UI_GROUPS, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
 import { CELL_W, KitBody } from './Widgets'
+import './uikit.css'
 
 const SIZES: [string, [number, number] | null][] = [
   ['1×1', [1, 1]],

@@ -1,0 +1,25 @@
+/* The full review, the Review tab (FullReview.tsx): out of the window's first load, it loads with it (npm run size) */
+.fr-talk .sp-comment-by .sp-copy { margin-left: 0; }
+.fr-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+.fr-head > .muted.grow { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* U6: its count never wraps */
+.fr-filter:focus-within { border-color: var(--accent); }
+.fr-strip.left { border-left: none; border-right: 1px solid var(--line); }
+.fr-strip.left .fr-vert { writing-mode: var(--vt, sideways-lr); } /* on the left, read from the bottom up, as the sidebar's strip */
+.fr-notes-head { display: flex; align-items: center; gap: var(--sp-3); }
+.fr-gh { display: flex; flex-direction: column; gap: var(--sp-2); }
+.fr-talk .sp-comment-by { display: flex; align-items: center; gap: var(--sp-3); }
+.sp-diff .dl.fr-flash { animation: fr-flash 1.6s ease-out; }
+.fr-files { border-right: 1px solid var(--line); padding-bottom: var(--sp-4); }
+.fr-notes { border-left: 1px solid var(--line); padding: var(--sp-4) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-4); }
+.fr-shape { flex: none; } /* the files column's List | Tree, in its filter box */
+.fr-files .sp-row.fr-done .sp-name { opacity: 0.55; }
+.fr-pr { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.fr-pr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.fr-file > .sp-row .sp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fr-note.outdated { border-style: dashed; opacity: 0.75; }
+.fr-note-head { display: flex; align-items: center; gap: var(--sp-2); }
+.fr-send .split { display: inline-flex; }
+/* the full review's GitHub tab: a reply on the PR's conversation */
+.fr-reply { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-3); margin-top: 10px; padding-bottom: 56px; } /* room for the floating Laki AI button: scrolled down, Comment is clear of it */
+.fr-reply textarea { resize: vertical; min-height: 64px; font: inherit; }
+html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-soft) var(--spring-soft); }

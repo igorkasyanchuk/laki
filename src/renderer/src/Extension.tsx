@@ -26,6 +26,7 @@ import { ask, askText, escapes, Icon, IconButton, ON, Page, Switch, useMenu } fr
 import { extMenuItems } from './extMenu'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 import { bindable, Builder, DataTree } from './Builder'
+import './extension.css'
 
 const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row', none: 'Nowhere: in the background' }
 const half = (d: number) => (d === 0.5 ? '½' : String(d))

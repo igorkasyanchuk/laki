@@ -1,0 +1,19 @@
+/* Settings › Extensions › UI kit (UiKit.tsx): out of the window's first load, it loads with the page (npm run size) */
+.kit-head { display: flex; flex-direction: column; gap: var(--sp-4); }
+.kit-find { max-width: 420px; } .kit-view { margin-left: 12px; }
+.kit-icon-groups { min-width: 0; } .kit-icon-groups .kit-h:first-child { margin-top: 0; }
+.kit-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--sp-3); } .kit-icon { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); min-width: 0; padding: var(--sp-5) var(--sp-2) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: none; color: var(--fg); }
+.starter-card:hover, .starter-card:focus-visible { border-color: var(--accent); }
+.starter-js { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); }
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: var(--sp-5); }
+.kit-notes { margin: 0; padding-left: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-2); line-height: 1.5; } .kit-h { margin: 18px 0 8px; font-size: var(--fs-3); }
+.kit-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-5); min-height: 0; padding: 20px var(--sp-6); }
+.kit-status { display: flex; align-items: center; gap: var(--sp-4); max-width: 100%; }
+.kit-type, .kit-colors { display: flex; flex-direction: column; gap: var(--sp-2); } .kit-type .kit-h, .kit-colors .kit-h { margin-bottom: 2px; } .kit-type p, .kit-colors p { margin: 0 0 8px; }
+.kit-type-s { min-width: 0; padding: 0; background: none; border: 0; } .kit-type-rows > .kit-type-s { padding: var(--sp-5) var(--sp-5); }
+.kit-sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--sp-4); }
+.kit-sw { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); color: var(--fg); text-align: left; } .kit-sw:hover { border-color: var(--accent); }
+.narrow .kit-type-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+.kit-json button { position: absolute; top: 6px; right: 6px; }
+.kit-edit { display: flex; flex-direction: column; gap: var(--sp-2); } .kit-edit button { position: static; }
+.kit-edit-acts { display: flex; flex-wrap: wrap; gap: var(--sp-3); } .kit-problems { margin: var(--sp-3) 0 0; padding-left: var(--sp-6); }

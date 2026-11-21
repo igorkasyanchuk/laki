@@ -110,6 +110,12 @@ are tested in `test/units-more.test.ts`.
   `npm run test:ui` (its first load and `first-row`): the window's first load 3,900 KB of JS in 7 files before, 3,021
   KB in 12 after; the first sidebar row painted at 177–219 ms before, 179–210 ms after (the parse saved is within the
   noise). The board's own chunk is 11 KB, but its import of the AI page's `Thumbs` kept that one in the first load.
+  Their CSS too (`npm run size`): a styles.css rule that only one lazy page draws is in that page's own file
+  (`ai.css`, `extension.css`, `uikit.css`, `schedules.css`, `board.css`, `review.css`), imported by it, so it loads
+  with its chunk, after styles.css, components.css and looks.css. A rule moves only when no rule of the same
+  specificity after it styles the same element (Glass's `:is(input, select, textarea)` beat `.kit-edit textarea` only
+  by coming later; `.ai-shimmer`'s reduced-motion override follows it): those stay in styles.css. `test/css.test.ts`
+  (`PAGES`) holds the page files to styles.css' checks.
 - **Cost of a redraw** (E7, 2026-11, 60 workspaces, 140 tabs): a state event from the daemon to React's commit, built
   app: 3–5 ms (dev React: 25–35 ms; App and the sidebar's rows, every one, each time; a hover card two of those;
   typing in the Reader box only the box). Under a frame, so no memo work: memo on `Icon` and `Glyph` measured no gain

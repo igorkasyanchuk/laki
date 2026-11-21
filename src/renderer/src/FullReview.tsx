@@ -22,6 +22,7 @@ import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act, ScrollEdge } from './ui'
 import { fileTree, prName, prNo } from './text'
+import './review.css'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)

@@ -14,6 +14,7 @@ import { type Complete, type Img, type Inserts, PromptInput, useDraft } from './
 import { ask as confirm, closeTo, escapes, Icon, IconButton, openFrom, Page, usePageSide } from './ui'
 import type { UiSpec } from '../../shared/widgetUi'
 import { CELL_W, KitBody } from './Widgets'
+import './ai.css'
 
 type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; seenFrom?: number; key: boolean; calls: AiCall[]; totals: AiTotals } // queue: what you sent while it answered, the next ask as it ends; seenFrom: A8, the first message the model still sees (its at), when older ones are left out
 

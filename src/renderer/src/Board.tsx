@@ -13,6 +13,7 @@ import { CiMark, prState } from './Info'
 import { completeOf, FileChip, type Img, PromptInput } from './PromptInput'
 import { wsShown } from './text'
 import { Icon, IconButton, Page, TurnTime, act } from './ui'
+import './board.css'
 
 export type BoardApi = {
   open: (ws: string) => void

@@ -1,0 +1,24 @@
+/* The board's page (Board.tsx): out of the window's first load, it loads with the page (npm run size) */
+.narrow .board-col.empty h3 { writing-mode: horizontal-tb; }
+.board-col h3 { margin: 0 0 2px; font-size: var(--fs-2); font-weight: 600; color: var(--muted); display: flex; gap: var(--sp-3); }
+.board-count { font-weight: 400; }
+.board-card.opens { cursor: var(--cur-act); }
+.board-card.opens:hover { border-color: var(--muted); }
+.board-col h3 { align-items: center; }
+.board-card:hover .board-more, .board-more:focus-visible { opacity: 1; }
+.board-more:hover { color: var(--fg); background: var(--hover); }
+.board-card.todo { cursor: grab; }
+.board-card.busy { opacity: 0.6; }
+.board-foot { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.board-pr { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-2); color: var(--muted); } /* the PR's mark in its state's colors (.ws-pr), its checks and conflicts in theirs: failing red, as everywhere */
+.board-pr { flex-wrap: wrap; } .board-pr > span { white-space: nowrap; }
+.board-queue-list { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--panel); font-size: var(--fs-2); }
+.board-queue-list ol { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); }
+.board-queue-list .q-merged { color: var(--muted); } .board-queue-list .q-stopped { color: var(--error); } .board-queue-list .q-checking, .board-queue-list .q-updating { color: var(--waiting); }
+.board-pr .ci-fail { color: var(--error); } .board-pr .ci-pass { color: var(--done); } .board-pr .ci-pending { color: var(--waiting); } .board-pr .ci-cancelled { color: var(--muted); }
+.board-add.nw-card { flex: none; background: var(--bg); }
+.board-add .prompt-images { padding: var(--sp-2) var(--sp-5) var(--sp-3); }
+.board-add .prompt-tools { padding: var(--sp-1) var(--sp-3) var(--sp-3); }
+.board-add .prompt-tools-end { flex-wrap: nowrap; gap: var(--sp-3); }
+.board-add .prompt-tools button[type='submit'] { height: 26px; padding: 0 var(--sp-5); }
+.board-ticket { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

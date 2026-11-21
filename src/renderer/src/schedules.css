@@ -1,0 +1,13 @@
+/* Scheduled tasks' page (Schedules.tsx): out of the window's first load, it loads with the page (npm run size) */
+.sched-arch-head h3 { margin: 0; }
+.sched-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+.sched-form .nw-composer textarea { min-height: 76px; }
+.sched-ext-says { padding: var(--sp-5) var(--sp-5) var(--sp-2); } /* an extension fetch: nothing to type */
+.sched-when.bad { border-color: color-mix(in srgb, var(--error) 60%, var(--line)); }
+.grp-name { font-weight: 600; }
+.grp-head.over { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
+.grp-row.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sched-examples { display: flex; flex-direction: column; gap: var(--sp-3); } /* U2: an empty Scheduled page's examples: a click fills in New task */
+.sched-example:hover:not(:disabled) { border-style: solid; background: var(--hover); }
+.sched-example-text { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.sched-missed { align-self: flex-start; }
