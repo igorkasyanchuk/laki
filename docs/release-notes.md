@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Settings › Appearance › *Diff style*: *Quiet* keeps the code's own color on a light tint with a bar at the line's edge, instead of coloring the whole line (*Filled*, the default).
 - New workspace's agent picker shows what's left of each profile's plan after its name (*62% of week*), in the warning color with its reset at 10% or under.
 - The wrapper sandbox's *Listed hosts* network refuses a listed name that points at this Mac, your network or a cloud's metadata address, and connects to the address it checked, so a name can't be switched after the check.
 - With *Confirm risky actions with Touch ID* on, Laki also asks before a new workspace, tab or race starts an agent that never asks (Bypass permissions, or Codex with approvals off).

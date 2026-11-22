@@ -2423,7 +2423,9 @@ Mac the *Frosted* design (Layout › *Design*; one from before keeps its own).
   as macOS's own apps, the hand over links; on a Mac, scroll bars show only while you scroll, point at or work in a list, unless
   System Settings › Appearance › *Show scroll bars* is *Always*), *Vertical text* (how sideways labels read: the
   Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
-  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *Empty page background* (its own card, each one
+  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *Diff style* (Changes, Review and an ask's
+  diff: *Filled*, the default, colors a changed line's text and row; *Quiet* keeps the code's own color on a light tint,
+  a bar at the line's edge and its + or − in color), *Empty page background* (its own card, each one
   live in a tile: behind a workspace with no tabs, Welcome, *No workspace selected* and the New workspace page; *Stars*
   by default, *Stardust*, *Dots*, a *Net*, a *Grid* or *Fireflies*, which stir as the pointer passes: stars shift with
   it, stardust's tiny ones join into constellations near it, dots swell and take the accent, the net's knots move aside

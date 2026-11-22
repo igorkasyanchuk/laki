@@ -66,6 +66,10 @@ test('contrast: every theme is readable', () => {
       const ink = t.c ? readable(ansi[i], [...bg, c.panel, c.raised]) : v(k)
       const line = over(ansi[i].slice(0, 7) + '1f', c.panel)
       need(`word mark (${k})`, c.fg, over(ink.slice(0, 7) + '26', line), 4.5)
+      // Diff style Quiet (html[data-diff='quiet']): the code's own color on 9% of --add or --del, over a diff's page, a
+      // panel or an ask's card, as plain text needs; its word marks (15%, as Filled's) over that, on a panel as Filled's
+      for (const under of [...bg, c.panel, c.raised]) need(`Quiet diff row (${k})`, c.fg, over(ink.slice(0, 7) + '17', under), 4.5)
+      need(`Quiet word mark (${k})`, c.fg, over(ink.slice(0, 7) + '26', over(ink.slice(0, 7) + '17', c.panel)), 4.5)
     }
     // Needs you's choices (styles.css, the default look and Frosted): the text on a fill of it (7%, its hover 11%) or of
     // the accent (22%, 30%) over the card (raised)

@@ -1647,6 +1647,12 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 mark.wd { color: var(--fg); border-radius: var(--r-xs); }
 mark.wd-add { background: color-mix(in srgb, var(--add) 15%, transparent); }
 mark.wd-del { background: color-mix(in srgb, var(--del) 15%, transparent); }
+/* Settings › Appearance › Diff style: Quiet: the code's own color on a light tint, a bar at the edge, the sign (.dl-mk)
+   in full color; a word mark keeps its 15%, stronger than the row's 9% (test/contrast.test.ts: the text on both) */
+html[data-diff='quiet'] :is(.sp-diff, .ask-diff) .dl-add { color: var(--fg); background: color-mix(in srgb, var(--add) 9%, transparent); box-shadow: inset 3px 0 var(--add); }
+html[data-diff='quiet'] :is(.sp-diff, .ask-diff) .dl-del { color: var(--fg); background: color-mix(in srgb, var(--del) 9%, transparent); box-shadow: inset 3px 0 var(--del); }
+html[data-diff='quiet'] .dl-add .dl-mk { color: var(--add); }
+html[data-diff='quiet'] .dl-del .dl-mk { color: var(--del); }
 .sp-diff .dl-hunk { color: var(--hunk); }
 .sp-diff .dl-hunk { display: flex; align-items: center; gap: var(--sp-4); }
 /* Revert at a hunk header's end, in sight however wide the lines are; on hover (always on a touch screen) */

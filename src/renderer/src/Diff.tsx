@@ -241,6 +241,8 @@ export function wordMarks(lines: DiffLine[]) {
   }
   return m
 }
+// a line's + or − (its first character), a span of its own: Diff style Quiet colors it alone
+const sign = (text: string) => <span className="dl-mk">{text[0]}</span>
 const marked = (spans: WordSpans, add: boolean) => spans.map(([t, on], i) => (on ? <mark key={i} className={add ? 'wd wd-add' : 'wd wd-del'}>{t}</mark> : t))
 // T18: two columns or one, every diff's (laki.diffSplit), its key (Settings › Keys' diffSplit: keydown.ts' event), and
 // one column whatever was picked while its room (the element room is given) is under 900px: the toggle says why
@@ -292,7 +294,7 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
         <>
           {gutter?.(l, side)}
           {numbers(l, side)}
-          {(s => (s ? <>{more ? '' : l.text[0]}{marked(s, l.old === undefined)}</> : more ? l.text.slice(1) || ' ' : l.text || ' '))(words.get(l))}
+          {(s => (s ? <>{more ? '' : sign(l.text)}{marked(s, l.old === undefined)}</> : more ? l.text.slice(1) || ' ' : l.text ? <>{sign(l.text)}{l.text.slice(1)}</> : ' '))(words.get(l))}
         </>
       )}
     </div>
@@ -439,7 +441,7 @@ export function AskDiff({ diff }: { diff: string }) {
       <pre>
         {(open ? lines : lines.slice(0, 8)).map((l, i) => (
           <div key={i} className={l[0] === '+' ? 'dl-add' : l[0] === '-' ? 'dl-del' : l[0] === '…' ? 'muted' : undefined}>
-            {l || ' '}
+            {l[0] === '+' || l[0] === '-' ? <>{sign(l)}{l.slice(1)}</> : l || ' '}
           </div>
         ))}
       </pre>

@@ -445,7 +445,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   // ponytail: PHONE by hand, the pages a phone gets to from the remote page's rail
   const sheet: typeof steps = []
   if (process.env.LAKI_SHEET) {
-    const { looks, themes } = JSON.parse(process.env.LAKI_SHEET) as { looks: string[]; themes: string[] }
+    const { looks, themes, set } = JSON.parse(process.env.LAKI_SHEET) as { looks: string[]; themes: string[]; set?: Record<string, unknown> } // set: LAKI_SHEET_SET's settings
     const PAGES = ['projects', 'reader', 'review', 'new-workspace', 'settings', 'board', 'schedule', 'ai', 'workflows', 'palette']
     const PHONE = ['projects', 'reader', 'settings', 'board']
     const back = async () => (await key('Escape')(), (ws.cart ??= await named('fix-cart-total')), await click(row(ws.cart.id))(), await click('.reader-switch button:first-child')())
@@ -457,7 +457,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
             const [, go, sel] = steps.find(x => x[0] === n)!
             const first = n === pages[0]
             sheet.push([`${look}-${theme}-${wd < 500 ? 'phone-' : ''}${n}`, async () => {
-              if (first) await rpc('settingsSet', { design: look, theme, themeAuto: false }), await size(wd, h)
+              if (first) await rpc('settingsSet', { ...set, design: look, theme, themeAuto: false }), await size(wd, h)
               if (n === 'projects') return back()
               return go?.()
             }, n === 'projects' ? (wd < 500 ? '.app.narrow' : '.sidebar .ws') : sel])

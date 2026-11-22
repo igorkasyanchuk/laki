@@ -2098,6 +2098,13 @@ export function SettingsPage(p: {
                   </select>
                   <Says title="Vertical text" hint="Sideways labels. By default the ones on the left read from the bottom up, the rest from the top down" />
                 </label>
+                <label className="switch-row" data-tip="Changes, Review and an ask's diff">
+                  <select value={s.diffLook ?? ''} onChange={e => paint({ diffLook: (e.target.value || undefined) as AppSettings['diffLook'] })}>
+                    <option value="">Filled (default)</option>
+                    <option value="quiet">Quiet</option>
+                  </select>
+                  <Says title="Diff style" hint="Filled colors a changed line's text and row. Quiet keeps the code's own color on a light tint, with a bar at its edge" />
+                </label>
               </div>
               <div className="setting-box">
                 <Switch className="switch-row" on={s.pointerHand !== false} /* as themes.ts applyTheme */ onChange={on => paint({ pointerHand: on })}>

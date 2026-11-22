@@ -4,7 +4,8 @@
 // dist/ui-sheet/index.html: looks as columns, pages as rows, each with its layout facts (a report, not a gate). Each
 // run's pictures are compared with the last run's (moved to dist/ui-sheet/prev first; main's uiSmoke compares them by
 // pixels, shared/pixelDiff.ts): Changed (n) first, before and after side by side, then new and removed pages, the rest
-// folded; "changed: n of m" at the end.
+// folded; "changed: n of m" at the end. LAKI_SHEET_SET='{"diffLook":"quiet"}': settings of every page's, a look
+// setting's pages against the last run's.
 // ponytail: the looks' and themes' ids read from their sources by a pattern (a node script can't import the renderer's)
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -30,7 +31,7 @@ if (lastRun.length) {
 }
 const before = existsSync(aside) ? readdirSync(aside).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)) : []
 try {
-  execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/ui-smoke.ts'], { cwd: root, stdio: 'inherit', env: { ...process.env, LAKI_SHEET: JSON.stringify({ looks, themes }), ...(before.length && { LAKI_SHEET_PREV: aside }) } })
+  execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/ui-smoke.ts'], { cwd: root, stdio: 'inherit', env: { ...process.env, LAKI_SHEET: JSON.stringify({ looks, themes, set: process.env.LAKI_SHEET_SET ? JSON.parse(process.env.LAKI_SHEET_SET) : {} }), ...(before.length && { LAKI_SHEET_PREV: aside }) } })
 } catch {} // a step that failed is in result.json: shown on the sheet
 if (before.length && existsSync(dir)) renameSync(aside, join(dir, 'prev'))
 if (!existsSync(join(dir, 'result.json'))) throw new Error('no dist/ui-sheet/result.json: the window never finished')

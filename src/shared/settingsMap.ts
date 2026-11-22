@@ -104,6 +104,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Customize toolbar', 'toolbar buttons tab bar hide show order reorder customize ship timer preview editor share'],
   ['appearance', 'Motion', 'motion animations animation movement reduce high low none off effects transitions breathe'],
   ['appearance', 'Empty page background', 'backdrop background stars stardust dots net grid fireflies particles constellation effect empty page welcome new workspace hover animated'],
+  ['appearance', 'Diff style', 'diff changes added removed lines green red colors filled quiet tint bar review'],
   ['appearance', 'Vertical text', 'sideways rotated direction text up down bottom top reverse board columns strip lanes writing'],
   ['appearance', 'High contrast mode', 'contrast accessibility readable legible stronger muted lines text hard to see'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
