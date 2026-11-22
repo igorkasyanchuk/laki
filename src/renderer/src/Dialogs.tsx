@@ -480,7 +480,7 @@ export function Pages({ app }: { app: AppCtx }) {
                 openWs: id => (setDialog(null), setWsId(id)),
                 openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })),
                 toast: (text, undo) => toast(text, undo),
-                phone: !!settings.webhook?.url?.trim(),
+                phone: !!settings.webhook?.url?.trim() || settings.webhook?.format === 'webpush' || (!!view.telegram?.user && !view.telegram.off), // Phone pushes or Telegram
                 settings: section => setDialog({ section }),
                 // Laki AI's floating chat over the page (it knows the open workflow); an ask: sent there, as you'd type it
                 ai: aiOn(settings) ? ask => (setAiFloat(true), ask && void whereNow().then(context => api.call('aiAsk', { text: ask, context })).catch(fail)) : undefined,

@@ -243,8 +243,14 @@ test('P2: a reply to a push goes to its tab (a waiting ask: a choice by its numb
   // a waiting menu: its push, and a reply with a choice's number picks it
   await rig.rpc('send', { target: tab.id, text: 'menu' })
   const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length), 'the ask'))!
+  // "yes" to the older push is words for later, never an Allow of what it asks now
+  b.message('Yes', { reply: done.id })
+  await until(() => b.of('sendMessage').some(c => /^Queued: claude asks something first/.test(c.body.text)), 'queued')
+  assert.doesNotMatch(await rig.screen(tab.id), /picked:/)
   b.message('1', { reply: ask.id })
   await until(async () => /picked: Yes/.test(await rig.screen(tab.id)), 'the reply picked 1')
+  await until(() => b.of('editMessageText').some(c => /<i>Picked: Yes<\/i>$/.test(c.body.text)), 'its push says so')
+  await until(async () => /answer: Yes/.test(await rig.screen(tab.id)), 'the queued words went once it was free') // before the restart: a queue it left waits for Resume
   // the map outlives a restart: a reply to the done push still reaches its tab
   await rig.stop()
   await rig.start()

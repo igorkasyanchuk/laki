@@ -459,9 +459,9 @@ export function mergeActions(global: RunAction[] = [], project: RunAction[] = []
 // paired, but quiet; threads: P4's topic per workspace (message_thread_id); notice: why it stopped (a 409, a 401, a group
 // from the old webhook)
 export type TgLevel = 'notify' | 'answer' | 'control'
-export type Telegram = { bot?: { id: number; username: string; name: string; topics?: boolean }; user?: { id: number; name: string; at: number }; level?: TgLevel; off?: boolean; waiting?: boolean; done?: boolean; detail?: 'titles'; topics?: boolean; threads?: Record<string, number>; notice?: string }
+export type Telegram = { keyed?: boolean /* a token is kept (the key store's: read only to call Telegram) */; bot?: { id: number; username: string; name: string; topics?: boolean }; user?: { id: number; name: string; at: number }; level?: TgLevel; off?: boolean; waiting?: boolean; done?: boolean; detail?: 'titles'; topics?: boolean; threads?: Record<string, number>; notice?: string }
 // the view's (no ids): token: one is kept; pairing: a code waits until then; polling: the long poll runs
-export type TelegramView = Omit<Telegram, 'user' | 'threads' | 'bot'> & { bot?: { username: string; name: string; topics?: boolean }; user?: { name: string; at: number }; token: boolean; pairing?: number; polling?: boolean }
+export type TelegramView = Omit<Telegram, 'user' | 'threads' | 'bot' | 'keyed'> & { bot?: { username: string; name: string; topics?: boolean }; user?: { name: string; at: number }; token: boolean; pairing?: number; polling?: boolean }
 // a webhook's URL as pushes take it (push.ts; Settings says why not as you type)
 export function webhookUrl(url?: string) {
   let u: URL

@@ -281,7 +281,7 @@ export const FIND: [string, string, string?][] = [
   ['remote', 'Activity', 'log history audit what was done device sent answered wrong pin paired'],
   ['remote', 'Answer only', 'phone access level read answer asks message agents no typing merge ship archive delete full access device'],
   ['remote', 'Unlock with a passkey', 'face id touch id passkey webauthn lock unlock idle pin instead device'],
-  ['remote', 'Send the link to my phone', 'push link phone webhook ntfy telegram web push notification start stop new device'],
+  ['remote', 'Send the link to my phone', 'push link phone webhook ntfy web push notification start stop new device'],
   ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
   ['simulator', 'Emulator window', 'android emulator window headless no-window one instance avd'],
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],

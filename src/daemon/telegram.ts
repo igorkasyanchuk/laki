@@ -13,7 +13,7 @@ import { LIMITS, limitsOf } from './clients.ts'
 import { changed, fileSave, imageSave, log, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
-import { hidden, pickedFor, takeTap } from './phone.ts'
+import { askOfMsg, hidden, pickedFor, takeTap } from './phone.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { type Push, pushText, tapOf } from './push.ts'
 import { redact } from './share.ts'
@@ -32,7 +32,7 @@ const RANK: Record<TgLevel, number> = { notify: 0, answer: 1, control: 2 }
 export const levelOf = (t = state.telegram): TgLevel => (t?.level && Object.hasOwn(RANK, t.level) ? t.level : 'answer')
 export const levelAtLeast = (l: TgLevel) => RANK[levelOf()] >= RANK[l]
 // pushes go: a bot and a paired user, not turned off
-export const tgOn = () => !!state.telegram?.user && !state.telegram.off && !!token()
+export const tgOn = () => !!state.telegram?.keyed && !!state.telegram.user && !state.telegram.off
 // its buttons answer: answer or control, and more than titles go
 export const tgAnswers = () => tgOn() && levelAtLeast('answer') && state.telegram?.detail !== 'titles'
 
@@ -155,9 +155,10 @@ function remember(msg: number, tab: string) {
 // ---------- pushes (phone.ts): a message each, its buttons a tap each (callback_data nonce:n), a done one silent
 type Msg = { message_id: number }
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
-// its HTML: the title bold, the rest escaped (a long one folded: blockquote expandable), secrets' shapes masked
-export function tgHtml(p: Push) {
-  const { title, body } = pushText({ ...p, options: undefined })
+// its HTML: the title bold, the rest escaped (a long one folded: blockquote expandable), secrets' shapes masked; the
+// choices as lines when no buttons go (choices)
+export function tgHtml(p: Push, choices = false) {
+  const { title, body } = pushText(choices ? p : { ...p, options: undefined })
   const b = redact(cut(body, 3000))
   return `<b>${esc(redact(title))}</b>${b ? (b.length > 300 || b.split('\n').length > 6 ? `\n<blockquote expandable>${esc(b)}</blockquote>` : `\n${esc(b)}`) : ''}`
 }
@@ -170,7 +171,7 @@ export async function tgPush(p: Push): Promise<number | undefined> {
   const taps = p.nonce && p.options?.length && tgAnswers() ? p.options : []
   const markup = taps.length ? { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } : p.url ? { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } : undefined
   const thread = await threadOf(p.tab)
-  const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
+  const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p, !taps.length), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
   if (m?.message_id && p.tab) remember(m.message_id, p.tab) // a reply to it goes to its tab
   return m?.message_id
 }
@@ -244,7 +245,7 @@ let offset = 0
 let lastOk = 0 // a poll answered then: a tap in the first batch after a gap may be from hours ago (a callback has no date)
 let ignored = 0 // updates from anyone else, since the last log line
 // it runs while a pairing code waits, or paired, on, and at answer or control
-const wanted = () => !!token() && (!!pair && pair.until > Date.now() ? true : tgOn() && levelAtLeast('answer'))
+const wanted = () => !!state.telegram?.keyed && (!!pair && pair.until > Date.now() ? true : tgOn() && levelAtLeast('answer'))
 export function sync() {
   if (wanted() && !ctl) void loop()
   else if (!wanted() && ctl) ctl.abort(), (ctl = undefined)
@@ -322,8 +323,16 @@ async function take(u: Update, gap: boolean) {
   if (!tgOn()) return // turned off (a pairing code's poll reads the chat): nothing acted on
   if (q) {
     const tap = !gap && levelAtLeast('answer') ? tapOf(q.data, '', false) : undefined
-    const said = tap && (await takeTap(tap))
-    return void out('answerCallbackQuery', { callback_query_id: q.id, text: gap ? 'Laki was off: that tap is too old' : said || 'That ask moved on' }).catch(() => {})
+    let did: string | undefined
+    try {
+      if (tap) spend('send') // a tap is an answer: the same minute's limit
+      did = tap && (await takeTap(tap, true))
+      if (did) said(`tapped: ${clip80(did)}`)
+    } catch (e) {
+      did = (e as Error).message
+      said(`refused a tap: ${did}`)
+    }
+    return void out('answerCallbackQuery', { callback_query_id: q.id, text: gap ? 'Laki was off: that tap is too old' : did || 'That ask moved on' }).catch(() => {})
   }
   if (!m) return
   if (Date.now() / 1000 - m.date > STALE / 1000) return void sayIn(m, 'Laki was off when you sent that: send it again.')
@@ -352,12 +361,14 @@ async function deliver(tab: string, m: TgMessage) {
   const f = m.photo?.length ? m.photo.at(-1)! : m.document
   const s = sessions.get(tab)
   const ask = !f && rtOf(tab).status === 'waiting' && s && !s.exited ? s.ask() : undefined
-  const o = ask?.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase())
+  // a choice only in a reply to that ask's own push: "yes" to an older one is words, never an Allow
+  const own = !!m.reply_to_message && askOfMsg(m.reply_to_message.message_id) === tab
+  const o = own ? ask?.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase()) : undefined
   if (o) return void (await act('answer', { tab, n: o.n, label: o.label }), pickedFor(tab, `Picked: ${o.label}`))
   if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
   if (!text) throw new Error('nothing to send')
   await act('send', { target: tab, text, whenIdle: true })
-  if (ask) void sayIn(m, `Queued: ${esc(t.name)} asks something first (reply with a choice's number to answer it).`)
+  if (ask) void sayIn(m, `Queued: ${esc(t.name)} asks something first (reply to its question's message with a choice's number to answer it).`)
 }
 // a photo or a file from the chat into Laki's images or files (core's imageSave, fileSave): its path. Telegram gives a
 // bot 20 MB at most
@@ -410,13 +421,16 @@ async function command(c: string, arg: string, m: TgMessage) {
     const rows = v.tabs.filter(t => tracked(state.tabs.find(x => x.id === t.id) ?? ({} as never)) && shownWs(t.workspace))
     const group = (title: string, l: typeof rows, q = false) =>
       l.length ? [`<b>${title} · ${l.length}</b>`, ...l.slice(0, 15).map(t => `${DOT[t.status] ?? '⚪'} ${esc(shownWs(t.workspace)!.name ?? t.workspace)} · ${esc(t.name)}${q && !titles ? (p => (p ? `: <code>${esc(redact(cut(`${p.tool}: ${p.what}`, 120)))}</code>` : ''))(rtOf(t.id).perm) : ''}`)] : []
-    const text = [...group('Needs you', rows.filter(t => t.status === 'waiting'), true), ...group('Working', rows.filter(t => t.status === 'running')), ...group('Done', rows.filter(t => t.status === 'idle' && t.done))].join('\n')
-    return void sayIn(m, text || 'Nothing needs you, nothing is working.')
+    const all = [...group('Needs you', rows.filter(t => t.status === 'waiting'), true), ...group('Working', rows.filter(t => t.status === 'running')), ...group('Done', rows.filter(t => t.status === 'idle' && t.done))]
+    // Telegram takes 4,096 characters: the lines that fit, then how many more
+    let size = 0
+    const fit = all.filter(l => (size += l.length + 1) <= 3600)
+    return void sayIn(m, fit.length ? `${fit.join('\n')}${fit.length < all.length ? `\n…and ${all.length - fit.length} more` : ''}` : 'Nothing needs you, nothing is working.')
   }
   if (c === 'quiet') {
     if (/^off$/i.test(arg)) return void (await act('dndSet', { off: true }), sayIn(m, 'Do not disturb is off.'))
     const n = /^(\d{1,4})\s*(m|min|h|hours?)?$/i.exec(arg || '1h')
-    if (!n) return void sayIn(m, 'How long? /quiet 2h, /quiet 30m, /quiet off')
+    if (!n || !Number(n[1])) return void sayIn(m, 'How long? /quiet 2h, /quiet 30m, /quiet off')
     const minutes = Number(n[1]) * (/^h/i.test(n[2] ?? 'm') ? 60 : 1)
     const r = await act<{ until: number }>('dndSet', { minutes })
     return void sayIn(m, `Do not disturb until ${new Date(r.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: only an important workspace's asks come.`)
@@ -464,7 +478,7 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
     const tok = p.token.trim()
     if (!tok) {
       keyWrite(KEY, keyFile(), '')
-      Object.assign(t, { bot: undefined, user: undefined, threads: undefined, notice: undefined })
+      Object.assign(t, { keyed: undefined, bot: undefined, user: undefined, threads: undefined, notice: undefined })
       forget()
       pair = undefined
     } else {
@@ -472,6 +486,7 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
       const me = await tg<{ id: number; username?: string; first_name?: string; has_topics_enabled?: boolean }>('getMe', {}, { tok })
       if (!me.username) throw new Error('Telegram says that token is no bot')
       keyWrite(KEY, keyFile(), tok)
+      t.keyed = true
       if (t.bot?.id !== me.id) Object.assign(t, { user: undefined, threads: undefined }), forget() // another bot: pair again
       Object.assign(t, { bot: { id: me.id, username: me.username, name: me.first_name ?? me.username, topics: !!me.has_topics_enabled }, notice: undefined, off: undefined })
       offset = 0
@@ -504,10 +519,9 @@ export async function telegramTest() {
 }
 export function tgView(): TelegramView | undefined {
   const t = state.telegram
-  const has = !!token()
-  if (!t && !has) return undefined
-  const { user, threads: _, bot, ...rest } = t ?? {}
-  return { ...rest, token: has, ...(bot && { bot: { username: bot.username, name: bot.name, topics: bot.topics } }), ...(user && { user: { name: user.name, at: user.at } }), ...(pair && pair.until > Date.now() && { pairing: pair.until }), ...(ctl && { polling: true }) }
+  if (!t) return undefined
+  const { user, threads: _, bot, keyed, ...rest } = t
+  return { ...rest, token: !!keyed, ...(bot && { bot: { username: bot.username, name: bot.name, topics: bot.topics } }), ...(user && { user: { name: user.name, at: user.at } }), ...(pair && pair.until > Date.now() && { pairing: pair.until }), ...(ctl && { polling: true }) }
 }
 
 // ---------- the old phone push format (settings.webhook format telegram, before Settings › Telegram): its token to the
@@ -524,7 +538,7 @@ export function tgMigrate(w: Webhook) {
   if (!tok || !TOKEN.test(decodeURIComponent(tok))) return void (T().notice = "Your Telegram push's URL had no bot token Laki could read: set your bot up again here (step 1)")
   keyWrite(KEY, keyFile(), decodeURIComponent(tok))
   const t = T()
-  Object.assign(t, { level: 'answer', waiting: w.waiting, done: w.done === true, detail: w.detail })
+  Object.assign(t, { keyed: true, level: 'answer', waiting: w.waiting, done: w.done === true, detail: w.detail })
   if (Number.isSafeInteger(id) && id > 0) t.user = { id, name: '', at: Date.now() }
   else t.notice = 'Your Telegram pushes went to a group: Laki now pairs one person in their private chat with the bot. Pair again (step 2)'
   log('telegram: the phone push to Telegram moved to Settings › Telegram')
@@ -532,7 +546,7 @@ export function tgMigrate(w: Webhook) {
 // the bot's name (getMe), for one migrated or kept from before: as Laki starts, else as the poll first works
 let naming = false
 async function named() {
-  if (naming || !token() || state.telegram?.bot) return
+  if (naming || !state.telegram?.keyed || state.telegram.bot) return
   naming = true
   await tg<{ id: number; username?: string; first_name?: string; has_topics_enabled?: boolean }>('getMe')
     .then(

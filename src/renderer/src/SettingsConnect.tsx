@@ -935,7 +935,7 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             <span className="muted">
               {opts.hook === 'your paired phones'
                 ? 'Through Web Push, to your paired phones.'
-                : `Its address goes to ${opts.hook}${/(^|\.)ntfy\.sh$/.test(opts.hook) ? ', a third party: anyone who reads your topic sees the link (they still need the PIN or your email). A self-hosted ntfy or your own Telegram bot keeps it yours.' : ': whoever runs it sees the link.'}`}
+                : `Its address goes to ${opts.hook}${/(^|\.)ntfy\.sh$/.test(opts.hook) ? ', a third party: anyone who reads your topic sees the link (they still need the PIN or your email). A self-hosted ntfy keeps it yours (Telegram never gets it).' : ': whoever runs it sees the link.'}`}
             </span>
           </span>
         </Switch>

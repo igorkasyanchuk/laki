@@ -464,7 +464,7 @@ drops it once `flowHooks.waitKey(id)` (the run's wait's options, none past it) i
 `flowHooks.answer({ id, n: n - 1 })` (`flowAnswer`). Tested in `test/push.test.ts`.
 
 Telegram (Settings › Telegram, `telegram.ts`; `state.telegram`, the view's `telegram` by `tgView`: no token, no code, no
-ids) is your own bot, paired with one user in its private chat. The token: `telegramSet { token }` checks it with
+ids; `keyed`: a token is kept, so a view or a push never reads the key store) is your own bot, paired with one user in its private chat. The token: `telegramSet { token }` checks it with
 `getMe` (BotFullInfo: `username`, `has_topics_enabled`), keeps it by `keychain.ts` `keyWrite('telegram', <data>/telegram-token)`
 (the Keychain, else that 0600 file), never in state.json, the view, a log or an error (`scrub`: a URL holds it, `TOKEN`'s
 shape is masked anywhere); another bot's token unpairs. Pairing: `telegramPair` makes a code (16 random bytes, base64url:
@@ -484,14 +484,17 @@ old*). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waite
 (`callback_data` `nonce:n`, unsigned: only the paired user's private chat counts) at answer and up unless titles only; its
 `message_id` stays with the nonce (`awaiting`'s `msg`), and as it goes (`gone`) `tgDone` edits it
 (`editMessageText` with an empty `inline_keyboard`) to say *Picked: …* or *Answered on the Mac, or it moved on*. A tap
-from the paired user (level answer and up, and on) is `takeTap`, its callback answered with what it did; a batch
+from the paired user (level answer and up, and on) is `takeTap(tap, true)`: an agent's ask only (a workflow's ask goes
+to Telegram as text, no buttons: its confirm may merge; remote access's Keep never), counted in the minute's limit and
+logged, its callback answered with what it did; with no buttons a push lists its choices as lines; a batch
 stops as its loop is aborted (the next loop reads the rest from the offset, never twice). Pairing another person
 starts at answer and forgets the old chat's messages (`forget`, as Unpair and a new bot do). Remote access's link
 (`phoneRemote`: its token and key) never goes to Telegram. P2: each push's
 `message_id` → its tab (`remember`, the newest 500 in `<data>/telegram-msgs.json`, 0600, so it outlives a restart); a
 message that replies to one (`reply_to_message`; not a workspace Recording mode hides) goes there (`deliver`; a slash
 in a reply or a topic is a command only when it's a known one: a path is words): a waiting ask's choice when the text is its
-number or its words (`answer` with `label`), else `send` with `whenIdle` (and *Queued* when an ask waits), a 👍
+number or its words, only in a reply to that ask's own push (`askOfMsg`: a "yes" to an older one is words, never an
+Allow; `answer` with `label`, its push then *Picked*), else `send` with `whenIdle` (and *Queued* when an ask waits), a 👍
 (`setMessageReaction`, refused quietly) its receipt, a failure said back (*Not sent: …*); a photo (its biggest size) or a
 document: `getFile`, then `/file/bot<token>/<path>` read up to 20 MB (`readCapped`) into core's `imageSave` or `fileSave`,
 its path after the caption. A message that replies to nothing gets how to reply. Every action goes through `tgHooks.call`

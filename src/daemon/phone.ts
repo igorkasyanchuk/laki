@@ -41,7 +41,7 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
   const what = o.what ?? p.tab
   if (t.hook) pushTo(t.hook, { ...p, ...(nonce && hook && { nonce, key: tapKey() }) }).catch(e => log(`push ${what}: ${e.message}`))
   if (t.tg)
-    tgPush({ ...p, ...o.tg, ...(o.tgTaps === false && { options: undefined }), ...(nonce && tg && { nonce }) }).then(
+    tgPush({ ...p, ...o.tg, ...(nonce && tg && { nonce }) }).then(
       msg => void (nonce && msg && (a => a && (a.msg = msg))(awaiting.get(nonce))),
       e => log(`telegram ${what}: ${e.message}`),
     )
@@ -106,6 +106,8 @@ const gone = (k: string, said = 'Answered on the Mac, or it moved on') => {
   awaiting.delete(k)
   if (a?.msg && a.push) tgDone(a.msg, a.push, said)
 }
+// the tab a Telegram message asks for (its buttons' ask, still waiting): a reply to it may pick a choice
+export const askOfMsg = (msg: number) => [...awaiting.values()].find(a => a.msg === msg && a.tab)?.tab
 // a tab's pushed ask answered some other way (a Telegram reply's number): its message says what was picked
 export const pickedFor = (tab: string, said: string) => awaiting.forEach((a, k) => a.tab === tab && gone(k, said))
 // the webhook's taps come back: Answer from the phone where they can (answerOk), never with titles only
@@ -153,10 +155,11 @@ export async function phoneTick() {
 }
 
 // a tap on a pushed button (Telegram's, ntfy's, a Web Push notification's action): the ask it was for, if it still asks
-// the same, answered as a click in Laki would; what it did (Picked: …), else undefined
-export async function takeTap(tap: Tap): Promise<string | undefined> {
+// the same, answered as a click in Laki would; what it did (Picked: …), else undefined. Telegram's (tg): an agent's ask
+// only, never a workflow's (its confirm may merge) nor remote access's Keep (gates.ts TELEGRAM_OK has neither)
+export async function takeTap(tap: Tap, tg = false): Promise<string | undefined> {
   const a = awaiting.get(tap.nonce)
-  if (!a) return
+  if (!a || (tg && !a.tab)) return
   awaiting.delete(tap.nonce)
   const done = (said: string) => (awaiting.set(tap.nonce, a), gone(tap.nonce, said), said) // its message says what was picked
   if (a.keep) return (remoteKeepHook.fn?.(), log('remote access kept on from the phone'), done('Kept on'))
@@ -197,7 +200,7 @@ export function flowAsk(run: { id: string; name: string; ws?: string }, question
   if ((!t.hook && !t.tg) || ws?.muted || hidden(ws)) return
   const key = flowHooks.waitKey?.(run.id) // its block, question and choices, as phoneTick checks them
   const where = ws ? ws.name || ws.id : undefined
-  send(t, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })) }, key ? { flow: run.id, key } : undefined, { what: run.name })
+  send(t, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })) }, key ? { flow: run.id, key } : undefined, { what: run.name, tgTaps: false }) // Telegram: its choices as text (a workflow's answer isn't Telegram's)
 }
 // D4: remote access's link to your phone (settings.remotePush, off unless set): as it starts, moves to a new address,
 // stops on its own (why) or pairs a new device. Never with *anyone with the link* (open): the webhook's host sees the
@@ -213,7 +216,7 @@ export function phoneRemote(title: string, o: { url?: string; open?: boolean } =
 export const remoteKeepHook: { fn?: () => void } = {}
 export function phoneRemoteIdle(text: string) {
   const t = to('any')
-  if (t.hook || t.tg) send(t, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title: text, options: [{ n: 1, label: 'Keep' }] }, { keep: true, key: 'keep' }, { ms: 15 * 60_000, what: 'remote access', tgTaps: false })
+  if (t.hook || t.tg) send(t, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title: text, options: [{ n: 1, label: 'Keep' }] }, { keep: true, key: 'keep' }, { ms: 15 * 60_000, what: 'remote access', tgTaps: false, tg: { options: undefined } })
 }
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)

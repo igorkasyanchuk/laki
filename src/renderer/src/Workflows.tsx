@@ -2273,7 +2273,7 @@ function NotifyFields({ b, set, api, what }: { b: Block; set: (f: (x: Block) => 
             And on my phone
           </Switch>
           <span className="wf-hint">
-            {api.phone ? 'A push to your phone too, the way Settings › Phone pushes sends an agent’s.' : 'Needs phone pushes (ntfy, Telegram, Slack, a webhook): '}
+            {api.phone ? 'A push to your phone too, the way Settings › Phone pushes sends an agent’s.' : 'Needs phone pushes (ntfy, Slack, a webhook) or Telegram: '}
             {!api.phone && api.settings && (
               <button className="link" onClick={() => api.settings!('webhook')}>
                 Settings › Phone pushes
