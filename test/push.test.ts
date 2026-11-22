@@ -15,7 +15,10 @@ test('push formats: ntfy text with a Title, Slack and Telegram text, generic JSO
   assert.deepEqual(ntfy.headers, { title: 'claude in fix-login is waiting for you' })
   assert.equal(ntfy.body, 'Run rm -rf build?')
   assert.match((pushRequest({}, { ...p, workspace: 'café ☕' }).headers as Record<string, string>).title, /^=\?UTF-8\?B\?.+\?=$/) // ntfy by default; past ASCII: RFC 2047
-  for (const format of ['slack', 'telegram'] as const) assert.deepEqual(JSON.parse(String(pushRequest({ format }, p).body)), { text: 'claude in fix-login is waiting for you\nRun rm -rf build?' })
+  assert.deepEqual(JSON.parse(String(pushRequest({ format: 'slack' }, p).body)), { text: 'claude in fix-login is waiting for you\nRun rm -rf build?' })
+  // Telegram: HTML, every value escaped, the title bold; a done one silent
+  assert.deepEqual(JSON.parse(String(pushRequest({ format: 'telegram' }, { ...p, question: 'Run <b>rm</b> & co?' }).body)), { text: '<b>claude in fix-login is waiting for you</b>\nRun &lt;b&gt;rm&lt;/b&gt; &amp; co?', parse_mode: 'HTML' })
+  assert.equal(JSON.parse(String(pushRequest({ format: 'telegram' }, { ...p, event: 'done' }).body)).disable_notification, true)
   assert.equal(JSON.parse(String(pushRequest({ format: 'slack' }, { ...p, question: 'Overwrite <dir> & <!channel>?' }).body)).text.split('\n')[1], 'Overwrite &lt;dir&gt; &amp; &lt;!channel&gt;?')
   assert.equal(JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, p).body)).chat_id, '42')
   assert.deepEqual(JSON.parse(String(pushRequest({ format: 'json' }, { ...p, event: 'done', question: undefined }, 5).body)), {
@@ -57,13 +60,16 @@ test('push choices: as text in every format; with a nonce, Telegram buttons and 
   assert.equal(auth.actions[0].url, 'https://ntfy.example/mine-xyz?auth=XYZ') // the topic's auth goes with the tap
 })
 
-test('Telegram taps: callback queries from the webhook\'s chat only, each acknowledged, the offset moved past all', async t => {
+test('Telegram taps: callback queries from the webhook\'s private chat by its user only, each acknowledged, the offset moved past all', async t => {
   const asked: string[] = []
+  const me = { chat: { id: 42, type: 'private' } }
   const server = createServer((req, res) => {
     asked.push(req.url!)
     const updates = [
-      { update_id: 7, callback_query: { id: 'q1', data: '00112233aabbccdd:2', message: { chat: { id: 42 } } } },
-      { update_id: 8, callback_query: { id: 'q2', data: '00112233aabbccdd:1', message: { chat: { id: 99 } } } }, // someone else's chat
+      { update_id: 7, callback_query: { id: 'q1', data: '00112233aabbccdd:2', from: { id: 42 }, message: me } },
+      { update_id: 8, callback_query: { id: 'q2', data: '00112233aabbccdd:1', from: { id: 99 }, message: { chat: { id: 99, type: 'private' } } } }, // someone else's chat
+      { update_id: 11, callback_query: { id: 'q4', data: '00112233aabbccdd:1', from: { id: 77 }, message: { chat: { id: 42, type: 'group' } } } }, // a group's member
+      { update_id: 12, callback_query: { id: 'q5', data: '00112233aabbccdd:1', from: { id: 77 }, message: me } }, // not its user
       { update_id: 9, message: { text: 'hi', chat: { id: 42 } } },
       { update_id: 10, callback_query: { id: 'q3', data: 'not a tap', message: { chat: { id: 42 } } } },
     ]
@@ -73,10 +79,10 @@ test('Telegram taps: callback queries from the webhook\'s chat only, each acknow
   t.after(() => void server.close())
   const w = { format: 'telegram' as const, url: `http://127.0.0.1:${(server.address() as { port: number }).port}/botT0K/sendMessage?chat_id=42` }
   const r = await replies(w, '5')
-  assert.deepEqual(r, { taps: [{ nonce: '00112233aabbccdd', n: 2 }], cursor: '11' })
+  assert.deepEqual(r, { taps: [{ nonce: '00112233aabbccdd', n: 2 }], cursor: '13' })
   assert.match(asked[0], /^\/botT0K\/getUpdates\?offset=5&/)
   await until(() => asked.some(u => u === '/botT0K/answerCallbackQuery?callback_query_id=q1'), 'q1 acknowledged')
-  assert.ok(!asked.some(u => u.includes('q2')), "another chat's tap isn't")
+  assert.ok(!asked.some(u => /q[245]/.test(u)), "another chat's, a group's or another user's tap isn't")
 })
 
 test('answer from the phone: an ntfy tap on a waiting menu picks that choice once, only while the same menu waits', async t => {
@@ -171,7 +177,7 @@ test('answer from the phone: the webhook changed while a question waits (ntfy to
   assert.ok(asked.some(u => u.startsWith('/topic-r1/json?poll=1&since=')), 'ntfy asked')
   // now Telegram: its updates from the start (offset 0), not from ntfy's place (a unix time); the old push's tap counts
   await rig.rpc('settingsSet', { webhook: { url: `${base}/botT0K/sendMessage?chat_id=42`, format: 'telegram', answer: true } })
-  updates.push({ update_id: 7, callback_query: { id: 'q1', data: `${nonce}:2`, message: { chat: { id: 42 } } } })
+  updates.push({ update_id: 7, callback_query: { id: 'q1', data: `${nonce}:2`, from: { id: 42 }, message: { chat: { id: 42, type: 'private' } } } })
   await rig.rpc('phoneTick')
   assert.match(asked.find(u => u.startsWith('/botT0K/getUpdates'))!, /offset=0&/)
   await until(async () => /picked: Yes, and don't ask/.test(await rig.screen(tab.id)), 'the tap picked 2')
@@ -480,4 +486,45 @@ test('D4: remote access pushes its link to the phone when asked (off by default)
   await sleep(300)
   assert.equal(got.length, 3)
   await stop()
+})
+
+test('P0: a Telegram ask answered from the phone, or on the Mac, is edited: its buttons gone, what was picked said', async t => {
+  const asked: { url: string; body: any }[] = []
+  const updates: object[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', d => (body += d))
+    req.on('end', () => {
+      asked.push({ url: req.url!, body: body ? JSON.parse(body) : undefined })
+      const result = req.url!.includes('getUpdates') ? updates.splice(0) : req.url!.includes('sendMessage') ? { message_id: 50 + asked.length } : true
+      res.writeHead(200).end(JSON.stringify({ ok: true, result }))
+    })
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '150', LAKI_ANSWER_HOLD_MS: '200' } })
+  const proj = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
+  await rig.rpc('settingsSet', { webhook: { url: `${base}/botT0K/sendMessage?chat_id=42`, format: 'telegram', answer: true } })
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  const push = (await until(() => asked.find(x => x.url.includes('/sendMessage') && x.body?.reply_markup), 'the push with buttons'))!
+  const nonce = push.body.reply_markup.inline_keyboard[0][0].callback_data.split(':')[0]
+  updates.push({ update_id: 1, callback_query: { id: 'q1', data: `${nonce}:1`, from: { id: 42 }, message: { message_id: 1, chat: { id: 42, type: 'private' } } } })
+  await rig.rpc('phoneTick')
+  await until(async () => /picked: Yes/.test(await rig.screen(tab.id)), 'the tap picked 1')
+  const edit = (await until(() => asked.find(x => x.url.endsWith('/editMessageText')), 'the message edited'))!
+  assert.equal(edit.body.message_id, asked.indexOf(push) + 51, 'the pushed message')
+  assert.equal(edit.body.reply_markup, undefined, 'no buttons')
+  assert.match(edit.body.text, /<i>Picked: Yes<\/i>$/)
+  // again, answered on the Mac this time: the next look edits it as gone
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  await until(() => asked.filter(x => x.url.includes('/sendMessage') && x.body?.reply_markup).length === 2, 'a second push')
+  await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting')
+  await rig.rpc('answer', { tab: tab.id, n: 1 })
+  await until(async () => (await rig.tab(ws.id)).status !== 'waiting', 'answered on the Mac')
+  await rig.rpc('phoneTick')
+  await until(() => asked.filter(x => x.url.endsWith('/editMessageText')).at(-1)?.body.text.includes('Answered on the Mac'), 'edited as gone')
 })

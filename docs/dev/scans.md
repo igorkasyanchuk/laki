@@ -450,9 +450,13 @@ the random part Settings makes). `types.ts` `answerOk`: ntfy answers need the se
 carry `auth` (a public topic: anyone reads the nonces); `settingsSet` refuses another (`ANSWER_WHY`), `load` turned an old
 one off once (`webhook.answerOff`, Settings' note). `awaiting` keeps each nonce with the tab and its choices; while any is there,
 `phoneTick` (every 5 s; the API's for tests) runs `push.ts` `replies` (Telegram's `getUpdates` from `tapCursor`, only
-callback queries from the URL's `chat_id`, each acknowledged; ntfy's `/json?poll=1&since=`) and answers a tap whose
+callback queries from the URL's `chat_id` that is a private chat, tapped by that chat's user (`from.id`: in a group anyone
+could tap), each acknowledged; ntfy's `/json?poll=1&since=`) and answers a tap whose
 nonce is waiting and whose tab still shows the same choices (`answer` with `label`); a nonce goes as it's used, when
-its tab stops waiting, or after a day; none left: the timer stops. ntfy gets a
+its tab stops waiting, or after a day; none left: the timer stops. A Telegram push's `message_id` (sendMessage's answer)
+stays with its nonce (`awaiting`'s `msg`): as it goes (`gone`), `tgDone` edits the message (`editMessageText`, no
+`reply_markup`: no buttons) to say *Picked: …* or *Answered on the Mac, or it moved on*. Telegram's text is HTML
+(`parse_mode`, `tgHtml`: the title bold, every value escaped by `esc`), a done push with `disable_notification`. ntfy gets a
 `Title` header (RFC 2047 past ASCII) and the question as the body; Slack its text escaped; JSON `{event, workspace, tab,
 agent, message, ts}`. `https://` only (plain `http://` to localhost: tests' server; Settings flags another). 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
 A workflow's waits (workflow.ts' `ask` and `unsure`: Ask you, confirm, stuck, a decision; not an agent's ask, its tab

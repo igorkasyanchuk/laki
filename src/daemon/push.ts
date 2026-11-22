@@ -37,6 +37,9 @@ export const ntfyReplies = (w: Webhook) => {
   return { url: `${u.origin}${u.pathname.replace(/\/+$/, '')}-${w.replyTopic}`, query: u.search }
 }
 
+// Telegram's HTML (parse_mode HTML): &, < and > escaped in everything that isn't a tag of ours; the title bold
+export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+export const tgHtml = (p: Push) => (({ title, body }) => `<b>${esc(title)}</b>${body ? `\n${esc(body)}` : ''}`)(pushText(p))
 // nothing off the screen goes (L8): who needs you only
 const shown = (w: Webhook, p: Push): Push => (w.detail === 'titles' ? { ...p, question: undefined, options: undefined, nonce: undefined } : p)
 // the request the webhook's format wants
@@ -56,8 +59,9 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
     }
     case 'slack': // Slack reads <…> as links and mentions (<!channel>)
       return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (p.url ? `\n<${p.url}|Open it>` : '') })
-    case 'telegram': // chat_id from the URL in the body too: Telegram reads either; a button per choice, a row each (a link: one that opens it)
-      return json({ chat_id: telegram(w.url)?.chat, text, ...(taps.length ? { reply_markup: { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } } : p.url ? { reply_markup: { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } } : {}) })
+    case 'telegram': // chat_id from the URL in the body too: Telegram reads either; HTML, every value escaped; a done one
+      // silent; a button per choice, a row each (a link: one that opens it)
+      return json({ chat_id: telegram(w.url)?.chat, text: tgHtml(p), parse_mode: 'HTML', ...(p.event === 'done' && { disable_notification: true }), ...(taps.length ? { reply_markup: { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } } : p.url ? { reply_markup: { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } } : {}) })
     default:
       return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ...(p.options?.length && { options: p.options }), ...(p.url && { url: p.url }), ts: now })
   }
@@ -139,9 +143,19 @@ export async function pushTo(w: Webhook, p: Push) {
   const to = ntfyJson(w, p) ? `${u.origin}/${u.search}` : u.href // ntfy's JSON goes to the server's root (an ?auth= kept)
   const res = await fetch(to, { ...pushRequest(w, p), signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`the webhook answered ${res.status} ${res.statusText}`.trim())
+  // Telegram's message: its id, for tgDone's edit once the ask is answered or gone
+  if (w.format === 'telegram') return ((await res.json().catch(() => undefined)) as { result?: { message_id?: number } } | undefined)?.result?.message_id
 }
+// a pushed ask answered (picked: its words) or gone: the message edited to say so, its buttons dropped (an edit
+// without reply_markup has none). Fire and forget
+export function tgDone(w: Webhook, msg: number, p: Push, said: string) {
+  const t = telegram(webhookUrl(w.url))
+  if (!t?.chat) return
+  void fetch(`${t.api}/editMessageText`, { ...json({ chat_id: t.chat, message_id: msg, text: `${tgHtml({ ...shown(w, p), options: undefined })}\n<i>${esc(said)}</i>`, parse_mode: 'HTML' }), signal: AbortSignal.timeout(5000) }).catch(() => {})
+}
+const json = (b: object): RequestInit => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
 
-// taps on the buttons since the last look: Telegram's callback queries from the webhook's own chat (getUpdates, from
+// taps on the buttons since the last look: Telegram's callback queries from the webhook's own private chat, by its user (getUpdates, from
 // offset; each one acknowledged, so the button stops spinning), ntfy's messages on the reply topic (since: a message
 // id or a unix time). The cursor moves on whatever they say; only nonce:n bodies count
 export type Tap = { nonce: string; n: number }
@@ -167,7 +181,8 @@ export async function replies(w: Webhook, cursor: string, key = ''): Promise<{ t
     for (const u of j.result ?? []) {
       cursor = String(Math.max(Number(cursor) || 0, u.update_id + 1))
       const q = u.callback_query
-      if (!q || String(q.message?.chat?.id) !== t.chat) continue
+      // the webhook's own chat, private (its id is its user's), and tapped by that user: in a group anyone could tap
+      if (!q || String(q.message?.chat?.id) !== t.chat || q.message?.chat?.type !== 'private' || String(q.from?.id) !== t.chat) continue
       tap(q.data)
       void fetch(`${t.api}/answerCallbackQuery?callback_query_id=${encodeURIComponent(q.id)}`, { signal: AbortSignal.timeout(5000) }).catch(() => {})
     }
