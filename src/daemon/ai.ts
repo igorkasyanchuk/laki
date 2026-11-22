@@ -19,7 +19,7 @@ import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, 
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state, storageOf } from './core.ts'
 import { diff } from './files.ts'
-import { hunksOf, type Walk, walkCheck, walkFold, walkInput, walkPrompt, WALK_SYSTEM } from '../shared/walk.ts'
+import { type HunkRef, hunksOf, type Walk, walkCheck, walkFold, walkInput, walkPrompt, WALK_SYSTEM } from '../shared/walk.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 import { execGroup, own } from './resources.ts'
@@ -978,6 +978,12 @@ export function explainOf(text: string): AskExplained | undefined {
 // workspace has no storage folder); again: asked anew; kept: only a kept one, else null (no call: the tab opening). A
 // failure isn't kept
 const walks = new Map<string, Promise<Walk>>()
+// a kept one from the storage folder (an agent can write there): checked as an answer is and folded on this diff's
+// hunks again, else none
+const walkKept = (w: Walk | undefined, all: HunkRef[]): Walk | undefined => {
+  const steps = w && typeof w === 'object' && typeof w.hash === 'string' && Number.isFinite(w.at) && Array.isArray(w.steps) ? walkCheck(JSON.stringify({ steps: w.steps.filter(s => !s?.rest) }), 1) : undefined // 1: a step the fold emptied is gone, so fewer than 3 is fine here
+  return steps && { steps: walkFold(steps, all), hash: w!.hash, at: w!.at, ...(w!.cut === true && { cut: true }) }
+}
 export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?: boolean; kept?: boolean }): Promise<Walk | null> {
   if (!p.kept && !aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')
   const ws = findWs(p.ws)
@@ -991,7 +997,7 @@ export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?
   const store = storageOf(ws)
   const file = store && join(store, '.laki-walk.json')
   if (!p.again || p.kept) {
-    const kept = walks.get(hash) ?? (file ? readJson<Record<string, Walk>>(file)?.[hash] : undefined)
+    const kept = walks.get(hash) ?? (file ? walkKept(readJson<Record<string, Walk>>(file)?.[hash], all) : undefined)
     if (kept || p.kept) return kept ?? null
   }
   const w = walkInput(d.diff)

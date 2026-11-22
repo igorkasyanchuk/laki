@@ -14,7 +14,7 @@ import { inRig } from './dir.ts'
 // network with a NAT64 gateway or a 6to4 relay reaches its LAN's through them
 const NO = new BlockList()
 for (const [a, n] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16], ['192.0.2.0', 24], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4]] as const) NO.addSubnet(a, n, 'ipv4')
-for (const [a, n] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8], ['2001::', 32], ['2001:db8::', 32], ['64:ff9b:1::', 48]] as const) NO.addSubnet(a, n, 'ipv6')
+for (const [a, n] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8], ['2001::', 32], ['2001:db8::', 32], ['64:ff9b:1::', 48], ['::', 96], ['::ffff:0:0:0', 96]] as const) NO.addSubnet(a, n, 'ipv6') // ::/96: IPv4-compatible, ::ffff:0:a.b.c.d: IPv4-translated (no public address in either)
 // an IPv6 address's eight 16-bit groups (isIP said it's one): :: filled in, a dotted IPv4 at its end as two groups
 const groups = (ip: string) => {
   const [l, r] = ip

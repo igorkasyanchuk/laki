@@ -81,7 +81,7 @@ export class HostPty {
   }
   write(d: string) {
     if (!lost()) return post({ op: 'write', id: this.id, data: d })
-    if (this.typedBytes + d.length > HOLD_MAX) return void (this.cut || ((this.cut = true), log(`${this.id}: over 64 KB typed while the connection was down: the rest dropped`)))
+    if (this.cut || this.typedBytes + d.length > HOLD_MAX) return void (this.cut || ((this.cut = true), log(`${this.id}: over 64 KB typed while the connection was down: the rest dropped`))) // once cut, all after it too: never a later key without what came before
     this.typed.push(d)
     this.typedBytes += d.length
   }

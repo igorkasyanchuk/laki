@@ -963,6 +963,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const def = on.some(x => x.name === view.settings.agent) ? view.settings.agent : on[0]?.name // what new workspaces start (Settings): a pill, and the foot sets it
   // a profile's plan left, after its name (its account's row, as StartChip picks it): muted, at 10% or under its reset too
   const leftOf = (agent: string, account?: string): Partial<MenuItem> => {
+    if (!usage) return {} // not read yet: nothing to say
     const r = usageRow(usage, agent, account)
     const l = LIMIT_AGENTS.includes(agent) ? planLeft(r) : undefined
     if (!l) return { tip: noLimitOf(agent, !!r && !r.error) }

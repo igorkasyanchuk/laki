@@ -159,7 +159,7 @@ export function TabList({ app }: { app: AppCtx }) {
         const accounts = ts.map(t => accountsOf(t.preset).find(a => a.id === t.account)?.name)
         // drawn again only when one of these changed (its tabs by each object: viewShare keeps the unchanged ones); its
         // handlers call the latest app's (ui.tsx Kept)
-        const deps = [g === group && !reviewOn, gi, keyOff, settings, ctxOn, costsOn, ctxLook, narrow, isNew, accounts.join('\0'), kt('Close', 'closeTab'), ts.length, ...ts]
+        const deps = [g === group && !reviewOn, gi, keyOff, settings, ctxOn, costsOn, ctxLook, narrow, isNew, accounts.join('\0'), kt('Close', 'closeTab'), ts.some(t => t.runAt || t.share) && Math.floor(Date.now() / 10_000) /* its tip's time: running, shared */, ts.length, ...ts]
         const L = () => app.cur.current
         return <Kept key={ts[0]?.id} deps={deps} render={() => (
           <div

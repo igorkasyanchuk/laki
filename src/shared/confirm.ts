@@ -38,7 +38,11 @@ export function confirmOf(method: string, p: P, cur: Cur = {}): ConfirmWhat | un
     const preset = p.preset ? String(p.preset) : typeof p.cmd === 'string' && p.cmd.trim() ? '' : cur.agent || 'claude' // '': a command of its own
     return preset && startsBypassed(preset, p.perm, cur) ? 'bypassNew' : undefined
   }
-  if (method === 'tabNew' && p) return !p.kind && p.preset && startsBypassed(String(p.preset), p.perm, cur) ? 'bypassNew' : undefined
+  if (method === 'tabNew' && p) {
+    if (!p.preset || (p.kind && p.kind !== 'agent')) return // a shell, a script
+    // kind 'agent': tabSpec takes preset as the agent itself, no profile, and perm as its mode
+    return (p.kind ? neverAsks(String(p.preset), typeof p.perm === 'string' ? p.perm || undefined : undefined) : startsBypassed(String(p.preset), p.perm, cur)) ? 'bypassNew' : undefined
+  }
   if (method === 'wsFan' && Array.isArray(p?.presets)) return p.presets.some(x => startsBypassed(String(x), undefined, cur)) ? 'bypassNew' : undefined
   if (method === 'presetSave' && p?.set && typeof p.set === 'object') {
     const was = cur.presets?.find(x => x.name === String(p.name ?? ''))

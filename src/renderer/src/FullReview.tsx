@@ -190,13 +190,13 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     setWalk(w)
     setStep(null)
     setStepsOn(true)
-    setSeenSteps((x => (x?.hash === w.hash ? x.seen : []))(readAll<{ hash: string; seen: number[] }>(WALK_SEEN)[ws]))
+    setSeenSteps((x => (x?.hash === w.hash && x.at === w.at ? x.seen : []))(readAll<{ hash: string; at: number; seen: number[] }>(WALK_SEEN)[ws])) // Again: the same diff, other steps
   }
   const walkAsk = (again = false) => {
     setWalking(true)
     setWalkErr('')
     wsApi.walk!(unc, { again }).then(
-      w => (w && walkSet(w), setWalking(false)),
+      w => (w && (walkSet(w), hideFiles(false)), setWalking(false)), // the steps are in the files column: unfolded
       e => (setWalkErr((e as Error).message), setWalking(false)),
     )
   }
@@ -230,7 +230,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     if (!walk) return
     const next = on ? [...new Set([...seenSteps, i])] : seenSteps.filter(x => x !== i)
     setSeenSteps(next)
-    keepFor(WALK_SEEN, ws, { hash: walk.hash, seen: next })
+    keepFor(WALK_SEEN, ws, { hash: walk.hash, at: walk.at, seen: next })
     const mine = [...new Set(walk.steps[i].hunks.map(h => h.file))].filter(p => files.some(f => f.path === p))
     const ps = on ? mine.filter(p => !viewed(p) && walk.steps.every((x, j) => next.includes(j) || !x.hunks.some(h => h.file === p))) : mine.filter(viewed)
     if (ps.length) mark(ps, on)

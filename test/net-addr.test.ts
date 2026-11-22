@@ -12,7 +12,7 @@ test("addrPrivate: loopback, private, link-local, CGNAT, unique local, unspecifi
 })
 
 test('addrPrivate: NAT64 and 6to4 by the IPv4 they carry; Teredo, documentation, multicast and local-use NAT64 refused', () => {
-  for (const a of ['64:ff9b::7f00:1', '64:ff9b::127.0.0.1', '64:ff9b::a00:1', '2002:c0a8:101::', '2002:7f00:1:1::1', '2001::1', '2001:0:4136:e378::1', '2001:db8::1', 'ff02::1', 'ff0e::1', '64:ff9b:1::808:808', '224.0.0.1', '239.255.255.250', '192.0.2.1', '198.51.100.7', '203.0.113.9'])
+  for (const a of ['64:ff9b::7f00:1', '64:ff9b::127.0.0.1', '64:ff9b::a00:1', '2002:c0a8:101::', '2002:7f00:1:1::1', '2001::1', '2001:0:4136:e378::1', '2001:db8::1', 'ff02::1', 'ff0e::1', '64:ff9b:1::808:808', '224.0.0.1', '239.255.255.250', '192.0.2.1', '198.51.100.7', '203.0.113.9', '::7f00:1', '::127.0.0.1', '::808:808', '::ffff:0:7f00:1', '::ffff:0:8.8.8.8'])
     assert.equal(addrPrivate(a), true, a)
   for (const a of ['64:ff9b::808:808', '64:ff9b::8.8.8.8', '2002:808:808::', '2002:808:808:1::1', '2001:4860::8888', '64:ff9b:0:1::7f00:1', '223.255.255.255'])
     assert.equal(addrPrivate(a), false, a)

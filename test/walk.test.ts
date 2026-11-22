@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { hunkKey, hunksOf, REST, riskOf, WALK_MAX, walkCheck, walkFold, walkInput, type WalkStep } from '../src/shared/walk.ts'
@@ -38,6 +39,8 @@ test('walk: a diff\'s hunks by file and new start (a file with none at 0, a dele
   assert.match(hs[3].text, /^diff --git a\/logo.png b\/logo.png\nBinary files/, "a hunkless file: its header lines")
   assert.equal(hs.at(-1)!.text, '@@ -5 +5 @@\n-x\n+y', 'no cut marker in it')
   assert.deepEqual(hs.map(h => riskOf(h) ?? ''), ['', '', 'deletes', '', 'lockfile'])
+  const quoted = hunksOf('diff --git "a/caf\\303\\251.txt" "b/caf\\303\\251.txt"\n@@ -1 +1 @@\n-a\n+b\ndiff --git a/x b/x\n@@ -2 +2 @@\n-c\n+d')
+  assert.deepEqual(quoted.map(h => hunkKey(h).replace('\0', ':')), [':1', 'x:2'], "a quoted name's hunks kept, under '' as diffByFile keys them")
   assert.equal(riskOf({ file: 'db/migrate/20261122_add.rb', start: 1 }), 'migration')
   assert.equal(riskOf({ file: 'schema.sql', start: 1 }), 'migration')
   assert.equal(riskOf({ file: 'src/auth/session.ts', start: 1 }), 'auth')
@@ -142,6 +145,14 @@ test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, ke
   // a new diff: nothing kept for it; asked, an answer that isn't one is refused and not kept
   writeFileSync(join(ws.path, 'src/app.ts'), 'export const n = 2\n')
   assert.equal(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), null)
+  // the storage folder is an agent's to write: a kept one is checked and folded on the diff again; a broken one is none
+  const keptFile = join(store, '.laki-walk.json')
+  const h2 = createHash('sha256').update(`walk 1\0${(await rig.rpc('diff', { ws: ws.id })).diff}`).digest('hex').slice(0, 32)
+  writeFileSync(keptFile, JSON.stringify({ [h2]: { hash: h2, at: 1, steps: 7 } }))
+  assert.equal(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), null, 'not steps: none')
+  writeFileSync(keptFile, JSON.stringify({ [h2]: { hash: h2, at: 1, steps: [{ title: 'Only this', why: '', hunks: [{ file: 'README.md', start: 1 }, { file: 'gone.ts', start: 9 }] }] } }))
+  assert.deepEqual((await rig.rpc('reviewSteps', { ws: ws.id, kept: true })).steps.map((x: any) => [x.title, x.hunks.length]), [['Only this', 1], [REST, 3]], 'folded: the rest in Everything else')
+  writeFileSync(keptFile, '{}')
   await assert.rejects(rig.rpc('reviewSteps', { ws: ws.id }), /Laki AI's answer wasn't a walk-through: try again/)
   assert.notEqual((await rig.rpc('reviewSteps', { ws: ws.id })).hash, w.hash, 'asked again: a new answer')
   assert.equal(or.hits.length, 3)
