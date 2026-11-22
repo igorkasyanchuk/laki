@@ -7,7 +7,8 @@ import { appendFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { floatOpts, floats, guardFloat } from './floater.ts'
 import { rpc } from '../shared/conn.ts'
-import { from, fromApp, mac, notifyLog, pageURL, quickWin, show, tray, win } from './index.ts'
+import { from, fromApp, mac, notifyLog, pageURL, quickWin, show, win } from './index.ts'
+import { tray } from './menu.ts'
 
 // sound: a macOS sound's name (Settings › General), 'none', or unset: the default. actions: buttons (a waiting agent's
 // choices, or a permission prompt's Allow and Deny; macOS shows the first with the Alerts style and the rest under
