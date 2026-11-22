@@ -822,8 +822,13 @@ are tested in `test/units-more.test.ts`.
   `Modal`; App's `artView`) unless `settings.artifactsIn` is `browser` (Settings › General › Storage; then main's
   `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
-  `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files and https: scripts, styles, fonts and pictures,
-  `connect-src 'self'`: its JSON beside it, CORS null; 50 MB a file); *Open file* and the right click's *Open the file*
+  `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files, scripts, styles and fonts from cdnjs, jsDelivr
+  and unpkg, pictures and media from its folder, data: and blob: (S18: shared/artHosts.ts `artCsp`, with the hosts allowed:
+  `artifactAllow`'s for that page, settings.artifactHosts' for all), `connect-src 'self'`: its JSON beside it, CORS null;
+  50 MB a file); `ArtifactView`'s `hosts` (the daemon's `artifactHosts`: `artBlocked` on the page's HTML, `artLoads`' tags,
+  srcset and CSS url()/@import) draw `.art-hosts` over it, *Allow for this report* (`artifactAllow`), *Always allow*
+  (`settingsSet` artifactHosts, then the same allow) loading it again (`n`), *Keep blocked* hiding it; Dialogs' `artView`
+  passes them when `hasCap(view, 'art.hosts')`; Settings › General › Storage lists the setting's hosts (settings.css); *Open file* and the right click's *Open the file*
   (App's `asFile`, main's `open-file`: an HTML file inside the storage folder as `file://` in the browser, asked for), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
   *Open in the browser* (App's `inBrowser`, the gallery's and the right click's too), *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
   its right click has *Open* (the viewer) and *Open in the browser*.

@@ -18,6 +18,7 @@ import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, paintTheme, preview, systemAccent, termTheme, themeFor, THEMES, transparent } from './themes'
 import './floater.css'
+import './settings.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
@@ -318,6 +319,7 @@ export type AppSettings = Paint & {
   memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, on unless false (daemon/memory.ts)
   imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
+  artifactHosts?: string[] // S18: hosts every report may load from beyond the CDNs (the viewer's Always allow)
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -1809,6 +1811,21 @@ export function SettingsPage(p: {
                     </select>
                     <Says title="Open HTML and Markdown artifacts" hint="In Laki: a viewer over the app (HTML sandboxed: its scripts run, it can't read Laki or your files; Markdown rendered), with Open in the browser. In the browser: your default browser, as Finder opens them" />
                   </label>
+                  {!!s.artifactHosts?.length && (
+                    <div className="switch-row art-hosts-set">
+                      <Says title="Hosts reports may load from" hint="Beyond cdnjs, jsDelivr and unpkg: scripts, styles, pictures. Added by the viewer's Always allow" />
+                      <span className="art-hosts-list">
+                        {s.artifactHosts.map(h => (
+                          <span key={h} className="chip">
+                            {h}
+                            <button type="button" className="ib" aria-label={`Stop allowing ${h}`} data-tip={`Stop allowing ${h}`} onClick={() => set({ artifactHosts: s.artifactHosts!.filter(x => x !== h) })}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </Group>
               <Group title="Development">

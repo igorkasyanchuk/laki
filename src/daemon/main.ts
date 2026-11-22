@@ -23,6 +23,7 @@ import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { meme } from './fun.ts'
 import { getPublic } from './netAddr.ts'
+import { artBlocked, artCsp, artHostOk } from '../shared/artHosts.ts'
 import * as core from './core.ts'
 import * as agentCliMod from './agentCli.ts'
 import * as uninstallMod from './uninstall.ts'
@@ -247,11 +248,12 @@ function pwaPage(path: string, res: ServerResponse) {
 
 // GET /artifact/<key>/<ws>/<path>: a file of a workspace's Artifacts for the app's viewer (an HTML report, its CSS,
 // scripts and pictures beside it: the key is in the path, so its relative links carry it). Sandboxed, an origin of its
-// own: it reads nothing of the daemon's or other files; https: for a CDN's script, style, font or picture. fetch and
+// own: it reads nothing of the daemon's or other files. S18: scripts, styles and fonts from three CDNs (Chart.js and the
+// like), pictures and media only from its folder, any other host once the user allows it (shared/artHosts.ts artCsp: for
+// this report, artifactAllow, in memory; always, settings.artifactHosts), so an agent's page can't put what it knows in
+// a picture's or a script's URL to a host of its choosing; artifactHosts tells the viewer what it blocked. fetch and
 // XHR only to its own folder here (connect-src by path), so a report reads the JSON beside it, never the workspace's
-// other artifacts (a picture's URL can still carry words out, as any page's can). ponytail: 50 MB a file
-// ponytail: https: scripts and pictures stay, agents' reports load Chart.js and the like from a CDN; 'unsafe-inline'
-// lets a page do inline whatever a CDN's script would, so dropping https: from script-src alone keeps nothing out
+// other artifacts. ponytail: 50 MB a file
 const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf' }
 // L7: an extension's https picture for the app window, whose CSP takes none from elsewhere (GitHub's avatars aside):
 // fetched here, https all the way, an image's type only, 10 MB at most; the key the view gives (imgKey). An SVG is a
@@ -311,7 +313,27 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
 // would have the whole of it as "its own folder", so its scripts fetch nothing (what it loads by a tag still loads), and
 // no CORS for its JSON (a JSON module would read any of the worktree's). Only at this Mac's own address: never through
 // remote access's tunnel, where the key in the path is all that would guard the source
-const ART_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:"
+const artAllowed = new Map<string, string[]>() // a report's hosts allowed for it (Allow for this report), by artKeyOf; ponytail: until the daemon restarts, 500 at most
+const artKeyOf = (wt: boolean, ws: string, path: string) => `${wt ? 'worktree' : 'artifact'}\0${ws}\0${path}`
+const artHostsFor = (key: string) => [...new Set([...(core.state.settings?.artifactHosts ?? []).filter(artHostOk), ...(artAllowed.get(key) ?? [])])]
+// what a report's page loads that its CSP blocks (the viewer's bar), and the hosts it has now
+function artifactHosts(p: { ws?: unknown; path?: unknown; wt?: unknown }) {
+  const [ws, path, wt] = [String(p?.ws ?? ''), String(p?.path ?? ''), p?.wt === true]
+  const allowed = artHostsFor(artKeyOf(wt, ws, path))
+  if (!/\.html?$/i.test(path)) return { blocked: [], allowed }
+  const file = wt ? filesMod.worktreeFile(ws, path) : filesMod.artifactFile(ws, path)
+  if (statSync(file).size > 50 << 20) return { blocked: [], allowed }
+  return { blocked: artBlocked(readFileSync(file, 'utf8'), allowed), allowed }
+}
+// Allow for this report: these hosts in its page's CSP from now on (the viewer loads it again)
+function artifactAllow(p: { ws?: unknown; path?: unknown; wt?: unknown; hosts?: unknown }) {
+  const hosts = Array.isArray(p?.hosts) ? p.hosts : []
+  if (!hosts.length || hosts.length > 50 || !hosts.every(artHostOk)) throw new Error('hosts: names on the internet (cdn.example.com), 50 at most')
+  const key = artKeyOf(p?.wt === true, String(p?.ws ?? ''), String(p?.path ?? ''))
+  if (!artAllowed.has(key) && artAllowed.size >= 500) artAllowed.delete(artAllowed.keys().next().value!)
+  artAllowed.set(key, [...new Set([...(artAllowed.get(key) ?? []), ...hosts.map(h => h.toLowerCase())])])
+  return { allowed: artHostsFor(key) }
+}
 function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/(?:artifact|worktree)\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
@@ -331,7 +353,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
     'content-type': ART_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
     // fetch: its own folder and under it (hostOk checked the host; a raw ; or , in the path can't add a directive), not
     // the rest of the storage folder
-    'content-security-policy': host && !wt ? `${ART_CSP}; connect-src ${host}${path.slice(0, path.lastIndexOf('/') + 1).replace(/[;,\s]/g, encodeURIComponent)}` : ART_CSP,
+    'content-security-policy': (csp => (host && !wt ? `${csp}; connect-src ${host}${path.slice(0, path.lastIndexOf('/') + 1).replace(/[;,\s]/g, encodeURIComponent)}` : csp))(artCsp(artHostsFor(artKeyOf(wt, m[2], decodeURIComponent(m[3]))))),
     'cache-control': 'no-store',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
@@ -493,6 +515,8 @@ const api = {
   promptQuestions: p => promptQuestions(p), // Ask me first (the New workspace page): the user's and their phone's
   askExplain: (p: In<typeof askExplain>) => askExplain(p), // the ? on an ask's card: what its command does, by Laki AI; the user's and their phone's
   reviewSteps: (p: In<typeof reviewSteps>) => reviewSteps(p), // R13: the Review tab's Walk through, by Laki AI; the user's and their phone's
+  artifactHosts: (p: In<typeof artifactHosts>) => artifactHosts(p), // S18: what a report's page loads that its CSP blocks
+  artifactAllow: (p: In<typeof artifactAllow>) => artifactAllow(p), // S18: Allow for this report
   aiAsk: ({ from, ...p }, c) => (core.agentCaller(from) ? aiAsk(byAgent(from, p), asAgent(from)) : (core.promptKeep(p.text), aiAsk(p, (method, params) => call(method, params, c?.remote ? c : undefined) as Promise<any>))), // a remote ask's tools: the phone's gates (REMOTE_NO, D7's level). ponytail: a message queued behind another's ask runs with that one's // Laki's own AI (yours: its text in your prompts' history): its tools call this API here; from: whoCalls'
   aiUnqueue: p => aiUnqueue(p), // a message sent while it answered, taken back before it goes
   aiState: ({ from, ...p }) => (core.agentCaller(from) ? { ...aiState({ chat: agentChat(String(from.tab)) }), calls: [], totals: aiTotals([]) } : aiState(p)), // an agent's: its own chat (S2), not yours, your calls or what they cost; chat: a spec's or brainstorm's (planChat), else the AI page's
@@ -830,7 +854,7 @@ const remoteNo = (method: string, p: any) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'secretKeep', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetStore', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'tabUnbox', 'projectNetAllow', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
+const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'secretKeep', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm', 'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetStore', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart', 'tabUnbox', 'projectNetAllow', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew', 'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave', 'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'flowTrashTidy', 'flowTick', 'prViewed', 'aiImage', 'sideState', 'studioChats', 'skillSet', 'accountAdd', 'accountLogin', 'accountSet', 'tabSleep', 'passkeyOptions', 'passkeyRegister', 'passkeyChallenge', 'passkeyUnlock', 'passkeyPin'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 // S5: OPEN: what any caller may call, as it is (reads of the view and of a workspace's own facts, the ticks tests move,
 // a connection's own view and size, the hook: hookWho's). Every method of api is in FROM, CALLER or OPEN, checked as
@@ -1263,6 +1287,8 @@ const ANSWER: Record<string, true | ((p: any) => string)> = {
   flowTrustDiff: true, // the trust sheet's diff: it reads
   askExplain: true, // the ? on an ask's card, from the phone too: it reads, it answers nothing
   reviewSteps: true, // R13: Walk through, from the phone too: it reads the diff, it changes nothing
+  artifactHosts: true, // S18: the viewer's bar on the phone too
+  artifactAllow: true, // S18: Allow for this report, from the phone's viewer (Always is settingsSet's, gated as it is)
   aiCredits: true, // Usage's OpenRouter part, from the phone too
   keptList: true,
   agentVersions: true,

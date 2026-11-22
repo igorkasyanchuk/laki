@@ -1,4 +1,5 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type ArtBlocked, artSay } from '../../shared/artHosts'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
@@ -2059,16 +2060,45 @@ function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undef
 // page loads again
 // wt: View as page, a worktree's HTML file: said so, Back instead of Close, and Reload (stamp is the HTML file's: a
 // change to its CSS or script alone loads nothing again). A Markdown one: Outline, its headings
-export function ArtifactView({ path, page, read, stamp, wt, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
+// hosts, allow (S18): what its CSP blocked (the daemon's artifactHosts), a bar with Allow for this report, Always allow
+// and Keep blocked; an allow loads it again
+export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; hosts?: () => Promise<{ blocked: ArtBlocked[] }>; allow?: (hosts: string[], always: boolean) => Promise<unknown>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
   useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path, n])
+  const [blocked, setBlocked] = useState<ArtBlocked[]>([])
+  const [kept, setKept] = useState(false) // Keep blocked: the bar gone while it's open
+  const [allowing, setAllowing] = useState(false)
+  useEffect(() => void (html && page && hosts?.().then(r => setBlocked(r.blocked), () => setBlocked([]))), [path, n, !!page])
+  const allowIt = (always: boolean) => {
+    if (!allow || allowing) return
+    setAllowing(true)
+    allow(blocked.map(b => b.host), always).then(() => setN(x => x + 1), () => {}).finally(() => setAllowing(false))
+  }
   useChanged(stamp, path, 1500, () => setN(x => x + 1))
   const [menu, openMenu] = useMenu()
   return (
     <Modal title={path} onClose={onClose} wide loose>
       {menu}
+      {html && page && blocked.length > 0 && !kept && (
+        <div className="art-hosts small" role="status">
+          <span className="grow">This page wants to load from the network: {artSay(blocked)}</span>
+          {allow && (
+            <>
+              <button type="button" className="primary" disabled={allowing} onClick={() => allowIt(false)}>
+                Allow for this report
+              </button>
+              <button type="button" disabled={allowing} onClick={() => allowIt(true)} data-tip="Every report may load from it: Settings › General › Storage lists it">
+                {blocked.length === 1 ? `Always allow ${blocked[0].host}` : 'Always allow these'}
+              </button>
+            </>
+          )}
+          <button type="button" onClick={() => setKept(true)}>
+            Keep blocked
+          </button>
+        </div>
+      )}
       <div className="art-big">
         {html ? (
           page ? <iframe key={n} className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>

@@ -3,6 +3,7 @@
 // modules that import it and that it imports: hosts, pr, files, remote, resources, artifacts, meters, phone,
 // schedule (main.ts and the others import each directly, not through core.ts). None of the modules in this cycle
 // reads another's const or let as it loads (test/load-order.test.ts); the data folder is dir.ts', out of it.
+import { artHostOk } from '../shared/artHosts.ts'
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
@@ -2806,6 +2807,7 @@ export function settingsSet(o: Settings, own = false) {
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
   if (o.aiEndpoint) o = { ...o, aiEndpoint: String(o.aiEndpoint.url ?? '').trim() ? { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } : undefined } // https, or http on this Mac; no credentials. No URL: none
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
+  if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)

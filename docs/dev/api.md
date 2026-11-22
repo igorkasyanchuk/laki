@@ -147,6 +147,12 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `test/uninstall.test.ts`;
 - W10, a workflow shared as a clean file (shared/workflow.ts `flowPortable`, `portableInputs`, `portableFill`, `flowSummary`): `flowExport` (a workflow's ref: `{ name, id, text, changes, inputs }`: a header comment with the Laki, `PORTABLE_V` and the inputs; secrets by shared/secrets.ts' shapes (and any URL token) as `{{secret_n}}`, paths under the project's folder or home `{{root}}`-relative (no project's: the home folder's, `{{home}}`), a project's id or name `{{project}}`, a profile of Settings' in an `agent:` line `{{profile}}` with its agent kind; no name the file uses already), `flowImport` (`text`: its `name`, `inputs`, `summary`, `problems`; a parse problem throws `not a workflow Laki reads: …`; nothing saved or run), `flowImportSave` (`text`, `inputs`: each filled (a project's id: its name; a profile of that agent; a root and home a full path; one line each), parsed, saved as yours by its name's slug, then `flowPause` off: `imported: …`). The user's (AGENT_NO); a phone may export and read, not save (REMOTE_NO); the page's ⋯ › *Share…* and New › *Import…*, `laki flow export|import`;
 - `flowWaitEnd` (`id`, `act`: `continue` or `cancel`): a workflow run waiting for a time (W9, a wait block's `timer`) goes on now by pass, or stops; the user's and a phone's, never an agent's (AGENT_NO) nor an answer-level page's;
+- Artifacts' network (S18, shared/artHosts.ts; main.ts `artifactPage`'s CSP): `artifactHosts { ws, path, wt? }` (an HTML
+  page's https hosts its CSP blocks, `{ blocked: { host, loads: { script?, style?, font?, image?, media? } }[], allowed }`,
+  read from the file as it would be served) and `artifactAllow { ws, path, wt?, hosts }` (*Allow for this report*: names
+  on the internet only, `artHostOk`, 50 at most; kept in memory by page, 500 pages, until the daemon restarts); both in
+  FROM, `AGENT_NO` (an agent's page can't widen its own CSP), `REMOTE_OK` and answer level (the phone's viewer). Always:
+  `settingsSet { artifactHosts }` (names only, lowercased, once, 200; `AGENT_SETTINGS_NO`).
 - Backup and restore (dataBackup.ts; Settings › General › Backup's `BackupField`, `laki backup`, `laki restore <file.tgz>`):
   `dataBackup` (`file`, a full path, never one already there): the system's `tar -czf`, the archive 0600: `manifest.json`
   first (`laki`, `stateV`: core.ts' `STATE_V`, `made`, `counts`), then `state.json` (the state in memory, without

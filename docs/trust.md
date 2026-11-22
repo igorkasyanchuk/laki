@@ -77,6 +77,9 @@ These appear in Laki's source as links you click, text shown to you, samples or 
 - The UI kit's and starters' sample data: `linear.app`, `vercel.com`, `sentry.io`, `picsum.photos`,
   `opengraph.githubassets.com`, `status.example.com`, `staging.example.com`, `dash.example.com`, `api.example.com`,
   `api.acme.com`, `shop-git-fix.vercel.app`.
+- A report's page in the artifacts viewer may load scripts, styles and fonts from `cdnjs.cloudflare.com`,
+  `cdn.jsdelivr.net` and `unpkg.com`, and any host you allow on its bar: the page asks them, in its sandbox, not Laki.
+- The UI smoke test's page: `pics.invalid` (a reserved name that never resolves).
 
 ## No account, no telemetry
 

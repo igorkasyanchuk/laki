@@ -81,7 +81,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const mark = () => void w.webContents.executeJavaScript("document.documentElement.dataset.smoke = ''").catch(() => {})
   w.webContents.on('dom-ready', mark)
   mark()
-  w.webContents.on('console-message', (_e, level, message) => void (level >= 3 && errors.push(message)))
+  w.webContents.on('console-message', (_e, level, message) => void (level >= 3 && !/^Loading the image 'https:\/\/pics\.invalid\/.*Content Security Policy/.test(message) && errors.push(message))) // S18: view-as-page's outside picture, blocked on purpose
   const js = <T>(code: string) => w.webContents.executeJavaScript(code, true) as Promise<T>
   const has = (sel: string) => js<boolean>(`!!document.querySelector(${JSON.stringify(sel)})`)
   const click = (sel: string) => () => js(`document.querySelector(${JSON.stringify(sel)})?.click()`)
@@ -353,7 +353,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       mkdirSync(join(d.path, 'emails'), { recursive: true })
       writeFileSync(join(d.path, 'emails/mail.css'), 'body { font: 16px sans-serif; padding: 40px } h1 { color: rgb(1, 2, 3) }')
       writeFileSync(join(d.path, 'emails/mail.js'), 'document.title = "ran"; document.querySelector("p").textContent = "Its script ran."')
-      writeFileSync(join(d.path, 'emails/welcome.html'), '<link rel="stylesheet" href="mail.css"><h1>Welcome to Shop</h1><p></p><script src="mail.js"></script>')
+      writeFileSync(join(d.path, 'emails/welcome.html'), '<link rel="stylesheet" href="mail.css"><h1>Welcome to Shop</h1><p></p><script src="mail.js"></script><img src="https://pics.invalid/hero.png" alt="">')
       writeFileSync(join(d.path, 'PLAN.md'), '# Dark mode plan\n\n## Goals\n\nShip it.\n\n### Colors\n\nTokens first.\n\n<h2>Rollout</h2>\n\nBehind a flag.\n')
       await click(row(d.id))()
       if (!(await has('[role=tab][aria-label="Changes"]'))) await js("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', metaKey: true, altKey: true, bubbles: true, cancelable: true }))")
@@ -364,8 +364,10 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('iframe.art-frame[src*="/worktree/"]'), 'the frame')
     }, async () => {
       const f = w.webContents.mainFrame.framesInSubtree.find(f => f.url.includes('/worktree/'))
-      return !!f && (await hasText('.modal button', 'Reload')) && (await f.executeJavaScript('document.title === "ran" && getComputedStyle(document.querySelector("h1")).color === "rgb(1, 2, 3)"').then(Boolean, () => false))
+      return !!f && (await hasText('.modal button', 'Reload')) && (await f.executeJavaScript('document.title === "ran" && getComputedStyle(document.querySelector("h1")).color === "rgb(1, 2, 3)"').then(Boolean, () => false)) && (await hasText('.art-hosts', 'pics.invalid (1 image)')) // S18: its outside picture blocked, the bar says so
     }],
+    // S18: Allow for this report: the bar gone, the page loaded again with the host (.invalid: no request leaves)
+    ['art-allow', () => clickText('.art-hosts button', 'Allow for this report'), async () => !(await has('.art-hosts')) && (await has('iframe.art-frame[src*="/worktree/"]'))],
     ['view-as-page-back', () => clickText('.modal button', 'Back'), async () => !(await has('iframe.art-frame'))],
     // Outline: a Markdown file in Files, its headings under Go to heading…, a raw <h2> among them
     ['outline', async () => {

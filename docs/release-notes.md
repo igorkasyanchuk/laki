@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A report opened in Laki's viewer can't send what it knows to a host of its choosing: it loads scripts from cdnjs, jsDelivr and unpkg (Chart.js works as before) and pictures from its own folder, and a bar names any other host it wanted, with *Allow for this report*, *Always allow* and *Keep blocked*.
 - An extension's URL source can't be redirected to this Mac or your network: a host other than `localhost` (your own service, read as before) must be https on the internet, and so must every redirect it gives.
 - The Review tab and the Ship sheet mark a file to read with care (a migration, auth, a lockfile, deletes) after its name, from the diff alone, Laki AI on or off; *Read with care (n)* over the Review tab's files shows only those.
 - Ship's top line: *Update from main* when the branch is behind (merged in, or its agent asked to when it conflicts), the sheet staying open; *N overlaps* opens Check overlaps over it.

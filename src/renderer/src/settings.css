@@ -1,0 +1,4 @@
+/* the Settings page's own rules (it loads as it opens: out of the window's first load, npm run size) */
+/* S18: Settings › General › Storage: the hosts the artifacts viewer's Always allow added */
+.art-hosts-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
+.art-hosts-list .chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 1px var(--sp-2) 1px var(--sp-4); border-radius: var(--r-pill); background: var(--sel); font-size: var(--fs-2); }

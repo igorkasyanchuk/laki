@@ -35,6 +35,7 @@ import { readerJump } from './Reader'
 import { type ComponentType, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
+import type { ArtBlocked } from '../../shared/artHosts'
 // D9: Settings › Remote access › Activity's (one function: its effect loads once per open)
 const remoteLog = () => api.call<{ at: number; device?: string; line: string }[]>('remoteLog')
 
@@ -667,6 +668,11 @@ export function Pages({ app }: { app: AppCtx }) {
           page={artPage(w, artView.path, artView.wt)}
           read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: !artView.wt })}
           stamp={() => api.call<{ size: number; at?: number }>('fileRead', { ws: w.id, path: artView.path, storage: !artView.wt, stat: true })}
+          {...(hasCap(view, 'art.hosts') && {
+            hosts: () => api.call<{ blocked: ArtBlocked[] }>('artifactHosts', { ws: w.id, path: artView.path, wt: !!artView.wt }),
+            // Always: the setting too (every report), then this one's allow, so it loads with them now
+            allow: async (hosts: string[], always: boolean) => (always && (await call('settingsSet', { artifactHosts: [...new Set([...(settings.artifactHosts ?? []), ...hosts])] })), api.call('artifactAllow', { ws: w.id, path: artView.path, wt: !!artView.wt, hosts })),
+          })}
           {...(artView.wt
             ? { wt: true, onExternal: bridge?.openExternal && (() => bridge!.openExternal!(artPage(w, artView.path, true)!)) } // View as page: the worktree's file; the browser for its devtools
             : { onExternal: bridge?.openPath && (() => inBrowser(w, artView.path)), onFile: asFile(w, artView.path), onReveal: bridge?.openPath && (() => revealArt(w, artView.path)) })}

@@ -2713,7 +2713,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   General › Storage) they're always deleted. None for Terminals, Browsers and SSH hosts.
   An HTML or Markdown file opens in a viewer over the app (*Open HTML and Markdown artifacts*: *In Laki*, the default, or
   *In the browser*): HTML sandboxed, its scripts run and the CSS and pictures beside it load, it can’t read Laki or your files; Markdown
-  rendered; with *Open in the browser* and *Show in Finder*. *In the browser*, and every *Open in the browser*
+  rendered. It loads scripts, styles and fonts from cdnjs, jsDelivr and unpkg (Chart.js and the like work), and nothing
+  else from the network until you say so: a bar over the page names the hosts it wanted and what (*This page wants to
+  load from the network: i.imgur.com (2 images)*), with *Allow for this report* (until Laki restarts), *Always allow*
+  (every report: Settings › General › Storage lists them, each with ×) and *Keep blocked*; the phone's viewer too; with *Open in the browser* and *Show in Finder*. *In the browser*, and every *Open in the browser*
   (the viewer's, the gallery's, a right click's), open an HTML one as Laki's sandboxed page of it, never the file itself.
   That page can `fetch()` the files beside it (a report's JSON), nothing from the internet. *Open file* (the viewer's, a
   right click's *Open the file*) opens the file itself, `file://`, in your browser: your call, as its scripts then run
