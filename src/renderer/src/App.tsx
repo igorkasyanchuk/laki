@@ -49,7 +49,7 @@ import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, role
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, csWord, initials, isStale, limitsCrossed, limitText, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, pendingWords, csWord, initials, isStale, limitsCrossed, limitText, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, paintTheme, css, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
@@ -57,7 +57,7 @@ import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, Usage
 import { BgButton } from './BgTasks'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
-import { MidText, Num, type Toast, Toasts, morph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { MidText, Num, Toasts, morph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -65,9 +65,10 @@ import { onKey } from './keydown'
 import { layoutOf, TabBar, TabStrip } from './TabBar'
 import { sideOf, Sidebar } from './Sidebar'
 import { Dialogs, Pages, PRELOAD } from './Dialogs'
-import { AiFloat, BarChoices, FabCorner, KeyBar, LESS, MORE, NARROW, PeekGlow, PinForm, shownWhole, SMALL, SYS_DARK, TOUCH, UnlockForm } from './AppParts'
-import { AWAY, toolLine, toolOn, toolShow } from './AppParts'
+import { AiFloat, BarChoices, FabCorner, KeyBar, LESS, MORE, NARROW, PeekGlow, PinForm, SMALL, SYS_DARK, TOUCH, UnlockForm } from './AppParts'
+import { AWAY, toolOn, toolShow } from './AppParts'
 import { useDaemon } from './useDaemon'
+import { askTool, useToasts } from './AppParts'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -235,11 +236,7 @@ export function App() {
   const { notices, answer: answerNotice } = useNotices() // laki notice's cards, in the same corner
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
-  const [notes, setNotes] = useState<Toast[]>([]) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one (ui.tsx Toasts: several stack)
-  const noteN = useRef(0)
-  const note = notes.length > 0
-  // a busy one (an action running) or none: the busy one goes, a new one comes with no timer of its own
-  const setNote = (n: Omit<Toast, 'id' | 'at'> | null) => setNotes(l => [...l.filter(x => !x.busy), ...(n ? [{ ...n, id: ++noteN.current, at: Date.now() }] : [])])
+  const { notes, setNotes, note, setNote, toast, done, fail } = useToasts()
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
@@ -875,14 +872,6 @@ export function App() {
     fit()
     return () => ro.disconnect()
   }, [])
-  // err: an error's (V2: the red edge only for those)
-  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean, ms?: number) => {
-    const id = ++noteN.current
-    setNotes(l => [...l.filter(x => !x.busy && x.text !== text), { id, at: Date.now(), text, undo, label, ok, err }]) // the same words again: once, its timer anew
-    setTimeout(() => setNotes(l => l.filter(x => x.id !== id)), ms ?? (undo ? 8000 : 6000)) // each its own
-  }
-  const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
-  const fail = (e: unknown) => toast((e as Error).message, undefined, undefined, false, true)
   // a picture in a viewer (a terminal link's card and its larger view, the file preview, Changes' zoom, the artifacts'
   // and Laki AI's big views): its right click copies it, unless the viewer has a menu of its own
   useEffect(() => {
@@ -2126,101 +2115,7 @@ export function App() {
       return !!made
     }
   }
-  // an extension's tool an agent calls (widgetToolCall): what would run, asked here and as a notification; the first
-  // answer counts (widgetToolAnswer), Esc denies. Always: in this workspace from now on, for a tool that asks first
-  toolAsk.current = m => {
-    if (toolLine.has(m.req)) return // sent again as the socket came back (widgetAsks)
-    type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
-    const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
-    if (m.ev === 'termAsk') {
-      // S1: a laki command from a terminal Laki hasn't seen (main.ts' termAsk): yours once you allow it, once per terminal
-      const title = 'Allow this terminal to act as you?'
-      const picks: Pick[] = [{ label: 'Allow this terminal', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, `${m.cmd} on ${m.tty}`, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `A laki command came from a terminal Laki hasn't seen: ${m.tty}, started by ${m.cmd} (${(m.chain ?? []).join(' ‹ ')}).\n\nAllow it if you just ran laki there. An agent that left its tab looks the same: Deny if you didn't. Asked once per terminal, and again after 12 hours with no call (Settings › Security › Terminals).`, picks, answer: allow => void api.call('termAnswer', { req: m.req, allow: allow === 'once' }).catch(() => {}) })
-      return toolShow()
-    }
-    if (m.ev === 'clientAsk') {
-      // T1: laki client add or rotate (main.ts' clientAsk): a token an app outside Laki drives it with, until revoked. No
-      // Allow on the notification: read here first
-      const title = m.what === 'rotate' ? `Give ${m.label} a new token?` : `Let ${m.label} drive Laki?`
-      const picks: Pick[] = [{ label: m.what === 'rotate' ? 'New token' : 'Allow', allow: 'once' }, ...(m.never ? [{ label: 'Allow, never expires', allow: 'always' as const }] : []), { label: 'Deny', allow: 'deny' }]
-      notify(title, 'Open Laki to see what it may do', '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `laki client ${m.what} asks for a token an app outside Laki uses to act as you, within:\n\n${(m.scopes ?? []).map((x: string) => `• ${x}`).join('\n') || '• reads only'}\n\n${m.projects ? `In ${m.projects.join(', ')} only.` : 'In every project.'}\n\nAt most ${m.limits}. Its token ends in ${m.days} days${m.never ? ' (or never, if you pick that)' : ''}; laki client rotate renews it.\n\nIt goes to ${m.file} (yours alone), until laki client revoke. Allow it only if you just ran laki client ${m.what} yourself.`, picks, answer: allow => void api.call('clientAnswer', { req: m.req, allow: allow === 'once' || allow === 'always', never: allow === 'always' }).catch(() => {}) })
-      return toolShow()
-    }
-    if (typeof m.perm === 'string') {
-      // an extension's agent (its AI source or an AI action, claude -p) asking for a tool it may not use unasked: its
-      // input as lines, Always: in its runs from now on (its page lists them)
-      const tool = m.perm.replace(/^mcp__(.+?)__(.+)$/, '$2 ($1)')
-      const lines = Object.entries((m.input ?? {}) as Record<string, unknown>).map(([k, v]) => `${k}: ${(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 300)}`)
-      const title = `${m.name} wants to use ${tool}`
-      const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always for ${m.name}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      // Allow from the notification only when it shows the whole input as it is (noteWhole; a value past 300 is cut, so
-      // that one's over too)
-      const said = lines.join(' · ')
-      notify(title, noteCut(said) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, !noteWhole(said) ? undefined : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
-      toolLine.add({ req: m.req, title, text: `${lines.length ? `${lines.join('\n')}\n\n` : ''}Its agent asks while it works in the background. Always: it uses ${m.perm} unasked from now on (Revoke on its page). Deny: it goes on without it.`, picks, answer })
-      return toolShow()
-    }
-    if (m.cross === 'preset') {
-      // an agent's laki preset (main.ts' presetAsk): the profile as it would be; once only
-      const title = `${m.agent} in ${m.from} wants to ${m.target}`
-      const picks: Pick[] = [{ label: 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      // no Allow on the notification: it can't show the profile, and one click could add a mode that never asks
-      notify(title, 'Open Laki to see what changes', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `Every tab started on it runs with its args and env.\n\n${m.text}`, picks, answer })
-      return toolShow()
-    }
-    if (m.cross === 'remove') {
-      // an agent's laki rm (main.ts' rmAsk): a workspace, a project or a scheduled task; once only, read in the dialog
-      const title = `${m.agent} in ${m.from} wants to ${m.target}`
-      const picks: Pick[] = [{ label: 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, String(m.text ?? ''), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: String(m.text ?? ''), picks, answer })
-      return toolShow()
-    }
-    if (m.cross === 'expose') {
-      // S7: an agent's Expose to the world (main.ts' exposeAsk): who and how long in the text; once only
-      const title = String(m.target ?? 'Expose a port to the world?')
-      const picks: Pick[] = [{ label: 'Expose it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, `${m.agent} in ${m.from} asks`, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-      toolLine.add({ req: m.req, title, text: `${m.agent} in ${m.from} asks for a public address.\n\n${m.text ?? ''}`, picks, answer })
-      return toolShow()
-    }
-    if (m.cross === 'cmd') {
-      // an agent's command in a new terminal tab (main.ts' cmdAsk: laki tab --cmd, laki new --tab): once only
-      const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`
-      const picks: Pick[] = [{ label: 'Run it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      const cmd = String(m.text ?? '')
-      // Run it from the notification only when it shows the whole command (shownWhole); any other is read in the dialog
-      notify(title, noteCut(cmd), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, shownWhole(cmd) ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
-      toolLine.add({ req: m.req, title, text: `In a new terminal tab of ${m.to}, as you: the agent's own permission prompts don't see it.\n\n$ ${m.text}`, picks, answer })
-      return toolShow()
-    }
-    if (m.cross) {
-      // an agent's send or screen into another workspace's tab (main.ts' crossAsk): what it sends, or that it reads; an
-      // event for another workspace (emit): its workflows and extensions run there
-      const send = m.cross === 'send'
-      const emit = m.cross === 'emit'
-      const title = emit ? `${m.agent} in ${m.from} wants to send ${m.target} to ${m.to}` : `${m.agent} in ${m.from} wants to ${send ? 'send to' : 'read'} ${m.target} in ${m.to}`
-      const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always from ${m.from} to ${m.to}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      const said = String(m.text ?? '')
-      // Allow from the notification only when it shows all of what goes (shownWhole); any other is read in the dialog
-      const whole = !(send || emit) || shownWhole(said)
-      notify(title, send || emit ? noteCut(said) : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, whole ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
-      toolLine.add({ req: m.req, title, text: `${emit ? `An event: the workflows and extensions listening in ${m.to} would run there, with this:\n\n${m.text}` : send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
-      return toolShow()
-    }
-    const where = m.ws ? (view?.workspaces.find(w => w.id === m.ws)?.name ?? m.ws) : ''
-    const title = `${m.agent || 'An agent'} wants to run ${m.name}: ${m.action}`
-    const input = m.input && Object.keys(m.input).length ? `\n\nInput: ${JSON.stringify(m.input)}` : ''
-    const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, ...(m.ask === 'first' ? [{ label: where ? `Always in ${where}` : 'Always', allow: 'always' } as Pick] : []), { label: 'Deny', allow: 'deny' }]
-    // its click: the window, this ask on screen (the one there back in line)
-    notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
-    toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
-    toolShow()
-  }
+  toolAsk.current = m => askTool(m, view, settings)
   // a repo's extension (or one in a folder an agent linked) turned on: what it runs, the settings it needs, what it can
   // hold; the files hash shown, or none
   // a repo's .laki.json not trusted as it is (cfgWait): its text, then Trust; meanwhile its setup, scripts and env wait

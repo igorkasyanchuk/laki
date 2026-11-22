@@ -5,7 +5,7 @@
 import type { AppInfo } from './Settings'
 import type { Call } from '../../shared/api'
 import { type Dialog, wsName } from './appCtx'
-import { type Dispatch, type SetStateAction, useEffect, type RefObject } from 'react'
+import { type Dispatch, type RefObject, type SetStateAction, useEffect } from 'react'
 import { api, bridge, type Msg, notify, type NotifyAction, onLakiLink, passkeyReady, passkeys } from './api'
 import { NEEDS } from '../../shared/tray'
 import { aiOn, type NotifyKind, type TabView, veiled, type View, type WorkspaceView } from '../../shared/types'
