@@ -1571,6 +1571,8 @@ test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one 
   assert.equal(confirmOf('scheduleSet', { preset: 'yolo', prompt: 'p', when: 'every day at 9am' }, cur), 'bypassNew', 'a scheduled task: each run starts it so')
   assert.equal(confirmOf('scheduleSet', { preset: 'calm' }, cur), undefined)
   assert.equal(confirmOf('scheduleSet', { id: 'ab12', on: false }, cur), undefined, 'a change that names no profile')
+  assert.equal(confirmOf('scheduleSet', { prompt: 'p', when: 'every day at 9am' }, { ...cur, agent: 'yolo' }), 'bypassNew', "a new one naming none: the default agent's")
+  assert.equal(confirmOf('scheduleSet', { prompt: 'p', when: 'every day at 9am' }, { ...cur, agent: 'calm' }), undefined)
   assert.equal(confirmOf('wsFan', { presets: ['calm', 'codex'] }, cur), undefined)
 })
 

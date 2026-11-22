@@ -216,7 +216,7 @@ export function agentDays(tab: Tab, cwd: string, now = false): { id: string; day
   }
   if (size < AGY_BIG) return (days => (days ? { id, days } : was()))(keep(agyRead(f, from)))
   seen.set(tab.id, { ...(c ?? { key: '' }), at: Date.now(), reading: true })
-  void agyWorker(f, from).then(keep)
+  void agyWorker(f, from).then(r => seen.has(tab.id) && keep(r)) // the tab closed meanwhile (agentDaysTidy): not kept
   return was()
 }
 export const agentDaysTidy = (live: (id: string) => boolean) => { for (const id of seen.keys()) if (!live(id)) seen.delete(id) }

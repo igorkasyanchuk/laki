@@ -17,10 +17,10 @@ import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
 import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state, storageOf } from './core.ts'
+import { broadcast, cliArgv, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
 import { diff } from './files.ts'
 import { type HunkRef, hunksOf, type Walk, walkCheck, walkFold, walkInput, walkPrompt, WALK_SYSTEM } from '../shared/walk.ts'
-import { dir } from './dir.ts'
+import { dir, walkFile } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 import { execGroup, own } from './resources.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -974,12 +974,11 @@ export function explainOf(text: string): AskExplained | undefined {
 // uncommitted's against HEAD) in 3 to 7 steps by one aiOnce (no tools; logged with its cost among Laki AI's calls),
 // only on the user's click (gates.ts: it spends their AI money). The model reads WALK_MAX of it (cut: said so); its answer
 // is checked strictly (walkCheck), then every hunk is in exactly one step (walkFold: the missed ones in Everything
-// else). Kept by the diff's hash in the workspace's storage folder (.laki-walk.json, the last 8) and in memory (a host's
-// workspace has no storage folder); again: asked anew; kept: only a kept one, else null (no call: the tab opening). A
-// failure isn't kept
+// else). Kept by the diff's hash in <data>/review-walks/<ws>.json (dir.ts walkFile: the last 8; not the storage folder,
+// which its agents write: they'd write the walk of their own change) and in memory; again: asked anew; kept: only a kept
+// one, else null (no call: the tab opening). A failure isn't kept
 const walks = new Map<string, Promise<Walk>>()
-// a kept one from the storage folder (an agent can write there): checked as an answer is and folded on this diff's
-// hunks again, else none
+// a kept one from its file: checked as an answer is and folded on this diff's hunks again, else none
 const walkKept = (w: Walk | undefined, all: HunkRef[]): Walk | undefined => {
   const steps = w && typeof w === 'object' && typeof w.hash === 'string' && Number.isFinite(w.at) && Array.isArray(w.steps) ? walkCheck(JSON.stringify({ steps: w.steps.filter(s => !s?.rest) }), 1) : undefined // 1: a step the fold emptied is gone, so fewer than 3 is fine here
   return steps && { steps: walkFold(steps, all), hash: w!.hash, at: w!.at, ...(w!.cut === true && { cut: true }) }
@@ -994,8 +993,7 @@ export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?
     throw new Error('no changes to walk through')
   }
   const hash = createHash('sha256').update(`walk 1\0${d.diff}`).digest('hex').slice(0, 32)
-  const store = storageOf(ws)
-  const file = store && join(store, '.laki-walk.json')
+  const file = walkFile(ws.id)
   if (!p.again || p.kept) {
     const kept = walks.get(hash) ?? (file ? walkKept(readJson<Record<string, Walk>>(file)?.[hash], all) : undefined)
     if (kept || p.kept) return kept ?? null
@@ -1006,6 +1004,7 @@ export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?
     if (!steps) throw new Error("Laki AI's answer wasn't a walk-through: try again")
     const out: Walk = { steps: walkFold(steps, all), hash, at: Date.now(), ...(w.cut && { cut: true }) }
     if (file) {
+      mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
       const had = Object.entries(readJson<Record<string, Walk>>(file) ?? {}).filter(([k]) => k !== hash)
       writeAtomic(file, JSON.stringify(Object.fromEntries([...had.slice(-7), [hash, out]])), 0o600)
     }

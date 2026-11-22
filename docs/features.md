@@ -50,7 +50,8 @@ time and AI money per run (`budget: 60 min, $5`).
   an MCP tool's app (MCP Apps) shows under its call, and a `laki-ui` block in an answer is drawn with Laki's own
   controls (a table, stats, choices you click to answer).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
-  window and the plan limits come from Claude itself; your own status line still shows.
+  window and the plan limits come from Claude itself; your own status line still shows. Numbers older than 20 minutes
+  are dimmed and say how old, with *Ask api.anthropic.com* beside them for the current ones.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
   beside each plan's limits and Laki AI's OpenRouter credits and spend (an amber dot when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
@@ -110,7 +111,8 @@ time and AI money per run (`budget: 60 min, $5`).
   this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
   a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
   every app; an emulator it starts has no window but Laki's. A *Review* tab puts every changed file's diff in one page, with comments gathered and
-  posted as one PR review. One-click layouts put the agent beside the preview, the diff or a shell.
+  posted as one PR review; its *Walk through* (Laki AI) puts the changes in 3 to 7 steps to read in order, marking
+  what to read with care. Diffs come *Filled* or *Quiet* (the code's own colors on a light tint; Settings › Appearance). One-click layouts put the agent beside the preview, the diff or a shell.
 - **Expose to the world**: a dev server's port as a public link (Cloudflare), for anyone or only some emails; it
   comes back if cloudflared drops, and with your own Cloudflare domain keeps an address like `shop.example.com`.
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in

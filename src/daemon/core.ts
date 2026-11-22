@@ -23,7 +23,7 @@ import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../s
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
-import { DATA_SECRETS, dir, flowTrustDrop, inRig } from './dir.ts'
+import { DATA_SECRETS, dir, flowTrustDrop, inRig, walkFile } from './dir.ts'
 import { STARTER_DROPPED } from './starterEnv.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
@@ -3751,6 +3751,8 @@ function dropWs(ws: Workspace) {
   prs.delete(ws.id)
   if (ws.codespace !== undefined) csGone(ws)
   if (/^[\w.-]+$/.test(ws.id)) rmSync(notesFile(ws.id), { force: true }) // R10: its unsent review comments
+  const walks = walkFile(ws.id)
+  if (walks) rmSync(walks, { force: true }) // R13: its Walk throughs
   agentLogDrop(ws.id) // what its agents did (agentLog.ts)
 }
 

@@ -246,7 +246,9 @@ async function up(again = true, tries = 0, start = true): Promise<void> {
     // another daemon still connected: the one before this, on its way out (laki stop --keep, an update, a crash), whose
     // connection ends a moment after its daemon.json goes; two never live at once (the data folder's lock), so 3 s of
     // tries. Or a host that just started and hasn't written its secret yet: the next try reads it
-    if (tries < 30) return void ((sock = undefined), s.destroy()), sleep(100).then(() => up(again, tries + 1, start))
+    sock = undefined // turned away: never taken for a connection (regain would think it back)
+    s.destroy()
+    if (tries < 30 && start) return sleep(100).then(() => up(again, tries + 1, start)) // regain's (start false): not its 3 s, GRACE's own tries go on
     throw new Error('the pty host turned this daemon away (another one is connected)')
   }
   hostPid = h.pid ?? 0

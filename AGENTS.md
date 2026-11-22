@@ -206,7 +206,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
 | `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links, kept in its `.laki-links.json` (`.url` files moved in) |
 | `src/daemon/meters.ts` | transcripts read as they grow: the context and usage meters, today's spend; the Reader's chat (`chatRead`), its background tasks and MCP calls |
-| `src/daemon/agentUsage.ts` | Grok's and Antigravity's chats by day and model, read only from their own files (Grok's `usage.json`, agy's conversation DB through node's sqlite): the Usage page's and Today's rows |
+| `src/daemon/agentUsage.ts` | Grok's and Antigravity's chats by day and model, read only from their own files (Grok's `usage.json`, agy's conversation DB through node's sqlite: cloned, only its new steps read, past 32 MB in a worker, `agyWorker.ts`): the Usage page's and Today's rows |
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
@@ -269,6 +269,7 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/appCtx.ts` | what App's parts read of App: `AppBase` (a field per App local they use; App builds `appBase` each render after `if (!view)`), the `Dialog` type, small helpers they share. No state, no hooks: those stay in App |
 | `src/renderer/src/menus.ts` | `menusOf`: the ⋯ and right-click menus of a workspace (`wsMenu`), a tab (`tabMenu`), a file (`fileMenu`) and a project (`projectActions`), and the sidebar's *Show ›* (`showItems`) |
 | `src/renderer/src/menuModel.ts` | Menus: macOS: Laki's menu items as a plain list for main's `menu-popup` (guards.ts `menuModelOk` checks it), colors as a submenu, each run by its id |
+| `src/renderer/src/viewShare.ts` | a `state` event's view sharing the last one's objects where nothing changed (by id and JSON), so ui.tsx' `Kept` rows, tabs and panes draw again only where something did |
 | `src/renderer/src/snapshot.ts` | the start-up snapshot (`snapshotOf`, `snapOf`): the last layout's names and widths, no Private rows, 20 KB; panels.tsx `SnapSkeleton` draws it |
 | `src/renderer/src/color.ts` | P3 colors: hex ↔ OKLCH, `inP3`, `p3Boost` (themes.ts' `p3Sheet`) |
 | `src/renderer/src/keydown.ts` | `onKey`: App's keys in the capture phase (Settings › Keys' `bound`, an extension action's key, the fixed `act` map: ⌘1…⌘9, ⌘↑ ⌘↓, ⌘O, ⌘E, ⌘D, zoom); App's listener calls it once there's a view |

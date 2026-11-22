@@ -44,7 +44,11 @@ export function confirmOf(method: string, p: P, cur: Cur = {}): ConfirmWhat | un
     return (p.kind ? neverAsks(String(p.preset), typeof p.perm === 'string' ? p.perm || undefined : undefined) : startsBypassed(String(p.preset), p.perm, cur)) ? 'bypassNew' : undefined
   }
   // a scheduled task on a profile that never asks: each run starts it so (schedule.ts' wsNew and addTab, no ticket then)
-  if (method === 'scheduleSet' && typeof p?.preset === 'string' && p.preset) return startsBypassed(p.preset, undefined, cur) ? 'bypassNew' : undefined
+  // a new one that names none (the CLI's laki schedule): the default agent, as schedule.ts' scheduleSet picks it
+  if (method === 'scheduleSet' && p) {
+    const preset = typeof p.preset === 'string' && p.preset ? p.preset : !p.id && !p.workflow && !p.widget ? (cur.agent && cur.presets?.some(x => x.name === cur.agent && x.agent !== 'command') ? cur.agent : 'claude') : ''
+    return preset && startsBypassed(preset, undefined, cur) ? 'bypassNew' : undefined
+  }
   if (method === 'wsFan' && Array.isArray(p?.presets)) return p.presets.some(x => startsBypassed(String(x), undefined, cur)) ? 'bypassNew' : undefined
   if (method === 'presetSave' && p?.set && typeof p.set === 'object') {
     const was = cur.presets?.find(x => x.name === String(p.name ?? ''))

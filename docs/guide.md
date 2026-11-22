@@ -1068,7 +1068,9 @@ its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
 the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows. Each shows when it resets. They come from what the agents report
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
-once a tab of that agent has run, with *As of* when they're older than 20 minutes. Laki asks no server for them unless
+once a tab of that agent has run. Older than 20 minutes, they're dimmed with *As of* and how old (what the agent used
+since, outside Laki too, isn't in them) and *Ask api.anthropic.com* (chatgpt.com for Codex) beside them, which turns
+that switch on and reads them again. Laki asks no server for them unless
 you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex, grok.com's for Grok) in Settings › Layout: undocumented endpoints that may break. Antigravity's come from agy's own `/usage` (it takes no turn and uses no quota; agy 1.1.11 or newer), each model group's 5-hour and weekly windows, unless you turn off *Ask agy for Antigravity's plan limits*. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen

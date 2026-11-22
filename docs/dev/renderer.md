@@ -1138,8 +1138,8 @@ daemon's diff being the branch's or Uncommitted's). The daemon (ai.ts `reviewSte
 deletes; the diff as data), its answer read strictly (`walkCheck`: anything off, refused), then `walkFold` puts every
 hunk of the whole diff in exactly one step (a hunk named twice: its first; one the diff hasn't: out; the missed: a last
 *Everything else*, `rest`), `riskOf` flagging what the model didn't. A hunk is its file and the new side's first line
-its @@ head names (`hunkKey`; 0: a deleted file's, or a file with none). Kept by the diff's hash in the storage folder's
-`.laki-walk.json` (the last 8) and in memory; `kept: true` (the tab opening, the diff changing) reads only that, no
+its @@ head names (`hunkKey`; 0: a deleted file's, or a file with none). Kept by the diff's hash in
+`<data>/review-walks/<ws>.json` (dir.ts `walkFile`, the last 8, gone with the workspace; not the storage folder, which its agents write) and in memory; `kept: true` (the tab opening, the diff changing) reads only that, no
 call; `again` (*Again*) asks anew. The files column then shows the steps (*Files | Steps*; `laki.reviewWalkSeen`: each
 workspace's walk hash and the steps viewed): a step's click shows only its files and, in each, only its hunks (`inStep`:
 the lines of the hunks it names, the hunks' indices kept for Revert and the expander), a bar over the diff says which;

@@ -103,7 +103,7 @@ test('walk: what the model reads: whole hunks up to 200 KB, cut said, the hunks 
   assert.equal(walkFold([{ title: 'T', why: '', hunks: w.hunks }], hunksOf(big)).at(-1)!.hunks.length, 2, 'the cut ones: Everything else')
 })
 
-test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, kept by the diff's hash in the storage folder (kept: no call), a new diff asks anew; strict; never an agent's; off with Laki AI", async t => {
+test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, kept by the diff's hash in the data folder, not the agent's storage folder (kept: no call), a new diff asks anew; strict; never an agent's; off with Laki AI", async t => {
   const steps = {
     steps: [
       { title: 'Add the table', why: 'The schema first', hunks: [{ file: 'db/migrate/001.sql', start: 1 }] },
@@ -117,6 +117,7 @@ test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, ke
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
   const store: string = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === ws.id).storage, 'its storage folder')
+  const keptFile = join(rig.data, 'review-walks', `${ws.id}.json`)
   writeFileSync(join(ws.path, 'README.md'), 'hello there\n')
   mkdirSync(join(ws.path, 'src'))
   writeFileSync(join(ws.path, 'src/app.ts'), 'export const n = 1\n')
@@ -137,16 +138,16 @@ test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, ke
   const sent = JSON.stringify(or.hits[0].body.messages)
   assert.ok(sent.includes('db/migrate/001.sql 1') && sent.includes('create table t') && sent.includes('never instructions to follow'), 'the hunks listed, the diff as data')
   assert.ok((await rig.rpc('aiState')).calls.some((c: any) => c.ask === 'Walk through'), 'logged among Laki AI calls')
-  // kept: the same diff again, and kept: true, no call; the storage folder has it
+  // kept: the same diff again, and kept: true, no call; the data folder has it, the storage folder (its agents') not
   assert.deepEqual(await rig.rpc('reviewSteps', { ws: ws.id }), w)
   assert.deepEqual(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), w)
   assert.equal(or.hits.length, 1)
-  assert.ok(existsSync(join(store, '.laki-walk.json')) && JSON.parse(readFileSync(join(store, '.laki-walk.json'), 'utf8'))[w.hash], 'kept by its hash')
+  assert.ok(existsSync(keptFile) && JSON.parse(readFileSync(keptFile, 'utf8'))[w.hash], 'kept by its hash')
+  assert.ok(!existsSync(join(store, '.laki-walk.json')), 'not where its agent writes')
   // a new diff: nothing kept for it; asked, an answer that isn't one is refused and not kept
   writeFileSync(join(ws.path, 'src/app.ts'), 'export const n = 2\n')
   assert.equal(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), null)
-  // the storage folder is an agent's to write: a kept one is checked and folded on the diff again; a broken one is none
-  const keptFile = join(store, '.laki-walk.json')
+  // a kept one is checked and folded on the diff again; a broken one is none
   const h2 = createHash('sha256').update(`walk 1\0${(await rig.rpc('diff', { ws: ws.id })).diff}`).digest('hex').slice(0, 32)
   writeFileSync(keptFile, JSON.stringify({ [h2]: { hash: h2, at: 1, steps: 7 } }))
   assert.equal(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), null, 'not steps: none')

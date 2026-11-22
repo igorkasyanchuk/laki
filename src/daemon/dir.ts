@@ -28,10 +28,12 @@ export const inRig = () => {
 // S6: what the data folder may hold that a sandboxed claude's Read tool never reads, there yet or not (hookFiles); globs:
 // state.json's dated backups and copies set aside, writeAtomic's temp files (<file>.<pid>-<hex>.tmp). Its Bash and the
 // wrapper sandbox (wrapCmd) hide the whole folder instead
-export const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'mcp', 'net-proxy.json', 'pty.json', 'pty.secret', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'agent-log', 'review-notes', 'background', 'daemon.log', 'flow-trust']
+export const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'mcp', 'net-proxy.json', 'pty.json', 'pty.secret', 'pty.sock', 'state.json', 'state.json.bak', 'state.json.*', 'state.json.tmp', '*.tmp', 'tap-key', 'ai-key', 'ai-endpoint-key', 'accounts', 'hooks', 'prompts.json', 'ai-chat.json', 'ai-chats', 'ai-agent-*.json', 'ai-calls.jsonl', 'inbox.json', 'notes', 'todo-list.json', 'secrets', 'turns', 'widget-data', 'widget-secrets.json', 'clients', 'clients.json', 'client-log', 'vapid.json', 'e2e-salts.json', 'remote-log.jsonl', 'remote-log.1.jsonl', 'agent-log', 'review-notes', 'review-walks', 'background', 'daemon.log', 'flow-trust']
 // laki backup's (dataBackup.ts): what of the data folder is yours to carry to another Mac; the rest (DATA_SECRETS'
 // keys, tokens and sign-ins, logs, temp files, the trash) stays out
 export const BACKUP_KEEP = ['state.json', 'notes', 'todo-list.json', 'plans', 'workflows', 'widgets', 'ai-chats', 'ai-chat.json', 'prompts.json', 'flow-trust']
+// R13: a workspace's Walk throughs (ai.ts reviewSteps), out of its agents' reach (the storage folder is theirs to write)
+export const walkFile = (ws: string) => (/^[\w.-]+$/.test(ws) ? join(dir, 'review-walks', `${ws}.json`) : undefined)
 // a project workflow's text as you allowed it (workflow.ts' trust), beside its hash in state.flowTrust: the trust
 // sheet's diff against what's there now (flowTrustDiff). By its key's hash; 0600
 export const flowTrustFile = (key: string) => join(dir, 'flow-trust', `${createHash('sha256').update(key).digest('hex')}.md`)
