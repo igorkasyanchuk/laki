@@ -186,25 +186,28 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const [seenSteps, setSeenSteps] = useState<number[]>([])
   const walkOk = !!wsApi.walk && !all
   const walkWhy = all ? "Walk through reads the branch's changes: pick Branch" : wsApi.walkOff
-  const walkSet = (w: Walk) => {
+  const walkScope = useRef(scope) // an answer for a scope left meanwhile is dropped
+  walkScope.current = scope
+  const walkSet = (w: Walk, open = false) => {
     setWalk(w)
     setStep(null)
-    setStepsOn(true)
+    if (open) setStepsOn(true) // asked: the steps; a kept one read again keeps Files | Steps as it was
     setSeenSteps((x => (x?.hash === w.hash && x.at === w.at ? x.seen : []))(readAll<{ hash: string; at: number; seen: number[] }>(WALK_SEEN)[ws])) // Again: the same diff, other steps
   }
   const walkAsk = (again = false) => {
+    const at = scope
     setWalking(true)
     setWalkErr('')
     wsApi.walk!(unc, { again }).then(
-      w => (w && (walkSet(w), hideFiles(false)), setWalking(false)), // the steps are in the files column: unfolded
-      e => (setWalkErr((e as Error).message), setWalking(false)),
+      w => (setWalking(false), walkScope.current === at && w && (walkSet(w, true), hideFiles(false))), // the steps are in the files column: unfolded
+      e => (setWalking(false), walkScope.current === at && setWalkErr((e as Error).message)),
     )
   }
   // the diff's changes as the walk names them (a file with none: start 0); one not in the walk, or gone: it's stale
   const nowKeys = useMemo(() => new Set([...byFile].flatMap(([p, fd]) => (fd.hunks.length ? fd.hunks.map(h => hunkKey({ file: p, start: startOf(h) })) : [hunkKey({ file: p, start: 0 })]))), [byFile])
   const walkKeys = walk?.steps.flatMap(x => x.hunks.map(hunkKey)) ?? []
   const stale = !!walk && !!d && (walkKeys.length !== nowKeys.size || walkKeys.some(k => !nowKeys.has(k)))
-  useEffect(() => setWalk(null), [scope]) // another scope's changes: none until its kept one is read
+  useEffect(() => (setWalk(null), setWalkErr('')), [scope]) // another scope's changes: none until its kept one is read
   useEffect(() => {
     if (!walkOk) return void setWalk(null)
     let on = true
@@ -232,8 +235,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     setSeenSteps(next)
     keepFor(WALK_SEEN, ws, { hash: walk.hash, at: walk.at, seen: next })
     const mine = [...new Set(walk.steps[i].hunks.map(h => h.file))].filter(p => files.some(f => f.path === p))
-    const ps = on ? mine.filter(p => !viewed(p) && walk.steps.every((x, j) => next.includes(j) || !x.hunks.some(h => h.file === p))) : mine.filter(viewed)
-    if (ps.length) mark(ps, on)
+    const ps = on ? mine.filter(p => !viewed(p) && walk.steps.every((x, j) => next.includes(j) || !x.hunks.some(h => h.file === p))) : [] // unticked: the step alone (a file viewed stays: yours, GitHub's)
+    if (ps.length) mark(ps, true)
   }
 
   // the PR's review threads, everyone's: the open ones at their lines (the PR's side as the diff has it), all of them in

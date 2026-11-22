@@ -1144,7 +1144,7 @@ call; `again` (*Again*) asks anew. The files column then shows the steps (*Files
 workspace's walk hash and the steps viewed): a step's click shows only its files and, in each, only its hunks (`inStep`:
 the lines of the hunks it names, the hunks' indices kept for Revert and the expander), a bar over the diff says which;
 a step's *Viewed* marks its files viewed (the files' `mark`, so GitHub's for a PR's) once every step with a hunk of
-theirs is, and unticked unmarks them. `stale`: the diff's hunks aren't the walk's any more (a note, *Again*).
+theirs is; unticked, only the step (a file viewed stays viewed: yours, GitHub's). `stale`: the diff's hunks aren't the walk's any more (a note, *Again*).
 
 The type scale (B1): `--fs-1`…`--fs-5` (11, 12, 13, 15, 20px: counts and kbd, secondary, body, panel titles, page
 titles) in styles.css `:root`; every `font-size` in px is one of them, but under 10px (badges) and over 22px (display

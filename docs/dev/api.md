@@ -18,9 +18,9 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
 
 Touch ID (`shared/confirm.ts`, `settings.touchId`, Settings › General, a Mac with Touch ID and the `touch.id` cap):
 `CONFIRM` names the actions (remote access started, a device paired, Bypass permissions on a running tab, `tabMode`, or
-a profile that didn't have it, `presetSave` or Settings' whole list, `bypassNew`: a workspace, tab or race that starts
-with an agent that never asks, `wsNew`, `tabNew` and `wsFan` by the call's `perm` or its profile's, the default agent
-when it names none (`cur.agent`), a webhook's secret shown, `uiReset`, the setting
+a profile that didn't have it, `presetSave` or Settings' whole list, `bypassNew`: a workspace, tab, race or scheduled task that starts
+with an agent that never asks, `wsNew`, `tabNew` and `wsFan` by the call's `perm` or its profile's (`tabNew`'s `kind:
+'agent'`: its preset the agent, no profile), `scheduleSet` by its profile, the default agent when it names none (`cur.agent`), a webhook's secret shown, `uiReset`, the setting
 turned off; `touchIdOn` asks as it goes on, with nothing for the daemon to hold), `confirmOf(method, params, cur)` which
 one a call is. The renderer never decides: `api.ts`' `call` asks main (`confirm` IPC, guards.ts `confirmAsk`: the app
 window's own page, a known action), main prompts with that action's words (`systemPreferences.promptTouchID`) and calls
