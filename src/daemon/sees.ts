@@ -195,7 +195,7 @@ const balanced = (v: string) => {
   return n <= 0
 }
 function tomlValue(v: string): unknown {
-  const s = v.replace(/("(?:[^"\\]|\\.)*"|'[^']*')|#[^\n]*/g, (m, str) => str ?? '').trim() // comments out, strings kept
+  const s = v.replace(/("(?:[^"\\]|\\.)*"|'[^']*')|#[^\n]*/g, (_m, str) => str ?? '').trim() // comments out, strings kept
   try {
     return JSON.parse(s.replace(/'([^']*)'/g, (_, x) => JSON.stringify(x)).replace(/([{,]\s*)(?:"([^"]+)"|([\w-]+))\s*=/g, (_, pre, a, b) => `${pre}${JSON.stringify(a ?? b)}:`).replace(/,(\s*[\]}])/g, '$1'))
   } catch {

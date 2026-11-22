@@ -3,7 +3,7 @@
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
 import { execFileSync } from 'node:child_process'
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'

@@ -5,7 +5,7 @@ import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { ICONS } from '../../shared/icons'
 import { UI_TYPES, type UiProblem } from '../../shared/widgetUi'
 import { type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
-import { Icon, IconButton, type MenuItem, ON, Switch, useMenu } from './ui'
+import { Icon, IconButton, Switch, useMenu } from './ui'
 import { Group, Says } from './SettingsKit'
 import { BARS, extMenuItems, fits, flipPlace, PLACES, SIZES } from './extMenu'
 export { extMenuItems }

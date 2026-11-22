@@ -1,7 +1,7 @@
 import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type AgentDid, type AiCredits, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type AgentDid, type AiCredits, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AchievementsKept, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, type Project, type Sep, type NotifyKind, type PlanKind, type PlanPin, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { askScope, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
@@ -13,32 +13,28 @@ import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
-import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
-import { type NeedsApi } from './Needs'
+import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, showAvatars, type WsInfo } from './Info'
 import { SideChat } from './SideChat'
 import { isCursor, notInstalled, tabAgent } from '../../shared/install'
 import { Backdrop } from './Backdrop'
-import { type Artifact, CopyDiagnostics, VIEWED, Loading, SnapSkeleton, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, GoalStrip, HookStrip, InstallStrip, SignInStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome, WhatsNew } from './panels'
-import type { AccountsApi, AppInfo, SkillInfo, WidgetsApi } from './Settings'
+import { CopyDiagnostics, VIEWED, Loading, SnapSkeleton, type NewWsParams, Ready, CheckStrip, GoalStrip, HookStrip, InstallStrip, SignInStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, videoCommand, Welcome, WhatsNew } from './panels'
+import type { AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
-import { Picker, PICKER_KEY } from './Picker'
+import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
-import { type DeskAsk, onDesk } from './Desk'
+import { onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
-import type { ProjectTab } from './Project' // a type alone: verbatimModuleSyntax keeps a { type } import's module in the bundle (E8)
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { hasCap } from '../../shared/caps'
-import { byOrder as extOrder, click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, status as extStatus, TurnChips, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { byOrder as extOrder, click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, status as extStatus, TurnChips, type WidgetApi, WidgetBody, WidgetButtons, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, whenOk } from '../../shared/widgetSchema'
-import type { ExtTab } from './Extension'
-import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
-import { badgeOf, needsTab, nextStep, reviewQueue, type Step, type StepId, waitsElsewhere } from '../../shared/nextStep'
+import { badgeOf, needsTab, nextStep, reviewQueue, type Step, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, hhmm, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
@@ -52,12 +48,12 @@ import { PhoneBar, useDrawerSwipe } from './Phone'
 import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionMenu, type Changes, type Commits, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
+import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, paintTheme, css, DARK, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
-import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
+import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, usageText } from './Usage'
 import { BgButton } from './BgTasks'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
@@ -1941,7 +1937,6 @@ export function App() {
     // ponytail: Undo opens its address again, not its pin, color, group or name (wsRm forgets them)
     done(`Closed ${wsName(w)}`, () => quickNew('browsers', w.browser || undefined))
   }
-  const statText = (w: WorkspaceView) => w.stat && `+${w.stat.add} −${w.stat.del} in ${w.stat.files} ${w.stat.files === 1 ? 'file' : 'files'} against ${w.kind === 'worktree' ? w.base : 'the last commit'}${w.stat.dirty ? `, ${w.stat.dirty} not committed` : ''}`
   const markUnread = (id: string) => call('unread', { tab: id }).catch(() => {})
   // claude's and codex's accounts by name (Settings › Agents & profiles): the agent's own sign-in first
   const accountsOf = (agent?: string) => (isAccountAgent(agent) ? [{ id: HOME_ACCOUNT, name: 'Default sign-in' }, ...(view?.settings.accounts ?? []).filter(a => a.agent === agent)] : [])
@@ -3488,7 +3483,7 @@ export function App() {
   // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
   const mark = (m: RowMark) => rowMarkOn(settings, m)
   const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), git: projOf(w)?.git !== false })
-  const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
+  const doStep = (w: WorkspaceView, s: Step) => {
     const at = () => (setWsId(w.id), setDialog(null))
     if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
     if (s.id === 'continue') return void call('send', { target: s.tab, text: 'continue' }).catch(() => {})

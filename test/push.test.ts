@@ -323,7 +323,7 @@ test('U8: Quiet (was Do not disturb): laki quiet; no push for a finish or an ask
   const tab = await rig.tab(ws.id)
   await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
   await rig.rpc('settingsSet', { webhook: { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`, format: 'json', done: true } })
-  const app = await connect(rig)
+  await connect(rig)
   const say = async (text: string, status: string) => {
     await rig.rpc('input', { tab: tab.id, data: `${text}\r` })
     await until(async () => (await rig.tab(ws.id)).status === status, status, 15000)

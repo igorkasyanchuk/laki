@@ -2,7 +2,7 @@
 // checks and review comments; a phone's screen (Simulator); a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { bridge, openExternal } from './api'
+import { bridge } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown, outlineItems } from './MarkdownView'

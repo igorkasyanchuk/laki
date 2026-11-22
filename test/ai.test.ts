@@ -603,7 +603,7 @@ test('ai: laki_ui moves the window; laki_find; laki_run in several shells; laki_
 
   // one command in two shells: one question, one Yes, both run, each one's output in the chat
   const s1 = await rig.rpc('tabNew', { ws: a.id, preset: 'shell' })
-  const s2 = await rig.rpc('tabNew', { ws: b.id, preset: 'shell' })
+  await rig.rpc('tabNew', { ws: b.id, preset: 'shell' })
   await sleep(1500)
   or.answers.push(call('c1', 'laki_run', { tabs: [s1.id, b.id, 'nope'], text: 'echo both-$((20+1))' })) // b: a session, its shell at its prompt
   await rig.rpc('aiAsk', { text: 'run it in both' })

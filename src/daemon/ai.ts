@@ -8,7 +8,7 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { readFile as readFileAsync } from 'node:fs/promises'
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { abortAfter, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { basename, dirname, extname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'

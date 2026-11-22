@@ -6,7 +6,6 @@ import { createHash, generateKeyPairSync, type KeyObject, randomBytes, sign } fr
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import WebSocket from 'ws'
 import { AT, authData, register, UP, UV, verifyGet } from '../src/daemon/passkey.ts'
 import { fresh, sleep, until, tokenOf, farFetch, FarWs } from './helpers.ts'
 

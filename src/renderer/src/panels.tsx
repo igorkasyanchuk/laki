@@ -1,4 +1,4 @@
-import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
@@ -14,7 +14,7 @@ import { preview, THEMES } from './themes'
 import { Backdrop } from './Backdrop'
 import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
-import { clock, groupNew, laterText, nameOf, type PalKind, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
+import { clock, groupNew, laterText, nameOf, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
 import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, openFrom, Page, ProjectMark, Switch, useMenu, act } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);

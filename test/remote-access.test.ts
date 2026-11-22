@@ -8,7 +8,6 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import WebSocket from 'ws'
 import { channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 import { connect, fresh, until, tokenOf, farFetch, farKey, FarWs } from './helpers.ts'
 

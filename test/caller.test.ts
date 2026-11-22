@@ -376,7 +376,7 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
   const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
   await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
-  const { port, token } = rig.info()
+  const { port } = rig.info()
   const said = join(rig.home, 'tab-token')
   const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
   const ls = join(rig.home, 'stale-ls')

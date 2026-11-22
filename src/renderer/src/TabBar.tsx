@@ -263,7 +263,7 @@ export function toolbarHere(app: AppCtx): ToolbarItem[] {
 // button hidden, or its group folded for room (collapseOf, from the right, whole), is an item in ⋯. A right click on
 // the bar's empty room: Customize toolbar… (the sheet, ToolbarSheet.tsx)
 export function TabBar({ app }: { app: AppCtx }) {
-  const { onePane, readSwitch, devRunning, devTab, editorName, editScripts, inReader, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setRead, setReveal, setSharing, setSideOpen, setWsId, settings, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
+  const { readSwitch, devRunning, devTab, editorName, editScripts, inReader, kh, kt, layoutMenu, live, narrow, openInItems, openMenu, ownWidgets, panelShown, panelTab, project, run, runMenu, selectTab, sendLater, setDialog, setRead, setReveal, setSharing, setSideOpen, setWsId, settings, sideOpen, tab, tabsAt, toggleFull, togglePanel, view, widgetApi, ws, wsMore } = app
   const bar = useRef<HTMLDivElement>(null)
   const [barW, setBarW] = useState(0)
   const [tabMin, setTabMin] = useState(120) // styles.css --tab-min, as TabList reads it

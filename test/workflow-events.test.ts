@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { check, hints, holds, parse, toFile } from '../src/shared/workflow.ts'
+import { check, hints, parse, toFile } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 import { neverAsks } from '../src/shared/types.ts'
 

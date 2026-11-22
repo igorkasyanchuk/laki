@@ -109,7 +109,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
   note: {
     title: 'A note',
     blurb: 'Markdown you type on its card, or from a file or a URL: lists, links, pictures',
-    files: (id, name) => ({
+    files: (_id, name) => ({
       'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Markdown: its text on its card (Data: Static), or a file or a URL', size: [4, 2], source: { kind: 'static', text: NOTE }, ui: { type: 'markdown', value: '{{text}}' }, sample: { text: NOTE } }),
       'fixtures/sample.json': json({ text: NOTE }),
       ...variants({ todo: { text: '## Today\n\n- [x] Review #412\n- [ ] Answer the API question\n- [ ] Deploy the docs\n- [ ] 1:1 at 15:00' }, table: { text: '## On call\n\n| Week | Who |\n|---|---|\n| 42 | octocat |\n| 43 | hubot |\n| 44 | monalisa |' }, links: { text: '## Links\n\n![octocat](https://avatars.githubusercontent.com/octocat?s=48) [Runbook](https://example.com/runbook) · [Status](https://status.example.com) · [Dashboards](https://example.com/grafana)' } }),
@@ -119,7 +119,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
   launcher: {
     title: 'A launcher',
     blurb: 'Buttons that start Laki things: a workspace, a prompt, Laki AI, a terminal, a page',
-    files: (id, name) => ({
+    files: (_id, name) => ({
       'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Buttons with do: Laki says what each will do and asks first', size: [4, 2], config: { project: { type: 'text', label: 'Project', hint: 'Its name: where Fix a flaky test starts', default: '' } }, sampleConfig: { project: 'web' }, ui: LAUNCH }),
       'README.md': `# ${name}\n\nA Laki extension of buttons that ask Laki to do things (\`do\`): \`new\` (a workspace, its agent on \`prompt\`), \`send\` (\`prompt\` to the workspace's agent), \`ai\` (\`prompt\` to Laki AI), \`terminal\` (\`command\`), \`browse\` (\`url\`). Laki shows what and asks before each.\n`,
     }),

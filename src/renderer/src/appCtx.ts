@@ -148,7 +148,7 @@ export type AppBase = {
   dialog: Dialog
   dock: (on: boolean) => void | NodeJS.Timeout
   done: (text: string, undo?: () => void) => void
-  doStep: (w: WorkspaceView, s: Step, e?: React.MouseEvent) => void | Window | null
+  doStep: (w: WorkspaceView, s: Step) => void | Window | null
   dropAgent: (w: WorkspaceView) => TabView
   dropOn: string | null
   dropProps: (w: WorkspaceView) => { onDragOver: (e: React.DragEvent) => void | false; onDragLeave: (e: React.DragEvent) => void | false; onDrop: (e: React.DragEvent) => void }

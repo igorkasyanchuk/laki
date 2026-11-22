@@ -14,7 +14,7 @@ import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
 import type { SpeechLine } from '../../shared/speech'
 import { spokenMode } from '../../shared/ask'
-import { AI_TO, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, type TalkTo, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
+import { AI_TO, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
 import { langOf } from '../../shared/speak'
 
