@@ -2,12 +2,13 @@
 // PIN and passkey forms, the media queries App follows, a phone's key bar, the ask bar's choices
 import { Choice, choiceProps, useSayWhy } from './Diff'
 import { DARK, LESS_CLEAR, MORE_CONTRAST } from './themes'
-import { Icon, keep as store, load } from './ui'
+import { choose, Icon, keep as store, load, unchoose } from './ui'
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TabView } from '../../shared/types'
 import { api, passkeyReady, passkeyUnlock } from './api'
 import { askScope, optLabel } from '../../shared/ask'
 import icon from './icon.svg'
+import { Line } from './text'
 
 // Laki AI's glow (experimental): a moving border and a soft inner light over the pane of the tab it looked at, else the
 // whole window; once (its own animation's end clears it)
@@ -352,4 +353,23 @@ export function BarChoices({ tab, answer }: { tab: TabView; answer: (n: number, 
       {why.box}
     </span>
   )
+}
+
+// an extension tool's asks: one dialog at a time, the others in line (tagged by req); toolOn: the one on screen
+export type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'deny' }[]; answer: (allow: string) => void }
+export const toolLine = new Line<ToolAsk>()
+export let toolOn: string | undefined
+export const AWAY = -2 // #18: a page or dialog opened over the ask on screen: it waits, first in line, and comes back as that closes
+export function toolShow() {
+  const t = toolLine.first
+  if (!t || toolOn === t.req) return
+  if (toolOn) return unchoose(toolOn) // another came first (a notification's click): this one back in line, its then shows it
+  toolOn = t.req
+  void choose(t.title, t.text, t.picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' })), undefined, t.req).then(i => {
+    toolOn = undefined
+    if (i === AWAY) return // App's effect on its dialog shows it again
+    // Esc, Deny or outside denies the one on screen only; one answered elsewhere (toolDone) or moved back: just the next
+    if (toolLine.first === t) toolLine.drop(t.req), t.answer(t.picks[i]?.allow ?? 'deny')
+    toolShow()
+  })
 }
