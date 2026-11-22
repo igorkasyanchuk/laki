@@ -182,7 +182,9 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
     el.style.bottom = `${window.innerHeight - anchor.top + 6}px`
   })
   const now = Date.now()
-  const ago = Math.round((now - Math.min(...rows.map(r => r.at))) / 60_000)
+  // asked: the rows a server or agy's /usage answered just now; the agents' own numbers keep their own As of
+  const asked = rows.filter(r => r.source === 'endpoint' || (r.source !== 'own' && asks?.[r.agent] === true))
+  const ago = asked.length ? Math.round((now - Math.min(...asked.map(r => r.at))) / 60_000) : 0
   return (
     <Backdrop onClose={onClose}>
       <div className="tunnel-pop usage-pop" ref={box} role="dialog" aria-label="Plan limits">
@@ -240,7 +242,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
           </section>
         )}
         <p className="muted small">
-          {rows.some(r => r.source === 'endpoint' || asks?.[r.agent] === true) ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Layout says so.` : "The agents' own numbers: Claude Code's status line, Codex's reports."}{rows.some(r => r.agent === 'claude' && r.windows.length > 0) && asks?.claude !== true && ` Claude's week per model (Fable's) only comes from Anthropic: Settings › Layout › Ask ${USAGE_HOSTS.claude}.`} Settings › Agents & profiles has the accounts.
+          {asked.length ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Layout says so${rows.some(r => r.source === 'own') ? "; the others are the agents' own numbers" : ''}.` : "The agents' own numbers: Claude Code's status line, Codex's reports."}{rows.some(r => r.agent === 'claude' && r.windows.length > 0) && asks?.claude !== true && ` Claude's week per model (Fable's) only comes from Anthropic: Settings › Layout › Ask ${USAGE_HOSTS.claude}.`} Settings › Agents & profiles has the accounts.
         </p>
       </div>
     </Backdrop>
