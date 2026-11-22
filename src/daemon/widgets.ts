@@ -9,6 +9,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { accessSync, constants, existsSync, type FSWatcher, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { homedir, tmpdir } from 'node:os'
+import { getFollow } from './netAddr.ts'
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { AI_SOURCE_EVERY, type Annotation, type Annotations, BUTTON_PLACES, RETRY_KINDS, type LogLevel, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetOption, type WidgetTool, type WidgetRun, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, type ActionFile, type WidgetFail, type WidgetWhen, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
@@ -1434,6 +1435,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
 // agent's answer (its last ```json block); a path, URL or prompt may name settings and the workspace: {{config.repo}},
 // {{workspace.path}}
 const SOURCE_WAIT = 30_000
+const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]']) // a URL source's host as written: this Mac (URL's hostname keeps ::1's brackets)
 async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   const at = (t: string) => fill(t, [{ config: typedOf(w), workspace: x ? wsInfo(x) : undefined, facts: x && factNames(w).length ? factsIn(w, x.id) : undefined }]).trim()
   if (src.kind === 'static') return src.text ?? ''
@@ -1456,12 +1458,32 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   }
   const url = at(src.url ?? '')
   if (!/^https?:\/\/\S+$/i.test(url)) throw new Error(url ? `${url} isn't an http(s) URL` : 'no URL')
-  const res = await fetch(url, { signal: AbortSignal.timeout(SOURCE_WAIT), headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5' } })
-  if (!res.ok) throw new Error(`${url.replace(/[?#].*$/, '')}: HTTP ${res.status}`) // its query may hold a key
-  if (Number(res.headers.get('content-length') ?? 0) > MAX_OUT) throw new Error('over 16 MB')
+  const bare = url.replace(/[?#].*$/, '') // its query may hold a key
+  // by where it points as written: this Mac (the user's own service) as before, but no redirect; anywhere else https,
+  // at the address checked (netAddr: never this Mac or a private network's), each redirect checked the same (getFollow)
+  const signal = AbortSignal.timeout(SOURCE_WAIT)
+  const headers = { accept: 'application/json, text/plain;q=0.9, */*;q=0.5' }
+  let status: number
+  let length: number
+  let body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>
+  if (LOCAL.has(new URL(url).hostname)) {
+    const res = await fetch(url, { signal, headers, redirect: 'error' }).catch(e => {
+      throw new Error(`${bare}: ${(e as { cause?: Error }).cause?.message ?? (e as Error).message}`) // a redirect: "unexpected redirect"
+    })
+    ;[status, length, body] = [res.status, Number(res.headers.get('content-length') ?? 0), res.body ?? []]
+  } else {
+    if (!/^https:/i.test(url)) throw new Error(`${bare}: https only for a host that isn't this Mac`)
+    const res = await getFollow(url, signal, headers).catch(e => {
+      throw new Error(`${bare}: ${(e as Error).message}`)
+    })
+    ;[status, length, body] = [res.statusCode ?? 0, Number(res.headers['content-length'] ?? 0), res]
+    if (status < 200 || status > 299) res.resume()
+  }
+  if (status < 200 || status > 299) throw new Error(`${bare}: HTTP ${status}`)
+  if (length > MAX_OUT) throw new Error('over 16 MB')
   const parts: Buffer[] = []
   let size = 0
-  for await (const b of res.body ?? []) {
+  for await (const b of body) {
     size += b.length
     if (size > MAX_OUT) throw new Error('over 16 MB') // the timeout's signal ends the request
     parts.push(Buffer.from(b))

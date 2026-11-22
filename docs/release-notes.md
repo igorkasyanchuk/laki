@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- An extension's URL source can't be redirected to this Mac or your network: a host other than `localhost` (your own service, read as before) must be https on the internet, and so must every redirect it gives.
 - The Review tab and the Ship sheet mark a file to read with care (a migration, auth, a lockfile, deletes) after its name, from the diff alone, Laki AI on or off; *Read with care (n)* over the Review tab's files shows only those.
 - Ship's top line: *Update from main* when the branch is behind (merged in, or its agent asked to when it conflicts), the sheet staying open; *N overlaps* opens Check overlaps over it.
 - `laki backup` (Settings › General › Backup) carries the Review tab's unsent comments too, and says that kept turns (Undo and rewind history) stay on this Mac.

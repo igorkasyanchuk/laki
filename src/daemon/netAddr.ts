@@ -63,3 +63,20 @@ export async function getPublic(u: string, signal: AbortSignal, headers: Record<
     req.end()
   })
 }
+
+// getPublic, its redirects followed: at most 5, each to https and its address checked again as the first was (an
+// extension's URL source: a public host answering 302 to this Mac, a router or 169.254.169.254 is refused). get: the
+// tests' stand-in for the first hop
+export async function getFollow(u: string, signal: AbortSignal, headers: Record<string, string>, get = getPublic): Promise<IncomingMessage> {
+  let url = u
+  for (let hops = 0; ; hops++) {
+    const res = await (hops ? getPublic : get)(url, signal, headers)
+    const to = res.headers.location
+    if (!res.statusCode || res.statusCode < 300 || res.statusCode > 399 || !to) return res
+    res.resume()
+    if (hops === 5) throw new Error('more than 5 redirects')
+    const next = new URL(to, url)
+    if (next.protocol !== 'https:') throw new Error(`a redirect to ${next.protocol}// refused: https only`)
+    url = next.href
+  }
+}

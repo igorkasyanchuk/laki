@@ -65,7 +65,7 @@ Each extension's card (Settings › Extensions, its page) has *Data*: pick where
 | *Own script* (`{ "kind": "fetch" }`) | its `fetch` command or `script`, every `every` minutes (the default, when it has one) |
 | *Static* (`{ "kind": "static", "text": "…" }`) | a text you type there (64 KB): JSON is its data, anything else `{ "text" }`; shown at once, never fetched |
 | *File* (`{ "kind": "file", "path": "~/notes/today.md" }`) | a file of this Mac, read every `every` minutes (16 MB); relative: the extension's folder |
-| *URL* (`{ "kind": "url", "url": "https://…" }`) | an http(s) address, read every `every` minutes (30 s, 16 MB): a public JSON API needs no fetch |
+| *URL* (`{ "kind": "url", "url": "https://…" }`) | an http(s) address, read every `every` minutes (30 s, 16 MB): a public JSON API needs no fetch. `localhost`, `127.0.0.1` or `[::1]` reaches your own service on this Mac (no redirects followed); any other host must be https on the internet, never your network, and its redirects (5 at most) too |
 | *AI* (`{ "kind": "ai", "prompt": "…", "tools": "mcp__slack" }`) | an agent finds it and sums it up, every hour unless `every` says (15 minutes at least: each run costs; 10 minutes a run) |
 
 An AI source runs Settings › Extensions' *Agent profile* (a claude or codex profile of Agents & profiles: its model,

@@ -2,7 +2,9 @@
 // resolves to. No daemon: test:fast (api.test.ts has the proxy's refusal of a name that resolves to 127.0.0.1)
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { addrPrivate, publicAddr } from '../src/daemon/netAddr.ts'
+import { PassThrough } from 'node:stream'
+import type { IncomingMessage } from 'node:http'
+import { addrPrivate, getFollow, publicAddr } from '../src/daemon/netAddr.ts'
 
 test("addrPrivate: loopback, private, link-local, CGNAT, unique local, unspecified, IPv4 in IPv6; the internet's goes", () => {
   for (const a of ['127.0.0.1', '127.9.9.9', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '169.254.169.254', '100.64.0.1', '100.127.255.255', '0.0.0.0', '::', '::1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'febf::1', '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::ffff:7f00:1', 'not an address', ''])
@@ -25,4 +27,15 @@ test('publicAddr: every address of a name on the internet, or it throws; an IP l
   assert.deepEqual(await publicAddr('v6.example', look), { address: '2606:4700::1111', family: 6 })
   assert.deepEqual(await publicAddr('[2606:4700::1111]', look), { address: '2606:4700::1111', family: 6 })
   for (const h of ['both.example', 'rebind.example', 'none.example', '127.0.0.1', '[::1]']) await assert.rejects(publicAddr(h, look), /isn't on the internet/, h)
+})
+
+test("getFollow: a public host's redirect to this Mac, a private network or plain http is refused; past 5, refused", async () => {
+  const hop = (location: string) => async () => Object.assign(new PassThrough(), { statusCode: 302, headers: { location } }) as unknown as IncomingMessage
+  const signal = AbortSignal.timeout(5000)
+  await assert.rejects(getFollow('https://pub.example/x', signal, {}, hop('https://127.0.0.1:9/')), /127.0.0.1 isn't on the internet/)
+  await assert.rejects(getFollow('https://pub.example/x', signal, {}, hop('https://[::1]/')), /isn't on the internet/)
+  await assert.rejects(getFollow('https://pub.example/x', signal, {}, hop('https://169.254.169.254/latest/meta-data')), /169.254.169.254 isn't on the internet/)
+  await assert.rejects(getFollow('https://pub.example/x', signal, {}, hop('http://8.8.8.8/')), /redirect to http:\/\/ refused: https only/)
+  const ok = Object.assign(new PassThrough(), { statusCode: 200, headers: {} }) as unknown as IncomingMessage
+  assert.equal(await getFollow('https://pub.example/x', signal, {}, async () => ok), ok, 'no redirect: the answer itself')
 })

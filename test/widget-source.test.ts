@@ -351,3 +351,37 @@ test("#8: an agent's change to a setting a source or an AI action's prompt reads
   await rig.rpc('widgetSet', { id: 'sum', config: { channel: 'general', path: 'b.md' } })
   assert.deepEqual([(await find(rig, 'sum')).config.channel, (await find(rig, 'sum')).config.path], ['general', 'b.md'])
 })
+
+test("a URL source reaches this Mac only as written, never by a redirect; elsewhere https at an address on the internet", async t => {
+  const rig = await fresh(t, { env: { LAKI_TEST_DNS: JSON.stringify({ 'lan.example': '10.0.0.1', 'home.example': '127.0.0.1' }) } })
+  mkdirSync(join(rig.data, 'widgets', 'u'), { recursive: true })
+  writeFileSync(join(rig.data, 'widgets', 'u', 'widget.json'), JSON.stringify({ name: 'U', fetch: 'echo \'{"n": 1}\'', ui: { type: 'text', value: 'n={{n}}' }, sample: { n: 0 } }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'u', on: true })
+  const srv = createServer((q, r) => (q.url === '/ok' ? r.end('{"n": 42}') : r.writeHead(302, { location: '/ok' }).end()))
+  await new Promise<void>(ok => srv.listen(0, 'localhost', ok))
+  t.after(() => srv.close())
+  const port = (srv.address() as any).port
+  const idle = () => until(async () => !(await find(rig, 'u')).running, 'u done fetching')
+  const said = async (re: RegExp) => until(async () => (e => re.test(e ?? '') && e)((await find(rig, 'u')).error), `u says ${re}`)
+  // this Mac by name: the user's own service, as before
+  await idle()
+  await rig.rpc('widgetSet', { id: 'u', source: { kind: 'url', url: `http://localhost:${port}/ok` } })
+  await until(async () => /n=42/.test(await rig.rpc('widgetRender', { id: 'u' })), 'localhost read')
+  // its redirect isn't followed, even to itself
+  await idle()
+  await rig.rpc('widgetSet', { id: 'u', source: { kind: 'url', url: `http://localhost:${port}/hop` } })
+  await said(/redirect/)
+  // a name on a private network, or one that resolves to this Mac: refused before any connection
+  await idle()
+  await rig.rpc('widgetSet', { id: 'u', source: { kind: 'url', url: 'https://lan.example/x.json' } })
+  await said(/lan.example isn't on the internet/)
+  await idle()
+  await rig.rpc('widgetSet', { id: 'u', source: { kind: 'url', url: `https://home.example:${port}/ok` } })
+  await said(/home.example isn't on the internet/)
+  // plain http to anywhere but this Mac
+  await idle()
+  await rig.rpc('widgetSet', { id: 'u', source: { kind: 'url', url: 'http://lan.example/x.json?key=SECRET' } })
+  const e = await said(/https only/)
+  assert.doesNotMatch(e, /SECRET/)
+})
