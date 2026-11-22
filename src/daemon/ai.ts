@@ -64,6 +64,19 @@ export function aiEndpointKey(o: { key?: string | null }) {
 }
 // where a chat-completions call goes: Your endpoint (backend 'endpoint'), else OpenRouter
 type Target = { url: string; key: string; model: string; or: boolean; name: string; redirect: RequestRedirect } // redirect: Your endpoint's never followed (its https-or-this-Mac rule would be gone)
+// an OpenAI-compatible server's JSON as it may come (OpenRouter's, Your endpoint's): every part optional, each checked
+// where it's read; an error is an object with a message, or (some servers) a string
+type ApiError = string | { message?: string; metadata?: { raw?: unknown } }
+type Usage = { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number; cost?: number; prompt_tokens_details?: { cached_tokens?: number } }
+type ToolCall = { id: string; type: string; function: { name: string; arguments: string } }
+type Message = { role?: string; content?: string | null; reasoning?: string; reasoning_details?: Record<string, unknown>[]; tool_calls?: ToolCall[] }
+type Delta = { content?: string; reasoning?: string; reasoning_details?: Record<string, unknown>[]; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] }
+type Reply = { error?: ApiError; model?: string; usage?: Usage; text?: unknown; answers?: unknown; data?: { id?: unknown; name?: unknown; pricing?: { prompt?: unknown; completion?: unknown } }[]; choices?: { message?: Message; delta?: Delta }[] }
+const errOf = (e?: ApiError) => (typeof e === 'string' ? e : e?.message)
+// a line of claude -p's stream-json or codex exec's --json, as it may come
+type CliUsage = { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
+type ClaudeLine = { type?: string; subtype?: string; session_id?: string; model?: string; message?: { content?: { type?: string; name?: unknown; input?: unknown }[] }; result?: string; is_error?: boolean; total_cost_usd?: number; usage?: CliUsage }
+type CodexLine = { type?: string; thread_id?: string; message?: string; usage?: CliUsage; item?: { type?: string; text?: string; tool?: string; arguments?: unknown }; error?: { message?: string } }
 const target = (backend = state.settings?.ai?.backend): Target => {
   if (backend !== 'endpoint') return { url: api(), key: readKey(), model: state.settings?.ai?.models?.openrouter || AI_MODEL, or: true, name: 'OpenRouter', redirect: 'follow' }
   const e = state.settings?.aiEndpoint
@@ -75,8 +88,8 @@ const headersOf = (t: Target) => ({ ...(t.key && { authorization: `Bearer ${t.ke
 export async function aiEndpointTest() {
   const t = target('endpoint')
   const res = await fetch(`${t.url}/chat/completions`, { method: 'POST', headers: headersOf(t), redirect: t.redirect, body: JSON.stringify({ model: t.model, messages: [{ role: 'user', content: 'Say OK.' }], max_tokens: 16 }), signal: AbortSignal.timeout(20000) })
-  const j: any = await res.json().catch(() => ({}))
-  if (!res.ok || j.error) throw new Error(`Your endpoint: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+  const j: Reply = await res.json().catch(() => ({}))
+  if (!res.ok || j.error) throw new Error(`Your endpoint: ${errOf(j.error) ?? res.status}`)
   const text = j.choices?.[0]?.message?.content
   if (typeof text !== 'string') throw new Error('Your endpoint: no answer (is it OpenAI-compatible?)')
   return { model: j.model || t.model, text: text.slice(0, 200) }
@@ -236,7 +249,7 @@ export async function voiceText(o: { audio?: unknown; text?: unknown }) {
     }).catch((e: Error) => {
       throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 90 seconds' : e.message}`)
     })
-    const j: any = await res.json().catch(() => ({}))
+    const j: Reply = await res.json().catch(() => ({}))
     if (res.ok && !j.error) {
       return voiceClean(String(j.text ?? ''))
     }
@@ -245,8 +258,8 @@ export async function voiceText(o: { audio?: unknown; text?: unknown }) {
       await new Promise(r => setTimeout(r, VOICE_AGAIN[n]))
       continue
     }
-    const raw = j.error?.metadata?.raw // the provider's own error: words, or its JSON
-    const said = (j.error?.message ?? res.statusText) + (raw ? `: ${(typeof raw === 'string' ? raw : JSON.stringify(raw)).slice(0, 200)}` : '')
+    const raw = typeof j.error === 'string' ? undefined : j.error?.metadata?.raw // the provider's own error: words, or its JSON
+    const said = (errOf(j.error) ?? res.statusText) + (raw ? `: ${(typeof raw === 'string' ? raw : JSON.stringify(raw)).slice(0, 200)}` : '')
     throw new Error(`OpenRouter ${res.status}: ${said}${busy ? ` (${model} is busy: try again in a moment, or another model in Settings › Voice)` : ''}`)
   }
 }
@@ -269,8 +282,8 @@ export async function voiceModels(): Promise<{ at: number; models: VoiceModel[] 
     throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 15 seconds' : e.message}`)
   })
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: its model list`)
-  const j: any = await res.json().catch(() => ({}))
-  const models: VoiceModel[] = (Array.isArray(j?.data) ? j.data : []).slice(0, 300).flatMap((m: any) => {
+  const j: Reply = await res.json().catch(() => ({}))
+  const models: VoiceModel[] = (Array.isArray(j?.data) ? j.data : []).slice(0, 300).flatMap(m => {
     const price = voicePrice(m?.pricing)
     return typeof m?.id === 'string' && /^[\w.-]+\/[\w.:-]+$/.test(m.id) && price ? [{ id: m.id.slice(0, 120), name: String(m.name ?? m.id).slice(0, 120), price }] : []
   })
@@ -317,7 +330,7 @@ function thread(id = ''): Thread {
   const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : AGENT_CHAT.test(id) ? join(dir, `ai-agent-${id.slice(6)}.json`) : planOfChat(id).file // a spec's gone, or off: that says so, each time
   const known = threads.get(id)
   if (known) return known
-  const j: any = readJson(file) ?? {}
+  const j = readJson<{ chat?: unknown; resume?: Thread['resume']; at?: unknown; ended?: number }>(file) ?? {}
   const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
   for (const m of t.chat) if (m.ask?.perm && m.ask.picked === undefined) m.ask.picked = 'Not answered' // its agent ended with the daemon
   // a Yes to several the daemon ended in the middle of: the one under way, and the ones it never got to, say so
@@ -635,21 +648,21 @@ const seenFrom = (t: Thread) => {
 const EPHEMERAL = { type: 'ephemeral' }
 export const cachesByMark = (model: string) => model.startsWith('anthropic/')
 // the cached tokens of a reply's usage (OpenRouter's prompt_tokens_details)
-const cachedOf = (u: any) => Number(u?.prompt_tokens_details?.cached_tokens) || 0
+const cachedOf = (u?: Usage) => Number(u?.prompt_tokens_details?.cached_tokens) || 0
 
 // A7: one round's answer as it streams (SSE, stream: true): its text and tool calls as they come (a call's arguments
 // in pieces, by index), reasoning kept for the next request, the model and usage from the chunks (usage: the last).
 // onText: the text so far; alive: a chunk came. A JSON answer (an error, a reply that doesn't stream) is read whole
-type Round = { model?: string; usage?: any; message?: any }
+type Round = { model?: string; usage?: Usage; message?: Message }
 async function roundOf(res: Response, onText: (text: string) => void, alive: () => void, name = 'OpenRouter'): Promise<Round> {
   if (!res.ok || !/text\/event-stream/.test(res.headers.get('content-type') ?? '')) {
-    const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`${name}: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
+    const j: Reply = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`${name}: ${errOf(j.error) ?? res.status}`)
     return { model: j.model, usage: j.usage, message: j.choices?.[0]?.message }
   }
-  const m: any = { role: 'assistant', content: '' }
-  const calls: any[] = []
-  const details: any[] = []
+  const m: { role: string; content: string; reasoning?: string; reasoning_details?: Record<string, unknown>[]; tool_calls?: ToolCall[] } = { role: 'assistant', content: '' }
+  const calls: ToolCall[] = []
+  const details: Record<string, unknown>[] = []
   const r: Round = { message: m }
   const dec = new TextDecoder()
   let buf = ''
@@ -657,13 +670,13 @@ async function roundOf(res: Response, onText: (text: string) => void, alive: () 
     if (!l.startsWith('data:')) return // its keep-alive comments (: OPENROUTER PROCESSING), blank lines
     const data = l.slice(5).trim()
     if (!data || data === '[DONE]') return
-    let j: any
+    let j: Reply
     try {
       j = JSON.parse(data)
     } catch {
       return
     }
-    if (j.error) throw new Error(`${name}: ${j.error.message ?? j.error}`)
+    if (j.error) throw new Error(`${name}: ${errOf(j.error) ?? j.error}`)
     r.model = j.model || r.model
     r.usage = j.usage ?? r.usage
     const d = j.choices?.[0]?.delta
@@ -674,7 +687,7 @@ async function roundOf(res: Response, onText: (text: string) => void, alive: () 
     for (const x of Array.isArray(d.reasoning_details) ? d.reasoning_details : []) {
       const at = x.index !== undefined ? details.find(y => y.index === x.index && y.type === x.type) : undefined
       if (!at) details.push({ ...x })
-      else for (const k of Object.keys(x)) at[k] = typeof x[k] === 'string' && typeof at[k] === 'string' && ['text', 'summary', 'data'].includes(k) ? at[k] + x[k] : x[k]
+      else for (const k of Object.keys(x)) at[k] = (([a, b]) => (typeof b === 'string' && typeof a === 'string' && ['text', 'summary', 'data'].includes(k) ? a + b : b))([at[k], x[k]])
     }
     for (const c of Array.isArray(d.tool_calls) ? d.tool_calls : []) {
       const at = (calls[c.index ?? calls.length] ??= { id: '', type: 'function', function: { name: '', arguments: '' } })
@@ -799,8 +812,8 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
       body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], ...(at.or && { usage: { include: true } }), ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
       signal: waitOf(o.signal),
     })
-    const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`${at.name}: ${j.error?.message ?? res.status}`)
+    const j: Reply = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`${at.name}: ${errOf(j.error) ?? res.status}`)
     Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, ...(cachedOf(j.usage) && { cachedIn: cachedOf(j.usage) }), cost: at.or ? j.usage?.cost : undefined })
     const text = j.choices?.[0]?.message?.content
     if (typeof text !== 'string') throw new Error(`${at.name}: no answer`)
@@ -856,7 +869,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
     })
     let text = ''
     for (const l of backend === 'claude' ? [out] : out.split('\n')) { // claude: one JSON document; codex: a line each
-      let j: any
+      let j: Omit<ClaudeLine, 'message'> & Omit<CodexLine, 'message'>
       try {
         j = JSON.parse(l)
       } catch {
@@ -1032,8 +1045,8 @@ export async function aiDecide(o: { model: string; state: unknown; questions: ob
       body: JSON.stringify({ model: o.model, state: o.state, questions: o.questions }),
       signal: waitOf(o.signal),
     })
-    const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
+    const j: Reply = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`OpenRouter: ${errOf(j.error) ?? res.status}`)
     if (!j.answers || typeof j.answers !== 'object') throw new Error('OpenRouter: no answers')
     Object.assign(call, { model: j.model || o.model, in: j.usage?.input_tokens ?? 0, out: j.usage?.output_tokens ?? 0, cost: j.usage?.cost })
     call.ok = true
@@ -1091,7 +1104,7 @@ const presetOf = (agent: AiBackend) => {
 const sessionKey = (agent: AiBackend) => `${agent}:${presetOf(agent)?.name ?? ''}`
 
 // an agent's CLI, its JSON lines to `line`; it fails with the last of what it printed to stderr
-function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
+function cli<L>(o: Opts, cmd: AiBackend, args: string[], line: (j: L) => void) {
   mkdirSync(home, { recursive: true })
   return new Promise<void>((resolve, reject) => {
     const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, ...((cmd === 'claude' || cmd === 'codex') && accountEnv(presetOf(cmd)?.account ?? accountUsed(cmd))), MCP_TOOL_TIMEOUT: '300000' } // its account: the preset's, else the default
@@ -1139,7 +1152,7 @@ async function claude(o: Opts) {
   const r = o.r
   let failed = ''
   try {
-    await cli(o, 'claude', args, j => {
+    await cli<ClaudeLine>(o, 'claude', args, j => {
       if (j.session_id) resume[sk] = j.session_id
       if (j.type === 'system' && j.model) r.model = j.model
       if (j.type === 'assistant')
@@ -1152,7 +1165,7 @@ async function claude(o: Opts) {
         const u = j.usage ?? {}
         r.in = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
         r.out = u.output_tokens ?? 0
-        if (j.is_error) failed = j.result || j.subtype
+        if (j.is_error) failed = j.result || j.subtype || ''
       }
     }).catch(e => {
       if (resume[sk] && /session|conversation/i.test(e.message)) resume[sk] = undefined // gone: the next ask starts afresh
@@ -1195,7 +1208,7 @@ async function codex(o: Opts) {
   const r = o.r
   let failed = ''
   try {
-    await cli(o, 'codex', args, j => {
+    await cli<CodexLine>(o, 'codex', args, j => {
       if (j.type === 'thread.started' && j.thread_id) resume[sk] = j.thread_id
       const it = j.item
       if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say(o.t, 'tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
