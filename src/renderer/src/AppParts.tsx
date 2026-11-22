@@ -9,6 +9,7 @@ import { api, type Msg, notify, passkeyReady, passkeyUnlock } from './api'
 import { askScope, optLabel } from '../../shared/ask'
 import icon from './icon.svg'
 import { Line, noteCut, noteWhole } from './text'
+import type { Dialog } from './appCtx'
 
 // Laki AI's glow (experimental): a moving border and a soft inner light over the pane of the tab it looked at, else the
 // whole window; once (its own animation's end clears it)
@@ -494,3 +495,10 @@ declare const __BUILT__: string | undefined // electron.vite.config.ts' define: 
 export const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
 export const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
+
+// the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
+export const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
+// a place for back and forward (App's history): a page, or none (the workspace view)
+export const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules', 'usage'])
+export const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
+export const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))

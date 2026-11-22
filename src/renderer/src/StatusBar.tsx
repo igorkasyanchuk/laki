@@ -209,6 +209,4 @@ export function statusBarOf(app: AppCtx) {
           )}
         </div>
   )
-
-  // what App's parts read (appCtx.ts), built after everything in it is
 }
