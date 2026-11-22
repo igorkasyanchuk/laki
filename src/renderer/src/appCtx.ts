@@ -6,7 +6,7 @@ import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react'
 import type { ExtTab } from './Extension'
 import type { DeskAsk } from './Desk'
 import type { ProjectTab } from './Project'
-import type { Account, AchievementsKept, Gate, MergeMethod, PlanKind, PlanPin, Project, RunScript, Sep, Settings, Stat, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
+import type { Account, AchievementsKept, Gate, MergeMethod, PlanKind, PlanPin, Project, ProjectConfig, RunScript, Sep, Settings, Stat, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import type { Edit, PanelApi, PanelTab } from './SidePanel'
 import type { IconName, MenuItem, useRowDrag } from './ui'
@@ -28,6 +28,12 @@ import type { layoutOf } from './TabBar'
 import type { sideOf } from './Sidebar'
 import { AGENT_COLORS } from './ui'
 import { shownStatus, wsShown } from './text'
+import type { AgentUsage } from './Usage'
+import type { ReaderApi } from './Reader'
+import type { TunnelApi } from './Tunnel'
+import type { TurnApi } from './TurnStrip'
+import type { UpdateState } from '../../shared/update'
+import type { WsInfo } from './Info'
 
 // the page or dialog over the workspace, App's `dialog`
 export type Dialog = null | 'toolbar' | 'chats' | 'scriptLogs' | 'new' | 'project' | 'clone' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | 'importantTimer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog; turn?: { tab: string; at: number } /* P5: a turn chip's: that turn's data */ } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; can?: boolean; back?: Dialog } | { sees: 'claude' | 'codex'; in?: string } /* F6: What it sees, from a workspace's Info: in that project */ | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
@@ -404,6 +410,30 @@ export type AppBase = {
   wsHere: string | null
   wsMore: (extra?: MenuItem[]) => MenuItem[] // extra: after the next step's item (the tab bar's Layout)
   zoom: (d: number) => void
+  AI_TIP: string
+  achMore: number
+  aiFab: boolean
+  aiFloat: boolean
+  behindMenu: (w: WorkspaceView) => MenuItem[]
+  branchFull: boolean
+  connected: boolean
+  fly: "" | "down" | "landed" | "up"
+  infoOf: (w: WorkspaceView, cfg?: ProjectConfig | undefined) => WsInfo
+  limits: (rows: AgentUsage[]) => AgentUsage[]
+  noBar: boolean
+  pageBar: boolean
+  portStop: (ws: WorkspaceView, port: number) => ReactNode | null
+  portUp: boolean
+  ports: number[]
+  problem: string | undefined
+  readerApi: ReaderApi
+  setBranchFull: Dispatch<SetStateAction<boolean>>
+  shortBranch: (b: string, pre?: string) => string
+  toAi: () => void
+  tracked: string[]
+  tunnelApi: (w: WorkspaceView) => TunnelApi
+  turnApi: (ws: string) => TurnApi
+  upd: UpdateState | null
 }
 
 // and what the parts App builds first give the ones after: the menus (menusOf), the Layout menu (layoutOf)
