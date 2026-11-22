@@ -28,7 +28,7 @@ export function widgetWhat(id: string) {
   const [runs, code]: [string, string?] =
     src.kind === 'static' ? ['runs nothing: its data is typed in']
     : src.kind === 'file' ? ['reads this file', src.path]
-    : src.kind === 'url' ? [localUrl(src.url ?? '') ? 'fetches this URL, a service on this Mac' : 'fetches this URL', src.url]
+    : src.kind === 'url' ? [localUrl((src.url ?? '').replace(/\{\{[^{}]*\}\}/g, '0')) ? /* a setting's {{…}} as a stand-in: the host as written */ 'fetches this URL, a service on this Mac' : 'fetches this URL', src.url]
     : src.kind === 'ai' ? [`asks an agent this${src.tools ? `, with ${src.tools.replace(/[`*_[\]]/g, '')}` : ''}`, src.prompt && src.prompt.length > 1500 ? `${src.prompt.slice(0, 1500)}…` : src.prompt]
     : fetch ? [`runs this${w.m.stream ? ' and keeps it running' : ''}`, fetch]
     : ['runs nothing (no fetch)']
