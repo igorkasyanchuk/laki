@@ -484,9 +484,13 @@ old*). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waite
 (`callback_data` `nonce:n`, unsigned: only the paired user's private chat counts) at answer and up unless titles only; its
 `message_id` stays with the nonce (`awaiting`'s `msg`), and as it goes (`gone`) `tgDone` edits it
 (`editMessageText` with an empty `inline_keyboard`) to say *Picked: …* or *Answered on the Mac, or it moved on*. A tap
-from the paired user (level answer and up) is `takeTap`, its callback answered with what it did. P2: each push's
+from the paired user (level answer and up, and on) is `takeTap`, its callback answered with what it did; a batch
+stops as its loop is aborted (the next loop reads the rest from the offset, never twice). Pairing another person
+starts at answer and forgets the old chat's messages (`forget`, as Unpair and a new bot do). Remote access's link
+(`phoneRemote`: its token and key) never goes to Telegram. P2: each push's
 `message_id` → its tab (`remember`, the newest 500 in `<data>/telegram-msgs.json`, 0600, so it outlives a restart); a
-message that replies to one (`reply_to_message`) goes there (`deliver`): a waiting ask's choice when the text is its
+message that replies to one (`reply_to_message`; not a workspace Recording mode hides) goes there (`deliver`; a slash
+in a reply or a topic is a command only when it's a known one: a path is words): a waiting ask's choice when the text is its
 number or its words (`answer` with `label`), else `send` with `whenIdle` (and *Queued* when an ask waits), a 👍
 (`setMessageReaction`, refused quietly) its receipt, a failure said back (*Not sent: …*); a photo (its biggest size) or a
 document: `getFile`, then `/file/bot<token>/<path>` read up to 20 MB (`readCapped`) into core's `imageSave` or `fileSave`,
@@ -512,7 +516,9 @@ to a message in a topic go in it (`sayIn`); words in a topic that reply to nothi
 chat as before. Remote access's Keep
 never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
 format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
-paired at answer with its When, a group's only a notice to pair again; `settingsSet` refuses the format. `telegramSet`,
+paired at answer with its When, a group's (or a URL with no token of a bot's shape) only a notice; saved at once (the
+token off the disk's state.json); `tgStart` names the bot (`getMe`; offline: again as the poll first works) and sets
+the menu; `settingsSet` refuses the format. `telegramSet`,
 `telegramPair`, `telegramTest` are the user's: AGENT_NO, REMOTE_NO, ANSWER_NO, no client's scope. `LAKI_TELEGRAM_API`:
 tests' fake Bot API (localhost only). Tested in `test/telegram.test.ts`.
 

@@ -5,7 +5,7 @@
 // is ignored without a word. What it may do is its level (types.ts TgLevel); what goes out goes through phone.ts' rules
 // (Do not disturb, mute, Recording mode, titles only) and redact, a message a second at most.
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { readCapped, writeAtomic } from '../shared/conn.ts'
 import type { Telegram, TelegramView, TgLevel, Webhook } from '../shared/types.ts'
@@ -13,7 +13,7 @@ import { LIMITS, limitsOf } from './clients.ts'
 import { changed, fileSave, imageSave, log, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
-import { hidden, takeTap } from './phone.ts'
+import { hidden, pickedFor, takeTap } from './phone.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { type Push, pushText, tapOf } from './push.ts'
 import { redact } from './share.ts'
@@ -29,7 +29,7 @@ const keyFile = () => join(dir, 'telegram-token')
 const token = () => keyRead(KEY, keyFile())
 const T = (): Telegram => (state.telegram ??= {})
 const RANK: Record<TgLevel, number> = { notify: 0, answer: 1, control: 2 }
-export const levelOf = (t = state.telegram): TgLevel => (t?.level && t.level in RANK ? t.level : 'answer')
+export const levelOf = (t = state.telegram): TgLevel => (t?.level && Object.hasOwn(RANK, t.level) ? t.level : 'answer')
 export const levelAtLeast = (l: TgLevel) => RANK[levelOf()] >= RANK[l]
 // pushes go: a bot and a paired user, not turned off
 export const tgOn = () => !!state.telegram?.user && !state.telegram.off && !!token()
@@ -135,6 +135,11 @@ function msgMap() {
   }
   return msgs
 }
+// a new bot or none, or unpaired: the old chat's ids mean nothing (a new chat's could collide)
+function forget() {
+  msgs = new Map()
+  rmSync(msgFile(), { force: true })
+}
 function remember(msg: number, tab: string) {
   const m = msgMap()
   m.delete(msg)
@@ -194,7 +199,12 @@ async function threadOf(tab?: string) {
       ws.id,
       out<{ message_thread_id: number }>('createForumTopic', { chat_id: chat(), name: cut(ws.name || ws.id, 128), icon_color: COLORS[[...ws.id].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length] }) // ponytail: a color by its id, not its own color's nearest
         .then(
-          r => ((T().threads ??= {})[ws.id] = r.message_thread_id, save(), r.message_thread_id),
+          r => {
+            if (!state.workspaces.some(w => w.id === ws.id)) return void out('deleteForumTopic', { chat_id: chat(), message_thread_id: r.message_thread_id }).catch(() => {}) // gone meanwhile
+            ;(T().threads ??= {})[ws.id] = r.message_thread_id
+            save()
+            return r.message_thread_id
+          },
           e => void ((T().topics = false), (T().notice = `Topics are off: Telegram didn't make one (${scrub((e as Error).message)}). Turn topics on for the bot in @BotFather, then here again`), log(`telegram: ${scrub((e as Error).message)}`), save(), changed()),
         )
         .finally(() => making.delete(ws.id)),
@@ -234,7 +244,7 @@ let offset = 0
 let lastOk = 0 // a poll answered then: a tap in the first batch after a gap may be from hours ago (a callback has no date)
 let ignored = 0 // updates from anyone else, since the last log line
 // it runs while a pairing code waits, or paired, on, and at answer or control
-const wanted = () => !!token() && !!state.telegram?.bot && (!!pair && pair.until > Date.now() ? true : tgOn() && levelAtLeast('answer'))
+const wanted = () => !!token() && (!!pair && pair.until > Date.now() ? true : tgOn() && levelAtLeast('answer'))
 export function sync() {
   if (wanted() && !ctl) void loop()
   else if (!wanted() && ctl) ctl.abort(), (ctl = undefined)
@@ -262,7 +272,9 @@ async function loop() {
       lastOk = Date.now()
       wait = 1000
       if (failed) log('telegram: reached again'), (failed = '')
+      if (!state.telegram?.bot) void named() // its name not known yet (offline as Laki started)
       for (const u of ups) {
+        if (c.signal.aborted) break // a new loop reads the rest from this offset: never twice
         offset = Math.max(offset, u.update_id + 1)
         await take(u, gap).catch(e => log(`telegram: ${scrub((e as Error).message)}`))
       }
@@ -295,6 +307,7 @@ async function take(u: Update, gap: boolean) {
   if (m && code && pair && pair.until > Date.now() && same(code, pair.code) && Date.now() / 1000 - m.date < STALE / 1000) {
     pair = undefined
     const was = state.telegram?.user
+    if (was?.id !== from.id) forget(), (T().level = 'answer') // another person: from Answer, as every pairing starts
     Object.assign(T(), { user: { id: from.id, name: nameOf(from), at: Date.now() }, notice: undefined, off: undefined, threads: was?.id === from.id ? state.telegram?.threads : undefined })
     T().level ??= 'answer'
     save()
@@ -306,6 +319,7 @@ async function take(u: Update, gap: boolean) {
     return sync()
   }
   if (from.id !== state.telegram?.user?.id) return void ignore()
+  if (!tgOn()) return // turned off (a pairing code's poll reads the chat): nothing acted on
   if (q) {
     const tap = !gap && levelAtLeast('answer') ? tapOf(q.data, '', false) : undefined
     const said = tap && (await takeTap(tap))
@@ -314,10 +328,14 @@ async function take(u: Update, gap: boolean) {
   if (!m) return
   if (Date.now() / 1000 - m.date > STALE / 1000) return void sayIn(m, 'Laki was off when you sent that: send it again.')
   if (!levelAtLeast('answer')) return
-  const cmd = /^\/([a-z_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i.exec(m.text?.trim() ?? '')
-  if (cmd) return command(cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), m).catch(e => void sayIn(m, `Not done: ${esc(scrub((e as Error).message))}`))
   const inWs = wsOfThread(m.message_thread_id)
-  const tab = (m.reply_to_message && msgMap().get(m.reply_to_message.message_id)) || (inWs && shownWs(inWs) ? state.tabs.find(t => t.workspace === inWs && tracked(t))?.id : undefined)
+  const to = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
+  // a command; in a reply or a topic only a known one (a path like /Users/… is words for the agent)
+  const cmd = /^\/([a-z_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i.exec(m.text?.trim() ?? '')
+  const name = cmd?.[1].toLowerCase()
+  if (cmd && (!(to || inWs) || name === 'start' || name === 'help' || COMMANDS.some(x => x[0] === name)))
+    return command(name!, (cmd[2] ?? '').trim(), m).catch(e => void sayIn(m, `Not done: ${esc(scrub((e as Error).message))}`))
+  const tab = (to && (t => t && shownWs(t.workspace) && t.id)(state.tabs.find(x => x.id === to))) || (inWs && shownWs(inWs) ? state.tabs.find(t => t.workspace === inWs && tracked(t))?.id : undefined)
   if (!tab) return void sayIn(m, inWs ? 'This workspace has no agent now.' : "Reply to one of my messages about an agent (swipe it left, or long-press it › Reply) and what you write goes to that agent.")
   await deliver(tab, m).then(
     () => react(m),
@@ -335,7 +353,7 @@ async function deliver(tab: string, m: TgMessage) {
   const s = sessions.get(tab)
   const ask = !f && rtOf(tab).status === 'waiting' && s && !s.exited ? s.ask() : undefined
   const o = ask?.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase())
-  if (o) return void (await act('answer', { tab, n: o.n, label: o.label }))
+  if (o) return void (await act('answer', { tab, n: o.n, label: o.label }), pickedFor(tab, `Picked: ${o.label}`))
   if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
   if (!text) throw new Error('nothing to send')
   await act('send', { target: tab, text, whenIdle: true })
@@ -422,7 +440,17 @@ async function command(c: string, arg: string, m: TgMessage) {
   const d = await act<{ files: { path: string; add: number; del: number }[] }>('diff', { ws: t.workspace })
   const add = d.files.reduce((n, f) => n + f.add, 0)
   const del = d.files.reduce((n, f) => n + f.del, 0)
-  return void sayIn(m, d.files.length ? `${head}: +${add} −${del} · ${d.files.length} file${d.files.length === 1 ? '' : 's'}\n${d.files.slice(0, 40).map(f => `<code>${esc(cut(f.path, 120))}</code> +${f.add} −${f.del}`).join('\n')}` : `${head}: no changes`)
+  if (!d.files.length) return void sayIn(m, `${head}: no changes`)
+  // Telegram takes 4,096 characters: the files that fit, then how many more
+  const lines: string[] = []
+  let size = head.length + 60
+  for (const f of d.files) {
+    const l = `<code>${esc(cut(f.path, 120))}</code> +${f.add} −${f.del}`
+    if (size + l.length > 3500) break
+    lines.push(l), (size += l.length + 1)
+  }
+  const more = d.files.length - lines.length
+  return void sayIn(m, `${head}: +${add} −${del} · ${d.files.length} file${d.files.length === 1 ? '' : 's'}\n${lines.join('\n')}${more ? `\n…and ${more} more` : ''}`)
 }
 
 // the receipt: a 👍 on your message (Telegram may refuse a reaction: then none)
@@ -437,19 +465,20 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
     if (!tok) {
       keyWrite(KEY, keyFile(), '')
       Object.assign(t, { bot: undefined, user: undefined, threads: undefined, notice: undefined })
+      forget()
       pair = undefined
     } else {
       if (!TOKEN.test(tok)) throw new Error("that isn't a bot token: BotFather's looks like 123456789:AA… (35 characters after the colon)")
       const me = await tg<{ id: number; username?: string; first_name?: string; has_topics_enabled?: boolean }>('getMe', {}, { tok })
       if (!me.username) throw new Error('Telegram says that token is no bot')
       keyWrite(KEY, keyFile(), tok)
-      if (t.bot?.id !== me.id) Object.assign(t, { user: undefined, threads: undefined }) // another bot: pair again
+      if (t.bot?.id !== me.id) Object.assign(t, { user: undefined, threads: undefined }), forget() // another bot: pair again
       Object.assign(t, { bot: { id: me.id, username: me.username, name: me.first_name ?? me.username, topics: !!me.has_topics_enabled }, notice: undefined, off: undefined })
       offset = 0
     }
   }
   if (p.level !== undefined) {
-    if (typeof p.level !== 'string' || !(p.level in RANK)) throw new Error('level: notify, answer or control')
+    if (typeof p.level !== 'string' || !Object.hasOwn(RANK, p.level)) throw new Error('level: notify, answer or control')
     t.level = p.level as TgLevel
   }
   if (p.topics === true && t.bot && !t.bot.topics) {
@@ -461,7 +490,7 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
   for (const k of ['off', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
   if (p.off === false) t.notice = undefined // on again (Try again after a 409): its notice read
   if (p.detail !== undefined) t.detail = p.detail === 'titles' ? 'titles' : undefined
-  if (p.unpair === true) Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), log('telegram: unpaired'), said('unpaired')
+  if (p.unpair === true) Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), forget(), log('telegram: unpaired'), said('unpaired')
   if (p.level !== undefined) commandsSet(), said(`level ${t.level}`)
   save()
   sync()
@@ -491,7 +520,8 @@ export function tgMigrate(w: Webhook) {
   const tok = u && /^\/bot([^/]+)\//.exec(u.pathname)?.[1]
   const id = Number(u?.searchParams.get('chat_id'))
   delete state.settings!.webhook
-  if (!tok || !TOKEN.test(decodeURIComponent(tok))) return
+  setImmediate(save) // the URL (its token) off state.json on disk now, not at the next change
+  if (!tok || !TOKEN.test(decodeURIComponent(tok))) return void (T().notice = "Your Telegram push's URL had no bot token Laki could read: set your bot up again here (step 1)")
   keyWrite(KEY, keyFile(), decodeURIComponent(tok))
   const t = T()
   Object.assign(t, { level: 'answer', waiting: w.waiting, done: w.done === true, detail: w.detail })
@@ -499,12 +529,20 @@ export function tgMigrate(w: Webhook) {
   else t.notice = 'Your Telegram pushes went to a group: Laki now pairs one person in their private chat with the bot. Pair again (step 2)'
   log('telegram: the phone push to Telegram moved to Settings › Telegram')
 }
-// the bot's name (getMe) once, for one migrated or kept from before
-export async function tgStart() {
-  if (token() && !state.telegram?.bot)
-    await tg<{ id: number; username?: string; first_name?: string; has_topics_enabled?: boolean }>('getMe').then(
-      me => me.username && ((T().bot = { id: me.id, username: me.username, name: me.first_name ?? me.username, topics: !!me.has_topics_enabled }), save()),
+// the bot's name (getMe), for one migrated or kept from before: as Laki starts, else as the poll first works
+let naming = false
+async function named() {
+  if (naming || !token() || state.telegram?.bot) return
+  naming = true
+  await tg<{ id: number; username?: string; first_name?: string; has_topics_enabled?: boolean }>('getMe')
+    .then(
+      me => void (me.username && ((T().bot = { id: me.id, username: me.username, name: me.first_name ?? me.username, topics: !!me.has_topics_enabled }), save(), changed())),
       e => log(`telegram: ${(e as Error).message}`),
     )
+    .finally(() => (naming = false))
+}
+export async function tgStart() {
+  await named()
   sync()
+  if (tgOn()) commandsSet() // the level's menu, a migrated pairing's too
 }

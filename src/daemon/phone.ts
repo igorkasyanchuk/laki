@@ -106,6 +106,8 @@ const gone = (k: string, said = 'Answered on the Mac, or it moved on') => {
   awaiting.delete(k)
   if (a?.msg && a.push) tgDone(a.msg, a.push, said)
 }
+// a tab's pushed ask answered some other way (a Telegram reply's number): its message says what was picked
+export const pickedFor = (tab: string, said: string) => awaiting.forEach((a, k) => a.tab === tab && gone(k, said))
 // the webhook's taps come back: Answer from the phone where they can (answerOk), never with titles only
 const hookAnswers = (w: Webhook) => !!w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'webpush' || ((w.format ?? 'ntfy') === 'ntfy' && !!w.replyTopic))
 // still asking what it pushed: a tab's menu on screen, a run's wait (workflow.ts' waitKey); remote access's Keep until
@@ -198,10 +200,10 @@ export function flowAsk(run: { id: string; name: string; ws?: string }, question
   send(t, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })) }, key ? { flow: run.id, key } : undefined, { what: run.name })
 }
 // D4: remote access's link to your phone (settings.remotePush, off unless set): as it starts, moves to a new address,
-// stops on its own (why) or pairs a new device. Never with *anyone with the link* (open): the webhook's host (Telegram's
-// servers too) sees the link, so the page must ask for more (a PIN, an email, the tailnet). Never the PIN
+// stops on its own (why) or pairs a new device. Never with *anyone with the link* (open): the webhook's host sees the
+// link, so the page must ask for more (a PIN, an email, the tailnet). Never the PIN, never to Telegram
 export function phoneRemote(title: string, o: { url?: string; open?: boolean } = {}) {
-  const t = to('any')
+  const t = { ...to('any'), tg: false } // never to Telegram: the link holds remote access's token and key, and Settings › Remote access names only the webhook's host
   if (state.settings?.remotePush !== true || (!t.hook && !t.tg) || o.open) return
   send(t, { event: 'remote', workspace: '', tab: '', agent: 'Laki', title, ...(o.url && { url: o.url }) }, undefined, { what: 'remote access' })
 }

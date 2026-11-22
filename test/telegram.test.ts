@@ -129,6 +129,12 @@ test('P1: pairing: only a private /start with the live code pairs, once; a wrong
   b.message(`/start ${code}`, { from: 69 }) // used: another user's try with it changes nothing
   await until(() => b.of('getUpdates').length >= 6, 'read')
   assert.equal((await rig.rpc('state')).telegram.user.name, 'Ada')
+  // another person paired after an unpair starts at Answer, whatever the last one had
+  await rig.rpc('telegramSet', { level: 'control' })
+  await rig.rpc('telegramSet', { unpair: true })
+  b.message(`/start ${new URL((await rig.rpc('telegramPair')).link).searchParams.get('start')}`, { from: 70 })
+  await until(async () => (await rig.rpc('state')).telegram?.user, 'paired again')
+  assert.equal((await rig.rpc('state')).telegram.level, 'answer')
   // a new code, run out before its /start
   await rig.rpc('telegramSet', { unpair: true })
   const late = new URL((await rig.rpc('telegramPair')).link).searchParams.get('start')
@@ -228,6 +234,8 @@ test('P2: a reply to a push goes to its tab (a waiting ask: a choice by its numb
   b.message('and the empty email too', { reply: done.id })
   await until(async () => /answer: and the empty email too/.test(await rig.screen(tab.id)), 'the reply sent to claude')
   await until(() => b.of('setMessageReaction').some(c => c.body.reaction[0].emoji === '👍'), 'the receipt')
+  b.message('/Users/me/app/log.txt has it', { reply: done.id }) // a path, not a command
+  await until(async () => /answer: \/Users\/me\/app\/log\.txt has it/.test(await rig.screen(tab.id)), 'a path sent as words')
   b.message('!rm -rf /', { reply: done.id })
   await until(() => b.of('sendMessage').some(c => /Not sent: .*a line that starts with !/.test(c.body.text)), 'a ! line refused')
   b.message('hello') // not a reply: how to send one
