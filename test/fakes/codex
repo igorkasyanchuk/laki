@@ -34,9 +34,9 @@ const n = args.find(a => a.startsWith('notify='))
 const notify = n ? JSON.parse(n.slice(7)) : null
 const thread = args[0] === 'resume' ? args[1] : 'thread-' + Math.random().toString(36).slice(2, 8)
 const script = require('./script.cjs')() // FAKE_SCRIPT: the demo's words, not the echo
+process.stdin.setRawMode(true) // before its banner: keys sent once it shows are read raw (cooked, a \r would be a \n)
 process.stdout.write(`\x1b[?2004h${script ? '>_ OpenAI Codex\r\n\r\n' : 'fake codex\r\n'}> `)
 let line = ''
-process.stdin.setRawMode(true)
 process.stdin.on('data', d => {
   for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
     if (ch === '\r') {

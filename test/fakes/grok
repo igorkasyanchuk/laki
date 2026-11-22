@@ -19,10 +19,10 @@ const turn = t => {
 }
 const flags = ['--resume', '--session-id', '--model']
 const positional = args.filter((a, i) => !a.startsWith('--') && !flags.includes(args[i - 1]))
+process.stdin.setRawMode(true) // before its banner: keys sent once it shows are read raw (cooked, a \r would be a \n)
 if (positional.length) turn(positional.at(-1))
 else process.stdout.write('> ')
 let line = ''
-process.stdin.setRawMode(true)
 process.stdin.on('data', d => {
   for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
     if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); if (asking && t === 'y') { asking = ''; turn('allowed') } else turn(t) }

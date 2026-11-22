@@ -25,8 +25,8 @@ const turn = t => {
   setTimeout(() => (process.stdout.write(`answer: ${t}\r\n> `), say('done')), 300)
 }
 const bye = code => (process.stdout.write(`\r\nResume with -c (or command below): agy --conversation=${conv}\r\n`), process.exit(code))
+process.stdin.setRawMode(true) // before its banner: keys sent once it shows are read raw (cooked, a \r would be a \n)
 process.stdout.write(`\x1b[?2004hfake agy ${args.join(' ')}\r\n`)
-process.stdin.setRawMode(true)
 let line = ''
 let started = false
 const start = () => {

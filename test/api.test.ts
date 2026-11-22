@@ -130,7 +130,9 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   const sh = await rig.rpc('tabNew', { ws: ws.id })
   await rig.rpc('resize', { tab: sh.id, cols: 100, rows: 40 })
   await rig.rpc('send', { target: sh.id, text: 'stty size' })
-  await until(async () => (await rig.screen(sh.id)).includes('40 100'), 'the new size')
+  await until(async () => (await rig.screen(sh.id)).includes('40 100'), 'the new size').catch(async e => {
+    throw new Error(`${e.message}; its screen then: ${JSON.stringify(await rig.screen(sh.id))}`) // which half was lost: the size or the line
+  })
   const a = await rig.connect()
   const b = await rig.connect()
   await a.call('attach', { tab: sh.id })
