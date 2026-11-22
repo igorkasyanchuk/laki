@@ -300,13 +300,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await c(`(e => { e.value = 'make it like this'; e.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })(document.querySelector('#card.pinned input'))`)
     }, async () => !pinned.tab && (await rpc<string>('screen', { target: ws.answered.id, lines: 30 })).includes('make it like this')],
     ['bubble-front', async () => setFront(true), async () => !floater?.isVisible()],
-    // U5: the Ship sheet on dark-mode (notes.txt uncommitted): its file with a box, the PR's title drafted, Open PR
+    // U5: the Ship sheet on dark-mode (notes.txt uncommitted, its PR #42 open): its file with a box, the PR's title
+    // drafted, Push to PR (the main button follows the PR)
     ['ship-sheet', async () => {
       await key('Escape')()
       await click(row(ws.dark.id))()
       await waitFor(() => has('.tabbar [aria-label^="Ship:"]'), 'the Ship button')
       await click('.tabbar [aria-label^="Ship:"]')()
-    }, async () => (await hasText('.ship-file', 'notes.txt')) && (await js<string>("document.querySelector('.ship-form input')?.value ?? ''")) !== '' && (await hasText('.ship button.primary', 'Open PR'))],
+    }, async () => (await hasText('.ship-file', 'notes.txt')) && (await js<string>("document.querySelector('.ship-form input')?.value ?? ''")) !== '' && (await hasText('.ship button.primary', 'Push to PR'))],
     // U11: the sidebar from the keyboard: its one tab stop, ↓ to another workspace's row, Enter opens it
     ['tree-keys', async () => {
       await key('Escape')()
