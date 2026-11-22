@@ -342,7 +342,8 @@ device full access there*). Every api method is in `ANSWER` or `ANSWER_NO`, chec
 classified before any test runs. The HTTP `/rpc` of a remote page calls with a Conn of its own (`remote`, its `device`),
 and Laki AI's tools for a remote ask (`aiAsk`, `aiAnswer`'s rpc) go through that Conn's gates, REMOTE_NO and the level
 (ponytail: a message queued behind another's ask runs with that ask's). The page's view has `remote.level` (main.ts'
-`send` adds it per remote connection; the Mac's view has none): menus.ts keeps only the items that level may do (by
+`send` adds it per remote connection; the Mac's view has none; a page that asks for patches, P2, gets them diffed
+against its own masked, leveled view): menus.ts keeps only the items that level may do (by
 label), the rail only the Board, the Calendar and AI, and the terminals take no keys (`api.answerOnly`,
 `disableStdin`). Tests: `test/api.test.ts` *D7*.
 

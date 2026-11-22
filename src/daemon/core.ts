@@ -3,6 +3,7 @@
 // modules that import it and that it imports: hosts, pr, files, remote, resources, artifacts, meters, phone,
 // schedule (main.ts and the others import each directly, not through core.ts). None of the modules in this cycle
 // reads another's const or let as it loads (test/load-order.test.ts); the data folder is dir.ts', out of it.
+import type { Sent } from '../shared/viewPatch.ts'
 import { artHostOk } from '../shared/artHosts.ts'
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
@@ -164,7 +165,7 @@ export const turnStarts = new Set<(tab: Tab) => void>()
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
 // and each turn that stops to ask (a moment after its hook: the menu it draws, askOf's options; none read: none)
 export const turnWaits = new Set<(tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => void>()
-export type Conn = Client & { remote?: boolean; device?: string /* D3: remote access's paired device, by its id */; locked?: boolean /* D6: a passkey device's page before its unlock: only UNLOCK's calls, nothing sent but LOCK_EVS */; at?: number /* D6: its last call */; asked?: Set<unknown> /* D6: the calls it made while locked, the only answers it gets */; ip?: string /* D6: the address its tunnel reported (a wrong PIN's log) */; view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
+export type Conn = Client & { patch?: boolean /* P2: it asked for patches (?patch=1) */; sent?: Sent /* P2: what it got last, the next patch's base */; remote?: boolean; device?: string /* D3: remote access's paired device, by its id */; locked?: boolean /* D6: a passkey device's page before its unlock: only UNLOCK's calls, nothing sent but LOCK_EVS */; at?: number /* D6: its last call */; asked?: Set<unknown> /* D6: the calls it made while locked, the only answers it gets */; ip?: string /* D6: the address its tunnel reported (a wrong PIN's log) */; view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -1088,9 +1089,11 @@ let pending: NodeJS.Timeout | null = null
 // the view as last sent: the same again isn't (claude's every tool call says running; each view the app gets, it
 // draws again whole). A client that connects gets one of its own (main.ts)
 let sent = ''
-// a client that connects: the view now, and the next change goes out to all, whatever was sent before it came
+// a client that connects: the view now (whole: P2's patches start from it), and the next change goes out to all,
+// whatever was sent before it came
 export function hello(c: Conn) {
   sent = ''
+  c.sent = undefined
   c.send({ ev: 'state', view: view() })
 }
 export function changed() {

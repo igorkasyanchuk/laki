@@ -23,6 +23,7 @@ import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
 import { meme } from './fun.ts'
 import { getPublic } from './netAddr.ts'
+import { viewDiff } from '../shared/viewPatch.ts'
 import { artBlocked, artCsp, artHostOk } from '../shared/artHosts.ts'
 import * as core from './core.ts'
 import * as agentCliMod from './agentCli.ts'
@@ -2013,6 +2014,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     const mineNow = () => mine && (!wsTerm || core.termOk(wsTerm))
     const c: core.Conn = {
       id: ++clientSeq,
+      ...(url.searchParams.get('patch') === '1' && { patch: true }), // P2: the renderer's (api.ts): states as patches
       remote: far,
       ...(device && { device, at: Date.now(), ip: ipOf(req) }),
       ...(locked && { locked: true, asked: new Set() }),
@@ -2028,6 +2030,13 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         const yours = isState && mineNow() // a state only: termOk per message would run on every byte of a screen
         if (isState && (!yours || (agent && core.state.settings?.recording)))
           msg = (m => ({ ...m, view: (v => (far && v.remote ? { ...v, remote: { ...v.remote, level: remoteMod.levelOf(c.device) } } : v))((v => (yours ? v : masked(v)))(agent ? recorded(m.view) : m.view)) }))(typeof msg === 'string' ? JSON.parse(msg) : msg) // D7: a remote page's own access
+        if (isState && c.patch) {
+          // P2: what changed since its last, as this client sees it (masked or not); the whole view first (hello)
+          const d = viewDiff(c.sent, (typeof msg === 'string' ? JSON.parse(msg) : msg).view)
+          c.sent = d.sent
+          if (!d.msg) return
+          msg = d.msg
+        }
         const text = typeof msg === 'string' ? msg : JSON.stringify(msg) // a string: JSON already (core's state, made once for all)
         ws.send(ch ? ch.seal(text) : text) // S14: remote access's, sealed
       },

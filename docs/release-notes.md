@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The window, and a phone over remote access, get only what changed with each update from Laki's background service: a tab's status is under 1 KB, where the whole state was about 40 KB with 60 workspaces.
 - Settings › *Notifications*, after General: Quiet, macOS notifications and a table of what tells you where (macOS, a card on screen, the phone, the sound) for each event, where General held them before; old links still land there. [Try it](laki://settings/notifications)
 - A report opened in Laki's viewer can't send what it knows to a host of its choosing: it loads scripts from cdnjs, jsDelivr and unpkg (Chart.js works as before) and pictures from its own folder, and a bar names any other host it wanted, with *Allow for this report*, *Always allow* and *Keep blocked*.
 - An extension's URL source can't be redirected to this Mac or your network: a host other than `localhost` (your own service, read as before) must be https on the internet, and so must every redirect it gives.

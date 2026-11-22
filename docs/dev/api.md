@@ -531,8 +531,14 @@ WebSocket events:
   `settingsSet` puts a `MASK` back as the value it hides (`unmasked`), so a masked page's save changes nothing;
   what `settingsSet` and `presetSave` answer with is masked too unless the caller is you (`call()`'s end);
   E6 measured it (2026-11, 60 workspaces, 140 tabs, 5 agents' hooks every 2 s): 40 KB an event, about one a second
-  (the 30 ms debounce and `sent` fold the hooks), ~42 KB/s; JSON.stringify 0.12 ms, JSON.parse 0.3 ms. Under the bar
-  for per-slice patches (a few ms, a few hundred KB/s): whole states stay. Measure again before adding them;
+  (the 30 ms debounce and `sent` fold the hooks), ~42 KB/s; JSON.stringify 0.12 ms, JSON.parse 0.3 ms.
+  P2 (API 221): a socket that asks (`/ws?…&patch=1`: the renderer's, api.ts `wsURL`) gets the whole view first (on
+  connect and after `hello`), then patches: `{ ev: 'state', patch, gone?, items? }`, only the top-level keys whose JSON
+  changed (`gone`: the ones that left), and for `workspaces` and `tabs` only the items that changed, by id
+  (`items.tabs.set`), with `order` (the ids) when it changed; nothing at all when this client's view is the same
+  (`shared/viewPatch.ts` `viewDiff`, against `Conn.sent`, what it got last). The diff is per client, after its own
+  masking, Recording mode and remote level, so a phone's patches are of its masked view. A tab's status: that tab
+  alone, under 1 KB (`test/upgrade.test.ts`); a socket without `patch=1` (an older app, the CLI) gets whole views as before;
 - `data` and `responder`: per tab;
 - `turn`: waiting, done or limit, for notifications;
 - `browse`: an agent browser op, for the app (above);

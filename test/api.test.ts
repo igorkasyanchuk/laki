@@ -703,6 +703,16 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await assert.rejects(connect(rig, undefined, tok))
   const c = await connect(rig, url, tok, true) // S11: its token in its first message
   assert.equal(await c.call('ping'), 'pong')
+  // P2: a phone that asks for patches: its whole view first, masked, then patches of its masked view
+  await rig.rpc('settingsSet', { env: { API_TOKEN: 'fake-secret-1' } })
+  const pc = await connect(rig, url, tok, true, true)
+  const whole = await until(() => pc.events.find(e => e.ev === 'state' && e.view), 'its whole view')
+  assert.notEqual(whole.view.settings.env?.API_TOKEN, 'fake-secret-1', 'masked')
+  await rig.rpc('settingsSet', { env: { API_TOKEN: 'fake-secret-2', OTHER_KEY: 'fake-secret-3' } }) // a new value under the mask alone: no patch (the masked view is the same)
+  const p2 = await until(() => pc.events.find(e => e.ev === 'state' && e.patch?.settings?.env?.OTHER_KEY), 'a patch of its settings')
+  assert.equal(p2.view, undefined)
+  assert.ok(!JSON.stringify(pc.events).includes('fake-secret'), 'masked in every patch too')
+  pc.close()
   // S14: end to end: a sealed /rpc and its sealed answer; a clear one, a salt again and a wrong tag refused
   const secret = farKey(url)!
   const rpcSealed = (body: Uint8Array, salt: Buffer) => fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url, 'x-laki-e2e': salt.toString('base64') }, body: body as BodyInit })

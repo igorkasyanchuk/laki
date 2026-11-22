@@ -237,9 +237,9 @@ export class FarWs extends EventEmitter {
   raw: WebSocket
   ch?: Channel
   private queued: string[] = []
-  constructor(port: number, origin: string, headers: Record<string, string>, auth: string, secret = farKeys.get(origin)) {
+  constructor(port: number, origin: string, headers: Record<string, string>, auth: string, secret = farKeys.get(origin), query = '') {
     super()
-    this.raw = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin, headers })
+    this.raw = new WebSocket(`ws://127.0.0.1:${port}/ws${query}`, { origin, headers })
     this.raw.on('error', e => this.emit('error', e))
     this.raw.on('close', (code, reason) => this.emit('close', code, reason))
     this.raw.on('message', (raw, binary) => {
@@ -274,10 +274,11 @@ export class FarWs extends EventEmitter {
 }
 
 // A WebSocket client like the renderer's: requests by id, events collected.
-// auth: as remote access's page (S11): the token in its first message, none in the URL; S14: sealed (FarWs)
-export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string, auth = false) {
+// auth: as remote access's page (S11): the token in its first message, none in the URL; S14: sealed (FarWs). patch: as
+// the renderer asks (P2: states as patches after the first)
+export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string, auth = false, patch = false) {
   const { port, token: tk } = rig.info()
-  const ws = auth && origin ? new FarWs(port, origin, {}, token ?? '') : new WebSocket(auth ? `ws://127.0.0.1:${port}/ws` : `ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
+  const ws = auth && origin ? new FarWs(port, origin, {}, token ?? '', undefined, patch ? '?patch=1' : '') : new WebSocket(auth ? `ws://127.0.0.1:${port}/ws${patch ? '?patch=1' : ''}` : `ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}${patch ? '&patch=1' : ''}`, origin ? { origin } : {}) // S1: the app's window's token
   let seq = 0
   const waiting = new Map<number, (m: any) => void>()
   const events: any[] = []

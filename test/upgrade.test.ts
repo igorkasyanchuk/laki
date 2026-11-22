@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { daemonInfo, daemonStale, ensureDaemon, freshDaemon, isDaemonCmd, NODE_API, pidRunning, rpc } from '../src/shared/conn.ts'
 import { API } from '../src/shared/types.ts'
-import { fresh, until } from './helpers.ts'
+import { connect, fresh, until } from './helpers.ts'
 
 const ORIGIN_API = 167 // main's: the first API with app://laki
 // an old daemon: daemon.json with its port, token and pid (bin: the copy that started it), ping as an old one answers,
@@ -90,4 +90,27 @@ test("S9: an update: an old daemon that refuses the new app's shutdown is stoppe
   assert.ok(existsSync(join(rig.data, 'daemon.json')) && daemonInfo()?.pid === third.pid)
   process.kill(third.pid, 'SIGTERM')
   await until(() => !pidRunning(third.pid), 'stopped at the end')
+})
+
+test("P2: a window that asks gets patches (a tab's status: that tab alone, under 1 KB); an older one, whole views as before", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id), 'its agent')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle')
+  const now = await connect(rig, undefined, undefined, false, true)
+  const old = await connect(rig) // a window from before P2: no ?patch=1
+  await until(() => now.events.some(e => e.ev === 'state' && e.view) && old.events.some(e => e.ev === 'state'), 'both have a view')
+  const from = [now.events.length, old.events.length]
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'go' } })
+  const patch = await until(() => now.events.slice(from[0]).find(e => e.ev === 'state' && e.items?.tabs?.set.some((x: any) => x.id === tab.id && x.status === 'running')), 'its patch')
+  assert.equal(patch.view, undefined)
+  assert.deepEqual(patch.items.tabs.set.map((x: any) => x.id), [tab.id], 'that tab alone')
+  assert.equal(patch.items.workspaces, undefined)
+  assert.ok(JSON.stringify(patch).length < 1024, `${JSON.stringify(patch).length} bytes: ${JSON.stringify(patch).slice(0, 300)}`)
+  const whole = await until(() => old.events.slice(from[1]).find(e => e.ev === 'state' && e.view?.tabs.some((x: any) => x.id === tab.id && x.status === 'running')), 'the old one\'s whole view')
+  assert.ok(whole.view.settings && whole.view.workspaces.length, 'whole, as before')
+  assert.ok(!old.events.some(e => e.ev === 'state' && !e.view), 'never a patch')
+  now.close()
+  old.close()
 })

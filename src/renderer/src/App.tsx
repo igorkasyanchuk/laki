@@ -1414,7 +1414,7 @@ export function App() {
         setLocked(null) // D6: unlocked (its state comes only then)
         const shown = veiled(m.view) // Recording mode: private workspaces out of everything drawn
         hid.current = shown === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !shown.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
-        const v = viewShare(viewRef.current, shown) // the last view's objects where nothing changed: memo'd rows, tabs and panes draw again only where something did
+        const v = m.patched ? shown : viewShare(viewRef.current, shown) // the last view's objects where nothing changed: memo'd rows, tabs and panes draw again only where something did (P2: a patch kept them already, no compare)
         settle([...m.view.workspaces.map((w: WorkspaceView) => w.id), ...m.view.tabs.map((t: TabView) => t.id)]) // V7: what's here as the window opens doesn't grow in
         // V13: a row pinned or unpinned slides to its new group. ponytail: Pinned only; Needs you's are cards of their own
         const was = viewRef.current

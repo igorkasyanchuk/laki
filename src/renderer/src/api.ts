@@ -2,6 +2,7 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the link's key alone in the hash (#t=…, S11) on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+import { viewPatch } from '../../shared/viewPatch'
 import type { Method, Out, ParamsOf } from '../../shared/api'
 import { outCall, outFlush } from './outbox'
 import type { InboxItem, TrayInfo } from '../../shared/tray'
@@ -133,7 +134,7 @@ function pageToken() {
 async function wsURL() {
   const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? pageToken() }))(new URLSearchParams(location.hash.slice(1)))
   const at = port ? `ws://127.0.0.1:${port}` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` // no port: the page's own daemon
-  return { url: port ? `${at}/ws?token=${encodeURIComponent(token)}` : `${at}/ws`, token, remote: !port } // S11: remote's in its first message
+  return { url: port ? `${at}/ws?token=${encodeURIComponent(token)}&patch=1` : `${at}/ws?patch=1`, token, remote: !port } // S11: remote's in its first message; P2: states as patches (an older daemon sends whole ones)
 }
 
 // the daemon's address for a frame (a JS widget's page): its port here, or none: the page's own daemon (remote access)
@@ -170,6 +171,7 @@ async function pinNeed(token: string): Promise<{ need: boolean; left?: number; t
 }
 
 class Api {
+  private last: Record<string, unknown> | null = null // P2: the last whole view, a patch's base (a new socket's first state replaces it)
   private ws: WebSocket | null = null
   private seq = 0
   private waiting = new Map<number, { res: (v: any) => void; rej: (e: Error) => void }>()
@@ -239,6 +241,13 @@ class Api {
         up()
       }
       const handle = (m: any) => {
+        if (m.ev === 'state') {
+          // P2: a patch onto the last whole view (a socket's first state is whole); every listener reads a whole one,
+          // patched: true says what didn't come kept its objects
+          if (m.view) this.last = m.view
+          else if (this.last && (m.patch || m.items || m.gone)) m = { ev: 'state', view: (this.last = viewPatch(this.last, m)), patched: true }
+          else return
+        }
         if (m.ev === 'e2e-device' && typeof m.key === 'string') return void baseKey(fromB64(m.key)).then(k => keyPut('device', k)) // D3: its next visits (no link) seal with it
         if (m.ev === 'locked') this.locked = true // D6: a passkey device's page, until its state comes
         if (m.ev === undefined && m.id !== undefined) { // a reply; an event may carry an id of its own (a workflow run's)

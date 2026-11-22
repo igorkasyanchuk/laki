@@ -124,7 +124,9 @@ are tested in `test/units-more.test.ts`.
   flag 1 rendered).
 - **Structural sharing** (2026-11): a `state` event's view keeps the last one's objects where nothing changed
   (`viewShare.ts`: workspaces, tabs, projects and widgets by id and JSON, other top-level fields by JSON;
-  `test/view-share.test.ts`), so a memo'd part sees the same object unless something of its own changed. Three parts are
+  `test/view-share.test.ts`), so a memo'd part sees the same object unless something of its own changed. A patch (P2:
+  api.ts applies it onto its last view, `viewPatch`, before any listener: they all read a whole view) keeps every
+  object it didn't name already, so App skips viewShare for it (`m.patched`). Three parts are
   kept (ui.tsx `Kept`: a render function and its deps, each compared by `Object.is`): a sidebar row (`Sidebar.tsx`
   `wsRow`), a tab of the tab bar (`TabList`) and a pane's body and foot (`Panes`' `deps`, App's `paneDeps`). Their deps
   list what they draw from (a row: its workspace, its tabs one by one, the settings, projects, widgets, flows, whether
