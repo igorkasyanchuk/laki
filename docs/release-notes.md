@@ -62,6 +62,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Settings › Security › *Terminals*: the terminals you allowed to run laki as you, with what started each and its last call; *Revoke* makes it ask again. One with no call for 12 hours asks again too. [Try it](laki://settings/security?spot=Terminals)
 - *What will this do?*: the ? beside a command an agent asks to run (or E on its card) has Laki AI say in a sentence what it does, and whether it can't be undone or reaches outside the workspace. Only on your click; it answers nothing.
 - Safety fix: a project's notes and memory kept in its repo (`.laki/`) are read only when the file is still a plain one as it's opened, and at 1 MB at most, so a file swapped for a link to one elsewhere (your SSH key) is never read and handed to agents.
+- Laki's background service no longer runs a core at full speed when the pipe its log goes to closes (`laki serve` piped into a command that ended): those log lines are dropped.
 
 ## 0.58.0 · Nov 20, 2026
 

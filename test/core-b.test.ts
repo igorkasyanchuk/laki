@@ -85,7 +85,7 @@ exec /usr/sbin/lsof "$@"
   writeFileSync(join(d, 'uid'), String(uid + 1))
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 4567 }), /ghost \(pid 4194304\) isn't yours to stop/)
   writeFileSync(join(d, 'uid'), String(uid))
-  // it ended as it was asked to (ESRCH): no error, and SIGKILL's check 3 s later finds it gone too
+  // it ended as it was asked to (ESRCH): no error, and SIGKILL's check after it (0.3 s here) finds it gone too
   const killedAt = Date.now()
   assert.deepEqual(await rig.rpc('portKill', { ws: ws.id, port: 4567 }), { pid: ghost, cmd: 'ghost' })
 
@@ -450,7 +450,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`
-  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '300', LAKI_ANSWER_HOLD_MS: '300' } }) // a wait's push 0.3 s on, an answer's hold 0.3 s
+  const rig = await fresh(t, { env: { LAKI_ANSWER_HOLD_MS: '300' } }) // an answer's hold 0.3 s; a wait's push as ever, 0.8 s on: room for two hooks under load
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
   const a = await rig.tab(ws.id)
@@ -459,10 +459,10 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   for (const x of [a, b]) await until(async () => /> $/m.test(await rig.screen(x.id)), 'claude up')
   await rig.rpc('settingsSet', { webhook: { url, answer: true, replyTopic: 'r1' } }) // ntfy, the default
 
-  // a wait that's over within the 0.3 s before its push: none goes
+  // a wait that's over within the 800 ms before its push: none goes
   await rig.rpc('hook', { tab: a.id, state: 'waiting', payload: { message: 'quick one' } })
   await rig.rpc('hook', { tab: a.id, state: 'running' })
-  await sleep(500)
+  await sleep(1000) // past the 0.8 s
   assert.equal(posts.length, 0)
   await state(rig) // seen running: its next wait pushes
   await rig.rpc('hook', { tab: a.id, state: 'idle', payload: {} })

@@ -64,7 +64,7 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
     } catch (e) {
       last = e
     }
-    await new Promise(r => setTimeout(r, Math.min(50, 5 << n))) // 5, 10, 20, 40 ms, then every 50: most waits are short
+    await new Promise(r => setTimeout(r, n < 4 ? 5 << n : 50)) // 5, 10, 20, 40 ms, then every 50: most waits are short
   }
   throw new Error(`timed out after ${(ms * SLOW) / 1000} s waiting for ${what}${last ? `: ${last}` : ''}${SLOW > 1 ? ` (waits ×${SLOW}: LAKI_TEST_SLOW or the load)` : ''}`)
 }
@@ -102,7 +102,20 @@ const repos = new Map<string, string>()
 // node's compile cache for the rig's daemons, CLIs, hooks and fakes, one per test process: the daemon's 1.4 MB bundle
 // compiled once, not at every start (no daemon, HOME or data is shared: only V8's code for the same files)
 let compiled: string | undefined
-const compileCache = () => (compiled ??= mkdtempSync('/tmp/laki-cc-'))
+const compileCache = () => (compiled ??= (sweep(), mkdtempSync(`/tmp/laki-cc-${process.pid}-`)))
+// both by this process's pid: a run killed midway (no exit handler then) leaves them, and the next one removes those
+// whose process is gone
+let swept = false
+function sweep() {
+  if (swept) return
+  swept = true
+  for (const n of readdirSync('/tmp')) {
+    const pid = Number(/^laki-(?:cc|repo)-(\d+)-/.exec(n)?.[1])
+    try {
+      if (pid && pid !== process.pid && !running(pid)) rmSync(join('/tmp', n), { recursive: true, force: true })
+    } catch {} // another's it can't remove: left
+  }
+}
 process.once('exit', () => {
   repos.forEach(r => rmSync(dirname(r), { recursive: true, force: true }))
   if (compiled) rmSync(compiled, { recursive: true, force: true })
@@ -111,7 +124,8 @@ function repoFor(config: object | undefined, env: Record<string, string>) {
   const key = JSON.stringify(config ?? null)
   const made = repos.get(key)
   if (made) return made
-  const r = join(mkdtempSync('/tmp/laki-repo-'), 'repo')
+  sweep()
+  const r = join(mkdtempSync(`/tmp/laki-repo-${process.pid}-`), 'repo')
   const at = { ...env, HOME: dirname(r) } // no rig's home: its git config, if a test wrote one, isn't the template's
   execFileSync('git', ['init', '-q', '-b', 'main', r], { env: at })
   writeFileSync(join(r, 'README.md'), 'hello\n')

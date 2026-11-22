@@ -2,6 +2,7 @@
 // a test's daemon gone with its test process.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { get } from 'node:http'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -45,6 +46,29 @@ test("a test's daemon goes with its test process (LAKI_TEST_PARENT): a run kille
   parent.kill()
   await until(() => !running(daemon.pid!), 'gone with its parent')
   assert.ok(!existsSync(join(rig.data, 'daemon.json')), 'shut down, not killed: its daemon.json removed')
+})
+
+// its stdout and stderr pipes' reader gone (the test process killed, `laki serve | head`): its log lines are dropped,
+// not an EPIPE that's uncaught, logged and fails again (a loop at 100% CPU, the parent's check starved: it never ended)
+test("a daemon whose log's reader is gone still answers and ends with its parent", async t => {
+  const rig = await fresh(t)
+  await rig.stop()
+  const parent = spawn('sleep', ['60'])
+  const daemon = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/daemon/main.ts', import.meta.url))], {
+    env: { ...rig.env, LAKI_TEST_PARENT: String(parent.pid), LAKI_PARENT_MS: '200' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  t.after(() => (parent.kill(), daemon.kill('SIGKILL')))
+  await until(() => rig.rpc('ping').then(r => r === 'pong'), 'the daemon up')
+  daemon.stdout!.destroy()
+  daemon.stderr!.destroy()
+  // a WebSocket from another Origin, refused, and logged once per Origin (fetch won't send an upgrade: node:http does)
+  const refused = (origin: string) =>
+    new Promise<void>(ok => get({ port: rig.info().port, host: '127.0.0.1', path: '/ws', headers: { connection: 'Upgrade', upgrade: 'websocket', origin } }).on('error', () => ok()).on('response', r => (r.resume(), ok())).on('upgrade', (_, so) => (so.destroy(), ok())))
+  for (let i = 0; i < 3; i++) await refused(`https://x${i}.example`)
+  assert.equal(await rig.rpc('ping'), 'pong')
+  parent.kill()
+  await until(() => !running(daemon.pid!), 'gone with its parent', 10000)
 })
 
 test('resume after a daemon restart: agents get --resume <id>, shells start fresh', async t => {

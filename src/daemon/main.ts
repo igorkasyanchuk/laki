@@ -2319,5 +2319,8 @@ function shutdown(keep: unknown = false) {
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)
 if (inRig()) process.on('SIGUSR2', () => ptyClose(true)) // a test's daemon only (test/ptyhost.test.ts): its pty host connection dropped, as a bad frame drops it
+// a stdout or stderr whose reader is gone (a test's rig ended, laki serve | head): its lines dropped. Unheard, the EPIPE is an
+// uncaught error whose log line fails again: a loop at 100% CPU that never lets the daemon end
+for (const s of [process.stdout, process.stderr]) s.on('error', () => {})
 process.on('uncaughtException', e => (log('uncaught', e), core.troubled(e))) // R6: counted, in the view's trouble: the app's bar
 process.on('unhandledRejection', e => (log('unhandled', e), core.troubled(e)))

@@ -214,7 +214,6 @@ test('ports of the workspace process tree, their names, stopping one; PR from gh
       run: `exec node -e 'process.on("SIGTERM", () => {}); const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'`,
       ports: { '3100': 'web', '3200': { name: 'api' } }, // not a string: left out
     },
-    env: { LAKI_KILL_AFTER_MS: '1200' }, // SIGKILL 1.2 s after the ignored SIGTERM, not 3
   })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
@@ -231,7 +230,7 @@ test('ports of the workspace process tree, their names, stopping one; PR from gh
   assert.equal(w.procs[m[1]].cmd, 'node')
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 1 }), /nothing of \S+ listens on :1/)
   assert.equal((await rig.rpc('portKill', { ws: ws.id, port: Number(m[1]) })).pid, w.procs[m[1]].pid)
-  await sleep(700) // 2 port scans (every 0.3 s), short of the SIGKILL
+  await sleep(700) // 2 port scans (every 0.3 s), well short of the SIGKILL 3 s after the SIGTERM
   assert.ok((await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'SIGTERM shrugged off')
   await until(async () => !(await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'killed, gone from the list', 6000)
 })

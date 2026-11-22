@@ -459,21 +459,21 @@ test("Hide secret-looking variables from agents: on, claude's env lacks NPM_TOKE
   assert.equal((await envOf(2)).NPM_TOKEN, 'fake-npm')
 })
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
-  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '500' } }) // a failure or none asked again 0.5 s on
+  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1000' } }) // a failure or none asked again 1 s on: room for two calls under load
   const asks = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] === 'app-server').length
   await rig.rpc('settingsSet', { env: { FAKE_MODELS: 'fail' } })
   await assert.rejects(rig.rpc('agentModels', { agent: 'codex' }), /ended without its models/)
   await assert.rejects(rig.rpc('agentModels', { agent: 'codex' }), /ended without its models/) // kept: not started again
   assert.equal(asks(), 1)
-  await sleep(600) // past MODELS_RETRY (0.5 s here)
+  await sleep(1100) // past MODELS_RETRY (1 s here)
   await rig.rpc('settingsSet', { env: { FAKE_MODELS: 'empty' } })
   assert.deepEqual(await rig.rpc('agentModels', { agent: 'codex' }), [])
   assert.deepEqual(await rig.rpc('agentModels', { agent: 'codex' }), [])
   assert.equal(asks(), 2)
-  await sleep(600) // past MODELS_RETRY (0.5 s here)
+  await sleep(1100) // past MODELS_RETRY (1 s here)
   await rig.rpc('settingsSet', { env: {} })
   assert.equal((await rig.rpc('agentModels', { agent: 'codex' }))[0].id, 'gpt-x')
-  await sleep(600) // past MODELS_RETRY (0.5 s here)
+  await sleep(1100) // past MODELS_RETRY (1 s here)
   assert.equal((await rig.rpc('agentModels', { agent: 'codex' }))[0].id, 'gpt-x') // a list: a day
   assert.equal(asks(), 3)
 })
