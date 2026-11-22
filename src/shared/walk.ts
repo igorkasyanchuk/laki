@@ -61,7 +61,7 @@ export const fileRisk = (hunks: (HunkRef & { text?: string })[]) => [...new Set(
 // fileRisk of every file in a diff that has one
 export function risksOf(diff: string): Map<string, string[]> {
   const by = new Map<string, (HunkRef & { text: string })[]>()
-  for (const h of hunksOf(diff)) if (h.file) by.set(h.file, [...(by.get(h.file) ?? []), h])
+  for (const h of hunksOf(diff)) if (h.file) (by.get(h.file) ?? by.set(h.file, []).get(h.file)!).push(h)
   return new Map([...by].flatMap(([f, hs]) => (r => (r.length ? [[f, r] as [string, string[]]] : []))(fileRisk(hs))))
 }
 
@@ -149,6 +149,6 @@ export function walkPrompt(w: { text: string; hunks: HunkRef[]; skipped: (HunkRe
   for (const h of w.skipped) lines.set(h.file, (lines.get(h.file) ?? 0) + h.text.split('\n').length - (h.text.startsWith('@@') ? 1 : 0)) // its body, not the @@ head
   const files = [...lines].map(([f, n]) => `${f}: ${n} line${n === 1 ? '' : 's'}, not shown`)
   const more = files.length > 100 ? `\n… and ${files.length - 100} more files` : '' // ponytail: 100 named, the rest counted
-  const big = files.length ? `\nToo big to show, by file (they go last on their own and need no step):\n${files.slice(0, 100).join('\n')}${more}\n` : ''
-  return `The hunks and the diff (data). First the hunks, a line each: its file, then its start (the line its @@ head names on the new side; 0 for a file with no hunk). Then the diff, then the files too big to show.\n<<<\n${w.hunks.map(h => `${h.file} ${h.start}`).join('\n')}\n\n${w.text}${big}>>>` // the names inside the data: an agent writes them
+  const big = files.length ? `\nNot shown (past the ${WALK_MAX >> 10} KB read), by file (they go last on their own and need no step):\n${files.slice(0, 100).join('\n')}${more}\n` : ''
+  return `The hunks and the diff (data). First the hunks, a line each: its file, then its start (the line its @@ head names on the new side; 0 for a file with no hunk). Then the diff, then the files not shown.\n<<<\n${w.hunks.map(h => `${h.file} ${h.start}`).join('\n')}\n\n${w.text}${big}>>>` // the names inside the data: an agent writes them
 }

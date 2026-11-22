@@ -146,7 +146,7 @@ test('walk: a hunk too big is skipped, not the end: the smaller ones after it st
   const w2 = walkInput([file('big.ts', mid), file('yarn.lock', '+a\n'), file('a.ts', '+b\n')].join(''))
   assert.deepEqual(w2.hunks.map(h => h.file), ['a.ts', 'big.ts', 'yarn.lock'])
   assert.equal(w2.cut, false)
-  assert.equal(walkPrompt(w2).includes('Too big'), false)
+  assert.equal(walkPrompt(w2).includes('Not shown'), false)
   // every hunk too big: nothing read, cut, Everything else alone
   const huge = `+${'z'.repeat(99)}\n`.repeat(2100) // 210 KB
   const w3 = walkInput([file('a.ts', huge), file('b.ts', huge)].join(''))

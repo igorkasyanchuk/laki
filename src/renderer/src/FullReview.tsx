@@ -670,7 +670,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 </button>
               </div>
               {stale && <div className="warn small pad">The changes moved since these steps: a step may miss some, or name ones gone. Again asks anew.</div>}
-              {walk.cut && <div className="muted small pad">{walk.skipped ? `${walk.skipped} change${walk.skipped === 1 ? '' : 's'} Laki AI did not read (too big): under ${REST}.` : `Over 200 KB: Laki AI read the first part, the rest is under ${REST}.`}</div>}
+              {walk.cut && <div className="muted small pad">{walk.skipped ? `${walk.skipped} change${walk.skipped === 1 ? '' : 's'} Laki AI did not read (past its 200 KB): under ${REST}.` : `Over 200 KB: Laki AI read the first part, the rest is under ${REST}.`}</div>}
               {walk.steps.map((x, i) => {
                 const risky = [...new Set(x.hunks.flatMap(h => (h.risky ? [h.risky] : [])))]
                 const n = new Set(x.hunks.map(h => h.file)).size

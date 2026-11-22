@@ -26,7 +26,7 @@ const modals: object[] = [] // the open Modals, the newest last: Esc closes that
 export function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
   const typed = useRef(false)
   const box = useRef<HTMLDivElement>(null)
-  useEffect(() => (modals.push(box), () => void modals.splice(modals.indexOf(box), 1)), [])
+  useEffect(() => (modals.push(box), () => void (i => i >= 0 && modals.splice(i, 1))(modals.indexOf(box))), [])
   useEffect(() => {
     if (box.current?.closest('.app > :is(aside, main)')) return
     const root = document.documentElement
