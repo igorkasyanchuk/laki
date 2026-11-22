@@ -658,6 +658,15 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
 - **The daemon's side.** `Session` takes a `Pty` (node-pty's, or `HostPty`): `spawnTab` gives it a `HostPty` when the
   setting is on and the host is up; a `HostPty`'s pid is -1 until the host says, and the host signals the job (`group`).
   A host that goes ends its terminals with a line saying so, and is started again for the next ones.
+- **A lost connection** (`regain`: a bad frame or a refused one closes it while the host runs on): with terminals open,
+  they're kept, nothing told exited, while it's dialed again at 0.1, 0.4, 1.2 and 2.2 s (`GRACE`, 3 s; `up`'s `start`
+  false: a host is never started for it). Back on the same host (its pid), each `HostPty` attaches again from its
+  `offset` (where its output got to here: the `attach` reply's and every `data` frame's `at`; `again`), what it printed
+  meanwhile drawn in order, then what was typed meanwhile (held, 64 KB a terminal, past that dropped and said once in
+  daemon.log), the last resize and a kill (a tab closed meanwhile); one the host no longer has ends. Then `orphans`
+  forgets what the host runs that this daemon doesn't hold. No host there (refused, its socket gone), another pid, or
+  none in 3 s: as before (`gone`). While it's down, new tabs' terminals run in the daemon (`ptyTakes`). A test's
+  daemon drops it on SIGUSR2 (main.ts, `inRig` only; test/ptyhost.test.ts).
 - **A daemon that starts** (`core.ptyAdopt`, before `restoreAll`): lists the host's terminals; each live one whose tab
   is still here gets its `Session` back (`spawnTab`'s `adopt`: nothing started), the mirror drawn from the host's buffer
   (`Session.replay`: muted, so old queries get no answer and old hooks and OSC 7501 reports aren't heard twice). The

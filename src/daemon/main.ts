@@ -16,7 +16,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
 import * as clientLogMod from './clientLog.ts'
-import { HostPty, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
+import { HostPty, ptyClose, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
@@ -2219,5 +2219,6 @@ function shutdown(keep: unknown = false) {
 }
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)
+if (inRig()) process.on('SIGUSR2', () => ptyClose(true)) // a test's daemon only (test/ptyhost.test.ts): its pty host connection dropped, as a bad frame drops it
 process.on('uncaughtException', e => (log('uncaught', e), core.troubled(e))) // R6: counted, in the view's trouble: the app's bar
 process.on('unhandledRejection', e => (log('unhandled', e), core.troubled(e)))

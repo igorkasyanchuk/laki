@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A dropped connection to the terminals' own process no longer ends your tabs: Laki reconnects within 3 seconds and each tab goes on where it was, with what it printed meanwhile and what you typed.
 - Frosted's panels have macOS 26's continuous corners, glass or not (18px inside the window's), and more cards and controls take them: the side panel, profiles, accounts, themes, segmented buttons, Run, the rail's icons.
 - Settings › Appearance › *Diff style*: *Quiet* keeps the code's own color on a light tint with a bar at the line's edge, instead of coloring the whole line (*Filled*, the default).
 - New workspace's agent picker shows what's left of each profile's plan after its name (*62% of week*), in the warning color with its reset at 10% or under.

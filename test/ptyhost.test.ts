@@ -161,13 +161,26 @@ test('the pty host: with no terminal and no daemon it ends by itself; one of ano
   back.flow()
   await until(() => (was + after).includes('n19999\r'), 'all of it')
   assert.deepEqual((was + after).match(/n\d+/g), Array.from({ length: 20000 }, (_, i) => `n${i}`))
-  // the connection lost with the host still there: its terminal was told gone here, so it's ended there too
+  // the connection lost with the host still there (a bad frame drops it): its terminals kept, attached again from
+  // where their output got to, what they printed meanwhile drawn, what was typed meanwhile sent once it's back
   const np = back.pid
   assert.ok(running(np))
+  const tick = new pty.HostPty('g1', { file: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 300 ]; do echo "g$i"; i=$((i+1)); sleep 0.01; done; sleep 30'], cwd: home, env: {}, cols: 80, rows: 24 })
+  let ticks = ''
+  tick.onData(d => (ticks += d))
+  const cat = new pty.HostPty('c1', { file: '/bin/cat', args: [], cwd: home, env: {}, cols: 80, rows: 24 })
+  let echoed = ''
+  cat.onData(d => (echoed += d))
+  await until(() => ticks.includes('g20\r') && cat.pid > 0, 'they run')
   pty.ptyClose(true)
-  await until(() => gone === 1 && !running(np) && pty.ptyOn(), 'ended in the host once this daemon is back', 15000)
-  assert.equal(pty.ptyPid(), hello.pid)
-  assert.deepEqual(await pty.ptyList(), [])
+  cat.write('typed-in-the-gap\r')
+  await until(() => pty.ptyOn() && ticks.includes('g299\r'), 'attached again, the output whole', 15000)
+  assert.deepEqual(ticks.match(/g\d+/g), Array.from({ length: 300 }, (_, i) => `g${i}`), 'every line once, in order')
+  await until(() => echoed.includes('typed-in-the-gap'), 'what was typed meanwhile')
+  assert.deepEqual([gone, back.pid, running(np), pty.ptyPid()], [undefined, np, true, hello.pid])
+  assert.deepEqual((await pty.ptyList()).map(p => p.id).sort(), ['c1', 'g1', 'n1'])
+  for (const id of ['c1', 'g1', 'n1']) pty.ptyForget(id)
+  await until(async () => (await pty.ptyList()).length === 0 && !running(np), 'let go')
   // a HostPty as Session uses it: output, exit, and a host that goes takes its terminals with a line saying so
   const p = new pty.HostPty('t1', { file: '/bin/sh', args: ['-c', 'echo up; sleep 30'], cwd: home, env: {}, cols: 80, rows: 24 })
   let out = ''
@@ -246,6 +259,38 @@ test("a daemon killed mid-command starts again: the terminal still runs, its out
   assert.ok(running(pid2))
   await rig.start()
   await until(() => !running(pid2) && !existsSync(join(rig.data, 'pty.sock')), 'the host and its shell ended')
+})
+
+// a lost connection to a pty host that still runs (a bad frame drops it; the rig's SIGUSR2 does it here): its tabs go
+// on, the lines printed meanwhile drawn once each, the same process; a host that dies ends them as before
+test('a dropped pty host connection: the tab goes on, its output whole, the same process; a dead host ends it', async t => {
+  const rig = await fresh(t)
+  await until(() => existsSync(join(rig.data, 'pty.sock')), 'the pty host')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const aw = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'ag', prompt: 'busy' })
+  const agent = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === aw.id && x.kind === 'agent'), 'an agent')
+  await until(async () => (await rig.screen(`${aw.id}/${agent.id}`)).includes('> '), 'its prompt')
+  const shell = await rig.rpc('tabNew', { ws: aw.id, kind: 'shell' })
+  const target = `${aw.id}/${shell.id}`
+  const said = join(rig.home, 'said')
+  await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === shell.id)?.status !== undefined, 'the shell up')
+  await rig.rpc('input', { tab: shell.id, data: `echo $$ > ${said}; for i in $(seq 1 30); do echo tick-$i; sleep 0.1; done\r` })
+  await until(async () => (await rig.screen(target)).includes('tick-3'), 'its first lines')
+  const pid = Number(readFileSync(said, 'utf8').trim())
+  process.kill(rig.info().pid, 'SIGUSR2')
+  await until(() => /back: \d+ terminals attached again/.test(rig.out), 'attached again')
+  const screen = (await until(async () => (s => s.includes('tick-30') && s)(await rig.screen(target)), 'the rest of its output')) as string
+  for (let i = 1; i <= 30; i++) assert.equal(screen.match(new RegExp(`^tick-${i}\\s*$`, 'gm'))?.length, 1, `tick-${i} once in:\n${screen}`)
+  assert.ok(running(pid), 'the same shell')
+  await rig.rpc('input', { tab: shell.id, data: 'echo "same $$"\r' })
+  await until(async () => (await rig.screen(target)).includes(`same ${pid}`), 'it answers as before')
+  assert.match(rig.out, /connection lost: \d+ terminals kept/)
+  assert.doesNotMatch(await rig.screen(`${aw.id}/${agent.id}`), /the pty host is gone/, 'the agent tab too')
+  // the host dies: its tabs end, as before
+  const host = Number(/## Pty host\non; running, pid (\d+)/.exec(await rig.rpc('diagnostics'))![1])
+  process.kill(host, 'SIGKILL')
+  await until(async () => (await rig.screen(`${aw.id}/${agent.id}`)).includes('the pty host is gone'), 'the agent tab told')
+  await until(async () => !running(pid) && !(await rig.rpc('state')).tabs.some((x: any) => x.id === shell.id), 'the shell gone with it, its tab closed as a shell that ends is')
 })
 
 // R9: on by default for a new install; a host that can't start or speaks another protocol leaves new terminals in the
