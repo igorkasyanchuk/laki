@@ -38,6 +38,15 @@ test('no more any in src than test/any-baseline.txt', () => {
   assert.ok(n <= base, `${n} ": any" or "as any" in src, the baseline ${base}: remove the any you added (a real type, unknown, a narrower one), or raise test/any-baseline.txt to ${n} on purpose in the same commit`)
 })
 
+// T14: the api table's handlers whose params are typed ((p: In<typeof fn>), or a shape of their own): their calls get
+// params and results checked. Never fewer than this floor (raise it as more are typed; lower it only on purpose)
+const TYPED_MIN = 49
+test(`main.ts' api: ${TYPED_MIN} handlers with typed params at least`, () => {
+  const table = read('src/daemon/main.ts').split('\nconst api = {')[1].split('\n} satisfies Record<string, Handler>')[0]
+  const n = table.match(/^  \w+: (async )?\(p: (In<typeof [\w.]+>|\{[^}]*\})\) =>/gm)?.length ?? 0
+  assert.ok(n >= TYPED_MIN, `${n} handlers with typed params, the floor ${TYPED_MIN}: type the params of the one you changed (p: In<typeof fn>), or lower TYPED_MIN on purpose`)
+})
+
 // T14: a daemon call by a name made at run time (conn.ts rpcAny, the window's callAny) skips the typecheck's name and
 // params: kept to the few that must, never above this ceiling (lower it as they go; raise it only on purpose)
 const RPC_ANY_MAX = 10

@@ -330,7 +330,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
   confirm, anyone with the link), with a token and an origin of its own that end with it; only the page's static files skip the checks.
 - **Daemon calls are typed** (T14, `src/shared/api.ts`): new calls go through `rpc` (conn.ts) or the window's `call`
   by a name the typecheck knows (main.ts' api table, `export type Api`); a handler whose params are typed (`In<typeof
-  fn>`, notes' so far) has its params and result checked on a call with no result type given. A name made at run time:
+  fn>`: notes', and the schedule, flow, plan, client and PR ones; test/docs.test.ts' `TYPED_MIN` keeps their count from going down) has its params and result checked on a call with no result type given. A name made at run time:
   `rpcAny` / `callAny`, held to `RPC_ANY_MAX` (test/docs.test.ts); `test/types/api.test-d.ts` is the typecheck's own test.
 - **A type from another module is `import type`**, not `import { type X }`: with `verbatimModuleSyntax` the latter keeps
   the module in the bundle, and a lazy page (Dialogs.tsx' `PRELOAD`) lands back in the window's first load.

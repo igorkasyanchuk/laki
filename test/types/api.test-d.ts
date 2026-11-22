@@ -12,5 +12,13 @@ export async function typed() {
   await rpc('note.get', { id: 1 })
   const n: Note = await rpc('noteGet', { id: 'x' }) // its result: the handler's
   const view: { tabs: unknown[] } = await rpc<{ tabs: unknown[] }>('state') // a result type given: the name only
-  return [n, view]
+  // the schedule*, flow*, plan*, client* and pr* handlers typed too
+  // @ts-expect-error: prFix takes a workspace, not a number
+  await rpc('prFix', { ws: 1, what: 'ci' })
+  // @ts-expect-error: flowStop needs its run's id
+  await rpc('flowStop', {})
+  // @ts-expect-error: prThreads' all is a boolean
+  await rpc('prThreads', { ws: 'x', all: 'yes' })
+  const plans = await rpc('planList', { project: 'p' }) // its result: Plan[]
+  return [n, view, plans.length]
 }
