@@ -1549,3 +1549,21 @@ test('lsAppExe: lsappinfo -long’s executable for that pid once it signalled re
   assert.equal(lsAppExe(`${long}\n"CFBundleExecutablePath"="/tmp/x.app/Contents/MacOS/x"`, 33600), undefined, 'a key twice')
   assert.equal(lsAppExe(`${long}\n"pid"=1`, 33600), undefined)
 })
+// Touch ID's bypassNew: a new workspace, tab or race whose agent never asks; its default agent, a command, a shell
+test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one that asks is nothing', async () => {
+  const { confirmOf } = await import('../src/shared/confirm.ts')
+  const presets = [{ name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'calm', agent: 'claude', perm: 'auto' }] as never
+  const cur = { touchId: true, presets }
+  assert.equal(confirmOf('wsNew', { preset: 'yolo' }, cur), 'bypassNew')
+  assert.equal(confirmOf('wsNew', { preset: 'yolo', perm: 'auto' }, cur), undefined, "the call's perm over the profile's")
+  assert.equal(confirmOf('wsNew', { preset: 'calm', perm: 'bypassPermissions' }, cur), 'bypassNew')
+  assert.equal(confirmOf('wsNew', {}, { ...cur, agent: 'yolo' }), 'bypassNew', 'the default agent')
+  assert.equal(confirmOf('wsNew', { cmd: 'make dev' }, { ...cur, agent: 'yolo' }), undefined, 'a command of its own')
+  assert.equal(confirmOf('wsNew', { preset: 'codex', perm: 'acceptEdits' }, cur), 'bypassNew', "codex's -a never")
+  assert.equal(confirmOf('tabNew', { preset: 'yolo' }, cur), 'bypassNew')
+  assert.equal(confirmOf('tabNew', { kind: 'shell' }, cur), undefined)
+  assert.equal(confirmOf('tabNew', {}, cur), undefined, 'no preset: a shell')
+  assert.equal(confirmOf('wsFan', { presets: ['calm', 'yolo'] }, cur), 'bypassNew')
+  assert.equal(confirmOf('wsFan', { presets: ['calm', 'codex'] }, cur), undefined)
+})
+

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- With *Confirm risky actions with Touch ID* on, Laki also asks before a new workspace, tab or race starts an agent that never asks (Bypass permissions, or Codex with approvals off).
 - The wrapper sandbox keeps an agent out of git's settings: in a worktree it writes only the files git commit writes in its git folder, and the worktree's `.git` is read-only to it (one it rewrote could make Laki's own git run a program of its choosing).
 - On macOS 27, Laki's window opened again onto a daemon that was still running (after Quit, or an update) is recognized as the app again: its terminals attach instead of saying *couldn't tell who's calling*.
 - Plan limits for Grok and Antigravity: Antigravity's 5-hour and weekly windows per model group from agy's own /usage (on by default, no turn, no quota), Grok's week from grok.com with its own sign-in (Settings › Layout › Ask grok.com, off by default); a workspace can start when their limit resets.

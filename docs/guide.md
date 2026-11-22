@@ -161,7 +161,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   *Nothing is waiting*.
 - **Confirm risky actions with Touch ID** (off until you turn it on: Settings › General, on a Mac with Touch ID): Laki
   asks for your finger before it starts remote access, pairs a device, turns a tab or a profile to Bypass permissions,
-  shows a webhook's secret or resets the interface, and before this switch goes off. Then only Laki's window can do
+  starts a workspace or a tab whose agent never asks, shows a webhook's secret or resets the interface, and before this switch goes off. Then only Laki's window can do
   these: the `laki` command, a phone and agents are told to do it there.
 - **Show and tell** (off until you turn it on: Settings › General or Keys › Global hotkey, ⌃⌥⌘T suggested; the menu
   bar's *Show and Tell…* and the bubbles' + have it too): from any app, pick a part of the screen, and the quick bar

@@ -180,7 +180,7 @@ class Api {
   locked = false // D6: the page waits for its unlock (a passkey device's): its state, once it comes, opens it as a new socket would
   private caps: string[] = [] // the daemon's, from its last view
   private waits?: { id: string; status?: string; needAt?: number }[] // the last view's tabs: an outbox answer's ask (outbox.ts)
-  private touch?: { touchId: true; presets?: Preset[] } // Touch ID on (the last view's settings.touchId): CONFIRM's calls ask main first
+  private touch?: { touchId: true; presets?: Preset[]; agent?: string } // Touch ID on (the last view's settings.touchId): CONFIRM's calls ask main first
 
   private fails = 0 // connects in a row that never opened
   private pinned = false // the remote page: no PIN asked for (or given)
@@ -248,7 +248,7 @@ class Api {
           if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): close this page and restart it from the yellow bar at the top (agents resume)` : m.error))
           else w?.res(m.result)
         } else {
-          if (m.ev === 'state') (this.touch = m.view?.settings?.touchId ? { touchId: true, presets: m.view.presets } : undefined)
+          if (m.ev === 'state') (this.touch = m.view?.settings?.touchId ? { touchId: true, presets: m.view.presets, agent: m.view.settings.agent } : undefined)
           if (m.ev === 'state') (this.caps = m.view?.caps ?? []), (this.answerOnly = m.view?.remote?.level === 'answer'), (this.waits = m.view?.tabs) // the namespaces it takes (caps.ts): call() sends the rest by their old names; D7: this page's access
           const opens = m.ev === 'state' && this.locked
           if (opens) this.locked = false

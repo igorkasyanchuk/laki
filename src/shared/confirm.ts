@@ -9,6 +9,7 @@ export const CONFIRM = {
   remoteStart: 'start remote access',
   remotePair: 'pair a device with remote access',
   bypass: 'turn on Bypass permissions',
+  bypassNew: 'start an agent with Bypass permissions',
   hookSecret: "show a webhook's secret",
   uiReset: 'reset the interface',
   touchIdOff: 'stop asking for Touch ID before risky actions',
@@ -22,10 +23,23 @@ export const TICKET_MS = 30_000
 // switched to Bypass (tabMode), a profile saved as one that never asks that wasn't one (presetSave, or Settings'
 // whole list), Touch ID turned off; undefined: none
 type P = Record<string, unknown> | undefined
+type Cur = { touchId?: boolean; presets?: Preset[]; agent?: string } // agent: settings.agent, a new workspace's when it names none
 const bypassed = (x: Partial<Preset>, was?: Preset) => neverAsks(x.agent, x.perm, x.args) && !(was && neverAsks(was.agent, was.perm, was.args))
-export function confirmOf(method: string, p: P, cur: { touchId?: boolean; presets?: Preset[] } = {}): ConfirmWhat | undefined {
+// a new tab's agent that never asks: its profile's, or the call's perm over it ('': the agent's own), as core's makeWs and tabSpec read them
+const startsBypassed = (preset: string, perm: unknown, cur: Cur) => {
+  const pr = cur.presets?.find(x => x.name === preset)
+  return neverAsks(pr?.agent ?? preset, perm === undefined ? pr?.perm : String(perm) || undefined, pr?.args)
+}
+export function confirmOf(method: string, p: P, cur: Cur = {}): ConfirmWhat | undefined {
   if (method === 'remoteStart' || method === 'remotePair' || method === 'hookSecret' || method === 'uiReset') return method
   if (method === 'tabMode') return p?.mode === 'bypassPermissions' ? 'bypass' : undefined
+  // a workspace, a tab or a race started with Bypass on (wsNew's preset: the default agent unless a command; tabNew's: none is a shell)
+  if (method === 'wsNew' && p) {
+    const preset = p.preset ? String(p.preset) : typeof p.cmd === 'string' && p.cmd.trim() ? '' : cur.agent || 'claude' // '': a command of its own
+    return preset && startsBypassed(preset, p.perm, cur) ? 'bypassNew' : undefined
+  }
+  if (method === 'tabNew' && p) return !p.kind && p.preset && startsBypassed(String(p.preset), p.perm, cur) ? 'bypassNew' : undefined
+  if (method === 'wsFan' && Array.isArray(p?.presets)) return p.presets.some(x => startsBypassed(String(x), undefined, cur)) ? 'bypassNew' : undefined
   if (method === 'presetSave' && p?.set && typeof p.set === 'object') {
     const was = cur.presets?.find(x => x.name === String(p.name ?? ''))
     return bypassed({ ...was, ...(p.set as Partial<Preset>) }, was) ? 'bypass' : undefined
