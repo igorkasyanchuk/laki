@@ -34,6 +34,10 @@ import type { TunnelApi } from './Tunnel'
 import type { TurnApi } from './TurnStrip'
 import type { UpdateState } from '../../shared/update'
 import type { WsInfo } from './Info'
+import type { Check, LabelApi } from './Info'
+import type { ReviewApi } from './FullReview'
+import type { SelectionUse } from './Term'
+import type { Drag } from './Panes'
 
 // the page or dialog over the workspace, App's `dialog`
 export type Dialog = null | 'toolbar' | 'chats' | 'scriptLogs' | 'new' | 'project' | 'clone' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | 'importantTimer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog; turn?: { tab: string; at: number } /* P5: a turn chip's: that turn's data */ } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; can?: boolean; back?: Dialog } | { sees: 'claude' | 'codex'; in?: string } /* F6: What it sees, from a workspace's Info: in that project */ | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
@@ -434,6 +438,40 @@ export type AppBase = {
   tunnelApi: (w: WorkspaceView) => TunnelApi
   turnApi: (ws: string) => TurnApi
   upd: UpdateState | null
+  artsIn: string | null
+  browsed: string[]
+  checkHid: string[]
+  ciLog: (w: WorkspaceView, c: Check) => void | "" | Window | null
+  closeFile: (f: Opened) => Promise<void>
+  detachPr: (w: WorkspaceView) => undefined
+  finds: Record<string, number>
+  guests: RefObject<Map<string, number>>
+  hookHid: string[]
+  label: (id: string) => ReactNode | undefined
+  labelApi: (w: WorkspaceView) => LabelApi
+  pageSeen: (id: string, url: string, title: string) => void
+  paneDeps: (id: string) => unknown[]
+  paneNow: RefObject<{ openPath: (tab: string, path: string) => Promise<void>; openCode: (tab: string) => (path: string, line: number | undefined, other: boolean) => undefined; selectionTo: (id: string) => (text: string, how: SelectionUse) => void; peekImage: (id: string) => (path: string) => Promise<string | null | undefined>; peekText: (id: string) => (path: string) => Promise<string | null | undefined>; readerApi: ReaderApi; turnApi: (ws: string) => TurnApi; }>
+  previewW: number | null
+  queueRemove: (t: TabView, i?: number) => void
+  queueSave: (t: TabView, queue: string[], was: string[]) => Promise<boolean>
+  readerLive: ReaderApi
+  reviewApi: (w: WorkspaceView) => ReviewApi
+  reviewTight: boolean
+  setCheckHid: Dispatch<SetStateAction<string[]>>
+  setHookHid: Dispatch<SetStateAction<string[]>>
+  setOpenFiles: Dispatch<SetStateAction<Opened[]>>
+  setPreviewW: Dispatch<SetStateAction<number | null>>
+  setReviewTight: Dispatch<SetStateAction<boolean>>
+  setShownFile: Dispatch<SetStateAction<Record<string, string>>>
+  sizeOf: (id: string) => number
+  theme: string
+  turnLive: (ws: string) => TurnApi
+  welcomeRun: (cmd: string) => Promise<void>
+  welcomeSample: (agent?: string) => Promise<void>
+  workerAsks: (tab: string) => { ws: string; name: string; tab: TabView; }[]
+  wsFiles: Opened[]
+  drag: Drag | null
 }
 
 // and what the parts App builds first give the ones after: the menus (menusOf), the Layout menu (layoutOf)

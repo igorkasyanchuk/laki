@@ -487,3 +487,5 @@ export function askTool(m: Msg, view: View | null, settings: Settings) {
   toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
   toolShow()
 }
+
+export const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`

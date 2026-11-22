@@ -1,26 +1,22 @@
 import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type AgentDid, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AchievementsKept, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, type Project, type Sep, type PlanKind, type PlanPin, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AchievementsKept, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, type Project, type Sep, type PlanKind, type PlanPin, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
 import { Outbox } from './OutboxStrip'
-import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, openExternal, openKeptLink, pageNow, passkeyReady, passkeySetUp } from './api'
+import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, openExternal, pageNow, passkeyReady, passkeySetUp } from './api'
 import { setSecretHint } from './secretHint'
 import type { Walk } from '../../shared/walk'
 import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
-import { BrowserPane } from './Browser'
 import type { ReviewApi, Talk } from './FullReview'
-import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, REVIEW, showAvatars, type WsInfo } from './Info'
-import { SideChat } from './SideChat'
-import { isCursor, notInstalled, tabAgent } from '../../shared/install'
-import { Backdrop } from './Backdrop'
-import { CopyDiagnostics, VIEWED, Loading, SnapSkeleton, type NewWsParams, Ready, CheckStrip, GoalStrip, HookStrip, InstallStrip, SignInStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, videoCommand, Welcome, WhatsNew } from './panels'
+import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, type LabelApi, MERGE_WORDS, type PRAct, prState, REVIEW, showAvatars, type WsInfo } from './Info'
+import { CopyDiagnostics, VIEWED, Loading, SnapSkeleton, type NewWsParams, type Shot, videoCommand, WhatsNew } from './panels'
 import type { AppInfo, SkillInfo, WidgetsApi } from './Settings'
-import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, termLook } from './settingsBase' // E8: not the Settings page, which loads as it opens
+import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
@@ -28,27 +24,27 @@ import { onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { hasCap } from '../../shared/caps'
-import { byOrder as extOrder, click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, status as extStatus, TurnChips, type WidgetApi, WidgetBody, WidgetButtons, WidgetPanel } from './Widgets'
+import { byOrder as extOrder, click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, layoutEditor, setLayoutEdit, TurnChips, type WidgetApi, WidgetButtons } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, whenOk } from '../../shared/widgetSchema'
 import { type WorkflowItem } from '../../shared/workflow'
-import { Glyph, rollup } from './Glyph'
+import { Glyph } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
-import { badgeOf, needsTab, nextStep, reviewQueue, type Step, waitsElsewhere } from '../../shared/nextStep'
+import { badgeOf, needsTab, nextStep, type Step, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
-import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
+import { flushDraft, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
 import { AskWrap, turnNext } from './Diff'
-import { type TurnApi, TurnStrip } from './TurnStrip'
+import { type TurnApi } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
-import { Term, xterms, type SelectionUse } from './Term'
+import { xterms, type SelectionUse } from './Term'
 import type { BarItem } from './Phone'
 import { PhoneBar, useDrawerSwipe } from './Phone'
-import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
+import { groupsOf, type Layout, move, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
-import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Commits, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
+import { SideHandle, useTabDrag } from './Panes'
+import { actionMenu, type Changes, type Commits, edited, type FileContent, type FileList, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, type Thread } from './SidePanel'
 import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, pendingWords, initials, isStale, limitsCrossed, limitText, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, paintTheme, css, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, type TunnelApi } from './Tunnel'
@@ -58,7 +54,7 @@ import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
 import { Num, Toasts, morph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
-import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
+import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { onKey } from './keydown'
 import { layoutOf, TabBar, TabStrip } from './TabBar'
@@ -69,11 +65,12 @@ import { AWAY, toolOn, toolShow } from './AppParts'
 import { useDaemon } from './useDaemon'
 import { askTool, useToasts } from './AppParts'
 import { statusBarOf } from './StatusBar'
+import { bodyOf } from './Body'
+import { fileKey } from './AppParts'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
-// E8: loaded as they first show (the Review tab, the floating AI chat): not in the window's first load
-const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.FullReview })))
+// E8: loaded as it first shows (the floating AI chat): not in the window's first load
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
@@ -111,7 +108,6 @@ const RAIL: [RailKind, string, IconName][] = [['projects', 'Projects', 'fork'], 
 const RAIL_FIT = 7
 const RAIL_MORE = ['todos', 'calendar', 'workflows', 'specs', 'board']
 let requests = 0
-const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`
 
 // the last theme (and glass, font), until the daemon's settings arrive
 applyTheme(load<string | Paint>('laki.theme', ''))
@@ -3151,11 +3147,13 @@ export function App() {
     todosOn, toggleArtifacts, toggleFull, togglePanel, toSettings, touch, travel, video, view, waits, watches,
     whereNow, wideBar, widgetApi, ws, wsActions, wsAt, wsHere, wsMore, zoom, cur,
     AI_TIP, achMore, aiFab, aiFloat, behindMenu, branchFull, connected, fly, infoOf, limits, noBar, pageBar, portStop, portUp, ports, problem, readerApi, setBranchFull, shortBranch, toAi, tracked, tunnelApi, turnApi, upd,
+    artsIn, browsed, checkHid, ciLog, closeFile, detachPr, finds, guests, hookHid, label, labelApi, pageSeen, paneDeps, paneNow, previewW, queueRemove, queueSave, readerLive, reviewApi, reviewTight, setCheckHid, setHookHid, setOpenFiles, setPreviewW, setReviewTight, setShownFile, sizeOf, theme, turnLive, welcomeRun, welcomeSample, workerAsks, wsFiles,
+    drag,
   }
   const parts = { ...appBase, ...menusOf(appBase), ...layoutOf(appBase) }
   const app: AppCtx = { ...parts, ...sideOf(parts) }
   cur.current = app
-  const { wsMenu, tabMenu, fileMenu, applyLayout, peekCard } = app
+  const { wsMenu, fileMenu, applyLayout, peekCard } = app
   keys.current = (e, force, fixed) => onKey(app, e, force, fixed)
   const statusBar = statusBarOf(app)
   return (
@@ -3265,220 +3263,7 @@ export function App() {
           </div>
         )}
         {connected && news.length > 0 && <WhatsNew version={appVersion} lines={news} onTry={setLink} onAll={() => (newsSeen(), setDialog({ section: 'notes' }))} onClose={newsSeen} />}
-        <div className="body">
-          {tabsAt === 'left' && <TabStrip app={app} />}
-          <div className="term-wrap" data-review={reviewOn && ws ? '' : undefined}>
-            {group ? (
-              <Panes
-                head={readSwitch}
-                layout={group}
-                active={tab?.id ?? null}
-                drag={drag}
-                label={label}
-                color={id => colorOf(byId(id))}
-                onMenu={(e, id) => wsTabMenu(e, tabMenu([id]))}
-                ghost={drag && (() => { // a pill: the tab's glyph and names, as in the tab bar
-                  const ts = (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null) : [drag.tab]).map(byId).filter((t): t is TabView => !!t)
-                  return ts.length > 1 ? <><Glyph s={rollup(ts)} /><span>{ts.map(t => t.name).join(' · ')}</span></> : label(drag.tab)
-                })()}
-                deps={paneDeps}
-                render={id => floated.includes(id) ? (
-                  <div className="floated">
-                    <span>In a window of its own, over every app</span>
-                    <div className="row">
-                      <button onClick={() => floatTab(id)}>Show it</button>
-                      <button onClick={() => floatTab(id, false)}>Bring it back</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                  <Term
-                    key={transparent() ? 'clear' : 'solid' /* xterm takes allowTransparency only as it opens */}
-                    tab={id}
-                    active={id === tab?.id && !dialog && !reviewOn && !inReader(id)}
-                    findSeq={finds[id] ?? 0}
-                    fontSize={narrow ? Math.min(sizeOf(id), 11) : sizeOf(id) /* ponytail: a phone's own size, not a setting */}
-                    fontFamily={settings.fontFamily}
-                    copyOnSelect={settings.copyOnSelect !== false}
-                    editKeys={settings.editKeys !== false}
-                    theme={theme}
-                    look={termLook(settings)}
-                    onFile={path => paneNow.current.openPath(id, path)}
-                    onReply={replyTo(id).length ? (text, at) => setReply({ tab: id, text, ...at }) : undefined}
-                    onSelection={(text, how) => paneNow.current.selectionTo(id)(text, how)}
-                    onCode={(path, line, other) => paneNow.current.openCode(id)(path, line, other)}
-                    codeTo={settings.fileClick === 'editor' ? 'editor' : 'preview'}
-                    image={path => paneNow.current.peekImage(id)(path)}
-                    text={path => paneNow.current.peekText(id)(path)}
-                    cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
-                    pictures={settings.termPictures !== false}
-                    savePicture={f => keepFile(f, (data, ext) => api.call<string>('imageSave', { data, ext })).then(r => r.path)}
-                  />
-                  {inReader(id) && <Reader tab={byId(id)!} api={readerLive} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
-                  </>
-                )}
-                foot={id =>
-                  (t =>
-                    t && (
-                      <>
-                        <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
-                        <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
-                        <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
-                        {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnLive(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
-                        <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
-                        {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
-                        {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}
-                        {(a => a && notInstalled(t) && (
-                          <InstallStrip
-                            agent={a}
-                            onCopy={copy}
-                            onInstall={cmd => void call<{ id: string }>('tabNew', { ws: t.workspace, kind: 'shell' }).then(sh => call('send', { target: sh.id, text: cmd, enter: false })).catch(fail)}
-                            onAgain={() => void call('input', { tab: t.id, data: '\r' }).catch(fail)}
-                          />
-                        ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' && isCursor(view?.presets.find(x => x.name === t.profile)) ? ('cursor' as const) : undefined))}
-                        <SignInStrip tab={t} onAct={act => void call('signIn', { tab: t.id, act }).catch(fail)} />
-                        <GoalStrip tab={t} onCmd={cmd => void call('send', { target: t.id, text: cmd }).catch(fail)} onOwn={a => void call(a === 'clear' ? 'goalClear' : 'goalSet', { tab: t.id, ...(a === 'resume' && { resume: true }) }).catch(fail)} />
-                        {!hookHid.includes(t.id) && <HookStrip tab={t} onCopy={copy} onHide={() => setHookHid(h => [...h, t.id])} />}
-                        {/* Send later's for this tab: its timers, also over the sidebar's foot */}
-                        <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />
-                      </>
-                    ))(byId(id))
-                }
-                onFocus={id => id !== tab?.id && selectTab(id)}
-                hoverFocus={settings.hoverFocus !== false}
-                onClose={id => byId(id) && closeTabs([byId(id)!])}
-                onResize={(path, at) => setGroups(groups.map(g => (g === group ? resize(g, path, at) : g)))}
-                startDrag={(e, id) => start(e, id, false)}
-              />
-            ) : (
-              <div className="empty-wrap">
-              {!(ws && ws.browser !== undefined) && <Backdrop kind={settings.backdrop} motion={settings.motion} />}
-              <div className="empty">
-                {ws ? (
-                  ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} project={view.projects.find(p => p.id === ws.project)?.name} actions={newTabActions.filter(x => x.label !== 'Command…')} later={ws.pending && { title: `${ws.pending.agent} ${pendingWords(ws.pending, true).replace(/^S/, 's')}`, prompt: ws.pending.prompt, failed: ws.pending.failed, onStart: () => laterNow(ws), onChange: () => void laterChange(ws), onCancel: () => void laterCancel(ws) }} />
-                ) : (
-                  view.projects.some(p => !p.kind) || railKind !== 'projects' ? ( /* U4: Welcome until a project of yours, a Terminals tab of its own aside */
-                    <>
-                      {/* none picked: a fresh start, or the last of this rail kind went (the rail stays on it) */}
-                      <p>{railKind === 'shells' ? 'No terminals open.' : railKind === 'browsers' ? 'No pages open.' : live.length ? 'No workspace selected.' : 'No workspaces yet.'}</p>
-                      {railKind === 'shells' || railKind === 'browsers' ? <button className="primary" onClick={() => void quickNew(railKind)}>{railKind === 'shells' ? 'New terminal' : 'New browser'}</button> : <button className="primary" onClick={() => newWs()}>New workspace  ⌘N</button>}
-                      <StarLaki />
-                    </>
-                  ) : (
-                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} onRun={welcomeRun} onSample={hasCap(view, 'sample') ? welcomeSample : undefined} />
-                  )
-                )}
-              </div>
-              </div>
-            )}
-            {browsed.flatMap(id => {
-              const w = live.find(x => x.id === id)
-              return w?.browser !== undefined ? [<BrowserPane key={id} onGuest={g => (g ? guests.current.set(id, g) : guests.current.delete(id))} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
-            })}
-            {reviewOn && ws && <Suspense fallback={null}><FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} next={() => (q => q[0] && { name: wsName(q[0]), files: q[0].stat?.files, pr: q[0].pr?.state === 'OPEN' ? `${prNo(q[0].pr)} ${q[0].pr.checks === 'pass' ? 'checks pass' : q[0].pr.checks === 'fail' ? 'checks fail' : 'in review'}` : 'no PR', more: q.length - 1, key: kh('reviewNext'), go: () => reviewGo(q[0]) })(reviewQueue(view, ws.id))} /></Suspense>}
-          </div>
-          {tabsAt === 'right' && <TabStrip app={app} />}
-          {previewed && ws && (
-            <div className={`pv-wrap ${previewW ? 'sized' : ''}`} style={previewW ? { width: previewW } : undefined}>
-              <PanelHandle onWidth={w => setPreviewW(w || null)} init={0} />
-              {wsFiles.length > 1 && (
-                <div className="pv-tabs" role="tablist" aria-label="Open files">
-                  {wsFiles.map(f => (
-                    <div key={fileKey(f)} role="tab" aria-selected={f === previewed} className={`pv-tab ${f === previewed ? 'on' : ''}`} data-tip={`${f.ext ? `${view.widgets?.find(x => x.id === f.ext)?.name ?? f.ext} · ` : ''}${f.storage ? `Artifacts › ${f.path}` : f.path}`} onClick={() => setShownFile(m => ({ ...m, [ws.id]: fileKey(f) }))} onAuxClick={e => e.button === 1 && void closeFile(f)}>
-                      {(x => (x ? <ExtGlyph w={x} size={12} /> : <Icon name="file" size={12} />))(f.ext && view.widgets?.find(x => x.id === f.ext))}
-                      <span className="pv-tab-name">{f.path.split('/').pop()}</span>
-                      {edited(f.edit) && <span className="pv-dirty" aria-label="unsaved" />}
-                      <IconButton icon="x" title="Close" className="pv-tab-x" onClick={e => (e.stopPropagation(), void closeFile(f))} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            {previewed.ext ? (
-              // a file opener's full view, its data what its action on this file kept
-              // ponytail: one data per extension (per workspace): two files' tabs of one opener show the last one run
-              (w => (
-                <div className="preview">
-                  <div className="pv-head">
-                    {w ? <ExtGlyph w={w} /> : <Icon name="panel" />}
-                    <span className="pv-path" data-tip={previewed.path}>
-                      {w?.name ?? previewed.ext} <span className="muted">{previewed.path}</span>
-                    </span>
-                    {w && <span className="muted small pv-wide">{extStatus(w)}</span>}
-                    <IconButton icon="x" title={kt('Close', 'closeTab')} onClick={closePreview} />
-                  </div>
-                  <div className="pv-body pv-ext">{w ? <WidgetBody w={w} full api={widgetApi} /> : <div className="muted small pad">That extension is gone (or off).</div>}</div>
-                </div>
-              ))((x => (x?.on ? inWs(x, ws.id) : undefined))(view.widgets?.find(x => x.id === previewed.ext)))
-            ) : (
-            <FilePreview
-              key={previewed.n}
-              path={previewed.path}
-              line={previewed.line}
-              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path, storage: previewed.storage, media: true })}
-              onOpen={() => (previewed.storage ? panelApi(ws).artifacts?.open(previewed.path) : panelApi(ws).openFile(previewed.path))}
-              onDefault={() => openIn('default', { ws: ws.id, file: previewed.path, storage: previewed.storage })}
-              onEditor={previewed.storage ? () => openIn('editor', { ws: ws.id, file: previewed.path, storage: true }) : undefined}
-              onReveal={() => openIn('finder', { ws: ws.id, file: previewed.path, storage: previewed.storage })}
-              openLabel={previewed.storage ? 'Open' : undefined}
-              readOnly={previewed.storage}
-              onClose={closePreview}
-              edit={previewed.edit}
-              onEdit={edit => setOpenFiles(l => l.map(x => (x.ws === previewed.ws && fileKey(x) === fileKey(previewed) ? { ...x, edit } : x)))}
-              save={(text, was, force) => api.call('fileWrite', { ws: ws.id, path: previewed.path, text, was, force })}
-            />
-            )}
-            </div>
-          )}
-          {panelShown && !(reviewOn && reviewTight) && ws && ( // the right panel: Info, Files, Changes, Review, Preview (U6: not beside a Review tab too narrow for its diff)
-            <SidePanel
-              w={infoOf(ws)}
-              git={git}
-              tab={panelTab}
-              onTab={setPanelTab}
-              api={panelApi(ws)}
-              sim={project?.config?.simulator ?? settings.simulator === true} /* the project's own over Settings' */
-              turn={view.tabs.some(t => t.workspace === ws.id && t.changes)}
-              width={panelW}
-              onWidth={setPanelW}
-              onClose={() => setPanelOpen(false)}
-              onOpen={openExternal}
-              onToggle={(k, v) => setAuto(ws, k, v)}
-              onFix={what => prFix(ws, what)}
-              onLog={c => ciLog(ws, c)}
-              onAct={(act, method) => prAct(ws, act, method)}
-              onLabel={labelApi(ws)}
-              root={artsIn === ws.id ? 'artifacts' : 'ws'}
-              onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
-              ext={ownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
-              side={(t => t && <SideChat key={t.id} tab={t} onSent={done} />)(tab?.kind === 'agent' && tab.workspace === ws.id ? tab : view.tabs.find(t => t.workspace === ws.id && t.kind === 'agent'))}
-              info={
-                <InfoTab
-                w={infoOf(ws)}
-                onOpen={url => void openKeptLink(url).catch(fail) /* its .url links too: a file:/// one */}
-                onToggle={(k, v) => setAuto(ws, k, v)}
-                onFix={what => prFix(ws, what)}
-                onLog={c => ciLog(ws, c)}
-                onAct={(act, method) => prAct(ws, act, method)}
-                onLabel={labelApi(ws)}
-                onRename={() => setDialog({ renameWs: ws.id })}
-                onAttach={attachable(ws) ? () => setDialog({ attachPr: ws.id }) : undefined}
-                onCopy={copy}
-                onWs={id => (setReveal(r => [...r, id]), setWsId(id))}
-                onTab={(w, t) => (setReveal(r => [...r, w]), selectTab({ id: t, workspace: w }))}
-                onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
-                onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
-                onDetach={() => detachPr(ws)}
-                sees={(['claude', 'codex'] as const).filter(a => !ws.host && view.tabs.some(t => t.workspace === ws.id && tabAgent(t, view.presets) === a))}
-                onSees={a => setDialog({ sees: a, in: ws.project })}
-                agentLog={hasCap(view, 'agent.log') ? () => call<AgentDid[]>('agentLog', { ws: ws.id }) : undefined}
-                spend={hasCap(view, 'ws.spend') && !ws.host ? () => call<SpendView>('wsSpend', { ws: ws.id }) : undefined}
-                tabName={id => view.tabs.find(t => t.id === id)?.name ?? id}
-                onStorage={bridge?.openPath && ws.storage ? () => void bridge!.openPath!(ws.storage!).then(r => r === 'missing' && toast('Nothing kept yet: its folder is made with its first tab')) : undefined}
-                />
-              }
-            />
-          )}
-        </div>
+        {bodyOf(app)}
         {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && !(app.needsShown && sideOpen && !video && !listOff) /* the sidebar's Needs you card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
           <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff} tab={tab.id} ask={tab.ask} explain={aiOn(settings) && hasCap(view, 'ask.explain') ? () => call('askExplain', { tab: tab.id }) : undefined}>{(chip, explain) => (
