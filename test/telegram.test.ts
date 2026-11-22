@@ -6,7 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { AGENT_NO, clientMethod, REMOTE_NO } from '../src/daemon/gates.ts'
+import { AGENT_NO, clientMethod, REMOTE_NO, TELEGRAM_OK } from '../src/daemon/gates.ts'
 import { esc, scrub, tgHtml } from '../src/daemon/telegram.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
@@ -259,4 +259,67 @@ test('P2: a photo or a file in a reply is saved through Laki and its path goes t
   await until(async () => /files\/\d+-\w+\/notes\.txt/.test((await rig.screen(tab.id)).replace(/\n/g, '')), 'the file\'s path sent')
   b.message('', { reply: done.id, document: { file_id: 'huge', file_name: 'x.bin', file_size: 21 << 20 } })
   await until(() => b.of('sendMessage').some(c => /Not sent: over 20 MB/.test(c.body.text)), 'too big')
+})
+
+test('P3: TELEGRAM_OK is the whole of what a chat can do: never Stop, Ship, merge, archive, delete, settings, secrets, terminals, remote access', () => {
+  assert.deepEqual(Object.keys(TELEGRAM_OK).sort(), ['answer', 'diff', 'dndSet', 'screen', 'send', 'state', 'wsNew'])
+  for (const m of ['stopAll', 'longStop', 'input', 'run', 'ship', 'prAct', 'wsArchive', 'wsRm', 'settingsSet', 'secretGive', 'remoteStart', 'telegramSet', 'tabNew', 'turnRewind']) assert.ok(!Object.hasOwn(TELEGRAM_OK, m), m)
+  assert.equal(TELEGRAM_OK.wsNew, 'control')
+})
+
+test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /quiet at answer, titles only and Recording mode kept; /new only at control; limits; the log", async t => {
+  const { b, rig } = await paired(t, { LAKI_TG_LIMITS: 'ws=1,send=2' })
+  const menu = (await until(() => b.of('setMyCommands').at(-1), 'the menu'))!
+  assert.deepEqual([menu.body.commands.map((c: any) => c.command), menu.body.scope], [['status', 'screen', 'diff', 'quiet'], { type: 'chat', chat_id: ME }])
+  const { ws, tab } = await claude(rig)
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length), 'the ask'))!
+  const last = () => b.of('sendMessage').at(-1)!.body.text as string
+  const sent = () => b.of('sendMessage').length
+  const ask2 = async (text: string, o = {}) => {
+    const n = sent()
+    b.message(text, o)
+    await until(() => sent() > n, `an answer to ${text}`)
+    return last()
+  }
+  assert.match(await ask2('/status'), /<b>Needs you · 1<\/b>\n🟡 .+ · claude/)
+  assert.match(await ask2('/screen', { reply: ask.id }), /^<b>claude<\/b> in <b>.+<\/b>\n<pre>[\s\S]*1\. Yes[\s\S]*<\/pre>$/)
+  assert.match(await ask2('/screen'), /Which one\?/)
+  assert.match(await ask2(`/diff ${ws.name ?? ws.id}`), /no changes|file/)
+  assert.match(await ask2('/new laki fix it'), /needs the Control level/)
+  assert.match(await ask2('/nope'), /^No \/nope\. \/status: /)
+  assert.match(await ask2('/quiet 2h'), /Do not disturb until/)
+  assert.ok((await rig.rpc('state')).dnd?.until > Date.now() + 3600_000)
+  assert.match(await ask2('/quiet off'), /is off/)
+  assert.equal((await rig.rpc('state')).dnd, undefined)
+  // titles only: nothing off a screen; Recording mode: a private workspace isn't named
+  await rig.rpc('telegramSet', { detail: 'titles' })
+  assert.match(await ask2('/screen', { reply: ask.id }), /Titles only is on/)
+  assert.doesNotMatch(await ask2('/status'), /<code>/, 'no ask words with titles only')
+  await rig.rpc('telegramSet', { detail: '' })
+  await rig.rpc('wsSet', { id: ws.id, private: true })
+  await rig.rpc('settingsSet', { recording: true })
+  assert.match(await ask2('/status'), /Nothing needs you/)
+  assert.match(await ask2('/screen', { reply: ask.id }), /Which one\?/)
+  await rig.rpc('settingsSet', { recording: false })
+  // control: /new starts one (1 an hour here), and its menu has /new
+  await rig.rpc('telegramSet', { level: 'control' })
+  await until(() => b.of('setMyCommands').at(-1)!.body.commands.some((c: any) => c.command === 'new'), 'the menu with /new')
+  const proj = (await rig.rpc('state')).projects[0]
+  assert.match(await ask2(`/new ${proj.name} add a README`), /^Started <b>/)
+  await until(async () => (await rig.rpc('state')).workspaces.length === 2, 'the new workspace')
+  assert.match(await ask2(`/new ${proj.name} another`), /Not done: 1 new workspaces an hour from Telegram at most/)
+  // messages: 2 a minute here (the reply that picked nothing counts too)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  const done = (await until(() => b.of('sendMessage').find(c => c.body.disable_notification), 'a done push'))!
+  for (const w of ['one', 'two']) b.message(w, { reply: done.id })
+  await until(async () => /answer: two/.test(await rig.screen(tab.id)), 'two sent')
+  b.message('three', { reply: done.id })
+  await until(() => b.of('sendMessage').some(c => /Not sent: 2 messages a minute from Telegram at most/.test(c.body.text)), 'the third refused')
+  const did = await rig.rpc('telegramLog', { n: 50 })
+  assert.ok(did.some((d: any) => /^paired with Ada$/.test(d.line)))
+  assert.ok(did.some((d: any) => /^Do not disturb for 120 minutes$/.test(d.line)))
+  assert.ok(did.some((d: any) => /^to .+ · claude: "one"$/.test(d.line)))
+  assert.ok(did.some((d: any) => /^refused to .+: "three": 2 messages a minute/.test(d.line)))
+  assert.ok(!JSON.stringify(did).includes('fake-secret'))
 })

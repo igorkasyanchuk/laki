@@ -84,7 +84,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   `LAKI_QUIET_MS`, `LAKI_ANSWER_HOLD_MS`, `LAKI_CODEX_LATER_MS`, `LAKI_FALLBACK_MS` (core.ts), `LAKI_KILL_AFTER_MS`
   (resources.ts), `LAKI_SWEEP_MS`, `LAKI_PARENT_MS`, `LAKI_LOOP_REPORT_MS` (main.ts), `LAKI_PR_SOON_MS`, `LAKI_PR_SCAN_MS`, `LAKI_PORT_SCAN_MS`,
   `LAKI_FLOW_RESUME_MS`, `LAKI_RUN_ENDED_MS`, `LAKI_PUSH_WAIT_MS`, `LAKI_CLIENT_LOG_MS`, `LAKI_WIDGET_LOG_MS`,
-  `LAKI_REPO_WATCH_MS`, `LAKI_HINT_MS` (the CLI's "Approve this terminal"), `LAKI_TG_GAP_MS`, `LAKI_TG_PAIR_MS` (telegram.ts). A sleep over a second says why.
+  `LAKI_REPO_WATCH_MS`, `LAKI_HINT_MS` (the CLI's "Approve this terminal"), `LAKI_TG_GAP_MS`, `LAKI_TG_PAIR_MS`, `LAKI_TG_LIMITS` (telegram.ts). A sleep over a second says why.
   `LAKI_TEST_SLEEPS=<file>`: each sleep's place and ms appended to it (the whole run's: 90 s in 213 calls, from 226 in 246).
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.

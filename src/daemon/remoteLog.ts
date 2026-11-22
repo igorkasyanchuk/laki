@@ -8,19 +8,20 @@ import { join } from 'node:path'
 import { dir } from './dir.ts'
 
 export type Activity = { at: number; device?: string; method?: string; line: string }
-const FILE = () => join(dir, 'remote-log.jsonl')
-const OLD = () => join(dir, 'remote-log.1.jsonl')
+// name: which log (Telegram's: telegram-log, telegram.ts)
+const FILE = (name = 'remote-log') => join(dir, `${name}.jsonl`)
+const OLD = (name = 'remote-log') => join(dir, `${name}.1.jsonl`)
 export const LOG_MAX = 1 << 20
 
-export function activity(e: Omit<Activity, 'at'>, at = Date.now()) {
+export function activity(e: Omit<Activity, 'at'>, at = Date.now(), name?: string) {
   try {
-    const f = FILE()
-    if (existsSync(f) && statSync(f).size >= LOG_MAX) renameSync(f, OLD())
+    const f = FILE(name)
+    if (existsSync(f) && statSync(f).size >= LOG_MAX) renameSync(f, OLD(name))
     appendFileSync(f, `${JSON.stringify({ at, ...e })}\n`, { mode: 0o600 })
   } catch {}
 }
 // the newest n, newest first
-export function activityList(n = 200): Activity[] {
+export function activityList(n = 200, name?: string): Activity[] {
   const read = (f: string) =>
     existsSync(f)
       ? readFileSync(f, 'utf8')
@@ -33,8 +34,8 @@ export function activityList(n = 200): Activity[] {
             }
           })
       : []
-  const now = read(FILE())
-  return (now.length >= n ? now : [...read(OLD()), ...now]).slice(-n).reverse()
+  const now = read(FILE(name))
+  return (now.length >= n ? now : [...read(OLD(name)), ...now]).slice(-n).reverse()
 }
 // a prompt or a message as the log keeps it: one line, its first 80 characters
 export const clip80 = (s: unknown) => (t => (t.length > 80 ? `${t.slice(0, 80)}…` : t))(String(s ?? '').replace(/\s+/g, ' ').trim())

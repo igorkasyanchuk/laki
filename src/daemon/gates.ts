@@ -77,6 +77,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   remoteDeviceSet: "change a remote device's access", webhookTest: 'send a push to a webhook (Settings › Phone pushes)',
   telegramSet: "set up the user's Telegram bot, its level or pairing (the user does, in Settings › Telegram)",
   telegramPair: "pair a Telegram chat with Laki (its code would let anyone in)", telegramTest: 'send a push to Telegram (Settings › Telegram)',
+  telegramLog: 'read what was done from Telegram',
   resourceStop: 'stop what Settings › Resources lists (Laki AI, remote access, shares, tunnels, extensions’ runs)',
   flowTest: "test a workflow's block (a model call or a webhook, as the user)", noteList: "read the user's notes", noteGet: "read the user's notes",
   noteFile: "read the user's notes", noteNew: "change the user's notes", noteSave: "change the user's notes", noteRestore: "change the user's notes",
@@ -105,7 +106,7 @@ flowHold flowGet flowForget'.split(' '))
 // Telegram (telegram.ts tgHooks: main.ts' gate): what a message from the paired chat may make Laki do, and the level each
 // needs. Anything else is refused, so a new method is never Telegram's by default. Never: Stop, Ship, merge, archive or
 // delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID (test/telegram.test.ts)
-export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer' }
+export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer', state: 'answer', screen: 'answer', diff: 'answer', dndSet: 'answer', wsNew: 'control' }
 
 // remote access at Full (a phone's page): REMOTE_NO is what outlives its session or opens Laki wider: its own set-up and
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
@@ -116,7 +117,7 @@ export const REMOTE_NO = new Set(['scheduleCopy', 'gitTidy', 'goalSet', 'flowImp
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',
   'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave',
-  'hook', 'tunnelStart', 'scheduleSet', 'accountSet', 'accountRm', 'tabAccount', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'uiReset', 'projectClone', 'device', 'aiShot', 'aiOpenApp',
+  'hook', 'tunnelStart', 'scheduleSet', 'accountSet', 'accountRm', 'tabAccount', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'uiReset', 'projectClone', 'device', 'aiShot', 'aiOpenApp',
   'widgetFileSave', 'widgetWrite', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRm', 'widgetRestore', 'widgetUndo', 'widgetRemix', 'widgetDev',
   'widgetMock', 'widgetCheck', ...TICKS])
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of

@@ -9,10 +9,12 @@ import { readFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { readCapped, writeAtomic } from '../shared/conn.ts'
 import type { Telegram, TelegramView, TgLevel, Webhook } from '../shared/types.ts'
-import { changed, fileSave, imageSave, log, rtOf, save, sessions, state } from './core.ts'
+import { LIMITS, limitsOf } from './clients.ts'
+import { changed, fileSave, imageSave, log, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
-import { takeTap } from './phone.ts'
+import { hidden, takeTap } from './phone.ts'
+import { activity, activityList, clip80 } from './remoteLog.ts'
 import { type Push, pushText, tapOf } from './push.ts'
 import { redact } from './share.ts'
 
@@ -88,7 +90,37 @@ function out<R = unknown>(method: string, body: object): Promise<R> {
 const chat = () => T().user!.id
 // main.ts' gate for what a message makes Laki do (TELEGRAM_OK at its level, remote access's answer-level checks), then the call
 export const tgHooks: { call?: (method: string, params: Record<string, unknown>) => Promise<unknown> } = {}
-const act = (method: string, params: Record<string, unknown>) => (tgHooks.call ? tgHooks.call(method, params) : Promise.reject(new Error('not ready')))
+// P3: trusted clients' limits (clients.ts LIMITS): messages and answers a sliding minute, workspaces a sliding hour
+const used: Record<'send' | 'ws', number[]> = { send: [], ws: [] }
+function spend(kind: 'send' | 'ws') {
+  const l0 = process.env.LAKI_TG_LIMITS ? limitsOf(process.env.LAKI_TG_LIMITS) : LIMITS // tests' smaller (ws=1,send=2)
+  const [n, ms] = kind === 'ws' ? [l0.wsPerHour, 3_600_000] : [l0.sendsPerMinute, 60_000]
+  const now = Date.now()
+  const l = (used[kind] = used[kind].filter(at => at > now - ms))
+  if (l.length >= n) throw new Error(kind === 'ws' ? `${n} new workspaces an hour from Telegram at most` : `${n} messages a minute from Telegram at most`)
+  l.push(now)
+}
+// P3: what Telegram did, for you to look back at (remoteLog.ts' log, <data>/telegram-log.jsonl): a line per action or
+// refusal, a message's first 80 characters, never a secret
+const said = (line: string) => activity({ device: 'Telegram', line }, Date.now(), 'telegram-log')
+export const telegramLog = (p: { n?: unknown } = {}) => activityList(Math.min(1000, Math.max(1, Number(p?.n) || 200)), 'telegram-log')
+const tabWords = (id: unknown) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : String(id)))(state.tabs.find(x => x.id === id))
+const lineOf = (method: string, p: Record<string, unknown>) =>
+  method === 'send' ? `to ${tabWords(p.target)}: "${clip80(p.text)}"` : method === 'answer' ? `answered ${tabWords(p.tab)}: ${clip80(p.label ?? p.n)}` : method === 'wsNew' ? `new workspace in ${p.project}: "${clip80(p.prompt)}"` : method === 'dndSet' ? (p.off ? 'Do not disturb off' : `Do not disturb for ${p.minutes} minutes`) : `${method}${p.ws || p.target ? ` (${p.ws ?? tabWords(p.target)})` : ''}`
+const READ = new Set(['state', 'screen', 'diff'])
+async function act<R = unknown>(method: string, params: Record<string, unknown>): Promise<R> {
+  try {
+    if (!tgHooks.call) throw new Error('not ready')
+    if (method === 'send' || method === 'answer') spend('send')
+    if (method === 'wsNew') spend('ws')
+    const r = (await tgHooks.call(method, params)) as R
+    if (!READ.has(method)) said(lineOf(method, params))
+    return r
+  } catch (e) {
+    said(`refused ${lineOf(method, params)}: ${(e as Error).message}`)
+    throw e
+  }
+}
 
 // P2: which tab each pushed message is about, so a reply to it goes there: the newest 500, in <data>/telegram-msgs.json
 const MSGS = 500
@@ -175,6 +207,7 @@ const stop = (notice: string, off = false) => {
   Object.assign(T(), { notice }, off && { off: true })
   pair = undefined
   log(`telegram: ${notice}`)
+  said(`stopped: ${notice}`)
   ctl?.abort()
   ctl = undefined
   save()
@@ -231,7 +264,9 @@ async function take(u: Update, gap: boolean) {
     save()
     changed()
     log(`telegram: paired with ${nameOf(from)}`)
-    void say(`<b>Paired with Laki.</b> Pushes from this Mac come here; what this chat may do is set in Laki's Settings › Telegram (now: <b>${levelOf()}</b>).`)
+    said(`paired with ${nameOf(from)}`)
+    void say(`<b>Paired with Laki.</b> Pushes from this Mac come here; what this chat may do is set in Laki's Settings › Telegram (now: <b>${levelOf()}</b>).${levelAtLeast('answer') ? ' Reply to a push to talk to its agent; /status for who needs you.' : ''}`)
+    commandsSet()
     return sync()
   }
   if (from.id !== state.telegram?.user?.id) return void ignore()
@@ -243,6 +278,8 @@ async function take(u: Update, gap: boolean) {
   if (!m) return
   if (Date.now() / 1000 - m.date > STALE / 1000) return void say('Laki was off when you sent that: send it again.')
   if (!levelAtLeast('answer')) return
+  const cmd = /^\/([a-z_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i.exec(m.text?.trim() ?? '')
+  if (cmd) return command(cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), m).catch(e => void say(`Not done: ${esc(scrub((e as Error).message))}`))
   const tab = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
   if (!tab) return void say("Reply to one of my messages about an agent (swipe it left, or long-press it › Reply) and what you write goes to that agent.")
   await deliver(tab, m).then(
@@ -284,6 +321,72 @@ async function fileIn(f: TgFile, name: string | false | undefined) {
   const ext = extname(got.file_path).slice(1).toLowerCase()
   return name || !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? fileSave({ name: name || basename(got.file_path), data: buf.toString('base64') }) : imageSave({ data: buf.toString('base64'), ext })
 }
+// ---------- P3: commands (setMyCommands, for this chat only: the level's). Each acts through act's gate; with titles only,
+// nothing off a screen comes; a workspace Recording mode hides isn't named
+const COMMANDS: [string, string, TgLevel][] = [
+  ['status', 'Who needs you, who is working, who is done', 'answer'],
+  ['screen', "An agent's screen: reply to its push, or /screen <workspace>", 'answer'],
+  ['diff', "A workspace's changed files: reply to a push, or /diff <workspace>", 'answer'],
+  ['quiet', 'Do not disturb: /quiet 2h, /quiet 30m, /quiet off', 'answer'],
+  ['new', 'Start a workspace: /new <project> <task>', 'control'],
+]
+const commandsSet = () => {
+  if (!state.telegram?.user) return
+  out('setMyCommands', { commands: COMMANDS.filter(c => levelAtLeast(c[2])).map(([command, description]) => ({ command, description })), scope: { type: 'chat', chat_id: chat() } }).catch(e => log(`telegram: ${(e as Error).message}`))
+}
+const shownWs = (id: string) => (w => (w && !w.archived && !hidden(w) ? w : undefined))(state.workspaces.find(x => x.id === id))
+// a command's agent tab: the push it replies to, else the workspace it names (its first agent tab)
+function tabFor(m: TgMessage, arg: string) {
+  const id = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
+  const by = id ? state.tabs.find(t => t.id === id) : undefined
+  if (by) return shownWs(by.workspace) && by
+  const w = arg && state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())
+  return w ? state.tabs.find(t => t.workspace === w.id && tracked(t)) : undefined
+}
+const DOT: Record<string, string> = { waiting: '🟡', running: '🔵', idle: '🟢' }
+async function command(c: string, arg: string, m: TgMessage) {
+  const known = COMMANDS.find(x => x[0] === c)
+  if (c === 'start' || c === 'help' || !known) return void say(`${c === 'start' || c === 'help' ? '' : `No /${esc(c)}. `}${COMMANDS.filter(x => levelAtLeast(x[2])).map(x => `/${x[0]}: ${esc(x[1])}`).join('\n')}\nReply to a push to talk to its agent.`)
+  if (!levelAtLeast(known[2])) return void say(`/${c} needs the Control level: Settings › Telegram, on your Mac`)
+  const titles = state.telegram?.detail === 'titles'
+  if (c === 'status') {
+    const v = await act<{ tabs: { id: string; name: string; workspace: string; status: string; done: boolean }[] }>('state', {})
+    const rows = v.tabs.filter(t => tracked(state.tabs.find(x => x.id === t.id) ?? ({} as never)) && shownWs(t.workspace))
+    const group = (title: string, l: typeof rows, q = false) =>
+      l.length ? [`<b>${title} · ${l.length}</b>`, ...l.slice(0, 15).map(t => `${DOT[t.status] ?? '⚪'} ${esc(shownWs(t.workspace)!.name ?? t.workspace)} · ${esc(t.name)}${q && !titles ? (p => (p ? `: <code>${esc(redact(cut(`${p.tool}: ${p.what}`, 120)))}</code>` : ''))(rtOf(t.id).perm) : ''}`)] : []
+    const text = [...group('Needs you', rows.filter(t => t.status === 'waiting'), true), ...group('Working', rows.filter(t => t.status === 'running')), ...group('Done', rows.filter(t => t.status === 'idle' && t.done))].join('\n')
+    return void say(text || 'Nothing needs you, nothing is working.')
+  }
+  if (c === 'quiet') {
+    if (/^off$/i.test(arg)) return void (await act('dndSet', { off: true }), say('Do not disturb is off.'))
+    const n = /^(\d{1,4})\s*(m|min|h|hours?)?$/i.exec(arg || '1h')
+    if (!n) return void say('How long? /quiet 2h, /quiet 30m, /quiet off')
+    const minutes = Number(n[1]) * (/^h/i.test(n[2] ?? 'm') ? 60 : 1)
+    const r = await act<{ until: number }>('dndSet', { minutes })
+    return void say(`Do not disturb until ${new Date(r.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: only an important workspace's asks come.`)
+  }
+  if (c === 'new') {
+    const [name, ...words] = arg.split(/\s+/)
+    const task = words.join(' ').trim()
+    const p = state.projects.find(x => !x.kind && !x.archived && !(state.settings?.recording && x.private) && [x.name, x.id].some(n => n?.toLowerCase() === name?.toLowerCase()))
+    if (!p || !task) return void say(`/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
+    const w = await act<{ id: string; name?: string }>('wsNew', { project: p.id, prompt: task })
+    return void say(`Started <b>${esc(w.name ?? w.id)}</b> in ${esc(p.name)}. Its pushes come here; reply to one to talk to it.`)
+  }
+  if (titles) return void say('Titles only is on (Settings › Telegram): nothing off a screen comes here.')
+  const t = tabFor(m, arg)
+  if (!t) return void say(`Which one? Reply /${c} to an agent's push, or /${c} &lt;workspace&gt;.`)
+  const head = `<b>${esc(t.name)}</b> in <b>${esc(shownWs(t.workspace)!.name ?? t.workspace)}</b>`
+  if (c === 'screen') {
+    const text = await act<string>('screen', { target: t.id, lines: 40 })
+    return void say(`${head}\n<pre>${esc(redact(text.trimEnd()).slice(-3500))}</pre>`)
+  }
+  const d = await act<{ files: { path: string; add: number; del: number }[] }>('diff', { ws: t.workspace })
+  const add = d.files.reduce((n, f) => n + f.add, 0)
+  const del = d.files.reduce((n, f) => n + f.del, 0)
+  return void say(d.files.length ? `${head}: +${add} −${del} · ${d.files.length} file${d.files.length === 1 ? '' : 's'}\n${d.files.slice(0, 40).map(f => `<code>${esc(cut(f.path, 120))}</code> +${f.add} −${f.del}`).join('\n')}` : `${head}: no changes`)
+}
+
 // the receipt: a 👍 on your message (Telegram may refuse a reaction: then none)
 const react = (m: TgMessage) => void out('setMessageReaction', { chat_id: chat(), message_id: m.message_id, reaction: [{ type: 'emoji', emoji: '👍' }] }).catch(() => {})
 const ignore = () => ++ignored === 1 && setTimeout(() => (log(`telegram: ignored ${ignored} update(s) from someone else`), (ignored = 0)), 60_000).unref()
@@ -314,7 +417,8 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
   for (const k of ['off', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
   if (p.off === false) t.notice = undefined // on again (Try again after a 409): its notice read
   if (p.detail !== undefined) t.detail = p.detail === 'titles' ? 'titles' : undefined
-  if (p.unpair === true) Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), log('telegram: unpaired')
+  if (p.unpair === true) Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), log('telegram: unpaired'), said('unpaired')
+  if (p.level !== undefined) commandsSet(), said(`level ${t.level}`)
   save()
   sync()
   changed()

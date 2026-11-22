@@ -493,7 +493,16 @@ document: `getFile`, then `/file/bot<token>/<path>` read up to 20 MB (`readCappe
 its path after the caption. A message that replies to nothing gets how to reply. Every action goes through `tgHooks.call`
 (main.ts): only `gates.ts` `TELEGRAM_OK`'s methods at their level, with `ANSWER`'s checks of what they say (`sendOk`: an
 agent tab's, the whole message, never a `!` line; `answer` without `say`), then as the user's call. A done push to
-Telegram carries the turn's last line and the workspace's diff (`files.ts` `stats`: `+add −del · n files`). Remote access's Keep
+Telegram carries the turn's last line and the workspace's diff (`files.ts` `stats`: `+add −del · n files`). P3: the
+commands (`COMMANDS`, `setMyCommands` with a `chat` scope as it pairs and as the level changes: the level's only):
+`/status` (`state`: Needs you, Working, Done, each with its agent tabs; a waiting one's ask, `redact`ed, unless titles
+only), `/screen` and `/diff` (the tab a reply's push was about, else the named workspace's first agent tab, `tabFor`;
+none with titles only; `<pre>`, the last 3,500 characters, `redact`ed), `/quiet` (`dndSet`), `/new <project> <task>`
+(`wsNew`, control only); `/start` and `/help` list them. Recording mode (`phone.ts` `hidden`) keeps a private workspace
+and project out of each. `act` spends trusted clients' limits (`clients.ts` `LIMITS`, `LAKI_TG_LIMITS` for tests): `send`
+and `answer` a sliding minute, `wsNew` a sliding hour; and logs each action or refusal (`remoteLog.ts`' `activity`,
+`<data>/telegram-log.jsonl`; reads not; `telegramLog`, Settings › Telegram › *What Telegram did*), with pairing, Unpair,
+a level and a stop. Remote access's Keep
 never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
 format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
 paired at answer with its When, a group's only a notice to pair again; `settingsSet` refuses the format. `telegramSet`,

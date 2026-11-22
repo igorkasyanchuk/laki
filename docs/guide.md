@@ -2749,7 +2749,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   button picks that choice, as a click in Laki would; a reply to a push, swiped left or long-pressed › Reply, goes to its
   agent, queued while it works, a 👍 on your message its receipt; a choice's number as the reply answers its question;
   a photo or a file, 20 MB at most, goes as its path on this Mac; never a line that starts with `!`, and only to an
-  agent's tab) or *Control*. Stop, Ship, merge, archive or delete, settings,
+  agent's tab; and commands, in Telegram's menu: `/status` who needs you, who works, who is done; `/screen` and `/diff`
+  as a reply to a push or with a workspace's name; `/quiet 2h`, `/quiet 30m`, `/quiet off` for Do not disturb) or
+  *Control* (also `/new <project> <task>`, a workspace started). 50 messages a minute and 10 new workspaces an hour at
+  most; with *Titles only* on, `/screen` and `/diff` send nothing; Recording mode keeps private workspaces out of all of
+  it. *What Telegram did* lists each thing done or refused from the chat. Stop, Ship, merge, archive or delete, settings,
   secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
   agent, remote access or a trusted client can't change this section. *What it sends*: *An agent waits for you* (on),
   *An agent is done* (on, silently), *Titles only* (who needs you, nothing off the screen). Do not disturb, a muted tab

@@ -123,14 +123,15 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
 // chat by a one-time code), what the chat may do, what it sends, how it works and what keeps it safe
 const LEVELS: [TgLevel, string, string][] = [
   ['notify', 'Notify', 'Pushes only: who waits for you, who is done. Nothing comes back.'],
-  ['answer', 'Answer', "Pushes; a tap on a push's button picks that choice, as a click here would; a reply to a push goes to its agent, a photo or a file too (a choice's number answers its question)."],
-  ['control', 'Control', 'Everything Answer does. Stop, Ship, merge and settings stay on the Mac at every level.'],
+  ['answer', 'Answer', "Pushes; a tap on a push's button picks that choice, as a click here would; a reply to a push goes to its agent, a photo or a file too (a choice's number answers its question); /status, /screen, /diff and /quiet."],
+  ['control', 'Control', 'Everything Answer does, and /new <project> <task> starts a workspace (10 an hour at most). Stop, Ship, merge and settings stay on the Mac at every level.'],
 ]
 export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call }) {
   const [token, setToken] = useState('')
   const [said, setSaid] = useState('') // the last call's outcome
   const [code, setCode] = useState<{ link: string; until: number }>() // the pairing link while it waits (only this window has it)
   const [busy, setBusy] = useState(false)
+  const [did, setDid] = useState<{ at: number; line: string }[]>() // What Telegram did (telegramLog), on a click
   const paired = !!tg?.user
   useEffect(() => void ((paired || !tg?.pairing) && setCode(undefined)), [paired, tg?.pairing]) // used, or run out
   const run = (f: () => Promise<unknown>, ok = '') => (setBusy(true), setSaid(''), f().then(() => setSaid(ok), (e: Error) => setSaid(e.message)).finally(() => setBusy(false)))
@@ -248,11 +249,25 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
         </>
       )}
       {said && <p className="muted small">{said}</p>}
+      {paired && (
+        <Group title="What Telegram did" hint="Each thing done or refused from the chat, newest first" act={<button type="button" onClick={() => call('telegramLog', { n: 50 }).then(setDid, (e: Error) => setSaid(e.message))}>{did ? 'Again' : 'Show'}</button>}>
+          {did && (did.length ? (
+            <ul className="tg-log">
+              {did.map((d, i) => (
+                <li key={i}>
+                  <span className="muted">{new Date(d.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span> {d.line}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="muted small">Nothing yet.</p>)}
+        </Group>
+      )}
       <Group title="How it works" hint="Nothing on your Mac listens: it asks Telegram, never the other way">
         <ul className="tg-steps">
           <li>Laki on this Mac keeps one request open to Telegram's servers and gets your taps and messages as its answer. No port is opened, no tunnel runs.</li>
           <li>While Laki runs (its window may be closed), pushes go as agents wait or finish. While the Mac sleeps, nothing goes; a tap older than two minutes is dropped, not acted on in the morning.</li>
           <li>To talk to an agent, reply to its push (swipe it left, or long-press it › Reply): your words go to that agent, queued while it works; a 👍 on your message says it went. A photo or a file (20 MB at most) goes as its path on this Mac.</li>
+          <li>Commands (Telegram's menu shows them): <code>/status</code> who needs you, who works, who is done; <code>/screen</code> and <code>/diff</code> as a reply to a push (or with a workspace's name); <code>/quiet 2h</code> Do not disturb; at Control, <code>/new &lt;project&gt; &lt;task&gt;</code>. 50 messages a minute and 10 new workspaces an hour at most.</li>
           <li>At Notify, Laki doesn't read the chat at all.</li>
         </ul>
       </Group>

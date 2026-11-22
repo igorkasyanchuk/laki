@@ -520,6 +520,7 @@ const api = {
   telegramSet: ({ from: _, ...p }) => tgMod.telegramSet(p), // Settings › Telegram: the bot's token (getMe), its level and switches, Unpair; yours only (AGENT_NO, REMOTE_NO, no client's)
   telegramPair: () => tgMod.telegramPair(), // a one-time code for 10 minutes: its t.me link, for your window's QR only
   telegramTest: () => tgMod.telegramTest(), // Send test, to the paired chat
+  telegramLog: p => tgMod.telegramLog(p), // what was done from Telegram, newest first (its own log, as remoteLog's)
   uiReset: () => core.uiReset(),
   portKill: p => resourcesMod.portKill(p),
   meme: () => meme(),
@@ -881,7 +882,7 @@ const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExp
   'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd',
   'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo',
   'tabClose', 'openIn', 'gateRestart', 'tabUnbox', 'projectNetAllow', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop',
-  'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew',
+  'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew',
   'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave',
   'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick',
   'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick',
@@ -1359,7 +1360,7 @@ const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTid
   'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen',
   'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet',
   'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk',
-  'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
+  'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
   'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook',
   'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct',
   'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
