@@ -981,7 +981,8 @@ export function explainOf(text: string): AskExplained | undefined {
 const walks = new Map<string, Promise<Walk>>()
 // a kept one from its file: checked as an answer is and folded on this diff's hunks again, else none
 const walkKept = (w: Walk | undefined, all: HunkRef[]): Walk | undefined => {
-  const steps = w && typeof w === 'object' && typeof w.hash === 'string' && Number.isFinite(w.at) && Array.isArray(w.steps) ? walkCheck(JSON.stringify({ steps: w.steps.filter(s => !s?.rest) }), 1) : undefined // 1: a step the fold emptied is gone, so fewer than 3 is fine here
+  const mine = w && typeof w === 'object' && typeof w.hash === 'string' && Number.isFinite(w.at) && Array.isArray(w.steps) ? w.steps.filter(s => !s?.rest) : undefined
+  const steps = !mine ? undefined : mine.length ? walkCheck(JSON.stringify({ steps: mine }), 1) : [] // 1: a step the fold emptied is gone, so fewer than 3 is fine here; none: every hunk was too big, Everything else alone
   return steps && { steps: walkFold(steps, all), hash: w!.hash, at: w!.at, ...(w!.cut === true && { cut: true }), ...(Number.isInteger(w!.skipped) && w!.skipped! > 0 && { skipped: w!.skipped }) }
 }
 export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?: boolean; kept?: boolean }): Promise<Walk | null> {

@@ -125,7 +125,8 @@ test('walk: a hunk too big is skipped, not the end: the smaller ones after it st
   assert.match(w.text, /login = 1[\s\S]*test\(\)/)
   assert.ok(!w.text.includes('xxxx'))
   const p = walkPrompt(w)
-  assert.match(p, /package-lock\.json: 6001 lines, not shown/)
+  assert.match(p, /package-lock\.json: 6000 lines, not shown/)
+  assert.ok(p.indexOf('package-lock.json: 6000') < p.lastIndexOf('>>>'), "the names inside the data's fence: an agent writes them")
   assert.ok(!/^package-lock\.json 1$/m.test(p), 'not among the hunks it reads')
   // the model names what it read, and the lockfile too (it can't have seen it): that one goes to Everything else
   const steps: WalkStep[] = [
@@ -208,6 +209,8 @@ test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, ke
   assert.equal(await rig.rpc('reviewSteps', { ws: ws.id, kept: true }), null, 'not steps: none')
   writeFileSync(keptFile, JSON.stringify({ [h2]: { hash: h2, at: 1, steps: [{ title: 'Only this', why: '', hunks: [{ file: 'README.md', start: 1 }, { file: 'gone.ts', start: 9 }] }] } }))
   assert.deepEqual((await rig.rpc('reviewSteps', { ws: ws.id, kept: true })).steps.map((x: any) => [x.title, x.hunks.length]), [['Only this', 1], [REST, 3]], 'folded: the rest in Everything else')
+  writeFileSync(keptFile, JSON.stringify({ [h2]: { hash: h2, at: 1, cut: true, skipped: 4, steps: [{ title: REST, why: '', hunks: [], rest: true }] } }))
+  assert.deepEqual((await rig.rpc('reviewSteps', { ws: ws.id, kept: true })).steps.map((x: any) => [x.title, x.hunks.length]), [[REST, 4]], 'every hunk too big: Everything else alone, read back too')
   writeFileSync(keptFile, '{}')
   await assert.rejects(rig.rpc('reviewSteps', { ws: ws.id }), /Laki AI's answer wasn't a walk-through: try again/)
   assert.notEqual((await rig.rpc('reviewSteps', { ws: ws.id })).hash, w.hash, 'asked again: a new answer')

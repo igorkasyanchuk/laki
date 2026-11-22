@@ -22,9 +22,11 @@ import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, File
 // macOS 26's sheet: the window behind an open one sinks a little (styles.css' html[data-sheet]), counted so two open
 // at once leave it set; never for one inside the sidebar or the main area (a page's: they'd sink with it)
 let sheets = 0
+const modals: object[] = [] // the open Modals, the newest last: Esc closes that one alone
 export function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
   const typed = useRef(false)
   const box = useRef<HTMLDivElement>(null)
+  useEffect(() => (modals.push(box), () => void modals.splice(modals.indexOf(box), 1)), [])
   useEffect(() => {
     if (box.current?.closest('.app > :is(aside, main)')) return
     const root = document.documentElement
@@ -33,7 +35,7 @@ export function Modal({ title, onClose, children, wide, loose }: { title: string
     return () => void (--sheets || delete root.dataset.sheet)
   }, [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => escapes(e) && [...document.querySelectorAll('.overlay')].at(-1)?.contains(box.current) && onClose() // the top one: Check overlaps over Ship closes alone
+    const f = (e: KeyboardEvent) => escapes(e) && modals.at(-1) === box && onClose() // the top one: Check overlaps over Ship closes alone
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose])

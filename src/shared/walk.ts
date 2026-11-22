@@ -146,8 +146,9 @@ export const WALK_SYSTEM = `You order a code change for its reviewer, so it read
 // a skipped hunk a step names anyway (walkFold's unread), so all of them are under Everything else and its count is exact
 export function walkPrompt(w: { text: string; hunks: HunkRef[]; skipped: (HunkRef & { text: string })[] }) {
   const lines = new Map<string, number>()
-  for (const h of w.skipped) lines.set(h.file, (lines.get(h.file) ?? 0) + h.text.split('\n').length)
+  for (const h of w.skipped) lines.set(h.file, (lines.get(h.file) ?? 0) + h.text.split('\n').length - (h.text.startsWith('@@') ? 1 : 0)) // its body, not the @@ head
   const files = [...lines].map(([f, n]) => `${f}: ${n} line${n === 1 ? '' : 's'}, not shown`)
   const more = files.length > 100 ? `\n… and ${files.length - 100} more files` : '' // ponytail: 100 named, the rest counted
-  return `The hunks and the diff (data). First the hunks, a line each: its file, then its start (the line its @@ head names on the new side; 0 for a file with no hunk). Then the diff.\n<<<\n${w.hunks.map(h => `${h.file} ${h.start}`).join('\n')}\n\n${w.text}>>>${files.length ? `\nToo big to show, by file (they go last on their own and need no step):\n${files.slice(0, 100).join('\n')}${more}` : ''}`
+  const big = files.length ? `\nToo big to show, by file (they go last on their own and need no step):\n${files.slice(0, 100).join('\n')}${more}\n` : ''
+  return `The hunks and the diff (data). First the hunks, a line each: its file, then its start (the line its @@ head names on the new side; 0 for a file with no hunk). Then the diff, then the files too big to show.\n<<<\n${w.hunks.map(h => `${h.file} ${h.start}`).join('\n')}\n\n${w.text}${big}>>>` // the names inside the data: an agent writes them
 }

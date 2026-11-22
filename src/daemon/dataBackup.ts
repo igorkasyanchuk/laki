@@ -45,7 +45,7 @@ export function countsOf(root: string, s: { projects?: unknown[]; workspaces?: u
     extensions: entries(join(root, 'widgets')).length,
     aiChats: entries(join(root, 'ai-chats')).length + (existsSync(join(root, 'ai-chat.json')) ? 1 : 0),
     prompts: (a => (Array.isArray(a) ? a.length : 0))(json(join(root, 'prompts.json'))),
-    reviewComments: entries(join(root, 'review-notes')).reduce((n, f) => n + (a => (Array.isArray(a) ? a.length : 0))(json(join(root, 'review-notes', f))?.notes), 0),
+    reviewComments: entries(join(root, 'review-notes')).filter(n => n.endsWith('.json')).reduce((n, f) => n + (a => (Array.isArray(a) ? a.length : 0))(json(join(root, 'review-notes', f))?.notes), 0),
   }
 }
 

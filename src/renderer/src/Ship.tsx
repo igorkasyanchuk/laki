@@ -36,6 +36,7 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
   const [ok, setOk] = useState<Set<string>>(new Set())
   const [tried, setTried] = useState<ShipMode | null>(null)
   const [updating, setUpdating] = useState(false) // Update from <base> at work: the sheet's buttons wait
+  const [told, setTold] = useState(false) // it conflicted: its agent was asked to merge (once is enough)
   // the files and their diff (the uncommitted one at once: a file's peek shows it, and its Read with care marks); again
   // after an update: the files and the finds anew, what you typed and ticked kept (a file new since: ticked)
   const load = (again = false) => {
@@ -54,7 +55,7 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
     setUpdating(true)
     setErr('')
     onUpdate()
-      .then(() => load(true), e => setErr(String((e as Error)?.message ?? e)))
+      .then(r => ((r as { told?: boolean } | undefined)?.told && setTold(true), load(true)), e => setErr(String((e as Error)?.message ?? e)))
       .finally(() => setUpdating(false))
   }
   const peek = (path: string) => setOpen(o => (o === path ? null : path))
@@ -106,7 +107,7 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
       <>
         {`${behind} commit${behind === 1 ? '' : 's'} behind ${ws.base}`}
         {onUpdate && (
-          <button type="button" className="ship-update" disabled={updating || !!going} onClick={update} data-tip={ws.stat?.clean === false ? `Merging ${ws.base} in conflicts: its agent is asked to merge it and resolve them` : `Merge ${ws.base} into this branch`}>
+          <button type="button" className="ship-update" disabled={updating || told || !!going} onClick={update} data-tip={told ? 'Its agent was asked to merge it in and resolve the conflicts' : ws.stat?.clean === false ? `Merging ${ws.base} in conflicts: its agent is asked to merge it and resolve them` : `Merge ${ws.base} into this branch`}>
             {updating && <span className="btn-spin" aria-hidden />}
             Update from {ws.base}
           </button>
