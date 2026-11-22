@@ -3,7 +3,7 @@ import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
-import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageOld, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -968,7 +968,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     const l = LIMIT_AGENTS.includes(agent) ? planLeft(r) : undefined
     if (!l) return { tip: noLimitOf(agent, !!r && !r.error) }
     const low = l.left <= 10
-    return { note: low && l.reset ? `${l.left}% · resets ${hhmm(l.reset)}` : `${l.left}% of ${l.label}`, noteTone: low ? 'warn' : undefined }
+    const asOf = usageOld(r) ? ` · as of ${hhmm(r!.at)}` : '' // the agent's own, too old to trust (the plan limits' popup can ask anew)
+    return { note: (low && l.reset ? `${l.left}% · resets ${hhmm(l.reset)}` : `${l.left}% of ${l.label}`) + asOf, noteTone: low ? 'warn' : undefined, ...(asOf && { tip: "What the agent last said as it worked in Laki: what it used since, outside Laki too, isn't in it" }) }
   }
   const agentMenu = (e: MouseEvent) =>
     openMenu(

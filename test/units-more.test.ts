@@ -1578,7 +1578,7 @@ test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one 
 
 // New workspace's profile list: a usage row's tightest window, what's left, its short name and a reset still ahead
 test('planLeft: the tighter of two windows; an error row nothing; a reset past none', async () => {
-  const { planLeft, usageRow } = await import('../src/shared/types.ts')
+  const { planLeft, usageOld, usageRow } = await import('../src/shared/types.ts')
   const now = 1_000_000
   const row = (windows: { label: string; used: number; resets?: number; note?: string }[], error?: string) => ({ agent: 'claude', windows, at: now, ...(error && { error }) })
   assert.deepEqual(planLeft(row([{ label: '5-hour', used: 20, resets: now + 60_000 }, { label: 'Weekly', used: 38, resets: now + 864e5 }]), now), { left: 62, label: 'week', reset: now + 864e5 })
@@ -1588,6 +1588,9 @@ test('planLeft: the tighter of two windows; an error row nothing; a reset past n
   assert.equal(planLeft(undefined, now), undefined)
   assert.deepEqual(planLeft(row([{ label: 'Weekly', used: 50, resets: now - 1 }]), now), { left: 50, label: 'week' }, 'a reset in the past: none')
   assert.deepEqual(planLeft(row([{ label: 'Extra usage', used: 99, note: '$4 of $50' }, { label: 'Weekly', used: 10 }]), now), { left: 90, label: 'week' }, "a note's amount isn't a limit")
+  // an agent's own numbers past 20 minutes: old (what it used since isn't in them); an endpoint's, or an error, never
+  const own = { agent: 'claude', windows: [{ label: '5-hour', used: 20 }], source: 'own' as const }
+  assert.deepEqual([usageOld({ ...own, at: now - 21 * 60_000 }, now), usageOld({ ...own, at: now - 60_000 }, now), usageOld({ ...own, at: 0, source: 'endpoint' }, now), usageOld({ ...own, at: 0, error: 'x' }, now), usageOld(undefined, now)], [true, false, false, false, false])
   // the account's row, else the default one
   const rows = [{ agent: 'claude', account: 'a', windows: [], at: 0 }, { agent: 'claude', account: 'home', default: true, windows: [], at: 0 }]
   assert.equal(usageRow(rows, 'claude', 'a')?.account, 'a')

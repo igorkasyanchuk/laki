@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow, usageOld } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -18,8 +18,7 @@ export const USAGE_HINTS: Record<string, string> = {
   gemini: 'Runs agy’s own /usage every 5 minutes: it takes no turn and uses no quota (agy 1.1.11 or newer). Off: no numbers',
 }
 const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
-// an agent's own numbers past STALE: dimmed, with Ask <host> (what it used outside Laki, or since, isn't in them)
-const old = (r: AgentUsage, now: number) => r.source === 'own' && !r.error && r.windows.length > 0 && now - r.at > STALE
+const old = usageOld // an agent's own numbers past STALE: dimmed, with Ask <host>
 const NAMES = USAGE_AGENTS
 
 // a window whose reset has passed starts over

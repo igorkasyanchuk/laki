@@ -207,7 +207,7 @@ test('agyRead: only the new steps; a smaller DB starts over; no temp folder left
   const was = process.env.TMPDIR
   process.env.TMPDIR = join(dir, 'tmp') // agyRead's clone goes here: os.tmpdir() reads it at each call
   mkdirSync(process.env.TMPDIR)
-  t.after(() => ((process.env.TMPDIR = was), rmSync(dir, { recursive: true, force: true })))
+  t.after(() => (was === undefined ? delete process.env.TMPDIR : (process.env.TMPDIR = was), rmSync(dir, { recursive: true, force: true }))) // unset again, not the string 'undefined'
   const sec = Math.floor(Date.now() / 1000)
   const step = (tokens?: number) => pb([1, pb([1, sec])], ...(tokens ? [[9, pb([1, 7], [2, tokens])] as [number, Uint8Array]] : []))
   const make = (f: string, ...steps: (number | undefined)[]) => {

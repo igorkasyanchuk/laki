@@ -278,6 +278,9 @@ export function planLeft(row: AgentUsage | undefined, now = Date.now()): { left:
   const label = h ? `${h[1]} h` : /^weekly/i.test(w.label) ? 'week' : /^monthly/i.test(w.label) ? 'month' : w.label.toLowerCase()
   return { left: Math.max(0, Math.min(100, Math.round(100 - w.used))), label, ...(w.resets && w.resets > now && { reset: w.resets }) }
 }
+// an agent's own numbers (Claude Code's status line, Codex's reports) older than 20 minutes: what it used since, outside
+// Laki too, isn't in them (the popup dims them, the profile list says as of when)
+export const usageOld = (r: AgentUsage | undefined, now = Date.now()) => !!r && r.source === 'own' && !r.error && r.windows.length > 0 && now - r.at > 20 * 60_000
 // the usage row a profile's tab would start on: its account's, else the default one (StartChip, the profile list)
 export const usageRow = (rows: AgentUsage[] | undefined, agent?: string, account?: string) => rows?.find(x => x.agent === agent && (account ? x.account === account : x.default))
 // a tab you closed (⌘W), kept for ⇧⌘T: what brings it back (core.ts closeTab, tabReopen); cwd: a shell's folder

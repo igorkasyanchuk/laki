@@ -1358,7 +1358,8 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
 - the agent picker lists each profile with what's left of its plan after its name (Claude Code, Codex, Antigravity and
   Grok, the profile's account: *62% of week*, its tightest window; at 10% or under, in the warning color with its reset,
-  *4% · resets 14:20*), as Laki last read it, again each time the page comes back into focus. Nothing there: no plan
+  *4% · resets 14:20*), as Laki last read it, again each time the page comes back into focus (*· as of 0:50* when
+  they're the agent's own and older than 20 minutes). Nothing there: no plan
   limits Laki reads, or not signed in (its tooltip says which);
 - the clock beside the send button: when the agent starts. *Now* (each time the page opens); *Pick date & time*; or
   *After usage limit resets* (claude and codex, the profile's account: the soonest reset of a window at Settings'
