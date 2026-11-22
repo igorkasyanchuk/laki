@@ -9,7 +9,7 @@ import type { ProjectTab } from './Project'
 import type { Account, AchievementsKept, Gate, MergeMethod, PlanKind, PlanPin, Project, ProjectConfig, RunScript, Sep, Settings, Stat, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import type { Edit, PanelApi, PanelTab } from './SidePanel'
-import type { IconName, MenuItem, useRowDrag } from './ui'
+import { AGENT_COLORS, type IconName, type MenuItem, type useRowDrag } from './ui'
 import type { Achievement } from '../../shared/achievements'
 import type { AppInfo, RowMark, SkillInfo, WidgetsApi } from './Settings'
 import type { Step, StepId } from '../../shared/nextStep'
@@ -21,20 +21,17 @@ import type { KeyId, KeyMap } from '../../shared/keys'
 import type { NewWsParams, Shot } from './panels'
 import type { Collision } from '../../shared/overlap'
 import type { Notice, ShownPop, ShownWin } from './Shown'
-import type { AutoKey, FixWhat, PRAct } from './Info'
+import type { AutoKey, Check, FixWhat, LabelApi, PRAct, WsInfo } from './Info'
 import type { WidgetApi } from './Widgets'
 import type { menusOf } from './menus'
 import type { layoutOf } from './TabBar'
 import type { sideOf } from './Sidebar'
-import { AGENT_COLORS } from './ui'
 import { shownStatus, wsShown } from './text'
 import type { AgentUsage } from './Usage'
 import type { ReaderApi } from './Reader'
 import type { TunnelApi } from './Tunnel'
 import type { TurnApi } from './TurnStrip'
-import type { UpdateState } from '../../shared/update'
-import type { WsInfo } from './Info'
-import type { Check, LabelApi } from './Info'
+import type { NewLine, UpdateState } from '../../shared/update'
 import type { ReviewApi } from './FullReview'
 import type { SelectionUse } from './Term'
 import type { Drag } from './Panes'
@@ -472,6 +469,24 @@ export type AppBase = {
   workerAsks: (tab: string) => { ws: string; name: string; tab: TabView; }[]
   wsFiles: Opened[]
   drag: Drag | null
+  alwaysAllow: (t: TabView) => Promise<void>
+  glow: { tab?: string; n: number; } | null
+  hung: "no" | "waited" | "yes"
+  keyOffer: boolean
+  locked: { pin: boolean; } | null
+  news: NewLine[]
+  newsSeen: () => undefined
+  oldSkills: SkillInfo[]
+  restartDaemon: () => Promise<unknown>
+  setGlow: Dispatch<SetStateAction<{ tab?: string; n: number; } | null>>
+  setHung: Dispatch<SetStateAction<"no" | "waited" | "yes">>
+  setKeyOffer: Dispatch<SetStateAction<boolean>>
+  setLink: Dispatch<SetStateAction<string | undefined>>
+  setOldSkills: Dispatch<SetStateAction<SkillInfo[]>>
+  setTroubleSeen: Dispatch<SetStateAction<number>>
+  skillsLater: RefObject<boolean>
+  troubleSeen: number
+  updateSkills: () => Promise<void>
 }
 
 // and what the parts App builds first give the ones after: the menus (menusOf), the Layout menu (layoutOf)

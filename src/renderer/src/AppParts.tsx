@@ -4,7 +4,7 @@ import { Choice, choiceProps, useSayWhy } from './Diff'
 import { DARK, LESS_CLEAR, MORE_CONTRAST } from './themes'
 import { choose, Icon, keep as store, load, type Toast, unchoose } from './ui'
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Settings, TabView, View } from '../../shared/types'
+import { API, type Settings, type TabView, type View } from '../../shared/types'
 import { api, type Msg, notify, passkeyReady, passkeyUnlock } from './api'
 import { askScope, optLabel } from '../../shared/ask'
 import icon from './icon.svg'
@@ -489,3 +489,8 @@ export function askTool(m: Msg, view: View | null, settings: Settings) {
 }
 
 export const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`
+
+declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
+export const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
+// a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
+export const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)

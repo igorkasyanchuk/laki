@@ -1,20 +1,20 @@
 import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type ReactNode, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, recorded, veiled, type Annotations, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AchievementsKept, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, type Project, type Sep, type PlanKind, type PlanPin, type TabView, type View, type WidgetCtx, type WidgetFail, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { type AchievementsKept, type ActionFile, type Agent, AGENT_NAMES, aiOn, type Annotations, type Blame, creatorOf, flowsOn as flowsOnIn, type Gate, type GateHeld, HOME_ACCOUNT, isAccountAgent, jobOf, type MergeMethod, neverAsks, PERMS, placesOf, type PlanKind, type PlanPin, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, type Project, RAIL_PINS, recorded, rowsOf, type RunScript, type Sep, specsOn as specsOnIn, type Stat, type StudioChat, type TabView, type TurnKept, veiled, type View, type WidgetCtx, type WidgetFail, type WidgetLogLine, type WidgetMenu, type WidgetRuns, type WidgetView, type WorkspaceView, type WsSort } from '../../shared/types'
 import { ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
 import { version as appVersion } from '../../../package.json'
 import { Outbox } from './OutboxStrip'
-import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, openExternal, pageNow, passkeyReady, passkeySetUp } from './api'
+import { api, bridge, daemonBase, type Msg, notify, openExternal, pageNow, reportView, setQuiet } from './api'
 import { setSecretHint } from './secretHint'
 import type { Walk } from '../../shared/walk'
 import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import type { ReviewApi, Talk } from './FullReview'
 import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, type LabelApi, MERGE_WORDS, type PRAct, prState, REVIEW, showAvatars, type WsInfo } from './Info'
-import { CopyDiagnostics, VIEWED, Loading, SnapSkeleton, type NewWsParams, type Shot, videoCommand, WhatsNew } from './panels'
+import { Loading, type NewWsParams, type Shot, SnapSkeleton, videoCommand, VIEWED } from './panels'
 import type { AppInfo, SkillInfo, WidgetsApi } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { extMenuItems } from './extMenu'
@@ -35,12 +35,11 @@ import { badgeOf, needsTab, nextStep, type Step, waitsElsewhere } from '../../sh
 import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
-import { AskWrap, turnNext } from './Diff'
+import { turnNext } from './Diff'
 import { type TurnApi } from './TurnStrip'
 import { type Collision } from '../../shared/overlap'
 import { xterms, type SelectionUse } from './Term'
-import type { BarItem } from './Phone'
-import { PhoneBar, useDrawerSwipe } from './Phone'
+import { type BarItem, PhoneBar, useDrawerSwipe } from './Phone'
 import { groupsOf, type Layout, move, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { SideHandle, useTabDrag } from './Panes'
@@ -52,31 +51,24 @@ import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, USAGE_AGENTS } from './Usage'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
-import { Num, Toasts, morph, ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, QUICK_KEY, TALK_KEY, SHOT_KEY, TELL_KEY } from './ui'
+import { ask, AskHost, askText, choose, colorVar, copyImage, type Fact, HOTKEY, Icon, IconButton, type IconName, keep as store, keyTip, load, type MenuItem, morph, moveId, moveIds, Num, ON, ProjectMark, QUICK_KEY, SHOT_KEY, TAB_COLORS, TALK_KEY, TELL_KEY, tipKeys, Tips, Toasts, unchoose, useMenu, useRowDrag, type Verdict } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, STEP_ICON, clip, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { onKey } from './keydown'
-import { layoutOf, TabBar, TabStrip } from './TabBar'
+import { layoutOf } from './TabBar'
 import { sideOf, Sidebar } from './Sidebar'
-import { Dialogs, Pages, PRELOAD } from './Dialogs'
-import { AiFloat, BarChoices, FabCorner, KeyBar, LESS, MORE, NARROW, PeekGlow, PinForm, SMALL, SYS_DARK, TOUCH, UnlockForm } from './AppParts'
-import { AWAY, toolOn, toolShow } from './AppParts'
+import { Dialogs, PRELOAD } from './Dialogs'
+import { AiFloat, askTool, AWAY, FabCorner, fileKey, LESS, MORE, NARROW, PinForm, SMALL, staleDaemon, SYS_DARK, toolOn, toolShow, TOUCH, UnlockForm, useToasts } from './AppParts'
 import { useDaemon } from './useDaemon'
-import { askTool, useToasts } from './AppParts'
 import { statusBarOf } from './StatusBar'
-import { bodyOf } from './Body'
-import { fileKey } from './AppParts'
+import { mainOf } from './MainArea'
 
-declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
-// a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
 // E8: loaded as it first shows (the floating AI chat): not in the window's first load
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
-const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
-const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
 
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
@@ -3149,6 +3141,7 @@ export function App() {
     AI_TIP, achMore, aiFab, aiFloat, behindMenu, branchFull, connected, fly, infoOf, limits, noBar, pageBar, portStop, portUp, ports, problem, readerApi, setBranchFull, shortBranch, toAi, tracked, tunnelApi, turnApi, upd,
     artsIn, browsed, checkHid, ciLog, closeFile, detachPr, finds, guests, hookHid, label, labelApi, pageSeen, paneDeps, paneNow, previewW, queueRemove, queueSave, readerLive, reviewApi, reviewTight, setCheckHid, setHookHid, setOpenFiles, setPreviewW, setReviewTight, setShownFile, sizeOf, theme, turnLive, welcomeRun, welcomeSample, workerAsks, wsFiles,
     drag,
+    alwaysAllow, glow, hung, keyOffer, locked, news, newsSeen, oldSkills, restartDaemon, setGlow, setHung, setKeyOffer, setLink, setOldSkills, setTroubleSeen, skillsLater, troubleSeen, updateSkills,
   }
   const parts = { ...appBase, ...menusOf(appBase), ...layoutOf(appBase) }
   const app: AppCtx = { ...parts, ...sideOf(parts) }
@@ -3165,138 +3158,7 @@ export function App() {
 
       {narrow && !sideOpen && <div className="drawer-edge" aria-hidden="true" /> /* a swipe from the left edge opens the drawer (Phone.tsx) */}
       <main inert={narrow && sideOpen /* a phone's drawer over it */} className={`main ${wsTint ? 'ws-tint' : ''}`} style={wsTint ? ({ '--ws': `var(--tc-${wsTint})` } as CSSProperties) : undefined /* Extras › Tint with the workspace's color: styles.css' --ws */}>
-        {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
-        <TabBar app={app} />
-        {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
-        {hung === 'yes' && (
-          <div className="stale-bar soft" role="alert">
-            <Icon name="alertCircle" size={16} />
-            <span>
-              <b>The daemon isn't answering.</b>{view.settings.ptyHost && !view.ptyHostOff && ' If you restart it, your terminals stay.'}
-            </span>
-            <button onClick={() => void bridge?.restartDaemon?.(true).then(ok => (ok ? setHung('no') : fail(new Error("the daemon didn't stop")))).catch(fail)}>Restart the daemon</button>
-            <button onClick={() => setHung('waited')}>Wait</button>
-          </div>
-        )}
-        {connected && view.trouble && view.trouble.at > troubleSeen && (
-          <div className="stale-bar soft" role="alert">
-            <Icon name="alertCircle" size={16} />
-            <span>
-              <b>Something went wrong inside Laki's daemon</b> ({view.trouble.n === 1 ? 'an error' : `${view.trouble.n} errors`} since it started; the last: {view.trouble.last}). It goes on running; a restart keeps your terminals.
-            </span>
-            <CopyDiagnostics />
-            <button onClick={() => void restartDaemon().catch(fail)}>Restart the daemon</button>
-            <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.at)} />
-          </div>
-        )}
-        {connected && ws?.broken && ( // T13: its worktree broke: what Laki found, and the repairs for that kind
-          <div className="stale-bar" role="alert">
-            <Icon name="alertCircle" size={16} />
-            <span>
-              <b>{ws.broken.kind === 'gone' ? "This workspace's worktree folder is gone." : ws.broken.kind === 'moved' ? 'The repo moved: this worktree lost its link to it.' : "This worktree isn't linked to its repo."}</b> {ws.broken.detail}.
-              {ws.broken.remote ? ` Repair it on ${ws.host}: Laki only finds it there.` : ws.broken.kind === 'gone' ? ` Recreate checks out ${ws.branch} there again.` : ' Relink runs git worktree repair.'}
-            </span>
-            {!ws.broken.remote &&
-              (([how, label]) => <button onClick={() => void api.call<{ lost?: string }>('wsRepair', { ws: ws.id, how }).then(r => toast(how === 'relink' ? 'Relinked' : r.lost ? `Recreated. Lost: ${r.lost}` : 'Recreated'), fail)}>{label}</button>)(ws.broken.kind === 'gone' ? ['recreate', 'Recreate'] : ['relink', 'Relink'])}
-            {!ws.broken.remote && (
-              <button className="ghost" onClick={() => void api.call<{ kept?: string }>('wsRepair', { ws: ws.id, how: 'forget' }).then(r => toast(r.kept ? `Archived. Its folder stays at ${r.kept}` : 'Archived. Its branch stays'), fail)}>
-                Archive, keep the branch
-              </button>
-            )}
-          </div>
-        )}
-        {connected && view.diskFull && (
-          <div className="stale-bar" role="alert">
-            <Icon name="alertCircle" size={16} />
-            <span>
-              <b>The disk is full.</b> Laki can't save its state ({Math.round(view.diskFull.free / 1e6)} MB free): it keeps it in memory and saves once there's room. Don't quit Laki until then.
-            </span>
-            <button onClick={() => setDialog({ section: 'resources' })}>What Laki holds</button>
-          </div>
-        )}
-        {connected && view.newerData && (
-          <div className="stale-bar" role="alert">
-            <Icon name="alertCircle" size={16} />
-            <span>
-              <b>This data was written by a newer Laki.</b> This one may not keep what it added: a copy is in Laki's data folder as state.json.v{view.newerData}. Update Laki to the version you used last.
-            </span>
-          </div>
-        )}
-        {connected && view.whenDone && (
-          <div className="stale-bar soft" role="alert">
-            <Icon name={view.whenDone.act === 'lock' ? 'lock' : view.whenDone.act === 'sleep' ? 'moon' : 'power'} size={16} />
-            <span>
-              <b>Everything is done.</b> The Mac {WHEN_DONE_WORDS[view.whenDone.act]} in <Countdown to={view.whenDone.at} />.
-            </span>
-            <button onClick={() => void api.call('settingsSet', { whenDone: 'off' })}>Cancel</button>
-          </div>
-        )}
-        {connected && !staleDaemon(view) && oldSkills.length > 0 && (
-          <div className="stale-bar soft" role="status">
-            <Icon name="import" size={16} />
-            <span>
-              <b>Laki's skill is out of date in {[...new Set(oldSkills.map(r => r.name))].join(', ')}.</b> Its agents read older commands and paths than this Laki's.
-            </span>
-            <button onClick={() => void updateSkills()}>Update</button>
-            <button className="ghost" onClick={() => ((skillsLater.current = true), setOldSkills([]))}>
-              Not now
-            </button>
-          </div>
-        )}
-        {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
-        {locked && connected && (
-          // D6: locked again after its idle minutes: nothing comes until it unlocks, so nothing of it shows
-          <div className="splash pinning lock-over">
-            <UnlockForm pin={locked.pin} />
-          </div>
-        )}
-        {keyOffer && (
-          <div className="stale-bar soft" role="status">
-            <Icon name="fingerprint" size={16} />
-            <span>
-              <b>Unlock Laki here with Face ID or Touch ID?</b> A passkey of this device's: each time you open Laki here, and after a while without using it.
-            </span>
-            <button onClick={() => void passkeySetUp().then(() => (setKeyOffer(false), toast('Passkey set up: this device unlocks with it')), e => (passkeyReady('passkeyOptions'), !/NotAllowed|cancel/i.test(String(e?.name ?? e?.message)) && toast(String(e?.message ?? e))))}>Set up</button>
-            <button className="ghost" onClick={() => setKeyOffer(false)}>
-              Not now
-            </button>
-          </div>
-        )}
-        {connected && news.length > 0 && <WhatsNew version={appVersion} lines={news} onTry={setLink} onAll={() => (newsSeen(), setDialog({ section: 'notes' }))} onClose={newsSeen} />}
-        {bodyOf(app)}
-        {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && !(app.needsShown && sideOpen && !video && !listOff) /* the sidebar's Needs you card has them */ && (
-          // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
-          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff} tab={tab.id} ask={tab.ask} explain={aiOn(settings) && hasCap(view, 'ask.explain') ? () => call('askExplain', { tab: tab.id }) : undefined}>{(chip, explain) => (
-          <div className="ask-bar" data-dock="bottom">
-            {tab.ask!.tool ? (
-              // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)
-              <>
-                <span className="tag ask-tool">{tab.ask!.tool}</span>
-                <span className="ask-what mono" data-tip={tab.ask!.what}>{tab.ask!.what}</span>
-                {explain}
-                {chip}
-              </>
-            ) : (
-              <span className="muted">{tab.name} asks:</span>
-            )}
-            <BarChoices tab={tab} answer={(n, label, say) => void call('answer', { tab: tab.id, n, label, ...(say && { say }) }).catch(() => {})} />
-            {tab.held ? (
-              <span className="muted small" data-tip="Settings › the project › Always ask for: no rule answers it">
-                Asked because it touches {tab.held}
-              </span>
-            ) : !view.managed?.allowRules && ruleFrom(tab.ask) && (
-              <button className="link small" data-tip="A rule of the project's: the same ask from any agent here is answered Allow (Settings › the project › Auto-answer rules)" onClick={() => void alwaysAllow(tab).catch(() => {})}>
-                Always allow here
-              </button>
-            )}
-          </div>
-          )}</AskWrap>
-        )}
-        {touch && tab && !(narrow && (panelOpen || previewed)) /* not under a panel */ && (
-          <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />
-        )}
-        {tabsAt === 'bottom' && <TabStrip app={app} />}
-        <Pages app={app} />
+        {mainOf(app)}
         {!wideBar && statusBar}
         {aiFab && (
           <>
