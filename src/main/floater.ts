@@ -15,7 +15,8 @@ import { rpc } from '../shared/conn.ts'
 import { speakable } from '../shared/speak.ts'
 import { speechLine } from '../shared/speech.ts'
 import type { View } from '../shared/types.ts'
-import { agentEnd, agentWins, aiW, aiWin, annot, cardWin, earn, from, inboxWin, newWin, newWsWin, pageURL, privacySay, quickW, quickWin, recording, screenOff, screenPick, screenshot, show, simWins, smoke, tabWins, tellShot, win, shooting } from './index.ts'
+import { agentEnd, agentWins, aiW, aiWin, cardWin, earn, from, inboxWin, newWin, newWsWin, pageURL, privacySay, quickW, quickWin, recording, screenOff, show, simWins, smoke, tabWins, tellShot, win } from './index.ts'
+import { annot, screenPick, screenshot, shooting } from './shots.ts'
 
 const mac = process.platform === 'darwin' // index.ts' too: this module's own, read as it loads (before index.ts' body runs)
 
