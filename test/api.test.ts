@@ -647,13 +647,15 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   mkdirSync(join(page, 'assets'), { recursive: true })
   writeFileSync(join(page, 'index.html'), '<title>Laki</title>')
   writeFileSync(join(page, 'assets/app.js'), 'x')
+  writeFileSync(join(page, 'assets/index-B3x_k9aZ.js'), 'x')
   writeFileSync(join(rig.home, 'secret'), 'no')
   const r = await fetch(`${at}/`, { headers: { origin: 'https://evil.example' } })
   assert.deepEqual([r.status, r.headers.get('content-type'), await r.text()], [200, 'text/html; charset=utf-8', '<title>Laki</title>'])
   assert.equal((await fetch(`${at}/assets/app.js`)).headers.get('content-type'), 'text/javascript')
-  // the page never from the cache (back through Cloudflare's sign-in), its files revalidated
+  // the page never from the cache (back through Cloudflare's sign-in), its files revalidated; a hashed one kept a year
   assert.equal(r.headers.get('cache-control'), 'no-store')
   assert.equal((await fetch(`${at}/assets/app.js`)).headers.get('cache-control'), 'no-cache')
+  assert.equal((await fetch(`${at}/assets/index-B3x_k9aZ.js`)).headers.get('cache-control'), 'public, max-age=31536000, immutable')
   for (const path of ['/..%2fsecret', '/assets/..%2f..%2fsecret', '/%E0%A4%A'])
     assert.equal((await fetch(at + path)).status, 404, path)
 

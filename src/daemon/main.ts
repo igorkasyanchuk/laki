@@ -187,9 +187,11 @@ function page(path: string, res: ServerResponse) {
     return res.end(pageDir ? 'not found' : 'no app page here: build it (npm run build)')
   }
   // the page itself never from the cache (a tab brought back, Back): it goes through Cloudflare's sign-in again, and
-  // doesn't load without one, its every other request turned away
+  // doesn't load without one, its every other request turned away. A build's file with its content's hash in its name
+  // (assets/index-B3x_k9aZ.js) never changes: kept a year, never asked again
   const html = extname(file) === '.html'
-  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': html ? 'no-store' : 'no-cache', 'x-content-type-options': 'nosniff' })
+  const hashed = /^\/assets\/[^/]+-[\w-]{8,}\.[a-z0-9]+$/i.test(path)
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': html ? 'no-store' : hashed ? 'public, max-age=31536000, immutable' : 'no-cache', 'x-content-type-options': 'nosniff' })
   res.end(body)
 }
 

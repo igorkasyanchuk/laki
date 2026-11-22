@@ -200,7 +200,8 @@ first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the acce
 `fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from
 `/rpc` is a dead link, no answer or a 5xx is the Mac out of reach; App shows it on the splash and in the status bar
 (the `problem` event). Retries back off to 10 s. `page` serves the HTML `no-store`, so a tab brought back or Back
-goes through the sign-in instead of loading from the cache with every other request turned away. It ends for good by
+goes through the sign-in instead of loading from the cache with every other request turned away; a build's file with its
+hash in its name (`assets/<name>-<hash>.<ext>`) is `public, max-age=31536000, immutable`, any other `no-cache`. It ends for good by
 `remoteStop` (you, Resources' Stop, a wrong PIN's stop) or at `until` (`remoteTick`, every 15 s): `state.remote` goes.
 
 My domain (D1, `remoteStart`'s `host`, Settings' *Address* › *My domain*: `remoteAuth: 'domain'`, `remoteHost`): a word
