@@ -5,22 +5,18 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createDecipheriv, createECDH, createPublicKey, hkdfSync, verify } from 'node:crypto'
-import { PAYLOAD_MAX, pushRequest, replies, subOk, tapOf, tapSig, vapidNew, webPushPayload, webPushRequest } from '../src/daemon/push.ts'
+import { PAYLOAD_MAX, pushRequest, subOk, tapOf, tapSig, vapidNew, webPushPayload, webPushRequest } from '../src/daemon/push.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 const p = { event: 'waiting', workspace: 'fix-login', tab: 't1', agent: 'claude', question: 'Run rm -rf build?' } as const
 
-test('push formats: ntfy text with a Title, Slack and Telegram text, generic JSON', () => {
+test('push formats: ntfy text with a Title, Slack text, generic JSON (Telegram: telegram.test.ts)', () => {
   const ntfy = pushRequest({ format: 'ntfy' }, p)
   assert.deepEqual(ntfy.headers, { title: 'claude in fix-login is waiting for you' })
   assert.equal(ntfy.body, 'Run rm -rf build?')
   assert.match((pushRequest({}, { ...p, workspace: 'café ☕' }).headers as Record<string, string>).title, /^=\?UTF-8\?B\?.+\?=$/) // ntfy by default; past ASCII: RFC 2047
   assert.deepEqual(JSON.parse(String(pushRequest({ format: 'slack' }, p).body)), { text: 'claude in fix-login is waiting for you\nRun rm -rf build?' })
-  // Telegram: HTML, every value escaped, the title bold; a done one silent
-  assert.deepEqual(JSON.parse(String(pushRequest({ format: 'telegram' }, { ...p, question: 'Run <b>rm</b> & co?' }).body)), { text: '<b>claude in fix-login is waiting for you</b>\nRun &lt;b&gt;rm&lt;/b&gt; &amp; co?', parse_mode: 'HTML' })
-  assert.equal(JSON.parse(String(pushRequest({ format: 'telegram' }, { ...p, event: 'done' }).body)).disable_notification, true)
   assert.equal(JSON.parse(String(pushRequest({ format: 'slack' }, { ...p, question: 'Overwrite <dir> & <!channel>?' }).body)).text.split('\n')[1], 'Overwrite &lt;dir&gt; &amp; &lt;!channel&gt;?')
-  assert.equal(JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, p).body)).chat_id, '42')
   assert.deepEqual(JSON.parse(String(pushRequest({ format: 'json' }, { ...p, event: 'done', question: undefined }, 5).body)), {
     event: 'done',
     workspace: 'fix-login',
@@ -33,22 +29,19 @@ test('push formats: ntfy text with a Title, Slack and Telegram text, generic JSO
 
 test('push detail titles: who needs you only, no question, choices or buttons in any format (L8)', () => {
   const opts = { ...p, options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }], nonce: '00112233aabbccdd' }
-  for (const format of ['ntfy', 'slack', 'telegram', 'json'] as const) {
-    const r = pushRequest({ format, detail: 'titles', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42', replyTopic: 'x' }, opts)
+  for (const format of ['ntfy', 'slack', 'json'] as const) {
+    const r = pushRequest({ format, detail: 'titles', url: 'https://ntfy.example/x', replyTopic: 'x' }, opts)
     const all = `${JSON.stringify(r.headers)}${r.body}`
     assert.match(all, /claude in fix-login is waiting for you/, format)
     assert.doesNotMatch(all, /rm -rf|Yes|actions|reply_markup|options/, format)
   }
 })
 
-test('push choices: as text in every format; with a nonce, Telegram buttons and ntfy actions (JSON, the first 3) to the reply topic', () => {
+test('push choices: as text in every format; with a nonce, ntfy actions (JSON, the first 3) to the reply topic', () => {
   const options = [1, 2, 3, 4].map(n => ({ n, label: `pick ${n}` }))
   const q = { ...p, options }
   assert.equal(pushRequest({ format: 'ntfy' }, q).body, 'Run rm -rf build?\n1. pick 1\n2. pick 2\n3. pick 3\n4. pick 4')
   assert.deepEqual(JSON.parse(String(pushRequest({ format: 'json' }, q, 5).body)).options, options)
-  const tg = (nonce?: string) => JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, { ...q, nonce }).body))
-  assert.equal(tg().reply_markup, undefined)
-  assert.deepEqual(tg('00112233aabbccdd').reply_markup.inline_keyboard[1], [{ text: '2. pick 2', callback_data: '00112233aabbccdd:2' }])
   const nt = JSON.parse(String(pushRequest({ format: 'ntfy', url: 'https://ntfy.sh/mine', replyTopic: 'xyz' }, { ...q, nonce: '00112233aabbccdd', key: 'k' }).body))
   assert.equal(nt.topic, 'mine')
   assert.equal(nt.actions.length, 3)
@@ -58,31 +51,6 @@ test('push choices: as text in every format; with a nonce, Telegram buttons and 
   assert.equal(typeof pushRequest({ format: 'ntfy', url: 'https://ntfy.sh/mine' }, { ...q, nonce: '00112233aabbccdd' }).body, 'string') // no reply topic: text
   const auth = JSON.parse(String(pushRequest({ format: 'ntfy', url: 'https://ntfy.example/mine?auth=XYZ', replyTopic: 'xyz' }, { ...q, nonce: '00112233aabbccdd' }).body))
   assert.equal(auth.actions[0].url, 'https://ntfy.example/mine-xyz?auth=XYZ') // the topic's auth goes with the tap
-})
-
-test('Telegram taps: callback queries from the webhook\'s private chat by its user only, each acknowledged, the offset moved past all', async t => {
-  const asked: string[] = []
-  const me = { chat: { id: 42, type: 'private' } }
-  const server = createServer((req, res) => {
-    asked.push(req.url!)
-    const updates = [
-      { update_id: 7, callback_query: { id: 'q1', data: '00112233aabbccdd:2', from: { id: 42 }, message: me } },
-      { update_id: 8, callback_query: { id: 'q2', data: '00112233aabbccdd:1', from: { id: 99 }, message: { chat: { id: 99, type: 'private' } } } }, // someone else's chat
-      { update_id: 11, callback_query: { id: 'q4', data: '00112233aabbccdd:1', from: { id: 77 }, message: { chat: { id: 42, type: 'group' } } } }, // a group's member
-      { update_id: 12, callback_query: { id: 'q5', data: '00112233aabbccdd:1', from: { id: 77 }, message: me } }, // not its user
-      { update_id: 9, message: { text: 'hi', chat: { id: 42 } } },
-      { update_id: 10, callback_query: { id: 'q3', data: 'not a tap', message: { chat: { id: 42 } } } },
-    ]
-    res.writeHead(200).end(JSON.stringify({ ok: true, result: req.url!.includes('getUpdates') ? updates : true }))
-  })
-  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
-  t.after(() => void server.close())
-  const w = { format: 'telegram' as const, url: `http://127.0.0.1:${(server.address() as { port: number }).port}/botT0K/sendMessage?chat_id=42` }
-  const r = await replies(w, '5')
-  assert.deepEqual(r, { taps: [{ nonce: '00112233aabbccdd', n: 2 }], cursor: '13' })
-  assert.match(asked[0], /^\/botT0K\/getUpdates\?offset=5&/)
-  await until(() => asked.some(u => u === '/botT0K/answerCallbackQuery?callback_query_id=q1'), 'q1 acknowledged')
-  assert.ok(!asked.some(u => /q[245]/.test(u)), "another chat's, a group's or another user's tap isn't")
 })
 
 test('answer from the phone: an ntfy tap on a waiting menu picks that choice once, only while the same menu waits', async t => {
@@ -145,42 +113,6 @@ test('answer from the phone over ntfy needs a topic only you read: ntfy.sh witho
   await rig.start()
   const w = (await rig.rpc('state')).settings.webhook
   assert.deepEqual([w.answer, w.answerOff], [false, true])
-})
-
-test('answer from the phone: the webhook changed while a question waits (ntfy to Telegram), taps are read from the new one from its start', async t => {
-  const asked: string[] = []
-  let push = ''
-  const updates: object[] = []
-  const server = createServer((req, res) => {
-    let body = ''
-    req.on('data', d => (body += d))
-    req.on('end', () => {
-      asked.push(req.url!)
-      if (req.method === 'POST' && req.url === '/') push = body
-      const tg = req.url!.startsWith('/botT0K/')
-      res.writeHead(200).end(tg ? JSON.stringify({ ok: true, result: req.url!.includes('getUpdates') ? updates.splice(0) : true }) : '')
-    })
-  })
-  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
-  t.after(() => void server.close())
-  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const rig = await fresh(t)
-  const proj = await rig.rpc('projectAdd', { path: rig.repo })
-  const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
-  const tab = await rig.tab(ws.id)
-  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
-  await rig.rpc('settingsSet', { webhook: { url: `${base}/topic`, format: 'ntfy', answer: true, replyTopic: 'r1' } })
-  await rig.rpc('send', { target: tab.id, text: 'menu' })
-  await until(() => push, 'the push with buttons')
-  const nonce = JSON.parse(push).actions[0].body.split(':')[0]
-  await rig.rpc('phoneTick')
-  assert.ok(asked.some(u => u.startsWith('/topic-r1/json?poll=1&since=')), 'ntfy asked')
-  // now Telegram: its updates from the start (offset 0), not from ntfy's place (a unix time); the old push's tap counts
-  await rig.rpc('settingsSet', { webhook: { url: `${base}/botT0K/sendMessage?chat_id=42`, format: 'telegram', answer: true } })
-  updates.push({ update_id: 7, callback_query: { id: 'q1', data: `${nonce}:2`, from: { id: 42 }, message: { chat: { id: 42, type: 'private' } } } })
-  await rig.rpc('phoneTick')
-  assert.match(asked.find(u => u.startsWith('/botT0K/getUpdates'))!, /offset=0&/)
-  await until(async () => /picked: Yes, and don't ask/.test(await rig.screen(tab.id)), 'the tap picked 2')
 })
 
 test('pushes: one per state change of a tab, done only when on, none when muted; Send test answers', async t => {
@@ -424,10 +356,9 @@ test('push format webpush: encrypted for the subscription, a VAPID JWT for its s
   assert.equal(long.actions.length, 2)
 })
 
-test('D4: remote access link in each format: the tap opens it (ntfy Click, Telegram button, Slack link, JSON url, Web Push data)', () => {
+test('D4: remote access link in each format: the tap opens it (ntfy Click, Slack link, JSON url, Web Push data)', () => {
   const r = { event: 'remote', workspace: '', tab: '', agent: 'Laki', title: 'Laki: remote access is on: tap to open it', url: 'https://fake.trycloudflare.com/#t=abc' } as const
   assert.deepEqual(pushRequest({ format: 'ntfy' }, r).headers, { title: r.title, click: r.url })
-  assert.deepEqual(JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, r).body)).reply_markup, { inline_keyboard: [[{ text: 'Open it', url: r.url }]] })
   assert.match(JSON.parse(String(pushRequest({ format: 'slack' }, r).body)).text, /\n<https:\/\/fake\.trycloudflare\.com\/#t=abc\|Open it>$/)
   assert.equal(JSON.parse(String(pushRequest({ format: 'json' }, r).body)).url, r.url)
   assert.equal(webPushPayload({ format: 'webpush' }, r).url, r.url)
@@ -486,45 +417,4 @@ test('D4: remote access pushes its link to the phone when asked (off by default)
   await sleep(300)
   assert.equal(got.length, 3)
   await stop()
-})
-
-test('P0: a Telegram ask answered from the phone, or on the Mac, is edited: its buttons gone, what was picked said', async t => {
-  const asked: { url: string; body: any }[] = []
-  const updates: object[] = []
-  const server = createServer((req, res) => {
-    let body = ''
-    req.on('data', d => (body += d))
-    req.on('end', () => {
-      asked.push({ url: req.url!, body: body ? JSON.parse(body) : undefined })
-      const result = req.url!.includes('getUpdates') ? updates.splice(0) : req.url!.includes('sendMessage') ? { message_id: 50 + asked.length } : true
-      res.writeHead(200).end(JSON.stringify({ ok: true, result }))
-    })
-  })
-  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
-  t.after(() => void server.close())
-  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '150', LAKI_ANSWER_HOLD_MS: '200' } })
-  const proj = await rig.rpc('projectAdd', { path: rig.repo })
-  const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
-  const tab = await rig.tab(ws.id)
-  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
-  await rig.rpc('settingsSet', { webhook: { url: `${base}/botT0K/sendMessage?chat_id=42`, format: 'telegram', answer: true } })
-  await rig.rpc('send', { target: tab.id, text: 'menu' })
-  const push = (await until(() => asked.find(x => x.url.includes('/sendMessage') && x.body?.reply_markup), 'the push with buttons'))!
-  const nonce = push.body.reply_markup.inline_keyboard[0][0].callback_data.split(':')[0]
-  updates.push({ update_id: 1, callback_query: { id: 'q1', data: `${nonce}:1`, from: { id: 42 }, message: { message_id: 1, chat: { id: 42, type: 'private' } } } })
-  await rig.rpc('phoneTick')
-  await until(async () => /picked: Yes/.test(await rig.screen(tab.id)), 'the tap picked 1')
-  const edit = (await until(() => asked.find(x => x.url.endsWith('/editMessageText')), 'the message edited'))!
-  assert.equal(edit.body.message_id, asked.indexOf(push) + 51, 'the pushed message')
-  assert.equal(edit.body.reply_markup, undefined, 'no buttons')
-  assert.match(edit.body.text, /<i>Picked: Yes<\/i>$/)
-  // again, answered on the Mac this time: the next look edits it as gone
-  await rig.rpc('send', { target: tab.id, text: 'menu' })
-  await until(() => asked.filter(x => x.url.includes('/sendMessage') && x.body?.reply_markup).length === 2, 'a second push')
-  await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting')
-  await rig.rpc('answer', { tab: tab.id, n: 1 })
-  await until(async () => (await rig.tab(ws.id)).status !== 'waiting', 'answered on the Mac')
-  await rig.rpc('phoneTick')
-  await until(() => asked.filter(x => x.url.endsWith('/editMessageText')).at(-1)?.body.text.includes('Answered on the Mac'), 'edited as gone')
 })

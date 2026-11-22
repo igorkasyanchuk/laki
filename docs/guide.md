@@ -1835,7 +1835,7 @@ window's bottom right until you close it: *Show* opens it as the window, *Open t
 (the workflow's name, how the run ended and what the End says (*What it says*, with variables; else its name); a click
 opens the run). In the file: `modal: no` (a Show you) or `modal: yes` (an End), `popover: yes`, `notify: yes`. A failed
 run notifies anyway, and Settings › General › *macOS notifications* turns them all off. *And on my phone* sends it to
-your phone pushes too (Settings › Phone pushes: ntfy, Telegram, Slack or a webhook).
+your phone pushes too (Settings › Phone pushes: ntfy, Slack or a webhook; Settings › Telegram).
 
 Each block has an **ID**, its `## id` in the file (on the canvas when it has its own name): change it in the block and
 every arrow and `{{steps.<id>.…}}` follows. The sidebar's *{{ }} Variables* lists every variable a workflow has, the run's
@@ -2724,20 +2724,42 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   as a local file and can read your other files.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
-  Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
-  workspace, tab, agent, message, ts}`). Once per wait or turn; muted workspaces and tabs don't push. It goes to that
+  Slack (an incoming webhook) or generic JSON (`{event,
+  workspace, tab, agent, message, ts}`); Telegram is *Telegram*, below. Once per wait or turn; muted workspaces and tabs don't push. It goes to that
   URL only (`https://`: it holds what the agent asks), and *Send test* sends one now. A wait goes a moment later,
   with the agent's numbered choices as lines of text (JSON: `options` too). *What it sends* › *Only who needs you*
   sends just which agent in which workspace waits or is done: nothing off its screen (no question, choices or
   buttons), for a service you'd rather not show your commands. *Answer from the phone* (off by default)
-  puts a button per choice on Telegram's push (taps from your bot's chat only) and ntfy's (the first 3; a tap posts
+  puts a button per choice on ntfy's push (the first 3; a tap posts
   to a reply topic, your topic's URL with a random part after it, shown there; each tap is signed with a key only Laki
   has, so a made-up one is ignored): a tap picks that choice, as a key press would, so it can allow a command. On
   ntfy it needs a topic only you can read: your own ntfy server, or ntfy.sh with an access token (`?auth=…` in the
-  URL); a plain ntfy.sh topic can't answer, and an upgrade turned it off where it was on (Settings says why). Laki asks Telegram or ntfy for taps every 5 seconds only while a pushed
+  URL); a plain ntfy.sh topic can't answer, and an upgrade turned it off where it was on (Settings says why). Laki asks ntfy for taps every 5 seconds only while a pushed
   question waits (a day at most), and a tap counts only while the same menu is still on screen. A workflow's questions
   come too (its *Ask you*, a confirm before a PR or a merge, a stuck block, a decision it isn't sure of), with a button
   per choice the same way, counted only while the run still asks the same; a typed answer needs Laki.
+- *Telegram* (after *Phone pushes*): your own Telegram bot brings Laki's pushes to your phone, and at the Answer level
+  a tap on a push's button answers the agent. Set it up in three steps: **1 · Make a bot**: in Telegram open
+  @BotFather, send `/newbot`, give it a name and a username that ends in `bot`, and paste the token it answers with
+  (`123456789:AA…`); *Connect* checks it with Telegram. **2 · Pair your phone**: *Show pairing code* shows a QR and a
+  `t.me/<your bot>?start=…` link; scan it with the phone's camera (or open the link there) and tap *Start* in Telegram:
+  Laki says *Paired*. The code is 128 random bits, works once, for 10 minutes, and only the Telegram account that sends
+  it is let in, in its private chat with the bot; anyone else who finds the bot gets no answer at all. **3 · What
+  Telegram may do**: *Notify* (pushes only; Laki doesn't read the chat), *Answer* (the default: a tap on a push's
+  button picks that choice, as a click in Laki would) or *Control*. Stop, Ship, merge, archive or delete, settings,
+  secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
+  agent, remote access or a trusted client can't change this section. *What it sends*: *An agent waits for you* (on),
+  *An agent is done* (on, silently), *Titles only* (who needs you, nothing off the screen). Do not disturb, a muted tab
+  or workspace and Recording mode hold as for every push. Once a pushed ask is answered (from the phone or on the Mac)
+  its message says so and its buttons go. How it works: Laki keeps one request open to Telegram (`api.telegram.org`)
+  and gets your taps as its answer: no port opens on your Mac and no tunnel runs; while the Mac sleeps nothing goes,
+  and a tap or message older than two minutes is dropped, never acted on later. The token stays in the Keychain (else
+  a file only you can read), never in Laki's state, logs or what agents see; Telegram's servers see what is sent (bots
+  aren't end-to-end encrypted), secrets' shapes masked. *Unpair* stops it at once; *Remove bot* also deletes the token
+  from this Mac (revoke it in @BotFather with `/revoke` too). If another program reads the same bot, Laki stops and
+  says to use a bot made only for Laki; a revoked token turns it off with a notice. A Telegram push set up in *Phone
+  pushes* before moved here as Laki updated: its token to the Keychain, a private chat paired at Answer (a group's
+  only asks you to pair again).
 - *Pull requests* (after *Git & worktrees*): the *Review tab* (on by default; off: no Review tab), how often Laki checks PRs (every minute by default; a quiet one, open with nothing running, every 5), how many tries in a row *fix CI* and *fix
   conflicts* get (3), the review bots whose comments *review* sends (any app can be a bot: others are skipped), and the
   prompts the PR switches send (above, in

@@ -75,6 +75,8 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   cliInstall: 'install the laki command on PATH (the user does, in Settings › General)', cliRemove: 'remove the laki command from PATH',
   remoteStop: 'stop remote access', remotePair: "pair a device with remote access", remoteDeviceRm: "revoke remote access's devices",
   remoteDeviceSet: "change a remote device's access", webhookTest: 'send a push to a webhook (Settings › Phone pushes)',
+  telegramSet: "set up the user's Telegram bot, its level or pairing (the user does, in Settings › Telegram)",
+  telegramPair: "pair a Telegram chat with Laki (its code would let anyone in)", telegramTest: 'send a push to Telegram (Settings › Telegram)',
   resourceStop: 'stop what Settings › Resources lists (Laki AI, remote access, shares, tunnels, extensions’ runs)',
   flowTest: "test a workflow's block (a model call or a webhook, as the user)", noteList: "read the user's notes", noteGet: "read the user's notes",
   noteFile: "read the user's notes", noteNew: "change the user's notes", noteSave: "change the user's notes", noteRestore: "change the user's notes",
@@ -109,7 +111,7 @@ export const REMOTE_NO = new Set(['scheduleCopy', 'gitTidy', 'goalSet', 'flowImp
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',
   'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave',
-  'hook', 'tunnelStart', 'scheduleSet', 'accountSet', 'accountRm', 'tabAccount', 'webhookTest', 'uiReset', 'projectClone', 'device', 'aiShot', 'aiOpenApp',
+  'hook', 'tunnelStart', 'scheduleSet', 'accountSet', 'accountRm', 'tabAccount', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'uiReset', 'projectClone', 'device', 'aiShot', 'aiOpenApp',
   'widgetFileSave', 'widgetWrite', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRm', 'widgetRestore', 'widgetUndo', 'widgetRemix', 'widgetDev',
   'widgetMock', 'widgetCheck', ...TICKS])
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of

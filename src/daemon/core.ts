@@ -56,7 +56,8 @@ import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MA
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
-import { phone, pushed } from './phone.ts'
+import { phone, prune, pushed } from './phone.ts'
+import { tgMigrate, tgView } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
@@ -290,7 +291,8 @@ export function load() {
   const mc = state.settings?.memoryCompact as { on?: boolean; off?: boolean } | undefined
   if (mc && typeof mc === 'object' && typeof mc.on !== 'boolean') ((mc.on = false), delete mc.off)
   const hook = state.settings?.webhook
-  if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
+  if ((hook?.format as string) === 'telegram') tgMigrate(hook!) // Settings › Telegram since 0.60: its token to the Keychain, off state.json
+  else if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
   if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
   state.cfgTrust = true
@@ -1105,6 +1107,7 @@ export function view(): View {
     ...(trouble && { trouble }),
     ...(state.mergeQueues?.length && { mergeQueues: state.mergeQueues }),
     ...(newerData && { newerData }),
+    ...(t => t && { telegram: t })(tgView()), // Settings › Telegram: no token, no code
     ...((m => m && { managed: m })(managedView())),
   }
 }
@@ -1126,6 +1129,7 @@ export function changed() {
     pending = null
     const v = view()
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
+    prune() // a pushed ask answered or gone: its Telegram message says so now
     for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
     const agents = agentsBusy(v)
     keepAwake('agents', agents)
@@ -2961,6 +2965,7 @@ export function settingsSet(o: Settings, own = false) {
   policySettings(o as Record<string, unknown>) // a managed one only as the policy has it
   if (o.ptyHost && !state.settings?.ptyHost) void ptyUp().catch((e: Error) => log(`pty host: ${(e as Error).message}`)) // R6: new terminals go there from now on
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
+  if ((o.webhook?.format as string) === 'telegram') throw new Error('Telegram has its own section now: Settings › Telegram (a bot of yours, paired with your chat)')
   if (o.aiEndpoint) o = { ...o, aiEndpoint: String(o.aiEndpoint.url ?? '').trim() ? { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } : undefined } // https, or http on this Mac; no credentials. No URL: none
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only

@@ -439,7 +439,8 @@ the agent has several; a toast, and a notification unless the window has the foc
 while the app is open with the ring on screen (not a Browsers page); the daemon doesn't watch usage itself.
 
 Phone pushes are the daemon's (`push.ts`, `phone.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
-`format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
+`format` ntfy/slack/json/webpush, `waiting` unset on, `done` unset off) and Telegram (below), each by its own When
+(`phone.ts` `to`; `send` makes one nonce for both, buttons only where taps come back) on a `turn` that waits or is done, and on
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
 later with `askOf`'s choices as lines (JSON: `options`; `webhook.detail` `titles`: `pushRequest` drops the question,
 choices and nonce, Settings' *What it sends*, L8); with `webhook.answer` (Settings' *Answer from the phone*,
@@ -449,14 +450,10 @@ nonce and choice with `<data>/tap-key`, 0600; `replies` drops a tap without it) 
 the random part Settings makes). `types.ts` `answerOk`: ntfy answers need the server not to be ntfy.sh or the URL to
 carry `auth` (a public topic: anyone reads the nonces); `settingsSet` refuses another (`ANSWER_WHY`), `load` turned an old
 one off once (`webhook.answerOff`, Settings' note). `awaiting` keeps each nonce with the tab and its choices; while any is there,
-`phoneTick` (every 5 s; the API's for tests) runs `push.ts` `replies` (Telegram's `getUpdates` from `tapCursor`, only
-callback queries from the URL's `chat_id` that is a private chat, tapped by that chat's user (`from.id`: in a group anyone
-could tap), each acknowledged; ntfy's `/json?poll=1&since=`) and answers a tap whose
+`phoneTick` (every 5 s while a webhook's ask waits, `awaiting`'s `hook`; the API's for tests) runs `push.ts` `replies`
+(ntfy's `/json?poll=1&since=`) and answers a tap whose
 nonce is waiting and whose tab still shows the same choices (`answer` with `label`); a nonce goes as it's used, when
-its tab stops waiting, or after a day; none left: the timer stops. A Telegram push's `message_id` (sendMessage's answer)
-stays with its nonce (`awaiting`'s `msg`): as it goes (`gone`), `tgDone` edits the message (`editMessageText`, no
-`reply_markup`: no buttons) to say *Picked: …* or *Answered on the Mac, or it moved on*. Telegram's text is HTML
-(`parse_mode`, `tgHtml`: the title bold, every value escaped by `esc`), a done push with `disable_notification`. ntfy gets a
+its tab stops waiting, or after a day (`prune`, also run by core's `changed()` as the view changes); none left: the timer stops. ntfy gets a
 `Title` header (RFC 2047 past ASCII) and the question as the body; Slack its text escaped; JSON `{event, workspace, tab,
 agent, message, ts}`. `https://` only (plain `http://` to localhost: tests' server; Settings flags another). 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
 A workflow's waits (workflow.ts' `ask` and `unsure`: Ask you, confirm, stuck, a decision; not an agent's ask, its tab
@@ -465,6 +462,34 @@ pushed) are `flowAsk(run, question, options, show)`: a `waiting` push titled *Wo
 nonce (`nonceFor`, the tab's rule) kept in `awaiting` as `flow` (the run) with its options' JSON; `phoneTick` (`stillAsks`)
 drops it once `flowHooks.waitKey(id)` (the run's wait's options, none past it) isn't that, and a tap is
 `flowHooks.answer({ id, n: n - 1 })` (`flowAnswer`). Tested in `test/push.test.ts`.
+
+Telegram (Settings › Telegram, `telegram.ts`; `state.telegram`, the view's `telegram` by `tgView`: no token, no code, no
+ids) is your own bot, paired with one user in its private chat. The token: `telegramSet { token }` checks it with
+`getMe` (BotFullInfo: `username`, `has_topics_enabled`), keeps it by `keychain.ts` `keyWrite('telegram', <data>/telegram-token)`
+(the Keychain, else that 0600 file), never in state.json, the view, a log or an error (`scrub`: a URL holds it, `TOKEN`'s
+shape is masked anywhere); another bot's token unpairs. Pairing: `telegramPair` makes a code (16 random bytes, base64url:
+22 characters of a start parameter's 64) for `LAKI_TG_PAIR_MS` (10 minutes), answers `{ link: t.me/<bot>?start=<code>,
+until }` (the window's QR; the view says only `pairing: until`); the first `/start <code>` from a private chat
+(`chat.id === from.id`), compared in constant time, pairs that user at `answer` and uses the code; anything else from
+anyone else is ignored without a word (`ignore`: a log line a minute). The long poll (`loop`): one `getUpdates`
+(`timeout` 50, `allowed_updates` message and callback_query) at a time with its own `AbortController`, run while a code
+waits or it's paired, on and at answer or control (`wanted`, `sync` as any of that changes; never at notify); network
+errors back off 1 s to 60 s (one log line until it works), a 429 waits `retry_after`, a 409 (another reader, or a
+webhook on the bot) stops with a notice to use a bot only for Laki and touches nothing of the other's, a 401 turns it
+off with a notice; `telegramSet { off: false }` tries again. A message older than 2 minutes (`date`) is dropped with
+*Laki was off*; a callback has no date, so the first batch after a gap of 2 minutes (`lastOk`) drops its taps (*too
+old*). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waited out once. A push (`tgPush`) is HTML
+(`tgHtml`: the title bold, every value escaped by `esc`, secrets' shapes by `redact`, over 300 characters folded in a
+`blockquote expandable`), `disable_notification` when done, `link_preview_options` off, a button per choice
+(`callback_data` `nonce:n`, unsigned: only the paired user's private chat counts) at answer and up unless titles only; its
+`message_id` stays with the nonce (`awaiting`'s `msg`), and as it goes (`gone`) `tgDone` edits it
+(`editMessageText` with an empty `inline_keyboard`) to say *Picked: …* or *Answered on the Mac, or it moved on*. A tap
+from the paired user (level answer and up) is `takeTap`, its callback answered with what it did. Remote access's Keep
+never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
+format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
+paired at answer with its When, a group's only a notice to pair again; `settingsSet` refuses the format. `telegramSet`,
+`telegramPair`, `telegramTest` are the user's: AGENT_NO, REMOTE_NO, ANSWER_NO, no client's scope. `LAKI_TELEGRAM_API`:
+tests' fake Bot API (localhost only). Tested in `test/telegram.test.ts`.
 
 Archive on merge (`archiveMerged`, after `autoPR` in `scanPR`; `settings.archiveMerged`, off by default): a worktree
 whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD` 0 and `wsArchive` `ifClean` (status,

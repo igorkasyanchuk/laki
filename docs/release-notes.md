@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Telegram has its own section: make a bot in @BotFather, paste its token, scan a one-time QR, and Laki's pushes reach your phone, with a tap on a button answering the agent. Only your account in its private chat counts; the token stays in the Keychain. [Try it](laki://settings/telegram)
+
 ## 0.59.0 · Nov 22, 2026
 
 - The window, and a phone over remote access, get only what changed with each update from Laki's background service: a tab's status is under 1 KB, where the whole state was about 40 KB with 60 workspaces.

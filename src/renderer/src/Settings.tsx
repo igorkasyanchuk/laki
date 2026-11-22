@@ -8,7 +8,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { CURSOR, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -34,7 +34,7 @@ import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from '.
 import type { AllowRule } from '../../shared/ask'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
-import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
+import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, TelegramSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
 import { DENSITIES, designTraits, DESIGNS, FONT_SIZE, fontStack, PAGE_ZOOMS, RAIL_ITEMS, type RailHas, railSorted, ROW_MARKS, rowMarkOn, rowMarkSet, rowMarkUsed, SCROLL, termLook } from './settingsBase'
@@ -1009,6 +1009,7 @@ export function SettingsPage(p: {
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
+  telegram?: TelegramView // Settings › Telegram: the view's (no token, no code); none: an older daemon (caps' telegram)
   cli?: CliApi // General › Developer: the laki command in any shell
   uninstall?: UninstallApi // B3: General › Developer's Uninstall Laki
   backup?: BackupApi // General › Backup: laki backup and restore
@@ -1031,7 +1032,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'security' || p.clients) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'telegram' || (p.telegram && p.call)) && (x.id !== 'security' || p.clients) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
   // U10: Basic (four heads of the cards most people change) or All (every section); a new install starts on Basic,
   // one with projects on All; a link to a section, or Find a setting, goes to All
   const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))
@@ -3043,6 +3044,7 @@ export function SettingsPage(p: {
             </Group>
           )}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
+          {sec === 'telegram' && p.call && p.telegram && <TelegramSection tg={p.telegram} call={p.call} />}
           {on('pr') && (
             <>
               <h2>Pull requests</h2>

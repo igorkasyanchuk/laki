@@ -1,6 +1,7 @@
-// Settings' connect sections: phone pushes, tunnels, remote access and the simulators. Settings.tsx re-exports it.
+// Settings' connect sections: phone pushes, Telegram, tunnels, remote access and the simulators. Settings.tsx re-exports it.
 import type { Call } from '../../shared/api'
-import { ANSWER_WHY, answerOk, type InHook, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
+import { ANSWER_WHY, answerOk, type InHook, type NamedTunnel, type SimCheck, type SimDev, type TelegramView, type TgLevel, type Webhook, webhookUrl } from '../../shared/types'
+import { openExternal } from './api'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
@@ -10,7 +11,6 @@ import { QR } from './Tunnel'
 const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
   ['ntfy', 'ntfy', 'https://ntfy.sh/a-topic-only-you-know'],
   ['slack', 'Slack', 'https://hooks.slack.com/services/…'],
-  ['telegram', 'Telegram', 'https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>'],
   ['json', 'Generic JSON', 'https://example.com/hook'],
   ['webpush', 'This phone (Web Push)', ''],
 ]
@@ -33,8 +33,8 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
       <h2>Phone pushes</h2>
       <p className="muted small">
         Pushes to your phone when an agent waits for you or finishes, posted to this URL and nowhere else. ntfy: a topic's URL, which the ntfy app
-        subscribes to; Slack: an incoming webhook; Telegram: your bot's whole sendMessage URL, chat_id included; generic JSON gets{' '}
-        <code>{'{event, workspace, tab, agent, message, ts}'}</code>. Muted workspaces and tabs don't push.
+        subscribes to; Slack: an incoming webhook; generic JSON gets{' '}
+        <code>{'{event, workspace, tab, agent, message, ts}'}</code>. Muted workspaces and tabs don't push. Telegram has its own section (Settings › Telegram).
       </p>
       <Group title="Where to">
       <div className="grid2">
@@ -73,7 +73,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
         </Switch>
       </div>
       </Group>
-      <Group title="What it sends" hint="It goes through the service you picked (ntfy, Slack, Telegram) and stays there">
+      <Group title="What it sends" hint="It goes through the service you picked (ntfy, Slack) and stays there">
       <div className="seg" role="radiogroup" aria-label="What it sends">
         {DETAILS.map(([v, label]) => (
           <button key={label} type="button" role="radio" aria-checked={w.detail === v} className={w.detail === v ? 'on' : ''} onClick={() => onChange({ ...w, detail: v, ...(v && { answer: false }) })}>
@@ -87,7 +87,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
           : "The agent's name and workspace, the question it asks or its last question, and its numbered choices, as they are on its screen: a command or a file path may be among them."}
       </p>
       </Group>
-      <Group title="Answers" hint="A waiting agent's choices go as text, unless it sends titles only. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3), Web Push the first and last">
+      <Group title="Answers" hint="A waiting agent's choices go as text, unless it sends titles only. With this on, ntfy gets a button per choice (the first 3), Web Push the first and last">
       <div className="setting-box">
         <Switch
           className="switch-row"
@@ -97,7 +97,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
         >
           <Says
             title="Answer from the phone"
-            hint={`A tap picks that choice in an agent's question and a workflow's (its Ask you, a confirm, a stuck block), as a click here would: it can allow a command or an edit; typed answers only in Laki. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : format === 'webpush' ? 'Web Push: the notification\'s buttons, signed by this Mac, from a paired phone only.' : 'Slack and JSON: the choices as text only.'}`}
+            hint={`A tap picks that choice in an agent's question and a workflow's (its Ask you, a confirm, a stuck block), as a click here would: it can allow a command or an edit; typed answers only in Laki. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : format === 'webpush' ? 'Web Push: the notification\'s buttons, signed by this Mac, from a paired phone only.' : 'Slack and JSON: the choices as text only.'}`}
           />
         </Switch>
         {w.answerOff && !w.answer && <p className="warn small">Laki turned this off as it updated: {ANSWER_WHY}, then turn it on again.</p>}
@@ -116,6 +116,155 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
           {said && <span className="muted small">{said}</span>}
         </div>
       )}
+    </>
+  )
+}
+// Settings › Telegram (daemon/telegram.ts): your own bot, set up in three steps (make it, paste its token, pair your
+// chat by a one-time code), what the chat may do, what it sends, how it works and what keeps it safe
+const LEVELS: [TgLevel, string, string][] = [
+  ['notify', 'Notify', 'Pushes only: who waits for you, who is done. Nothing comes back.'],
+  ['answer', 'Answer', "Pushes, and a tap on a push's button picks that choice, as a click here would."],
+  ['control', 'Control', 'Everything Answer does. Stop, Ship, merge and settings stay on the Mac at every level.'],
+]
+export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call }) {
+  const [token, setToken] = useState('')
+  const [said, setSaid] = useState('') // the last call's outcome
+  const [code, setCode] = useState<{ link: string; until: number }>() // the pairing link while it waits (only this window has it)
+  const [busy, setBusy] = useState(false)
+  const paired = !!tg?.user
+  useEffect(() => void ((paired || !tg?.pairing) && setCode(undefined)), [paired, tg?.pairing]) // used, or run out
+  const run = (f: () => Promise<unknown>, ok = '') => (setBusy(true), setSaid(''), f().then(() => setSaid(ok), (e: Error) => setSaid(e.message)).finally(() => setBusy(false)))
+  const set = (p: Record<string, unknown>, ok = '') => run(() => call('telegramSet', p), ok)
+  const t = (iso: number) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const link = (url: string, text: string) => (
+    <a href={url} onClick={e => (e.preventDefault(), openExternal(url))}>
+      {text}
+    </a>
+  )
+  return (
+    <>
+      <h2>Telegram</h2>
+      <p className="muted small">
+        Your own Telegram bot brings Laki's pushes to your phone: an agent waits for you, an agent is done. At the Answer level, a tap on a push's button
+        answers the agent. Set it up once in three steps; it takes about two minutes.
+      </p>
+      {tg?.notice && (
+        <p className="warn small">
+          {tg.notice}{' '}
+          {tg.user && (
+            <button type="button" className="link" disabled={busy} onClick={() => set({ off: false }, 'Listening again')}>
+              Try again
+            </button>
+          )}
+        </p>
+      )}
+      <Group title="1 · Make a bot" hint="A bot of your own, only for Laki: one Mac, one bot">
+        {tg?.bot ? (
+          <div className="tg-row">
+            <span className="tg-ok">✓ @{tg.bot.username}</span>
+            <span className="muted small">{tg.bot.name}</span>
+            <button type="button" disabled={busy} onClick={() => set({ token: '' }, 'Removed: its token is gone from this Mac')}>
+              Remove bot
+            </button>
+          </div>
+        ) : (
+          <>
+            <ol className="tg-steps">
+              <li>In Telegram, open {link('https://t.me/BotFather', '@BotFather')} and send <code>/newbot</code>.</li>
+              <li>Give it a name (Laki on my Mac) and a username that ends in <code>bot</code> (laki_yourname_bot).</li>
+              <li>BotFather answers with a token like <code>123456789:AA…</code>: copy it and paste it here.</li>
+            </ol>
+            <div className="tg-row">
+              <input className="mono" type="password" value={token} placeholder="123456789:AA…" aria-label="Bot token" spellCheck={false} autoComplete="off" onChange={e => setToken(e.target.value)} />
+              <button type="button" className="primary" disabled={busy || !token.trim()} onClick={() => set({ token: token.trim() }, 'Connected').then(() => setToken(''))}>
+                Connect
+              </button>
+            </div>
+          </>
+        )}
+      </Group>
+      {tg?.bot && (
+        <Group title="2 · Pair your phone" hint="Only the Telegram account that sends the code is let in">
+          {paired ? (
+            <div className="tg-row">
+              <span className="tg-ok">✓ Paired{tg.user!.name ? ` with ${tg.user!.name}` : ''}</span>
+              <span className="muted small">{new Date(tg.user!.at).toLocaleDateString()}</span>
+              <button type="button" disabled={busy} onClick={() => run(() => call('telegramTest'), 'Sent: check Telegram')}>
+                Send test
+              </button>
+              <button type="button" disabled={busy} onClick={() => set({ unpair: true }, 'Unpaired: Telegram stops at once')}>
+                Unpair
+              </button>
+            </div>
+          ) : code ? (
+            <div className="tg-pair">
+              <QR text={code.link} label="the pairing link" />
+              <div className="tg-pair-says">
+                <span>Scan it with your phone's camera (or open the link there), then tap Start in Telegram.</span>
+                <code className="tg-link">{code.link}</code>
+                <span className="muted small">Waiting for you to tap Start. The code works once, until {t(code.until)}.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="tg-row">
+              <span className="muted small">A one-time code for your chat with @{tg.bot.username}, for 10 minutes.</span>
+              <button type="button" className="primary" disabled={busy} onClick={() => run(() => call('telegramPair').then(setCode))}>
+                Show pairing code
+              </button>
+            </div>
+          )}
+        </Group>
+      )}
+      {paired && (
+        <>
+          <Group title="3 · What Telegram may do" hint="Answer is where it starts. Lower it any time; Unpair stops everything">
+            <div className="seg" role="radiogroup" aria-label="What Telegram may do">
+              {LEVELS.map(([v, label]) => (
+                <button key={v} type="button" role="radio" aria-checked={(tg?.level ?? 'answer') === v} className={(tg?.level ?? 'answer') === v ? 'on' : ''} disabled={busy} onClick={() => set({ level: v })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="muted small">{LEVELS.find(l => l[0] === (tg?.level ?? 'answer'))![2]}</p>
+            <div className="setting-box">
+              <Switch className="switch-row" on={!tg?.off} onChange={v => set({ off: !v })}>
+                <Says title="On" hint="Off: paired, but nothing goes and nothing is read" />
+              </Switch>
+            </div>
+          </Group>
+          <Group title="What it sends" hint="Do not disturb, a muted tab or workspace and Recording mode hold here too">
+            <div className="setting-box">
+              <Switch className="switch-row" on={tg?.waiting !== false} onChange={v => set({ waiting: v })}>
+                <Says title="An agent waits for you" hint="A permission prompt or a question, with what it asks" />
+              </Switch>
+              <Switch className="switch-row" on={tg?.done !== false} onChange={v => set({ done: v })}>
+                <Says title="An agent is done" hint="Silently: no sound, no buzz" />
+              </Switch>
+              <Switch className="switch-row" on={tg?.detail === 'titles'} onChange={v => set({ detail: v ? 'titles' : '' })}>
+                <Says title="Titles only" hint="Who needs you, nothing off the screen: no question, no choices, no buttons" />
+              </Switch>
+            </div>
+          </Group>
+        </>
+      )}
+      {said && <p className="muted small">{said}</p>}
+      <Group title="How it works" hint="Nothing on your Mac listens: it asks Telegram, never the other way">
+        <ul className="tg-steps">
+          <li>Laki on this Mac keeps one request open to Telegram's servers and gets your taps and messages as its answer. No port is opened, no tunnel runs.</li>
+          <li>While Laki runs (its window may be closed), pushes go as agents wait or finish. While the Mac sleeps, nothing goes; a tap older than two minutes is dropped, not acted on in the morning.</li>
+          <li>At Notify, Laki doesn't read the chat at all.</li>
+        </ul>
+      </Group>
+      <Group title="Security" hint="Your bot, your chat, and nothing more">
+        <ul className="tg-steps">
+          <li><b>The token stays on this Mac</b>, in the Keychain (else a file only you can read): never in Laki's state, logs, backups or what agents see.</li>
+          <li><b>Only you</b>: Laki answers one Telegram account, the one that sent the code, in its private chat with the bot. Anyone else who finds the bot gets no answer at all.</li>
+          <li><b>The code</b> is 128 random bits, shown only in this window, good once for 10 minutes.</li>
+          <li><b>Never from Telegram</b>, at any level: Stop, Ship, merge, archive or delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID. Agents, remote access and trusted clients can't change this section.</li>
+          <li><b>Telegram sees what is sent</b> (bots aren't end-to-end encrypted): secrets' shapes are masked, Titles only sends who needs you and nothing more, Recording mode keeps private workspaces out.</li>
+          <li><b>Lost your phone?</b> Unpair here: Telegram stops at once. Remove bot also deletes its token from this Mac (revoke it in @BotFather with <code>/revoke</code> too).</li>
+        </ul>
+      </Group>
     </>
   )
 }

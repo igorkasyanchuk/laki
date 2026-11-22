@@ -47,6 +47,7 @@ import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
+import * as tgMod from './telegram.ts'
 import { subOk } from './push.ts'
 import { policy, policyTick } from './policy.ts'
 import * as ticks from './ticks.ts'
@@ -516,6 +517,9 @@ const api = {
   prList: (p: In<typeof prMod.prList>) => prMod.prList(p), // Laki AI's laki_prs: a project's open PRs
   prRefresh: () => prMod.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: ({ from: _, ...p }) => (webhookOk(p.url), phoneMod.webhookTest(p)), // S5: yours only (AGENT_NO), and not your network's
+  telegramSet: ({ from: _, ...p }) => tgMod.telegramSet(p), // Settings › Telegram: the bot's token (getMe), its level and switches, Unpair; yours only (AGENT_NO, REMOTE_NO, no client's)
+  telegramPair: () => tgMod.telegramPair(), // a one-time code for 10 minutes: its t.me link, for your window's QR only
+  telegramTest: () => tgMod.telegramTest(), // Send test, to the paired chat
   uiReset: () => core.uiReset(),
   portKill: p => resourcesMod.portKill(p),
   meme: () => meme(),
@@ -877,7 +881,7 @@ const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExp
   'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd',
   'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo',
   'tabClose', 'openIn', 'gateRestart', 'tabUnbox', 'projectNetAllow', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop',
-  'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew',
+  'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'resourceStop', 'flowTest', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'quickNew',
   'planRm', 'noteRm', 'widgetRm', 'noteList', 'noteGet', 'noteFile', 'noteNew', 'noteSave', 'noteRestore', 'noteUpload', 'todoListGet', 'todoListSave',
   'sampleNew', 'sampleRm', 'hookTick', 'memoryTick', 'reminderTick', 'storageTidy', 'secretsTidy', 'phoneTick', 'aiTick', 'sleepTick', 'spareTick',
   'archiveIdleTick', 'longTurnTick', 'watchLimits', 'scheduleTick', 'eventTick', 'pendingTick', 'remoteTick', 'archivedTidy', 'shareTick', 'tunnelTick',
@@ -1355,7 +1359,7 @@ const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTid
   'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen',
   'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet',
   'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk',
-  'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
+  'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
   'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook',
   'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct',
   'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
@@ -2230,6 +2234,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
     } catch {}
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   remoteMod.setDaemonPort(port)
+  void tgMod.tgStart() // Settings › Telegram: its bot's name once, the long poll while it's paired
   // H4.5: idle, nobody looking: no client connected, or no window shown and no agent running (ticks.ts' slow and pause).
   // Not in the rig, where tests call with no window: LAKI_IDLE=1 tests it
   if (!inRig() || process.env.LAKI_IDLE === '1') ticks.setIdle(() => !core.clients.size || (![...core.clients].some(c => c.view?.shown !== false) && !core.state.tabs.some(t => core.rt.get(t.id)?.status === 'running')))

@@ -16,7 +16,7 @@ import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, shipPrimary, toolSummary, mi
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
-import { ntfyReplies, pushRequest, pushText, replies, tapSig } from '../src/daemon/push.ts'
+import { ntfyReplies, pushText, replies, tapSig } from '../src/daemon/push.ts'
 import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
@@ -167,27 +167,23 @@ test('syntax tokens: a keyword before a paren, files named by their whole name',
   assert.deepEqual(of('.gitignore', 'key = 1'), [['hl-p:key', 'hl-n:1']])
 })
 
-test('pushes: titles, Telegram without a bot path or chat, ntfy reply topics only for a URL', () => {
+test('pushes: titles, ntfy reply topics only for a URL', () => {
   const p = { event: 'done', workspace: 'w', tab: 't', agent: 'codex' } as const
   assert.deepEqual(pushText({ ...p, event: 'test' }), { title: 'Laki: pushes reach you', body: '', text: 'Laki: pushes reach you' })
   assert.equal(pushText(p).title, 'codex in w is done')
   assert.equal(pushText({ ...p, title: 'Workflow Triage in w failed' }).title, 'Workflow Triage in w failed') // a workflow's own
-  for (const url of ['https://example.com/hook', 'https://api.telegram.org/botT/sendMessage']) assert.equal(JSON.parse(String(pushRequest({ format: 'telegram', url }, p).body)).chat_id, undefined)
   assert.equal(ntfyReplies({ url: 'https://ntfy.sh/mine' }), undefined)
   assert.equal(ntfyReplies({ replyTopic: 'x' }), undefined)
   assert.equal(ntfyReplies({ replyTopic: 'x', url: 'not a url' }), undefined)
   assert.deepEqual(ntfyReplies({ replyTopic: 'x', url: 'https://ntfy.sh/mine/' }), { url: 'https://ntfy.sh/mine-x', query: '' })
 })
 
-test('phone taps: nothing to ask without a chat or reply topic; ntfy messages since the cursor; a failing server throws', async t => {
-  assert.deepEqual(await replies({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage' }, '3'), { taps: [], cursor: '3' })
+test('phone taps: nothing to ask without a reply topic; ntfy messages since the cursor; a failing server throws', async t => {
   assert.deepEqual(await replies({ format: 'ntfy', url: 'https://ntfy.sh/mine' }, 'c'), { taps: [], cursor: 'c' })
   const asked: string[] = []
   const server = createServer((req, res) => {
     asked.push(req.url!)
     if (req.url!.startsWith('/down')) return void res.writeHead(500).end()
-    if (req.url!.startsWith('/botE/')) return void res.writeHead(200).end('{"ok":false}')
-    if (req.url!.includes('getUpdates')) return void res.writeHead(200).end(JSON.stringify({ result: [{ update_id: 3, callback_query: { id: 'q', message: { chat: { id: 42 } } } }] }))
     const lines = [{ event: 'open', id: 'o' }, { event: 'message', id: 'm1', message: `00112233aabbccdd:3:${tapSig('k', '00112233aabbccdd', 3)}` }, { event: 'message', id: 'm1b', message: '00112233aabbccdd:2' }, { event: 'message', id: 'm2', message: 42 }, { event: 'keepalive', id: 'k' }]
     res.writeHead(200).end(['', ...lines.map(l => JSON.stringify(l)), ''].join('\n'))
   })
@@ -196,8 +192,6 @@ test('phone taps: nothing to ask without a chat or reply topic; ntfy messages si
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   assert.deepEqual(await replies({ format: 'ntfy', url: `${base}/mine?auth=XYZ`, replyTopic: 'xyz' }, 'c0', 'k'), { taps: [{ nonce: '00112233aabbccdd', n: 3 }], cursor: 'm2' }) // the unsigned one: no tap
   assert.equal(asked[0], '/mine-xyz/json?poll=1&since=c0&auth=XYZ')
-  assert.deepEqual(await replies({ format: 'telegram', url: `${base}/botT/sendMessage?chat_id=42` }, ''), { taps: [], cursor: '4' }, 'a query without data is no tap')
-  assert.deepEqual(await replies({ format: 'telegram', url: `${base}/botE/sendMessage?chat_id=42` }, '7'), { taps: [], cursor: '7' }, 'no result: nothing moves')
   await assert.rejects(replies({ format: 'ntfy', url: `${base}/down`, replyTopic: 'x' }, ''), /answered 500/)
 })
 

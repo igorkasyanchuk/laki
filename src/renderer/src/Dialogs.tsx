@@ -237,6 +237,7 @@ export function Pages({ app }: { app: AppCtx }) {
             },
           }}
           webhookTest={w => api.call('webhookTest', w)}
+          telegram={hasCap(view, 'telegram') ? (view.telegram ?? { token: false }) : undefined}
           cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
           uninstall={hasCap(view, 'uninstall') ? o => api.call('uninstall', o) : undefined}
           backup={bridge && hasCap(view, 'backup') ? { make: file => api.call('dataBackup', { file }), restore: o => api.call('dataRestore', o) } : undefined}

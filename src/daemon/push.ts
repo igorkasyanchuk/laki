@@ -1,7 +1,7 @@
 // Pushes to your phone (Settings › Phone pushes): an agent waiting for you or done, posted to the URL you give
-// as ntfy, Slack, Telegram (its whole sendMessage URL, chat_id included) or plain JSON wants it. Only to that URL: no
+// as ntfy, Slack or plain JSON wants it (Telegram is its own: telegram.ts). Only to that URL: no
 // telemetry. Fire and forget, 5 s at most; the caller logs a failure. A waiting agent's menu goes as lines of text;
-// with Answer from the phone (webhook.answer), Telegram and ntfy get a button per choice, whose tap comes back
+// with Answer from the phone (webhook.answer), ntfy gets a button per choice, whose tap comes back
 // through replies() with the push's nonce. Web Push (M4): to the phones paired with remote access that turned
 // notifications on, encrypted for each (RFC 8291) through its browser vendor's push service; a tap posts back to /tap.
 import { createCipheriv, createECDH, createHmac, createPrivateKey, type ECDH, generateKeyPairSync, hkdfSync, randomBytes, sign, timingSafeEqual } from 'node:crypto'
@@ -23,11 +23,6 @@ export function pushText(p: Push) {
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 // buttons: only with a nonce (answer on) and choices
 const buttons = (p: Push) => (p.nonce && p.options?.length ? p.options : [])
-// a Telegram bot URL's parts: https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>
-const telegram = (url?: string) => {
-  const m = URL.canParse(url ?? '') ? /^\/(bot[^/]+)\//.exec(new URL(url!).pathname) : null
-  return m ? { api: `${new URL(url!).origin}/${m[1]}`, chat: new URL(url!).searchParams.get('chat_id') ?? undefined } : undefined
-}
 // where taps on an ntfy push's buttons go: the topic's URL with -<replyTopic> after it (a random part, Settings'), and
 // the topic's query (an ?auth=) to go with it
 const ntfyJson = (w: Webhook, p: Push) => (w.format ?? 'ntfy') === 'ntfy' && buttons(p).length > 0 && !!ntfyReplies(w)
@@ -37,9 +32,6 @@ export const ntfyReplies = (w: Webhook) => {
   return { url: `${u.origin}${u.pathname.replace(/\/+$/, '')}-${w.replyTopic}`, query: u.search }
 }
 
-// Telegram's HTML (parse_mode HTML): &, < and > escaped in everything that isn't a tag of ours; the title bold
-export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-export const tgHtml = (p: Push) => (({ title, body }) => `<b>${esc(title)}</b>${body ? `\n${esc(body)}` : ''}`)(pushText(p))
 // nothing off the screen goes (L8): who needs you only
 const shown = (w: Webhook, p: Push): Push => (w.detail === 'titles' ? { ...p, question: undefined, options: undefined, nonce: undefined } : p)
 // the request the webhook's format wants
@@ -59,9 +51,6 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
     }
     case 'slack': // Slack reads <…> as links and mentions (<!channel>)
       return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (p.url ? `\n<${p.url}|Open it>` : '') })
-    case 'telegram': // chat_id from the URL in the body too: Telegram reads either; HTML, every value escaped; a done one
-      // silent; a button per choice, a row each (a link: one that opens it)
-      return json({ chat_id: telegram(w.url)?.chat, text: tgHtml(p), parse_mode: 'HTML', ...(p.event === 'done' && { disable_notification: true }), ...(taps.length ? { reply_markup: { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } } : p.url ? { reply_markup: { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } } : {}) })
     default:
       return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ...(p.options?.length && { options: p.options }), ...(p.url && { url: p.url }), ts: now })
   }
@@ -143,24 +132,14 @@ export async function pushTo(w: Webhook, p: Push) {
   const to = ntfyJson(w, p) ? `${u.origin}/${u.search}` : u.href // ntfy's JSON goes to the server's root (an ?auth= kept)
   const res = await fetch(to, { ...pushRequest(w, p), signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`the webhook answered ${res.status} ${res.statusText}`.trim())
-  // Telegram's message: its id, for tgDone's edit once the ask is answered or gone
-  if (w.format === 'telegram') return ((await res.json().catch(() => undefined)) as { result?: { message_id?: number } } | undefined)?.result?.message_id
 }
-// a pushed ask answered (picked: its words) or gone: the message edited to say so, its buttons dropped (an edit
-// without reply_markup has none). Fire and forget
-export function tgDone(w: Webhook, msg: number, p: Push, said: string) {
-  const t = telegram(webhookUrl(w.url))
-  if (!t?.chat) return
-  void fetch(`${t.api}/editMessageText`, { ...json({ chat_id: t.chat, message_id: msg, text: `${tgHtml({ ...shown(w, p), options: undefined })}\n<i>${esc(said)}</i>`, parse_mode: 'HTML' }), signal: AbortSignal.timeout(5000) }).catch(() => {})
-}
-const json = (b: object): RequestInit => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
 
-// taps on the buttons since the last look: Telegram's callback queries from the webhook's own private chat, by its user (getUpdates, from
-// offset; each one acknowledged, so the button stops spinning), ntfy's messages on the reply topic (since: a message
-// id or a unix time). The cursor moves on whatever they say; only nonce:n bodies count
+// taps on the buttons since the last look: ntfy's messages on the reply topic (since: a message id or a unix time).
+// The cursor moves on whatever they say; only nonce:n:sig bodies count (Telegram's come with its long poll: telegram.ts)
 export type Tap = { nonce: string; n: number }
 const TAP = /^([0-9a-f]{16}):(\d{1,2})(?::([0-9a-f]{16}))?$/
-// a tap's text (nonce:n, signed: nonce:n:sig with key's tapSig): ntfy's from its reply topic, Web Push's from /tap
+// a tap's text (nonce:n, signed: nonce:n:sig with key's tapSig): ntfy's from its reply topic, Web Push's from /tap,
+// Telegram's callback_data (unsigned: only the paired user's private chat counts)
 export function tapOf(s: unknown, key: string, signed = true): Tap | undefined {
   const m = typeof s === 'string' ? TAP.exec(s.trim()) : null
   if (m && (!signed || (m[3] && timingSafeEqual(Buffer.from(m[3]), Buffer.from(tapSig(key, m[1], Number(m[2]))))))) return { nonce: m[1], n: Number(m[2]) }
@@ -173,20 +152,6 @@ export async function replies(w: Webhook, cursor: string, key = ''): Promise<{ t
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
     if (!res.ok) throw new Error(`${new URL(url).host} answered ${res.status}`)
     return res.text()
-  }
-  if (w.format === 'telegram') {
-    const t = telegram(webhookUrl(w.url))
-    if (!t?.chat) return { taps, cursor }
-    const j = JSON.parse(await get(`${t.api}/getUpdates?offset=${Number(cursor) || 0}&timeout=0&allowed_updates=${encodeURIComponent('["callback_query"]')}`))
-    for (const u of j.result ?? []) {
-      cursor = String(Math.max(Number(cursor) || 0, u.update_id + 1))
-      const q = u.callback_query
-      // the webhook's own chat, private (its id is its user's), and tapped by that user: in a group anyone could tap
-      if (!q || String(q.message?.chat?.id) !== t.chat || q.message?.chat?.type !== 'private' || String(q.from?.id) !== t.chat) continue
-      tap(q.data)
-      void fetch(`${t.api}/answerCallbackQuery?callback_query_id=${encodeURIComponent(q.id)}`, { signal: AbortSignal.timeout(5000) }).catch(() => {})
-    }
-    return { taps, cursor }
   }
   const to = ntfyReplies(w)
   if (!to) return { taps, cursor }
