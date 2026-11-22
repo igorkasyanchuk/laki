@@ -8,6 +8,7 @@ import { connect, createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { publicAddr } from '../src/daemon/netAddr.ts'
 import { hostOn, proxyDown, proxyDrop, proxyFor, proxyUp } from '../src/daemon/netProxy.ts'
 
 // a raw request through the proxy: its status line and what came after. then: once tunneled, sent through it; done
@@ -92,4 +93,44 @@ test("the proxy: a tab's listed hosts only, by its own password; a refused host 
   assert.equal((await ask(one, CONNECT(`localhost:${port}`, auth(one)), 'again')).rest, 'again!')
   proxyDrop('tab1')
   assert.match((await ask(one, CONNECT(`localhost:${port}`, auth(one)))).status, /^HTTP\/1\.1 407/)
+})
+
+// a listed name looked up once: one that resolves to this Mac, a cloud's metadata address or a LAN's refused (403) and
+// never connected to; one on the internet reached at the address checked (no second lookup: the name has no real DNS);
+// localhost by name, but never the daemon's port or the proxy's own
+test("the proxy: a listed name that resolves to this Mac or a LAN is refused, never connected to; the address checked is the one used", async t => {
+  const home = mkdtempSync(join(tmpdir(), 'laki-proxy-'))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
+  let conns = 0
+  const echo = createServer(s => (conns++, s.on('data', d => s.write(`${d}!`))))
+  let gets = 0
+  const web = httpServer((_q, r) => (gets++, r.end('fetched')))
+  await Promise.all([new Promise<void>(r => echo.listen(0, '127.0.0.1', r)), new Promise<void>(r => web.listen(0, '127.0.0.1', r))])
+  t.after(() => (echo.close(), web.close()))
+  const port = (echo.address() as AddressInfo).port
+  const webPort = (web.address() as AddressInfo).port
+  const dns: Record<string, string> = { 'rebind.example': '127.0.0.1', 'meta.example': '169.254.169.254', 'lan.example': '10.0.0.1', 'v6.example': '::1' }
+  const looked: string[] = []
+  const lookup = async (h: string) => (looked.push(h), h === 'ok.example' ? { address: '127.0.0.1', family: 4 } : publicAddr(h, async n => (dns[n] ? [{ address: dns[n], family: dns[n].includes(':') ? 6 : 4 }] : [])))
+  const daemon = 4321
+  await proxyUp(join(home, 'net-proxy.json'), { list: () => [...Object.keys(dns), 'ok.example', 'localhost'], refused: () => {}, lookup, ports: () => [daemon] })
+  t.after(proxyDown)
+  const one = proxyFor('tab1')
+  const CONNECT = (target: string) => `CONNECT ${target} HTTP/1.1\r\nHost: ${target}\r\nProxy-Authorization: Basic ${auth(one)}\r\n\r\n`
+  for (const h of Object.keys(dns)) {
+    const r = await ask(one, CONNECT(`${h}:${port}`))
+    assert.match(r.status, /^HTTP\/1\.1 403/, h)
+    assert.match((await ask(one, `GET http://${h}:${webPort}/ HTTP/1.1\r\nHost: ${h}\r\nProxy-Authorization: Basic ${auth(one)}\r\nConnection: close\r\n\r\n`)).status, /^HTTP\/1\.1 403/, `${h}, plain http`)
+  }
+  assert.deepEqual([conns, gets], [0, 0], 'no upstream opened')
+  assert.match((await ask(one, CONNECT(`nowhere.example:${port}`))).status, /^HTTP\/1\.1 403/, 'no address: refused')
+  // on the internet (as this lookup says): connected at the address it gave, once looked up
+  looked.length = 0
+  assert.equal((await ask(one, CONNECT(`ok.example:${port}`), 'hi')).rest, 'hi!')
+  assert.match((await ask(one, `GET http://ok.example:${webPort}/ HTTP/1.1\r\nHost: ok.example\r\nProxy-Authorization: Basic ${auth(one)}\r\nConnection: close\r\n\r\n`)).rest, /fetched/)
+  assert.deepEqual(looked, ['ok.example', 'ok.example'], 'once a request')
+  // localhost by name: this Mac's, not the daemon's port nor the proxy's own
+  assert.equal((await ask(one, CONNECT(`localhost:${port}`), 'lo')).rest, 'lo!')
+  for (const p of [daemon, Number(new URL(one).port)]) assert.match((await ask(one, CONNECT(`localhost:${p}`))).status, /^HTTP\/1\.1 403/, String(p))
+  assert.ok(!looked.includes('localhost'), 'localhost never looked up')
 })

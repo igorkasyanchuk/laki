@@ -2,15 +2,21 @@
 // Mac only, and its HTTPS_PROXY / HTTP_PROXY is this: an HTTP proxy on 127.0.0.1, one per daemon, that lets a tab
 // CONNECT (or fetch plain http) only to the hosts on its list, each tab by a user:pass of its own in the proxy URL (one
 // tab can't use another's list). The port and the passwords are kept in a 0600 file, so a terminal the pty host kept
-// across a daemon restart goes on with its URL. Stdlib only, no Laki import: test/net-proxy.test.ts runs it alone.
+// across a daemon restart goes on with its URL. A listed name is looked up once and refused when it's this Mac's or a
+// private network's (netAddr.ts: DNS rebinding, a cloud's metadata address), then connected to at the address checked;
+// localhost, listed by name, is this Mac's but for the daemon's and the proxy's own ports. Out of core's import cycle
+// (stdlib and netAddr.ts only): test/net-proxy.test.ts runs it alone.
 // ponytail: the URL is in the agent's environment, which another process of yours can read (as LAKI_HOOK is)
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
+import type { LookupAddress } from 'node:dns'
 import { createServer, request, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { connect, type AddressInfo, type Socket } from 'node:net'
+import { publicAddr } from './netAddr.ts'
 
-// list: a tab's hosts now (undefined: no such tab, or not one on a list); refused: a host it asked for that isn't
-export type ProxyHooks = { list: (tab: string) => string[] | undefined; refused: (tab: string, host: string) => void }
+// list: a tab's hosts now (undefined: no such tab, or not one on a list); refused: a host it asked for that isn't.
+// lookup: a listed host's one address on the internet, else it throws (publicAddr; tests' own DNS); ports: the daemon's
+export type ProxyHooks = { list: (tab: string) => string[] | undefined; refused: (tab: string, host: string) => void; lookup?: (host: string) => Promise<LookupAddress>; ports?: () => number[] }
 let server: Server | undefined
 let file = ''
 let hooks: ProxyHooks = { list: () => undefined, refused: () => {} }
@@ -36,6 +42,17 @@ function whoOf(req: IncomingMessage) {
 const AUTH = 'proxy-authenticate: Basic realm="laki"\r\n'
 const no = (s: Socket, code: number, what: string, extra = '') => s.end(`HTTP/1.1 ${code} ${what}\r\n${extra}content-length: 0\r\nconnection: close\r\n\r\n`)
 const why = (host: string) => `Laki's wrapper sandbox: ${host} isn't on this profile's list (its card: Allow this domain in this project)`
+const notOut = (host: string) => `Laki's wrapper sandbox: ${host} is this Mac's or a private network's address, or has none`
+// where a listed host is reached: undefined for localhost by name (this Mac's, not the daemon's port or this proxy's),
+// else the one address checked; a name that resolves to this Mac or a LAN (or doesn't): thrown, and code: no answer
+async function target(host: string, port: number): Promise<LookupAddress | undefined> {
+  if (host.toLowerCase().replace(/\.$/, '') === 'localhost') {
+    if (port === (server?.address() as AddressInfo | null)?.port || hooks.ports?.().includes(port)) throw new Error(notOut(host))
+    return
+  }
+  return (hooks.lookup ?? publicAddr)(host)
+}
+const refusal = (e: unknown) => ((e as { code?: unknown }).code ? 502 : 403) as 502 | 403 // a lookup's ENOTFOUND: no such host
 
 function onConnect(req: IncomingMessage, sock: Socket, head: Buffer) {
   sock.on('error', () => sock.destroy())
@@ -49,21 +66,27 @@ function onConnect(req: IncomingMessage, sock: Socket, head: Buffer) {
   if (!(port >= 1 && port <= 65535)) return no(sock, 400, 'Bad Request')
   const host = at[1].replace(/^\[|\]$/g, '')
   if (!hostOn(host, who.list)) return hooks.refused(who.tab, host), no(sock, 403, 'Forbidden', `x-laki: ${why(host)}\r\n`)
-  let open = false
-  let up: Socket
-  try {
-    up = connect(port, host, () => {
-      open = true
-      sock.write('HTTP/1.1 200 Connection Established\r\n\r\n')
-      if (head.length) up.write(head)
-      up.pipe(sock)
-      sock.pipe(up)
-    })
-  } catch {
-    return no(sock, 502, 'Bad Gateway') // any other throw of connect's (a host it won't take) answered here, not uncaught; no upstream to end
-  }
-  up.on('error', () => (open ? sock.destroy() : no(sock, 502, 'Bad Gateway')))
-  sock.on('close', () => up.destroy())
+  void target(host, port).then(
+    addr => {
+      if (sock.destroyed) return
+      let open = false
+      let up: Socket
+      try {
+        up = connect(port, addr?.address ?? host, () => {
+          open = true
+          sock.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+          if (head.length) up.write(head)
+          up.pipe(sock)
+          sock.pipe(up)
+        })
+      } catch {
+        return no(sock, 502, 'Bad Gateway') // any other throw of connect's (a host it won't take) answered here, not uncaught; no upstream to end
+      }
+      up.on('error', () => (open ? sock.destroy() : no(sock, 502, 'Bad Gateway')))
+      sock.on('close', () => up.destroy())
+    },
+    e => (c => no(sock, c, c === 403 ? 'Forbidden' : 'Bad Gateway', c === 403 ? `x-laki: ${notOut(host)}\r\n` : ''))(refusal(e)),
+  )
 }
 function onRequest(req: IncomingMessage, res: ServerResponse) {
   const who = whoOf(req)
@@ -73,10 +96,16 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
   const host = u.hostname.replace(/^\[|\]$/g, '')
   if (!hostOn(host, who.list)) return hooks.refused(who.tab, host), void res.writeHead(403).end(why(host))
   const { 'proxy-authorization': _a, 'proxy-connection': _c, ...headers } = req.headers
-  const up = request(u, { method: req.method, headers }, r => (res.writeHead(r.statusCode ?? 502, r.headers), r.pipe(res)))
-  up.on('error', () => (res.headersSent ? res.destroy() : res.writeHead(502).end()))
-  res.on('close', () => up.destroy()) // the agent gone (or done): nothing more pulled from the host
-  req.pipe(up)
+  void target(host, Number(u.port) || 80).then(
+    at => {
+      if (res.destroyed) return
+      const up = request(u, { method: req.method, headers, ...(at && { lookup: (_h, o, cb) => (o.all ? cb(null, [at]) : cb(null, at.address, at.family)) }) }, r => (res.writeHead(r.statusCode ?? 502, r.headers), r.pipe(res))) // at: the address checked, no second lookup
+      up.on('error', () => (res.headersSent ? res.destroy() : res.writeHead(502).end()))
+      res.on('close', () => up.destroy()) // the agent gone (or done): nothing more pulled from the host
+      req.pipe(up)
+    },
+    e => (c => void res.writeHead(c).end(c === 403 ? notOut(host) : ''))(refusal(e)),
+  )
 }
 
 const keep = () => {

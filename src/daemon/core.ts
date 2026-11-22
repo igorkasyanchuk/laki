@@ -2014,6 +2014,7 @@ export const netProxyUp = () =>
       if (!t || !ws || !wrapped(t) || presetOf(t)?.net !== 'list') return
       return netList(f => existsSync(join(ws.path, f)), t.preset ?? '', state.projects.find(p => p.id === ws.project)?.netAllow)
     },
+    ports: () => (daemonPort ? [daemonPort] : []), // localhost's, through the proxy: never the daemon's
     refused: (id, host) => {
       const r = rtOf(id)
       if (r.boxed?.host === host) return
