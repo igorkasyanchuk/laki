@@ -680,7 +680,7 @@ export function Pages({ app }: { app: AppCtx }) {
 
 // the dialogs over everything (and the keys overlay, between them as it always was)
 export function Dialogs({ app }: { app: AppCtx }) {
-  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, prAct, setAuto, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws, setRead, restore } = app
+  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, prAct, setAuto, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws, setRead, restore, updateWs } = app
   // a chat search's hit: its tab in the Reader at that message; a closed tab's: its workspace, ⇧⌘T to reopen it
   const openHit = (h: ChatHit) => {
     if (!h.tab || !view.tabs.some(t => t.id === h.tab)) return void (setWsId(h.ws), toast(`${h.name} is closed: ⇧⌘T reopens it`))
@@ -761,6 +761,8 @@ export function Dialogs({ app }: { app: AppCtx }) {
           merge={prAllows(projOf(ws)?.config, 'merge')}
           onMerge={() => void prAct(ws, 'merge')}
           onLand={() => void setAuto(ws, 'autoLand', true)}
+          onUpdate={() => updateWs(ws)}
+          onOverlaps={() => setOverlapsAt({ w: ws.id, list: radarOf(ws) })}
           call={call}
           onClose={() => setDialog(null)}
           onShip={async ({ autoLand, autoFix, ...a }) => {

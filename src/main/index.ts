@@ -308,6 +308,23 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('.tabbar [aria-label^="Ship:"]'), 'the Ship button')
       await click('.tabbar [aria-label^="Ship:"]')()
     }, async () => (await hasText('.ship-file', 'notes.txt')) && (await js<string>("document.querySelector('.ship-form input')?.value ?? ''")) !== '' && (await hasText('.ship button.primary', 'Push to PR'))],
+    // Ship's Update from <base>: dark-mode one commit behind main (an empty commit on main, the stat scan's ↓1), the
+    // button's merge, the banner up to date with main again, the sheet still open
+    ['ship-behind', async () => {
+      const repo = (await rpc<View>('state')).projects.find(p => p.id === ws.dark.project)!.path
+      const r = spawnSync('git', ['-C', repo, '-c', 'user.name=Laki', '-c', 'user.email=smoke@example.invalid', 'commit', '--allow-empty', '-qm', 'On main meanwhile'], { encoding: 'utf8' })
+      if (r.status !== 0) throw new Error(`git commit on main: ${r.stderr}`)
+      await waitFor(async () => (await named('dark-mode')).stat?.behind === 1, 'dark-mode 1 behind main', 30000) // the stat scan's 10 s: in the act, not the check's 8
+    }, async () => (await named('dark-mode')).stat?.behind === 1],
+    ['ship-update', async () => {
+      // the sheet opened again (the bubble steps' tab focus can close the last one meanwhile)
+      await key('Escape')()
+      await click(row(ws.dark.id))()
+      await waitFor(() => has('.tabbar [aria-label^="Ship:"]'), 'the Ship button')
+      await click('.tabbar [aria-label^="Ship:"]')()
+      await waitFor(() => has('.ship-update'), 'Update from main in the banner')
+      await click('.ship-update')()
+    }, async () => (await hasText('.ship-banner', 'up to date with')) && (await has('.ship-file'))],
     // U11: the sidebar from the keyboard: its one tab stop, ↓ to another workspace's row, Enter opens it
     ['tree-keys', async () => {
       await key('Escape')()

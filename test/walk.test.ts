@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { hunkKey, hunksOf, REST, riskOf, WALK_MAX, walkCheck, walkFold, walkInput, walkPrompt, type WalkStep } from '../src/shared/walk.ts'
+import { fileRisk, hunkKey, hunksOf, REST, riskOf, risksOf, WALK_MAX, walkCheck, walkFold, walkInput, walkPrompt, type WalkStep } from '../src/shared/walk.ts'
 import { fresh, openrouter, reply, until } from './helpers.ts'
 
 const DIFF = [
@@ -49,6 +49,17 @@ test('walk: a diff\'s hunks by file and new start (a file with none at 0, a dele
   assert.equal(riskOf({ file: 'src/tokenizer/x.ts', start: 1 }), undefined)
   assert.equal(riskOf({ file: 'a.ts', start: 1, text: `@@ -1,20 +0,0 @@\n${'-x\n'.repeat(20)}` }), 'deletes')
   assert.equal(riskOf({ file: 'a.ts', start: 3, text: `@@ -1,25 +3,0 @@\n${'-x\n'.repeat(25)}` }), 'deletes', 'twenty lines out and none in')
+})
+
+test("walk: fileRisk: a file's riskOf words once each, from its hunks; risksOf: every file of a diff that has one, no model", () => {
+  const big = `@@ -10,22 +10,0 @@\n${'-gone\n'.repeat(22)}`
+  const auth = [{ file: 'src/auth/session.ts', start: 1, text: '@@ -1 +1 @@\n-a\n+b' }, { file: 'src/auth/session.ts', start: 10, text: big }, { file: 'src/auth/session.ts', start: 40, text: '@@ -40 +40 @@\n-c\n+d' }]
+  assert.deepEqual(fileRisk(auth), ['auth', 'deletes'], 'an auth path with a big delete: both, once each')
+  assert.deepEqual(fileRisk([{ file: 'src/a.ts', start: 1, text: '@@ -1 +1 @@\n-a\n+b' }, { file: 'src/a.ts', start: 10, text: big }, { file: 'src/a.ts', start: 50, text: big }]), ['deletes'])
+  assert.deepEqual(fileRisk([{ file: 'src/a.ts', start: 1, text: '@@ -1 +1 @@\n-a\n+b' }]), [], 'a clean file: none')
+  assert.deepEqual(fileRisk([{ file: 'db/migrate/1_add.rb', start: 1, text: '@@ -0,0 +1 @@\n+x' }, { file: 'db/migrate/1_add.rb', start: 9, text: big }]), ['migration', 'deletes'], 'both, each once')
+  assert.deepEqual([...risksOf(DIFF)], [['gone.ts', ['deletes']], ['yarn.lock', ['lockfile']]])
+  assert.equal(risksOf('').size, 0)
 })
 
 test('walk: the answer read strictly: a fenced object of 3 to 7 steps, each with a title, a why and hunks by file and a whole start; anything off, none', () => {

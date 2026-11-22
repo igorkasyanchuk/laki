@@ -41,17 +41,28 @@ export function hunksOf(diff: string): (HunkRef & { text: string })[] {
   return out
 }
 
-// a guess at why a hunk wants care, from its path and text, for one the model didn't flag (and Everything else's)
-export function riskOf(h: HunkRef & { text?: string }): string | undefined {
+// a guess at why a hunk wants care, from its path and text, for one the model didn't flag (and Everything else's): the
+// first of riskWords'
+export const riskOf = (h: HunkRef & { text?: string }): string | undefined => riskWords(h)[0]
+// every reason a hunk wants care, in that order: a lockfile, a migration, auth, deletes
+export function riskWords(h: HunkRef & { text?: string }): string[] {
   const name = h.file.slice(h.file.lastIndexOf('/') + 1)
-  if (/^(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Gemfile\.lock|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|go\.sum|composer\.lock|mix\.lock|Podfile\.lock|flake\.lock)$/.test(name)) return 'lockfile'
-  if (/(^|\/)(migrations?|migrate)\//i.test(h.file) || /\.sql$/i.test(name)) return 'migration'
-  if (/(^|[/_.-])(auth[nz]?|authenticat\w*|authoriz\w*|login|logout|sessions?|passwords?|permissions?|oauth\d?|jwt|tokens?|secrets?|crypto|acl|rbac)([/_.-]|$)/i.test(h.file)) return 'auth'
-  if (h.text && /^@@ -\d+(?:,\d+)? \+0,0 @@/m.test(h.text)) return 'deletes' // a file deleted
+  const out: string[] = []
+  if (/^(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Gemfile\.lock|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|go\.sum|composer\.lock|mix\.lock|Podfile\.lock|flake\.lock)$/.test(name)) out.push('lockfile')
+  if (/(^|\/)(migrations?|migrate)\//i.test(h.file) || /\.sql$/i.test(name)) out.push('migration')
+  if (/(^|[/_.-])(auth[nz]?|authenticat\w*|authoriz\w*|login|logout|sessions?|passwords?|permissions?|oauth\d?|jwt|tokens?|secrets?|crypto|acl|rbac)([/_.-]|$)/i.test(h.file)) out.push('auth')
   const lines = h.text?.split('\n').slice(1) ?? []
-  const del = lines.filter(l => l[0] === '-').length
-  if (del >= 20 && !lines.some(l => l[0] === '+')) return 'deletes'
-  return undefined
+  if ((h.text && /^@@ -\d+(?:,\d+)? \+0,0 @@/m.test(h.text)) || (lines.filter(l => l[0] === '-').length >= 20 && !lines.some(l => l[0] === '+'))) out.push('deletes') // a file deleted; 20 lines out, none in
+  return out
+}
+
+// a file's riskWords, each once, from its hunks (hunksOf's): the Review tab's files and the Ship sheet's mark, no model
+export const fileRisk = (hunks: (HunkRef & { text?: string })[]) => [...new Set(hunks.flatMap(riskWords))]
+// fileRisk of every file in a diff that has one
+export function risksOf(diff: string): Map<string, string[]> {
+  const by = new Map<string, (HunkRef & { text: string })[]>()
+  for (const h of hunksOf(diff)) if (h.file) by.set(h.file, [...(by.get(h.file) ?? []), h])
+  return new Map([...by].flatMap(([f, hs]) => (r => (r.length ? [[f, r] as [string, string[]]] : []))(fileRisk(hs))))
 }
 
 // the model's answer, strictly: the first JSON object in it (a fenced one too), {"steps":[{title, why, hunks:[{file,

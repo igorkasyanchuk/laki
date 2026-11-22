@@ -157,8 +157,13 @@ are tested in `test/units-more.test.ts`.
     `matchMedia`) `.palette-body.two`: the list at 45%, `PreviewPane` beside it; ⇥ from the box focuses its buttons
     (an item's `acts`: Changes, Ship; *All actions* is the old ⇥ list), Esc back; the box is `aria-describedby` it, not
     live. Recording mode's private workspaces: `null`. Tested in `test/units-more.test.ts`.
-  - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` as it opens, the file's diff from `diff` (uncommitted) on a
-    click (`diffByFile`), `gated` around `ship`; after an Open PR, the sheet's Merge when green and Send CI failures as
+  - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` and the `diff` (uncommitted) as it opens (`load`), a
+    file's diff on a click (`diffByFile`), Diff.tsx' `RiskMark` after a file's name from walk.ts `risksOf` (`fileRisk`:
+    every hunk's `riskWords`, each once; the Review tab's files and its *Read with care (n)* chip too, `useMemo` on the
+    diff's text, per window), `gated` around `ship`; the banner's *Update from <base>* (AppCtx `updateWs`, the status
+    bar's ↓n merge: `wsUpdate`, its toast; meanwhile the sheet's buttons wait, then `load(true)`: the files and secret
+    finds anew, the words and picks kept; a failure in its error line) and *N overlaps* (Dialogs' `setOverlapsAt`, Check
+    overlaps over it: Modal's Esc closes only the top `.overlay`); after an Open PR, the sheet's Merge when green and Send CI failures as
     `wsSet` (no second ask: the box was it). ⌘↵ is Open PR. In a short window each column scrolls (`.ship-cols`' one
     `minmax(0, 1fr)` row); on a phone the files sit over the words, scrolling as one. The secret check's finds (the
     draft's `secrets`, then a stopped ship's) over the columns, a ticked file's only: *Untick*, or *Not a secret* (its

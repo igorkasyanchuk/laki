@@ -33,7 +33,7 @@ export function Modal({ title, onClose, children, wide, loose }: { title: string
     return () => void (--sheets || delete root.dataset.sheet)
   }, [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => escapes(e) && onClose()
+    const f = (e: KeyboardEvent) => escapes(e) && [...document.querySelectorAll('.overlay')].at(-1)?.contains(box.current) && onClose() // the top one: Check overlaps over Ship closes alone
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose])

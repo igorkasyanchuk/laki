@@ -598,6 +598,8 @@ selected workspace's PR is in the status bar.
   last change (into the next or last file at a file's end), v Viewed, b blame, p pin, c a comment on the line under the
   mouse, ⌘⏎ sends to the agent. *Unviewed n / m* over the files shows only the ones not viewed yet (with the filter
   too): one you mark viewed leaves and the next takes its place; with all viewed, the bar names the next workspace.
+  A mark after a file's name says to read it with care (a migration, auth, a lockfile, deletes), from the diff alone, no
+  Laki AI needed (*PR #n*'s too); *Read with care (n)* over the files shows only those, with the filter and *Unviewed*.
   *Walk through* (Laki AI on: Settings › AI) puts the changes in 3 to 7 steps to read in order, each with a title and
   why it comes there, marking what to read with care (a migration, auth, a lockfile, deletes); what no step names is
   in a last *Everything else*, with any change too big for Laki AI to read (a lockfile, a generated file: it says how
@@ -689,10 +691,13 @@ working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach t
 - ship: the Ship sheet, then commit, push and open a PR, in a *ship* tab (nothing uncommitted and no commit the base
   lacks: *nothing to ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo; into the workspace's
   base branch when origin has it, else the repo's default). The sheet: on the left the uncommitted files, each with a
-  box (unticked ones stay uncommitted) and its +/−, a click shows its diff; on the right the commit message, the PR's
+  box (unticked ones stay uncommitted) and its +/−, a click shows its diff, and a mark after the name on one to read
+  with care (a migration, auth, a lockfile, deletes: the same as the Review tab's, from the diff, no model); on the right the commit message, the PR's
   title and body (from the workspace's name, its first prompt and the agent's last answer, no model asked), its base
   branch and reviewers, and *Draft*, *Merge when green*, *Send CI failures to the agent*. A line on top says how the
-  Done check went, the Collision radar's overlaps and how far behind its base it is. *Commit only*, *Push* (commit and
+  Done check went, the Collision radar's overlaps (a click opens *Check overlaps* over the sheet) and how far behind its
+  base it is, with *Update from <base>* when it is: the base merged in (or, when that conflicts, its agent asked to),
+  then the files read again, the sheet left open with what you typed. *Commit only*, *Push* (commit and
   push) or the main button (⌘↵), which follows the PR: *Open PR* with none, *Push to PR* when one is open and there's
   something to send, *Merge* when it's green and mergeable with nothing to send (the same merge as ⌘K's, its confirm,
   Touch ID and extension gates included), *Merge when green* while its checks run (turns that switch on). Before the commit it looks for secrets (API keys, private keys, passwords in URLs, a

@@ -3932,6 +3932,8 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 /* U5: the Ship sheet: the files on the left, the words and switches on the right */
 .ship { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 0; }
 .ship-banner { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-in); background: var(--bg2, rgba(127, 127, 127, 0.08)); }
+.ship-banner .link { color: inherit; text-decoration: underline; text-underline-offset: 2px; } /* N overlaps: Check overlaps */
+.ship-update { margin-left: var(--sp-3); padding: 0 var(--sp-3); min-height: var(--h-s); font-size: var(--fs-2); } /* Update from <base> */
 .ship-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; grid-template-rows: minmax(0, 1fr); gap: var(--sp-5); min-height: 0; } /* a short window: the row fits the sheet and each column scrolls (not clipped: a field's focus ring shows) */
 .narrow .ship-cols { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; overflow-y: auto; } /* a phone: the files over the words, the two scrolling as one */
 .narrow .ship-form { margin: 0; } /* inside its column: no scroll of its overhang, sideways or down */
@@ -3939,6 +3941,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .ship-head { display: flex; gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); }
 .ship-file { display: flex; gap: var(--sp-3); align-items: center; }
 .ship-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ship-risk { flex: none; display: inline-flex; color: var(--waiting); } /* Read with care: riskOf's words (Diff.tsx RiskMark) */
 .ship-diff { max-height: 260px; overflow: auto; margin: 2px 0 6px 22px; }
 .ship-form { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0; overflow-y: auto; padding: var(--sp-2); margin: calc(-1 * var(--sp-2)); } /* its Base, Reviewers and switches were cut off under the buttons; the padding: a field's focus ring, not clipped */
 .ship-form > * { flex-shrink: 0; }

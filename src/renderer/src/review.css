@@ -36,4 +36,7 @@ html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-sof
 .fr-step-title { font-weight: 600; }
 .fr-step.fr-done .fr-step-text { opacity: 0.55; }
 .fr-risk { flex: none; color: var(--waiting); }
+.fr-care { display: flex; padding: var(--sp-3) var(--sp-4) 0; } /* Read with care (n): the files riskOf marks, a chip over the list */
+.fr-care .seg button { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.fr-care .seg button:not(.on) .icon-svg { color: var(--waiting); }
 .fr-step-bar { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--muted); }

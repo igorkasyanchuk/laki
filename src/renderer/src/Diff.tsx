@@ -93,6 +93,12 @@ export function localStore(k: string, v?: string) {
   return null
 }
 
+// what to read with care (walk.ts riskOf's words, or the model's): the Review tab's files and steps, the Ship sheet's files
+export const RiskMark = ({ risk, cls }: { risk: string[]; cls: string }) => (
+  <span className={cls} role="img" aria-label={`Read with care: ${risk.join(', ')}`} data-tip={`Read with care: ${risk.join(', ')}`}>
+    <Icon name="alertCircle" size={12} />
+  </span>
+)
 export const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 export const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 

@@ -280,6 +280,7 @@ export type AppBase = {
   termType: (cmd: string, project?: string) => Promise<void>
   radarKey: (w: WorkspaceView, c: Collision) => string
   radarOf: (w: WorkspaceView) => Collision[]
+  updateWs: (w: WorkspaceView) => Promise<{ merged?: boolean; told?: boolean }> // F8: wsUpdate, merge (or its agent told), with its toast
   rail: boolean
   railBar: false | React.JSX.Element
   railKind: RailKind

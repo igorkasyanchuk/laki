@@ -15,9 +15,9 @@
 // first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
-import { hunkKey, REST, startOf, type Walk } from '../../shared/walk'
+import { hunkKey, REST, risksOf, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
-import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
+import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -119,12 +119,19 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   // Changes' too; unset: a tree here). In a tree the diffs and j/k go in its order, folders' files together
   const [tree, setTree] = useState(() => localStore('laki.diffTree') !== 'list')
   const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
+  // Read with care: riskOf's words per file from the diff itself (no model, no call), a mark after its name; the chip
+  // narrows the list to them as the filter does (per window, not kept)
+  const risks = useMemo(() => risksOf(d?.diff ?? ''), [d?.diff])
+  const nCare = files.filter(f => risks.has(f.path)).length
+  const [care, setCare] = useState(false)
+  const careOn = care && nCare > 0
+  const narrowed = !!query || careOn
   const matched = useMemo(() => {
-    const ls = files.filter(f => matches(f.path))
+    const ls = files.filter(f => matches(f.path) && (!careOn || risks.has(f.path)))
     const at = (p: string) => pins.indexOf(p)
     const rest = ls.filter(f => at(f.path) < 0)
     return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...(tree ? fileTree(rest).flatMap(r => ('file' in r ? [r.file] : [])) : rest)]
-  }, [files, matches, pins, tree])
+  }, [files, matches, pins, tree, careOn, risks])
   const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
 
@@ -587,6 +594,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}
               </span>
+              {risks.has(f.path) && <RiskMark risk={risks.get(f.path)!} cls="fr-risk" />}
               {(notes.some(n => n.path === f.path) || live.some(t => t.path === f.path)) && <Icon name="message" size={11} />}
               <button type="button" className={`fr-pin ${pins.includes(f.path) ? 'on' : ''}`} aria-label={pins.includes(f.path) ? 'Unpin' : 'Pin to the top'} data-tip={pins.includes(f.path) ? 'Pinned: first in both lists · click: unpin' : 'Pin to the top (p)'} onClick={e => (e.stopPropagation(), pinGo(f.path))}>
                 <Icon name="pin" size={11} />
@@ -677,11 +685,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                         {x.rest && walk.skipped ? ` · ${walk.skipped} Laki AI did not read` : ''}
                       </span>
                     </span>
-                    {risky.length > 0 && (
-                      <span className="fr-risk" role="img" aria-label={`Read with care: ${risky.join(', ')}`} data-tip={`Read with care: ${risky.join(', ')}`}>
-                        <Icon name="alertCircle" size={12} />
-                      </span>
-                    )}
+                    {risky.length > 0 && <RiskMark risk={risky} cls="fr-risk" />}
                     <label className="sp-viewed" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={seenSteps.includes(i)} onChange={e => seeStep(i, e.target.checked)} aria-label={`${x.title}: viewed`} />
                     </label>
@@ -714,6 +718,15 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             )}
             <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
           </div>
+          {nCare > 0 && (
+            <div className="fr-care">
+              <span className="seg fr-only">
+                <button type="button" className={careOn ? 'on' : ''} aria-pressed={careOn} onClick={() => setCare(!careOn)} data-tip={careOn ? 'Only the files to read with care · click: every file' : 'Show only the files to read with care: a migration, auth, a lockfile, deletes'}>
+                  <Icon name="alertCircle" size={12} /> Read with care ({nCare})
+                </button>
+              </span>
+            </div>
+          )}
           <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
             {files.length > 0 && (
               <span className="seg fr-only">
@@ -723,11 +736,11 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
               </span>
             )}
             <span className="grow">
-              {nViewed} of {files.length} viewed{query && ` · ${listed.length} shown`}
+              {nViewed} of {files.length} viewed{narrowed && ` · ${listed.length} shown`}
             </span>
             {listed.length > 0 && (
-              <button type="button" className="link small" onClick={() => mark(listed.map(f => f.path), !listedViewed)} data-tip={query ? `The ${listed.length} the filter shows` : 'Every file'}>
-                {listedViewed ? (query ? 'Unmark these' : 'Unmark all') : query ? `Mark ${listed.length} viewed` : 'Mark all viewed'}
+              <button type="button" className="link small" onClick={() => mark(listed.map(f => f.path), !listedViewed)} data-tip={narrowed ? `The ${listed.length} the filter shows` : 'Every file'}>
+                {listedViewed ? (narrowed ? 'Unmark these' : 'Unmark all') : narrowed ? `Mark ${listed.length} viewed` : 'Mark all viewed'}
               </button>
             )}
           </div>
@@ -751,8 +764,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 }),
               ]
             : listed.map(f => fileRow(f))}
-          {query && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
-          {only && !query && files.length > 0 && !listed.length && <div className="muted small pad">Every file viewed.</div>}
+          {narrowed && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
+          {only && !narrowed && files.length > 0 && !listed.length && <div className="muted small pad">Every file viewed.</div>}
           </>
           )}
         </div>

@@ -1773,11 +1773,12 @@ export function App() {
     const r = await call<{ stopped: string[] }>('stopAll', {}).catch(() => undefined) // call's toast said why
     if (r) toast(`Stopped ${r.stopped.length} of ${at.length}`)
   }
-  // F8: the status bar's ↓n: the base merged in (clean), or its agent asked to (conflicts); a rebase asks first when the
-  // branch is pushed (a force push would follow, yours to do)
+  // F8: the base merged in (clean), or its agent asked to (conflicts): the status bar's ↓n and the Ship sheet's Update
+  const updateWs = (w: WorkspaceView) => call<{ merged?: boolean; told?: boolean }>('wsUpdate', { ws: w.id }).then(r => (toast(r.merged ? `Merged ${w.base} in` : 'Its agent merges it in and resolves the conflicts'), r))
+  // the status bar's ↓n: updateWs, or a rebase, which asks first when the branch is pushed (a force push would follow, yours to do)
   const behindMenu = (w: WorkspaceView): MenuItem[] => [
     { head: `${w.stat?.behind} behind ${w.base}` },
-    { label: w.stat?.clean !== false ? `Update: merge ${w.base} in` : `Update: ask the agent to merge ${w.base} in (conflicts)`, icon: 'gitCompare', run: () => void call<{ merged?: boolean; told?: boolean }>('wsUpdate', { ws: w.id }).then(r => toast(r.merged ? `Merged ${w.base} in` : 'Its agent merges it in and resolves the conflicts')).catch(() => {}) },
+    { label: w.stat?.clean !== false ? `Update: merge ${w.base} in` : `Update: ask the agent to merge ${w.base} in (conflicts)`, icon: 'gitCompare', run: () => void updateWs(w).catch(() => {}) },
     {
       label: `Rebase onto ${w.base}…`,
       icon: 'fork',
@@ -4004,7 +4005,7 @@ export function App() {
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
     openInItems, openMenu, wsTabMenu, openPort, openProject, openReview, reviewGo, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
-    pinPlan, placeName, notices, answerNotice, pops, prAct, setAuto, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail,
+    pinPlan, placeName, notices, answerNotice, pops, prAct, setAuto, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail, updateWs,
     railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
     reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
     schedulesFor, selectGroup, selectTab, sendLater, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal,
