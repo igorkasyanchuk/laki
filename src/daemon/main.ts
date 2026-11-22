@@ -16,7 +16,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
 import * as clientLogMod from './clientLog.ts'
-import { HostPty, ptyGone, ptyOn } from './ptyHost.ts'
+import { HostPty, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
@@ -2204,14 +2204,16 @@ function shutdown(keep: unknown = false) {
   } catch (e) {
     log('keeping shells', e) // the stop goes on
   }
-  for (const s of core.sessions.values()) if (!kept || !(s.pty instanceof HostPty)) s.kill()
-  if (!kept) void ptyGone().catch(() => {}) // a stop ends the terminals, the host's too: one still being connected to as well (dialed, told to quit)
+  const ends: Promise<unknown>[] = [] // what the exit waits for, 300 ms at most: the terminals' ends, the host's frames written out, the last log lines
+  for (const s of core.sessions.values()) if (!kept || !(s.pty instanceof HostPty)) (s.exited || ends.push(new Promise(r => s.pty.onExit(r))), s.kill())
+  ends.push(kept ? ptySent() : ptyGone().catch(() => {})) // a stop ends the terminals, the host's too: one still being connected to as well (dialed, told to quit)
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })
   const restoring = backupMod.restoring() // the lock kept until it's moved in: a daemon started meanwhile stops at once
   if (!restoring) rmSync(lockPath, { force: true })
   server.close()
-  setTimeout(() => (uninstallMod.wipe(), backupMod.apply(), restoring && rmSync(lockPath, { force: true }), process.exit(0)), 300) // B3: the data folder too, when Uninstall Laki said so; a restore's data moved in
+  for (const o of [process.stdout, process.stderr]) ends.push(new Promise(r => o.write('', r)))
+  void Promise.race([Promise.all(ends), new Promise(r => setTimeout(r, 300))]).then(() => (uninstallMod.wipe(), backupMod.apply(), restoring && rmSync(lockPath, { force: true }), process.exit(0))) // B3: the data folder too, when Uninstall Laki said so; a restore's data moved in
 }
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)

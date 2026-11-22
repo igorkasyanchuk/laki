@@ -201,10 +201,12 @@ async function up(again = true, tries = 0): Promise<void> {
 // the setting off: a host left from when it was on is ended, its terminals with it (their tabs start again as any)
 export async function ptyGone() {
   why = undefined
-  if (sock) return ptyQuit()
+  if (sock) return ptyQuit(), ptySent()
   const s = existsSync(ptySock()) ? await dial().catch(() => undefined) : undefined
-  s?.end(Buffer.concat([frame(hello()), frame({ op: 'quit' })]))
+  if (s) await new Promise<void>(r => s.on('error', () => r()).end(Buffer.concat([frame(hello()), frame({ op: 'quit' })]), () => r()))
 }
+// every frame posted so far handed to the kernel: a daemon that exits next loses none (main.ts shutdown)
+export const ptySent = () => new Promise<void>(r => (sock && !sock.destroyed ? sock.write(Buffer.alloc(0), () => r()) : r()))
 let upping: Promise<void> | undefined
 export const ptyUp = () =>
   (upping ??= up()
