@@ -889,41 +889,169 @@ function turnTook(tab: Tab, sec: number) {
   save()
 }
 
+// a tab's status now: asleep, exited, its agent's (hooks), a script's, a shell's (its agent's, or busy)
+function statusOf(t: Tab): Status {
+  const s = sessions.get(t.id)
+  if (asleep.has(t.id)) return 'idle'
+  if (!s || s.exited) return 'exited'
+  if (tracked(t)) return rtOf(t.id).status
+  if (t.kind === 'script') return 'running'
+  return shellAgents.get(t.id)?.status ?? (busyShells.has(t.id) ? 'running' : 'idle')
+}
+
+// what a status means for a tab's times, noted as the view sees it: every change of status comes with changed(), which
+// builds a view within 30 ms. A turn's start (runAt), its idle and wait since, its estimate gone as it ends, its next
+// wait or end pushed again once it runs
+function noteStatus(t: Tab, status: Status) {
+  const r = rtOf(t.id)
+  if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
+  else r.runAt = undefined
+  if (status === 'idle') r.idleAt ??= Date.now()
+  else r.idleAt = undefined
+  if (status === 'waiting') r.waitAt ??= Date.now()
+  else r.waitAt = undefined
+  if (status === 'idle' || status === 'exited') r.progress = undefined // however it ended (an Esc, sweepRunning)
+  if (status === 'running') pushed.delete(t.id)
+}
+
+// a tab as the view has it, from its record and its runtime; nothing changed. The fields' order is the JSON's (the
+// renderer and test/view-snapshot.test.ts compare it)
+function tabView(t: Tab, status: Status): TabView {
+  const s = sessions.get(t.id)
+  const r = rtOf(t.id)
+  const sleeping = asleep.has(t.id)
+  const waiting = status === 'waiting'
+  const idle = status === 'idle'
+  const menu = waiting && s ? s.ask(shellAgents.has(t.id)) : undefined
+  const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
+  // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
+  const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
+  const planOn = state.settings?.livePlan !== false
+  const needAt = waiting ? r.waitAt : r.done && idle ? r.idleAt : undefined
+  const signedOut = signedOutView(r)
+  const card = cards.get(t.id)
+  const share = shareLink(t.id)
+  const hookless = deafOf(t.id) // hooks not heard (hookTick)
+  return {
+    // its record, less what's the daemon's own
+    ...t,
+    ...(u && { usual: u }),
+    usedAt: undefined,
+    bgTold: undefined,
+    draft: undefined,
+    // what it may do, and what holds it
+    ...(r.allowed && { allowed: r.allowed }),
+    ...(r.held && waiting && { held: r.held }),
+    ...(t.draft && { drafted: true }),
+    ...(uncovered(t) && { ungated: true }),
+    ...(signedOut && { signedOut }),
+    ...(r.failed && idle && !r.signedOut && { failed: r.failed }),
+    ...(r.boxed && (waiting || idle) && { boxed: r.boxed }),
+    // claude's permission mode, while it runs
+    ...(t.preset === 'claude' && status !== 'exited' && !sleeping && r.mode && {
+      mode: r.mode,
+      ...(r.modeUnknown && { modeUnknown: true }),
+      bypassNo: bypassNo(t),
+    }),
+    ...(card && { card }),
+    // its status and turn
+    status,
+    code: s?.exited && !sleeping ? s.exitCode : undefined,
+    done: r.done,
+    limit: r.limit,
+    last: r.last,
+    runAt: r.runAt,
+    ...(needAt && { needAt }),
+    ask,
+    ...(sleeping && { asleep: true }),
+    ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }),
+    ...(r.progress && { progress: r.progress }),
+    ...(r.compacting && status === 'running' && { compacting: true }),
+    ...(r.suggest && idle && { suggest: r.suggest }),
+    // what it left: a secret asked for, its changes, its marks, its plan
+    ...(r.secret && { secret: r.secret }),
+    ...(r.changes && { changes: r.changes }),
+    ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }),
+    ...(r.plan && planOn && { plan: r.plan }),
+    ...(r.planAsk && waiting && planOn && { planAsk: r.planAsk }),
+    // a shell's agent, a shared view, the meters
+    ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }),
+    ...(share && { share }),
+    ...meterView(t),
+    ...(hookless && { hookless }),
+  }
+}
+
+// a workspace as the view has it: its record and what the scans found. ponytail: run and portNames read .laki.json per
+// workspace on every view; cache by mtime if many workspaces
+function wsView(w: Workspace) {
+  const c = projectConfig(w)
+  const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
+  const ticket = ticketOf(w.id)
+  return {
+    ...wsOut(w),
+    setup: existsSync(setupMarker(w)),
+    // what runs there
+    ports: ports.get(w.id) ?? [],
+    procs: procs.get(w.id),
+    portNames,
+    tunnels: tunnelsOf(w.id),
+    pr: prs.get(w.id),
+    run: !!c.run,
+    scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()),
+    // what the scans found: its diff's size, a broken worktree, the radar, the Done check, its proof, annotations
+    stat: stats.get(w.id),
+    broken: broken.get(w.id),
+    overlaps: collisions.get(w.id),
+    check: checks.get(w.id),
+    proof: proofs.get(w.id),
+    annotAt: annotAt.get(w.id),
+    // its storage folder's files and links, the viewer's keys
+    artifacts: artifacts.get(w.id),
+    links: links.get(w.id),
+    artKey: urlKey(`artifact:${w.id}`),
+    ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }),
+    pending: w.pending && pendingView(w.pending),
+    ...(ticket && { ticket }),
+  }
+}
+
+// a project as the view has it: a Terminals or Browsers one as it is; else what it waits on, its setup script, GitHub,
+// and (B6) the memory and notes in its checkout
+function projectView(p: Project) {
+  if (p.kind) return p
+  const h = cfgWait(p)
+  return {
+    ...p,
+    ...(h && { cfgWait: h }),
+    ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }),
+    ...(!p.host && onGitHub(p.path) && { github: true }),
+    ...(inRepo(p) && { memory: memoryOf(p), notes: notesOf(p) }),
+  }
+}
+
 export function view(): View {
-  const tabs: TabView[] = state.tabs.map(t => {
-    const s = sessions.get(t.id)
-    const r = rtOf(t.id)
-    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : t.kind === 'script' ? 'running' : (shellAgents.get(t.id)?.status ?? (busyShells.has(t.id) ? 'running' : 'idle'))
-    // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
-    if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
-    else r.runAt = undefined
-    if (status === 'idle') r.idleAt ??= Date.now()
-    else r.idleAt = undefined
-    if (status === 'waiting') r.waitAt ??= Date.now()
-    else r.waitAt = undefined
-    if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
-    if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
-    const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
-    const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
-    // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
-    return { ...t, ...(u && { usual: u }), usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(r.held && status === 'waiting' && { held: r.held }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...((o => o && { signedOut: o })(signedOutView(r))), ...(r.failed && status === 'idle' && !r.signedOut && { failed: r.failed }), ...(r.boxed && (status === 'waiting' || status === 'idle') && { boxed: r.boxed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.marks?.length && { marks: r.marks.map(({ data: _, ...m }) => m) }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
-  })
-  for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
+  const status = new Map(state.tabs.map(t => [t.id, statusOf(t)]))
+  for (const t of state.tabs) noteStatus(t, status.get(t.id)!)
+  const tabs: TabView[] = state.tabs.map(t => tabView(t, status.get(t.id)!))
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
   const shelved = new Set(state.projects.filter(p => p.archived).map(p => p.id))
   const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
   return {
     ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
     ...(agentCliMod.outdated.length && { agentUpdates: agentCliMod.outdated }), // A9: a dot on Settings
-    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }), ...(!p.host && onGitHub(p.path) && { github: true }), ...(inRepo(p) && { memory: memoryOf(p), notes: notesOf(p) }) }))(cfgWait(p)))), // B6: in the repo: its checkout's files
-    ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
-    // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
-    workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
-      const c = projectConfig(w)
-      const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), broken: broken.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), proof: proofs.get(w.id), annotAt: annotAt.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), ...(pageable(w) && { wtKey: urlKey(`worktree:${w.id}`) }), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+    projects: state.projects.filter(p => !p.archived).map(projectView),
+    ...(shelved.size && {
+      archivedProjects: state.projects.filter(p => p.archived).map(p => ({
+        id: p.id,
+        name: p.name,
+        path: p.path,
+        ...(p.host && { host: p.host }),
+        archived: p.archived!,
+        workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length,
+      })),
     }),
+    workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(wsView),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
     settings: state.settings ?? {},

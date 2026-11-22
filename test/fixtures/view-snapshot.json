@@ -1,0 +1,132 @@
+{
+ "projects": [
+  {
+   "id": "<project>",
+   "name": "<project>",
+   "path": "/private<home>/<project>",
+   "git": true
+  }
+ ],
+ "workspaces": [
+  {
+   "id": "<ws>",
+   "project": "<project>",
+   "path": "<home>/data/worktrees/<project>/<ws>",
+   "branch": "laki/<ws>",
+   "base": "main",
+   "kind": "worktree",
+   "port": 3100,
+   "created": "<time>",
+   "storage": "<home>/data/storage/<ws>",
+   "setup": false,
+   "ports": "<moves>",
+   "tunnels": [],
+   "pr": {
+    "number": 42,
+    "state": "OPEN",
+    "url": "https://example.invalid/pr/42",
+    "checks": "pending",
+    "list": [
+     {
+      "name": "?",
+      "state": "pending"
+     }
+    ]
+   },
+   "run": false,
+   "scripts": [],
+   "artKey": "<key>",
+   "wtKey": "<key>"
+  }
+ ],
+ "tabs": [
+  {
+   "id": "<t-run>",
+   "workspace": "<ws>",
+   "name": "claude: work",
+   "kind": "agent",
+   "preset": "claude",
+   "profile": "claude",
+   "account": "home",
+   "resumeId": "<moves>",
+   "status": "running",
+   "done": false,
+   "runAt": "<time>"
+  },
+  {
+   "id": "<t-wait>",
+   "workspace": "<ws>",
+   "name": "waits",
+   "kind": "agent",
+   "preset": "claude",
+   "profile": "claude",
+   "account": "home",
+   "resumeId": "<moves>",
+   "status": "waiting",
+   "done": false,
+   "runAt": "<time>",
+   "needAt": "<time>",
+   "ask": {
+    "options": [
+     {
+      "n": 1,
+      "label": "Yes"
+     },
+     {
+      "n": 2,
+      "label": "Yes, and don’t ask again for: npm init *"
+     },
+     {
+      "n": 3,
+      "label": "No"
+     }
+    ],
+    "at": "<time>",
+    "question": "Do you want to proceed?",
+    "tool": "Bash",
+    "what": "npm test",
+    "rule": "npm init *"
+   }
+  },
+  {
+   "id": "<t-done>",
+   "workspace": "<ws>",
+   "name": "d<ws>",
+   "kind": "agent",
+   "preset": "claude",
+   "profile": "claude",
+   "account": "home",
+   "resumeId": "<moves>",
+   "status": "idle",
+   "done": true,
+   "last": "<moves>",
+   "needAt": "<time>"
+  },
+  {
+   "id": "<t-gone>",
+   "workspace": "<ws>",
+   "name": "g<ws>",
+   "kind": "agent",
+   "preset": "custom",
+   "cmd": "exit 3",
+   "status": "exited",
+   "code": "<moves>",
+   "done": false
+  },
+  {
+   "id": "<t-sleep>",
+   "workspace": "<ws>",
+   "name": "sleepy",
+   "kind": "agent",
+   "preset": "claude",
+   "profile": "claude",
+   "account": "home",
+   "resumeId": "<moves>",
+   "status": "idle",
+   "done": true,
+   "last": "<moves>",
+   "needAt": "<time>",
+   "asleep": true
+  }
+ ]
+}
