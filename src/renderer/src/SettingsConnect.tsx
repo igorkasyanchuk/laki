@@ -177,7 +177,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
             </ol>
             <div className="tg-row">
               <input className="mono" type="password" value={token} placeholder="123456789:AA…" aria-label="Bot token" spellCheck={false} autoComplete="off" onChange={e => setToken(e.target.value)} />
-              <button type="button" className="primary" disabled={busy || !token.trim()} onClick={() => set({ token: token.trim() }, 'Connected').then(() => setToken(''))}>
+              <button type="button" className="primary" disabled={busy || !token.trim()} onClick={() => run(() => call('telegramSet', { token: token.trim() }).then(() => setToken('')), 'Connected')}>
                 Connect
               </button>
             </div>
