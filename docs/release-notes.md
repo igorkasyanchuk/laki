@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- New workspace's agent picker shows what's left of each profile's plan after its name (*62% of week*), in the warning color with its reset at 10% or under.
 - The wrapper sandbox's *Listed hosts* network refuses a listed name that points at this Mac, your network or a cloud's metadata address, and connects to the address it checked, so a name can't be switched after the check.
 - With *Confirm risky actions with Touch ID* on, Laki also asks before a new workspace, tab or race starts an agent that never asks (Bypass permissions, or Codex with approvals off).
 - The wrapper sandbox keeps an agent out of git's settings: in a worktree it writes only the files git commit writes in its git folder, and the worktree's `.git` is read-only to it (one it rewrote could make Laki's own git run a program of its choosing).

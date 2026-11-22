@@ -1549,6 +1549,7 @@ test('lsAppExe: lsappinfo -long’s executable for that pid once it signalled re
   assert.equal(lsAppExe(`${long}\n"CFBundleExecutablePath"="/tmp/x.app/Contents/MacOS/x"`, 33600), undefined, 'a key twice')
   assert.equal(lsAppExe(`${long}\n"pid"=1`, 33600), undefined)
 })
+
 // Touch ID's bypassNew: a new workspace, tab or race whose agent never asks; its default agent, a command, a shell
 test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one that asks is nothing', async () => {
   const { confirmOf } = await import('../src/shared/confirm.ts')
@@ -1567,3 +1568,21 @@ test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one 
   assert.equal(confirmOf('wsFan', { presets: ['calm', 'codex'] }, cur), undefined)
 })
 
+// New workspace's profile list: a usage row's tightest window, what's left, its short name and a reset still ahead
+test('planLeft: the tighter of two windows; an error row nothing; a reset past none', async () => {
+  const { planLeft, usageRow } = await import('../src/shared/types.ts')
+  const now = 1_000_000
+  const row = (windows: { label: string; used: number; resets?: number; note?: string }[], error?: string) => ({ agent: 'claude', windows, at: now, ...(error && { error }) })
+  assert.deepEqual(planLeft(row([{ label: '5-hour', used: 20, resets: now + 60_000 }, { label: 'Weekly', used: 38, resets: now + 864e5 }]), now), { left: 62, label: 'week', reset: now + 864e5 })
+  assert.deepEqual(planLeft(row([{ label: '5-hour', used: 96, resets: now + 60_000 }, { label: 'Weekly', used: 38 }]), now), { left: 4, label: '5 h', reset: now + 60_000 })
+  assert.equal(planLeft(row([{ label: '5-hour', used: 20 }], 'signed out'), now), undefined)
+  assert.equal(planLeft(row([]), now), undefined)
+  assert.equal(planLeft(undefined, now), undefined)
+  assert.deepEqual(planLeft(row([{ label: 'Weekly', used: 50, resets: now - 1 }]), now), { left: 50, label: 'week' }, 'a reset in the past: none')
+  assert.deepEqual(planLeft(row([{ label: 'Extra usage', used: 99, note: '$4 of $50' }, { label: 'Weekly', used: 10 }]), now), { left: 90, label: 'week' }, "a note's amount isn't a limit")
+  // the account's row, else the default one
+  const rows = [{ agent: 'claude', account: 'a', windows: [], at: 0 }, { agent: 'claude', account: 'home', default: true, windows: [], at: 0 }]
+  assert.equal(usageRow(rows, 'claude', 'a')?.account, 'a')
+  assert.equal(usageRow(rows, 'claude')?.account, 'home')
+  assert.equal(usageRow(rows, 'codex'), undefined)
+})

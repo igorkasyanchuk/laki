@@ -1349,6 +1349,10 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
 - *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
+- the agent picker lists each profile with what's left of its plan after its name (Claude Code, Codex, Antigravity and
+  Grok, the profile's account: *62% of week*, its tightest window; at 10% or under, in the warning color with its reset,
+  *4% · resets 14:20*), as Laki last read it, again each time the page comes back into focus. Nothing there: no plan
+  limits Laki reads, or not signed in (its tooltip says which);
 - the clock beside the send button: when the agent starts. *Now* (each time the page opens); *Pick date & time*; or
   *After usage limit resets* (claude and codex, the profile's account: the soonest reset of a window at Settings'
   *Plan limit at*, else the 5-hour one's, read again until it comes). The chip says *Starts Fri 16 Oct 09:00*, the

@@ -926,6 +926,8 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu-pill { flex: none; padding: 1px var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--muted); font: var(--fs-1)/16px var(--mono); }
 .menu-pill.good { border-color: color-mix(in srgb, var(--done) 65%, transparent); color: var(--done); }
 .menu-pill.warn { border-color: color-mix(in srgb, var(--waiting) 65%, transparent); color: var(--waiting); }
+.menu-note { margin-left: var(--sp-3); color: var(--muted); font: var(--fs-1) var(--ui-font); white-space: nowrap; }
+.menu-note.warn { color: var(--waiting); }
 /* { filter }'s box on top, foot items under a line at the bottom (their icon at the end) */
 .menu-filter { flex: none; margin: 1px 1px 6px; padding: var(--sp-4) var(--sp-5); background: color-mix(in srgb, var(--bg) 55%, transparent); border: 1px solid var(--line); border-radius: var(--r-l); color: var(--fg); font-size: var(--fs-3); outline: none; }
 .menu-filter:focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }

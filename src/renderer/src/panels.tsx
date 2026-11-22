@@ -3,7 +3,7 @@ import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
-import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -654,6 +654,9 @@ const ZONE = (() => {
 })()
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+// why a profile shows no plan left (StartChip's After usage limit resets, the profile list's tooltip): known, the usage read
+const noLimitOf = (agent: string | undefined, known: boolean) => (!agent || !LIMIT_AGENTS.includes(agent) ? `${agent ?? 'This agent'} has no plan limits Laki reads: ${LIMIT_AGENTS.join(', ')} only` : !known ? "Laki can't read this account's plan usage (signed out, or Settings › Theme & type turned it off)" : undefined)
+const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: number | 'limit'; onStart: (s?: number | 'limit') => void; agent?: string; account?: string; usageAt: number; off?: string }) {
   const [open, setOpen] = useState(false)
   const [reset, setReset] = useState<number | null>() // the limit's: undefined not read yet, null not known
@@ -662,7 +665,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
   useEffect(() => {
     if (!limits || (!open && start !== 'limit')) return
     api.call<AgentUsage[]>('usage').then(
-      rows => (r => setReset((r && !r.error && resetOf(r.windows, usageAt)) || null))(rows.find(x => x.agent === agent && (account ? x.account === account : x.default))),
+      rows => (r => setReset((r && !r.error && resetOf(r.windows, usageAt)) || null))(usageRow(rows, agent, account)),
       () => setReset(null),
     )
   }, [open, agent, account, start === 'limit'])
@@ -676,7 +679,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
   }, [open])
   useEffect(() => void ((off || (start === 'limit' && !limits)) && start !== undefined && onStart(undefined)), [off, limits]) // a codespace, another agent: now
   const at = typeof start === 'number' ? new Date(start) : null
-  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: ${LIMIT_AGENTS.join(', ')} only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Theme & type turned it off)" : undefined
+  const noLimit = noLimitOf(agent, reset !== null)
   const pick = (d: string, t: string) => {
     const ms = new Date(`${d}T${t || '09:00'}`).getTime()
     if (Number.isFinite(ms)) onStart(Math.max(ms, Date.now() + 60_000))
@@ -686,7 +689,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
     d.setMinutes(0, 0, 0)
     onStart(d.getTime())
   }
-  const word = start === 'limit' ? `Starts at the limit reset${reset ? ` (~${new Date(reset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}` : at ? `Starts ${startWords(at.getTime())}` : ''
+  const word = start === 'limit' ? `Starts at the limit reset${reset ? ` (~${hhmm(reset)})` : ''}` : at ? `Starts ${startWords(at.getTime())}` : ''
   const earliest = start === 'limit' ? (reset ? startWords(reset) : 'when usage says, read again each half minute') : at ? startWords(at.getTime()) : ''
   return (
     <span className="nw-start" ref={box}>
@@ -727,6 +730,14 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
 
 export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams> & { linked?: boolean }; images?: Shot[]; inserts?: (project: string) => Inserts; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
+  // the plan limits' rows as the daemon kept them (no request leaves the Mac): read as the page opens and as it's back in focus
+  const [usage, setUsage] = useState<AgentUsage[]>()
+  useEffect(() => {
+    const read = () => void api.call<AgentUsage[]>('usage').then(setUsage, () => {})
+    read()
+    window.addEventListener('focus', read)
+    return () => window.removeEventListener('focus', read)
+  }, [])
   // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
   // draft goes, prompt and all, and the page starts empty there
   const draft = useMemo(() => {
@@ -950,6 +961,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   }
   const on = view.presets.filter(x => !x.off)
   const def = on.some(x => x.name === view.settings.agent) ? view.settings.agent : on[0]?.name // what new workspaces start (Settings): a pill, and the foot sets it
+  // a profile's plan left, after its name (its account's row, as StartChip picks it): muted, at 10% or under its reset too
+  const leftOf = (agent: string, account?: string): Partial<MenuItem> => {
+    const r = usageRow(usage, agent, account)
+    const l = LIMIT_AGENTS.includes(agent) ? planLeft(r) : undefined
+    if (!l) return { tip: noLimitOf(agent, !!r && !r.error) }
+    const low = l.left <= 10
+    return { note: low && l.reset ? `${l.left}% · resets ${hhmm(l.reset)}` : `${l.left}% of ${l.label}`, noteTone: low ? 'warn' : undefined }
+  }
   const agentMenu = (e: MouseEvent) =>
     openMenu(
       e,
@@ -958,7 +977,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         { head: 'Agent' },
         ...view.presets
           .filter(x => !x.off || x.name === p.preset)
-          .map(x => ({ label: x.name, icon: 'agent', mono: true, sub: presetSays(x), pill: x.name === def ? 'default' : undefined, hint: p.preset === x.name ? ON : undefined, run: () => set({ preset: x.name, model: undefined, effort: undefined, perm: undefined, fast: undefined }) }) as MenuItem), // another agent's names
+          .map(x => ({ label: x.name, icon: 'agent', mono: true, sub: presetSays(x), pill: x.name === def ? 'default' : undefined, hint: p.preset === x.name ? ON : undefined, ...leftOf(x.agent, x.account), run: () => set({ preset: x.name, model: undefined, effort: undefined, perm: undefined, fast: undefined }) }) as MenuItem), // another agent's names
         null,
         ...OTHER_AGENTS.map(([x, label, icon, sub]) => ({ label, icon, sub, hint: p.preset === x ? ON : undefined, run: () => set({ preset: x, model: undefined, effort: undefined }) }) as MenuItem),
         ...(p.preset !== def && view.presets.some(x => x.name === p.preset) ? [{ label: `Make ${p.preset} the default for new workspaces`, icon: 'pin', foot: true, run: () => void api.call('settingsSet', { agent: p.preset }) } as MenuItem] : []),

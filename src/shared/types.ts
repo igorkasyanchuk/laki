@@ -268,6 +268,18 @@ export function resetOf(windows: UsageWindow[], at: number) {
   const hit = real.filter(w => w.used >= at).map(w => w.resets!)
   return hit.length ? Math.min(...hit) : real.find(w => w.label === '5-hour')?.resets
 }
+// New workspace's profile list: a usage row's tightest window (the most used, a note's amount aside), what's left of it
+// (0 to 100), its name short ("5 h", "week") and its reset while it's ahead; none: an error, or no window
+export function planLeft(row: AgentUsage | undefined, now = Date.now()): { left: number; label: string; reset?: number } | undefined {
+  const real = row && !row.error ? row.windows.filter(w => !w.note) : []
+  if (!real.length) return
+  const w = real.reduce((a, b) => (b.used > a.used ? b : a))
+  const h = /^(\d+)-hour/.exec(w.label)
+  const label = h ? `${h[1]} h` : /^weekly/i.test(w.label) ? 'week' : /^monthly/i.test(w.label) ? 'month' : w.label.toLowerCase()
+  return { left: Math.max(0, Math.min(100, Math.round(100 - w.used))), label, ...(w.resets && w.resets > now && { reset: w.resets }) }
+}
+// the usage row a profile's tab would start on: its account's, else the default one (StartChip, the profile list)
+export const usageRow = (rows: AgentUsage[] | undefined, agent?: string, account?: string) => rows?.find(x => x.agent === agent && (account ? x.account === account : x.default))
 // a tab you closed (⌘W), kept for ⇧⌘T: what brings it back (core.ts closeTab, tabReopen); cwd: a shell's folder
 // Search chats' hit (meters.ts chatSearch): its workspace and tab (none: a closed tab's chat), the tab's name and agent,
 // when it was said, who said it, 160 characters around the words, the transcript line's id (claude's uuid, else L<n>)
