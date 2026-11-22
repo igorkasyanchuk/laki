@@ -66,7 +66,7 @@ npm run dev                       # Electron + renderer dev server on :5199
 - `npm run test:ui` (`scripts/ui-smoke.ts`): first a short launch of its own on an empty data folder (no state.json, no
   project; its daemon the app's own, `test/fakes` first on PATH; main's `LAKI_SMOKE_FIRST`, `firstRun`): the Welcome
   screen, then *Try it on a sample repo* lands on New workspace with the sample's task (`first-*.png`). Then a demo world of its own, the built app (`out/`) in Electron with
-  `--laki-smoke=<dir>` (main's `uiSmoke`): Projects, Reader, the Review tab, New workspace, Settings, Board, Schedule,
+  `--laki-smoke=<dir>` (main's `uiSmoke`, smoke.ts): Projects, Reader, the Review tab, New workspace, Settings, Board, Schedule,
   AI, Workflows and ⌘K, each opened (its laki:// link, a click, a key), a selector of its own waited for, failed by
   ui.tsx' Boundary (`.boom`) or a console error; a screenshot each. Then the flows (E3), each done as you would (a right
   click, a menu's item, a dialog's button) and waited for: archive with an uncommitted file (the dialog names it), Undo
@@ -191,6 +191,7 @@ for the part you change, and keep it up to date with the change.
 | `src/main/cards.ts` | notifications and cards on screen: `notify` (its buttons answer through the daemon), the cards for what's marked important (`addCard`: ask.html at the bottom right, over every app), the menu bar's Inbox (`inboxSet` with each badge, `inboxOpen`), `ask-act`, `ask-explain`, Open, ×, Close all, `asking`, a timer's sound; each handler checks its sender |
 | `src/main/agentBrowser.ts` | the agent browser (`browse` IPC: the app window's, the daemon's call through it): a hidden window per tab, `AGENT_TABS` per workspace, in the preview's session (this Mac's localhost), gone after 10 idle minutes; each op through the Chrome DevTools Protocol, with the errors, blocked loads and changes it caused |
 | `src/main/menu.ts` | the menus: a native popup for the renderer's (`menu-popup`, Settings › Layout's Menus: macOS), the menu bar's item (`Tray`, its picture by state, Q8: `shared/tray.ts`; its menu, drops on it, Quiet), the `badge` IPC that feeds it and the Inbox, Hand off, the Dock's icon, count, progress, menu and recent folders, the app menu (with *Quit Laki Completely*; File, Edit, View and Go list the renderer's ⌘ keys: `key()`, `registerAccelerator: false`, a click sends `browser-key`; Settings › Keys' through `bound()`, from the `keys` IPC's `keysNow`; `appMenu` builds it again, index.ts calls it once everything is defined) |
+| `src/main/smoke.ts` | `npm run test:ui` and `test:sheet` (`--laki-smoke=<dir>`, `uiSmoke`): the real window walked page by page, then the risky flows (E3), each step waited for and screenshotted, `sheetDiff` against the last run's; index.ts starts it once the window has loaded |
 | `src/main/guards.ts` | main's checks, pure (no electron: `test/main-guards.test.ts`): who sent an IPC message (`fromApp`, `pageIs`), and the URLs it lets through (`local`, `web`, `webviewOk`, `externalOf`), the partitions' names |
 | `src/main/update.ts` | the app's updates: GitHub's latest release, Squirrel.Mac's download and install (Updates: `docs/dev/scans.md`) |
 | `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES` |
