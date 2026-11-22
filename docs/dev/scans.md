@@ -599,8 +599,12 @@ what was kept and what's read now, so a restart's reading anew counts once and a
 their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
 `endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
 worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else
-`cache/last_conversations.json`'s for the worktree; copied to a temp folder with its WAL, read with node's own sqlite,
-at most every 30 s per tab: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
+`cache/last_conversations.json`'s for the worktree; cloned to a temp folder with its WAL (`COPYFILE_FICLONE`: on APFS no
+bytes copied, elsewhere node's copy), read with node's own sqlite, at most every 30 s per tab and only the `steps` rows
+past the last one with usage that tab counted (`agyRead`'s `last`, kept in `seen` with its days: `agyNext` adds them; a
+row with no usage yet, a step under way, is read again; the table's rowid going below it is another conversation: read
+whole); a DB and its WAL past 32 MB (`AGY_BIG`) are read in a worker (`agyWorker.ts`, its own build entry: 512 MB heap,
+ended at 20 s; the tab's days as they were until it answers), past 256 MB not at all: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
 and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). Tested in `test/meter.test.ts`. ponytail: agy's
 field numbers are read off its files (Nov 2026); their plan limits: Plan limits, above; and
 a limit notice on their screen (core's `checkLimit` for every agent but claude: limits.ts' `lineRe` takes Grok's *You

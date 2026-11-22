@@ -5,24 +5,30 @@
 // - Antigravity: ~/.gemini/antigravity-cli/conversations/<id>.db (the id it printed as it exited, else its
 //   cache/last_conversations.json's for the worktree), SQLite with protobuf rows: each `steps` row's metadata, field 1
 //   its time (seconds), field 9 its usage (2 input, 3 output, 4 cache write, 5 cache read; 1 the model's number), the
-//   model's name from `gen_metadata` (1.3 → 1.19). Copied to a temp folder first (agy keeps it open, its WAL beside it),
-//   read with node's own sqlite. No price: tokens only.
+//   model's name from `gen_metadata` (1.3 → 1.19). Cloned to a temp folder first (agy keeps it open, its WAL beside it;
+//   APFS: no bytes copied, else a copy), read with node's own sqlite: only the steps past the last one counted, each
+//   tab's days kept (agyNext); past AGY_BIG in a worker (agyWorker.ts). No price: tokens only.
 // ponytail: agy's field numbers read off its files (Nov 2026, agy 1.x); a release that moves them reads as nothing
-import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { constants, copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Worker } from 'node:worker_threads'
 import type { Tab } from '../shared/types.ts'
 import { type ByModel, dayOf } from './share.ts'
 
 export type Days = Record<string, ByModel>
 const ID = /^[\w-]{1,80}$/
-const AGY_EVERY = 30_000 // agy's file is a few MB, copied each read: at most this often per tab
-const AGY_MAX = 256 << 20 // a conversation's DB past this isn't copied (the daemon's thread copies it)
-const seen = new Map<string, { key: string; days?: Days; at: number; id?: string }>() // by tab
+const AGY_EVERY = 30_000 // at most this often per tab (agy writes its DB at every step)
+const AGY_BIG = 32 << 20 // a DB and its WAL past this: read in a worker (a first read whole, or a copy where the clone falls back, would stall the daemon)
+const AGY_MAX = 256 << 20 // past this: not read
+const AGY_MS = 20_000 // a worker's read at most
+// by tab: its file's key, the days read; agy's: its DB (another conversation starts over), the rowid read up to, a worker's read under way
+const seen = new Map<string, { key: string; days?: Days; at: number; id?: string; db?: string; rowid?: number; reading?: boolean }>()
 
-const add = (days: Days, at: number, model: string, tokens: number, cost: number) => {
-  if (!Number.isFinite(at) || !(tokens > 0)) return
-  const m = ((days[dayOf(at)] ??= {})[model || 'unknown'] ??= { tokens: 0, cost: 0 })
+const add = (days: Days, at: number, model: string, tokens: number, cost: number, day = Number.isFinite(at) ? dayOf(at) : '') => {
+  if (!day || !(tokens > 0)) return
+  const m = ((days[day] ??= {})[model || 'unknown'] ??= { tokens: 0, cost: 0 })
   m.tokens += tokens
   m.cost += cost
 }
@@ -112,18 +118,31 @@ export function agyParse(steps: Uint8Array[], gens: Uint8Array[]): Days {
   return days
 }
 type Sqlite = typeof import('node:sqlite')
-function agyRead(db: string): Days | undefined {
+export const agyRows = { n: 0 } // steps' rows read, all reads (tests: only the new ones are)
+export type AgyRead = { days: Days; last: number; again: boolean }
+// agy's steps past from (a rowid: what was counted before) and their days; last: the newest row with usage now (one with
+// none yet, a step under way, is read again next time); again: its newest rowid went below from (another conversation in
+// that file): read whole. ponytail: a step's usage, once there, is taken as final (a row rewritten later isn't read again)
+export function agyRead(db: string, from = 0): AgyRead | undefined {
   const sqlite = process.getBuiltinModule?.('node:sqlite') as Sqlite | undefined // loaded only here: its warning only for an agy user
   if (!sqlite) return
   const tmp = mkdtempSync(join(tmpdir(), 'laki-agy-'))
   try {
     const copy = join(tmp, 'c.db')
-    copyFileSync(db, copy)
-    if (existsSync(`${db}-wal`)) copyFileSync(`${db}-wal`, `${copy}-wal`)
+    copyFileSync(db, copy, constants.COPYFILE_FICLONE) // APFS: a clone, no bytes copied (temp and home: one volume on a Mac); elsewhere node copies
+    if (existsSync(`${db}-wal`)) copyFileSync(`${db}-wal`, `${copy}-wal`, constants.COPYFILE_FICLONE)
     const d = new sqlite.DatabaseSync(copy)
     try {
-      const rows = (q: string, k: string) => (d.prepare(q).all() as Record<string, unknown>[]).flatMap(r => (r[k] instanceof Uint8Array ? [r[k] as Uint8Array] : []))
-      return agyParse(rows('SELECT metadata FROM steps', 'metadata'), rows('SELECT data FROM gen_metadata', 'data'))
+      const top = Number((d.prepare('SELECT max(rowid) AS m FROM steps').get() as { m?: unknown } | undefined)?.m ?? 0)
+      const again = top < from
+      const since = again ? 0 : from
+      const steps = d.prepare('SELECT rowid AS id, metadata FROM steps WHERE rowid > ? ORDER BY rowid').all(since) as { id: number | bigint; metadata: unknown }[]
+      agyRows.n += steps.length
+      let last = since
+      const blobs: Uint8Array[] = []
+      for (const r of steps) if (r.metadata instanceof Uint8Array) (blobs.push(r.metadata), msg(pbFields(r.metadata), 9) && (last = Number(r.id)))
+      const gens = (d.prepare('SELECT data FROM gen_metadata').all() as { data: unknown }[]).flatMap(r => (r.data instanceof Uint8Array ? [r.data] : []))
+      return { days: agyParse(blobs, gens), last, again }
     } finally {
       d.close()
     }
@@ -132,6 +151,25 @@ function agyRead(db: string): Days | undefined {
   } finally {
     rmSync(tmp, { recursive: true, force: true })
   }
+}
+// the days kept and a read's: added to them, or instead of them (again)
+export function agyNext(kept: Days | undefined, r: AgyRead): Days {
+  const days: Days = r.again || !kept ? {} : structuredClone(kept)
+  for (const [day, byModel] of Object.entries(r.days)) for (const [model, m] of Object.entries(byModel)) add(days, 0, model, m.tokens, m.cost, day)
+  return days
+}
+// past AGY_BIG: agyRead in a worker of its own (its build entry: out/main/agyWorker.js), ended at AGY_MS
+function agyWorker(db: string, from: number): Promise<AgyRead | undefined> {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const file = [join(here, 'agyWorker.js'), join(here, '../agyWorker.js'), join(here, 'agyWorker.ts')].find(p => existsSync(p))
+  if (!file) return Promise.resolve(undefined)
+  return new Promise(res => {
+    const w = new Worker(file, { workerData: { db, from }, resourceLimits: { maxOldGenerationSizeMb: 512 } })
+    const t = setTimeout(() => void w.terminate(), AGY_MS)
+    w.once('message', (m: { r?: AgyRead }) => res(m.r))
+    w.once('error', () => res(undefined))
+    w.once('exit', () => (clearTimeout(t), res(undefined))) // a settled promise ignores it
+  })
 }
 const AGY = () => join(homedir(), '.gemini', 'antigravity-cli')
 // agy's latest conversation in a folder (its cache/last_conversations.json), before it printed the id itself
@@ -157,13 +195,28 @@ export function agentDays(tab: Tab, cwd: string, now = false): { id: string; day
   const id = tab.preset === 'grok' ? tab.resumeId! : basename(f, '.db')
   const key = `${f}|${stamp(f)}|${tab.preset === 'gemini' ? stamp(`${f}-wal`) : ''}`
   if (c?.key === key) return (c.at = Date.now()), was()
-  let days: Days | undefined
   if (tab.preset === 'grok') {
     const s = statSync(f, { throwIfNoEntry: false })
-    days = s && s.size < 8 << 20 ? grokParse(readFileSync(f, 'utf8')) : undefined
-  } else days = (statSync(f, { throwIfNoEntry: false })?.size ?? Infinity) < AGY_MAX ? agyRead(f) : undefined // past AGY_MAX: not copied
-  if (days) seen.set(tab.id, { key, days, at: Date.now(), id })
-  else if (c) c.at = Date.now()
-  return days ? { id, days } : was()
+    const days = s && s.size < 8 << 20 ? grokParse(readFileSync(f, 'utf8')) : undefined
+    if (days) seen.set(tab.id, { key, days, at: Date.now(), id })
+    else if (c) c.at = Date.now()
+    return days ? { id, days } : was()
+  }
+  if (c?.reading) return was() // a worker's read under way: its days next time
+  const size = (statSync(f, { throwIfNoEntry: false })?.size ?? Infinity) + (statSync(`${f}-wal`, { throwIfNoEntry: false })?.size ?? 0)
+  if (size >= AGY_MAX) return c && (c.at = Date.now()), was() // past AGY_MAX: not read
+  const same = c?.db === f // the same conversation: only its new steps
+  const from = same ? (c.rowid ?? 0) : 0
+  const keep = (r: AgyRead | undefined) => {
+    const now = seen.get(tab.id)
+    if (!r) return now ? ((now.at = Date.now()), (now.reading = false), undefined) : undefined
+    const days = agyNext(same ? now?.days : undefined, r)
+    seen.set(tab.id, { key, days, at: Date.now(), id, db: f, rowid: r.last })
+    return days
+  }
+  if (size < AGY_BIG) return (days => (days ? { id, days } : was()))(keep(agyRead(f, from)))
+  seen.set(tab.id, { ...(c ?? { key: '' }), at: Date.now(), reading: true })
+  void agyWorker(f, from).then(keep)
+  return was()
 }
 export const agentDaysTidy = (live: (id: string) => boolean) => { for (const id of seen.keys()) if (!live(id)) seen.delete(id) }

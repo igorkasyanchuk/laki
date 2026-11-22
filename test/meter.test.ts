@@ -1,7 +1,8 @@
 // The meters (meters.ts' meterTick, share.ts' meterOf): each claude and codex tab's context, from its transcript read on as
 // it grows, and what its chat used, tokens and ≈ cost by shared/types.ts' PRICES; today's kept in usage-today.json.
 import assert from 'node:assert/strict'
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { dayOf, meterNew, meterOf } from '../src/daemon/share.ts'
@@ -195,6 +196,51 @@ test("meter: Grok's and Antigravity's chats by day and model for the Usage page 
   const today = await until(async () => (x => x?.tokens === 6000 && x)((await rig.rpc('state')).today), 'today’s')
   assert.deepEqual([today.cost, today.ws.map((w: any) => w.ws)], [3, [ws.id]])
   assert.ok(ag.id)
+})
+
+// Antigravity's DB read again: only the steps past the last one with usage (a step under way is read again), added to
+// the days kept; a DB whose rows went back (another conversation) starts over; the temp folder goes even when it throws
+test('agyRead: only the new steps; a smaller DB starts over; no temp folder left', async t => {
+  const { agyNext, agyRead, agyRows } = await import('../src/daemon/agentUsage.ts')
+  const { DatabaseSync } = await import('node:sqlite')
+  const dir = mkdtempSync(join(tmpdir(), 'laki-agy-test-'))
+  const was = process.env.TMPDIR
+  process.env.TMPDIR = join(dir, 'tmp') // agyRead's clone goes here: os.tmpdir() reads it at each call
+  mkdirSync(process.env.TMPDIR)
+  t.after(() => ((process.env.TMPDIR = was), rmSync(dir, { recursive: true, force: true })))
+  const sec = Math.floor(Date.now() / 1000)
+  const step = (tokens?: number) => pb([1, pb([1, sec])], ...(tokens ? [[9, pb([1, 7], [2, tokens])] as [number, Uint8Array]] : []))
+  const make = (f: string, ...steps: (number | undefined)[]) => {
+    const db = new DatabaseSync(f)
+    db.exec('CREATE TABLE IF NOT EXISTS steps (idx integer, metadata blob); CREATE TABLE IF NOT EXISTS gen_metadata (idx integer, data blob)')
+    for (const n of steps) db.prepare('INSERT INTO steps VALUES (0, ?)').run(step(n))
+    db.close()
+  }
+  const total = (d: Record<string, Record<string, { tokens: number }>>) => Object.values(d).flatMap(Object.values).reduce((n, m) => n + m.tokens, 0)
+  const f = join(dir, 'conv.db')
+  make(f, 100, 200)
+  let n = agyRows.n
+  const r1 = agyRead(f)!
+  assert.deepEqual([total(r1.days), r1.last, r1.again, agyRows.n - n], [300, 2, false, 2])
+  let kept = agyNext(undefined, r1)
+  make(f, 50, undefined) // one more step, and one under way (no usage yet)
+  n = agyRows.n
+  const r2 = agyRead(f, r1.last)!
+  assert.deepEqual([total(r2.days), r2.last, agyRows.n - n], [50, 3, 2], 'the two new rows only')
+  kept = agyNext(kept, r2)
+  assert.equal(total(kept), 350)
+  n = agyRows.n
+  assert.equal(agyRead(f, r2.last)!.last, 3)
+  assert.equal(agyRows.n - n, 1, 'the step under way read again')
+  // replaced by a smaller one (another conversation): read whole, the kept days dropped
+  rmSync(f)
+  make(f, 70)
+  const r3 = agyRead(f, 3)!
+  assert.deepEqual([r3.again, total(agyNext(kept, r3))], [true, 70])
+  // not a DB: nothing, and its temp folder gone
+  writeFileSync(join(dir, 'bad.db'), 'not sqlite')
+  assert.equal(agyRead(join(dir, 'bad.db')), undefined)
+  assert.deepEqual(readdirSync(process.env.TMPDIR), [])
 })
 
 test('meter: each day by model, for the Usage page; a day past and a model of its own each', () => {
