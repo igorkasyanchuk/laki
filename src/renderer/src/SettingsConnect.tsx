@@ -231,6 +231,12 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
               <Switch className="switch-row" on={!tg?.off} onChange={v => set({ off: !v })}>
                 <Says title="On" hint="Off: paired, but nothing goes and nothing is read" />
               </Switch>
+              <Switch className="switch-row" on={!!tg?.topics} disabled={busy} onChange={v => set({ topics: v }, v ? 'A topic per workspace from its next push' : '')}>
+                <Says
+                  title="A topic per workspace"
+                  hint={`Each workspace's pushes in a topic of its own in your chat with the bot; what you write in a topic goes to that workspace's agent, no reply needed; the topic goes with the workspace. ${tg?.bot?.topics ? '' : `First turn topics on for @${tg?.bot?.username} in @BotFather (its Bot Settings).`}`}
+                />
+              </Switch>
             </div>
           </Group>
           <Group title="What it sends" hint="Do not disturb, a muted tab or workspace and Recording mode hold here too">

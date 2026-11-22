@@ -502,7 +502,14 @@ none with titles only; `<pre>`, the last 3,500 characters, `redact`ed), `/quiet`
 and project out of each. `act` spends trusted clients' limits (`clients.ts` `LIMITS`, `LAKI_TG_LIMITS` for tests): `send`
 and `answer` a sliding minute, `wsNew` a sliding hour; and logs each action or refusal (`remoteLog.ts`' `activity`,
 `<data>/telegram-log.jsonl`; reads not; `telegramLog`, Settings › Telegram › *What Telegram did*), with pairing, Unpair,
-a level and a stop. Remote access's Keep
+a level and a stop. P4: topics (`state.telegram.topics`, off by default; `telegramSet { topics: true }` asks `getMe` again
+and refuses until the bot's `has_topics_enabled`, BotFather's switch): a workspace's first push makes its topic in the
+private chat (`threadOf`: `createForumTopic`, its name, one of the six icon colors by its id; one at a time per
+workspace, `making`), kept in `threads` (ws → `message_thread_id`); its pushes go there (`message_thread_id`), answers
+to a message in a topic go in it (`sayIn`); words in a topic that reply to nothing go to that workspace's first agent tab
+(`wsOfThread`), and `/screen` or `/diff` there with no name are that workspace's; `dropWs` (core) deletes it
+(`tgWsGone`: `deleteForumTopic`). Telegram refusing to make one turns topics off with a notice; the push goes to the
+chat as before. Remote access's Keep
 never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
 format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
 paired at answer with its When, a group's only a notice to pair again; `settingsSet` refuses the format. `telegramSet`,

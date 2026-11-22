@@ -2753,7 +2753,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   as a reply to a push or with a workspace's name; `/quiet 2h`, `/quiet 30m`, `/quiet off` for Do not disturb) or
   *Control* (also `/new <project> <task>`, a workspace started). 50 messages a minute and 10 new workspaces an hour at
   most; with *Titles only* on, `/screen` and `/diff` send nothing; Recording mode keeps private workspaces out of all of
-  it. *What Telegram did* lists each thing done or refused from the chat. Stop, Ship, merge, archive or delete, settings,
+  it. *What Telegram did* lists each thing done or refused from the chat. *A topic per workspace* (off by default; first
+  turn topics on for the bot in @BotFather's Bot Settings): each workspace's pushes in a topic of its own in your chat
+  with the bot, what you write in a topic goes to that workspace's agent with no reply needed, `/screen` and `/diff`
+  there are that workspace's, and the topic goes when the workspace is deleted. Stop, Ship, merge, archive or delete, settings,
   secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
   agent, remote access or a trusted client can't change this section. *What it sends*: *An agent waits for you* (on),
   *An agent is done* (on, silently), *Titles only* (who needs you, nothing off the screen). Do not disturb, a muted tab

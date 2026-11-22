@@ -15,7 +15,7 @@ const ME = 42 // the paired user (a private chat's id is its user's)
 type Call = { method: string; tok: string; body: any; id?: number } // id: a sent message's
 // the Bot API: getMe for TOKEN only, getUpdates from a queue (held a moment when empty, as a long poll is), a message id
 // per sendMessage; next: the next getUpdates' error instead
-async function bot(t: { after: (f: () => void) => void }) {
+async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean; noTopics?: boolean } = {}) {
   const calls: Call[] = []
   const queue: object[] = []
   let id = 0
@@ -31,7 +31,8 @@ async function bot(t: { after: (f: () => void) => void }) {
     calls.push(call)
     const ok = (result: unknown) => r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, result }))
     if (call.tok !== TOKEN) return void r.writeHead(401).end(JSON.stringify({ ok: false, error_code: 401, description: `Unauthorized: ${call.tok}` }))
-    if (call.method === 'getMe') return ok({ id: 777, is_bot: true, first_name: 'Laki test', username: 'laki_test_bot', has_topics_enabled: false })
+    if (call.method === 'getMe') return ok({ id: 777, is_bot: true, first_name: 'Laki test', username: 'laki_test_bot', has_topics_enabled: o.topics })
+    if (call.method === 'createForumTopic') return o.noTopics ? void r.writeHead(400).end(JSON.stringify({ ok: false, error_code: 400, description: 'Bad Request: the chat is not a forum' })) : ok({ message_thread_id: 500 + calls.length, name: call.body.name, icon_color: call.body.icon_color })
     if (call.method === 'getUpdates') {
       if (next) return void (r.writeHead(200).end(JSON.stringify(next)), (next = undefined))
       for (let i = 0; i < 6 && !queue.length; i++) await sleep(50)
@@ -51,16 +52,16 @@ async function bot(t: { after: (f: () => void) => void }) {
     of: (method: string) => calls.filter(c => c.method === method),
     fail: (e: object) => (next = e),
     // an update from someone (from, a chat), at a time (date: seconds ago)
-    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number; photo?: object[]; document?: object } = {}) =>
-      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), ...(o.photo || o.document ? { caption: text } : { text }), ...(o.photo && { photo: o.photo }), ...(o.document && { document: o.document }), ...(o.reply && { reply_to_message: { message_id: o.reply } }) } }),
+    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number; photo?: object[]; document?: object; thread?: number } = {}) =>
+      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), ...(o.photo || o.document ? { caption: text } : { text }), ...(o.photo && { photo: o.photo }), ...(o.document && { document: o.document }), ...(o.reply && { reply_to_message: { message_id: o.reply } }), ...(o.thread && { message_thread_id: o.thread, is_topic_message: true }) } }),
     tap: (data: string, o: { from?: number; chat?: number; type?: string } = {}) =>
       queue.push({ update_id: ++id, callback_query: { id: `q${id}`, from: { id: o.from ?? ME }, data, message: { message_id: 1, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' } } } }),
   }
 }
 const daemonLog = (rig: { data: string; out: string }) => rig.out + (existsSync(join(rig.data, 'daemon.log')) ? readFileSync(join(rig.data, 'daemon.log'), 'utf8') : '')
 // a rig with its bot connected and the user paired at answer, its long poll running
-async function paired(t: { after: (f: () => void) => void }, env: Record<string, string> = {}) {
-  const b = await bot(t)
+async function paired(t: { after: (f: () => void) => void }, env: Record<string, string> = {}, o: { topics?: boolean; noTopics?: boolean } = {}) {
+  const b = await bot(t, o)
   const rig = await fresh(t as never, { env: { LAKI_TELEGRAM_API: b.url, LAKI_TG_GAP_MS: '0', LAKI_PUSH_WAIT_MS: '150', LAKI_ANSWER_HOLD_MS: '200', ...env } })
   await rig.rpc('telegramSet', { token: TOKEN })
   const { link } = await rig.rpc('telegramPair')
@@ -322,4 +323,42 @@ test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /qu
   assert.ok(did.some((d: any) => /^to .+ · claude: "one"$/.test(d.line)))
   assert.ok(did.some((d: any) => /^refused to .+: "three": 2 messages a minute/.test(d.line)))
   assert.ok(!JSON.stringify(did).includes('fake-secret'))
+})
+
+test("P4: a topic per workspace: needs the bot's topics; its pushes in it, plain words there to its agent, gone with the workspace", async t => {
+  const { b, rig } = await paired(t, {}, { topics: true })
+  await rig.rpc('telegramSet', { topics: true })
+  const { ws, tab } = await claude(rig)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  const made = (await until(() => b.of('createForumTopic').at(-1), 'its topic'))!
+  assert.equal(made.body.name, ws.name ?? ws.id)
+  const done = (await until(() => b.of('sendMessage').find(c => c.body.disable_notification), 'the done push'))!
+  const thread = done.body.message_thread_id
+  assert.ok(thread > 500, 'in its topic')
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  await until(() => b.of('sendMessage').filter(c => c.body.disable_notification).length === 2, 'a second push')
+  assert.equal(b.of('createForumTopic').length, 1, 'one topic, however many pushes')
+  assert.equal(b.of('sendMessage').filter(c => c.body.disable_notification)[1].body.message_thread_id, thread)
+  b.message('words in the topic', { thread })
+  await until(async () => /answer: words in the topic/.test(await rig.screen(tab.id)), 'to its agent, no reply needed')
+  b.message('/screen', { thread })
+  await until(() => b.of('sendMessage').some(c => c.body.message_thread_id === thread && /^<b>claude<\/b> in .*<pre>/s.test(c.body.text)), 'its screen, in its topic')
+  await rig.rpc('wsRm', { id: ws.id })
+  await until(() => b.of('deleteForumTopic').some(c => c.body.message_thread_id === thread), 'the topic gone with it')
+})
+
+test("P4: topics refused until the bot has them; Telegram refusing one turns them off with a notice", async t => {
+  const { b, rig } = await paired(t, {}, { noTopics: true })
+  await assert.rejects(rig.rpc('telegramSet', { topics: true }), /turn topics on for @laki_test_bot in @BotFather first/)
+  await rig.stop()
+  const sp = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(sp, 'utf8'))
+  Object.assign(st.telegram, { topics: true, bot: { ...st.telegram.bot, topics: true } }) // on, as if BotFather's were
+  writeFileSync(sp, JSON.stringify(st))
+  await rig.start()
+  const { tab } = await claude(rig)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  await until(async () => (await rig.rpc('state')).telegram.topics === false, 'topics off')
+  assert.match((await rig.rpc('state')).telegram.notice, /Topics are off: Telegram didn't make one/)
+  await until(() => b.of('sendMessage').some(c => c.body.disable_notification && !c.body.message_thread_id), 'the push in the chat anyway')
 })

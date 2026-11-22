@@ -164,7 +164,8 @@ export async function tgPush(p: Push): Promise<number | undefined> {
   p = shown(p)
   const taps = p.nonce && p.options?.length && tgAnswers() ? p.options : []
   const markup = taps.length ? { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } : p.url ? { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } : undefined
-  const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
+  const thread = await threadOf(p.tab)
+  const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
   if (m?.message_id && p.tab) remember(m.message_id, p.tab) // a reply to it goes to its tab
   return m?.message_id
 }
@@ -173,7 +174,42 @@ export function tgDone(msg: number, p: Push, said: string) {
   if (!state.telegram?.user) return
   out('editMessageText', { chat_id: chat(), message_id: msg, text: `${tgHtml(shown(p))}\n<i>${esc(said)}</i>`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }).catch(e => log(`telegram: ${(e as Error).message}`))
 }
-const say = (text: string) => out('sendMessage', { chat_id: chat(), text, parse_mode: 'HTML', link_preview_options: { is_disabled: true } }).catch(e => log(`telegram: ${(e as Error).message}`))
+const say = (text: string, thread?: number) => out('sendMessage', { chat_id: chat(), text, parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }) }).catch(e => log(`telegram: ${(e as Error).message}`))
+// an answer where the message was: its topic (P4), else the chat
+const sayIn = (m: { message_thread_id?: number }, text: string) => say(text, m.message_thread_id)
+
+// ---------- P4: a topic per workspace in the private chat (settings' topics, and the bot's own: BotFather's topics on,
+// getMe's has_topics_enabled): made as its first push goes (createForumTopic), its pushes in it (message_thread_id),
+// plain words there to its agent, gone with the workspace (deleteForumTopic). Off, or none made: the chat as it is
+export const topicsOn = () => !!state.telegram?.topics && !!state.telegram.bot?.topics
+const COLORS = [7322096, 16766590, 13338331, 9367192, 16749490, 16478047] // the six a topic's icon may be
+const making = new Map<string, Promise<number | undefined>>() // a workspace's topic on its way: one, however many pushes
+async function threadOf(tab?: string) {
+  const ws = tab && state.workspaces.find(w => w.id === state.tabs.find(t => t.id === tab)?.workspace)
+  if (!ws || !topicsOn()) return
+  const had = state.telegram?.threads?.[ws.id]
+  if (had) return had
+  if (!making.has(ws.id))
+    making.set(
+      ws.id,
+      out<{ message_thread_id: number }>('createForumTopic', { chat_id: chat(), name: cut(ws.name || ws.id, 128), icon_color: COLORS[[...ws.id].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length] }) // ponytail: a color by its id, not its own color's nearest
+        .then(
+          r => ((T().threads ??= {})[ws.id] = r.message_thread_id, save(), r.message_thread_id),
+          e => void ((T().topics = false), (T().notice = `Topics are off: Telegram didn't make one (${scrub((e as Error).message)}). Turn topics on for the bot in @BotFather, then here again`), log(`telegram: ${scrub((e as Error).message)}`), save(), changed()),
+        )
+        .finally(() => making.delete(ws.id)),
+    )
+  return making.get(ws.id)
+}
+// a workspace gone (core's dropWs): its topic too
+export function tgWsGone(ws: string) {
+  const id = state.telegram?.threads?.[ws]
+  if (!id) return
+  delete state.telegram!.threads![ws]
+  if (tgOn()) out('deleteForumTopic', { chat_id: chat(), message_thread_id: id }).catch(e => log(`telegram: ${(e as Error).message}`))
+}
+// the workspace a topic is (its thread id), shown (not archived, nor Recording mode's)
+const wsOfThread = (thread?: number) => (thread ? Object.entries(state.telegram?.threads ?? {}).find(([, id]) => id === thread)?.[0] : undefined)
 
 // ---------- pairing: a one-time code (128 bits) for 10 minutes, shown only in Laki's window as t.me/<bot>?start=<code>
 let pair: { code: string; until: number } | undefined
@@ -191,7 +227,7 @@ const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(
 type User = { id: number; first_name?: string; last_name?: string; username?: string }
 type Chat = { id: number; type: string }
 type TgFile = { file_id: string; file_size?: number }
-type TgMessage = { message_id: number; from?: User; chat: Chat; date: number; text?: string; caption?: string; reply_to_message?: { message_id: number }; photo?: TgFile[]; document?: TgFile & { file_name?: string } }
+type TgMessage = { message_id: number; from?: User; chat: Chat; date: number; text?: string; caption?: string; reply_to_message?: { message_id: number }; photo?: TgFile[]; document?: TgFile & { file_name?: string }; message_thread_id?: number }
 type Update = { update_id: number; message?: TgMessage; callback_query?: { id: string; from: User; message?: { message_id: number; chat: Chat }; data?: string } }
 let ctl: AbortController | undefined
 let offset = 0
@@ -276,15 +312,16 @@ async function take(u: Update, gap: boolean) {
     return void out('answerCallbackQuery', { callback_query_id: q.id, text: gap ? 'Laki was off: that tap is too old' : said || 'That ask moved on' }).catch(() => {})
   }
   if (!m) return
-  if (Date.now() / 1000 - m.date > STALE / 1000) return void say('Laki was off when you sent that: send it again.')
+  if (Date.now() / 1000 - m.date > STALE / 1000) return void sayIn(m, 'Laki was off when you sent that: send it again.')
   if (!levelAtLeast('answer')) return
   const cmd = /^\/([a-z_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i.exec(m.text?.trim() ?? '')
-  if (cmd) return command(cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), m).catch(e => void say(`Not done: ${esc(scrub((e as Error).message))}`))
-  const tab = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
-  if (!tab) return void say("Reply to one of my messages about an agent (swipe it left, or long-press it › Reply) and what you write goes to that agent.")
+  if (cmd) return command(cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), m).catch(e => void sayIn(m, `Not done: ${esc(scrub((e as Error).message))}`))
+  const inWs = wsOfThread(m.message_thread_id)
+  const tab = (m.reply_to_message && msgMap().get(m.reply_to_message.message_id)) || (inWs && shownWs(inWs) ? state.tabs.find(t => t.workspace === inWs && tracked(t))?.id : undefined)
+  if (!tab) return void sayIn(m, inWs ? 'This workspace has no agent now.' : "Reply to one of my messages about an agent (swipe it left, or long-press it › Reply) and what you write goes to that agent.")
   await deliver(tab, m).then(
     () => react(m),
-    e => say(`Not sent: ${esc(scrub((e as Error).message))}`),
+    e => sayIn(m, `Not sent: ${esc(scrub((e as Error).message))}`),
   )
 }
 // a reply's words (and its photo's or file's path) to its tab: a waiting ask's choice when it names one (its number or
@@ -302,7 +339,7 @@ async function deliver(tab: string, m: TgMessage) {
   if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
   if (!text) throw new Error('nothing to send')
   await act('send', { target: tab, text, whenIdle: true })
-  if (ask) void say(`Queued: ${esc(t.name)} asks something first (reply with a choice's number to answer it).`)
+  if (ask) void sayIn(m, `Queued: ${esc(t.name)} asks something first (reply with a choice's number to answer it).`)
 }
 // a photo or a file from the chat into Laki's images or files (core's imageSave, fileSave): its path. Telegram gives a
 // bot 20 MB at most
@@ -340,14 +377,15 @@ function tabFor(m: TgMessage, arg: string) {
   const id = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
   const by = id ? state.tabs.find(t => t.id === id) : undefined
   if (by) return shownWs(by.workspace) && by
-  const w = arg && state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())
+  const here = !arg && wsOfThread(m.message_thread_id) // in a workspace's topic: that one
+  const w = here ? shownWs(here) : arg && state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())
   return w ? state.tabs.find(t => t.workspace === w.id && tracked(t)) : undefined
 }
 const DOT: Record<string, string> = { waiting: '🟡', running: '🔵', idle: '🟢' }
 async function command(c: string, arg: string, m: TgMessage) {
   const known = COMMANDS.find(x => x[0] === c)
-  if (c === 'start' || c === 'help' || !known) return void say(`${c === 'start' || c === 'help' ? '' : `No /${esc(c)}. `}${COMMANDS.filter(x => levelAtLeast(x[2])).map(x => `/${x[0]}: ${esc(x[1])}`).join('\n')}\nReply to a push to talk to its agent.`)
-  if (!levelAtLeast(known[2])) return void say(`/${c} needs the Control level: Settings › Telegram, on your Mac`)
+  if (c === 'start' || c === 'help' || !known) return void sayIn(m, `${c === 'start' || c === 'help' ? '' : `No /${esc(c)}. `}${COMMANDS.filter(x => levelAtLeast(x[2])).map(x => `/${x[0]}: ${esc(x[1])}`).join('\n')}\nReply to a push to talk to its agent.`)
+  if (!levelAtLeast(known[2])) return void sayIn(m, `/${c} needs the Control level: Settings › Telegram, on your Mac`)
   const titles = state.telegram?.detail === 'titles'
   if (c === 'status') {
     const v = await act<{ tabs: { id: string; name: string; workspace: string; status: string; done: boolean }[] }>('state', {})
@@ -355,36 +393,36 @@ async function command(c: string, arg: string, m: TgMessage) {
     const group = (title: string, l: typeof rows, q = false) =>
       l.length ? [`<b>${title} · ${l.length}</b>`, ...l.slice(0, 15).map(t => `${DOT[t.status] ?? '⚪'} ${esc(shownWs(t.workspace)!.name ?? t.workspace)} · ${esc(t.name)}${q && !titles ? (p => (p ? `: <code>${esc(redact(cut(`${p.tool}: ${p.what}`, 120)))}</code>` : ''))(rtOf(t.id).perm) : ''}`)] : []
     const text = [...group('Needs you', rows.filter(t => t.status === 'waiting'), true), ...group('Working', rows.filter(t => t.status === 'running')), ...group('Done', rows.filter(t => t.status === 'idle' && t.done))].join('\n')
-    return void say(text || 'Nothing needs you, nothing is working.')
+    return void sayIn(m, text || 'Nothing needs you, nothing is working.')
   }
   if (c === 'quiet') {
-    if (/^off$/i.test(arg)) return void (await act('dndSet', { off: true }), say('Do not disturb is off.'))
+    if (/^off$/i.test(arg)) return void (await act('dndSet', { off: true }), sayIn(m, 'Do not disturb is off.'))
     const n = /^(\d{1,4})\s*(m|min|h|hours?)?$/i.exec(arg || '1h')
-    if (!n) return void say('How long? /quiet 2h, /quiet 30m, /quiet off')
+    if (!n) return void sayIn(m, 'How long? /quiet 2h, /quiet 30m, /quiet off')
     const minutes = Number(n[1]) * (/^h/i.test(n[2] ?? 'm') ? 60 : 1)
     const r = await act<{ until: number }>('dndSet', { minutes })
-    return void say(`Do not disturb until ${new Date(r.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: only an important workspace's asks come.`)
+    return void sayIn(m, `Do not disturb until ${new Date(r.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: only an important workspace's asks come.`)
   }
   if (c === 'new') {
     const [name, ...words] = arg.split(/\s+/)
     const task = words.join(' ').trim()
     const p = state.projects.find(x => !x.kind && !x.archived && !(state.settings?.recording && x.private) && [x.name, x.id].some(n => n?.toLowerCase() === name?.toLowerCase()))
-    if (!p || !task) return void say(`/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
+    if (!p || !task) return void sayIn(m, `/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
     const w = await act<{ id: string; name?: string }>('wsNew', { project: p.id, prompt: task })
-    return void say(`Started <b>${esc(w.name ?? w.id)}</b> in ${esc(p.name)}. Its pushes come here; reply to one to talk to it.`)
+    return void sayIn(m, `Started <b>${esc(w.name ?? w.id)}</b> in ${esc(p.name)}. Its pushes come here; reply to one to talk to it.`)
   }
-  if (titles) return void say('Titles only is on (Settings › Telegram): nothing off a screen comes here.')
+  if (titles) return void sayIn(m, 'Titles only is on (Settings › Telegram): nothing off a screen comes here.')
   const t = tabFor(m, arg)
-  if (!t) return void say(`Which one? Reply /${c} to an agent's push, or /${c} &lt;workspace&gt;.`)
+  if (!t) return void sayIn(m, `Which one? Reply /${c} to an agent's push, or /${c} &lt;workspace&gt;.`)
   const head = `<b>${esc(t.name)}</b> in <b>${esc(shownWs(t.workspace)!.name ?? t.workspace)}</b>`
   if (c === 'screen') {
     const text = await act<string>('screen', { target: t.id, lines: 40 })
-    return void say(`${head}\n<pre>${esc(redact(text.trimEnd()).slice(-3500))}</pre>`)
+    return void sayIn(m, `${head}\n<pre>${esc(redact(text.trimEnd()).slice(-3500))}</pre>`)
   }
   const d = await act<{ files: { path: string; add: number; del: number }[] }>('diff', { ws: t.workspace })
   const add = d.files.reduce((n, f) => n + f.add, 0)
   const del = d.files.reduce((n, f) => n + f.del, 0)
-  return void say(d.files.length ? `${head}: +${add} −${del} · ${d.files.length} file${d.files.length === 1 ? '' : 's'}\n${d.files.slice(0, 40).map(f => `<code>${esc(cut(f.path, 120))}</code> +${f.add} −${f.del}`).join('\n')}` : `${head}: no changes`)
+  return void sayIn(m, d.files.length ? `${head}: +${add} −${del} · ${d.files.length} file${d.files.length === 1 ? '' : 's'}\n${d.files.slice(0, 40).map(f => `<code>${esc(cut(f.path, 120))}</code> +${f.add} −${f.del}`).join('\n')}` : `${head}: no changes`)
 }
 
 // the receipt: a 👍 on your message (Telegram may refuse a reaction: then none)
@@ -413,6 +451,12 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
   if (p.level !== undefined) {
     if (typeof p.level !== 'string' || !(p.level in RANK)) throw new Error('level: notify, answer or control')
     t.level = p.level as TgLevel
+  }
+  if (p.topics === true && t.bot && !t.bot.topics) {
+    // BotFather's switch may be new since the token was pasted: ask again
+    const me = await tg<{ has_topics_enabled?: boolean }>('getMe')
+    t.bot.topics = !!me.has_topics_enabled
+    if (!t.bot.topics) throw new Error(`turn topics on for @${t.bot.username} in @BotFather first (its Bot Settings), then here`)
   }
   for (const k of ['off', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
   if (p.off === false) t.notice = undefined // on again (Try again after a 409): its notice read

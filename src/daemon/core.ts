@@ -57,7 +57,7 @@ import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widge
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, prune, pushed } from './phone.ts'
-import { tgMigrate, tgView } from './telegram.ts'
+import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
@@ -3900,6 +3900,7 @@ async function teardown(ws: Workspace) {
 export const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
   widgetEvent('workspace.removed', {}, ws.id) // its payload now, while it's there
+  tgWsGone(ws.id) // its Telegram topic (P4)
   if (ws.archived) archiveDrop(state.projects.find(p => p.id === ws.project)?.path ?? '', ws.id) // R2: what archiving kept of it
   if (ws.reviewed && !ws.host) reviewDrop(state.projects.find(p => p.id === ws.project)?.path ?? '', ws.id) // R11
   prSeen.delete(ws.id)

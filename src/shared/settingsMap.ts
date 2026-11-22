@@ -57,7 +57,7 @@ export const FIND: [string, string, string?][] = [
   ['telegram', 'Telegram', 'telegram bot botfather phone push notify chat messenger answer tap pair'],
   ['telegram', '1 · Make a bot', 'telegram bot botfather newbot token paste connect remove'],
   ['telegram', '2 · Pair your phone', 'telegram pair pairing code qr start unpair send test chat'],
-  ['telegram', '3 · What Telegram may do', 'telegram level notify answer control access on off'],
+  ['telegram', '3 · What Telegram may do', 'telegram level notify answer control access on off topic topics thread per workspace forum'],
   ['telegram', 'What it sends', 'telegram waiting done finished silent titles only'],
   ['telegram', 'How it works', 'telegram long poll no port tunnel sleep stale reply message agent photo file receipt commands status screen diff quiet new'],
   ['telegram', 'What Telegram did', 'telegram log activity audit history done refused'],
