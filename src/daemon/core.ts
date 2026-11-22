@@ -5203,8 +5203,9 @@ export const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // who runs a laki command: the tab main.ts finds its process in (tabOfPeer), else what its $LAKI_WORKSPACE and
 // $LAKI_TAB say (the CLI passes them): an agent when that tab is an agent's, or a shell tab running one (shellAgents: the
 // view's runs); you typing in a shell tab, or outside Laki, aren't. Its workspace, else nothing
-const agentTab = (from?: { ws?: unknown; tab?: unknown }) => {
-  const t = typeof from?.tab === 'string' && from.tab ? state.tabs.find(x => x.id === from.tab) : undefined
+const agentTab = (from?: unknown) => {
+  const id = from && typeof from === 'object' && 'tab' in from && typeof from.tab === 'string' ? from.tab : '' // a call's from, as its request has it
+  const t = id ? state.tabs.find(x => x.id === id) : undefined
   return t && (t.kind === 'agent' || shellAgents.has(t.id) || treeAgents.has(t.id) || typedBy.has(t.id)) ? t : undefined
 }
 // #14: a shell tab's agent by every process under it (under npx, a wrapper, in the background), looked at as a call from
@@ -5255,7 +5256,7 @@ export function promptList() {
   prompts ??= (readJson(promptsFile()) as typeof prompts) ?? []
   return [...prompts].reverse()
 }
-export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
+export const agentCaller = (from?: unknown) => agentTab(from)?.workspace
 // a tab's agent in its sandbox (agentCmd's): the tab's switch, else its profile's; none with bypass permissions (its
 // mode or its profile's flags)
 export function sandboxed(tab: Tab) {
@@ -5264,7 +5265,7 @@ export function sandboxed(tab: Tab) {
   return !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
 }
 // a call from a sandboxed agent's tab (main.ts' boxNo)
-export const boxedCaller = (from?: { ws?: unknown; tab?: unknown }) => (t => !!t && sandboxed(t))(agentTab(from))
+export const boxedCaller = (from?: unknown) => (t => !!t && sandboxed(t))(agentTab(from))
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
 export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
 // that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs

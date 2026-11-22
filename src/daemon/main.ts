@@ -365,6 +365,10 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 
 // ---------- the API: same methods over HTTP and WebSocket
 
+// a call's params as the request has them (JSON): each read narrowed where it's used
+type Params = Record<string, unknown>
+// a call's from (an agent's tab: { ws, tab }), as its request has it
+const fromTab = (f: unknown) => (f && typeof f === 'object' && 'tab' in f ? f.tab : undefined)
 type Handler = (p: any, c?: core.Conn) => unknown
 // a handler's params as its function takes them, and what the daemon adds to every call (an agent's from)
 type In<F extends (p: never, ...a: never[]) => unknown> = NonNullable<Parameters<F>[0]> & { from?: unknown }
@@ -825,7 +829,7 @@ export type Api = typeof api
 const table: Record<string, Handler> = api // a name looked up at run time
 
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
-const changes = (p: any, keys: (k: string) => boolean) => Object.keys(p ?? {}).some(k => keys(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
+const changes = (p: Params, keys: (k: string) => boolean) => Object.keys(p ?? {}).some(k => keys(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
 // an agent's: every setting but the look and layout (gates.ts AGENT_SETTINGS_OK); what call() and whoCalls add is no setting
 const CALL_KEYS = new Set(['from', 'caller', 'byClient', 'now', 'touchTicket', 'cid'])
 const agentSettingsNo = (p: Record<string, unknown>) => changes(p, k => !AGENT_SETTINGS_OK.has(k) && !CALL_KEYS.has(k))
@@ -838,8 +842,8 @@ const norm = (k: string, v: unknown, cur: any): unknown => {
   const x = typeof v === 'string' ? v.trim() || undefined : k === 'env' && v && typeof v === 'object' ? back(v, cur?.env) : k === 'mcp' && Array.isArray(v) ? v.map(s => (s?.env && typeof s.env === 'object' ? { ...s, env: back(s.env, (cur?.mcp as { name?: string; env?: Record<string, unknown> }[] | undefined)?.find(c => c?.name === s.name)?.env) } : s)) : (v ?? undefined)
   return x && typeof x === 'object' && !Object.keys(x).length ? undefined : x // none and empty alike
 }
-const scriptsChange = (p: any) => !!p?.config && typeof p.config === 'object' && (cur => SCRIPT_KEYS.some(k => JSON.stringify(norm(k, p.config[k], cur)) !== JSON.stringify(norm(k, cur?.[k], cur))))((core.state.projects.find(x => x.id === p.id) as any)?.config)
-const remoteNo = (method: string, p: any) =>
+const scriptsChange = (p: Params) => (c => !!c && typeof c === 'object' && (cur => SCRIPT_KEYS.some(k => JSON.stringify(norm(k, (Object.entries(c).find(([x]) => x === k) ?? [])[1], cur)) !== JSON.stringify(norm(k, cur?.[k], cur))))((core.state.projects.find(x => x.id === p.id) as any)?.config))(p?.config)
+const remoteNo = (method: string, p: Params) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
   (method === 'settingsSet' && changes(p, k => REMOTE_KEYS.test(k))) ||
@@ -1119,7 +1123,7 @@ function clientLine(method: string, p: Record<string, unknown>, e?: unknown) {
   log(`client ${clientsMod.clientName(p.byClient)}: ${method}${(w => (w ? ` (${w})` : ''))(agentWhat(p))}${e === undefined ? '' : ` refused: ${core.firstLine(e)}`}`)
 }
 // the app's answer (its token only: call() checks before anyone is looked up)
-const termAnswer = (p: any) => void [...termAsks.values()].find(a => a.msg.req === p?.req)?.answer(p?.allow === true)
+const termAnswer = (p: Params) => void [...termAsks.values()].find(a => a.msg.req === p?.req)?.answer(p?.allow === true)
 // the CLI's own question while its call waits (not a method of api: it reads the socket, as appPair does)
 const termHeld = async (sock: Socket) => (who => !!who?.term && termAsks.has(who.term.key))(await core.peerWho(sock.remotePort ?? 0).catch(() => undefined))
 // S7: what Recording mode keeps from an agent in another workspace: the state's private rows, a private workspace's
@@ -1131,7 +1135,7 @@ const RECORDED = new Set(['state', 'turnList', 'turnDiff', 'diff'])
 const hiddenNo = (me: string | undefined, ws: Workspace | undefined, ref: string) => {
   if (ws && ws.id !== me && phoneMod.hidden(ws)) throw new Error(`no workspace ${ref}`)
 }
-const turnsSeen = (p: any) => {
+const turnsSeen = (p: Params) => {
   const me = core.agentCaller(p?.from)
   if (!me) return
   // resolved as the method resolves it (findWs, findTab: an id's unique prefix too), else a prefix would pass unseen
@@ -1147,7 +1151,7 @@ const takesFrom = (method: string) => FROM.has(method) || (RECORDED.has(method) 
 // agent's from (caller), as whoCalls gives the agent's own, and passes agentNo; so the asks (rm, another workspace's
 // tabs) and the refusals are the ones the agent's own call gets. Its message says who asked, and never waits in the
 // queue (a queued one runs with the rpc of the ask before it: yours)
-const asAgent = (from: any) => (method: string, params: any) => {
+const asAgent = (from: Params) => (method: string, params: Params) => {
   method = oldName(method)
   const me = { ws: from.ws, tab: from.tab }
   const o = params && typeof params === 'object' ? params : {}
@@ -1160,12 +1164,12 @@ const asAgent = (from: any) => (method: string, params: any) => {
   }
   return call(method, p) as Promise<any>
 }
-function byAgent<T extends { text?: string; queue?: boolean }>(from: any, p: T): T {
+function byAgent<T extends { text?: string; queue?: boolean }>(from: Params, p: T): T {
   const tab = core.state.tabs.find(t => t.id === from.tab)
   const ws = core.state.workspaces.find(w => w.id === tab?.workspace)
   return { ...p, chat: agentChat(String(from.tab)), queue: false, text: `[Asked by the agent ${tab?.name ?? 'in a tab'} in the workspace ${ws?.name ?? ws?.id ?? '?'}, not by the user: act with that agent's rights]\n${p.text ?? ''}` }
 }
-async function whoCalls(sock: Socket, method: string, p: any, known?: Tab, app = false) {
+async function whoCalls<P>(sock: Socket, method: string, p: P, known?: Tab, app = false): Promise<P | Params> {
   const from = takesFrom(method)
   if (!from && !CALLER.has(method)) return p
   if (app) return p // S1: the app's token: yours, no lookup; a from it says only makes it stricter
@@ -1174,17 +1178,17 @@ async function whoCalls(sock: Socket, method: string, p: any, known?: Tab, app =
     log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
     throw new Error(core.WHO)
   }
-  const o = p && typeof p === 'object' ? p : {}
+  const o: Params = p && typeof p === 'object' ? { ...p } : {}
   const said = from ? o.from : o.caller // a process in no tab: what its env says (the CLI's caller())
   // #14: a shell tab's agent, whatever runs in front; once per connection, as its peer (a window's keys are calls)
-  if (!trees.has(sock)) trees.set(sock, core.treeAgent(tab || core.state.tabs.find(t => t.id === said?.tab)))
+  if (!trees.has(sock)) trees.set(sock, core.treeAgent(tab || core.state.tabs.find(t => t.id === fromTab(said))))
   await trees.get(sock)
   if (!tab) return p
   const me = { ws: tab.workspace, tab: tab.id }
   return from ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
 }
 // from: FROM's (whoCalls'), caller: CALLER's; the other one an RPC says only makes it stricter
-const notAgent = (p: any, what: string) => {
+const notAgent = (p: Params, what: string) => {
   if (core.agentCaller(p.from) ?? core.agentCaller(p.caller)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
 }
 // a sandboxed agent's calls: what it starts is sandboxed too, and nothing of its own runs outside the sandbox: no
@@ -1202,12 +1206,12 @@ const GIT_PATH = /(^|[\\/])\.git([\\/]|$)/i // .git/config, .git/hooks: what git
 // strips them before typing, C1's too, so \x01!cmd would land as !cmd), and a ! line (claude's and codex's command mode)
 const bangNo = (text: string, name: string) =>
   /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) ? `send editing keys into ${name} (they could make a ! line its agent runs as a command)` : /(?:^|[\r\n])[ \t]*!/.test(text) ? `send a ! line (${name}'s agent runs it as a command)` : undefined
-function boxNo(method: string, p: any) {
+function boxNo(method: string, p: Params) {
   if (!core.boxedCaller(p.caller) && !core.boxedCaller(p.from)) return
   const no = (what: string) => {
     throw new Error(`a sandboxed agent can't ${what}: it would run outside its sandbox (ask the user)`)
   }
-  if (method === 'tabNew' && (p.kind === 'shell' || (!p.kind && !p.cmd?.trim() && (!p.preset || p.preset === 'shell')))) no('open a terminal')
+  if (method === 'tabNew' && (p.kind === 'shell' || (!p.kind && !(typeof p.cmd === 'string' && p.cmd.trim()) && (!p.preset || p.preset === 'shell')))) no('open a terminal')
   if (method === 'wsNew' && (p.preset || core.state.settings?.agent) === 'shell') no('open a terminal') // a race's: refused as no agent (wsFan)
   if (method === 'quickNew' && p.kind !== 'browsers') no('open a terminal') // S5: a Terminals workspace's
   if (method === 'openIn' && p.file && fileApp(p.app)) no('open a file in a browser or with its default app') // S7
@@ -1259,9 +1263,9 @@ for (const k of [...CLIENT_READ, ...Object.values(CLIENT_SCOPE).flat()]) if (!Ob
 // Every method of api is in ANSWER or ANSWER_NO, checked as the daemon loads: a new one is classified, never allowed by
 // default. Laki AI's tools for a remote ask go through the same gates (aiAsk's rpc with its Conn)
 // a new tab's or workspace's agent: its profile's, else what it names; none: wsNew's default agent, tabNew's a shell (tabSpec)
-const agentOf = (p: any, tab: boolean) => (name => (name ? core.presetNamed(name)?.agent ?? name : ''))(typeof p?.preset === 'string' && p.preset ? p.preset : tab ? '' : core.state.settings?.agent || 'claude')
+const agentOf = (p: Params, tab: boolean) => (name => (name ? core.presetNamed(name)?.agent ?? name : ''))(typeof p?.preset === 'string' && p.preset ? p.preset : tab ? '' : core.state.settings?.agent || 'claude')
 const NEW_KEYS = new Set(['caller', 'from', 'fromTab', 'project', 'ws', 'preset', 'cmd', 'prompt', 'name', 'base', 'local', 'another', 'model', 'effort', 'perm', 'fast', 'sandbox', 'issue', 'pr', 'place', 'named', 'guessed', 'link', 'linked', 'vars', 'startAt', 'beside', 'edge', 'focus'])
-const newOk = (tab: boolean) => (p: any) => {
+const newOk = (tab: boolean) => (p: Params) => {
   const extra = Object.keys(p ?? {}).find(k => !NEW_KEYS.has(k))
   if (extra) return extra
   if (typeof p?.cmd === 'string' && p.cmd.trim()) return 'a command'
@@ -1272,7 +1276,7 @@ const newOk = (tab: boolean) => (p: any) => {
 }
 // a message to an agent: whole (no keys without Enter, which could build one in pieces), and not its shell mode (a line
 // that starts with ! runs as a command in claude, codex and agy, with no ask)
-const sendOk = (p: any) => {
+const sendOk = (p: Params) => {
   let t: Tab
   try {
     t = core.resolveTarget(String(p?.target ?? ''))
@@ -1284,7 +1288,7 @@ const sendOk = (p: any) => {
   return /^\s*!/.test(String(p?.text ?? '')) ? "a command (a line that starts with ! is the agent's shell)" : ''
 }
 const WS_SET = new Set(['id', 'name', 'color', 'pinned', 'railPin', 'from', 'asked'])
-const ANSWER: Record<string, true | ((p: any) => string)> = {
+const ANSWER: Record<string, true | ((p: Params) => string)> = {
   flowTrustDiff: true, // the trust sheet's diff: it reads
   askExplain: true, // the ? on an ask's card, from the phone too: it reads, it answers nothing
   reviewSteps: true, // R13: Walk through, from the phone too: it reads the diff, it changes nothing
@@ -1310,7 +1314,7 @@ const ANSWER: Record<string, true | ((p: any) => string)> = {
 const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext', 'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet', 'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork', 'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen', 'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet', 'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk', 'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook', 'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct', 'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount', 'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart', 'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick', 'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash', 'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetStore', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick', 'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetCheck', 'noteNew', 'noteSave', 'noteRestore', 'noteRm', 'noteUpload', 'todoListSave', 'planNew', 'planSave', 'planUpload', 'planWrite', 'planRm', 'mcpAppCall', 'checkAgain', 'checkStop', 'proofShot', 'flowSave', 'flowTrust', 'flowPause', 'flowRm', 'flowRestore', 'flowTrash', 'flowTrashTidy', 'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
 for (const k of Object.keys(api)) if (Object.hasOwn(ANSWER, k) === ANSWER_NO.has(k)) throw new Error(`api's ${k} is ${ANSWER_NO.has(k) ? 'in ANSWER and ANSWER_NO' : 'in neither ANSWER nor ANSWER_NO'}: classify it for remote access's answer level (D7)`)
 for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, k)) throw new Error(`ANSWER's or ANSWER_NO's ${k} isn't a method of api`)
-const answerNo = (method: string, p: any) => {
+const answerNo = (method: string, p: Params) => {
   const ok = Object.hasOwn(ANSWER, method) ? ANSWER[method] : undefined
   const why = ok === undefined ? method : ok === true ? '' : ok(p)
   if (why) throw new Error(`answer only from here (${why === method ? method : `${method}: ${why}`}): do that on the Mac itself, or give this device full access there (Settings › Remote access)`)
@@ -1326,7 +1330,7 @@ for (const k of Object.keys(api)) if (!FROM.has(k) && !CALLER.has(k) && !OPEN.ha
 const SHIFT_TAB = /\x1b\[(?:[\d:;]*Z|9[\d:]*;[\d:;]*u|27;\d+;9~)/ // 9[\d:]*: kitty's alternate keys (9:9;2u)
 const KEY_START = /\x1b(?:\[[\d:;]*)?$/
 const keyTail = new Map<string, string>()
-function shiftTabNo(p: any, tab: string, text: string, keep = true) {
+function shiftTabNo(p: Params, tab: string, text: string, keep = true) {
   const all = (keyTail.get(tab) ?? '') + text
   if (SHIFT_TAB.test(all)) notAgent(p, 'change a permission mode')
   if (!keep) return
@@ -1339,12 +1343,12 @@ function shiftTabNo(p: any, tab: string, text: string, keep = true) {
 function text(v: unknown, what: string) {
   if (typeof v !== 'string') throw new Error(`${what} must be a string`)
 }
-function agentNo(method: string, p: any) {
+function agentNo(method: string, p: Params) {
   if (method === 'input') text(p.data, 'data')
   if (method === 'send') text(p.text, 'text')
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || agentSettingsNo(p))) notAgent(p, 'change that setting')
-  else if (method === 'scheduleSet' && p?.onlyIf?.kind === 'cmd') notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
+  else if (method === 'scheduleSet' && (o => !!o && typeof o === 'object' && 'kind' in o && o.kind === 'cmd')(p?.onlyIf)) notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
   else if (method === 'scheduleSet' && p?.maxMinutes === 0 && core.state.schedules?.find(x => x.id === p.id)?.maxMinutes !== 0) notAgent(p, "turn off a scheduled task's time limit (settings.scheduleMaxMinutes is the user's too)") // T8: 1 to 1440 minutes is fine; a task already without one, sent back as it is, too
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined || p.inRepo !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : p.memory !== undefined ? 'memory list (laki memory add adds to it)' : 'notes and memory place (in its repo or in Laki)'}`)
@@ -1374,7 +1378,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'ship' && p.allowSecrets !== undefined && p.allowSecrets !== false) notAgent(p, 'ship past the secret check (the user says what is not a secret)')
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
-  else if (method === 'tabSet' && p.from?.tab !== p.id) notAgent(p, p.alias !== undefined ? "name another agent's tab (laki name names your own)" : "rename, color or mute a tab that isn't its own") // an alias: else it could take a name and its messages; S11: the rest too (a muted tab's asks go unseen)
+  else if (method === 'tabSet' && fromTab(p.from) !== p.id) notAgent(p, p.alias !== undefined ? "name another agent's tab (laki name names your own)" : "rename, color or mute a tab that isn't its own") // an alias: else it could take a name and its messages; S11: the rest too (a muted tab's asks go unseen)
   else if (FILE_EDITS.has(method) && core.agentCaller(p.from)) {
     // S2: its own workspace's files (it writes those itself anyway), never git's own: another's is the user's to change
     if (core.findWs(String(p.ws ?? '')).id !== core.agentCaller(p.from)) throw new Error("an agent can change files in its own workspace only (ask the user)")
@@ -1396,7 +1400,7 @@ const crossOk = new Set<string>()
 // a new workspace's prompt, yours (no agent's tab asked: byCaller's from; no agent said, as MCP and Laki AI do), into
 // your prompts' history
 const yours = <T extends { from?: string; agent?: string; prompt?: string; byClient?: string }>(p: T) => (p.from || p.agent || p.byClient || core.promptKeep(p.prompt), p) // T1: a trusted client's isn't yours either
-function agentSend(p: any) {
+function agentSend(p: Params) {
   const tab = core.resolveTarget(String(p.target ?? ''))
   const by = core.agentCaller(p.from)
   if (by) delete p.steer // into a running turn is your follow-ups' only: an agent's waits its turn (an Enter typed now could answer a menu just drawn)
@@ -1417,7 +1421,7 @@ function agentSend(p: any) {
   else core.agentTyped(tab.id)
 }
 // keys: an agent's into a terminal of its own workspace make it the agent's (as a send does); yours give it back
-function typed(p: any, tab: string, data: string) {
+function typed(p: Params, tab: string, data: string) {
   if (core.agentCaller(p.from)) core.agentTyped(tab)
   else core.youTyped(tab, data, true)
 }
@@ -1433,7 +1437,7 @@ const wsRef = (ref: string) => {
 }
 // laki preset from an agent's tab: a profile's args and env run in every tab started on it (a mode that never asks too),
 // so the user says yes in the app first, the whole profile shown; once only (no Always)
-async function presetAsk(p: any) {
+async function presetAsk(p: Params) {
   const by = core.agentCaller(p.from)
   if (!by) return
   const name = String(p.name ?? '')
@@ -1444,25 +1448,25 @@ async function presetAsk(p: any) {
   const set = p.set && typeof p.set === 'object' ? p.set : {}
   const whole = JSON.stringify(p.rm ? (was ?? { name }) : { ...(was ?? { name, agent: 'claude' }), ...set }, null, 2)
   const text = p.rm || !Object.keys(set).length ? whole : `What changes:\n${JSON.stringify(set, null, 2)}\n\nThe profile then:\n${whole}`
-  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const agent = core.state.tabs.find(t => t.id === fromTab(p.from))?.name ?? 'An agent'
   const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text, ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text, ws: by, tab: fromTab(p.from) })
   if (how !== 'once') throw new Error(`${what} the profile ${name}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 // S2: an agent's laki rm (a workspace, a project, a scheduled task): the user says yes in the app first, what goes with
 // it shown; once only. A worker it started itself (laki new from its tab) it may delete unasked, as it may write to it
-async function rmAsk(p: any, what: string, text: string, cross: 'remove' | 'expose' = 'remove') {
+async function rmAsk(p: Params, what: string, text: string, cross: 'remove' | 'expose' = 'remove') {
   const by = core.agentCaller(p.from)
   if (!by) return
   if (!core.clients.size) throw new Error(`to ${what.replace(/\?$/, '')} the user says yes in Laki's window, and it isn't open: ask them to do it`)
-  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const agent = core.state.tabs.find(t => t.id === fromTab(p.from))?.name ?? 'An agent'
   const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross, agent, from: ws, to: '', target: what, text, ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross, agent, from: ws, to: '', target: what, text, ws: by, tab: fromTab(p.from) })
   if (how !== 'once') throw new Error(`${what}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 // S7: an agent's Expose to the world: the project's `expose` (who gets in) is the rule when it has one (remote.ts holds
 // every caller to it); without one, the user says yes in the app first, who and how long shown; once only
-async function exposeAsk(p: any) {
+async function exposeAsk(p: Params) {
   const by = core.agentCaller(p.from)
   if (!by) return
   const ws = core.findWs(String(p.ws ?? ''))
@@ -1481,7 +1485,7 @@ async function renameAsk(p: any) {
   await rmAsk(p, `rename the workspace ${w.name ?? w.id} to ${String(q.name).trim().slice(0, 80)}`, 'You named it, so its name stays unless you say so.')
   return { ...q, asked: true }
 }
-async function wsRmAsk(p: any) {
+async function wsRmAsk(p: Params) {
   const by = core.agentCaller(p.from)
   if (!by) return
   const ws = core.findWs(String(p.id ?? ''))
@@ -1490,7 +1494,7 @@ async function wsRmAsk(p: any) {
   const lost = [n.dirty ? `${n.dirty} uncommitted file${n.dirty === 1 ? '' : 's'}` : '', n.unpushed ? `${n.unpushed} commit${n.unpushed === 1 ? '' : 's'} on no remote` : ''].filter(Boolean).join(', ')
   await rmAsk(p, `delete the workspace ${ws.name ?? ws.id}`, `Its folder and its tabs go${ws.id === by ? ' (its own: the agent ends with it)' : ''}.${lost ? ` With it: ${lost}.` : ''}`)
 }
-async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string | null = p.target, text = p.text) {
+async function crossAsk(p: Params, kind: 'send' | 'screen' | 'emit', target: unknown = p.target, text: unknown = p.text) {
   const by = core.agentCaller(p.from)
   if (!by) return
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
@@ -1500,9 +1504,9 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
   if (!to || to === by || (kind !== 'emit' && core.state.workspaces.find(w => w.id === to)?.from === by) || crossOk.has(`${kind}:${by}>${to}`)) return
   const what = tab ? tab.name : kind === 'emit' ? `custom.${String(p.name ?? '').replace(/^custom\./, '')}` : 'a new agent tab'
   if (!core.clients.size) throw new Error(`${name(to)} is another workspace: the user allows that in Laki's window, and it isn't open`)
-  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const agent = core.state.tabs.find(t => t.id === fromTab(p.from))?.name ?? 'An agent'
   const said = kind === 'send' ? String(text ?? '') : kind === 'emit' ? JSON.stringify(p.data ?? {}) : undefined
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said && said.length > 2000 ? `${said.slice(0, 2000)}\n… and ${said.length - 2000} more characters` : said, ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said && said.length > 2000 ? `${said.slice(0, 2000)}\n… and ${said.length - 2000} more characters` : said, ws: by, tab: fromTab(p.from) })
   if (how === 'always') crossOk.add(`${kind}:${by}>${to}`)
   else if (how !== 'once') throw new Error(`${tab ? `${tab.name} is in ${name(to)}` : `${what} is for ${name(to)}`}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
@@ -1515,7 +1519,7 @@ const CMD_ASK = 2000
 const BLANK = /\n[ \t]*\n/
 const CMD_ROWS = 20
 const rowsOf = (cmd: string) => cmd.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 50)), 0)
-async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
+async function cmdAsk(from: Params, by: string, ws: string, cmd: string) {
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
   const to = ws
   if (HIDDEN.test(cmd)) throw new Error("the command has characters the user couldn't see (a control, direction or zero-width one): ask them to run it, or put it in a script") // you allow what you read
@@ -1533,7 +1537,7 @@ async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
 // the Done check), run the tool gates on input it chose and fire tool.call. A hook is looked up only without its key
 // (whoCalls never does: one per tool call). ponytail: the key is in the agent's env, which a process of yours can
 // read; per-tab users are the real fix
-async function hookWho(sock: Socket, p: any, known?: Tab, app = false) {
+async function hookWho(sock: Socket, p: Params, known?: Tab, app = false) {
   if (p.key !== undefined) {
     if (core.hookOk(String(p.tab ?? ''), p.key)) return
     throw new Error("not this tab's start: a tab's state comes from its own agent")
@@ -1567,7 +1571,7 @@ const tabWords = (id: unknown) => {
   }
 }
 const keysSaid = new Map<string, number>() // 'input': the last line per tab
-function remoteLine(method: string, p: any): string | undefined {
+function remoteLine(method: string, p: Params): string | undefined {
   if (method === 'send') return `to ${tabWords(p.target)}: "${clip80(p.text)}"`
   if (method === 'answer') return `answered ${tabWords(p.tab)}: ${clip80(p.label ?? p.pick ?? p.n ?? (p.text !== undefined ? 'its own words' : ''))}`
   if (method === 'secretGive') return `gave ${tabWords(p.tab ?? p.id)} the secret it asked for`
