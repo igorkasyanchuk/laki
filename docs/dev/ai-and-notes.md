@@ -228,6 +228,10 @@ first JSON object's `questions`: at most 3 (`ASK_FIRST`), each `q` 140 character
 ANSWER_NO, REMOTE_OK); agents and trusted clients refused (AGENT_NO; CLIENT_SCOPE has no class for it). The page's picks
 go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* adds none.
 
+Walk through (`reviewSteps { ws, uncommitted?, again?, kept? }`, ai.ts, R13): the Review tab's steps by one `aiOnce`
+(`ask: 'Walk through'`), the user's and remote access's at the answer level, never an agent's (gates.ts `AGENT_NO`: it
+spends the user's Laki AI) nor a trusted client's (no scope has it); `docs/dev/renderer.md` has the rest.
+
 Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on its card (Diff.tsx `useExplain`: the ask
 bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when
 App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or agy menu names no tool); an Edit

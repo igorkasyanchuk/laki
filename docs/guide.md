@@ -598,6 +598,11 @@ selected workspace's PR is in the status bar.
   last change (into the next or last file at a file's end), v Viewed, b blame, p pin, c a comment on the line under the
   mouse, ⌘⏎ sends to the agent. *Unviewed n / m* over the files shows only the ones not viewed yet (with the filter
   too): one you mark viewed leaves and the next takes its place; with all viewed, the bar names the next workspace.
+  *Walk through* (Laki AI on: Settings › AI) puts the changes in 3 to 7 steps to read in order, each with a title and
+  why it comes there, marking what to read with care (a migration, auth, a lockfile, deletes); what no step names is
+  in a last *Everything else*. The files column shows the steps (*Files | Steps* goes back): click one to see only its
+  changes, tick its *Viewed* and its files are viewed once all their changes are in viewed steps. Kept until the
+  changes do; *Again* asks anew. It reads the branch's changes (or *Uncommitted*), not *PR #n*'s, and only on your click.
   Kept on this Mac. It reads the diff again as the workspace's files change, keeping your place and comments.
   The files show as a tree by folder unless you pick the list (the List | Tree switch over them, remembered): each
   folder folds with a click, says how many of its files are viewed and has a *Viewed* box for all of them; its right

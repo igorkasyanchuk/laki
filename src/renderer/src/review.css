@@ -25,3 +25,15 @@
 html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-soft) var(--spring-soft); }
 .fr-only { flex: none; } /* the files column's Unviewed n / m toggle */
 .fr-only button { font-family: var(--ui-font, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* R13: Walk through: its button, the files column's Files | Steps and the steps, the bar over a picked step's changes */
+.fr-walk-btn { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; }
+.fr-walk-btn.on { color: var(--accent); }
+.fr-walk-btn[aria-disabled], .fr-steps .link[aria-disabled] { opacity: 0.5; cursor: default; }
+.fr-walk-seg { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) 0 var(--sp-4); }
+.fr-step { align-items: flex-start; white-space: normal; padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+.fr-step-n { flex: none; min-width: 2ch; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fr-step-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.fr-step-title { font-weight: 600; }
+.fr-step.fr-done .fr-step-text { opacity: 0.55; }
+.fr-risk { flex: none; color: var(--waiting); }
+.fr-step-bar { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--muted); }

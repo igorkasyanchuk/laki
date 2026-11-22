@@ -1130,6 +1130,22 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 `onTight` has App hide the side panel while the Review tab shows (`reviewTight`, back as you leave the tab); under
 `HEAD_MIN` (720px) the head's count is `+a −d` without its "n files".
 
+Walk through (R13): the Review tab head's *Walk through* (ReviewApi's `walk`, App's `reviewApi`: the daemon's
+`reviewSteps`, `review.steps` cap; `walkOff`: Laki AI is off, the button says so; on *PR #n* it says to pick Branch, the
+daemon's diff being the branch's or Uncommitted's). The daemon (ai.ts `reviewSteps`) reads the diff (files.ts `diff`),
+`shared/walk.ts` cuts what the model reads at `WALK_MAX` (200 KB, whole hunks: `walkInput`, `cut` said), one `aiOnce`
+(`ask: 'Walk through'`, json; `WALK_SYSTEM`: 3 to 7 steps, every hunk once, `risky` on a migration, auth, a lockfile or
+deletes; the diff as data), its answer read strictly (`walkCheck`: anything off, refused), then `walkFold` puts every
+hunk of the whole diff in exactly one step (a hunk named twice: its first; one the diff hasn't: out; the missed: a last
+*Everything else*, `rest`), `riskOf` flagging what the model didn't. A hunk is its file and the new side's first line
+its @@ head names (`hunkKey`; 0: a deleted file's, or a file with none). Kept by the diff's hash in the storage folder's
+`.laki-walk.json` (the last 8) and in memory; `kept: true` (the tab opening, the diff changing) reads only that, no
+call; `again` (*Again*) asks anew. The files column then shows the steps (*Files | Steps*; `laki.reviewWalkSeen`: each
+workspace's walk hash and the steps viewed): a step's click shows only its files and, in each, only its hunks (`inStep`:
+the lines of the hunks it names, the hunks' indices kept for Revert and the expander), a bar over the diff says which;
+a step's *Viewed* marks its files viewed (the files' `mark`, so GitHub's for a PR's) once every step with a hunk of
+theirs is, and unticked unmarks them. `stale`: the diff's hunks aren't the walk's any more (a note, *Again*).
+
 The type scale (B1): `--fs-1`…`--fs-5` (11, 12, 13, 15, 20px: counts and kbd, secondary, body, panel titles, page
 titles) in styles.css `:root`; every `font-size` in px is one of them, but under 10px (badges) and over 22px (display
 numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). Motion (B5, V7): `--t-fast`, `--t-mid`

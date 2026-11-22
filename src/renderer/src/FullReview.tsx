@@ -15,6 +15,7 @@
 // first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
+import { hunkKey, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
 import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
@@ -37,6 +38,8 @@ export type ReviewApi = PanelApi & {
   notesGet: () => Promise<{ notes: ReviewNote[]; at?: number }> // R10: the daemon's copy of the unsent comments (at: none, never set there)
   notesSet: (notes: ReviewNote[]) => Promise<unknown>
   mark: () => Promise<unknown> // R11: Since I reviewed starts here (reviewMark)
+  walk?: (uncommitted: boolean, o?: { again?: boolean; kept?: boolean }) => Promise<Walk | null> // R13: reviewSteps (none: an older daemon)
+  walkOff?: string // why Walk through can't ask (Laki AI is off)
 }
 
 const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet: a cache of the daemon's (R10: reviewNotesGet), drawn at once
@@ -50,6 +53,7 @@ const UNVIEWED = 'laki.reviewUnviewed' // true: only the files not viewed yet
 const FILES_OFF = 'laki.reviewFilesOff' // true: the files hidden to a strip, likewise
 const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
 const PINS = 'laki.reviewPins' // each workspace's pinned files, in the order pinned
+const WALK_SEEN = 'laki.reviewWalkSeen' // each workspace's Walk through: its hash and the steps viewed
 const FILES_INIT = 220
 const NOTES_INIT = 300
 const STRIP = 28 // a hidden column's strip: the files', the comments'
@@ -170,6 +174,67 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const nViewed = files.filter(f => viewed(f.path)).length
   const listedViewed = listed.length > 0 && listed.every(f => viewed(f.path))
   const inFolder = (dir: string) => files.filter(f => f.path.startsWith(`${dir}/`)).map(f => f.path)
+
+  // R13: Walk through: the diff in steps by Laki AI (the daemon's reviewSteps, kept by the diff's hash: read back as the
+  // tab opens or the diff changes, with no call). The files column shows the steps (Files | Steps goes back); a picked
+  // step shows only its changes; a step viewed marks its files viewed once every step with a change of theirs is
+  const [walk, setWalk] = useState<Walk | null>(null)
+  const [walking, setWalking] = useState(false)
+  const [walkErr, setWalkErr] = useState('')
+  const [stepsOn, setStepsOn] = useState(true)
+  const [step, setStep] = useState<number | null>(null)
+  const [seenSteps, setSeenSteps] = useState<number[]>([])
+  const walkOk = !!wsApi.walk && !all
+  const walkWhy = all ? "Walk through reads the branch's changes: pick Branch" : wsApi.walkOff
+  const walkSet = (w: Walk) => {
+    setWalk(w)
+    setStep(null)
+    setStepsOn(true)
+    setSeenSteps((x => (x?.hash === w.hash ? x.seen : []))(readAll<{ hash: string; seen: number[] }>(WALK_SEEN)[ws]))
+  }
+  const walkAsk = (again = false) => {
+    setWalking(true)
+    setWalkErr('')
+    wsApi.walk!(unc, { again }).then(
+      w => (w && walkSet(w), setWalking(false)),
+      e => (setWalkErr((e as Error).message), setWalking(false)),
+    )
+  }
+  // the diff's changes as the walk names them (a file with none: start 0); one not in the walk, or gone: it's stale
+  const nowKeys = useMemo(() => new Set([...byFile].flatMap(([p, fd]) => (fd.hunks.length ? fd.hunks.map(h => hunkKey({ file: p, start: startOf(h) })) : [hunkKey({ file: p, start: 0 })]))), [byFile])
+  const walkKeys = walk?.steps.flatMap(x => x.hunks.map(hunkKey)) ?? []
+  const stale = !!walk && !!d && (walkKeys.length !== nowKeys.size || walkKeys.some(k => !nowKeys.has(k)))
+  useEffect(() => setWalk(null), [scope]) // another scope's changes: none until its kept one is read
+  useEffect(() => {
+    if (!walkOk) return void setWalk(null)
+    let on = true
+    wsApi.walk!(unc, { kept: true }).then(w => on && w && walkSet(w), () => {})
+    return () => void (on = false)
+  }, [scope, walkOk, stale ? hash(d?.diff ?? '') : ''])
+  const picked = walk && step !== null ? walk.steps[step] : undefined
+  const stepFiles = picked ? [...new Set(picked.hunks.map(h => h.file))].flatMap(p => files.filter(f => f.path === p)) : []
+  // a file's lines in the picked step: only its changes there (the hunks' indices kept: Revert's and the expander's)
+  const inStep = (path: string, fd: FileDiff): FileDiff => {
+    if (!picked) return fd
+    const want = new Set(picked.hunks.filter(h => h.file === path).map(h => h.start))
+    const keep = new Set(fd.hunks.flatMap((h, i) => (want.has(startOf(h)) ? [i] : [])))
+    return keep.size ? { ...fd, lines: fd.lines.filter(l => l.hunk === undefined || keep.has(l.hunk)) } : fd
+  }
+  const pickStep = (i: number | null) => {
+    setStep(i)
+    if (i === null || !walk) return
+    setShown([...new Set(walk.steps[i].hunks.map(h => h.file))], true)
+    requestAnimationFrame(() => body.current?.scrollTo({ top: 0 }))
+  }
+  const seeStep = (i: number, on: boolean) => {
+    if (!walk) return
+    const next = on ? [...new Set([...seenSteps, i])] : seenSteps.filter(x => x !== i)
+    setSeenSteps(next)
+    keepFor(WALK_SEEN, ws, { hash: walk.hash, seen: next })
+    const mine = [...new Set(walk.steps[i].hunks.map(h => h.file))].filter(p => files.some(f => f.path === p))
+    const ps = on ? mine.filter(p => !viewed(p) && walk.steps.every((x, j) => next.includes(j) || !x.hunks.some(h => h.file === p))) : mine.filter(viewed)
+    if (ps.length) mark(ps, on)
+  }
 
   // the PR's review threads, everyone's: the open ones at their lines (the PR's side as the diff has it), all of them in
   // the comments' GitHub list; and its conversation
@@ -540,6 +605,11 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             </>
           ) : err ? '' : 'Loading…'}
         </span>
+        {wsApi.walk && files.length > 0 && (
+          <button type="button" className={`ghost fr-walk-btn ${walk && stepsOn && !filesOff ? 'on' : ''}`} aria-disabled={walking || (!walk && !!walkWhy) || undefined} data-tip={walking ? 'Laki AI reads the changes' : walk ? 'The steps Laki AI put the changes in' : (walkWhy ?? 'Laki AI puts the changes in 3 to 7 steps to read in order')} onClick={() => (walking || (!walk && walkWhy) ? undefined : walk ? (setStepsOn(true), hideFiles(false)) : walkAsk())}>
+            <Icon name="map" size={12} /> {walking ? 'Reading…' : 'Walk through'}
+          </button>
+        )}
         {/* U2: the keys in a popover, each with what it does: no bare legend */}
         <button type="button" className="ghost fr-keys-btn" aria-haspopup="menu" onClick={e => openMenu(e, [{ head: 'Keys in the review' }, ...REVIEW_KEYS.map(([k, what]) => ({ label: what, hint: k, run: () => {} }))])}>
           Keys
@@ -564,6 +634,59 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         ) : (
         <div className="fr-files">
           <ScrollEdge />
+          {walk && walkOk && (
+            <div className="fr-walk-seg">
+              <span className="seg">
+                <button type="button" className={stepsOn ? '' : 'on'} aria-pressed={!stepsOn} onClick={() => (setStepsOn(false), setStep(null))}>
+                  Files
+                </button>
+                <button type="button" className={stepsOn ? 'on' : ''} aria-pressed={stepsOn} onClick={() => setStepsOn(true)}>
+                  Steps
+                </button>
+              </span>
+              <span className="grow" />
+              <IconButton icon="chevronsLeft" title="Hide the steps" onClick={() => hideFiles(true)} />
+            </div>
+          )}
+          {walk && walkOk && stepsOn ? (
+            <div className="fr-steps">
+              <div className="fr-viewed muted small">
+                <span className="grow">
+                  {seenSteps.length} of {walk.steps.length} steps viewed
+                </span>
+                <button type="button" className="link small" onClick={() => !walking && !walkWhy && walkAsk(true)} aria-disabled={walking || !!walkWhy || undefined} data-tip={walkWhy ?? 'Laki AI puts the changes in steps again'}>
+                  {walking ? 'Reading…' : 'Again'}
+                </button>
+              </div>
+              {stale && <div className="warn small pad">The changes moved since these steps: a step may miss some, or name ones gone. Again asks anew.</div>}
+              {walk.cut && <div className="muted small pad">Over 200 KB: Laki AI read the first part, the rest is under {walk.steps.at(-1)?.title}.</div>}
+              {walk.steps.map((x, i) => {
+                const risky = [...new Set(x.hunks.flatMap(h => (h.risky ? [h.risky] : [])))]
+                const n = new Set(x.hunks.map(h => h.file)).size
+                return (
+                  <div key={i} className={`sp-row fr-step ${step === i ? 'sel' : ''} ${seenSteps.includes(i) ? 'fr-done' : ''}`} {...act(() => pickStep(step === i ? null : i))} data-tip={step === i ? 'Click: every change again' : undefined}>
+                    <span className="fr-step-n">{x.rest ? '…' : i + 1}</span>
+                    <span className="fr-step-text">
+                      <span className="fr-step-title">{x.title}</span>
+                      {x.why && <span className="muted small">{x.why}</span>}
+                      <span className="muted small">
+                        {x.hunks.length} change{x.hunks.length === 1 ? '' : 's'} in {n} file{n === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                    {risky.length > 0 && (
+                      <span className="fr-risk" role="img" aria-label={`Read with care: ${risky.join(', ')}`} data-tip={`Read with care: ${risky.join(', ')}`}>
+                        <Icon name="alertCircle" size={12} />
+                      </span>
+                    )}
+                    <label className="sp-viewed" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={seenSteps.includes(i)} onChange={e => seeStep(i, e.target.checked)} aria-label={`${x.title}: viewed`} />
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+          <>
           <div className="fr-filter">
             <Icon name="filter" />
             <input
@@ -626,6 +749,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             : listed.map(f => fileRow(f))}
           {query && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
           {only && !query && files.length > 0 && !listed.length && <div className="muted small pad">Every file viewed.</div>}
+          </>
+          )}
         </div>
         )}
         {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
@@ -633,9 +758,21 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           <DiffFind at={root} within={body} unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)} />
           {err && <div className="warn small pad">{err}</div>}
           {gh.err && <div className="warn small pad">{gh.err}</div>}
+          {walkErr && <div className="warn small pad">Walk through: {walkErr}</div>}
+          {picked && (
+            <div className="fr-step-bar small">
+              <Icon name="map" size={12} />
+              <span className="grow">
+                Step {picked.rest ? '' : `${step! + 1} `}of {walk!.steps.length}: {picked.title}
+              </span>
+              <button type="button" className="link small" onClick={() => pickStep(null)}>
+                Every change
+              </button>
+            </div>
+          )}
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
-          {listed.map(f => {
-            const fd = byFile.get(f.path) ?? NO_DIFF
+          {(picked ? stepFiles : listed).map(f => {
+            const fd = inStep(f.path, byFile.get(f.path) ?? NO_DIFF)
             const fdx = xp.expanded(f.path, fd)
             const tail = xp.expander(f.path, fd, 'down')
             const box = boxFor(f.path)

@@ -6,30 +6,8 @@ import { basename, join } from 'node:path'
 import { test } from 'node:test'
 import { aiRpc, findSessions, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
 import { aiTotals } from '../src/shared/types.ts'
-import { connect, fixtureWidgets, fresh, seen, sleep, until } from './helpers.ts'
+import { connect, fixtureWidgets, fresh, openrouter, reply, seen, sleep, until } from './helpers.ts'
 
-// a fake OpenRouter: each request to `answers`' next, recorded
-async function openrouter(t: { after: (f: () => void) => void }, answers: object[]) {
-  const hits: { auth?: string; title?: string; url?: string; body: any }[] = []
-  const srv = createServer(async (q, r) => {
-    let body = ''
-    for await (const c of q) body += c
-    hits.push({ auth: q.headers.authorization, title: q.headers['x-title'] as string | undefined, url: q.url, body: JSON.parse(body) })
-    const a = answers[hits.length - 1] ?? { error: { message: 'no more answers' } }
-    if ('slow' in a) return // never answers: a stop ends it
-    if ('sse' in a) {
-      // A7: a streamed answer, a chunk at a time (gap ms apart), after a keep-alive comment
-      r.writeHead(200, { 'content-type': 'text/event-stream' }).write(': OPENROUTER PROCESSING\n\n')
-      for (const c of a.sse as object[]) await new Promise(ok => setTimeout(ok, Number((a as any).gap ?? 120))), r.write(`data: ${JSON.stringify(c)}\n\n`)
-      return void r.end('data: [DONE]\n\n')
-    }
-    r.writeHead('status' in a ? Number(a.status) : 'error' in a ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify(a))
-  })
-  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
-  t.after(() => (srv.closeAllConnections(), srv.close()))
-  return { hits, answers, url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } // answers: a test adds to it as it goes
-}
-const reply = (message: object, usage = { prompt_tokens: 100, completion_tokens: 10, cost: 0.002 }) => ({ model: 'anthropic/claude-sonnet-5.5', choices: [{ message }], usage })
 
 test("ai: Your endpoint: the same tool loop at its own URL with its own key, none of OpenRouter's parts, not priced; https or this Mac's http; the key never in the view", async t => {
   const own = await openrouter(t, [

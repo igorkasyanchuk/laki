@@ -10,6 +10,7 @@ import { Outbox } from './OutboxStrip'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeyReady, passkeys, passkeySetUp, passkeyUnlock } from './api'
 import { setSecretHint } from './secretHint'
 import { viewShare } from './viewShare'
+import type { Walk } from '../../shared/walk'
 import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -2205,6 +2206,7 @@ export function App() {
     notesGet: () => api.call('reviewNotesGet', { ws: w.id }),
     notesSet: notes => api.call('reviewNotesSet', { ws: w.id, notes }),
     mark: () => api.call('reviewMark', { ws: w.id }),
+    ...(hasCap(view, 'review.steps') && { walk: (uncommitted: boolean, o?: { again?: boolean; kept?: boolean }) => api.call<Walk | null>('reviewSteps', { ws: w.id, uncommitted, ...o }), walkOff: aiOn(settings) ? undefined : 'Laki AI is off: Settings › AI' }), // R13: Walk through
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
