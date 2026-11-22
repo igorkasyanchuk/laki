@@ -5,9 +5,9 @@ import { speakable } from '../../shared/speak'
 import type { Call } from '../../shared/api'
 import { Terminals, TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
-import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS } from '../../shared/settingsMap'
+import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
-import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { CURSOR, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
@@ -341,12 +341,6 @@ const WHEN_DONE_SAYS: readonly (readonly [WhenDone, string])[] = [
   ['shutdown', 'Shut down'],
 ]
 
-const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
-  ['waiting', 'Waiting for you', 'A permission prompt, or CI that keeps failing'],
-  ['done', 'Finished', 'The end of a turn, with its last words'],
-  ['limit', 'Usage limit', 'An agent hit its plan limit'],
-  ['usage', 'Plan limit nearly used', "Claude's or Codex's 5-hour or weekly limit reaching the share below, once a reset, while Laki is open"],
-]
 const SOUNDS = ['Basso', 'Blow', 'Bottle', 'Frog', 'Funk', 'Glass', 'Hero', 'Morse', 'Ping', 'Pop', 'Purr', 'Sosumi', 'Submarine', 'Tink']
 
 // General › Storage › Delete files after: days (0: never)
@@ -1042,7 +1036,7 @@ export function SettingsPage(p: {
   // one with projects on All; a link to a section, or Find a setting, goes to All
   const [view, setView] = useState<'basic' | 'all'>(() => (p.section || p.spot ? 'all' : load<'basic' | 'all' | null>('laki.settingsView', null) ?? (p.projects?.length ? 'all' : 'basic')))
   useEffect(() => keep('laki.settingsView', view), [view])
-  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || (view === 'basic' && BASIC.some(y => y.id === x)) || p.projects?.some(y => `project:${y.id}` === x) ? x : view === 'basic' ? BASIC[0].id : 'general'))(p.section ?? load('laki.settingsSec', 'general'))) // a Basic head only in Basic (a link's spot opens All)
+  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || (view === 'basic' && BASIC.some(y => y.id === x)) || p.projects?.some(y => `project:${y.id}` === x) ? x : view === 'basic' ? BASIC[0].id : 'general'))((p.section && p.spot ? spotSection(p.section, p.spot) : p.section) ?? load('laki.settingsSec', 'general'))) // spotSection: an old link to a setting that moved // a Basic head only in Basic (a link's spot opens All)
   const basic = view === 'basic' ? (BASIC.find(b => b.id === sec) ?? BASIC[0]) : undefined
   // a section's cards on: its own, or a Basic head's (only the cards it names: Shown)
   const on = (id: string) => (basic ? basic.cards.some(c => c[0] === id) : sec === id)
@@ -1682,98 +1676,11 @@ export function SettingsPage(p: {
                   </Switch>
                 </Group>
               )}
-              <Group title="Notifications" hint="Phone pushes are in their own section">
+              <Group title="Turns">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
-                  <Says title="macOS notifications" hint="When an agent off screen waits or finishes, or CI keeps failing. A workspace's or tab's menu mutes just it." />
-                </Switch>
-                {s.notify !== false && (
-                  <>
-                    {NOTIFY_KINDS.map(([k, title, hint]) => (
-                      <Switch key={k} className="switch-row sub" on={s.notifyOn?.[k] !== false} onChange={v => set({ notifyOn: { ...s.notifyOn, [k]: v } })}>
-                        <Says title={title} hint={hint} />
-                      </Switch>
-                    ))}
-                    {s.notifyOn?.usage !== false && (
-                      <label className="switch-row sub">
-                        <select value={s.usageAt ?? USAGE_AT} onChange={e => set({ usageAt: Number(e.target.value) })}>
-                          {[75, 90, 95].map(x => (
-                            <option key={x} value={x}>
-                              {x}%
-                            </option>
-                          ))}
-                        </select>
-                        <Says title="Plan limit at" hint="How much of a limit is used when it tells you" />
-                      </label>
-                    )}
-                    <label className="switch-row sub">
-                      <select value={s.notifySound ?? ''} onChange={e => set({ notifySound: e.target.value })}>
-                        <option value="">Default</option>
-                        <option value="none">None</option>
-                        {SOUNDS.map(x => (
-                          <option key={x}>{x}</option>
-                        ))}
-                      </select>
-                      <Says title="Sound" hint="macOS's sounds, as in System Settings › Sound" />
-                    </label>
-                  </>
-                )}
-                <Switch className="switch-row" on={s.edgeGlow === true} onChange={v => set({ edgeGlow: v })}>
-                  <Says title="Glow the window's edge when an agent waits" hint="While an agent in another tab waits for you and Laki is in use. A thin line instead with reduced motion; none in a flat look or on a phone." />
-                </Switch>
-                {bridge?.bounce && (
-                  <Switch className="switch-row" on={s.dockBounce !== false} onChange={v => set({ dockBounce: v })}>
-                    <Says title="Bounce the Dock icon" hint="Once, when a workspace starts waiting on you and Laki isn't in front. Not for a muted workspace, nor while quiet unless it's important." />
-                  </Switch>
-                )}
-                {p.quiet && (
-                  <label className="switch-row">
-                    <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <select aria-label="Quiet for" value={s.quietMinutes ?? 60} onChange={e => set({ quietMinutes: Number(e.target.value) })}>
-                        {QUIET_FOR.map(([m, t]) => (
-                          <option key={m} value={m}>{t}</option>
-                        ))}
-                      </select>
-                      {p.quiet.until ? <button type="button" onClick={() => p.quiet!.set({ off: true })}>End now</button> : <button type="button" onClick={() => p.quiet!.set({ minutes: s.quietMinutes ?? 60 })}>Start</button>}
-                    </span>
-                    <Says title={p.quiet.until ? `Quiet until ${hhmm(p.quiet.until)}` : 'Quiet'} hint="No notifications, sounds, cards or phone pushes for a while. Asks still show in Needs you, and laki alert still shows. As it ends, one summary of what happened. Also in the menu bar's menu, ⌘K and laki quiet." />
-                  </label>
-                )}
-                <label className="switch-row">
-                  <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {longOwn && <input type="number" min={1} style={{ width: 70 }} aria-label="Minutes" value={s.longTurn} onChange={e => set({ longTurn: Math.max(1, Number(e.target.value) || 1) })} />}
-                    <select value={longOwn ? -1 : (s.longTurn ?? 0)} onChange={e => (v => (setLongTyped(v < 0), set({ longTurn: v < 0 ? s.longTurn || 90 : v })))(Number(e.target.value))}>
-                      {LONG_TURN.map(([m, t]) => (
-                        <option key={m} value={m}>{t}</option>
-                      ))}
-                      <option value={-1}>Custom (minutes)</option>
-                    </select>
-                  </span>
-                  <Says title="Tell me when a turn runs longer than" hint="Once per turn, also on your phone if pushes are on. Time waiting on you or on a plan limit doesn't count." />
-                </label>
                 <Switch className="switch-row" on={!!s.continueOnError} onChange={v => set({ continueOnError: v })}>
                   <Says title="Continue after an API error by itself" hint="A turn that ended overloaded, on a 500 or a dropped connection gets one continue a minute later. Never after your Esc, a refused model or a plan limit." />
                 </Switch>
-              </div>
-              </Group>
-              <Group title="Timers" hint="As a timer in the sidebar ends">
-              <div className="setting-box">
-                <label className="switch-row">
-                  <select value={s.timerAlert ?? 'dialog'} onChange={e => set({ timerAlert: e.target.value as 'dialog' | 'notification' })}>
-                    <option value="dialog">A dialog</option>
-                    <option value="notification">A notification</option>
-                  </select>
-                  <Says title="Show" hint="A dialog in Laki stays until you close it (Again starts the timer over); a notification is macOS's" />
-                </label>
-                <label className="switch-row">
-                  <select value={s.timerSound ?? 'Glass'} onChange={e => (set({ timerSound: e.target.value }), e.target.value !== 'none' && bridge?.sound?.(e.target.value))}>
-                    <option value="none">None</option>
-                    {SOUNDS.map(x => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                  <Says title="Sound" hint="Played as it ends, whatever the notifications' settings; picking one plays it" />
-                </label>
               </div>
               </Group>
               <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the side panel's Info opens it">
@@ -1927,6 +1834,132 @@ export function SettingsPage(p: {
                   </button>
                 </div>
                 </div>
+              </Group>
+            </>
+          )}
+          {on('notifications') && (
+            <>
+              <h2>Notifications</h2>
+              <Group title="Notifications" hint="Where each thing tells you. Phone pushes are set up in their own section">
+              <div className="setting-box">
+                {p.quiet && (
+                  <label className="switch-row">
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select aria-label="Quiet for" value={s.quietMinutes ?? 60} onChange={e => set({ quietMinutes: Number(e.target.value) })}>
+                        {QUIET_FOR.map(([m, t]) => (
+                          <option key={m} value={m}>{t}</option>
+                        ))}
+                      </select>
+                      {p.quiet.until ? <button type="button" onClick={() => p.quiet!.set({ off: true })}>End now</button> : <button type="button" onClick={() => p.quiet!.set({ minutes: s.quietMinutes ?? 60 })}>Start</button>}
+                    </span>
+                    <Says title={p.quiet.until ? `Quiet until ${hhmm(p.quiet.until)}` : 'Quiet'} hint="No notifications, sounds, cards or phone pushes for a while. Asks still show in Needs you, and laki alert still shows. As it ends, one summary of what happened. Also in the menu bar's menu, ⌘K and laki quiet." />
+                  </label>
+                )}
+                <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
+                  <Says title="macOS notifications" hint="When an agent off screen waits or finishes, or CI keeps failing. A workspace's or tab's menu mutes just it." />
+                </Switch>
+                <label className="switch-row">
+                  <select value={s.notifySound ?? ''} disabled={s.notify === false} onChange={e => set({ notifySound: e.target.value })}>
+                    <option value="">Default</option>
+                    <option value="none">None</option>
+                    {SOUNDS.map(x => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                  <Says title="Sound" hint="macOS notifications' sound, as in System Settings › Sound" />
+                </label>
+              </div>
+              {(() => {
+                // the per-event switches as a table: a row per event, a column per place; a cell only where a setting is
+                const mac = s.notify !== false
+                const push = !!(s.webhook?.url || s.webhook?.format === 'webpush')
+                const kind = (k: NotifyKind, what: string) => <Switch on={s.notifyOn?.[k] !== false} disabled={!mac} tip={`${what}: macOS`} onChange={v => set({ notifyOn: { ...s.notifyOn, [k]: v } })} />
+                const phone = (k: 'waiting' | 'done', on: boolean, what: string) => <Switch on={on} disabled={!push} tip={push ? `${what}: Phone` : 'Set up Phone pushes first'} onChange={v => set({ webhook: { ...s.webhook, [k]: v } })} />
+                const rows: [ReactNode, ReactNode?, ReactNode?, ReactNode?, ReactNode?][] = [
+                  ['An agent waits for you', kind('waiting', 'An agent waits for you'), undefined, phone('waiting', s.webhook?.waiting !== false, 'An agent waits for you')],
+                  ['A turn finished', kind('done', 'A turn finished'), undefined, phone('done', s.webhook?.done === true, 'A turn finished')],
+                  [<span data-tip="The same switch as An agent waits for you">CI keeps failing</span>, kind('waiting', 'CI keeps failing')],
+                  ['A plan limit is hit', kind('limit', 'A plan limit is hit')],
+                  [
+                    <span className="nt-when">
+                      A plan limit is
+                      <select aria-label="Plan limit at" value={s.usageAt ?? USAGE_AT} onChange={e => set({ usageAt: Number(e.target.value) })}>
+                        {[75, 90, 95].map(x => (
+                          <option key={x} value={x}>{x}%</option>
+                        ))}
+                      </select>
+                      used
+                    </span>,
+                    kind('usage', 'A plan limit is nearly used'),
+                  ],
+                  [
+                    <span className="nt-when">
+                      A turn runs longer than
+                      {longOwn && <input type="number" min={1} style={{ width: 70 }} aria-label="Minutes" value={s.longTurn} onChange={e => set({ longTurn: Math.max(1, Number(e.target.value) || 1) })} />}
+                      <select aria-label="Tell me when a turn runs longer than" value={longOwn ? -1 : (s.longTurn ?? 0)} onChange={e => (v => (setLongTyped(v < 0), set({ longTurn: v < 0 ? s.longTurn || 90 : v })))(Number(e.target.value))}>
+                        {LONG_TURN.map(([m, t]) => (
+                          <option key={m} value={m}>{t}</option>
+                        ))}
+                        <option value={-1}>Custom (minutes)</option>
+                      </select>
+                    </span>,
+                  ],
+                  [
+                    'A timer ended',
+                    <Switch on={s.timerAlert === 'notification'} tip="A timer ended: macOS (off: Laki's own dialog, which stays until you close it)" onChange={v => set({ timerAlert: v ? 'notification' : 'dialog' })} />,
+                    undefined,
+                    undefined,
+                    <select aria-label="A timer ended: sound" value={s.timerSound ?? 'Glass'} onChange={e => (set({ timerSound: e.target.value }), e.target.value !== 'none' && bridge?.sound?.(e.target.value))}>
+                      <option value="none">None</option>
+                      {SOUNDS.map(x => (
+                        <option key={x}>{x}</option>
+                      ))}
+                    </select>,
+                  ],
+                ]
+                return (
+                  <div className="nt-wrap">
+                    <table className="nt-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">When</th>
+                          <th scope="col">macOS</th>
+                          <th scope="col">Card on screen</th>
+                          <th scope="col">
+                            {push ? 'Phone' : (
+                              <button type="button" className="link" onClick={() => openSec('webhook')} data-tip="Set up Phone pushes: then these switches work">
+                                Phone
+                              </button>
+                            )}
+                          </th>
+                          <th scope="col">Sound</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(([when, ...cells], i) => (
+                          <tr key={i}>
+                            <th scope="row">{when}</th>
+                            {[0, 1, 2, 3].map(j => (
+                              <td key={j}>{cells[j]}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
+              <p className="muted small">A turn running long tells you on macOS, and on your phone when pushes are on. Cards on screen are a workspace's: its ⋯ › Workspace › Important. A workspace's or tab's menu mutes just it.</p>
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.edgeGlow === true} onChange={v => set({ edgeGlow: v })}>
+                  <Says title="Glow the window's edge when an agent waits" hint="While an agent in another tab waits for you and Laki is in use. A thin line instead with reduced motion; none in a flat look or on a phone." />
+                </Switch>
+                {bridge?.bounce && (
+                  <Switch className="switch-row" on={s.dockBounce !== false} onChange={v => set({ dockBounce: v })}>
+                    <Says title="Bounce the Dock icon" hint="Once, when a workspace starts waiting on you and Laki isn't in front. Not for a muted workspace, nor while quiet unless it's important." />
+                  </Switch>
+                )}
+              </div>
               </Group>
             </>
           )}

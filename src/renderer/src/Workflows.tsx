@@ -2259,7 +2259,7 @@ function NotifyFields({ b, set, api, what }: { b: Block; set: (f: (x: Block) => 
       </Switch>
       <span className="wf-hint">
         {b.kind === 'end' ? 'A notification on this Mac with the workflow’s name, how the run ended and what it says (below); a click opens the run. A failed run always notifies. ' : 'A notification on this Mac with its title; a click opens the run. '}
-        Settings › General › macOS notifications turns them all off.
+        Settings › Notifications › macOS notifications turns them all off.
       </span>
       {b.notify && (
         <>

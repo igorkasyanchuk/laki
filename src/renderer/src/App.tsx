@@ -960,7 +960,7 @@ export function App() {
     else if (then === 'close') setVideo(null)
     else if (then === 'command') call('tabNew', { ws: t.ws, preset: 'custom', cmd: t.cmd }).catch(() => {}) // a tab of its own, not focused: it closes when the command succeeds
     const did = gone ? `: ${t.cmd} didn't run, its workspace is gone` : then === 'notify' ? '' : then === 'command' ? `: ran ${t.cmd}` : `: ${TIMER_THEN.find(x => x[0] === then)![1].toLowerCase()}`
-    // Settings › General › Timers: a sound and the app's dialog (Again starts the same one over), or a notification
+    // Settings › Notifications › A timer ended: a sound and the app's dialog (Again starts the same one over), or a notification
     const s = viewRef.current?.settings
     const sound = s?.timerSound || 'Glass'
     const up = t.note ? `${t.note} (${span(t.ms)} is up${did})` : `${span(t.ms)} is up${did}` // its message first: what it was for

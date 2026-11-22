@@ -2,3 +2,15 @@
 /* S18: Settings › General › Storage: the hosts the artifacts viewer's Always allow added */
 .art-hosts-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
 .art-hosts-list .chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 1px var(--sp-2) 1px var(--sp-4); border-radius: var(--r-pill); background: var(--sel); font-size: var(--fs-2); }
+/* Notifications: a row per event, a column per place it tells you; on a phone it scrolls sideways in its card */
+.nt-wrap { overflow-x: auto; margin: var(--sp-3) 0; border: 1px solid var(--line); border-radius: var(--r-m); }
+.nt-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--fs-2); }
+.nt-table th, .nt-table td { padding: var(--sp-3) var(--sp-4); text-align: center; vertical-align: middle; border-bottom: 1px solid var(--line); }
+.nt-table tr:last-child > * { border-bottom: none; }
+.nt-table thead th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.nt-table th[scope=row], .nt-table thead th:first-child { text-align: left; font-weight: 400; color: var(--fg); }
+.nt-table thead th:first-child { color: var(--muted); }
+.nt-table .toggle { justify-content: center; }
+.nt-when { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.nt-when :is(select, input) { width: auto; flex: none; } /* the form's full-width fields: here, in the row's words */
+.nt-table td select { width: auto; }

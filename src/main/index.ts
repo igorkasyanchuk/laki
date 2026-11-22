@@ -140,6 +140,8 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['settings-rows', null, () => js<boolean>(`[...document.querySelectorAll('.settings-nav > button')].every(b => b.scrollHeight <= b.clientHeight + 1)`)],
     // Terminal › Shell: the daemon's list came (the login shell first, Another path… last)
     ['settings-shell', link('laki://settings/terminal?spot=Shell'), () => js<boolean>(`[...document.querySelectorAll('.settings-main select')].some(s => s.options[0]?.textContent.startsWith('Your login shell') && s.options[s.options.length - 1].value === '…')`)],
+    // Settings › Notifications: an old link to a setting General held lands there, its table drawn (6 rows and more)
+    ['settings-notify', link('laki://settings/general?spot=Quiet'), async () => (await hasText('.settings-nav > button.on', 'Notifications')) && (await js<number>("document.querySelectorAll('.nt-table tbody tr').length")) >= 6],
     ['board', link('laki://board'), '.board'],
     // behind a rail page the sidebar is hidden but keeps its box (its scroll with it), the main area over it
     ['board-sidebar', null, () => js<boolean>(`(([s, m]) => getComputedStyle(s).visibility === 'hidden' && s.getBoundingClientRect().width > 0 && Math.abs(s.getBoundingClientRect().height - m.getBoundingClientRect().height) < 2 && m.getBoundingClientRect().left < s.getBoundingClientRect().right)([document.querySelector('.sidebar'), document.querySelector('.main')])`)],
@@ -1291,7 +1293,7 @@ ipcMain.on('card-gone', (e, key: unknown) => e.sender === win?.webContents && ty
 // the app window's tabs that wait: an agent's ask whose tab no longer does goes
 ipcMain.on('asking', (e, tabs: unknown) => e.sender === win?.webContents && Array.isArray(tabs) && dropCards(c => !c.ask || tabs.includes(c.tab)))
 
-// a timer's end with its dialog (Settings › General › Timers): one of macOS's sounds, whatever notifications say
+// a timer's end with its dialog (Settings › Notifications › A timer ended): one of macOS's sounds, whatever notifications say
 ipcMain.on('sound', (e, name: string) => {
   if (from(e) && typeof name === 'string' && /^[A-Za-z]+$/.test(name)) execFile('afplay', [`/System/Library/Sounds/${name}.aiff`], () => {})
 })

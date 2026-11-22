@@ -909,6 +909,14 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   tabIndex 0, Enter and Space) or carries a role of its own (a backdrop's `presentation`): `test/a11y.test.ts` `mute`.
   Inputs ring on `:focus-visible`; a PR's mark has a shape per state (merged, ×, dashed draft) and an `aria-label`;
   the context meters say their level in words (Usage.tsx `levelWord`).
+- **Settings › Notifications** (`notifications`, after General): Quiet (`p.quiet`), `notify` and `notifySound`, then
+  `.nt-table` (settings.css: `.nt-wrap` scrolls it sideways on a phone): a row per event, a cell per place bound to the
+  setting there is (`notifyOn` waiting, done, limit, usage with `usageAt`; CI failing is `notifyOn.waiting` too;
+  `longTurn` in its row's words; `timerAlert` as macOS, `timerSound`; the phone's `webhook.waiting`/`done`, disabled
+  with *Phone* a link to Phone pushes until `webhook.url` or webpush), empty where none (cards on screen are a
+  workspace's); `edgeGlow`, `dockBounce` under it. Basic's Notifications head shows its card. An old link's spot under
+  General (`laki://settings/general?spot=Quiet`) opens it: settingsMap.ts `spotSection` (FIND's section, the old cards'
+  titles in `MOVED_CARDS`). `continueOnError` stays in General's *Turns*.
 - **Settings' Basic view** (U10): `view` (`laki.settingsView`; unset: Basic with no projects, else All; a `section`/`spot`
   or Find a setting: All). Basic's nav is settingsMap.ts `BASIC` (four heads, each `[section, card title]`s, `*` all of
   one); `on(id)` renders those sections, SettingsKit's `Shown` context makes `Group` return null for a card not named,

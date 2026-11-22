@@ -6,6 +6,7 @@ import { KEYS } from './keys.ts'
 // the nav's sections, under a head each (group): the app, its agents, what it connects to
 export const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
+  { id: 'notifications', label: 'Notifications', icon: 'bell', group: 'Laki' },
   { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
   { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Laki' },
   { id: 'appearance', label: 'Theme & type', icon: 'palette', group: 'Laki' },
@@ -39,14 +40,18 @@ export const FIND: [string, string, string?][] = [
   ['general', 'New workspaces start', 'default agent profile preset'],
   ['git', 'Branch prefix', 'git worktree'],
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
-  ['general', 'macOS notifications', 'notify waiting done limit mute'],
-  ['general', 'Sound', 'notification'],
-  ['general', 'Bounce the Dock icon', 'dock bounce jump attention waiting notification'],
-  ['general', 'Quiet', 'do not disturb dnd focus silence mute notifications pause snooze summary until 9'],
-  ['general', "Glow the window's edge when an agent waits", 'edge glow border pulse waiting attention another tab'],
+  ['notifications', 'macOS notifications', 'notify waiting done limit mute'],
+  ['notifications', 'Sound', 'notification'],
+  ['notifications', 'Bounce the Dock icon', 'dock bounce jump attention waiting notification'],
+  ['notifications', 'Quiet', 'do not disturb dnd focus silence mute notifications pause snooze summary until 9'],
+  ['notifications', 'An agent waits for you', 'waiting permission question notify macos phone push table'],
+  ['notifications', 'A turn finished', 'done end notify macos phone push table'],
+  ['notifications', 'CI keeps failing', 'checks failing red ci notify macos'],
+  ['notifications', 'A plan limit is hit', 'usage limit reached notify macos'],
+  ['notifications', "Glow the window's edge when an agent waits", 'edge glow border pulse waiting attention another tab'],
   ['general', 'Continue after an API error by itself', 'retry overloaded 500 connection dropped auto resume failed'],
-  ['general', 'Tell me when a turn runs longer than', 'long stuck loop hours hung alert notification time'],
-  ['general', 'Plan limit nearly used', 'usage 5-hour weekly session quota notify 90% threshold claude codex'],
+  ['notifications', 'A turn runs longer than', 'tell me when long stuck loop hours hung alert notification time'],
+  ['notifications', 'A plan limit is', 'plan limit nearly used usage 5-hour weekly session quota notify 90% threshold claude codex'],
   ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],
   ['notes', 'Release notes', "what's new changelog version changes added recently"],
   ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],
@@ -203,7 +208,7 @@ export const FIND: [string, string, string?][] = [
   ['voice', 'Send as you stop talking', 'auto send submit enter release let go stop talking voice dictation agent prompt'],
   ['voice', 'Remove filler words', 'um uh er hmm hesitation clean dictation transcript voice'],
   ['voice', 'Word fixes', 'vocabulary dictionary words names terms correct correction replace mishearing misheard spelling voice dictation transcript'],
-  ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
+  ['notifications', 'A timer ended', 'timers timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
   ['git', 'Clone dependency folders into new worktrees', 'node_modules venv vendor target pods gradle apfs clonefile reflink fast copy'],
   ['git', 'Terminals outlive the daemon (experimental)', 'pty host terminal survive crash restart daemon update keep running'],
@@ -282,12 +287,20 @@ export const FIND: [string, string, string?][] = [
 // of that section's), what most people change; All is every section as it is
 export const BASIC: { id: string; label: string; icon: IconName; cards: [string, string][] }[] = [
   { id: 'basic:agents', label: 'Agents', icon: 'agent', cards: [['general', 'New workspaces'], ['presets', '*']] },
-  { id: 'basic:notify', label: 'Notifications', icon: 'bell', cards: [['general', 'Notifications'], ['needs', 'The list']] },
+  { id: 'basic:notify', label: 'Notifications', icon: 'bell', cards: [['notifications', 'Notifications'], ['needs', 'The list']] },
   { id: 'basic:look', label: 'Look', icon: 'palette', cards: [['appearance', 'Theme'], ['appearance', 'Interface'], ['terminal', 'Text']] },
   { id: 'basic:git', label: 'Git & PRs', icon: 'fork', cards: [['git', 'New worktrees'], ['git', 'In the background'], ['git', 'When a PR merges'], ['pr', 'Checks']] },
 ]
+// a spot an old link names under a section it left (laki://settings/general?spot=Quiet, a release note's Try): the
+// section FIND has it in now; its cards' old titles too
+const MOVED_CARDS: Record<string, string> = { 'general|notifications': 'notifications', 'general|timers': 'notifications', 'general|tell me when a turn runs longer than': 'notifications', 'general|plan limit nearly used': 'notifications' }
+export const spotSection = (section: string, spot: string) => {
+  const t = spot.toLowerCase()
+  if (FIND.some(f => f[0] === section && f[1].toLowerCase() === t)) return section
+  return MOVED_CARDS[`${section}|${t}`] ?? FIND.find(f => f[1].toLowerCase() === t)?.[0] ?? section
+}
 // the settings in Basic's cards (Find a setting marks them, laki_settings_find says basic: true)
-const BASIC_SET = new Set(['general|New workspaces start', 'presets|Agents & profiles', 'presets|Accounts', 'presets|Sandbox', 'general|macOS notifications', 'general|Sound', 'general|Plan limit nearly used', 'general|Tell me when a turn runs longer than', 'needs|Needs you list', 'needs|Older finishes go under Earlier', 'appearance|Follow the system', 'appearance|Favorites', 'appearance|Terminals use', 'appearance|Interface font', 'appearance|Accent color', 'appearance|Pages size', 'terminal|Font', 'terminal|Font size', 'git|Folder for worktrees', 'git|Branch prefix', 'git|Sync the base branch', 'git|Done check', 'git|Collision radar', 'git|Archive workspace when its PR merges', 'pr|Check pull requests every', 'pr|Tries in a row'])
+const BASIC_SET = new Set(['notifications|An agent waits for you', 'notifications|A turn finished', 'notifications|Quiet', 'general|New workspaces start', 'presets|Agents & profiles', 'presets|Accounts', 'presets|Sandbox', 'notifications|macOS notifications', 'notifications|Sound', 'notifications|A plan limit is', 'notifications|A turn runs longer than', 'needs|Needs you list', 'needs|Older finishes go under Earlier', 'appearance|Follow the system', 'appearance|Favorites', 'appearance|Terminals use', 'appearance|Interface font', 'appearance|Accent color', 'appearance|Pages size', 'terminal|Font', 'terminal|Font size', 'git|Folder for worktrees', 'git|Branch prefix', 'git|Sync the base branch', 'git|Done check', 'git|Collision radar', 'git|Archive workspace when its PR merges', 'pr|Check pull requests every', 'pr|Tries in a row'])
 export const isBasic = (f: [string, string, string?]) => BASIC_SET.has(`${f[0]}|${f[1]}`)
 
 // the ? beside a setting that assumes agent know-how (SettingsKit's Says, by its title as the page writes it): what it
