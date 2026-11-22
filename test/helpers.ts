@@ -51,14 +51,14 @@ export function running(pid: number) {
 export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 20000): Promise<T> { // room for a loaded machine: a pass returns at once
   const end = Date.now() + ms * SLOW
   let last: unknown
-  while (Date.now() < end) {
+  for (let n = 0; Date.now() < end; n++) {
     try {
       const v = await f()
       if (v) return v
     } catch (e) {
       last = e
     }
-    await new Promise(r => setTimeout(r, 50))
+    await new Promise(r => setTimeout(r, Math.min(50, 5 << n))) // 5, 10, 20, 40 ms, then every 50: most waits are short
   }
   throw new Error(`timed out after ${(ms * SLOW) / 1000} s waiting for ${what}${last ? `: ${last}` : ''}${SLOW > 1 ? ` (waits ×${SLOW}: LAKI_TEST_SLOW or the load)` : ''}`)
 }
@@ -66,6 +66,18 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
 export const seen = <E extends { ev?: string }>(app: { events: E[] }, is: (e: E) => unknown, what = 'an event', ms?: number) => until(() => app.events.find(is), what, ms)
 // E3: a view sent after from (app.events.length before the change) with that tab's status: changed()'s 30 ms passed
 export const viewed = (app: { events: any[] }, from: number, tab: string, status: string) => until(() => app.events.slice(from).some(e => e.ev === 'state' && e.view.tabs.some((x: any) => x.id === tab && x.status === status)), `a view with ${tab} ${status}`)
+
+// LAKI_TEST_PROFILE=1: fresh()'s parts on stderr, ms each (repo, the daemon's token, its first ping), then the whole
+const profile = () => {
+  if (!process.env.LAKI_TEST_PROFILE) return (_?: string) => {}
+  const at = [performance.now()]
+  const parts: string[] = []
+  return (what?: string) => {
+    const now = performance.now()
+    if (what) return void (parts.push(`${what} ${Math.round(now - at[at.length - 1])}`), at.push(now))
+    console.error(`fresh: ${parts.join(', ')}; ${Math.round(now - at[0])} ms`)
+  }
+}
 
 export type Rig = Awaited<ReturnType<typeof fresh>>
 // links and my-prs (test/widgets: extensions that came with Laki before 0.44), copied into this rig as a folder of yours
@@ -77,7 +89,35 @@ export async function fixtureWidgets(rig: Rig) {
   return d
 }
 
+// the rig's repo (README.md, and the test's .laki.json when it gives one, in one commit), made once per test process for
+// each config and copied into each rig with its times (git status reads the index as it was): git init, add and commit
+// were a quarter of fresh(). Gone as the process ends
+const repos = new Map<string, string>()
+// node's compile cache for the rig's daemons, CLIs, hooks and fakes, one per test process: the daemon's 1.4 MB bundle
+// compiled once, not at every start (no daemon, HOME or data is shared: only V8's code for the same files)
+let compiled: string | undefined
+const compileCache = () => (compiled ??= mkdtempSync('/tmp/laki-cc-'))
+process.once('exit', () => {
+  repos.forEach(r => rmSync(dirname(r), { recursive: true, force: true }))
+  if (compiled) rmSync(compiled, { recursive: true, force: true })
+})
+function repoFor(config: object | undefined, env: Record<string, string>) {
+  const key = JSON.stringify(config ?? null)
+  const made = repos.get(key)
+  if (made) return made
+  const r = join(mkdtempSync('/tmp/laki-repo-'), 'repo')
+  const at = { ...env, HOME: dirname(r) } // no rig's home: its git config, if a test wrote one, isn't the template's
+  execFileSync('git', ['init', '-q', '-b', 'main', r], { env: at })
+  writeFileSync(join(r, 'README.md'), 'hello\n')
+  if (config) writeFileSync(join(r, '.laki.json'), JSON.stringify(config))
+  execFileSync('git', ['add', '-A'], { cwd: r, env: at })
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: r, env: at })
+  repos.set(key, r)
+  return r
+}
+
 export async function fresh(t: TestContext, o: { setup?: string; config?: object; env?: Record<string, string> } = {}) {
+  const mark = profile()
   const home = mkdtempSync('/tmp/laki-')
   const repo = join(home, 'repo')
   const env: Record<string, string> = {
@@ -96,6 +136,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     LAKI_PR_SCAN_MS: '500',
     LAKI_STAT_SCAN_MS: '300',
     LAKI_RESTORE_GAP: '0', // a restart's tabs all at once (restart.test.ts tries the queue)
+    NODE_COMPILE_CACHE: compileCache(),
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 't',
     GIT_AUTHOR_EMAIL: 't@t',
@@ -105,11 +146,8 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'LAKI_TAB_TOKEN' || k.startsWith('LAKI_CLIENT_TOKEN') || k === 'CODEX_HOME' || k.startsWith('ANDROID_') || /^(ANTHROPIC|OPENAI|GEMINI)_API_KEY$/.test(k) || k === 'FORCE_COLOR') delete env[k] // U4: doctor's signed in by a key in the env; FORCE_COLOR: node --test's, on a terminal: a node the daemon runs would print in color (an extension's console.log of a number) // ANDROID_HOME: the Simulator's adb, never this Mac's
   Object.assign(env, o.env)
   mkdirSync(join(home, 'bin'))
-  execFileSync('git', ['init', '-q', '-b', 'main', repo], { env })
-  writeFileSync(join(repo, 'README.md'), 'hello\n')
-  if (o.config) writeFileSync(join(repo, '.laki.json'), JSON.stringify(o.config))
-  execFileSync('git', ['add', '-A'], { cwd: repo, env })
-  execFileSync('git', ['commit', '-qm', 'init'], { cwd: repo, env })
+  cpSync(repoFor(o.config, env), repo, { recursive: true, preserveTimestamps: true })
+  mark('repo')
 
   let daemon: ChildProcess | null = null
   const rig = {
@@ -124,9 +162,17 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       daemon.stdout!.on('data', d => (rig.out += d))
       daemon.stderr!.on('data', d => (rig.out += d))
       let said = ''
-      daemon.stdio[3]!.on('data', d => (said += d))
-      await until(() => /^[0-9a-f]{64}\n/.test(said) && (rig.app = said.slice(0, 64)), `daemon start (${rig.out})`)
+      const d = daemon
+      // the app's token as it comes (fd 3), else why not: its exit, or the wait's limit
+      rig.app = await new Promise<string>((ok, no) => {
+        const limit = setTimeout(() => no(new Error(`timed out after ${(20 * SLOW)} s waiting for daemon start (${rig.out})`)), 20000 * SLOW)
+        const gone = () => (clearTimeout(limit), no(new Error(`the daemon ended before it started (${rig.out})`)))
+        d.once('exit', gone)
+        d.stdio[3]!.on('data', b => (said += b) && /^[0-9a-f]{64}\n/.test(said) && (clearTimeout(limit), d.off('exit', gone), ok(said.slice(0, 64))))
+      })
+      mark('token')
       await until(() => rig.rpc('ping').then(r => r === 'pong'), `daemon start (${rig.out})`)
+      mark('ping')
     },
     async stop() {
       if (!daemon) return
@@ -206,6 +252,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     }
   })
   await rig.start()
+  mark()
   return rig
 }
 

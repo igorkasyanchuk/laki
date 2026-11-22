@@ -36,6 +36,9 @@ npm run dev                       # Electron + renderer dev server on :5199
     npm test, test:one and test:changed build first; a build older than src, or `LAKI_TEST_SRC=1`, runs it from source), and the
     fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), `caffeinate` (records its starts and stops), a shell `tsh`,
     `ssh` (every host is this machine) and `da-probe` (counts terminal query replies). No network.
+    About 200 ms a rig: its repo made once per test process (per `.laki.json`) and copied, node's compile cache one per
+    test process (`NODE_COMPILE_CACHE`), the daemon's pty host started as it loads (`daemon/ptyEarly.ts`); `LAKI_TEST_PROFILE=1`
+    prints its parts (repo, the daemon's token, its first ping).
   - The fakes echo their arguments and prompts; tests lean on that. `FAKE_SCRIPT=<file>` (only `scripts/demo.ts` sets it,
     for the README's stills) makes claude and codex talk like the real ones instead (`test/fakes/script.cjs`: per
     workspace, tool lines and a summary); the hooks and menus stay the same. No test may depend on it (`test/agents.test.ts`).

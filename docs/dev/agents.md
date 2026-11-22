@@ -643,7 +643,10 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
 
 - **The pty host** (`src/ptyhost/main.ts`, its own build entry `out/main/ptyhost.js`): one small process that owns the
   ptys and the last 2 MB each printed. No state.json, no git, no hooks; it reads no file. The daemon starts it detached
-  when missing (`daemon/ptyHost.ts` `ptyUp`: as the setting is turned on, and as a daemon starts with it on); its log is
+  when missing (`daemon/ptyHost.ts` `ptyUp`: as the setting is turned on, and as a daemon starts with it on: then from
+  `daemon/ptyEarly.ts`, main.ts' second import, as the daemon's other modules load, so its ~100 ms run beside theirs and
+  `ptyAdopt` dials it; only the daemon's own entry, with state.json's setting on or no state.json, no socket there and no
+  other daemon's lock; dialed every 10 ms for its first 200 ms, then every 100, 5 s in all); its log is
   `<data>/ptyhost.log`. It ends with `quit` (a stop), with no live terminal and no daemon for 10 minutes
   (`LAKI_PTY_IDLE_MS`), with no daemon at all for 3 days whatever still runs (`LAKI_PTY_ORPHAN_MS`), or in tests once
   `LAKI_TEST_PARENT` is gone.

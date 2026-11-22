@@ -2,6 +2,7 @@
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
+import { earlyHost } from './ptyEarly.ts' // second: the pty host starting beside the daemon's other modules as they load
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
@@ -16,7 +17,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
 import * as clientLogMod from './clientLog.ts'
-import { HostPty, ptyClose, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
+import { HostPty, ptyClose, ptyEarly, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
 import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
@@ -129,6 +130,7 @@ if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
+ptyEarly(earlyHost)
 await core.ptyAdopt() // R6: terminals that outlived the last daemon (settings.ptyHost), before the rest start again
 await core.netProxyUp().catch((e: Error) => log(`wrapper sandbox's network proxy: ${e.message}`)) // its port and passwords: a kept terminal's go on
 core.restoreAll()

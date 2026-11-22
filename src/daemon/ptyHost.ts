@@ -224,6 +224,9 @@ function script() {
   throw new Error('pty host script not found')
 }
 // start: one started when none answers (regain's doesn't: a host that died isn't one to wait for)
+// ptyEarly.ts started this daemon's host as it loaded: its first up dials it, starting none of its own
+let early = false
+export const ptyEarly = (on: boolean) => void (early = on)
 async function up(again = true, tries = 0, start = true): Promise<void> {
   if (sock) return
   let dialed: unknown
@@ -236,8 +239,10 @@ async function up(again = true, tries = 0, start = true): Promise<void> {
     } catch (e) {
       throw new Error(`the pty host didn't start (${(e as Error).message})`)
     }
-    spawn(process.execPath, [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), script()], { detached: true, stdio: ['ignore', out, out] }).unref()
-    for (let i = 0; i < 50 && !s; i++) (await sleep(100), (s = await dial().catch(() => undefined)))
+    if (!early) spawn(process.execPath, [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), script()], { detached: true, stdio: ['ignore', out, out] }).unref()
+    early = false
+    // its socket every 10 ms for the first 200 (a host is up in about 50: a daemon's start waits on it), then every 100; 5 s in all
+    for (let i = 0; i < 70 && !s; i++) (await sleep(i < 20 ? 10 : 100), (s = await dial().catch(() => undefined)))
   }
   if (!s) throw new Error("the pty host didn't start: see ptyhost.log")
   wire(s)
@@ -248,7 +253,7 @@ async function up(again = true, tries = 0, start = true): Promise<void> {
     // tries. Or a host that just started and hasn't written its secret yet: the next try reads it
     sock = undefined // turned away: never taken for a connection (regain would think it back)
     s.destroy()
-    if (tries < 30 && start) return sleep(100).then(() => up(again, tries + 1, start)) // regain's (start false): not its 3 s, GRACE's own tries go on
+    if (tries < 40 && start) return sleep(tries < 10 ? 10 : 100).then(() => up(again, tries + 1, start)) // regain's (start false): not its 3 s, GRACE's own tries go on; a host's secret not written yet: read again in 10 ms
     throw new Error('the pty host turned this daemon away (another one is connected)')
   }
   hostPid = h.pid ?? 0
