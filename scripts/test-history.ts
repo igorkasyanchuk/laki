@@ -33,6 +33,14 @@ export default async function* history(source: AsyncIterable<Ev>) {
     }
   })()
   cap()
+  // uncommitted changes to tracked files: the sha isn't what ran (test-report.ts leaves such runs out of the flaky list)
+  const dirty = (() => {
+    try {
+      return execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim() !== ''
+    } catch {
+      return false
+    }
+  })()
   const before = parse(read())
   const slow = () => Number(process.env.LAKI_TEST_SLOW) || Math.max(1, Math.min(3, Math.round(loadavg()[0] / cpus().length)))
   const began = new Map<string, { load: number; slow: number }>()
@@ -48,7 +56,7 @@ export default async function* history(source: AsyncIterable<Ev>) {
     if (!began.has(file)) began.set(file, { load: Math.round(loadavg()[0] * 100) / 100, slow: slow() })
     if (e.type === 'test:fail' && e.data.name) (failed.get(file) ?? failed.set(file, new Set()).get(file)!).add(e.data.name)
     if (e.type !== 'test:summary') continue
-    const r: Run = { date: new Date().toISOString(), sha, file, ms: Math.round(e.data.duration_ms ?? 0), pass: e.data.success === true, ...(failed.get(file)?.size && { failed: [...failed.get(file)!] }), slow: began.get(file)!.slow, load: began.get(file)!.load, ...(process.env.LAKI_TEST_RERUN === '1' && { rerun: true }) } // rerun: test-rerun.ts' second try of a file
+    const r: Run = { date: new Date().toISOString(), sha, ...(dirty && { dirty: true }), file, ms: Math.round(e.data.duration_ms ?? 0), pass: e.data.success === true, ...(failed.get(file)?.size && { failed: [...failed.get(file)!] }), slow: began.get(file)!.slow, load: began.get(file)!.load, ...(process.env.LAKI_TEST_RERUN === '1' && { rerun: true }) } // rerun: test-rerun.ts' second try of a file
     now.push(r)
     if (!part)
       try {

@@ -24,7 +24,7 @@
     "pretest": "electron-vite build -l warn",
     "pretest:one": "electron-vite build -l warn",
     "pretest:changed": "electron-vite build -l warn",
-    "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-history.ts --test-reporter-destination=stdout test/*.test.ts",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-run.ts",
     "test:report": "node --experimental-strip-types --no-warnings scripts/test-report.ts",
     "test:ui": "node --experimental-strip-types --no-warnings scripts/ui-smoke.ts",
     "test:sheet": "node --experimental-strip-types --no-warnings scripts/ui-sheet.ts",

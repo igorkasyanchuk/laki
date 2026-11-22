@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export type Run = { date: string; sha: string; file: string; ms: number; pass: boolean; failed?: string[]; slow?: number; load?: number; rerun?: boolean } // rerun: npm run test:release's second try, alone (test-rerun.ts)
+export type Run = { date: string; sha: string; file: string; ms: number; pass: boolean; failed?: string[]; slow?: number; load?: number; rerun?: boolean; dirty?: boolean } // rerun: npm run test:release's second try, alone (test-rerun.ts)
 export const HISTORY = '.test-history.jsonl'
 export const HISTORY_MAX = 5000
 const LAST = 20
@@ -38,7 +38,8 @@ export function report(runs: Run[], last = LAST): Report {
     .sort((a, b) => b.median - a.median || a.file.localeCompare(b.file))
     .slice(0, 10)
   const flaky: Report['flaky'] = []
-  for (const [file, rs] of by) {
+  for (const [file, all] of by) {
+    const rs = all.filter(r => !r.dirty) // a run on uncommitted changes: its sha isn't the code that ran, so it says nothing of flakiness
     const recent = rs.slice(-last)
     const fails = recent.filter(r => !r.pass).length
     const reruns = recent.filter(r => r.rerun && r.pass).length
