@@ -450,5 +450,5 @@ export function chromeOf(r: ChromeIn) {
           )}
     </>
   )
-  return { AI_TIP, achAll, achHidden, achN, aiFab, aiNames, calOn, costsOn, ctxLook, ctxOn, deskOn, doStep, footButtons, histNav, label, labels, listOff, mark, noBar, notesOn, ownWidgets, pageBar, phoneItems, pinPlan, portStop, portUp, ports, radarKey, radarOf, railBar, railColor, railColors, railUp, samePlan, schedulesFor, shownWidgets, stepItem, stepOf, stepsOn, strip, stripBar, tabsAt, toAi, toSettings, todosOn, whereNow, wideBar, wsMore, wsTint } as const // the literal types App had (tabsAt, ctxLook)
+  return { AI_TIP, achAll, achHidden, achN, aiFab, aiNames, calOn, costsOn, ctxLook, ctxOn, deskOn, doStep, footButtons, histNav, label, labels, listOff, mark, noBar, notesOn, ownWidgets, pageBar, phoneItems, pinPlan, portStop, portUp, ports, radarKey, radarOf, railBar, railColor, railUp, samePlan, schedulesFor, shownWidgets, stepItem, stepOf, stepsOn, strip, stripBar, tabsAt, toAi, toSettings, todosOn, whereNow, wideBar, wsMore, wsTint } as const // the literal types App had (tabsAt, ctxLook)
 }
