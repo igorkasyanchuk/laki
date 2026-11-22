@@ -1,6 +1,6 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { Component, Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { Component, Fragment, memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
@@ -758,6 +758,16 @@ export type RowDrop = { kind: string; id: string; target: string; after: boolean
 
 // rows ([data-row="<kind>:<id>"], optional data-group) dragged into a new order; `over` is where the
 // pointer would drop, for an insertion line
+// a part drawn again only when one of its deps changed (each by Object.is; viewShare keeps a view's unchanged objects):
+// a sidebar row, a tab, a pane. What it calls on an event goes through a live ref (App's cur), never the closures of the
+// render it was kept from
+export const Kept = memo(
+  function Kept(p: { deps: readonly unknown[]; render: () => ReactNode }) {
+    return <>{p.render()}</>
+  },
+  (a, b) => a.deps.length === b.deps.length && a.deps.every((d, i) => Object.is(d, b.deps[i])),
+)
+
 export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const [over, setOver] = useState<RowDrop | null>(null)
   const dragged = useRef(false)

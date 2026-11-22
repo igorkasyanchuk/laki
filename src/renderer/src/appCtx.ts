@@ -105,6 +105,7 @@ export const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', t
 export const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 export type AppBase = {
+  cur: { current: AppCtx } // the latest render's: a kept row's, tab's or pane's handlers call through it (ui.tsx Kept)
   accountsOf: (agent?: string) => (Account | { id: string; name: string })[]
   achAll: Achievement[]
   achHidden: string[]

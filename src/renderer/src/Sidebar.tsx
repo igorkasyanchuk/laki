@@ -6,16 +6,16 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
 import { aiOn, GOAL_SAYS } from '../../shared/types'
-import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip } from './ui'
+import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
 import { type Collision, spanText } from '../../shared/overlap'
-import { type CSSProperties, type KeyboardEvent as ReactKey, useLayoutEffect, useRef } from 'react'
+import { type CSSProperties, type DragEvent, type KeyboardEvent as ReactKey, useLayoutEffect, useRef } from 'react'
 import { short, prState, Avatar, PrCard } from './Info'
-import { RowMarks, rowMarks, TurnChips, WidgetGrid } from './Widgets'
+import { RowMarks, rowMarks, TurnChips, WidgetGrid, type WidgetApi } from './Widgets'
 import { planCount } from '../../shared/todos'
 import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
@@ -35,7 +35,7 @@ const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Pl
 const markOf = (p: Project): IconName => (p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork')
 
 export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
-  const { anchor, busyWith, call, done, doStep, dropAgent, dropOn, dropProps, find, flowsOn, fold, folded, going, kh, kindOf, live, making, mark, markUnread, narrow, needAfter, needsYou, newWs, openMenu, wsTabMenu, openProject, order, peek, peekBox, peekStat, peekTimer, picked, pinned, projOf, quickNew, radarOf, rail, railKind, railOf, rawKind, restart, restore, ring, rows, selectTab, setDialog, setOverlapsAt, setPeek, setPicked, setSideOpen, setTimer, settings, setWsId, showPanel, sortedRows, sortItems, stepOf, stepsOn, termIn, termsOk, termWhere, timers, tint, toast, view, waits, widgetApi, ws, wsAt, wsMenu } = app
+  const { anchor, busyWith, call, done, dropAgent, dropOn, find, flowsOn, fold, folded, going, kh, kindOf, live, making, mark, markUnread, narrow, needAfter, needsYou, newWs, openMenu, wsTabMenu, openProject, order, peek, peekBox, peekStat, peekTimer, picked, pinned, projOf, quickNew, radarOf, rail, railKind, railOf, rawKind, restart, restore, ring, rows, selectTab, setDialog, setPeek, setPicked, setSideOpen, setTimer, settings, setWsId, showPanel, sortedRows, sortItems, stepOf, stepsOn, termIn, termsOk, termWhere, timers, tint, toast, view, waits, widgetApi, ws, wsAt, wsMenu } = app
   const peekAt = (id?: string, el?: HTMLElement) => {
     clearTimeout(peekTimer.current)
     peekTimer.current = window.setTimeout(() => {
@@ -210,6 +210,10 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const clashes = portClashes(view.workspaces)
   const clashTip = (cs: Clash[]) =>
     cs.map(c => (o => (c.theirs ? `Port ${c.port} is ${o ? wsName(o) : c.other}'s (its ports: ${o?.port} to ${(o?.port ?? 0) + BLOCK - 1}): a server here listens on it` : `${o ? wsName(o) : c.other} listens on port ${c.port}, one of this workspace's`))(view.workspaces.find(x => x.id === c.other))).join('\n') + '\nEach workspace has its own ten: $PORT and $PORT_1…$PORT_9'
+  // a kept row's handlers: the latest app's (ui.tsx Kept), never the render's it was kept from
+  const L = () => app.cur.current
+  const dropLive = (w: WorkspaceView) => ({ onDragOver: (e: DragEvent) => L().dropProps(w).onDragOver(e), onDragLeave: (e: DragEvent) => L().dropProps(w).onDragLeave(e), onDrop: (e: DragEvent) => L().dropProps(w).onDrop(e) })
+  const widgetLive = new Proxy({} as WidgetApi, { get: (_, k) => (L().widgetApi as Record<string | symbol, unknown>)[k] })
   const radarTip = (w: WorkspaceView) => radarOf(w).map(c => `${c.file}: ${c.ws ? `${radarWhose(c)} changes it too` : `${c.base} changed it since this branched`} (${spanText(c.theirs)}; here ${spanText(c.mine)})`).join('\n')
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
@@ -224,10 +228,15 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     const pill = words && w.pr && settings.prIcon !== false ? prPill(w.pr) : undefined
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     const simple = settings.simpleRow === true // B4: a name and one next-step chip (or the turn's time); the other marks on hover and in the peek card
-    return (
+    const st = (simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term ? stepOf(w) : undefined
+    const isNew = fresh(w.id)
+    const needs = wt.some(needsYou)
+    const cs = clashes.get(w.id)
+    // drawn again only when one of these changed (its tabs by each object: viewShare keeps the unchanged ones)
+    const deps = [w, pin, settings, view.projects, view.widgets, view.flows, narrow, w.id === ws?.id, picked.includes(w.id), going[w.id], needs, dropOn === w.id && (dropAgent(w)?.name ?? null), isNew, rows.at('ws', w.id), moves, st && JSON.stringify(st), cs && clashTip(cs), mark('radar') && radarOf(w).length ? radarTip(w) : '', timers.some(t => t.then === 'remind' && t.ws === w.id), wt.length, ...wt]
+    return <Kept key={w.id} deps={deps} render={() => (
       <div data-floor
-        key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${fresh(w.id) ? 'v-new' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${needs ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${isNew ? 'v-new' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
@@ -240,13 +249,13 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         data-keys={moves || undefined}
         data-group={pin ? 'pinned' : w.project}
         data-peek={(!narrow && !view.projects.find(p => p.id === w.project)?.kind) || undefined /* its peek card names it: no native title on its cut name (ui.tsx MidText) */}
-        onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
-        onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
-        onPointerLeave={() => peekAt()}
-        onClick={e => ((e.metaKey || e.shiftKey) && !narrow && pickable(w) ? pickRow(w, e) : (setWsId(w.id), (!pin && !find && rows.dragged()) || (setPicked([]), setDialog(null)), narrow && setSideOpen(false))) /* ⌘ and ⇧: picked; a page over the main area (Settings, the new-workspace page…) gives way to it, and the picks go, not at a drag's end */}
-        onDoubleClick={e => !(e.metaKey || e.shiftKey) && setDialog({ renameWs: w.id })}
-        onContextMenu={e => wsTabMenu(e, wsMenu(w))}
-        {...dropProps(w)}
+        onPointerDown={e => (clearTimeout(peekTimer.current), L().setPeek(null), !pin && !L().find && L().rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
+        onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && L().peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
+        onPointerLeave={() => L().peekAt()}
+        onClick={e => ((e.metaKey || e.shiftKey) && !narrow && pickable(w) ? L().pickRow(w, e) : (L().setWsId(w.id), (!pin && !L().find && L().rows.dragged()) || (L().setPicked([]), L().setDialog(null)), narrow && L().setSideOpen(false))) /* ⌘ and ⇧: picked; a page over the main area (Settings, the new-workspace page…) gives way to it, and the picks go, not at a drag's end */}
+        onDoubleClick={e => !(e.metaKey || e.shiftKey) && L().setDialog({ renameWs: w.id })}
+        onContextMenu={e => L().wsTabMenu(e, L().wsMenu(w))}
+        {...dropLive(w)}
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : w.pending && !wt.length ? 'idle' /* its agent comes later: not ended */ : rollup(wt)} />}
         {marksAt === 'start' && yes}
@@ -257,7 +266,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} aria-label={STEP_CHIP[st.id] ?? st.label} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), doStep(w, st)))}><Icon name={STEP_ICON[st.id]} size={11} /><span className="ws-step-w">{STEP_CHIP[st.id] ?? st.label}</span></span>)(stepOf(w))}
+        {st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} aria-label={STEP_CHIP[st.id] ?? st.label} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), L().doStep(w, st)))}><Icon name={STEP_ICON[st.id]} size={11} /><span className="ws-step-w">{STEP_CHIP[st.id] ?? st.label}</span></span>}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {(settings.timers || simple) && (simple ? <span className="ws-keep"><TurnTime tabs={wt} /></span> : <TurnTime tabs={wt} />)}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -271,7 +280,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             {w.ticket.key}
           </span>
         )}
-        <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
+        <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetLive} />
         {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}><Num value={planCount(t.plan)} /></span>)(wt.find(t => t.plan))}
         {(cs => cs && (
           <span className="ws-clash" data-tip={clashTip(cs)}>
@@ -279,7 +288,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           </span>
         ))(clashes.get(w.id))}
         {mark('radar') && (n => n > 0 && (
-          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), setOverlapsAt({ w: w.id, list: radarOf(w) })))}>
+          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), L().setOverlapsAt({ w: w.id, list: L().radarOf(w) })))}>
             <Icon name="gitCompare" size={11} />
             {n}
           </span>
@@ -374,7 +383,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         )}
         {/* on hover, after the marks (they slide left): its menu */}
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-          <IconButton icon="more" title="Workspace" onClick={e => wsTabMenu(e, wsMenu(w))} />
+          <IconButton icon="more" title="Workspace" onClick={e => L().wsTabMenu(e, L().wsMenu(w))} />
         </span>
         {more && (
           <div className="ws-sub">
@@ -405,7 +414,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {status && <span className={`ws-line ${pct >= 0 ? 'pct' : ''}`} />}
         {!status && pctSide && settings.progressLook && settings.progressLook !== 'pct' && (top => top >= 0 && <span className="ws-line pct" style={{ '--p': `${top}%` } as CSSProperties} />)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1))) /* the status style's line, filling as it goes */}
       </div>
-    )
+    )} />
   }
   // an open PR's marks (settings.prMarks, each unset on): ✓ approved, ✓✓ approved by you too, 👀 you commented
   const marksAt = settings.prMarks?.at ?? 'end'
@@ -571,7 +580,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const listed = rail && !find ? view.projects.filter(p => railOf(p.kind) === railKind) : view.projects
   const inList = (w: WorkspaceView) => !rail || !!find || kindOf(w) === railKind
   const pins = pinned.filter(w => shows(w) && inList(w))
-  return { addMenu, busiest, found, listed, makingRows, needNext, needsApi, needsShown, pause, peekCard, pickedArchive, pickedMute, pickedRm, pickedWs, pins, plusMenu, reminder, sendTo, shownRows, shows, sideStyle, timerMenu, wsRow }
+  return { addMenu, busiest, peekAt, pickRow, found, listed, makingRows, needNext, needsApi, needsShown, pause, peekCard, pickedArchive, pickedMute, pickedRm, pickedWs, pins, plusMenu, reminder, sendTo, shownRows, shows, sideStyle, timerMenu, wsRow }
 }
 
 // the sidebar itself (App keeps it, hidden, while a video plays)

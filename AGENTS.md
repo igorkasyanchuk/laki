@@ -51,7 +51,7 @@ npm run dev                       # Electron + renderer dev server on :5199
     longest now, `api`, 75 s; `workflow-runs`, `pr`, `restart`, `worktrees` and `ai` about one), else split it by topic as `daemon` was (`agents`, `presets`,
     `restart`, `worktrees`), or it's the run's tail.
 - **Trying the UI in a browser**:
-  1. `npm run demo -- /tmp/laki-x` builds a temp world (a repo, 3 workspaces, fake agents) and a daemon
+  1. `npm run demo -- /tmp/laki-x` builds a temp world (a repo, 3 workspaces, fake agents; `LAKI_DEMO_MANY=30`: 30) and a daemon
      that accepts the dev origin. It prints a URL with the port and token in the hash. To try Expose to the
      world, `ln -s $PWD/test/cloudflared /tmp/laki-x/bin/`.
   2. `npm run dev:web` serves the renderer on :5199; open that URL.

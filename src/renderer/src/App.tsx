@@ -9,6 +9,7 @@ import { version as appVersion } from '../../../package.json'
 import { Outbox } from './OutboxStrip'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow, passkeyReady, passkeys, passkeySetUp, passkeyUnlock } from './api'
 import { setSecretHint } from './secretHint'
+import { viewShare } from './viewShare'
 import { maskSecrets } from '../../shared/secrets'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -1410,8 +1411,9 @@ export function App() {
     const off = api.on(m => {
       if (m.ev === 'state') {
         setLocked(null) // D6: unlocked (its state comes only then)
-        const v = veiled(m.view) // Recording mode: private workspaces out of everything drawn
-        hid.current = v === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !v.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
+        const shown = veiled(m.view) // Recording mode: private workspaces out of everything drawn
+        hid.current = shown === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !shown.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
+        const v = viewShare(viewRef.current, shown) // the last view's objects where nothing changed: memo'd rows, tabs and panes draw again only where something did
         settle([...m.view.workspaces.map((w: WorkspaceView) => w.id), ...m.view.tabs.map((t: TabView) => t.id)]) // V7: what's here as the window opens doesn't grow in
         // V13: a row pinned or unpinned slides to its new group. ponytail: Pinned only; Needs you's are cards of their own
         const was = viewRef.current
@@ -3211,6 +3213,13 @@ export function App() {
       ),
     fork: t => void call<WorkspaceView>('turnFork', { ws, n: t.n }).then(w => showNew(w.id), () => {}),
   })
+  // a kept pane's (ui.tsx Kept) terminal, Reader and turns call the latest render's, never the one it was kept from
+  const paneNow = useRef({ openPath, openCode, selectionTo, peekImage, peekText, readerApi, turnApi })
+  paneNow.current = { openPath, openCode, selectionTo, peekImage, peekText, readerApi, turnApi }
+  const readerLive = useMemo(() => new Proxy({} as ReaderApi, { get: (_, k) => (paneNow.current.readerApi as Record<string | symbol, unknown>)[k] }), [])
+  const turnLive = (ws: string) => new Proxy({} as TurnApi, { get: (_, k) => (paneNow.current.turnApi(ws) as Record<string | symbol, unknown>)[k] })
+  // what a pane's body and foot draw from (Panes' deps): its tab, its workspace, the settings and state they read
+  const paneDeps = (id: string) => (t => [t, view?.workspaces.find(x => x.id === t?.workspace), settings, view?.presets, view?.widgets, view?.managed, view?.caps, view?.api, theme, dialog, reviewOn, readerOn, readMode[id], narrow, finds[id], zooms[id], fontSize, floated.includes(id), id === tab?.id, transparent(), noBar, full, checkHid, hookHid, timers, JSON.stringify(workerAsks(id))])(byId(id))
   const restore = (id: string) => call('wsRestore', { id }).then(() => showNew(id))
   const newWs = (projectId?: string, init?: Partial<NewWsParams>) => {
     setNewFor(projectId)
@@ -3383,6 +3392,7 @@ export function App() {
 
   // keys: capture phase, before xterm.js sees them (keydown.ts' onKey, set at the end once there's a view)
   const keys = useRef<(e: KeyboardEvent, force?: KeyId, fixed?: boolean) => void>(() => {})
+  const cur = useRef<AppCtx>(null!) // the latest app: what a kept (memo'd) part's handlers call
   useEffect(() => {
     const f = (e: KeyboardEvent) => keys.current(e)
     bridge?.onBrowserKey?.(key => keys.current(new KeyboardEvent('keydown', { key, metaKey: true }), isKeyId(key) ? key : undefined, !isKeyId(key))) // a menu bar item's (an id, or a fixed key) or a Browsers page's, as if here
@@ -4003,10 +4013,11 @@ export function App() {
     shownWidgets, showPanel, sideOpen, sideW, sortedRows, sortItems, specsOn, split, stale, staleMin, start, statKey,
     stepItem, stepOf, stepsOn, strip, tab, tabByWs, tabsAt, targets, termIn, termsOk, termWhere, timers, tint, toast,
     todosOn, toggleArtifacts, toggleFull, togglePanel, toSettings, touch, travel, video, view, waits, watches,
-    whereNow, wideBar, widgetApi, ws, wsActions, wsAt, wsHere, wsMore, zoom,
+    whereNow, wideBar, widgetApi, ws, wsActions, wsAt, wsHere, wsMore, zoom, cur,
   }
   const parts = { ...appBase, ...menusOf(appBase), ...layoutOf(appBase) }
   const app: AppCtx = { ...parts, ...sideOf(parts) }
+  cur.current = app
   const { wsMenu, tabMenu, fileMenu, applyLayout, peekCard } = app
   keys.current = (e, force, fixed) => onKey(app, e, force, fixed)
   return (
@@ -4132,6 +4143,7 @@ export function App() {
                   const ts = (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null) : [drag.tab]).map(byId).filter((t): t is TabView => !!t)
                   return ts.length > 1 ? <><Glyph s={rollup(ts)} /><span>{ts.map(t => t.name).join(' · ')}</span></> : label(drag.tab)
                 })()}
+                deps={paneDeps}
                 render={id => floated.includes(id) ? (
                   <div className="floated">
                     <span>In a window of its own, over every app</span>
@@ -4153,18 +4165,18 @@ export function App() {
                     editKeys={settings.editKeys !== false}
                     theme={theme}
                     look={termLook(settings)}
-                    onFile={path => openPath(id, path)}
+                    onFile={path => paneNow.current.openPath(id, path)}
                     onReply={replyTo(id).length ? (text, at) => setReply({ tab: id, text, ...at }) : undefined}
-                    onSelection={selectionTo(id)}
-                    onCode={openCode(id)}
+                    onSelection={(text, how) => paneNow.current.selectionTo(id)(text, how)}
+                    onCode={(path, line, other) => paneNow.current.openCode(id)(path, line, other)}
                     codeTo={settings.fileClick === 'editor' ? 'editor' : 'preview'}
-                    image={peekImage(id)}
-                    text={peekText(id)}
+                    image={path => paneNow.current.peekImage(id)(path)}
+                    text={path => paneNow.current.peekText(id)(path)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                     pictures={settings.termPictures !== false}
                     savePicture={f => keepFile(f, (data, ext) => api.call<string>('imageSave', { data, ext })).then(r => r.path)}
                   />
-                  {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
+                  {inReader(id) && <Reader tab={byId(id)!} api={readerLive} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll, times: settings.readerTimes }} />}
                   </>
                 )}
                 foot={id =>
@@ -4174,7 +4186,7 @@ export function App() {
                         <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
                         <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
-                        {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnApi(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
+                        {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnLive(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}

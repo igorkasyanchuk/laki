@@ -110,6 +110,8 @@ const a = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'fix-cart-
 const b = await rpc('wsNew', { project: p.id, preset: 'codex', name: 'dark-mode' })
 const c = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'checkout-flow' })
 for (const w of [a, b, c]) await rpc('tabNew', { ws: w.id })
+// LAKI_DEMO_MANY=30: that many workspaces in all (the window's redraws with a long sidebar), each a claude tab and a shell
+for (let i = 4; i <= Number(process.env.LAKI_DEMO_MANY ?? 0); i++) await rpc('tabNew', { ws: (await rpc<{ id: string }>('wsNew', { project: p.id, preset: 'claude', name: `more-${i}` })).id })
 await new Promise(r => setTimeout(r, 3000))
 // some changes to look at in the diff
 writeFileSync(join(a.path, 'src/cart.js'), 'export function total(items) {\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n  return cents / 100\n}\n\nexport const empty = () => []\n')

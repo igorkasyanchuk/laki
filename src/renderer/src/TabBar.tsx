@@ -3,7 +3,7 @@
 import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
-import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText, titleDbl } from './ui'
+import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText, titleDbl, Kept } from './ui'
 import { type TabView, GOAL_SAYS, HOME_ACCOUNT, creatorOf } from '../../shared/types'
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
@@ -103,7 +103,7 @@ export function tabTip(ts: TabView[], o: TabTipOf) {
 }
 
 export function TabList({ app }: { app: AppCtx }) {
-  const { accountsOf, byId, call, closeTabs, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, wsTabMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, setDialog, settings, start, statKey, tabMenu, ws } = app
+  const { accountsOf, byId, call, costsOn, ctxLook, ctxOn, group, groups, kt, narrow, newTabActions, openMenu, openReview, quickNew, reviewOn, reviewSeen, reviewTab, selectGroup, settings, statKey, ws } = app
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
   // over the terminals: as many tabs as fit at --tab-min each, the rest behind +n (fitTabs); the selected one always
@@ -155,20 +155,25 @@ export function TabList({ app }: { app: AppCtx }) {
         const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
         const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
         const ctx = ctxOn ? ts.flatMap(t => t.context ?? []).sort((a, b) => ctxPct(b) - ctxPct(a))[0] : undefined // a split's: the fullest
-        return (
+        const isNew = fresh(ts[0]?.id)
+        const accounts = ts.map(t => accountsOf(t.preset).find(a => a.id === t.account)?.name)
+        // drawn again only when one of these changed (its tabs by each object: viewShare keeps the unchanged ones); its
+        // handlers call the latest app's (ui.tsx Kept)
+        const deps = [g === group && !reviewOn, gi, keyOff, settings, ctxOn, costsOn, ctxLook, narrow, isNew, accounts.join('\0'), kt('Close', 'closeTab'), ts.length, ...ts]
+        const L = () => app.cur.current
+        return <Kept key={ts[0]?.id} deps={deps} render={() => (
           <div
-            key={ts[0]?.id}
             data-gi={gi}
-            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}${fresh(ts[0]?.id) ? ' v-new' : ''}`}
+            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}${isNew ? ' v-new' : ''}`}
             style={colorVar(colorOf(ts[0]))}
-            {...act(() => selectGroup(g))}
-            onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
-            onContextMenu={e => wsTabMenu(e, tabMenu(tabsOf(g)))}
-            onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
-            onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
+            {...act(() => L().selectGroup(g))}
+            onDoubleClick={() => ts[0] && L().setDialog({ rename: ts[0].id })}
+            onContextMenu={e => L().wsTabMenu(e, L().tabMenu(tabsOf(g)))}
+            onPointerDown={e => !narrow && ts[0] && L().start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
+            onAuxClick={e => e.button === 1 && L().closeTabs(ts)}
+            data-keys={gi + keyOff < 9 ? `⌘${gi + 1 + keyOff}` : undefined}
             data-tip-card
-            data-tip={tabTip(ts, { ctxOn, costsOn, key: groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined, account: t => accountsOf(t.preset).find(a => a.id === t.account)?.name })}
+            data-tip={tabTip(ts, { ctxOn, costsOn, key: gi + keyOff < 9 ? `⌘${gi + 1 + keyOff}` : undefined, account: t => accounts[ts.indexOf(t)] })}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <MidText text={ts.map(t => t.name).join(' · ')} />
@@ -202,11 +207,11 @@ export function TabList({ app }: { app: AppCtx }) {
             {queued > 0 && <span className="badge">+{queued}</span>}
             {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} role="img" aria-label={`Context ${ctxPct(ctx)}%, ${levelWord(ctxPct(ctx))}`} style={{ '--p': `${ctxPct(ctx)}%` } as CSSProperties} />}
             {ctx && ctxLook === 'ring' && <Ring p={ctxPct(ctx)} />}
-            <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+            <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), L().closeTabs(ts))}>
               <Icon name="x" size={10} />
             </button>
           </div>
-        )
+        )} />
       })}
       {more}
       {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N) · ⌘-click an item: a tab of its own, never a split" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}

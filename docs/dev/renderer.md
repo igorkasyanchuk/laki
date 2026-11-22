@@ -122,6 +122,19 @@ are tested in `test/units-more.test.ts`.
   and went. To measure again: a world (`npm run demo` with more workspaces), and `window.__REACT_DEVTOOLS_GLOBAL_HOOK__`
   defined before React loads (its `onCommitFiberRoot(id, root)`: `root.current.actualDuration` in dev; the fibers with
   flag 1 rendered).
+- **Structural sharing** (2026-11): a `state` event's view keeps the last one's objects where nothing changed
+  (`viewShare.ts`: workspaces, tabs, projects and widgets by id and JSON, other top-level fields by JSON;
+  `test/view-share.test.ts`), so a memo'd part sees the same object unless something of its own changed. Three parts are
+  kept (ui.tsx `Kept`: a render function and its deps, each compared by `Object.is`): a sidebar row (`Sidebar.tsx`
+  `wsRow`), a tab of the tab bar (`TabList`) and a pane's body and foot (`Panes`' `deps`, App's `paneDeps`). Their deps
+  list what they draw from (a row: its workspace, its tabs one by one, the settings, projects, widgets, flows, whether
+  it's open, picked, dropped on, its step, clashes and radar as text…); add one there when a part starts reading
+  something new, or it won't redraw. What they call on an event goes through the latest app, never the closures of the
+  render they were kept from: `app.cur` (the `AppCtx` of App's last render; Sidebar's and TabList's `L()`), App's
+  `paneNow` and the proxies over it (`readerLive`, `turnLive`), Sidebar's `widgetLive` and `dropLive`. A tab's status
+  change then redraws its row, its tab and its pane (when it shows), and the status displays; measured with React's
+  `Profiler` over one fake turn (dev React, `npm run demo` with `LAKI_DEMO_MANY=30`): 30 workspaces 94 ms of commits to
+  26 ms, 3 workspaces about 57 ms either way (the open workspace's own parts, Needs you and the status bar).
 - **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
   built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).

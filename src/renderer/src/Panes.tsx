@@ -2,7 +2,7 @@
 // resize handle. Panes are absolutely placed siblings keyed by session, so splitting never remounts a terminal.
 import { useRef, useState, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { type Bar, type Layout, place, type Spot } from '../../shared/layout'
-import { colorVar, snapped, snapStart } from './ui'
+import { colorVar, Kept, snapped, snapStart } from './ui'
 
 export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Spot; line?: { left: number; top: number; width: number; height: number } }
 
@@ -108,6 +108,7 @@ export function Panes(p: {
   onMenu: (e: MouseEvent, tab: string) => void // right click on a pane header
   ghost: ReactNode // what follows the pointer while dragging
   render: (tab: string) => ReactNode
+  deps: (tab: string) => readonly unknown[] // what its body and foot draw from: drawn again only when one changed (ui.tsx Kept)
   head?: (tab: string) => ReactNode // a split pane's header's own controls (Terminal | Reader), before its ×
   foot?: (tab: string) => ReactNode // under the pane's terminal, which gets shorter (a tab's queue)
   onFocus: (tab: string) => void
@@ -148,8 +149,12 @@ export function Panes(p: {
               </button>
             </div>
           )}
-          <div className="pane-body">{p.render(tab)}</div>
-          {p.foot?.(tab)}
+          <Kept deps={p.deps(tab)} render={() => (
+            <>
+              <div className="pane-body">{p.render(tab)}</div>
+              {p.foot?.(tab)}
+            </>
+          )} />
           {over && 'pane' in over && over.pane === tab && <div className={`drop-zone ${over.edge}`} />}
         </div>
       ))}
