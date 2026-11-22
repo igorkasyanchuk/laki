@@ -42,7 +42,7 @@ import { SECRETS_DIR } from './secrets.ts'
 import { CURSOR } from '../shared/install.ts'
 import { type SignedOut, signedOutView, turnSignedOut } from './signin.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
-import { appBinOk, appOf, helperBin, launcherOurs } from '../shared/helper.ts'
+import { appBinOk, appOf, helperBin, launcherOurs, lsAppExe } from '../shared/helper.ts'
 import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
@@ -5270,9 +5270,8 @@ export async function appPeer(port: number, proc = process.platform === 'linux' 
   }
   const asn = (await run('/usr/bin/lsappinfo', ['find', `pid=${p.pid}`]).catch(() => ({ stdout: '' }))).stdout.trim()
   if (!asn) return false
-  const info = (await run('/usr/bin/lsappinfo', ['info', '-only', 'pid,CFBundleExecutablePath,LSApplicationHasSignalledItIsReady', asn]).catch(() => ({ stdout: '' }))).stdout
-  const at = /"CFBundleExecutablePath"="([^"]*)"/.exec(info)?.[1] ?? ''
-  return new RegExp(`^"pid"=${p.pid}$`, 'm').test(info) && /^"LSApplicationHasSignalledItIsReady"=true$/m.test(info) && !!at && (() => { try { return appBinOk(realpathSync(at), bin) } catch { return false } })()
+  const at = lsAppExe((await run('/usr/bin/lsappinfo', ['info', '-long', asn]).catch(() => ({ stdout: '' }))).stdout, p.pid)
+  return !!at && (() => { try { return appBinOk(realpathSync(at), bin) } catch { return false } })()
 }
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {

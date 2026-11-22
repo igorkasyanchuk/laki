@@ -26,7 +26,7 @@ import { type TabView, aiFromOf, latin, nonLatin, browseSays, fillTemplate, keyE
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
-import { appBinOk, appOf, helperBin, launcherOurs } from '../src/shared/helper.ts'
+import { appBinOk, appOf, helperBin, launcherOurs, lsAppExe } from '../src/shared/helper.ts'
 import { speechLine } from '../src/shared/speech.ts'
 import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
@@ -1506,4 +1506,15 @@ test("toolSummary: a run of tool calls in a few words for the Reader's pill", ()
   assert.equal(toolSummary('mcp__github__create_issue: x'), 'create_issue x')
   assert.equal(toolSummary('A\nB\nC\nD\nE'), 'A · B · C · +2 more')
   assert.equal(toolSummary('TodoWrite'), 'TodoWrite')
+})
+
+test('lsAppExe: lsappinfo -long’s executable for that pid once it signalled ready; macOS 27’s -only layout, a value posing as a key: none', () => {
+  const exe = '/Applications/Laki.app/Contents/MacOS/Laki'
+  const long = ['"ApplicationType"="Foreground"', '"BundleIdentifierLowerCase"="dev.laki.app"', `"CFBundleExecutablePath"="${exe}"`, '"CFBundleExecutablePathDeviceID"=16777230', '"LSApplicationHasSignalledItIsReady"=true', '"pid"=33600'].join('\n')
+  assert.equal(lsAppExe(long, 33600), exe)
+  assert.equal(lsAppExe(long, 336), undefined, 'another pid')
+  assert.equal(lsAppExe(long.replace('ItIsReady"=true', 'ItIsReady"=false'), 33600), undefined, 'not finished launching')
+  assert.equal(lsAppExe(`[ NULL ]  ASN:0x0-0xcc7cc7:\n    executable path="${exe}"\n    pid = 33600 !cgsConnection`, 33600), undefined, "macOS 27's -only: no keys")
+  assert.equal(lsAppExe(`${long}\n"CFBundleExecutablePath"="/tmp/x.app/Contents/MacOS/x"`, 33600), undefined, 'a key twice')
+  assert.equal(lsAppExe(`${long}\n"pid"=1`, 33600), undefined)
 })

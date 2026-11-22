@@ -23,6 +23,14 @@ export const launcherOurs = (text: string, app: string | undefined, home: string
 // S1 (core.ts appPeer): is this binary (a real path) the app's own, whose window may have the app's token? In a bundle:
 // the outer app's main executable (its Contents/MacOS), whether the daemon runs on that or on the helper inside; else
 // the daemon's own binary, or the one its Linux helper sits beside
+// S1 (core.ts appPeer): `lsappinfo info -long <asn>`'s answer for the process pid: its executable's path when it's that
+// pid's and has signalled it finished launching, each key once (a value never stands in for a key). -long: macOS 27's
+// `-only` prints its own layout without the keys (every relaunched window refused, 22 Nov 2026)
+export function lsAppExe(info: string, pid: number): string | undefined {
+  const one = (re: RegExp) => (m => (m.length === 1 ? m[0] : undefined))([...info.matchAll(re)])
+  const exe = one(/^"CFBundleExecutablePath"="([^"\n]*)"$/gm)?.[1]
+  return exe && one(new RegExp(`^"pid"=${pid}$`, 'gm')) && one(/^"LSApplicationHasSignalledItIsReady"=true$/gm) && one(/^"pid"=/gm) && one(/^"LSApplicationHasSignalledItIsReady"=/gm) ? exe : undefined
+}
 export function appBinOk(peer: string, execPath: string): boolean {
   const app = appOf(execPath)
   if (!app) return peer === (execPath.endsWith(NODE_SUFFIX) ? execPath.slice(0, -NODE_SUFFIX.length) : execPath)

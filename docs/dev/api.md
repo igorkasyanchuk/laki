@@ -685,8 +685,8 @@ you (`if (!tab) return p`). Now only two kinds of caller in no tab are you.
   (`ensureDaemon(env, true)`: the app's main, `scripts/demo.ts`; the test rig) spawns the daemon with a pipe on fd 3 and
   `LAKI_APP_PIPE=3`, and the daemon writes it there once daemon.json is written. An app that finds a daemon running (the
   CLI's, or one an earlier app left) sends `appPair` with daemon.json's token: `core.appPeer` gives it only to a GUI app
-  on the daemon's own binary that LaunchServices knows finished launching (`lsappinfo`'s
-  `LSApplicationHasSignalledItIsReady`: Electron as node, `open --env ELECTRON_RUN_AS_NODE=1` too, never says so), in no
+  on the daemon's own binary that LaunchServices knows finished launching (`lsappinfo info -long`'s
+  `LSApplicationHasSignalledItIsReady`, read by helper.ts' `lsAppExe`; macOS 27's `-only` prints no keys: Electron as node, `open --env ELECTRON_RUN_AS_NODE=1` too, never says so), in no
   tab; Linux: `/proc/<pid>/exe` and no `ELECTRON_RUN_AS_NODE` in its first environment. conn.ts keeps it in memory
   (`appToken()`, paired again when the daemon's pid changes) and main's `conn` IPC gives it to the app's pages, whose
   WebSocket sends it. A call or socket with it is yours with no lookup (`whoCalls`' `app`, `apps`); a `from` it says

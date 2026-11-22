@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- On macOS 27, Laki's window opened again onto a daemon that was still running (after Quit, or an update) is recognized as the app again: its terminals attach instead of saying *couldn't tell who's calling*.
 - Plan limits for Grok and Antigravity: Antigravity's 5-hour and weekly windows per model group from agy's own /usage (on by default, no turn, no quota), Grok's week from grok.com with its own sign-in (Settings › Layout › Ask grok.com, off by default); a workspace can start when their limit resets.
 - Grok, Antigravity and OpenCode tabs go to sleep when idle, as Claude Code's and Codex's do, and resume their chat on a look or a message; scheduled tasks and workflow blocks on them are tested end to end.
 - The Usage page and Today count Grok's and Antigravity's tabs too: tokens by day and model (Grok's with its own price), with their own filters; a Grok or Antigravity tab that hits its plan's limit shows when it resets, as Claude's and Codex's do.
