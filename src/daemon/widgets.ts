@@ -595,7 +595,7 @@ function watchRepos() {
         const n = String(f ?? '')
         if (n && n !== '.laki' && (flat || n.split(/[\\/]/)[0] !== 'extensions')) return // its workflows, the project's other files
         clearTimeout(timer)
-        timer = setTimeout(() => repoWatchers.get(r)?.w === w && scanWidgets(), 1000)
+        timer = setTimeout(() => repoWatchers.get(r)?.w === w && scanWidgets(), Number(process.env.LAKI_REPO_WATCH_MS) || 1000) // tests' shorter
       })
       w.on('error', () => (w.close(), repoWatchers.get(r)?.w === w && repoWatchers.delete(r)))
       repoWatchers.set(r, { w, at })

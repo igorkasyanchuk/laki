@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { overlaps, rangesOf, spanText } from '../src/shared/overlap.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 const DIFF = `diff --git cart.ts cart.ts
 index 1..2 100644
@@ -80,7 +80,7 @@ test('Check overlaps asks for one now; the radar, turned on, marks two worktrees
   writeFileSync(join(c.path, 'other.ts'), lines(30, i => (i === 2 ? 'c 2' : `line ${i}`))) // apart from both
   const view = async (id: string) => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === id)
   // off unless turned on: no marks; the workspace menu's Check overlaps reads one now
-  await new Promise(r => setTimeout(r, 900))
+  await sleep(900)
   assert.equal((await view(a.id)).overlaps, undefined)
   assert.deepEqual(await rig.rpc('overlapCheck', { ws: a.id }), [{ file: 'cart.ts', mine: [10, 12], theirs: [13, 13], ws: b.id }])
   assert.deepEqual(await rig.rpc('overlapCheck', { ws: c.id }), [])

@@ -821,7 +821,7 @@ const api = {
   clientRotate: p => clientAsk('rotate', p), // a new token (its scopes too), asked the same way
   clientRm: p => (c => (log(`trusted client ${c.label}: revoked`), clientLogMod.clientLogDrop(c.id), c))(clientsMod.clientRm(p.id)), // at once: no ask, it only takes away
   clientList: () => clientsMod.clientList().map(c => ({ ...c, use: clientUseOf(c), today: clientLogMod.callsToday(c.id) })),
-  remoteKeep: () => remoteMod.remoteKeep(), // T10: its idle clock starts over (the window's line, the push's Keep)
+  remoteKeep: p => remoteMod.remoteKeep(typeof p?.now === 'number' ? p.now : undefined), // T10: its idle clock starts over (the window's line, the push's Keep)
   clientLog: p => ({ lines: p.id ? clientLogMod.clientLogOf(clientsMod.clientFind(p.id).id, p.refused === true).slice(0, 2000) : [], unknown: clientLogMod.unknownTokens() }), // T12: { id, refused? }: what it did, newest first; calls with a token nobody has today // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
   clientAnswer: (p: In<typeof clientAnswer>) => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
   clientWho: p => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
@@ -1723,7 +1723,7 @@ setInterval(() => {
   if (ms <= 2000 || Date.now() - lateSaid < 60_000) return
   lateSaid = Date.now()
   log(`the event loop was blocked for ${(ms / 1000).toFixed(1)} s (API methods running then: ${who.join(', ') || 'none'})`)
-}, 2000).unref()
+}, Number(process.env.LAKI_LOOP_REPORT_MS) || 2000).unref() // tests' shorter
 // a remote page's outbox (renderer outbox.ts): a send or an answer it may send again after a lost reply carries its own
 // id (cid); the last CIDS of each device (else of the connection; /rpc's: rpc) are kept with their call: a repeat gets
 // its answer and isn't done again. A call that failed is forgotten (its retry runs)
@@ -2240,7 +2240,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('dndTick', 20_000, () => core.dndTick(), { idle: 'keep' }) // U8: Do not disturb ends on time, its digest shown
   ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
-  ticks.register('sweepRunning', 2000, core.sweepRunning, { idle: 'slow' })
+  ticks.register('sweepRunning', Number(process.env.LAKI_SWEEP_MS) || 2000, core.sweepRunning, { idle: 'slow' }) // tests' shorter
   ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so
   ticks.register('shellTick', 2000, core.shellTick, { idle: 'pause' })
   ticks.register('sleepTick', 60000, () => resourcesMod.sleepTick(), { idle: 'slow' })
@@ -2277,7 +2277,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)
   if (parent)
-    ticks.register('testParent', 2000, () => {
+    ticks.register('testParent', Number(process.env.LAKI_PARENT_MS) || 2000, () => {
       try {
         process.kill(parent, 0)
       } catch {

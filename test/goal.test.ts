@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { meterNew, meterOf } from '../src/daemon/share.ts'
-import { connect, fresh, seen, until } from './helpers.ts'
+import { connect, fresh, seen, until, sleep } from './helpers.ts'
 
 const line = (o: object) => `${JSON.stringify(o)}\n`
 const stamp = () => new Date().toISOString()
@@ -47,7 +47,7 @@ test('A1: while its goal works a tab stays running across turn ends, nothing tol
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: '/goal Make every e2e test pass' } })
   appendFileSync(file, goal({ met: false, condition: 'Make every e2e test in checkout/ pass without retries', reason: '2 still flaky' }))
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'fixed one' } })
-  await new Promise(r => setTimeout(r, 600))
+  await sleep(600)
   assert.equal((await rig.tab(ws.id)).status, 'running')
   assert.ok(!app.events.some((e: any) => e.ev === 'turn' && e.tab === tab.id && e.kind === 'done'), 'no done yet')
 

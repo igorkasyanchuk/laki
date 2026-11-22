@@ -116,11 +116,11 @@ test('ship: commits everything, pushes the branch, opens the PR; again replaces 
 })
 
 test('diff size, archive only when clean, the first-run checks', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_STAT_SCAN_MS: '150' } }) // diff sizes scanned every 0.15 s
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const stat = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.stat
-  await new Promise(r => setTimeout(r, 700))
+  await sleep(400) // 2 scans
   assert.equal(await stat(), undefined) // the Review tab's, on by default: only for a workspace a window shows
   assert.deepEqual(await rig.rpc('wsStat', { ws: ws.id }), { add: 0, del: 0, files: 0, dirty: 0, made: 0, gone: 0 }) // a row's hover card: asked for, now
   const app = await connect(rig)
@@ -148,7 +148,7 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   await until(async () => (await stat()) === undefined, 'no stat once archived')
   await rig.rpc('settingsSet', { diffStat: false })
   await rig.rpc('wsRestore', { id: ws.id })
-  await new Promise(r => setTimeout(r, 700))
+  await sleep(400)
   assert.equal(await stat(), undefined) // turned off
   // an agent switches the worktree to a branch of its own: the workspace follows it, and its PR is that branch's
   execFileSync('git', ['checkout', '-qb', 'agent-made'], { cwd: ws.path })
@@ -187,7 +187,7 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   assert.equal(asked.question, 'Do you want to proceed?') // the Needs you list's card
   assert.ok((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.needAt <= Date.now()) // waiting since
   const first = rig.rpc('answer', { tab: tab.id, n: 3 })
-  await new Promise(r => setTimeout(r, 100)) // it holds the tab for a second after its Enter
+  await sleep(100) // it holds the tab for a second after its Enter
   await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1 }), /being answered/) // a double click answers once
   assert.deepEqual(await first, { picked: 'No, and tell Claude what to do differently (esc)' })
   await until(async () => /picked: No, and tell Claude/.test(await rig.rpc('screen', { target: tab.id })), 'two down arrows then Enter')
@@ -342,7 +342,7 @@ test('what an agent publishes is kept as a link: its publish tool, the hosts its
   assert.ok(!readdirSync(dir).some(f => f.endsWith('.url')), 'no .url file left')
   // the same link again, another turn: nothing new
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'Still at https://shop.vercel.app' } })
-  await new Promise(r => setTimeout(r, 300))
+  await sleep(300)
   assert.equal(Object.keys(await urls()).length, 5)
   await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).links?.length === 5, 'in the view')
   // taken off: the gallery's right click
@@ -647,7 +647,7 @@ test('a managed policy that comes after a tab: the tab made in bypass permission
   await rig.stop()
   await rig.start()
   await until(async () => (await rig.screen((await rig.tab(asks.id, 'claude')).id)).includes('fake claude'), 'the one that asks resumes')
-  await sleep(1000)
+  await sleep(400) // its start refused in the same pass that resumed the other
   const tab = await rig.tab(free.id, 'claude')
   assert.equal(tab.status, 'exited')
   const ws = await rig.connect() // the notice waits for the window: sent as it connects

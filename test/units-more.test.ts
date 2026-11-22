@@ -32,6 +32,7 @@ import { menuModel } from '../src/renderer/src/menuModel.ts'
 import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/snapshot.ts'
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
 import { OUT_MAX, type OutItem, outAdd, outParams, outReplay } from '../src/renderer/src/outbox.ts'
+import { sleep } from './helpers.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
   assert.equal(newReview('t1:1'), true, 'nothing sent yet')
@@ -1045,7 +1046,7 @@ test('abortAfter fires after a GC: its timeout is held (AbortSignal.any alone ho
   let fired = false
   s.addEventListener('abort', () => (fired = true))
   for (let i = 0; i < 5; i++) gc(), await new Promise(r => setImmediate(r))
-  await new Promise(r => setTimeout(r, 400))
+  await sleep(400)
   assert.ok(fired, 'the timeout fired')
   assert.equal((s.reason as Error).name, 'TimeoutError')
   const early = abortAfter(60_000, outer.signal)

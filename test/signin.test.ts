@@ -6,7 +6,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { signedOutIn } from '../src/daemon/signin.ts'
-import { connect, fresh, seen, until } from './helpers.ts'
+import { connect, fresh, seen, until, sleep } from './helpers.ts'
 
 test('A2: the words that mean signed out (claude, codex), and ones that don\'t', () => {
   for (const s of ['Not logged in · Please run /login', 'Invalid API key · Please run /login', 'OAuth token has expired. Please obtain a new token or refresh your existing token.', 'API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}', 'ChatGPT account ID not available, please re-run codex login', 'OAuth refresh token was rejected: sign in again'])
@@ -46,7 +46,7 @@ test('A2: signed out: the band keeps the message; Sign in runs claude auth login
   await until(async () => !(await rig.tab(ws.id)).signedOut, 'the band gone')
   await rig.rpc('send', { target: tab, text: 'needlogin once more' })
   await until(async () => (await rig.tab(ws.id)).signedOut?.step === 'out', 'signed out again')
-  await new Promise(r => setTimeout(r, 400)) // its credentials (none) read first
+  await sleep(400) // its credentials (none) read first
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'fake-elsewhere' } }))
   await until(async () => (await rig.tab(ws.id)).signedOut?.step === 'in', 'noticed')
   await until(async () => !(await rig.tab(ws.id)).signedOut && (await rig.tab(ws.id)).status === 'idle', 'sent, answered')

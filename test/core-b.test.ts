@@ -19,7 +19,7 @@ const fakeLog = (rig: Rig) => readFileSync(rig.env.FAKE_LOG, 'utf8')
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } })
 
 test('ports: a kill refused (gone, not yours), one already ended; sleep skips a tab whose port is in its tree; limits; resources', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_KILL_AFTER_MS: '300' } }) // the SIGKILL check 0.3 s after its SIGTERM, not 3
   const app = await rig.connect()
   t.after(() => app.ws.close())
   const d = join(rig.home, 'fake')
@@ -125,7 +125,7 @@ exec /usr/sbin/lsof "$@"
   assert.equal(await rig.rpc('tabSleep', { tab: tab.id }), false) // asleep already
   assert.equal((await rig.tab(ws.id)).asleep, true)
 
-  await sleep(Math.max(0, killedAt + 3300 - Date.now())) // the SIGKILL check ran, and the daemon is fine
+  await sleep(Math.max(0, killedAt + 600 - Date.now())) // the SIGKILL check ran (0.3 s on here), and the daemon is fine
   assert.equal(await rig.rpc('ping'), 'pong')
 })
 
@@ -450,7 +450,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '300', LAKI_ANSWER_HOLD_MS: '300' } }) // a wait's push 0.3 s on, an answer's hold 0.3 s
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
   const a = await rig.tab(ws.id)
@@ -459,10 +459,10 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   for (const x of [a, b]) await until(async () => /> $/m.test(await rig.screen(x.id)), 'claude up')
   await rig.rpc('settingsSet', { webhook: { url, answer: true, replyTopic: 'r1' } }) // ntfy, the default
 
-  // a wait that's over within the 800 ms before its push: none goes
+  // a wait that's over within the 0.3 s before its push: none goes
   await rig.rpc('hook', { tab: a.id, state: 'waiting', payload: { message: 'quick one' } })
   await rig.rpc('hook', { tab: a.id, state: 'running' })
-  await sleep(1000)
+  await sleep(500)
   assert.equal(posts.length, 0)
   await state(rig) // seen running: its next wait pushes
   await rig.rpc('hook', { tab: a.id, state: 'idle', payload: {} })
@@ -502,7 +502,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   const na2 = await menu(a.id)
   await rig.rpc('answer', { tab: a.id, n: 1 })
   await until(async () => (await statusOf(a.id)) === 'idle', 'a answered again')
-  await sleep(1100) // answer holds a tab a second after its Enter
+  await sleep(450) // answer holds a tab 0.3 s after its Enter here
   replies.push(JSON.stringify({ event: 'message', id: 'm2', message: na2[2] }))
   await rig.rpc('phoneTick')
   await sleep(300)
@@ -652,7 +652,7 @@ test('scheduled tasks: the default agent, empty prompts and times, edits that ke
   await rig.rpc('scheduleSet', { id: s2.id, on: true })
   writeFileSync(join(rig.repo, '.git/hooks/post-checkout'), '#!/bin/sh\nsleep 0.3\n', { mode: 0o755 }) // a worktree that takes a while (Linux makes one in under 30 ms)
   const tick = rig.rpc('scheduleTick', { now: due + 1000 })
-  await sleep(30)
+  await sleep(30) // the tick under way (its worktree being made) as the task goes
   await rig.rpc('scheduleRm', { id: s2.id })
   await tick
   const runs = (await state(rig)).runs

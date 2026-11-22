@@ -20,13 +20,13 @@ test('single instance: a second daemon exits', async t => {
 })
 
 test('a blocked event loop: one line in the log with how long and the API method that held it', async t => {
-  const rig = await fresh(t, { env: { LAKI_TEST_BUSY: 'cliState' } })
+  const rig = await fresh(t, { env: { LAKI_TEST_BUSY: 'cliState', LAKI_LOOP_REPORT_MS: '400' } }) // the loop's report every 0.4 s, not 2
   await rig.rpc('cliState') // 3 s of a busy loop inside the call
   await until(() => /the event loop was blocked for [2-9]\.\d s \(API methods running then: [^)]*cliState/.test(rig.out), "the blocked loop's line").catch(e => {
     throw new Error(`${e.message}; the log then: ${rig.out.slice(-600)}`) // as it was at the timeout, not as the wait began
   })
   await rig.rpc('cliState')
-  await sleep(2500)
+  await sleep(900) // past main.ts' next report, which would say it again
   assert.equal(rig.out.match(/the event loop was blocked/g)?.length, 1, 'once a minute at most')
 })
 
@@ -35,12 +35,12 @@ test("a test's daemon goes with its test process (LAKI_TEST_PARENT): a run kille
   await rig.stop()
   const parent = spawn('sleep', ['60']) // stands in for the test process
   const daemon = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/daemon/main.ts', import.meta.url))], {
-    env: { ...rig.env, LAKI_TEST_PARENT: String(parent.pid) },
+    env: { ...rig.env, LAKI_TEST_PARENT: String(parent.pid), LAKI_PARENT_MS: '200' }, // its parent looked at every 0.2 s, not 2
     stdio: 'ignore',
   })
   t.after(() => (parent.kill(), daemon.kill()))
   await until(() => rig.rpc('ping').then(r => r === 'pong'), 'the daemon up')
-  await sleep(2500) // a check or more while its parent lives
+  await sleep(700) // a check or more (every 0.2 s here) while its parent lives
   assert.ok(running(daemon.pid!), 'stays while its parent runs')
   parent.kill()
   await until(() => !running(daemon.pid!), 'gone with its parent')
@@ -301,13 +301,13 @@ test("a restart stopped a claude chat's background commands: the resumed tab is 
   // nor shown as running in the status bar's Background chip (their ends never come)
   await sleep(800)
   assert.deepEqual((await rig.rpc('state')).tabs.find((x: any) => x.id === live.id).background?.now ?? [], [])
-  await sleep(1500)
+  await sleep(500) // 1.3 s past the other's: said in the same pass
   assert.ok(!(await rig.screen(ended.id)).includes('Laki restarted'), 'its task ended: nothing said')
   // again: those were named already (their ends never come), nothing new to say
   await rig.stop()
   await rig.start()
   await until(async () => (await rig.screen(live.id)).includes('fake claude'), 'resumed again')
-  await sleep(1500)
+  await sleep(1500) // as long as the first start's took to tell it, and more
   assert.ok(!(await rig.screen(live.id)).includes('Laki restarted'), 'not named twice')
 })
 

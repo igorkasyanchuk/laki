@@ -389,7 +389,7 @@ test("T9, T11: a token ends (90 days; never only when picked on the card), rotat
 })
 
 test("T12: each client's log: a refusal with its reason, 20 reads one line of 20, never a message's text; a revoked token counted, never kept; the log is yours alone", async t => {
-  const rig = await fresh(t, { env: { LAKI_TERM_WAIT: '5000' } })
+  const rig = await fresh(t, { env: { LAKI_TERM_WAIT: '5000', LAKI_CLIENT_LOG_MS: '200' } }) // a folded line rewritten 0.2 s on, not 5
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const app = await connect(rig)
   const made = rig.rpc('clientAdd', { label: 'Logger' })
@@ -413,8 +413,7 @@ test("T12: each client's log: a refusal with its reason, 20 reads one line of 20
   const refused = (await rig.rpc('clientLog', { id: 'logger', refused: true })).lines
   assert.ok(refused.length === 2 && refused.every((l: any) => !l.ok), JSON.stringify(refused))
   await until(() => existsSync(join(rig.data, 'client-log', 'logger.jsonl')), 'its file')
-  await new Promise(r => setTimeout(r, 5500)) // its folded line written
-  const file = readFileSync(join(rig.data, 'client-log', 'logger.jsonl'), 'utf8')
+  const file = await until(() => (f => (f.includes('"n":20') ? f : ''))(readFileSync(join(rig.data, 'client-log', 'logger.jsonl'), 'utf8')), 'its folded line written (0.2 s on here)')
   assert.ok(!file.includes(SAID) && !JSON.stringify(lines).includes(SAID), 'never the text it sent')
   assert.ok(file.includes('"n":20'), file)
   assert.equal(statSync(join(rig.data, 'client-log', 'logger.jsonl')).mode & 0o777, 0o600)

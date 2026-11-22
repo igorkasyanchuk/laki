@@ -6,16 +6,14 @@ import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'nod
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 const make = (rig: any, id: string, m: object) => {
   mkdirSync(join(rig.data, 'widgets', id), { recursive: true })
   writeFileSync(join(rig.data, 'widgets', id, 'widget.json'), JSON.stringify(m))
 }
-const logs = async (rig: any, id: string, o: object = {}) => {
-  await new Promise(r => setTimeout(r, 650)) // written in batches every 500 ms
-  return rig.rpc('widgetLogs', { id, ...o })
-}
+// a read has the lines not written yet too (widgetLogs.ts readLog): none waited for
+const logs = (rig: any, id: string, o: object = {}) => rig.rpc('widgetLogs', { id, ...o })
 
 test('logs: nothing while off; Laki’s lines, a run’s line and its stderr with their levels, once on for all or for one', async t => {
   const rig = await fresh(t)
@@ -42,6 +40,7 @@ test('logs: nothing while off; Laki’s lines, a run’s line and its stderr wit
   assert.ok(seen.findIndex((l: string) => l.endsWith('it broke')) < seen.findIndex((l: string) => /ran \(manual\)/.test(l)), 'stderr before the run’s line')
   const ns = r.lines.map((l: any) => l.n)
   assert.deepEqual(ns, [...ns].sort((a, b) => a - b))
+  await until(() => existsSync(join(rig.data, 'widget-data', 'x.log')), 'its file, at the next write (a batch every 500 ms)')
   assert.equal((statSync(join(rig.data, 'widget-data', 'x.log')).mode & 0o777).toString(8), '600')
   const v = (await rig.rpc('state')).widgets.find((w: any) => w.id === 'x')
   assert.equal(v.log, true)
@@ -76,7 +75,7 @@ test('logs: nothing while off; Laki’s lines, a run’s line and its stderr wit
 })
 
 test('logs: laki widget log (exit 0 while off), a secret masked, laki widget logs -f, rotation, the trash, a remix', async t => {
-  const rig = await fresh(t, { env: { LAKI_WIDGET_LOG_MAX: '4000' } })
+  const rig = await fresh(t, { env: { LAKI_WIDGET_LOG_MAX: '4000', LAKI_WIDGET_LOG_MS: '30' } })
   make(rig, 'y', { name: 'Y', config: { token: { type: 'secret' }, api_key: 'zzzz9999', who: 'me' }, fetch: 'echo "using $WIDGET_TOKEN and $WIDGET_API_KEY for $WIDGET_WHO" >&2; echo {}' })
   await rig.rpc('widgetReload')
   await rig.rpc('widgetSet', { id: 'y', on: true, config: { token: 'abcd1234' } })
@@ -113,7 +112,7 @@ test('logs: laki widget log (exit 0 while off), a secret masked, laki widget log
   // past LOG_MAX: <id>.log.1 and <id>.log, two at most; read across both, in order
   for (let i = 0; i < 6; i++) {
     await rig.rpc('widgetLog', { id: 'y', text: `line ${i} ${'x'.repeat(1900)}` }) // two a file: rotated more than once
-    await new Promise(r => setTimeout(r, 550))
+    await sleep(80) // a flush between lines (LAKI_WIDGET_LOG_MS: 30): two a file, rotated more than once
   }
   const files = readdirSync(join(rig.data, 'widget-data')).filter(n => n.startsWith('y.log'))
   assert.deepEqual(files.sort(), ['y.log', 'y.log.1'])

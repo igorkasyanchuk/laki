@@ -205,7 +205,7 @@ test('tools: laki mcp lists ext_ tools only with a daemon running, and routes ca
   assert.deepEqual(await asked, { text: 'Said hi.' })
   assert.match(hits[1].messages.at(-1).content, /hi ai/)
   assert.match(hits[0].messages[0].content[0].text, /laki_extension_tools/, 'its instructions say so')
-  await sleep(10)
+  await sleep(10) // its last log line written before the rig stops
 })
 
 test('an agent can’t get around the ask: laki widget action asks (a tool as its tool says), on is refused, dev links off, check runs no off one', async t => {

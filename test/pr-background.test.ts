@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 test("the timer's scans spare GitHub's quota: a quiet PR waits, a low quota waits; Refresh asks at once", async t => {
   const rig = await fresh(t, { env: { LAKI_PR_BG: '1' } })
@@ -38,7 +38,7 @@ test("the timer's scans spare GitHub's quota: a quiet PR waits, a low quota wait
 })
 
 test("a low GraphQL quota: the timer's scans wait for its reset, Laki's log says so with its own gh calls", async t => {
-  const rig = await fresh(t, { env: { LAKI_PR_BG: '1' } })
+  const rig = await fresh(t, { env: { LAKI_PR_BG: '1', LAKI_PR_SCAN_MS: '200' } })
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
   writeFileSync(join(gh, 'ratelimit.json'), JSON.stringify({ limit: 5000, remaining: 12, reset: Math.floor(Date.now() / 1000) + 3600 }))
@@ -47,8 +47,8 @@ test("a low GraphQL quota: the timer's scans wait for its reset, Laki's log says
   await until(() => /GraphQL quota has 12 left, the timer's scans wait until \d\d:\d\d \(Laki's own gh calls \d+ since/.test(rig.out), 'said')
   const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr view')).length
   const n = views()
-  await new Promise(r => setTimeout(r, 2500))
-  assert.ok(views() <= n + 1, `none while low (a new branch's own scan aside): ${views() - n} more`) // the timer's: ~5 in that time
+  await sleep(1000)
+  assert.ok(views() <= n + 1, `none while low (a new branch's own scan aside): ${views() - n} more`) // the timer's: ~5 in that time (a scan every 0.2 s)
   const m = views()
   await rig.rpc('prRefresh') // yours: at once
   assert.equal(views(), m + 1)

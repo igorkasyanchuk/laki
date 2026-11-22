@@ -7,7 +7,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync
 import { join } from 'node:path'
 import { test } from 'node:test'
 import type { SimCheck, SimDev } from '../src/shared/types.ts'
-import { fresh, type Rig, until, tokenOf, farFetch } from './helpers.ts'
+import { fresh, type Rig, until, tokenOf, farFetch, sleep } from './helpers.ts'
 
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
 // a 1×1 PNG: what the fake simulator's screenshot writes
@@ -129,7 +129,7 @@ test("Run ▾'s scripts: a tab each, named as it, replaced when run again; Enter
   await until(async () => (await rig.screen(dep.id)).includes('Run ▾ › Deploy runs it again'), 'the deploy ended')
   await rig.rpc('input', { tab: dep.id, data: '\r' })
   assert.equal((await rig.tab(ws.id, 'deploy'))?.status, 'exited') // a restart would be running at once
-  await new Promise(r => setTimeout(r, 500))
+  await sleep(500)
   assert.equal(readFileSync(join(rig.home, 'deploys'), 'utf8'), 'x\n')
   assert.match((await rig.cli('run', ws.id, 'lint')).out, /started lint/)
   assert.equal((await rig.tab(ws.id, 'lint'))?.status, 'running') // while its command runs

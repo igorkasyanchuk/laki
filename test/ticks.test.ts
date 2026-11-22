@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loops, register, setIdle, SLOW, stopAll } from '../src/daemon/ticks.ts'
+import { sleep } from './helpers.ts'
 
 // H4.5: while idle, 'pause' skips, 'slow' runs every SLOW-th tick, 'keep' runs as ever; back at full speed at once
 test('ticks: idle pauses, slows or keeps each loop; a throw is logged, never stops it', async t => {
@@ -14,7 +15,7 @@ test('ticks: idle pauses, slows or keeps each loop; a throw is logged, never sto
     n.thrown++
     throw new Error('boom')
   })
-  const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
+  const wait = sleep
   await wait(500)
   assert.equal(n.pause, 0)
   assert.ok(n.keep >= 20, `keep: ${n.keep}`)

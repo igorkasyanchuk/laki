@@ -28,9 +28,9 @@ test('kept turns: three survive a restart, each diff its own; rewind, and a rewi
   await turn('drop b', () => rmSync(file('b.txt')))
   // a turn that changes nothing isn't kept
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'nothing' } })
-  await sleep(300)
+  await sleep(300) // its snapshot first, as claude's first tool call comes after the hook
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
-  await sleep(500)
+  await sleep(500) // a turn kept would be listed by now
   let list = await rig.rpc('turnList', { ws: ws.id })
   assert.deepEqual(list.map((x: any) => [x.n, x.tab, x.prompt, x.count, x.add, x.del, x.files.map((f: any) => `${f.status} ${f.path}`).join()]), [
     [1, tab.id, 'add a', 1, 1, 0, 'A a.txt'],
@@ -105,7 +105,7 @@ test('R11: Since I reviewed: a mark, a later turn changes two files, the diff si
   const file = (name: string) => join(ws.path, name)
   const turn = async (prompt: string, edit: () => void) => {
     await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt } })
-    await sleep(300)
+    await sleep(300) // its snapshot first, as claude's first tool call comes after the hook
     edit()
     await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
     await until(async () => (await rig.rpc('turnList', { ws: ws.id })).at(-1)?.prompt === prompt, `turn kept: ${prompt}`)

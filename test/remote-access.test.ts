@@ -9,7 +9,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
-import { connect, fresh, until, tokenOf, farFetch, farKey, FarWs } from './helpers.ts'
+import { connect, fresh, until, tokenOf, farFetch, farKey, FarWs, sleep } from './helpers.ts'
 
 const kids = (data: string) => (f => (existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as { pid: number }[]) : []))(join(data, 'children.json'))
 const saved = (data: string) => JSON.parse(readFileSync(join(data, 'state.json'), 'utf8')).remote
@@ -116,9 +116,8 @@ test('D2: remote access started again when cloudflared ends (a quick one: a new 
   const s = saved(rig.data)
   writeFileSync(join(rig.data, 'state.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')), remote: { ...s, until: Date.now() - 1000 } }))
   await rig.start()
-  await new Promise(r => setTimeout(r, 1500))
+  await until(() => saved(rig.data) === undefined, 'its time was up: forgotten as the daemon started (remoteBack)')
   assert.equal(await remote(), undefined)
-  assert.equal(saved(rig.data), undefined)
 
   // stopped by you: final, not back after a restart
   await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev' })
@@ -126,7 +125,7 @@ test('D2: remote access started again when cloudflared ends (a quick one: a new 
   assert.equal(saved(rig.data), undefined)
   await rig.stop()
   await rig.start()
-  await new Promise(r => setTimeout(r, 1500))
+  await sleep(800) // remoteBack's moment after the start (after reapChildren): nothing comes back
   assert.equal(await remote(), undefined)
 })
 
@@ -534,29 +533,25 @@ test("T10: remote access turns itself off without a device: a device's call and 
   const { port } = rig.info()
   const url = 'https://laki.example.dev'
   const app = await connect(rig)
-  const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
   const st = async () => (await rig.rpc('state')).remote
   await rig.rpc('settingsSet', { remoteIdleOff: 4 / 3600 }) // 4 s
   const on = await rig.rpc('remoteStart', { hours: 1, host: '' })
   const jar = (await pinRaw(port, url, { token: tokenOf(on.link), pin: on.pin })).cookie!.split(';')[0]
   assert.ok((await st()).idleOffAt > Date.now(), 'its countdown in the view')
-  // a device's calls keep it on
+  // a device's calls keep it on: each one's clock 3 s on (the test's now) is inside the 4, three times, 9 s in all
   for (let i = 0; i < 3; i++) {
-    await wait(1500)
     assert.equal(await rpcAt(port, url, jar), 200)
-    await rig.rpc('remoteTick')
+    await rig.rpc('remoteTick', { now: Date.now() + 3000 })
   }
   assert.ok(await st(), 'still on: a device used it')
   assert.ok(app.events.some((e: any) => e.ev === 'remoteIdle' && /Remote access turns off in/.test(e.text)), 'the line in the window, before the limit')
-  // Keep (the window's line, the push's tap) too
-  await wait(2500)
-  await rig.rpc('remoteKeep')
-  await wait(2500)
-  await rig.rpc('remoteTick')
+  // Keep (the window's line, the push's tap) too: kept 2.5 s on, it's still on 5 s on, past the device's 4
+  const t0 = Date.now()
+  await rig.rpc('remoteKeep', { now: t0 + 2500 })
+  await rig.rpc('remoteTick', { now: t0 + 5000 })
   assert.ok(await st(), 'still on: kept')
   // none: off, as Stop does; the device's call refused; a notice with Turn on again, its devices still paired
-  await wait(4200)
-  await rig.rpc('remoteTick')
+  await rig.rpc('remoteTick', { now: t0 + 2500 + 4200 })
   assert.equal(await st(), undefined)
   assert.notEqual(await rpcAt(port, url, jar), 200)
   const notice: any = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Remote access is off'), 'the notice')
@@ -570,8 +565,7 @@ test("T10: remote access turns itself off without a device: a device's call and 
   // laki serve's (headless): never off for want of a device
   await rig.rpc('remoteStart', { hours: 1, host: '', serve: true })
   assert.equal((await st()).idleOffAt, undefined)
-  await wait(4500)
-  await rig.rpc('remoteTick')
+  await rig.rpc('remoteTick', { now: Date.now() + 4500 })
   assert.ok(await st(), "laki serve's stays")
   await rig.rpc('remoteStop')
   // the setting is yours: an agent's and a phone's settingsSet refused
@@ -610,18 +604,17 @@ test("T10: the push's Keep, tapped, starts its clock over; after a restart, the 
     }
   }
   const push = await until(() => posts.map(x => parse(x.body)).find(j => j?.actions?.some((a: { label: string }) => /Keep/.test(a.label))), 'the push with Keep')
-  await new Promise(r => setTimeout(r, 1500))
+  await sleep(20) // the tap's clock a later ms than the start's
   await rig.rpc('phoneTick') // a poll before the tap: the Keep it waits for stays (not pruned as a tab's ask would be)
   queue.push(JSON.stringify({ event: 'message', id: 'k1', message: push.actions[0].body }))
   await rig.rpc('phoneTick')
-  await until(async () => (await st())?.idleOffAt > was + 1000, 'its clock started over by the tap')
+  await until(async () => (await st())?.idleOffAt > was, 'its clock started over by the tap')
   // a daemon restart: what it was started with is kept, so the notice's Turn on again starts it again
   await rig.stop()
   await rig.start()
   await until(async () => !!(await st()), 'back after the restart')
   const app = await connect(rig)
-  await new Promise(r => setTimeout(r, 4200))
-  await rig.rpc('remoteTick')
+  await rig.rpc('remoteTick', { now: Date.now() + 4200 }) // past its 4 s, by the test's clock
   await until(async () => (await st()) === undefined, 'off without a device')
   const notice: any = await until(() => app.events.find((e: any) => e.ev === 'notice' && e.title === 'Remote access is off'), 'the notice')
   await app.call('alertAnswer', { id: notice.id, choice: 'Turn on again' })

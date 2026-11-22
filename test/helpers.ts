@@ -1,7 +1,7 @@
 // Test rig: a temp LAKI_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
@@ -36,7 +36,13 @@ const entry = (src: string, out: string) => join(root, built() ? out : src)
 // R9: one multiplier for every wait's limit (until, seen; not sleep): LAKI_TEST_SLOW, else from the load as this file
 // starts (1 on a quiet machine, up to 3 with more runnable processes than cores: a release build beside the tests)
 export const SLOW = Number(process.env.LAKI_TEST_SLOW) || Math.max(1, Math.min(3, Math.round(loadavg()[0] / cpus().length)))
-export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms)) // as written: a settle's length is part of some tests (a timer's seconds, a debounce)
+// as written: a settle's length is part of some tests (a timer's seconds, a debounce). LAKI_TEST_SLEEPS=<file>: each
+// one's caller (test/<file>:<line>) and ms appended there, a line each (the sleeps' list and total: how long tests wait
+// on nothing)
+export const sleep = (ms: number) => {
+  if (process.env.LAKI_TEST_SLEEPS) appendFileSync(process.env.LAKI_TEST_SLEEPS, `${/(test\/[\w.-]+\.ts:\d+)/.exec(new Error().stack?.split('\n').slice(2).find(l => !l.includes('helpers.ts')) ?? '')?.[1] ?? '?'}\t${ms}\n`)
+  return new Promise(r => setTimeout(r, ms))
+}
 
 // whether a process exists (signal 0 only checks)
 export function running(pid: number) {

@@ -50,7 +50,7 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   // (one that would end the paste) is dropped
   await rig.rpc('send', { target: ws.id, text: 'the button main > a.cta \x1b[201~x\x03\x04', enter: false })
   await until(async () => (await rig.screen(tab.id)).includes('the button main > a.cta x'), 'in the prompt')
-  await new Promise(r => setTimeout(r, 600))
+  await sleep(600)
   tv = await rig.tab(ws.id)
   assert.equal(tv.status, 'idle')
   assert.equal(tv.last, 'answer: fourth') // no Enter, no turn
@@ -70,7 +70,7 @@ test("claude's Stop while its background subagents work: still running, no ●, 
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'review it' } })
   const bg = [{ type: 'subagent', status: 'running' }, { type: 'shell', status: 'running' }]
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Started 2 reviewers.', background_tasks: bg } })
-  await new Promise(r => setTimeout(r, 300))
+  await sleep(300)
   let tv = await rig.tab(ws.id)
   assert.deepEqual([tv.status, tv.done, tv.last], ['running', false, 'answer: first task'])
   assert.ok(!watcher.events.some(e => e.ev === 'turn' && e.kind === 'done'))
@@ -158,7 +158,7 @@ test("agy's exit line: the last conversation id on screen is its chat; agy typed
 })
 
 test('agy (the gemini agent): no hooks, its OSC 7501 says each turn and ask; the chat it printed as it exited resumes', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_SWEEP_MS: '300' } }) // the screen sweep every 0.3 s, not 2
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   assert.ok((await rig.rpc('state')).presets.some((x: any) => x.name === 'gemini'), 'agy on PATH: a default preset')
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', prompt: 'hello agy' })
@@ -170,7 +170,7 @@ test('agy (the gemini agent): no hooks, its OSC 7501 says each turn and ask; the
   // blocked: waiting, and it stays so while the screen sweep (2 s) would read a quiet title as answered
   await rig.rpc('input', { tab: tab.id, data: 'ask to edit\r' })
   await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting: state=blocked')
-  await sleep(2500)
+  await sleep(1000) // three sweeps (every 0.3 s here): still waiting
   assert.equal((await rig.tab(ws.id)).status, 'waiting')
   await rig.rpc('input', { tab: tab.id, data: '1\r' })
   await until(async () => (await rig.screen(tab.id)).includes('answer: allowed ask to edit'), 'answered')
@@ -206,7 +206,7 @@ test('opencode: Laki\'s plugin reports its session and turns (not a subagent\'s)
   // an error, then the idle after it: one end of turn, so the limit it set stays
   await rig.rpc('input', { tab: tab.id, data: 'hit the limit\r' })
   const hit = await until(async () => (await rig.tab(ws.id)).limit && (await rig.tab(ws.id)), 'limit from the error')
-  await new Promise(r => setTimeout(r, 1500))
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'the idle after it')
   assert.equal((await rig.tab(ws.id)).limit, hit.limit, 'the idle after the error keeps the limit')
   await rig.rpc('input', { tab: tab.id, data: 'ask first\r' })
   await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting on a permission')
@@ -251,7 +251,7 @@ test("claude's PreToolUse and PostToolUse run in the background (async); a late 
   const tab = await rig.tab(ws.id)
   await until(async () => (await rig.tab(ws.id)).last === 'answer: tools 2', 'Stop')
   assert.match(rig.fakeLog().find((l: any) => l.tab === tab.id).args.join(' '), /--settings \S+\/claude-settings\.json/) // no gate on
-  await new Promise(r => setTimeout(r, 1200)) // the late ones in by now
+  await sleep(700) // the late ones in by now (FAKE_HOOK_DELAY: 0.4 s)
   assert.equal((await rig.tab(ws.id)).status, 'idle')
   // by when each started: an older one is late, a newer one counts
   const at = Date.now() + 60_000
@@ -367,7 +367,7 @@ test('the fakes echo; FAKE_SCRIPT is the demo only', async t => {
 // No, and say why (answer's say): claude's own tell-why choice gets the words typed into its box; a plain No sends
 // them as its next message once it took the answer; never with a yes, never an agent's
 test("No, and say why: the tell-why choice, then the words as its next prompt; a plain No, the words after it; a yes can't", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_ANSWER_HOLD_MS: '200' } }) // an answer's hold 0.2 s, not 1
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const tab = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
@@ -384,7 +384,7 @@ test("No, and say why: the tell-why choice, then the words as its next prompt; a
   await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)?.status === 'idle', 'its turn done')
   await rig.rpc('send', { target: tab, text: 'menuno' })
   await until(async () => (await ask()).options.length === 2, 'the Yes / No menu')
-  await sleep(1000) // answer's hold (core's answering: a second after the last one): a built daemon gets here sooner
+  await sleep(300) // answer's hold (core's answering: 0.2 s after the last one here)
   assert.deepEqual(await rig.rpc('answer', { tab, n: 2, say: 'build it first' }), { picked: 'No' })
   await until(async () => /picked: No\r?\n[\s\S]*answer: build it first/.test(await screen()), 'the No, then the words')
 })

@@ -82,7 +82,7 @@ const soonAt = new Map<string, number>()
 export function prSoon(ws: string) {
   if (state.settings?.bgRefresh === false || Date.now() - (soonAt.get(ws) ?? 0) < 20000) return
   soonAt.set(ws, Date.now())
-  setTimeout(() => void scanPRs(false, new Set([ws])), 2000)
+  setTimeout(() => void scanPRs(false, new Set([ws])), Number(process.env.LAKI_PR_SOON_MS) || 2000) // tests' shorter
 }
 
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)

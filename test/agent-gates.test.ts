@@ -338,7 +338,7 @@ test("S7: an agent's file in a browser is refused; its tunnel asks (a no leaves 
 // F14: a project's auto-answer rules are the user's: an agent can't add or change one; a matching ask is answered Allow
 // as the user's click would (counted on the rule, said on the tab), a near miss and a risky command stay asked
 test("F14: an agent can't add an auto-answer rule; a matching ask is answered, a near miss and the deny list aren't", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_ANSWER_HOLD_MS: '200' } }) // each answer holds its tab 0.2 s, not 1: the loop answers again soon
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
   const tab = await until(() => rig.tab(ws.id))
@@ -358,7 +358,7 @@ test("F14: an agent can't add an auto-answer rule; a matching ask is answered, a
   for (const cmd of ['npm testx', 'git push --force origin main']) {
     await rig.rpc('send', { target: tab.id, text: `perm bash :: ${cmd}` })
     await until(async () => (t => t.status === 'waiting' && t.ask?.what === cmd)(await now()), `${cmd} asked`)
-    await new Promise(r => setTimeout(r, 1500)) // past the rule's wait for the menu
+    await sleep(450) // a matching rule answers within 0.2 s of its menu (autoAllow): none does
     assert.equal((await now()).status, 'waiting', cmd)
     await rig.rpc('answer', { tab: tab.id, pick: 'last' })
     await until(async () => (await now()).status !== 'waiting', 'answered No')
@@ -407,7 +407,7 @@ test("What its agents did: an agent's wsNew and a refused merge are logged with 
 // F15: Always ask for holds a matching ask from a rule (its card says why); five Allows of one kind in a row suggest a
 // rule once, a Deny or a failed Done check starts over, a risky command never; the globs and the pick are the user's
 test("F15: an always-ask glob beats a rule; five allows suggest one rule; a deny or a failed check starts over; never a risky one; never an agent's", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_ANSWER_HOLD_MS: '200' } }) // an answer holds its tab 0.2 s, not 1
   const app = await connect(rig)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
@@ -427,7 +427,7 @@ test("F15: an always-ask glob beats a rule; five allows suggest one rule; a deny
   await rig.rpc('send', { target: tab.id, text: 'perm bash :: npm test db/migrations/001.sql' })
   const held = await until(async () => (x => x.status === 'waiting' && x)(await now()), 'asked')
   assert.equal(held.held, '**/migrations/**')
-  await sleep(1500) // past a rule's wait for the menu
+  await sleep(450) // a matching rule answers within 0.2 s of its menu (autoAllow): none does
   assert.equal((await now()).status, 'waiting')
   await rig.rpc('answer', { tab: tab.id, pick: 'last' })
   await until(async () => (await now()).status !== 'waiting', 'answered No')

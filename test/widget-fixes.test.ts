@@ -84,7 +84,10 @@ test('events: one refresh waits per extension, not one per event', async t => {
   rmSync(go)
   await Promise.all(Array.from({ length: 6 }, () => rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'x' } })))
   writeFileSync(go, '')
-  await sleep(2500)
+  const runs = () => (existsSync(join(home, 'fetch.log')) ? readFileSync(join(home, 'fetch.log'), 'utf8').trim().split('\n').length : 0)
+  await until(async () => runs() > before && !(await find(rig, 'busy')).running, 'one fetch for them')
+  await sleep(500) // a queued one starts as that one ends
+  await until(async () => !(await find(rig, 'busy')).running, 'the queued one done')
   const after = readFileSync(join(home, 'fetch.log'), 'utf8').trim().split('\n').length
   assert.ok(after - before <= 2, `${after - before} fetches for 6 events: one now, one queued`)
 })
@@ -102,7 +105,7 @@ test('a fetch that fails waits twice its every, then 4 and 8 times; a good one r
   const at = store(rig, 'flaky').at
   const tick = async (min: number) => {
     await rig.rpc('widgetTick', { now: at + min * 60_000 + 1000 })
-    await sleep(300)
+    await sleep(300) // the tick's fetch started (running), then waited out
     await until(async () => !(await find(rig, 'flaky')).running, 'idle')
     return store(rig, 'flaky')
   }

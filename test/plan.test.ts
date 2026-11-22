@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { planCount, planDone, planFrom, planNow } from '../src/shared/todos.ts'
 import { meterNew, meterOf } from '../src/daemon/share.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 test('planFrom: TodoWrite and update_plan whole, TaskCreate and TaskUpdate a task at a time, a stale list started over', () => {
   let p = planFrom(undefined, { tool: 'TodoWrite', post: false, input: { todos: [{ content: 'Read', status: 'completed' }, { content: 'Fix', status: 'in_progress' }, { content: 'Test', status: 'pending' }] } })!
@@ -51,6 +51,6 @@ test("an agent's to-do list on its tab, gone once all done; a plan to approve wh
   await rig.rpc('settingsSet', { livePlan: false })
   await rig.rpc('send', { target: id, text: 'todo One;Two' })
   await until(async () => (await tab()).status === 'running', 'its turn')
-  await new Promise(r => setTimeout(r, 300))
+  await sleep(300)
   assert.equal((await tab()).plan, undefined)
 })

@@ -66,12 +66,12 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
   await Promise.all(Array.from({ length: 25 }, () => rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'x' } })))
   writeFileSync(join(home, 'go'), '')
   await until(() => existsSync(join(home, 'q.log')) && readFileSync(join(home, 'q.log'), 'utf8').trim().split('\n').length === 21, '21 handled', 15000)
-  await sleep(800)
+  await sleep(400)
   assert.equal(readFileSync(join(home, 'q.log'), 'utf8').trim().split('\n').length, 21, '4 dropped')
 })
 
 test('events: a PR\'s checks failing and its merge, once per head; nothing replayed after a restart', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_PR_SCAN_MS: '150' } }) // scans every 0.15 s, not the rig's 0.5
   const home = rig.env.HOME
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
@@ -85,23 +85,23 @@ test('events: a PR\'s checks failing and its merge, once per head; nothing repla
   const head = (h: string) => until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr?.head === h, `head ${h}`)
   const log = () => (existsSync(join(home, 'pr.log')) ? readFileSync(join(home, 'pr.log'), 'utf8') : '')
   await head('aaa')
-  await sleep(1200) // a few scans: the first one only noted it
+  await sleep(500) // a few scans (3): the first one only noted it
   assert.equal(log(), '')
   pr('bbb', 'OPEN', 'FAILURE')
   await head('bbb')
   // a timeout says what was there
   const seenNow = async () => `pr.log ${JSON.stringify(log())}, its PR ${JSON.stringify((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr)}, its runs ${JSON.stringify(await rig.rpc('widgetRuns', { id: 'prs' }).catch((e: Error) => e.message)).slice(0, 1500)}`
   await until(async () => log() === 'pr.checks.failed 7 test\n' || Promise.reject(new Error(await seenNow())), 'failed on bbb')
-  await sleep(1200)
+  await sleep(500) // 3 scans more
   assert.equal(log(), 'pr.checks.failed 7 test\n', 'once per head')
   pr('bbb', 'MERGED', 'SUCCESS')
   await until(() => log().includes('pr.merged'), 'merged')
-  await sleep(1200)
+  await sleep(500)
   assert.equal(log(), 'pr.checks.failed 7 test\npr.checks.passed 7 \npr.merged 7 \n')
   await rig.stop()
   await rig.start()
   await head('bbb')
-  await sleep(1500)
+  await sleep(600)
   assert.equal(log(), 'pr.checks.failed 7 test\npr.checks.passed 7 \npr.merged 7 \n', 'a restart replays nothing')
 })
 
@@ -127,7 +127,7 @@ test('streams: each line of JSON is its data, again after an exit with backoff, 
   // sample data by hand: the stream stops, its lines never write over it; Live starts it again
   await rig.rpc('widgetMock', { id: 'st', data: { n: 99 } })
   assert.equal((await rig.rpc('widgetRuns', { id: 'st' })).stream, undefined, 'mocked: no stream')
-  await sleep(700)
+  await sleep(500) // a stream writes every 0.2 s
   assert.equal((await dataOf(rig, 'st'))?.n, 99, 'the sample data stays')
   await rig.rpc('widgetMock', { id: 'st', off: true })
   await until(() => rig.rpc('widgetRuns', { id: 'st' }).then((r: any) => r.stream?.running), 'Live: streaming again')
@@ -135,7 +135,7 @@ test('streams: each line of JSON is its data, again after an exit with backoff, 
   r = await rig.rpc('widgetRuns', { id: 'st' })
   assert.equal(r.stream, undefined, 'off: no stream')
   const at = (await rig.rpc('state')).widgets.find((w: any) => w.id === 'st').at
-  await sleep(700)
+  await sleep(500)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'st').at, at, 'nothing more')
   // a script's async generator streams too; the starter checks out and streams
   make(rig, 'gen', { name: 'Gen', stream: true, script: 'gen.mjs' })
@@ -242,7 +242,7 @@ const keeper = (rig: any, id: string, events: string[], extra: object = {}) =>
 const kept = (rig: any, id: string) => (f => (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []))(join(rig.env.HOME, `${id}.log`))
 
 test('events: a new tab, a port newly listening (once), a ship, a usage limit; laki widget events lists them', async t => {
-  const rig = await fresh(t, { config: { run: `exec node -e 'const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port))'` } })
+  const rig = await fresh(t, { config: { run: `exec node -e 'const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port))'` }, env: { LAKI_PORT_SCAN_MS: '150' } }) // ports scanned every 0.15 s
   const remote = join(rig.home, 'remote.git')
   execFileSync('git', ['init', '-q', '--bare', remote], { env: rig.env })
   execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: rig.repo, env: rig.env })
@@ -262,7 +262,7 @@ test('events: a new tab, a port newly listening (once), a ship, a usage limit; l
   const port = Number((await until(async () => (await rig.screen(dev.id)).match(/listening (\d+)/), 'dev server up'))![1])
   const opened = await until(() => kept(rig, 'all').find(e => e.event === 'port.open'), 'port.open', 12000)
   assert.deepEqual([opened.port, opened.ws.id, typeof opened.pid, opened.command], [port, ws.id, 'number', 'node'])
-  await sleep(1500) // more scans (the rig's every 300 ms)
+  await sleep(600) // more scans (4)
   assert.equal(kept(rig, 'all').filter(e => e.event === 'port.open').length, 1, 'once per appearance')
 
   // ship.done: its exit and the PR
@@ -277,7 +277,7 @@ test('events: a new tab, a port newly listening (once), a ship, a usage limit; l
   const hit = await until(() => kept(rig, 'all').find(e => e.event === 'limit.hit'), 'limit.hit', 12000)
   assert.deepEqual([hit.agent, hit.tab.id, hit.until > Date.now()], ['claude', a.id, true])
   await rig.rpc('hook', { tab: a.id, state: 'failed', payload: { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." } })
-  await sleep(600)
+  await sleep(300)
   assert.equal(kept(rig, 'all').filter(e => e.event === 'limit.hit').length, 1, 'the same limit read again: not again')
 
   // laki widget events: the newest first, with whom each reached
@@ -315,7 +315,7 @@ test('events of your own: emit reaches others not itself, custom.*, workspace, t
   await rig.cli('widget', 'emit', 'ping')
   await until(() => existsSync(join(home, 'self.log')), 'self ran')
   await until(() => kept(rig, 'any').some(e => e.event === 'custom.ping' && e.from.widget === 'self'), 'its emit reached the others, from it')
-  await sleep(1000)
+  await sleep(400) // handed to it with the others, it would have run by now
   assert.equal(readFileSync(join(home, 'self.log'), 'utf8').trim().split('\n').length, 1, 'not its own')
 
   // names and sizes
@@ -332,10 +332,9 @@ test('events of your own: emit reaches others not itself, custom.*, workspace, t
   await rig.rpc('widgetSet', { id: 'ping', log: true })
   await rig.cli('widget', 'emit', 'ping')
   await until(() => (existsSync(join(home, 'ping.log')) ? readFileSync(join(home, 'ping.log'), 'utf8').trim().split('\n') : []).includes('3'), 'hops counted up')
-  await sleep(1500)
+  await until(async () => (await rig.rpc('widgetLogs', { id: 'ping' })).lines.some((l: any) => /emit custom\.ping: dropped, 4 hops/.test(l.text)), 'the drop logged')
   assert.deepEqual(readFileSync(join(home, 'pong.log'), 'utf8').trim().split('\n'), ['0', '2'])
   assert.deepEqual(readFileSync(join(home, 'ping.log'), 'utf8').trim().split('\n'), ['1', '3'])
-  await until(async () => (await rig.rpc('widgetLogs', { id: 'ping' })).lines.some((l: any) => /emit custom\.ping: dropped, 4 hops/.test(l.text)), 'the drop logged')
   assert.ok((await rig.rpc('widgetEvents')).some((e: any) => e.refused?.[0] === '4 hops: dropped'))
 
   // widget.json: custom names and custom.* pass the check; a made-up built-in doesn't

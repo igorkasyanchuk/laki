@@ -204,7 +204,7 @@ test('interrupts: a turn again or its end first, a waiting agent; dev mode logs 
   // Esc, then a turn starts again before the screen is read: that Esc is forgotten
   await rig.rpc('input', { tab: tab.id, data: '\x1b' })
   await rig.rpc('hook', { tab: tab.id, state: 'running' })
-  await sleep(1300)
+  await sleep(1300) // past the screen's checks at 0.3 and 1 s after an Esc (core.ts interrupted)
   assert.equal(await status(tab.id), 'running')
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
 
@@ -228,7 +228,7 @@ test('interrupts: a turn again or its end first, a waiting agent; dev mode logs 
   const asker = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'ask me' })
   await until(async () => (await status(asker.id)) === 'waiting', 'it asks')
   await rig.rpc('input', { tab: asker.id, data: '\x1b' })
-  await sleep(1200)
+  await sleep(1200) // past the checks at 0.3 and 1 s
   assert.equal(await status(asker.id), 'waiting')
 
   // Esc on AskUserQuestion's menu: claude says it declined (no hook, no "Interrupted", 12 lines up): idle, not asking

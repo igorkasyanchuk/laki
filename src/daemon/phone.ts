@@ -43,7 +43,7 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
     const said = perm ? `${perm.tool}: ${redact(perm.what)}` : question
     pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: said || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
   }
-  if (kind === 'waiting') setTimeout(go, 800)
+  if (kind === 'waiting') setTimeout(go, Number(process.env.LAKI_PUSH_WAIT_MS) || 800) // tests' shorter
   else go()
 }
 

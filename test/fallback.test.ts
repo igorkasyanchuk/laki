@@ -6,13 +6,12 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { older, tooOld } from '../src/daemon/limits.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 const limit = (h: number) => ({ last_assistant_message: `You've hit your limit · resets in ${h} hours` })
 
 test('auto fallback: at its plan limit a tab goes on on the next account in the order; with none left it waits', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_FALLBACK_MS: '200' } }) // the next account tried 0.2 s after the limit, not 1
   mkdirSync(join(rig.home, '.claude'))
   const work = await rig.rpc('accountAdd', { agent: 'claude', name: 'Work' })
   const spare = await rig.rpc('accountAdd', { agent: 'claude', name: 'Spare' })
@@ -22,7 +21,7 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
   const runs = () => rig.fakeLog().filter(l => l.bin === 'claude' && l.tab === tab.id)
   // off (no order): it waits for the reset, as before
   await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(2) })
-  await sleep(1500)
+  await sleep(600) // past that 0.2 s: it would have gone on
   assert.equal(runs().length, 1)
   assert.ok((await rig.tab(ws.id)).limit)
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
@@ -41,7 +40,7 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
   assert.equal(runs()[2].env.CLAUDE_CONFIG_DIR, spare.dir)
   await until(async () => (await rig.tab(ws.id)).last === 'answer: continue', 'it went on again')
   await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(5) })
-  await sleep(1500)
+  await sleep(600)
   assert.equal(runs().length, 3)
   assert.ok((await rig.tab(ws.id)).limit, 'it waits for the reset')
   // Reset the interface keeps the order (yours)
@@ -54,7 +53,7 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
 })
 
 test('auto fallback: with every account at its limit, it goes on on the first one to reset, not the last', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_FALLBACK_MS: '200' } }) // the next account tried 0.2 s after the limit, not 1
   mkdirSync(join(rig.home, '.claude'))
   const work = await rig.rpc('accountAdd', { agent: 'claude', name: 'Work' })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -68,7 +67,7 @@ test('auto fallback: with every account at its limit, it goes on on the first on
   await until(async () => (await rig.tab(ws.id)).last === 'answer: continue', 'it went on')
   // Work's resets in 2 hours, the default's in seconds: it waits for the default's, then goes on there
   await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(2) })
-  await sleep(1500)
+  await sleep(600)
   if (Date.now() - t0 < 4500) assert.equal(runs().length, 2) // past 5 s, on a busy Mac, the default's has reset: nothing to wait for
   await until(() => runs().length === 3, 'back on the default as it reset')
   assert.equal(runs()[2].env.CLAUDE_CONFIG_DIR, runs()[0].env.CLAUDE_CONFIG_DIR)
@@ -81,7 +80,7 @@ test("a model too new for the installed claude: the API's error kept and said, t
   assert.equal(tooOld('API Error: 400 invalid model'), undefined)
   assert.deepEqual([older('2.1.99', '2.1.280'), older('2.1.280', '2.1.280'), older('2.2.0', '2.1.999')], [true, false, false])
 
-  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1000' } })
+  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '300' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', model: 'claude-opus-9-1' })
   const tab = await until(async () => (x => x?.last === 'answer: hi' && x)(await rig.tab(ws.id)), 'its first turn')
@@ -92,7 +91,7 @@ test("a model too new for the installed claude: the API's error kept and said, t
   assert.deepEqual([v.modelNeeds, v.claudeHas], [{ 'claude-opus-9-1': '2.1.280' }, '2.1.200']) // the fake's
   // updated: it goes once the version is looked at again
   writeFileSync(join(rig.home, 'claude-version'), '2.1.300')
-  await sleep(1100)
+  await sleep(400) // past the 0.3 s before the version is looked at again
   await rig.rpc('agentModels', { agent: 'claude' })
   v = await until(async () => (x => !x.modelNeeds && x)(await rig.rpc('state')), 'dropped after the update')
   assert.equal(v.claudeHas, undefined) // the view says it only with a model to warn about

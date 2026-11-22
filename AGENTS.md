@@ -80,6 +80,12 @@ npm run dev                       # Electron + renderer dev server on :5199
 - Sleeps in tests: `until`/`seen`/`viewed` (a view sent with a tab's status: changed()'s 30 ms passed) where there's a
   condition. A sleep stays where a test proves nothing more happens (once per head, not its own event, dropped past a
   limit), where it waits out a timer of the code (answer's hold, the SIGKILL check), or makes a race on purpose.
+  A code timer a test waits out has an env knob, set per test with `fresh(t, { env })`, the sleep a little past it:
+  `LAKI_QUIET_MS`, `LAKI_ANSWER_HOLD_MS`, `LAKI_CODEX_LATER_MS`, `LAKI_FALLBACK_MS` (core.ts), `LAKI_KILL_AFTER_MS`
+  (resources.ts), `LAKI_SWEEP_MS`, `LAKI_PARENT_MS`, `LAKI_LOOP_REPORT_MS` (main.ts), `LAKI_PR_SOON_MS`, `LAKI_PR_SCAN_MS`, `LAKI_PORT_SCAN_MS`,
+  `LAKI_FLOW_RESUME_MS`, `LAKI_RUN_ENDED_MS`, `LAKI_PUSH_WAIT_MS`, `LAKI_CLIENT_LOG_MS`, `LAKI_WIDGET_LOG_MS`,
+  `LAKI_REPO_WATCH_MS`, `LAKI_HINT_MS` (the CLI's "Approve this terminal"). A sleep over a second says why.
+  `LAKI_TEST_SLEEPS=<file>`: each sleep's place and ms appended to it (the whole run's: 90 s in 213 calls, from 226 in 246).
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
 - The maintainer's own daemon may be running with real agents in it, in `~/.laki` or `~/.laki-electron` (from when

@@ -51,7 +51,7 @@ end: failed
 `
 
 test('workflow pause after this block: parks before the next, Resume once; a restart while pausing and while paused; the CLI', async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_FLOW_RESUME_MS: '600' } }) // a restart's runs back after 0.6 s, not 8
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true })
   await rig.rpc('flowSave', { id: 'hold', text: HOLD })
@@ -87,7 +87,7 @@ test('workflow pause after this block: parks before the next, Resume once; a res
   // a restart while paused: still parked, nothing ran (RESUME_AFTER passed)
   await rig.stop()
   await rig.start()
-  await sleep(9000)
+  await sleep(1200) // past RESUME_AFTER (0.6 s here): nothing more happens
   r = await get(a.id)
   assert.equal(r.wait?.kind, 'hold')
   assert.equal(await ran(a.id), 'one\n')

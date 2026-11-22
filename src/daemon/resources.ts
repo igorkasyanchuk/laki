@@ -15,6 +15,7 @@ import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
 import type { turnsDrop, turnsKept } from './turns.ts'
 
+const KILL_AFTER = Number(process.env.LAKI_KILL_AFTER_MS) || 3000 // SIGKILL this long after a SIGTERM that's shrugged off (tests' shorter)
 // what an agent runs without a shell between (its browser bridge, an MCP server, the browser that one drives), any
 // browser and an Android emulator (its console, adb, gRPC and netsimd's ports: none is the workspace's server) listen
 // for the agent, not as the workspace's servers: kept in procs (sleep sees them), left out of ports (the status bar's
@@ -129,7 +130,7 @@ export async function portKill(o: { ws: string; port: number }) {
       } catch {}
     }
     void scanPorts()
-  }, 3000)
+  }, KILL_AFTER)
   return p
 }
 
@@ -171,7 +172,7 @@ export function killGroup(c: ChildProcess) {
       try {
         process.kill(-c.pid!, 'SIGKILL')
       } catch {}
-    }, 3000).unref()
+    }, KILL_AFTER).unref()
   } catch {}
 }
 // execFile's shape (its callback's error has code, the exit code or an errno, and killed) for a command run as a group:

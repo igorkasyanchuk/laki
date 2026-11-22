@@ -7,7 +7,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, until, sleep } from './helpers.ts'
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
   const rig = await fresh(t)
   await assert.rejects(rig.rpc('frob'), /unknown method frob/)
@@ -409,10 +409,10 @@ test('the view goes out only when it changed: tool calls that keep a tab running
   // a window's first view comes once the daemon knows whose it is (S3), and the change after it goes out to all,
   // the same or not (core's hello): have that one out before counting
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUse' } })
-  await new Promise(r => setTimeout(r, 300)) // anything else under way goes out
+  await sleep(300) // anything else under way goes out
   app.events.splice(0)
   for (const h of ['PostToolUse', 'PreToolUse', 'PostToolUse']) await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: h } })
-  await new Promise(r => setTimeout(r, 200))
+  await sleep(200)
   assert.equal(app.events.filter((m: any) => m.ev === 'state').length, 0)
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'done' } })
   await until(() => app.events.some((m: any) => m.ev === 'state' && m.view.tabs.find((x: any) => x.id === tab.id)?.status === 'idle'), 'idle goes out')

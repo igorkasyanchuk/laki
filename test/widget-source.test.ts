@@ -222,7 +222,7 @@ test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetc
   const act = rig.rpc('widgetAction', { id: 'slow', action: 'wait' })
   await working(true)
   await rig.rpc('widgetSet', { id: 'slow', source: { kind: 'static', text: '{"text": "typed"}' } })
-  await new Promise(r => setTimeout(r, 300))
+  await sleep(300)
   assert.ok((await find(rig, 'slow')).agent, 'the action runs on')
   await rig.rpc('widgetSet', { id: 'slow', source: { kind: 'ai', prompt: 'quick' } })
   await rig.rpc('resourceStop', { key: 'agent:slow' })

@@ -537,7 +537,7 @@ test('T9: after another task: B runs as A ends done, not when A fails; any runs 
   assert.deepEqual(parseAfter('after build any'), { name: 'build', when: 'any' })
   assert.deepEqual(parseAfter('after Company'), { name: 'Company', when: 'done' }) // any as a word of its own only
   assert.equal(parseAfter('afternoon at 3'), undefined)
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_RUN_ENDED_MS: '200' } }) // a run's turn end read 0.2 s on, not 1.5
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { scheduleAtOnce: 0 }) // T8's cap: schedule-runs.test
   const task = (o: object) => rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', when: 'every day at 2am', ...o })
@@ -590,7 +590,7 @@ test('T9: after another task: B runs as A ends done, not when A fails; any runs 
   await until(async () => (await runsOf(b.id)).length === 2, 'b after a second run of a')
   await rig.rpc('send', { target: ra1.tab, text: 'one more thing', whenIdle: true })
   await until(async () => (await rig.tab(ra1.ws)).last === 'answer: one more thing', 'your turn in its tab')
-  await sleep(2500) // runEnded's 1.5 s after a turn's end
+  await sleep(700) // runEnded's 0.2 s after a turn's end here: it starts nothing
   assert.equal((await runsOf(b.id)).length, 2, 'a later turn in a run tab starts nothing')
 
   // deleting or archiving a task others wait on: asked, then they're off with why

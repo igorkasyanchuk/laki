@@ -1103,7 +1103,7 @@ async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) 
 }
 // main.ts, as the daemon starts (not as this module loads: core's sets may not be there yet, load-order.test)
 export function runOutcomes() {
-  turnEnds.add((tab, o) => void setTimeout(() => void runEnded(tab, o.failed || o.limit ? 'failed' : 'done', o.last, !!o.limit && !o.failed).catch(e => log(`run ${tab.id}: ${e.message}`)), 1500).unref?.()) // its usage meter is read a second after the end
+  turnEnds.add((tab, o) => void setTimeout(() => void runEnded(tab, o.failed || o.limit ? 'failed' : 'done', o.last, !!o.limit && !o.failed).catch(e => log(`run ${tab.id}: ${e.message}`)), Number(process.env.LAKI_RUN_ENDED_MS) || 1500).unref?.()) // its usage meter is read a second after the end
   turnWaits.add((tab, o) => void runEnded(tab, 'waiting', o.question).catch(e => log(`run ${tab.id}: ${e.message}`)))
 }
 // a workflow's run ended (workflow.ts' end): its task's log entry says how

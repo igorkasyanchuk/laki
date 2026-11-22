@@ -105,7 +105,8 @@ test("#5: an on: workspace.archived worktree workflow started once runs once; A 
   await rig.rpc('flowSave', { id: 'loop', text: `# Loop\nruns in: worktree · on: workspace.archived${body}` })
   await rig.rpc('flowStart', { workflow: 'loop', project: p.id, task: 'go' })
   await until(async () => (await rig.rpc('state')).workspaces.some((w: any) => w.archived), 'its worktree archived', 20000)
-  await sleep(3000)
+  await until(async () => (await rig.rpc('state')).flows.every((f: any) => ['done', 'stopped', 'failed'].includes(f.status)), 'its run ended')
+  await sleep(300) // a second run would start as its archive's event comes: none does
   const s = await rig.rpc('state')
   assert.equal(s.flows.filter((f: any) => f.workflow === 'loop').length, 1, 'one run')
   assert.equal(s.workspaces.filter((w: any) => w.kind === 'worktree').length, 1)
@@ -118,10 +119,11 @@ test("#5: an on: workspace.archived worktree workflow started once runs once; A 
   await rig.rpc('flowSave', { id: 'kick', text: `# Kick\nruns in: main${body}` })
   await rig.rpc('flowStart', { workflow: 'kick', project: p.id, task: 'go' })
   await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'flow.ended' && e.refused?.some((r: string) => /4 hops: a loop of events\? dropped/.test(r))), 'the chain refused', 20000)
-  await sleep(2000)
-  const n = (await rig.rpc('state')).flows.filter((f: any) => f.workflow === 'a' || f.workflow === 'b').length
+  const ab = async () => (await rig.rpc('state')).flows.filter((f: any) => f.workflow === 'a' || f.workflow === 'b')
+  await until(async () => (await ab()).every((f: any) => ['done', 'stopped', 'failed'].includes(f.status)), 'their runs ended')
+  const n = (await ab()).length
   assert.ok(n > 0 && n <= 6, `${n} runs of A and B`)
-  await sleep(2000)
+  await sleep(300) // a next hop would start as the last one's flow.ended comes: none does
   assert.equal((await rig.rpc('state')).flows.filter((f: any) => f.workflow === 'a' || f.workflow === 'b').length, n, 'no more')
 })
 
@@ -186,7 +188,7 @@ test('only when: tests on the event filter its runs; one live run per workspace 
   for (const id of ['ping', 'pong']) await rig.rpc('flowSave', { id, text: `# ${id}\nruns in: main · on: flow.ended${body('true')}` })
   await rig.rpc('flowStart', { workflow: 'ping', project: p.id, task: 'go' })
   await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.refused?.some((x: string) => /4 hops: a loop of events\? dropped/.test(x))), 'dropped past HOPS_MAX', 20000)
-  await sleep(1500)
+  await until(async () => [...(await runsOf('ping')), ...(await runsOf('pong'))].every((f: any) => ['done', 'stopped', 'failed'].includes(f.status)), 'the chain ended')
   const chain = [...(await runsOf('ping')), ...(await runsOf('pong'))].sort((a: any, b: any) => a.started - b.started)
   assert.deepEqual(chain.map((x: any) => [x.workflow, x.hops ?? 0]), [['ping', 0], ['pong', 1], ['ping', 2], ['pong', 3]])
   for (const id of ['ping', 'pong']) await rig.rpc('flowRm', { id })
@@ -231,7 +233,7 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   assert.equal((await item()).changed, true)
   await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
   await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.refused?.includes('onnew: from the repo, changed since you allowed it: open it in Workflows, then Allow or Save it')), 'refused as changed')
-  await sleep(1000)
+  await sleep(300) // refused as its event came: no run starts after
   assert.equal(await started(), 2)
   // an agent can't allow it (its own edit would run): refused, still not trusted
   const ag = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'four' })
@@ -361,8 +363,8 @@ test("a worktree workflow on workspace.new, or on tab.new with a setup script, n
   const wf = (on: string) => `# Self\nruns in: worktree · at once: 5 · on: ${on}\nwhen done: keep\n\n## start\nnext: say\n\n## say\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n`
   await rig.rpc('flowSave', { id: 'onws', text: wf('workspace.new') })
   await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' }) // yours: one run, in a worktree of its own (its setup tab too)
-  await until(async () => (await runsOf('onws')).length >= 1, 'it starts')
-  await sleep(2000)
+  await until(async () => (await runsOf('onws')).length >= 1 && (await runsOf('onws')).every((f: any) => ['done', 'stopped', 'failed'].includes(f.status)), 'it ran (its worktree and setup tab made)')
+  await sleep(300) // their events came as they were made: no other run starts
   const [r] = await runsOf('onws')
   assert.equal((await runsOf('onws')).length, 1, 'its own worktree started no other run')
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws)?.flow, r.id, "the worktree is its run's")
@@ -371,8 +373,8 @@ test("a worktree workflow on workspace.new, or on tab.new with a setup script, n
   await rig.rpc('flowSave', { id: 'ontab', text: wf('tab.new') })
   const mine = (await rig.rpc('state')).workspaces.find((w: any) => w.name === 'mine' || w.id === 'mine')
   await rig.rpc('tabNew', { ws: mine.id, preset: 'shell' })
-  await until(async () => (await runsOf('ontab')).length >= 1, 'it starts')
-  await sleep(2000)
+  await until(async () => (await runsOf('ontab')).length >= 1 && (await runsOf('ontab')).every((f: any) => ['done', 'stopped', 'failed'].includes(f.status)), 'it ran (its setup tab made)')
+  await sleep(300) // that tab's event came as it was made: no other run starts
   assert.equal((await runsOf('ontab')).length, 1, 'its setup tab started no other run')
 })
 

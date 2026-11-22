@@ -426,7 +426,7 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
 // S1: a process in no tab with a terminal of its own could be an agent that left its tab and gave itself a pty: its
 // terminal is yours only once you said so in Laki's window (main.ts' termAsk, core.ts' termOk)
 test("S1: a terminal Laki hasn't seen is held until you allow it in the window: none open or Deny refuses; allowed once it holds until its shell exits; only the window answers", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_HINT_MS: '200' } }) // the CLI's hint 0.2 s in, not 1
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
   const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
@@ -462,7 +462,7 @@ test("S1: a terminal Laki hasn't seen is held until you allow it in the window: 
   at = app.events.length
   run = term(`${laki} rename ${ws.id} first && ${laki} rename ${ws.id} second`)
   ask = await asked(at)
-  await sleep(1500) // the CLI's hint comes a second in
+  await sleep(500) // past the CLI's hint
   await app.call('termAnswer', { req: ask.req, allow: true })
   assert.match(await run, /Approve this terminal in Laki's window/)
   assert.equal(await name(), 'second')

@@ -37,7 +37,7 @@ const rewrite = (id: string) => {
   lines.set(id, l.length)
   dirty.delete(id)
 }
-const later = () => (flushing ??= setTimeout(() => ((flushing = undefined), [...dirty].forEach(id => { try { rewrite(id) } catch {} })), 5000).unref())
+const later = () => (flushing ??= setTimeout(() => ((flushing = undefined), [...dirty].forEach(id => { try { rewrite(id) } catch {} })), Number(process.env.LAKI_CLIENT_LOG_MS) || 5000).unref()) // tests' shorter
 // read: a read's call (folded); what's logged is the caller's to pick: ids and names only
 export function clientDid(id: string, e: Omit<ClientDid, 'at'>, read = false, now = Date.now()) {
   try {

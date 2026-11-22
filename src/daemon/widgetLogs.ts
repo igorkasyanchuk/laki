@@ -21,6 +21,7 @@ export const pending = new Map<string, WidgetLogLine[]>()
 export const lastN = new Map<string, number>() // each log's last n, read from its files once
 export const errAt = new Map<string, number>() // its last error line's time (Settings' red tag): since the daemon started
 let flushing: NodeJS.Timeout | undefined
+const FLUSH_MS = Number(process.env.LAKI_WIDGET_LOG_MS) || 500 // tests' shorter (a rotation's file a flush)
 // a line's own level: debug:, info:, warn: or error: at its start (taken off), else info
 const leveled = (t: string): [LogLevel, string] => (m => (m ? [m[1].toLowerCase() as LogLevel, t.slice(m[0].length)] : ['info', t]))(/^(debug|info|warn|error):\s?/i.exec(t))
 export const masks = new Map<string, (t: string) => string>() // each one's, until its secrets or settings are written again
@@ -64,7 +65,7 @@ export function xlog(w: Entry, level: LogLevel, src: string, text: string, ws?: 
   }
   lastN.set(w.id, n)
   pending.set(w.id, l)
-  flushing ??= setTimeout(flushLogs, 500)
+  flushing ??= setTimeout(flushLogs, FLUSH_MS)
 }
 export function flushLogs() {
   clearTimeout(flushing)

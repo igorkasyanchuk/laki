@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 test('a turn that changed files is checked: a failing test goes back to the agent, then passes; the review notes; an unchanged turn skips', async t => {
   const rig = await fresh(t, { env: { FAKE_TURN_MS: '1500' } })
@@ -34,7 +34,7 @@ test('a turn that changed files is checked: a failing test goes back to the agen
   // a turn that changes nothing isn't checked again
   await rig.rpc('send', { target: tab, text: 'just a question' })
   await until(async () => (await rig.rpc('screen', { target: tab, lines: 40 }).then((x: unknown) => JSON.stringify(x))).includes('answer: just a question'), 'its answer')
-  await new Promise(r => setTimeout(r, 1500))
+  await sleep(300) // a check starts as the turn ends: none does
   assert.equal((await view()).check.at, passed.at)
   // Check again: now, whatever changed
   await rig.rpc('checkAgain', { ws: ws.id })
@@ -50,7 +50,7 @@ test('no check: none ticked, the setting off, or a script missing', async t => {
   const view = async () => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === ws.id)
   const tab = await until(async () => (await rig.rpc('state')).tabs.find((x: { workspace: string; kind: string }) => x.workspace === ws.id && x.kind === 'agent')?.id, 'its tab')
   await until(async () => (await rig.rpc('screen', { target: tab, lines: 40 }).then((x: unknown) => JSON.stringify(x))).includes('answer: run echo'), 'its turn ends')
-  await new Promise(r => setTimeout(r, 1000))
+  await sleep(300) // a check starts as the turn ends: none does
   assert.equal((await view()).check, undefined)
   await assert.rejects(rig.rpc('checkAgain', { ws: ws.id }), /no check for this workspace/)
   await rig.rpc('settingsSet', { doneCheck: true })

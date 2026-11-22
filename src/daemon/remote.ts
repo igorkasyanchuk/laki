@@ -652,7 +652,7 @@ export function remoteSeen(now = Date.now()) {
   warned = false
   if (was) changed() // its countdown starts over
 }
-export const remoteKeep = () => (remoteSeen(), changed(), { idleOffAt: idleOffAt() })
+export const remoteKeep = (now?: number) => (remoteSeen(now), changed(), { idleOffAt: idleOffAt() }) // now: a test's clock
 function idleLimit(r = remote): number | undefined {
   if (!r || r.serve) return
   const s = state.settings?.remoteIdleOff

@@ -149,7 +149,7 @@ test('workflow agents: a turn whose working line only ticks is nudged 10 min aft
   await until(async () => /\d+s · esc to interrupt/.test(await rig.screen(r.wait.tab)), 'its line ticking')
   const t1 = Date.now()
   await rig.rpc('flowTick', { now: t1 + 1000 }) // its screen seen
-  await sleep(2500) // ticks meanwhile: the last output 2 s on, the screen the same
+  await sleep(1300) // ticks meanwhile (the fake's every 0.2 s): the last output past t1 + 1 s, the screen the same
   await rig.rpc('flowTick', { now: t1 + 10 * 60000 + 1000 }) // 10 min since it changed, not since it last printed
   assert.ok((await get()).wait.nudged, 'nudged')
 })

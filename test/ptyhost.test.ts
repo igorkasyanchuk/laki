@@ -362,7 +362,8 @@ test("R9: an install from before keeps the pty host off until it answers its one
   await rig.stop()
   await rig.start()
   const again = await rig.connect()
-  await sleep(1500)
+  await seen(again, (e: any) => e.ev === 'state', 'its first view') // the notices up come as it connects
+  await sleep(300)
   assert.ok(!again.events.some((e: any) => e.ev === 'notice' && /Keep terminals alive/.test(e.title)), 'asked once')
   again.close()
   delete rig.env.LAKI_TEST_ASK_PTY

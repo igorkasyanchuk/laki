@@ -886,7 +886,7 @@ const BUSY: Record<string, RegExp> = {
   opencode: /esc (again to )?interrupt/i,
 }
 const ASKS = /action required/i // grok's title while a permission prompt waits
-const QUIET = 4000
+const QUIET = Number(process.env.LAKI_QUIET_MS) || 4000 // a turn with no hook: idle this long after its last output (tests' shorter)
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time (none run from source)
 const BUILT = typeof __BUILT__ === 'string' ? __BUILT__ : undefined
@@ -2663,6 +2663,7 @@ async function autoAllow(tab: Tab, rule: AllowRule, perm: Perm, tell: () => void
 // answer: a choice of the menu a waiting agent shows (n, or the first or last), as its arrows and Enter would pick it;
 // one at a time per tab, and not again for a second after (a double click, Allow and a click: the menu isn't redrawn yet)
 const answering = new Set<string>()
+const ANSWER_HOLD = Number(process.env.LAKI_ANSWER_HOLD_MS) || 1000 // a tab held this long after an answer's Enter (tests' shorter)
 // label: the choice's words as they were asked (a notification's, a phone's button): refused when n says something else now
 // say ("No, and say why": Needs you, the Reader, the ask bar): with a no only; the agent's tell-why choice gets the words
 // typed into its box once its menu is gone, a plain no sends them as the next message, after it took the answer (send's
@@ -2688,7 +2689,7 @@ export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'las
     // one key at a time: a TUI reads a burst as one unknown key
     for (let i = 0; i < Math.abs(n - a.at); i++) input(t.id, key), await new Promise(r => setTimeout(r, 40))
     input(t.id, '\r')
-    setTimeout(() => answering.delete(t.id), 1000)
+    setTimeout(() => answering.delete(t.id), ANSWER_HOLD)
     if (say) void sayAfter(t, s, picked, say).catch((e: Error) => wsLog({ id: t.workspace }, `to ${t.name}: why not sent: ${e.message}`))
     return { picked }
   } catch (e) {
@@ -4435,6 +4436,7 @@ export function tabOfToken(token: unknown) {
     if (!s.exited && own.length === said.length && timingSafeEqual(own, said)) return state.tabs.find(t => t.id === id)
   }
 }
+const CODEX_LATER = Number(process.env.LAKI_CODEX_LATER_MS) || 1500 // a codex notify while it still looks busy: judged this much later (tests' shorter)
 export function hook(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true
@@ -4455,7 +4457,7 @@ export function hook(p: { tab: string; state: string; payload?: any; at?: number
     // still busy, the chat's own turn ended meanwhile (its notify came and set it idle) or the tab started again: another
     // thread's, dropped
     const s0 = sessions.get(p.tab)
-    if (busy()) return void (r.later = setTimeout(() => (sessions.get(p.tab) !== s0 || busy() || r.status !== 'running' ? wsLog({ id: tab.workspace }, `${tab.name}: a codex thread ended (${p.payload?.['thread-id'] ?? '?'}), not the chat's turn`) : turn(p)), 1500))
+    if (busy()) return void (r.later = setTimeout(() => (sessions.get(p.tab) !== s0 || busy() || r.status !== 'running' ? wsLog({ id: tab.workspace }, `${tab.name}: a codex thread ended (${p.payload?.['thread-id'] ?? '?'}), not the chat's turn`) : turn(p)), CODEX_LATER))
   }
   turn(p)
 }
@@ -5058,7 +5060,7 @@ function checkLimit(tab: Tab, text: string) {
   if (fresh) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
   limitSent.set(key, t.getTime())
   r.limit = t.getTime()
-  if (fresh) setTimeout(() => fallback(tab, t!.getTime()), 1000) // after the turn's end is told (a workflow pauses on it, and goes on at the next one)
+  if (fresh) setTimeout(() => fallback(tab, t!.getTime()), Number(process.env.LAKI_FALLBACK_MS) || 1000) // tests' shorter; after the turn's end is told (a workflow pauses on it, and goes on at the next one)
 }
 const limitSent = new Map<string, number>() // ponytail: a closed tab's stays (a number each)
 

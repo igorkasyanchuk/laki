@@ -98,7 +98,7 @@ async function post(method: string, params: any, timeoutMs: number) {
   // wait as long as it does (a minute)
   const stop = new AbortController()
   let limit = setTimeout(() => stop.abort(new Error('The operation was aborted due to timeout')), timeoutMs)
-  const hint = !process.stderr.isTTY || inTab() ? undefined : setTimeout(() => void fetch(`http://127.0.0.1:${info.port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${info.token}` }, body: '{"method":"termHeld"}', signal: AbortSignal.timeout(5000) }).then(r => r.json()).then(r => { if (r.result === true && !stop.signal.aborted) (process.stderr.write("Approve this terminal in Laki's window…\n"), clearTimeout(limit), (limit = setTimeout(() => stop.abort(new Error('The operation was aborted due to timeout')), Math.max(timeoutMs, 70000)))) }, () => {}), 1000)
+  const hint = !process.stderr.isTTY || inTab() ? undefined : setTimeout(() => void fetch(`http://127.0.0.1:${info.port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${info.token}` }, body: '{"method":"termHeld"}', signal: AbortSignal.timeout(5000) }).then(r => r.json()).then(r => { if (r.result === true && !stop.signal.aborted) (process.stderr.write("Approve this terminal in Laki's window…\n"), clearTimeout(limit), (limit = setTimeout(() => stop.abort(new Error('The operation was aborted due to timeout')), Math.max(timeoutMs, 70000)))) }, () => {}), Number(process.env.LAKI_HINT_MS) || 1000) // tests' shorter
   const send = (token: string) =>
     fetch(`http://127.0.0.1:${info.port}/rpc`, {
       method: 'POST',

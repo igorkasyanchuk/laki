@@ -5,7 +5,7 @@ import { test } from 'node:test'
 import { bytes, dur, num, pageOf, pct, render, uiBehave } from '../src/shared/widget.ts'
 import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
 import { tools } from '../src/shared/tools.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 const at = Date.parse('2026-10-17T10:00:00Z')
 
@@ -629,7 +629,7 @@ test('UI kit: a slider whose run is declined goes back to its value', async () =
   const t: any = { localName: 'input', value: '40', defaultValue: '25', getAttribute: (k: string) => (k === 'data-change' ? 'rollout' : null), closest: (q: string) => (q === '[data-change]' ? t : { querySelector: () => rv }) }
   on.change({ target: t })
   assert.equal(t.disabled, true, 'one run at a time')
-  await new Promise(r => setTimeout(r, 0))
+  await sleep(0)
   assert.equal(t.value, '25')
   assert.equal(rv.textContent, '25')
   assert.equal(t.disabled, false)
@@ -760,11 +760,11 @@ test('UI kit: a palette’s keys, a textarea’s ⌘ Enter, a prompt box’s do,
   assert.deepEqual(sent.pop(), { laki: 'do', cmd: { do: 'send', prompt: 'fix the login' }, label: 'Send', confirm: undefined })
   press()
   assert.equal(sent.length, 0, 'one at a time')
-  await new Promise(r => setTimeout(r, 0))
+  await sleep(0)
   assert.equal(box.value, ' fix the login ', 'declined: the words stay')
   answer = true
   press()
-  await new Promise(r => setTimeout(r, 0))
+  await sleep(0)
   assert.equal(box.value, '')
   sent.length = 0
   // a hover card: shown as the pointer comes, hidden as it goes; a click on its button keeps it
@@ -775,7 +775,7 @@ test('UI kit: a palette’s keys, a textarea’s ⌘ Enter, a prompt box’s do,
   const pop: any = { querySelector: () => body, contains: (x: unknown) => x === inside, setAttribute: (k: string) => popAttrs.add(k), removeAttribute: (k: string) => popAttrs.delete(k), hasAttribute: (k: string) => popAttrs.has(k) }
   const inside = {}
   const over = (type: string, related: unknown = null) => on[type]({ type, target: { closest: (s: string) => (s === '.k-pop.hover' ? pop : null) }, relatedTarget: related })
-  const later = () => new Promise(r => setTimeout(r, 300))
+  const later = () => sleep(300) // past the hover card's close, 0.25 s after the pointer leaves (uiBehave)
   over('mouseover')
   over('mouseout', inside)
   over('mouseout')

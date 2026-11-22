@@ -94,7 +94,7 @@ test('answer from the phone: an ntfy tap on a waiting menu picks that choice onc
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_ANSWER_HOLD_MS: '200' } }) // an answer's hold 0.2 s, not 1
   const proj = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
   const tab = await rig.tab(ws.id)
@@ -118,7 +118,7 @@ test('answer from the phone: an ntfy tap on a waiting menu picks that choice onc
   await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting again')
   queue.push(JSON.stringify({ event: 'message', id: 'm3', message: j.actions[0].body }))
   await rig.rpc('phoneTick')
-  await sleep(1200) // and answer holds a tab for a second after its Enter
+  await sleep(500) // and answer holds a tab a moment after its Enter (0.2 s here): no pick comes
   assert.doesNotMatch(await rig.screen(tab.id), /picked: Yes/)
   await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1, label: 'No' }), /asks something else now/)
 })
@@ -188,7 +188,7 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '150' } }) // a wait's push 0.15 s on, not 0.8
   const proj = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
   const tab = await rig.tab(ws.id)
@@ -204,7 +204,7 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
     await until(async () => (await seen()) > was && (await rig.tab(ws.id)).status === status, status, 15000) // two hooks, each a node start (the fake waits 3 s for one)
   }
   const pushed = (n: number) => until(() => got.length >= n, `push ${n}`)
-  const none = () => sleep(1000) // for a push that mustn't come: it would be in by now (a wait's goes 800 ms later, with its menu)
+  const none = () => sleep(350) // for a push that mustn't come: it would be in by now (a wait's goes 150 ms later here, with its menu)
   const events = () => got.map(g => JSON.parse(g.body).event + ':' + JSON.parse(g.body).message)
 
   await say('hi', 'idle')
@@ -302,7 +302,7 @@ test('U8: Quiet (was Do not disturb): laki quiet; no push for a finish or an ask
   })
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_PUSH_WAIT_MS: '150' } }) // a wait's push 0.15 s on, not 0.8
   // laki quiet: on for a length (Settings' default without one), off; nothing happened: no digest, so no card and no notification
   await rig.rpc('settingsSet', { quietMinutes: 120 })
   const q1 = await rig.cli('quiet')
@@ -342,12 +342,12 @@ test('U8: Quiet (was Do not disturb): laki quiet; no push for a finish or an ask
   await assert.rejects(rig.rpc('dndSet', { minutes: 30, from: { ws: ws.id, tab: tab.id } }), /silence the user's notifications/)
   const { until: end } = await rig.rpc('dndSet', { minutes: 30 })
   assert.equal((await rig.rpc('state')).dnd.until, end)
-  await sleep(1200) // the stop's own push, if any, is in
+  await sleep(500) // the stop's own push, if any, is in
   got.length = 0
   await rig.rpc('queueResume', { tab: tab.id }) // hi: a turn that ends meanwhile
   await until(async () => (t => !t.queue && !t.queueHeld && t.status === 'idle' && t.done)(await rig.tab(ws.id)), 'the queued one ran', 15000)
   await say('ask', 'waiting')
-  await sleep(1500) // a wait's push goes 800 ms later
+  await sleep(500) // a wait's push goes 150 ms later here: none comes while quiet
   assert.deepEqual(got, [])
   const r = await rig.rpc('dndSet', { off: true })
   assert.equal(r.ended, true)

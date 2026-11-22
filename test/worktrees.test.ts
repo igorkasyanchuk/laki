@@ -33,7 +33,7 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   assert.ok((await proj()).cfgWait)
   const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const skip = await rig.rpc('wsNew', { project: p.id, preset: 'none', noSetup: true }) // its copy waits too, its setup never runs
-  await sleep(1500)
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === a.id)?.setupWait, 'its setup waits for the file to be trusted')
   assert.ok(!existsSync(join(a.path, 'env.txt')), "an untrusted file's setup doesn't run")
   const ws = async (id: string) => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === id)
   assert.equal((await ws(a.id)).setupWait, true)
@@ -51,14 +51,14 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar--\n') // S12: git's ssh, Python's startup, npm's config too
   assert.equal((await ws(a.id)).setupWait, undefined)
   assert.equal((await ws(skip.id)).setupWait, undefined)
-  await sleep(1000)
+  await sleep(300) // a's setup ran as it was trusted: skip's would have beside it
   assert.ok(!existsSync(join(skip.path, 'env.txt')), 'skipped: trusting runs no setup')
   assert.equal(rig.out.split(".laki.json's env ZDOTDIR refused").length, 2) // said once
   // an edit: untrusted again, a new workspace's setup waits
   writeFileSync(join(rig.repo, '.laki.json'), JSON.stringify({ setup: 'touch edited' }))
   assert.ok((await proj()).cfgWait)
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
-  await sleep(1500)
+  await until(async () => (await ws(b.id)).setupWait, 'its setup waits for the edited file to be trusted')
   assert.ok(!existsSync(join(b.path, 'edited')), "an edited file's setup doesn't run")
   // a project from before trust (no cfgTrust in state.json): trusted as its file is
   await rig.stop()
@@ -471,7 +471,7 @@ test("a nested repo an agent made: its config never runs in Laki's git, whatever
   assert.ok((await rig.rpc('wsPeek', { id: ws.id })).dirty > 0)
   assert.match((await rig.rpc('diff', { ws: ws.id })).diff, /\.gitmodules/)
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'go' } })
-  await sleep(300)
+  await sleep(300) // its snapshot first, as claude's first tool call comes after the hook
   writeFileSync(join(ws.path, 'x.txt'), 'x\n')
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
   const ch = await until(async () => (await rig.tab(ws.id)).changes, 'its changes')

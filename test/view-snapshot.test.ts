@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 const FILE = join(import.meta.dirname, 'fixtures', 'view-snapshot.json')
 const MOVES = new Set(['ports', 'procs', 'stat', 'usedAt', 'usual', 'claudeHas', 'resumeId', 'pid', 'cols', 'rows', 'last', 'code'])
@@ -45,7 +45,7 @@ test('view: tabs in each state, their workspace and project, as pinned', async t
   }
   // settled: the same twice, half a second apart (a Stop hook, a transcript's meter land a little later)
   let was = ''
-  const text = await until(async () => (now => (now === was ? now : ((was = now), false)))(await snap().then(async x => (await new Promise(r => setTimeout(r, 500)), x))), 'the view settled')
+  const text = await until(async () => (now => (now === was ? now : ((was = now), false)))(await snap().then(async x => (await sleep(500), x))), 'the view settled')
   if (process.env.UPDATE_SNAPSHOT || !existsSync(FILE)) {
     mkdirSync(join(import.meta.dirname, 'fixtures'), { recursive: true })
     writeFileSync(FILE, `${text}\n`)

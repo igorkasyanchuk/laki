@@ -131,7 +131,7 @@ test('whenDone: once what was going is done, a countdown, then the Mac sleeps an
     return x?.resumeId && x.status === 'idle' && x
   }, 'first turn')
   await rig.rpc('settingsSet', { whenDone: 'sleep' })
-  await sleep(1000)
+  await sleep(800) // past whenDone's 0.6 s
   assert.throws(ran) // set with nothing going: it waits for the next thing that goes
   await going()
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
@@ -150,7 +150,7 @@ test('whenDone: once what was going is done, a countdown, then the Mac sleeps an
   await rig.rpc('hook', { tab: tab.id, state: 'idle' })
   await until(async () => (await rig.rpc('state')).whenDone, 'armed again')
   await rig.rpc('settingsSet', { whenDone: 'off' }) // Cancel
-  await sleep(1000)
+  await sleep(800) // past whenDone's 0.6 s
   assert.equal(ran(), 'sleepnow')
 })
 
@@ -191,7 +191,7 @@ test("Disk: a workspace's worktree and its node_modules measured; a folder gone 
   // a turn kept in each (files changed between the hooks)
   const turn = async (x: { ws: any; tab: any }, f: string) => {
     await rig.rpc('hook', { tab: x.tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: `add ${f}` } })
-    await sleep(300)
+    await sleep(300) // its snapshot first, as claude's first tool call comes after the hook
     writeFileSync(join(x.ws.path, f), `${f}\n`)
     await rig.rpc('hook', { tab: x.tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
     await until(async () => (await rig.rpc('turnList', { ws: x.ws.id })).length === 1, `${f} kept`)
@@ -227,7 +227,7 @@ test("Disk: a workspace's worktree and its node_modules measured; a folder gone 
   // Archives over 30 days: only the ones it listed get the notice; one archived later, under 30 days then, is left as it is
   await rig.rpc('hook', { tab: b.tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
   await rig.rpc('wsArchive', { id: a.ws.id })
-  await sleep(50)
+  await sleep(50) // a's archive under way first: the two overlap
   await rig.rpc('wsArchive', { id: b.ws.id })
   const at = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
   const [t1, t2] = [(await at(a.ws.id)).archivedAt, (await at(b.ws.id)).archivedAt]

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, until, sleep } from './helpers.ts'
 
 const FAKE = join(import.meta.dirname, 'fakes', 'acp-agent')
 
@@ -38,7 +38,7 @@ test('ACP tab: the Reader shows its words, its permission is an ask answered bac
   chat = await rig.rpc('chatRead', { tab: tab.id })
   assert.equal(chat.said.at(-1).text, ' (picked allow-once)')
   assert.equal((await rig.tab(ws.id)).last, 'answer: add tests\n\n (picked allow-once)')
-  await new Promise(r => setTimeout(r, 300))
+  await sleep(300)
   assert.equal(watcher.events.filter((e: any) => e.ev === 'turn' && e.kind === 'done' && e.tab === tab.id).length, 1, 'one turn end')
 
   // a turn it works on until Stop: session/cancel, then no turn end

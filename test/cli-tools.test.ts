@@ -5,7 +5,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSy
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { completionWords } from '../src/shared/usage.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 test('laki mcp: initialize, tools, a call, errors', async t => {
   const rig = await fresh(t)
@@ -206,7 +206,7 @@ test('laki events: a turn done as a JSON line, --once exits after it; --type kee
   const once = rig.cli('events', '--json', '--type', 'turn.done', '--once', '--timeout', '30')
   let ended = false
   void once.then(() => (ended = true))
-  for (let i = 0; !ended && i < 40; i++) await done(ta, `all done ${i}`), await new Promise(r => setTimeout(r, 300))
+  for (let i = 0; !ended && i < 40; i++) await done(ta, `all done ${i}`), await sleep(300)
   const r = await once
   assert.equal(r.code, 0, r.err)
   const lines = r.out.trim().split('\n')

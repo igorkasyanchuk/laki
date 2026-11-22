@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { veiled, type View } from '../src/shared/types.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 test('prompts: yours through Laki, newest first, the same text moved up, a /command left out', async t => {
   const rig = await fresh(t)
@@ -29,7 +29,7 @@ test('background image: kept in its folder, read back as a data URL, the one bef
   const a = await rig.rpc('bgSet', { data: png, ext: 'png' })
   assert.equal((await rig.rpc('state')).settings.background.file, a.file)
   assert.match(await rig.rpc('bgGet'), /^data:image\/png;base64,/)
-  await new Promise(r => setTimeout(r, 5)) // a new name: its ms
+  await sleep(5) // a new name: its ms
   const b = await rig.rpc('bgSet', { data: png, ext: 'jpg' })
   assert.deepEqual(readdirSync(join(rig.data, 'background')), [b.file])
   assert.match(await rig.rpc('bgGet'), /^data:image\/jpeg;base64,/)

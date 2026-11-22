@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { fresh, until, sleep } from './helpers.ts'
 
 const ext = (root: string, id: string, m: object, files: Record<string, string> = {}) => {
   const d = join(root, '.laki', 'extensions', id)
@@ -222,7 +222,7 @@ test("a repo's extension's turn-on question shows widget.json as it is on disk; 
 })
 
 test("a repo's extension is trusted as every file in its folder but its state: what its fetch writes and widget.json's state names (or __pycache__) keeps it on; a new file or an edit to its fetch.sh turns it off, the notice naming it; not a repo: hidden files, node_modules and __pycache__ don't count", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_REPO_WATCH_MS: '150' } }) // the watch's scan 0.15 s after a change, not 1
   const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
   const d = ext(rig.repo, 'w', { name: 'W', fetch: 'sh fetch.sh', state: ['last.txt'] }, { 'fetch.sh': `date > last.txt; mkdir -p __pycache__; date > __pycache__/x.pyc; echo '{"n": 1}'\n` })
   ext(rig.repo, 'v', { name: 'V', fetch: `date > state.txt; echo '{"n": 1}'` })
@@ -245,12 +245,12 @@ test("a repo's extension is trusted as every file in its folder but its state: w
   await turnOn(w)
   for (let i = 0; i < 3; i++) assert.equal((await rig.rpc('widgetRun', { id: w })).error, undefined)
   assert.ok(existsSync(join(d, 'last.txt')) && existsSync(join(d, '__pycache__', 'x.pyc')))
-  await new Promise(r => setTimeout(r, 1800)) // the watch's scan, a second after the last change
+  await sleep(600) // the watch's scan, 0.15 s after the last change here: it stays on
   assert.deepEqual([(await find(w)).on, (await find(w)).changed], [true, undefined])
   const c = `${p.id}.c`
   await turnOn(c)
   assert.equal((await rig.rpc('widgetRun', { id: c })).error, undefined, 'a data file its command names, ignored: not code, not counted')
-  await new Promise(r => setTimeout(r, 1800))
+  await sleep(600)
   assert.equal((await find(c)).on, true)
 
   // a file it writes that the repo doesn't ignore: off, named
@@ -281,7 +281,7 @@ test("a repo's extension is trusted as every file in its folder but its state: w
 // #4: git's listing missed code a repo's extension runs: a submodule's files (one gitlink line) and an ignored file a
 // tracked script sources. Both count now; what it declares as its state, and .DS_Store, don't
 test("#4: a submodule moved or an ignored file it sources rewritten turns it off; its declared state and .DS_Store don't; not a repo: its state neither", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_REPO_WATCH_MS: '150' } }) // the watch's scan 0.15 s after a change, not 1
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'protocol.file.allow=always', ...a], { cwd, env: rig.env, stdio: 'pipe' })
   const sub = gitRepo(rig, 'sub')
   writeFileSync(join(sub, 'run.sh'), '. "$(dirname "$0")/helper.sh"\n')
@@ -302,7 +302,7 @@ test("#4: a submodule moved or an ignored file it sources rewritten turns it off
     await until(async () => (x => x.at && !x.running)(await find(id)), 'its first fetch done')
     return what.text as string
   }
-  const settle = () => new Promise(r => setTimeout(r, 1800)) // the watch's scan, a second after the last change
+  const settle = () => sleep(600) // the watch's scan, 0.15 s after the last change here
 
   // its state and .DS_Store: written, it stays on; the sheet names the ignored files it's trusted as and its state
   const l = `${p.id}.l`
@@ -350,7 +350,7 @@ test("#34.4: a branch without .laki/extensions and back: its extensions go, then
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const has = async () => (await rig.rpc('state')).widgets.some((w: any) => w.id === `${p.id}.w`)
   assert.ok(await has())
-  await new Promise(r => setTimeout(r, 500)) // the watch starts a moment after
+  await sleep(500) // the watch starts a moment after
   git('checkout', '-q', 'bare')
   await until(async () => !(await has()), "gone on the bare branch")
   git('checkout', '-q', 'main')

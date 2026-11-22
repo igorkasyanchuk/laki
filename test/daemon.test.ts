@@ -61,13 +61,13 @@ test('attach, reattach, resize, multiple clients', async t => {
 })
 
 test("codex: a sub-agent's turn end leaves the chat's own turn running", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_CODEX_LATER_MS: '300' } }) // a notify while busy judged 0.3 s on, not 1.5
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'codex' })
   const tab = await rig.tab(ws.id)
   await until(async () => (await rig.screen(tab.id)).includes('fake codex'), 'codex up')
   await rig.rpc('send', { target: ws.id, text: 'sub task' })
-  await new Promise(r => setTimeout(r, 2500)) // the sub-agent's notify came, and the wait after it
+  await sleep(900) // the sub-agent's notify came (0.1 s in), and the wait after it (0.3 s); its own ends at 3.5 s
   let tv = await rig.tab(ws.id)
   assert.equal(tv.status, 'running')
   assert.equal(tv.resumeId, undefined) // not the sub-agent's thread
@@ -78,7 +78,7 @@ test("codex: a sub-agent's turn end leaves the chat's own turn running", async t
   // the chat's own end comes while the screen still says Working: it, not the sub-agent's before it, ends the turn
   await rig.rpc('send', { target: ws.id, text: 'near task' })
   await until(async () => (await rig.tab(ws.id)).last === 'answer: near task', 'its own end, late')
-  await new Promise(r => setTimeout(r, 1700)) // past both waits
+  await sleep(700) // past both waits (0.3 s each): nothing more happens
   tv = await rig.tab(ws.id)
   assert.equal(tv.last, 'answer: near task')
   assert.match(tv.resumeId, /^thread-(?!sub)/)
@@ -214,6 +214,7 @@ test('ports of the workspace process tree, their names, stopping one; PR from gh
       run: `exec node -e 'process.on("SIGTERM", () => {}); const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'`,
       ports: { '3100': 'web', '3200': { name: 'api' } }, // not a string: left out
     },
+    env: { LAKI_KILL_AFTER_MS: '1200' }, // SIGKILL 1.2 s after the ignored SIGTERM, not 3
   })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
@@ -230,7 +231,7 @@ test('ports of the workspace process tree, their names, stopping one; PR from gh
   assert.equal(w.procs[m[1]].cmd, 'node')
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 1 }), /nothing of \S+ listens on :1/)
   assert.equal((await rig.rpc('portKill', { ws: ws.id, port: Number(m[1]) })).pid, w.procs[m[1]].pid)
-  await sleep(1500)
+  await sleep(700) // 2 port scans (every 0.3 s), short of the SIGKILL
   assert.ok((await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'SIGTERM shrugged off')
   await until(async () => !(await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'killed, gone from the list', 6000)
 })
@@ -278,7 +279,7 @@ test('settings: branch prefix, tab name and color, open in a custom editor', asy
 })
 
 test('PR: failing CI and new review comments go to the agent once; global env; images; workspace name; a silent turn ends', async t => {
-  const rig = await fresh(t, { config: { env: { TEST_SHARED: 'file' } } })
+  const rig = await fresh(t, { config: { env: { TEST_SHARED: 'file' } }, env: { LAKI_QUIET_MS: '1000', LAKI_SWEEP_MS: '300', LAKI_PR_SOON_MS: '300', LAKI_PR_SCAN_MS: '200' } }) // idle after 1 s of quiet, not 4; a scan 0.3 s after a turn, not 2, and every 0.2 s
   await rig.rpc('settingsSet', { env: { TEST_GLOBAL: 'g', TEST_SHARED: 'global', 'bad key': 'x' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
@@ -308,7 +309,7 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   assert.deepEqual(w.pr.list, [{ name: 'test', state: 'fail', url: 'https://github.com/o/r/actions/runs/1/job/7' }])
   assert.equal(w.fix.tries, 1)
   assert.match(await rig.screen(tab.id), /expected 2, got 3/)
-  await sleep(1500) // scans go on: the same commit isn't sent again
+  await sleep(600) // scans go on (every 0.2 s): the same commit isn't sent again
   assert.equal((await rig.screen(tab.id)).split('answer: CI fails').length, 2)
   // a new commit still failing: sent again
   pr('def')
@@ -328,7 +329,7 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   review(1) // the agent replied as you
   await until(async () => (await rig.screen(tab.id)).includes('answer: Address the open review comments'), 'review answered') // a busy Mac: the fake answers late
   await until(async () => (await rig.rpc('state')).workspaces[0].fix?.mine?.includes('c-me-0'), "the agent's reply seen")
-  await sleep(3000) // scans every 500 ms, and one 2 s after a turn ends
+  await sleep(800) // scans every 0.2 s, and one 0.3 s after a turn ends: nothing more is sent
   assert.equal((await rig.screen(tab.id)).split('answer: Address the open review comments').length, 2) // the fake echoes it, then answers
   assert.ok(!(await rig.screen(tab.id)).includes('push my token'))
 
@@ -344,7 +345,7 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   await until(async () => (await rig.screen(tab.id)).includes('answer: after the recap'), 'idle after a quiet while, then the queue', 15000)
   // while it says "esc to interrupt", it's still running
   await rig.rpc('input', { tab: tab.id, data: 'slow\r' })
-  await sleep(7000)
+  await sleep(2800) // past twice the quiet (1 s here) and a sweep: still running while it says so
   assert.equal((await rig.tab(ws.id)).status, 'running')
 })
 

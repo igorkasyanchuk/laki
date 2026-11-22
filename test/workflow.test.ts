@@ -1039,7 +1039,7 @@ test('templates (workflows/): each checks; listed last, never untrusted; save, d
     assert.ok(workflow.blocks.length >= 4 && workflow.blocks.length <= 8, `${f}: 4 to 8 blocks`)
     assert.ok(!workflow.blocks.some(b => b.kind === 'llm' || b.kind === 'decide'), `${f}: no AI blocks`)
   }
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_PR_SCAN_MS: '150' } }) // PRs scanned every 0.15 s, not the rig's 0.5
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
   const pr = (head: string, state: string) => writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state, url: 'https://github.com/o/r/pull/7', title: 'Fix it', headRefOid: head, statusCheckRollup: [] }))
@@ -1063,10 +1063,10 @@ test('templates (workflows/): each checks; listed last, never untrusted; save, d
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const st = (s: string) => until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr?.state === s, s)
   await st('OPEN')
-  await sleep(1200) // the first scan only notes it
+  await sleep(500) // a few scans (3): the first one only notes it
   pr('aaa', 'MERGED')
   await st('MERGED')
-  await sleep(1500)
+  await sleep(600) // 4 scans: a run would have started
   assert.deepEqual((await rig.rpc('state')).flows ?? [], [], 'a template never starts')
 
   // Use this: a copy of yours, as the app's sheet makes it (flowSave), listens from then on
@@ -1076,7 +1076,7 @@ test('templates (workflows/): each checks; listed last, never untrusted; save, d
   assert.equal(mine.on, 'pr.merged')
   pr('bbb', 'OPEN')
   await st('OPEN')
-  await sleep(1200)
+  await sleep(500)
   pr('bbb', 'MERGED')
   const run = await until(async () => (await rig.rpc('state')).flows?.find((r: any) => r.workflow === 'release-notes'), 'the copy starts on pr.merged')
   assert.equal(run.source, 'yours')
