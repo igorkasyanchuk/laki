@@ -123,7 +123,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
 // chat by a one-time code), what the chat may do, what it sends, how it works and what keeps it safe
 const LEVELS: [TgLevel, string, string][] = [
   ['notify', 'Notify', 'Pushes only: who waits for you, who is done. Nothing comes back.'],
-  ['answer', 'Answer', "Pushes, and a tap on a push's button picks that choice, as a click here would."],
+  ['answer', 'Answer', "Pushes; a tap on a push's button picks that choice, as a click here would; a reply to a push goes to its agent, a photo or a file too (a choice's number answers its question)."],
   ['control', 'Control', 'Everything Answer does. Stop, Ship, merge and settings stay on the Mac at every level.'],
 ]
 export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call }) {
@@ -146,7 +146,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
       <h2>Telegram</h2>
       <p className="muted small">
         Your own Telegram bot brings Laki's pushes to your phone: an agent waits for you, an agent is done. At the Answer level, a tap on a push's button
-        answers the agent. Set it up once in three steps; it takes about two minutes.
+        answers the agent, and a reply to a push goes to it. Set it up once in three steps; it takes about two minutes.
       </p>
       {tg?.notice && (
         <p className="warn small">
@@ -252,6 +252,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
         <ul className="tg-steps">
           <li>Laki on this Mac keeps one request open to Telegram's servers and gets your taps and messages as its answer. No port is opened, no tunnel runs.</li>
           <li>While Laki runs (its window may be closed), pushes go as agents wait or finish. While the Mac sleeps, nothing goes; a tap older than two minutes is dropped, not acted on in the morning.</li>
+          <li>To talk to an agent, reply to its push (swipe it left, or long-press it › Reply): your words go to that agent, queued while it works; a 👍 on your message says it went. A photo or a file (20 MB at most) goes as its path on this Mac.</li>
           <li>At Notify, Laki doesn't read the chat at all.</li>
         </ul>
       </Group>

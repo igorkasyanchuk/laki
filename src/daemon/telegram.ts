@@ -5,9 +5,11 @@
 // is ignored without a word. What it may do is its level (types.ts TgLevel); what goes out goes through phone.ts' rules
 // (Do not disturb, mute, Recording mode, titles only) and redact, a message a second at most.
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { basename, extname, join } from 'node:path'
+import { readCapped, writeAtomic } from '../shared/conn.ts'
 import type { Telegram, TelegramView, TgLevel, Webhook } from '../shared/types.ts'
-import { changed, log, save, state } from './core.ts'
+import { changed, fileSave, imageSave, log, rtOf, save, sessions, state } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 import { takeTap } from './phone.ts'
@@ -84,6 +86,34 @@ function out<R = unknown>(method: string, body: object): Promise<R> {
   return p
 }
 const chat = () => T().user!.id
+// main.ts' gate for what a message makes Laki do (TELEGRAM_OK at its level, remote access's answer-level checks), then the call
+export const tgHooks: { call?: (method: string, params: Record<string, unknown>) => Promise<unknown> } = {}
+const act = (method: string, params: Record<string, unknown>) => (tgHooks.call ? tgHooks.call(method, params) : Promise.reject(new Error('not ready')))
+
+// P2: which tab each pushed message is about, so a reply to it goes there: the newest 500, in <data>/telegram-msgs.json
+const MSGS = 500
+let msgs: Map<number, string> | undefined
+const msgFile = () => join(dir, 'telegram-msgs.json')
+function msgMap() {
+  if (msgs) return msgs
+  try {
+    msgs = new Map(JSON.parse(readFileSync(msgFile(), 'utf8')) as [number, string][])
+  } catch {
+    msgs = new Map()
+  }
+  return msgs
+}
+function remember(msg: number, tab: string) {
+  const m = msgMap()
+  m.delete(msg)
+  m.set(msg, tab)
+  for (const k of m.keys()) if (m.size > MSGS) m.delete(k)
+  try {
+    writeAtomic(msgFile(), JSON.stringify([...m]), 0o600)
+  } catch (e) {
+    log(`telegram: ${(e as Error).message}`)
+  }
+}
 
 // ---------- pushes (phone.ts): a message each, its buttons a tap each (callback_data nonce:n), a done one silent
 type Msg = { message_id: number }
@@ -103,6 +133,7 @@ export async function tgPush(p: Push): Promise<number | undefined> {
   const taps = p.nonce && p.options?.length && tgAnswers() ? p.options : []
   const markup = taps.length ? { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } : p.url ? { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } : undefined
   const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
+  if (m?.message_id && p.tab) remember(m.message_id, p.tab) // a reply to it goes to its tab
   return m?.message_id
 }
 // an ask answered (said: what was picked) or gone: its message says so, its buttons gone (an empty keyboard)
@@ -127,7 +158,8 @@ const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(
 // ---------- the long poll: one getUpdates at a time, its own loop (not a tick), stopped by its AbortController
 type User = { id: number; first_name?: string; last_name?: string; username?: string }
 type Chat = { id: number; type: string }
-type TgMessage = { message_id: number; from?: User; chat: Chat; date: number; text?: string }
+type TgFile = { file_id: string; file_size?: number }
+type TgMessage = { message_id: number; from?: User; chat: Chat; date: number; text?: string; caption?: string; reply_to_message?: { message_id: number }; photo?: TgFile[]; document?: TgFile & { file_name?: string } }
 type Update = { update_id: number; message?: TgMessage; callback_query?: { id: string; from: User; message?: { message_id: number; chat: Chat }; data?: string } }
 let ctl: AbortController | undefined
 let offset = 0
@@ -208,8 +240,52 @@ async function take(u: Update, gap: boolean) {
     const said = tap && (await takeTap(tap))
     return void out('answerCallbackQuery', { callback_query_id: q.id, text: gap ? 'Laki was off: that tap is too old' : said || 'That ask moved on' }).catch(() => {})
   }
-  if (m && Date.now() / 1000 - m.date > STALE / 1000) return void say('Laki was off when you sent that: send it again.')
+  if (!m) return
+  if (Date.now() / 1000 - m.date > STALE / 1000) return void say('Laki was off when you sent that: send it again.')
+  if (!levelAtLeast('answer')) return
+  const tab = m.reply_to_message && msgMap().get(m.reply_to_message.message_id)
+  if (!tab) return void say("Reply to one of my messages about an agent (swipe it left, or long-press it › Reply) and what you write goes to that agent.")
+  await deliver(tab, m).then(
+    () => react(m),
+    e => say(`Not sent: ${esc(scrub((e as Error).message))}`),
+  )
 }
+// a reply's words (and its photo's or file's path) to its tab: a waiting ask's choice when it names one (its number or
+// its words), else a message to the agent, queued until it's free (send's whenIdle). Through tgHooks' gate: an agent's
+// tab only, the whole message, never a line that starts with !
+async function deliver(tab: string, m: TgMessage) {
+  const t = state.tabs.find(x => x.id === tab)
+  if (!t) throw new Error('that tab is gone')
+  let text = (m.text ?? m.caption ?? '').trim().slice(0, 8000)
+  const f = m.photo?.length ? m.photo.at(-1)! : m.document
+  const s = sessions.get(tab)
+  const ask = !f && rtOf(tab).status === 'waiting' && s && !s.exited ? s.ask() : undefined
+  const o = ask?.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase())
+  if (o) return void (await act('answer', { tab, n: o.n, label: o.label }))
+  if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
+  if (!text) throw new Error('nothing to send')
+  await act('send', { target: tab, text, whenIdle: true })
+  if (ask) void say(`Queued: ${esc(t.name)} asks something first (reply with a choice's number to answer it).`)
+}
+// a photo or a file from the chat into Laki's images or files (core's imageSave, fileSave): its path. Telegram gives a
+// bot 20 MB at most
+const FILE_MAX = 20 << 20
+async function fileIn(f: TgFile, name: string | false | undefined) {
+  if ((f.file_size ?? 0) > FILE_MAX) throw new Error('over 20 MB: Telegram gives bots 20 MB at most')
+  const got = await tg<{ file_path?: string }>('getFile', { file_id: f.file_id })
+  if (!got.file_path) throw new Error("Telegram didn't give the file")
+  const tok = token()
+  const res = await fetch(`${API()}/file/bot${tok}/${got.file_path}`, { signal: AbortSignal.timeout(60_000), redirect: 'error' }).catch((e: Error) => {
+    throw new Error(scrub(`Telegram didn't send the file (${e.message})`, tok))
+  })
+  if (!res.ok) throw new Error(`Telegram didn't send the file (${res.status})`)
+  const { buf, cut } = await readCapped(res, FILE_MAX)
+  if (cut) throw new Error('over 20 MB')
+  const ext = extname(got.file_path).slice(1).toLowerCase()
+  return name || !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? fileSave({ name: name || basename(got.file_path), data: buf.toString('base64') }) : imageSave({ data: buf.toString('base64'), ext })
+}
+// the receipt: a 👍 on your message (Telegram may refuse a reaction: then none)
+const react = (m: TgMessage) => void out('setMessageReaction', { chat_id: chat(), message_id: m.message_id, reaction: [{ type: 'emoji', emoji: '👍' }] }).catch(() => {})
 const ignore = () => ++ignored === 1 && setTimeout(() => (log(`telegram: ignored ${ignored} update(s) from someone else`), (ignored = 0)), 60_000).unref()
 
 // ---------- Settings › Telegram: the bot's token (checked with getMe), switches, Unpair; Send test

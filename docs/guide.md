@@ -2746,7 +2746,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Laki says *Paired*. The code is 128 random bits, works once, for 10 minutes, and only the Telegram account that sends
   it is let in, in its private chat with the bot; anyone else who finds the bot gets no answer at all. **3 · What
   Telegram may do**: *Notify* (pushes only; Laki doesn't read the chat), *Answer* (the default: a tap on a push's
-  button picks that choice, as a click in Laki would) or *Control*. Stop, Ship, merge, archive or delete, settings,
+  button picks that choice, as a click in Laki would; a reply to a push, swiped left or long-pressed › Reply, goes to its
+  agent, queued while it works, a 👍 on your message its receipt; a choice's number as the reply answers its question;
+  a photo or a file, 20 MB at most, goes as its path on this Mac; never a line that starts with `!`, and only to an
+  agent's tab) or *Control*. Stop, Ship, merge, archive or delete, settings,
   secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
   agent, remote access or a trusted client can't change this section. *What it sends*: *An agent waits for you* (on),
   *An agent is done* (on, silently), *Titles only* (who needs you, nothing off the screen). Do not disturb, a muted tab

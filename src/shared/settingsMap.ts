@@ -59,7 +59,7 @@ export const FIND: [string, string, string?][] = [
   ['telegram', '2 · Pair your phone', 'telegram pair pairing code qr start unpair send test chat'],
   ['telegram', '3 · What Telegram may do', 'telegram level notify answer control access on off'],
   ['telegram', 'What it sends', 'telegram waiting done finished silent titles only'],
-  ['telegram', 'How it works', 'telegram long poll no port tunnel sleep stale'],
+  ['telegram', 'How it works', 'telegram long poll no port tunnel sleep stale reply message agent photo file receipt'],
   ['telegram', 'Security', 'telegram token keychain safe security pairing code who unpair lost phone revoke'],
   ['notes', 'Release notes', "what's new changelog version changes added recently"],
   ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],

@@ -24,6 +24,8 @@ async function bot(t: { after: (f: () => void) => void }) {
   const srv = createServer(async (q, r) => {
     let body = ''
     for await (const c of q) body += c
+    if (q.url === `/file/bot${TOKEN}/photos/file_1.jpg`) return void r.writeHead(200).end(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]))
+    if (q.url === `/file/bot${TOKEN}/documents/notes.txt`) return void r.writeHead(200).end('my notes')
     const m = /^\/bot([^/]+)\/(\w+)$/.exec(q.url ?? '')
     const call: Call = { method: m?.[2] ?? '', tok: decodeURIComponent(m?.[1] ?? ''), body: body ? JSON.parse(body) : {} }
     calls.push(call)
@@ -36,6 +38,7 @@ async function bot(t: { after: (f: () => void) => void }) {
       if (r.socket?.destroyed) return // its daemon gone meanwhile: the updates wait for the next one
       return ok(queue.splice(0).filter((u: any) => u.update_id >= (call.body.offset ?? 0)))
     }
+    if (call.method === 'getFile') return ok({ file_id: call.body.file_id, file_unique_id: 'u', file_path: call.body.file_id === 'big' ? undefined : call.body.file_id === 'doc' ? 'documents/notes.txt' : 'photos/file_1.jpg' })
     if (call.method === 'sendMessage') return ok({ message_id: (call.id = ++msg), chat: { id: call.body.chat_id, type: 'private' }, date: Math.floor(Date.now() / 1000) })
     ok(true)
   })
@@ -48,8 +51,8 @@ async function bot(t: { after: (f: () => void) => void }) {
     of: (method: string) => calls.filter(c => c.method === method),
     fail: (e: object) => (next = e),
     // an update from someone (from, a chat), at a time (date: seconds ago)
-    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number } = {}) =>
-      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), text, ...(o.reply && { reply_to_message: { message_id: o.reply } }) } }),
+    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number; photo?: object[]; document?: object } = {}) =>
+      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), ...(o.photo || o.document ? { caption: text } : { text }), ...(o.photo && { photo: o.photo }), ...(o.document && { document: o.document }), ...(o.reply && { reply_to_message: { message_id: o.reply } }) } }),
     tap: (data: string, o: { from?: number; chat?: number; type?: string } = {}) =>
       queue.push({ update_id: ++id, callback_query: { id: `q${id}`, from: { id: o.from ?? ME }, data, message: { message_id: 1, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' } } } }),
   }
@@ -204,4 +207,56 @@ test('P1: the old telegram webhook moves to Settings › Telegram: a private cha
     assert.ok(!readFileSync(sp, 'utf8').includes('fake-secret'), 'the token off state.json')
   }
   await assert.rejects(rig.rpc('settingsSet', { webhook: { url: 'https://example.com/x', format: 'telegram' } }), /its own section now/)
+})
+
+// an agent tab with claude up, its project and workspace
+async function claude(rig: Awaited<ReturnType<typeof fresh>>) {
+  const proj = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
+  return { ws, tab }
+}
+
+test('P2: a reply to a push goes to its tab (a waiting ask: a choice by its number), a 👍 its receipt; never a ! line; across a restart', async t => {
+  const { b, rig } = await paired(t)
+  const { ws, tab } = await claude(rig)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  const done = (await until(() => b.of('sendMessage').find(c => c.body.disable_notification), 'the done push, silent'))!
+  assert.match(done.body.text, /^<b>claude in .+ is done<\/b>\n.*hi/, 'with its last line')
+  b.message('and the empty email too', { reply: done.id })
+  await until(async () => /answer: and the empty email too/.test(await rig.screen(tab.id)), 'the reply sent to claude')
+  await until(() => b.of('setMessageReaction').some(c => c.body.reaction[0].emoji === '👍'), 'the receipt')
+  b.message('!rm -rf /', { reply: done.id })
+  await until(() => b.of('sendMessage').some(c => /Not sent: .*a line that starts with !/.test(c.body.text)), 'a ! line refused')
+  b.message('hello') // not a reply: how to send one
+  await until(() => b.of('sendMessage').some(c => /Reply to one of my messages/.test(c.body.text)), 'the hint')
+  // a waiting menu: its push, and a reply with a choice's number picks it
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length), 'the ask'))!
+  b.message('1', { reply: ask.id })
+  await until(async () => /picked: Yes/.test(await rig.screen(tab.id)), 'the reply picked 1')
+  // the map outlives a restart: a reply to the done push still reaches its tab
+  await rig.stop()
+  await rig.start()
+  await until(async () => (await rig.rpc('state')).telegram?.polling, 'polling again')
+  await until(async () => (await rig.tab(ws.id)) && /> $/m.test(await rig.screen(tab.id)), 'claude back')
+  await until(() => b.of('getUpdates').length > 0, 'polling')
+  await sleep(400) // past the first batch (a gap's)
+  b.message('after the restart', { reply: done.id })
+  await until(async () => /answer: after the restart/.test(await rig.screen(tab.id)), 'still its tab')
+})
+
+test('P2: a photo or a file in a reply is saved through Laki and its path goes to the agent; past 20 MB refused', async t => {
+  const { b, rig } = await paired(t)
+  const { tab } = await claude(rig)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  const done = (await until(() => b.of('sendMessage').find(c => c.body.disable_notification), 'the done push'))!
+  b.message('look', { reply: done.id, photo: [{ file_id: 'small', file_size: 10 }, { file_id: 'p1', file_size: 7 }] })
+  await until(async () => /answer: look .*images\/\d+-\w+\.jpg/s.test((await rig.screen(tab.id)).replace(/\n/g, ' ')), 'the picture\'s path sent')
+  assert.equal(b.of('getFile').at(-1)!.body.file_id, 'p1', 'the biggest size')
+  b.message('', { reply: done.id, document: { file_id: 'doc', file_name: 'notes.txt', file_size: 8 } })
+  await until(async () => /files\/\d+-\w+\/notes\.txt/.test((await rig.screen(tab.id)).replace(/\n/g, '')), 'the file\'s path sent')
+  b.message('', { reply: done.id, document: { file_id: 'huge', file_name: 'x.bin', file_size: 21 << 20 } })
+  await until(() => b.of('sendMessage').some(c => /Not sent: over 20 MB/.test(c.body.text)), 'too big')
 })

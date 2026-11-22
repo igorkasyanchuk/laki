@@ -102,6 +102,11 @@ usageDays commits commitDiff prLabels ghCard blame fileWeb prDiff prFile prFiles
 widgetStore widgetReload widgetFiles widgetWrite widgetPush widgetEmit widgetEvents widgetTools widgetToolCall widgetGrantRm widgetRuns widgetAnnotations widgetMock widgetDev widgetNew widgetCheck noteRm planList planNew planGet planSave planFile planUpload planWrite planRm flowList flowSave flowTrust flowPause flowRm flowRestore flowTrash flowHistory flowRevert flowStart flowEvent flowStop \
 flowHold flowGet flowForget'.split(' '))
 
+// Telegram (telegram.ts tgHooks: main.ts' gate): what a message from the paired chat may make Laki do, and the level each
+// needs. Anything else is refused, so a new method is never Telegram's by default. Never: Stop, Ship, merge, archive or
+// delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID (test/telegram.test.ts)
+export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer' }
+
 // remote access at Full (a phone's page): REMOTE_NO is what outlives its session or opens Laki wider: its own set-up and
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
 // install, apps' windows: device's and Laki AI's aiShot, an app opened: aiOpenApp), the clock. hookAdd: a new webhook and its secret; presetSave: a profile's args and env, as

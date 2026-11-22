@@ -68,7 +68,7 @@ import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRest
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
 import { agentContext, agentContextOpen } from './sees.ts'
-import { AGENT_NO, AGENT_OK, AGENT_OWN, AGENT_SETTINGS_OK, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_KEYS, REMOTE_NO, REMOTE_OK } from './gates.ts'
+import { AGENT_NO, AGENT_OK, AGENT_OWN, AGENT_SETTINGS_OK, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_KEYS, REMOTE_NO, REMOTE_OK, TELEGRAM_OK } from './gates.ts'
 import * as clientsMod from './clients.ts'
 
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -1374,6 +1374,17 @@ const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTid
   'flowRevert', 'flowStart', 'flowEvent', 'flowStop', 'flowHold', 'flowFirst', 'flowTest', 'flowForget', 'flowTick', 'shutdown'])
 for (const k of Object.keys(api)) if (Object.hasOwn(ANSWER, k) === ANSWER_NO.has(k)) throw new Error(`api's ${k} is ${ANSWER_NO.has(k) ? 'in ANSWER and ANSWER_NO' : 'in neither ANSWER nor ANSWER_NO'}: classify it for remote access's answer level (D7)`)
 for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, k)) throw new Error(`ANSWER's or ANSWER_NO's ${k} isn't a method of api`)
+// Telegram's (telegram.ts tgHooks.call): only TELEGRAM_OK's methods, at the level each needs, with ANSWER's checks of
+// what a call says (an agent tab's whole message, never a ! line; no say), then as the user's own call
+for (const k of Object.keys(TELEGRAM_OK)) if (!Object.hasOwn(api, k)) throw new Error(`TELEGRAM_OK's ${k} isn't a method of api`)
+tgMod.tgHooks.call = (method, p) => {
+  const need = Object.hasOwn(TELEGRAM_OK, method) ? TELEGRAM_OK[method] : undefined
+  if (!need || !tgMod.levelAtLeast(need)) return Promise.reject(new Error(`not from Telegram (${method}): do it on the Mac`))
+  const ok = Object.hasOwn(ANSWER, method) ? ANSWER[method] : true
+  const why = ok === true ? '' : ok(p)
+  if (why) return Promise.reject(new Error(`not from Telegram: ${why}`))
+  return call(method, p)
+}
 const answerNo = (method: string, p: Params) => {
   const ok = Object.hasOwn(ANSWER, method) ? ANSWER[method] : undefined
   const why = ok === undefined ? method : ok === true ? '' : ok(p)

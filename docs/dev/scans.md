@@ -484,7 +484,16 @@ old*). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waite
 (`callback_data` `nonce:n`, unsigned: only the paired user's private chat counts) at answer and up unless titles only; its
 `message_id` stays with the nonce (`awaiting`'s `msg`), and as it goes (`gone`) `tgDone` edits it
 (`editMessageText` with an empty `inline_keyboard`) to say *Picked: …* or *Answered on the Mac, or it moved on*. A tap
-from the paired user (level answer and up) is `takeTap`, its callback answered with what it did. Remote access's Keep
+from the paired user (level answer and up) is `takeTap`, its callback answered with what it did. P2: each push's
+`message_id` → its tab (`remember`, the newest 500 in `<data>/telegram-msgs.json`, 0600, so it outlives a restart); a
+message that replies to one (`reply_to_message`) goes there (`deliver`): a waiting ask's choice when the text is its
+number or its words (`answer` with `label`), else `send` with `whenIdle` (and *Queued* when an ask waits), a 👍
+(`setMessageReaction`, refused quietly) its receipt, a failure said back (*Not sent: …*); a photo (its biggest size) or a
+document: `getFile`, then `/file/bot<token>/<path>` read up to 20 MB (`readCapped`) into core's `imageSave` or `fileSave`,
+its path after the caption. A message that replies to nothing gets how to reply. Every action goes through `tgHooks.call`
+(main.ts): only `gates.ts` `TELEGRAM_OK`'s methods at their level, with `ANSWER`'s checks of what they say (`sendOk`: an
+agent tab's, the whole message, never a `!` line; `answer` without `say`), then as the user's call. A done push to
+Telegram carries the turn's last line and the workspace's diff (`files.ts` `stats`: `+add −del · n files`). Remote access's Keep
 never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
 format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
 paired at answer with its When, a group's only a notice to pair again; `settingsSet` refuses the format. `telegramSet`,

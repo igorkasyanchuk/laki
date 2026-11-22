@@ -9,6 +9,7 @@ import { answerOk, pushOn, type Tab, type Webhook, type Workspace } from '../sha
 import { answered } from './askStreak.ts'
 import { answer, changed, log, rtOf, save, sessions, state, view } from './core.ts'
 import { dir } from './dir.ts'
+import { stats } from './files.ts'
 import { type Push, pushTo, replies, type Tap, tapOf, type Vapid, vapidNew, webPush } from './push.ts'
 import { flowHooks } from './schedule.ts'
 import { redact } from './share.ts'
@@ -32,7 +33,7 @@ function to(kind: 'waiting' | 'done' | 'any', bell = false): To {
 }
 // a push to each: buttons (a nonce, kept in awaiting with what it asks) where taps come back (ask), Telegram's message
 // id kept with it for tgDone. tgTaps false: none on Telegram (remote access's Keep: never from Telegram)
-function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'>, o: { ms?: number; what?: string; tgTaps?: boolean } = {}) {
+function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'>, o: { ms?: number; what?: string; tgTaps?: boolean; tg?: Partial<Push> } = {}) {
   const hook = !!t.hook && hookAnswers(t.hook)
   const tg = t.tg && tgAnswers() && o.tgTaps !== false
   const nonce = ask && p.options?.length && (hook || tg) ? randomBytes(8).toString('hex') : undefined
@@ -40,7 +41,7 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
   const what = o.what ?? p.tab
   if (t.hook) pushTo(t.hook, { ...p, ...(nonce && hook && { nonce, key: tapKey() }) }).catch(e => log(`push ${what}: ${e.message}`))
   if (t.tg)
-    tgPush({ ...p, ...(o.tgTaps === false && { options: undefined }), ...(nonce && tg && { nonce }) }).then(
+    tgPush({ ...p, ...o.tg, ...(o.tgTaps === false && { options: undefined }), ...(nonce && tg && { nonce }) }).then(
       msg => void (nonce && msg && (a => a && (a.msg = msg))(awaiting.get(nonce))),
       e => log(`telegram ${what}: ${e.message}`),
     )
@@ -62,7 +63,11 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
     // (Settings' titles only: pushRequest drops it, as any question)
     const perm = kind === 'waiting' ? rtOf(tab.id).perm : undefined
     const said = perm ? `${perm.tool}: ${redact(perm.what)}` : question
-    send(t, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: said || undefined, options: ask?.options }, ask && { tab: tab.id, key: JSON.stringify(ask.options) })
+    // Telegram's done one: the agent's last line and the workspace's diff (+add −del · files), a reply to it goes back
+    const st = kind === 'done' ? stats.get(tab.workspace) : undefined
+    const last = kind === 'done' ? (text.split('\n').map(l => l.trim()).filter(Boolean).at(-1) ?? '').slice(0, 500) : ''
+    const tg = kind === 'done' ? { question: [last, st && st.files ? `+${st.add} −${st.del} · ${st.files} file${st.files === 1 ? '' : 's'}` : ''].filter(Boolean).join('\n') || undefined } : undefined
+    send(t, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: said || undefined, options: ask?.options }, ask && { tab: tab.id, key: JSON.stringify(ask.options) }, { tg })
   }
   if (kind === 'waiting') setTimeout(go, Number(process.env.LAKI_PUSH_WAIT_MS) || 800) // tests' shorter
   else go()
