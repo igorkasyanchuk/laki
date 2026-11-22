@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.59.0 · Nov 22, 2026
 
 - The window, and a phone over remote access, get only what changed with each update from Laki's background service: a tab's status is under 1 KB, where the whole state was about 40 KB with 60 workspaces.
 - Settings › *Notifications*, after General: Quiet, macOS notifications and a table of what tells you where (macOS, a card on screen, the phone, the sound) for each event, where General held them before; old links still land there. [Try it](laki://settings/notifications)
