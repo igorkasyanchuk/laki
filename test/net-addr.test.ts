@@ -11,6 +11,13 @@ test("addrPrivate: loopback, private, link-local, CGNAT, unique local, unspecifi
     assert.equal(addrPrivate(a), false, a)
 })
 
+test('addrPrivate: NAT64 and 6to4 by the IPv4 they carry; Teredo, documentation, multicast and local-use NAT64 refused', () => {
+  for (const a of ['64:ff9b::7f00:1', '64:ff9b::127.0.0.1', '64:ff9b::a00:1', '2002:c0a8:101::', '2002:7f00:1:1::1', '2001::1', '2001:0:4136:e378::1', '2001:db8::1', 'ff02::1', 'ff0e::1', '64:ff9b:1::808:808', '224.0.0.1', '239.255.255.250', '192.0.2.1', '198.51.100.7', '203.0.113.9'])
+    assert.equal(addrPrivate(a), true, a)
+  for (const a of ['64:ff9b::808:808', '64:ff9b::8.8.8.8', '2002:808:808::', '2002:808:808:1::1', '2001:4860::8888', '64:ff9b:0:1::7f00:1', '223.255.255.255'])
+    assert.equal(addrPrivate(a), false, a)
+})
+
 test('publicAddr: every address of a name on the internet, or it throws; an IP literal as it is', async () => {
   const dns = (m: Record<string, string[]>) => async (h: string) => (m[h] ?? []).map(address => ({ address, family: address.includes(':') ? 6 : 4 }))
   const look = dns({ 'pics.example': ['93.184.216.34'], 'both.example': ['93.184.216.34', '127.0.0.1'], 'rebind.example': ['::1'], 'v6.example': ['2606:4700::1111'] })
