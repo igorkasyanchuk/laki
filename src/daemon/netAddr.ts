@@ -36,6 +36,11 @@ export const addrPrivate = (ip: string): boolean => {
   return g[0] === 0x2002 && NO.check(v4(g[1], g[2]), 'ipv4') // 6to4: bits 16 to 48
 }
 
+// an http(s) URL whose host as written is this Mac (an extension's URL source: the user's own service), by its parsed
+// hostname (a userinfo's localhost@ is no host); a URL that won't parse isn't. URL's hostname keeps ::1's brackets
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+export const localUrl = (u: string) => /^https?:\/\//i.test(u) && URL.canParse(u) && LOCAL_HOSTS.has(new URL(u).hostname)
+
 type Look = (host: string) => Promise<LookupAddress[]>
 // the rig's resolver (LAKI_TEST_DNS: { name: address }), only in its daemon (dir.ts inRig): a test names a host that
 // resolves to this Mac without DNS

@@ -1,5 +1,5 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type ArtBlocked, artSay } from '../../shared/artHosts'
+import { type ArtBlocked, artHostOk, artSay } from '../../shared/artHosts'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
@@ -2071,10 +2071,15 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
   const [kept, setKept] = useState(false) // Keep blocked: the bar gone while it's open
   const [allowing, setAllowing] = useState(false)
   useEffect(() => void (html && page && hosts?.().then(r => setBlocked(r.blocked), () => setBlocked([]))), [path, n, !!page])
+  const [allowErr, setAllowErr] = useState('')
+  // an address or a local name can't be allowed (artHostOk: the daemon refuses them): only the others are sent
+  const can = blocked.filter(b => artHostOk(b.host))
+  const cant = blocked.filter(b => !artHostOk(b.host))
   const allowIt = (always: boolean) => {
-    if (!allow || allowing) return
+    if (!allow || allowing || !can.length) return
     setAllowing(true)
-    allow(blocked.map(b => b.host), always).then(() => setN(x => x + 1), () => {}).finally(() => setAllowing(false))
+    setAllowErr('')
+    allow(can.map(b => b.host), always).then(() => setN(x => x + 1), e => setAllowErr(String(e?.message ?? e))).finally(() => setAllowing(false))
   }
   useChanged(stamp, path, 1500, () => setN(x => x + 1))
   const [menu, openMenu] = useMenu()
@@ -2084,13 +2089,15 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
       {html && page && blocked.length > 0 && !kept && (
         <div className="art-hosts small" role="status">
           <span className="grow">This page wants to load from the network: {artSay(blocked)}</span>
-          {allow && (
+          {cant.length > 0 && <span className="muted">An address or a local name can't be allowed: {cant.map(b => b.host).join(', ')}</span>}
+          {allowErr && <span className="warn">{allowErr}</span>}
+          {allow && can.length > 0 && (
             <>
               <button type="button" className="primary" disabled={allowing} onClick={() => allowIt(false)}>
                 Allow for this report
               </button>
               <button type="button" disabled={allowing} onClick={() => allowIt(true)} data-tip="Every report may load from it: Settings › General › Storage lists it">
-                {blocked.length === 1 ? `Always allow ${blocked[0].host}` : 'Always allow these'}
+                {can.length === 1 ? `Always allow ${can[0].host}` : 'Always allow these'}
               </button>
             </>
           )}

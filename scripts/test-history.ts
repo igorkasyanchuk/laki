@@ -33,10 +33,11 @@ export default async function* history(source: AsyncIterable<Ev>) {
     }
   })()
   cap()
-  // uncommitted changes to tracked files: the sha isn't what ran (test-report.ts leaves such runs out of the flaky list)
+  // uncommitted changes (a tracked file's, a new file under src, test or scripts): the sha isn't what ran (test-report.ts
+  // leaves such runs out of the flaky list)
   const dirty = (() => {
     try {
-      return execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim() !== ''
+      return execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).split('\n').some(l => (l && !l.startsWith('??')) || /^\?\? "?(src|test|scripts)\//.test(l))
     } catch {
       return false
     }

@@ -10,6 +10,7 @@ import { hasScript } from '../shared/widget.ts'
 import { termsOf } from '../shared/widgetUi.ts'
 import { type Entry, find, guarded, type Manifest, manifestOf, oneFile, onOf, scanWidgets, sourceOf, under, widgets } from './widgets.ts'
 import { gatesOf } from './widgetEvents.ts'
+import { localUrl } from './netAddr.ts'
 
 // what turning one on starts, in words, its command or prompt as a code block (a code span breaks on its backticks or
 // lines): Laki AI's Yes / No says it (aiQuestion), and a Yes turns it on only while it still says the same and its
@@ -27,7 +28,7 @@ export function widgetWhat(id: string) {
   const [runs, code]: [string, string?] =
     src.kind === 'static' ? ['runs nothing: its data is typed in']
     : src.kind === 'file' ? ['reads this file', src.path]
-    : src.kind === 'url' ? [/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(src.url ?? '') ? 'fetches this URL, a service on this Mac' : 'fetches this URL', src.url]
+    : src.kind === 'url' ? [localUrl(src.url ?? '') ? 'fetches this URL, a service on this Mac' : 'fetches this URL', src.url]
     : src.kind === 'ai' ? [`asks an agent this${src.tools ? `, with ${src.tools.replace(/[`*_[\]]/g, '')}` : ''}`, src.prompt && src.prompt.length > 1500 ? `${src.prompt.slice(0, 1500)}…` : src.prompt]
     : fetch ? [`runs this${w.m.stream ? ' and keeps it running' : ''}`, fetch]
     : ['runs nothing (no fetch)']

@@ -76,7 +76,7 @@ export function ago(v: unknown, now = Date.now()) {
 }
 // numbers (or objects' .value) as a line across a 100×30 box, stretched to the width it's given
 export function spark(v: unknown) {
-  const ns = (Array.isArray(v) ? v : []).map(x => Number(x && typeof x === 'object' && 'value' in x ? x.value : x)).filter(Number.isFinite)
+  const ns = (Array.isArray(v) ? v : []).map(x => Number(x && typeof x === 'object' ? ('value' in x ? x.value : undefined) : x)).filter(Number.isFinite)
   if (!ns.length) return ''
   const lo = Math.min(...ns)
   const span = Math.max(...ns) - lo || 1

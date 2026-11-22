@@ -13,6 +13,6 @@ const named = process.argv.slice(2)
 const all = readdirSync('test').filter(f => f.endsWith('.test.ts')).map(f => `test/${f}`)
 const files = named.length ? named : order(all, existsSync(HISTORY) ? parse(readFileSync(HISTORY, 'utf8')) : [])
 const s = run({ files: files.map(f => resolve(f)), concurrency: 4, execArgv: ['--experimental-strip-types', '--no-warnings'] })
-s.on('test:fail', () => (process.exitCode = 1))
+s.on('test:fail', e => void (e.todo === undefined || e.todo === false ? (process.exitCode = 1) : 0)) // a todo test's failure fails nothing, as with node --test
 s.compose(spec).pipe(process.stdout)
 s.compose(history).pipe(process.stdout)

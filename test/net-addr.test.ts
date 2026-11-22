@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { PassThrough } from 'node:stream'
 import type { IncomingMessage } from 'node:http'
-import { addrPrivate, getFollow, publicAddr } from '../src/daemon/netAddr.ts'
+import { addrPrivate, getFollow, localUrl, publicAddr } from '../src/daemon/netAddr.ts'
 
 test("addrPrivate: loopback, private, link-local, CGNAT, unique local, unspecified, IPv4 in IPv6; the internet's goes", () => {
   for (const a of ['127.0.0.1', '127.9.9.9', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '169.254.169.254', '100.64.0.1', '100.127.255.255', '0.0.0.0', '::', '::1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'febf::1', '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::ffff:7f00:1', 'not an address', ''])
@@ -38,4 +38,9 @@ test("getFollow: a public host's redirect to this Mac, a private network or plai
   await assert.rejects(getFollow('https://pub.example/x', signal, {}, hop('http://8.8.8.8/')), /redirect to http:\/\/ refused: https only/)
   const ok = Object.assign(new PassThrough(), { statusCode: 200, headers: {} }) as unknown as IncomingMessage
   assert.equal(await getFollow('https://pub.example/x', signal, {}, async () => ok), ok, 'no redirect: the answer itself')
+})
+
+test("localUrl: this Mac by the URL's parsed host, never a userinfo's localhost@ or a URL that won't parse", () => {
+  for (const u of ['http://localhost:3000/x', 'https://127.0.0.1/', 'http://[::1]:8080/a']) assert.equal(localUrl(u), true, u)
+  for (const u of ['https://localhost:1@evil.example/', 'https://localhost.evil.example/', 'http://{{config.host}}/', 'file://localhost/etc/hosts', 'localhost:3000']) assert.equal(localUrl(u), false, u)
 })

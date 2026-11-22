@@ -320,10 +320,10 @@ default, the store's (`widgetSet` `source`, `sourceOk`: a static text 64 KB, a p
 `ownFetch`) wins, `sourceOf`. `fetches` is a fetch of its own or any other source; `due` skips static; `streaming` only
 its own fetch. `widgetRun` reads a source through `sourceText` (static: its text; file: `fill`ed over `{ config,
 workspace }`, `~` home, relative to its folder, `MAX_OUT`; URL: `SOURCE_WAIT` 30 s, its status said without
-the query; by its host as written: `localhost`, `127.0.0.1` or `[::1]` (`LOCAL`, the user's own service) by `fetch` with
+the query; by its host as written (netAddr.ts `localUrl`, the URL's parsed hostname: a userinfo's `localhost@` is no host): `localhost`, `127.0.0.1` or `[::1]` (the user's own service) by `fetch` with
 `redirect: 'error'`, anything else https only through netAddr.ts `getFollow`: `getPublic` at the address `publicAddr`
 checked, each redirect, at most 5, https and checked again, so a public host can't send it to this Mac, the LAN or
-169.254.169.254; widgetWhat says a local one is "a service on this Mac"; `test/widget-source.test.ts`, `net-addr`) and `parsed` (JSON when it starts with `{` or `[`, else `{ text }`; a static text that doesn't parse is an
+169.254.169.254; widgetWhat says a local one (`localUrl` too) is "a service on this Mac"; a refused answer is closed at once; `test/widget-source.test.ts`, `net-addr`) and `parsed` (JSON when it starts with `{` or `[`, else `{ text }`; a static text that doesn't parse is an
 error). A static pick is kept at once (`keep`), on or off. `needsSample` (widgetSchema.ts: a fetch, a script, a file
 or a URL) is `manifestCheck`'s and `widgetWrite`'s rule. `SourceField`, the page's Data tab: a segment
 per kind (its fetch only with `ownFetch`), the text, path or URL saved on blur.
