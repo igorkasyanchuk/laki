@@ -1182,6 +1182,37 @@ test('wrapProfile under the real sandbox-exec: the data folder hidden whole, wha
   }
 })
 
+// a worktree's .git file and a checkout's .git folder fenced (each names the git folder and config Laki's own git reads
+// outside the sandbox: a program to run as you); what git commit writes there (gitDirs) allowed back
+test('wrapProfile under the real sandbox-exec: .git not its to write, but what git commit writes', { skip: !existsSync('/usr/bin/sandbox-exec') }, async () => {
+  const { wrapProfile } = await import('../src/shared/wrap.ts')
+  const { realpathSync } = await import('node:fs')
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'laki-wrap-')))
+  try {
+    const repo = join(root, 'repo')
+    const own = join(repo, '.git', 'worktrees', 'wt')
+    const wt = join(root, 'wt')
+    for (const d of [join(repo, '.git', 'objects'), own, wt]) mkdirSync(d, { recursive: true })
+    writeFileSync(join(wt, '.git'), `gitdir: ${own}\n`)
+    const run = (worktree: string, gitDirs: string[], cmd: string) => {
+      const { text, params } = wrapProfile({ agent: 'opencode', worktree, home: join(root, 'home'), gitDirs, tmp: [] })
+      return execFileSync('/usr/bin/sandbox-exec', ['-p', text, ...params, '/bin/sh', '-c', `${cmd} 2>/dev/null && echo yes || echo NO`], { encoding: 'utf8' }).trim()
+    }
+    // a worktree: its .git file and its git folder's config.worktree no; its index yes
+    const wtDirs = [join(repo, '.git', 'objects'), join(own, 'index'), join(own, 'index.lock')]
+    assert.equal(run(wt, wtDirs, `echo 'gitdir: /tmp/x' > '${join(wt, '.git')}'`), 'NO', "the worktree's .git file")
+    assert.equal(run(wt, wtDirs, `echo x > '${join(own, 'config.worktree')}'`), 'NO', 'config.worktree')
+    assert.equal(run(wt, wtDirs, `echo x > '${join(own, 'index')}'`), 'yes', 'its index')
+    assert.equal(run(wt, wtDirs, `echo x > '${join(wt, 'a')}'`), 'yes', 'its files')
+    // a checkout: .git/config no, its objects yes
+    assert.equal(run(repo, [join(repo, '.git', 'objects')], `echo x > '${join(repo, '.git', 'config')}'`), 'NO', "a checkout's .git/config")
+    assert.equal(run(repo, [join(repo, '.git', 'objects')], `echo x > '${join(repo, '.git', 'objects', 'o')}'`), 'yes', 'its objects')
+    assert.equal(run(repo, [join(repo, '.git', 'objects')], `echo x > '${join(repo, 'b')}'`), 'yes', "the checkout's files")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 // a wrapped profile's net list: every connection out denied but this Mac's (its proxy's), in the text and as
 // sandbox-exec runs it; all, or unset: no network rule
 test("wrapProfile's net list: (deny network-outbound) but this Mac's loopback, nothing for all", async () => {

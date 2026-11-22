@@ -1976,7 +1976,7 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     agent: tab.preset as Agent,
     worktree: realOf(ws.path),
     home: realOf(homedir()),
-    gitDirs: gitWrites(ws.path, tab.preset === 'codex').map(realOf),
+    gitDirs: gitWrites(ws.path, true).map(realOf), // the files git commit writes, never a worktree's whole git folder (its config.worktree: a program Laki's own git runs)
     tmp: [realOf('/tmp'), dirname(realOf(tmpdir()))],
     write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
     data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
@@ -2077,7 +2077,7 @@ const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD'
 // (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
 // The repo itself (a local workspace): its objects, refs and logs only, as a worktree's shared folder; its index, HEAD,
 // hooks and config sit in .git itself, so they stay read-only and git commit there runs outside the sandbox. None: not a repo.
-// files (codex's writable_roots take files): the worktree's own folder as OWN_WRITES, never the folder, whose commondir,
+// files (codex's writable_roots take files; the wrapper's profile, which fences .git itself: shared/wrap.ts): the worktree's own folder as OWN_WRITES, never the folder, whose commondir,
 // gitdir and config.worktree say where git finds the repo and its config (one the agent wrote: core.fsmonitor or
 // core.hooksPath, a program run as you by Laki's scans and your git); codex keeps the folder read-only itself. claude's
 // --add-dir takes folders: it gets the folder, and its sandbox guards .git, commondir and config.worktree (2.1.319, checked

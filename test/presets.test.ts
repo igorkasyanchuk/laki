@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { type TestContext, test } from 'node:test'
 import { sandboxStop } from '../src/shared/types.ts'
 import { fresh, sleep, until } from './helpers.ts'
@@ -495,6 +495,10 @@ test('wrapper sandbox: a wrapped agy starts through sandbox-exec; a missing one 
   assert.match(said[1], /^\(version 1\)\n\(allow default\)/)
   assert.ok(!said[1].includes(rig.home), 'no path in the profile')
   assert.ok(said.some(x => x.endsWith(`=${realpathSync(ws.path)}`) && /^P\d+=/.test(x)), 'its worktree, realpath-ed, a parameter')
+  // its worktree's git folder: the files git commit writes, never the folder (a config.worktree there would run as you in Laki's git)
+  const own = realpathSync(resolve(ws.path, readFileSync(join(ws.path, '.git'), 'utf8').match(/^gitdir:\s*(.+)$/m)![1].trim()))
+  assert.ok(said.some(x => x.endsWith(`=${own}/index`)), "its git folder's index")
+  assert.ok(!said.some(x => x.endsWith(`=${own}`) || x.endsWith('/config') || x.endsWith('/config.worktree')), 'not its whole git folder, no config')
   assert.deepEqual(said.slice(-4, -1), ['/bin/sh', '-c', said.at(-2)!]) // the agent's line, run by sh
   // not with its own sandbox on, nor around claude's; an agent's call can't change it
   await assert.rejects(rig.rpc('presetSave', { name: 'gem-box', set: { args: '--sandbox' } }), /agent's own sandbox on/)

@@ -61,7 +61,8 @@ export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
   }
   const h = (rel: string) => `${o.home.replace(/\/+$/, '')}/${rel}`
   const own = AGENT_WRITES[o.agent].map(rel => ref(h(rel), /\.json$/.test(rel) ? 'literal' : 'subpath'))
-  const writes = [o.worktree, ...(o.gitDirs ?? []), ...o.tmp, ...(o.write ?? [])].map(p => ref(p))
+  const writes = [o.worktree, ...o.tmp, ...(o.write ?? [])].map(p => ref(p))
+  const git = (o.gitDirs ?? []).map(p => ref(p))
   const others = (Object.keys(AGENT_WRITES) as Agent[]).filter(a => a !== o.agent).flatMap(a => AGENT_WRITES[a]).filter(rel => !AGENT_WRITES[o.agent].includes(rel))
   const reads = [...SECRET_HOME.map(h), ...others.map(h)].map(p => ref(p, /\.json$/.test(p) ? 'literal' : 'subpath'))
   const data = o.data ? ref(o.data) : undefined
@@ -72,6 +73,10 @@ export function wrapProfile(o: WrapIn): { text: string; params: string[] } {
     '(allow default)',
     '(deny file-write*)',
     `(allow file-write*\n  ${[...writes, ...own].join('\n  ')}\n  (literal "/dev/null") (literal "/dev/zero") (literal "/dev/dtracehelper") (literal "/dev/ptmx")\n  (regex #"^/dev/tty") (regex #"^/dev/fd/"))`,
+    // its .git (a worktree's file, a checkout's folder) isn't its to write: it names the git folder and the config that
+    // Laki's own git reads outside the sandbox (a program to run). What git commit writes there allowed back (gitDirs)
+    `(deny file-write* ${ref(`${o.worktree.replace(/\/+$/, '')}/.git`)})`,
+    ...(git.length ? [`(allow file-write*\n  ${git.join('\n  ')})`] : []),
     ...(data ? [`(deny file-read-data ${data})`] : []),
     ...(back.length ? [`(allow file-read-data\n  ${back.join('\n  ')})`] : []), // never one with none: that allows every read
     `(deny file-read*\n  ${reads.join('\n  ')})`,
