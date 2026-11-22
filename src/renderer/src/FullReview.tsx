@@ -15,7 +15,7 @@
 // first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
-import { hunkKey, startOf, type Walk } from '../../shared/walk'
+import { hunkKey, REST, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
 import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
@@ -662,7 +662,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 </button>
               </div>
               {stale && <div className="warn small pad">The changes moved since these steps: a step may miss some, or name ones gone. Again asks anew.</div>}
-              {walk.cut && <div className="muted small pad">Over 200 KB: Laki AI read the first part, the rest is under {walk.steps.at(-1)?.title}.</div>}
+              {walk.cut && <div className="muted small pad">{walk.skipped ? `${walk.skipped} change${walk.skipped === 1 ? '' : 's'} Laki AI did not read (too big): under ${REST}.` : `Over 200 KB: Laki AI read the first part, the rest is under ${REST}.`}</div>}
               {walk.steps.map((x, i) => {
                 const risky = [...new Set(x.hunks.flatMap(h => (h.risky ? [h.risky] : [])))]
                 const n = new Set(x.hunks.map(h => h.file)).size
@@ -674,6 +674,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                       {x.why && <span className="muted small">{x.why}</span>}
                       <span className="muted small">
                         {x.hunks.length} change{x.hunks.length === 1 ? '' : 's'} in {n} file{n === 1 ? '' : 's'}
+                        {x.rest && walk.skipped ? ` · ${walk.skipped} Laki AI did not read` : ''}
                       </span>
                     </span>
                     {risky.length > 0 && (

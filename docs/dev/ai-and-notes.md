@@ -230,7 +230,12 @@ go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* ad
 
 Walk through (`reviewSteps { ws, uncommitted?, again?, kept? }`, ai.ts, R13): the Review tab's steps by one `aiOnce`
 (`ask: 'Walk through'`), the user's and remote access's at the answer level, never an agent's (gates.ts `AGENT_NO`: it
-spends the user's Laki AI) nor a trusted client's (no scope has it); `docs/dev/renderer.md` has the rest.
+spends the user's Laki AI) nor a trusted client's (no scope has it). The model reads 200 KB of whole hunks
+(`walkInput`): the big ones last (a lockfile, a hunk over a quarter of that), one that doesn't fit skipped rather than the end of
+the read, so a new `package-lock.json` before `src/` no longer hides the code; the skipped are named by file and line
+count in the prompt, left to *Everything else* (`walkFold`'s `unread`) and counted (`Walk.skipped`, the tab's *N
+changes Laki AI did not read*). The kept walk's hash starts `walk 2` (1: the input that stopped at the first big hunk,
+asked anew). `docs/dev/renderer.md` has the rest.
 
 Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on its card (Diff.tsx `useExplain`: the ask
 bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when

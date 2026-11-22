@@ -600,7 +600,8 @@ selected workspace's PR is in the status bar.
   too): one you mark viewed leaves and the next takes its place; with all viewed, the bar names the next workspace.
   *Walk through* (Laki AI on: Settings › AI) puts the changes in 3 to 7 steps to read in order, each with a title and
   why it comes there, marking what to read with care (a migration, auth, a lockfile, deletes); what no step names is
-  in a last *Everything else*. The files column shows the steps (*Files | Steps* goes back): click one to see only its
+  in a last *Everything else*, with any change too big for Laki AI to read (a lockfile, a generated file: it says how
+  many) while the code after it is still read. The files column shows the steps (*Files | Steps* goes back): click one to see only its
   changes, tick its *Viewed* and its files are viewed once all their changes are in viewed steps. Kept until the
   changes do; *Again* asks anew. It reads the branch's changes (or *Uncommitted*), not *PR #n*'s, and only on your click.
   Kept on this Mac. It reads the diff again as the workspace's files change, keeping your place and comments.

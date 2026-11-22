@@ -1133,7 +1133,10 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 Walk through (R13): the Review tab head's *Walk through* (ReviewApi's `walk`, App's `reviewApi`: the daemon's
 `reviewSteps`, `review.steps` cap; `walkOff`: Laki AI is off, the button says so; on *PR #n* it says to pick Branch, the
 daemon's diff being the branch's or Uncommitted's). The daemon (ai.ts `reviewSteps`) reads the diff (files.ts `diff`),
-`shared/walk.ts` cuts what the model reads at `WALK_MAX` (200 KB, whole hunks: `walkInput`, `cut` said), one `aiOnce`
+`shared/walk.ts` cuts what the model reads at `WALK_MAX` (200 KB, whole hunks: `walkInput`; a lockfile's and any hunk over
+a quarter of it go last; one that doesn't fit is skipped and the smaller ones after it still read; `cut` and `skipped`, the
+count, said: the prompt names each skipped file with its lines, `walkFold`'s `unread` keeps them out of the model's steps,
+so all are under *Everything else*; nothing readable: that step alone, no call; the hash's `walk 2` prefix), one `aiOnce`
 (`ask: 'Walk through'`, json; `WALK_SYSTEM`: 3 to 7 steps, every hunk once, `risky` on a migration, auth, a lockfile or
 deletes; the diff as data), its answer read strictly (`walkCheck`: anything off, refused), then `walkFold` puts every
 hunk of the whole diff in exactly one step (a hunk named twice: its first; one the diff hasn't: out; the missed: a last

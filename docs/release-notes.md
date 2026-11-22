@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - The Review tab's *Walk through*: Laki AI puts a workspace's changes in 3 to 7 steps to read in order, each saying why it comes there and marking what to read with care; click a step to see only its changes, tick it to mark its files viewed.
+- *Walk through* reads past a change too big for it (a new `package-lock.json`, a generated file): the code and tests after it are still put in steps, and *Everything else* says how many changes Laki AI did not read.
 - Electron 45.4.1: Chromium 156.0.8078.100 with its security fixes (and V8's, ANGLE's, PDFium's and FFmpeg's), for the window and every page Laki shows.
 - A dropped connection to the terminals' own process no longer ends your tabs: Laki reconnects within 3 seconds and each tab goes on where it was, with what it printed meanwhile and what you typed.
 - Frosted's panels have macOS 26's continuous corners, glass or not (18px inside the window's), and more cards and controls take them: the side panel, profiles, accounts, themes, segmented buttons, Run, the rail's icons.

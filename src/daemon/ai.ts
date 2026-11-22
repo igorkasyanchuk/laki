@@ -972,16 +972,17 @@ export function explainOf(text: string): AskExplained | undefined {
 
 // R13: the Review tab's Walk through: the workspace's diff (files.ts diff: the branch's against its base, or
 // uncommitted's against HEAD) in 3 to 7 steps by one aiOnce (no tools; logged with its cost among Laki AI's calls),
-// only on the user's click (gates.ts: it spends their AI money). The model reads WALK_MAX of it (cut: said so); its answer
+// only on the user's click (gates.ts: it spends their AI money). The model reads WALK_MAX of it, the big hunks last and
+// one that doesn't fit skipped (walkInput; cut and skipped: said so, the skipped ones under Everything else); its answer
 // is checked strictly (walkCheck), then every hunk is in exactly one step (walkFold: the missed ones in Everything
-// else). Kept by the diff's hash in <data>/review-walks/<ws>.json (dir.ts walkFile: the last 8; not the storage folder,
+// else). Nothing it could read (every hunk too big): Everything else alone, no call. Kept by the diff's hash in <data>/review-walks/<ws>.json (dir.ts walkFile: the last 8; not the storage folder,
 // which its agents write: they'd write the walk of their own change) and in memory; again: asked anew; kept: only a kept
 // one, else null (no call: the tab opening). A failure isn't kept
 const walks = new Map<string, Promise<Walk>>()
 // a kept one from its file: checked as an answer is and folded on this diff's hunks again, else none
 const walkKept = (w: Walk | undefined, all: HunkRef[]): Walk | undefined => {
   const steps = w && typeof w === 'object' && typeof w.hash === 'string' && Number.isFinite(w.at) && Array.isArray(w.steps) ? walkCheck(JSON.stringify({ steps: w.steps.filter(s => !s?.rest) }), 1) : undefined // 1: a step the fold emptied is gone, so fewer than 3 is fine here
-  return steps && { steps: walkFold(steps, all), hash: w!.hash, at: w!.at, ...(w!.cut === true && { cut: true }) }
+  return steps && { steps: walkFold(steps, all), hash: w!.hash, at: w!.at, ...(w!.cut === true && { cut: true }), ...(Number.isInteger(w!.skipped) && w!.skipped! > 0 && { skipped: w!.skipped }) }
 }
 export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?: boolean; kept?: boolean }): Promise<Walk | null> {
   if (!p.kept && !aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')
@@ -992,17 +993,18 @@ export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?
     if (p.kept) return null
     throw new Error('no changes to walk through')
   }
-  const hash = createHash('sha256').update(`walk 1\0${d.diff}`).digest('hex').slice(0, 32)
+  const hash = createHash('sha256').update(`walk 2\0${d.diff}`).digest('hex').slice(0, 32) // 2: walkInput skips a hunk too big rather than stopping there (a walk of 1's input is asked anew)
   const file = walkFile(ws.id)
   if (!p.again || p.kept) {
     const kept = walks.get(hash) ?? (file ? walkKept(readJson<Record<string, Walk>>(file)?.[hash], all) : undefined)
     if (kept || p.kept) return kept ?? null
   }
   const w = walkInput(d.diff)
-  const run = aiOnce({ system: WALK_SYSTEM, prompt: walkPrompt(w), ask: 'Walk through', json: true }).then(text => {
-    const steps = walkCheck(text, w.hunks.length)
+  const asked = w.hunks.length ? aiOnce({ system: WALK_SYSTEM, prompt: walkPrompt(w), ask: 'Walk through', json: true }) : Promise.resolve('')
+  const run = asked.then(text => {
+    const steps = w.hunks.length ? walkCheck(text, w.hunks.length) : []
     if (!steps) throw new Error("Laki AI's answer wasn't a walk-through: try again")
-    const out: Walk = { steps: walkFold(steps, all), hash, at: Date.now(), ...(w.cut && { cut: true }) }
+    const out: Walk = { steps: walkFold(steps, all, w.skipped), hash, at: Date.now(), ...(w.cut && { cut: true }), ...(w.skipped.length > 0 && { skipped: w.skipped.length }) }
     if (file) {
       mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
       const had = Object.entries(readJson<Record<string, Walk>>(file) ?? {}).filter(([k]) => k !== hash)
