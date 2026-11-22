@@ -52,8 +52,8 @@ function lookup(scopes: Record<string, unknown>[], path: string): unknown {
   if (path === 'this') return scopes[0].this
   const [head, ...rest] = path.split('.')
   const scope = scopes.find(s => s && typeof s === 'object' && Object.hasOwn(s, head))
-  let v: any = scope?.[head]
-  for (const k of rest) v = v !== null && v !== undefined && (Object.hasOwn(Object(v), k) || (k === 'length' && Array.isArray(v))) ? v[k] : undefined
+  let v: unknown = scope?.[head]
+  for (const k of rest) v = v !== null && v !== undefined && (Object.hasOwn(Object(v), k) || (k === 'length' && Array.isArray(v))) ? Object(v)[k] : undefined
   return v
 }
 
@@ -76,7 +76,7 @@ export function ago(v: unknown, now = Date.now()) {
 }
 // numbers (or objects' .value) as a line across a 100×30 box, stretched to the width it's given
 export function spark(v: unknown) {
-  const ns = (Array.isArray(v) ? v : []).map(x => Number(x && typeof x === 'object' ? (x as any).value : x)).filter(Number.isFinite)
+  const ns = (Array.isArray(v) ? v : []).map(x => Number(x && typeof x === 'object' && 'value' in x ? x.value : x)).filter(Number.isFinite)
   if (!ns.length) return ''
   const lo = Math.min(...ns)
   const span = Math.max(...ns) - lo || 1
@@ -633,25 +633,30 @@ export function sayOf(x: unknown): WidgetSay | null {
 // [data-filter] box hides the [data-row]s of its [data-rows] whose words (not their buttons') don't match; data-more
 // shows the rows a limit hid (a preview: its full view); a click elsewhere on a preview opens the full view (the app
 // knows whether there is one)
-export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => void) => void; removeEventListener: (t: string, f: (e: any) => void) => void }, send: (m: Record<string, unknown>) => unknown) {
-  const said = (x: any): string => [...x.childNodes].map((c: any) => (c.nodeType === 3 ? c.data : c.nodeType === 1 && c.localName !== 'button' && c.localName !== 'kbd' ? said(c) : '')).join('') // a row's words, not its buttons'
+// root: a shadow root, or a JS page's window (its document's elements)
+type Root = { addEventListener: (t: string, f: (e: Event) => void, c?: boolean) => void; removeEventListener: (t: string, f: (e: Event) => void, c?: boolean) => void; querySelectorAll?: ParentNode['querySelectorAll']; document?: Document }
+export function uiBehave(root: Root, send: (m: Record<string, unknown>) => unknown) {
+  const said = (x: globalThis.Node): string => [...x.childNodes].map(c => (c.nodeType === 3 ? (c as Text).data : c.nodeType === 1 && (c as Element).localName !== 'button' && (c as Element).localName !== 'kbd' ? said(c) : '')).join('') // a row's words, not its buttons'
+  // an event's element (none: a text node's, a window's); what send gave back when it's a promise
+  const elOf = <E extends Element = HTMLElement>(x: EventTarget | null | undefined) => (x && typeof (x as Element).closest === 'function' ? (x as E) : null)
+  const sent = (m: Record<string, unknown>) => (p => (p && typeof (p as Promise<unknown>).then === 'function' ? (p as Promise<unknown>) : null))(send(m))
   // the rows of a box: those whose words have q (none: all but the extra ones, unless it's open)
-  const sift = (box: any, q: string) => {
+  const sift = (box: Element, q: string) => {
     const open = box.hasAttribute('data-unfolded')
-    box.querySelectorAll('[data-row]').forEach((x: any) => (x.hidden = q ? !said(x).toLowerCase().includes(q) : (x.hasAttribute('data-extra') && !open) || x.hasAttribute('data-lazy'))) // no words: a table's rows past 200 wait for its scroll again
-    box.querySelectorAll('[data-group]').forEach((g: any) => (g.hidden = !g.querySelector('[data-row]:not([hidden])')))
+    box.querySelectorAll<HTMLElement>('[data-row]').forEach(x => (x.hidden = q ? !said(x).toLowerCase().includes(q) : (x.hasAttribute('data-extra') && !open) || x.hasAttribute('data-lazy'))) // no words: a table's rows past 200 wait for its scroll again
+    box.querySelectorAll<HTMLElement>('[data-group]').forEach(g => (g.hidden = !g.querySelector('[data-row]:not([hidden])')))
     // a heading among its rows (a menu's): shown while a row up to the next one is
-    box.querySelectorAll('[data-sect]').forEach((hd: any) => {
-      let x = hd.nextElementSibling
-      while (x && !x.hasAttribute('data-sect') && !(x.hasAttribute('data-row') && !x.hidden)) x = x.nextElementSibling
+    box.querySelectorAll<HTMLElement>('[data-sect]').forEach(hd => {
+      let x = hd.nextElementSibling as HTMLElement | null
+      while (x && !x.hasAttribute('data-sect') && !(x.hasAttribute('data-row') && !x.hidden)) x = x.nextElementSibling as HTMLElement | null
       hd.hidden = !x || x.hasAttribute('data-sect')
     })
-    const more = box.querySelector('[data-more]')
+    const more = box.querySelector<HTMLElement>('[data-more]')
     if (more) more.hidden = !!q
-    const none = box.querySelector('[data-none]') // a palette's "Nothing matches"
+    const none = box.querySelector<HTMLElement>('[data-none]') // a palette's "Nothing matches"
     if (none) none.hidden = !q || !!box.querySelector('[data-row]:not([hidden])')
   }
-  const all = (q: string): any[] => (d => (d && d.querySelectorAll ? [...d.querySelectorAll(q)] : []))((root as any).querySelectorAll ? root : (root as any).document) // a shadow root's, a page's
+  const all = <E extends Element = HTMLElement>(q: string): E[] => (d => (d?.querySelectorAll ? [...d.querySelectorAll<E>(q)] : []))(root.querySelectorAll ? root : root.document) // a shadow root's, a page's
   // K3: a table's header sorts it (numbers, then ISO dates, then words; again: the other way), kept by the table's place
   // in the view and done again as it's drawn anew; sorted, every row shows (its filter's words still hold)
   const sorted = new Map<number, [number, number]>()
@@ -697,19 +702,19 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
   const target = (r => (r.nodeType ? r : typeof document !== 'undefined' ? document : null))(root as unknown as globalThis.Node) // a shadow root's, a page's (its window: the document)
   const mo = target && typeof MutationObserver !== 'undefined' ? new MutationObserver(drawn) : null
   if (target) mo?.observe(target, { childList: true, subtree: true })
-  const click = (e: any) => {
-    const t = e.target && e.target.closest ? e.target : null
+  const click = (e: Event) => {
+    const t = elOf(e.target)
     if (!t) return
     // an open dropdown closes at a click outside it or in its menu (its own summary toggles it)
     let shut = false
-    for (const dd of all('details.k-dd[open]')) if (!dd.contains(t) || t.closest('.k-dd-m')) (dd.open = false), (shut = true)
+    for (const dd of all<HTMLDetailsElement>('details.k-dd[open]')) if (!dd.contains(t) || t.closest('.k-dd-m')) (dd.open = false), (shut = true)
     // a hover card opened by the pointer: a click on its button keeps it open (it would toggle it shut)
     const pin = t.closest('.k-pop[data-hov] > [popovertarget]')
-    if (pin) return void (e.preventDefault(), pin.parentNode.removeAttribute('data-hov'))
+    if (pin) return void (e.preventDefault(), (pin.parentNode as Element).removeAttribute('data-hov'))
     const th = t.closest('th[data-sort]')
     if (th) {
-      const tbl = th.closest('.k-table')
-      const i = all('.k-table').indexOf(tbl)
+      const tbl = th.closest('.k-table')!
+      const i = all<Element>('.k-table').indexOf(tbl)
       const j = Number(th.getAttribute('data-sort'))
       const was = sorted.get(i)
       const dir = was && was[0] === j ? -was[1] : 1
@@ -722,8 +727,8 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       const box = chip.closest('[data-filt]')
       if (!box) return
       const v = chip.classList.contains('on') ? '' : chip.getAttribute('data-chip') || ''
-      box.querySelectorAll('[data-chip]').forEach((c: any) => (on => (c.classList.toggle('on', on), c.setAttribute('aria-pressed', String(on))))((c.getAttribute('data-chip') || '') === v))
-      box.querySelectorAll('[data-rows]').forEach((r: any) => sift(r, v.toLowerCase()))
+      box.querySelectorAll('[data-chip]').forEach(c => (on => (c.classList.toggle('on', on), c.setAttribute('aria-pressed', String(on))))((c.getAttribute('data-chip') || '') === v))
+      box.querySelectorAll('[data-rows]').forEach(r => sift(r, v.toLowerCase()))
       return
     }
     // the innermost thing to click wins: a button in a row that runs an action is the button's
@@ -741,14 +746,14 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       const box = more.closest('[data-rows]')
       if (!more.closest('[data-kit="full"]') || !box) return void send({ laki: 'full' })
       box.setAttribute('data-unfolded', '') // not data-open: that's a link a click opens
-      box.querySelectorAll('[data-extra]').forEach((x: any) => (x.hidden = false))
+      box.querySelectorAll<HTMLElement>('[data-extra]').forEach(x => (x.hidden = false))
       more.remove()
     } else if (r) {
       e.preventDefault()
       if (r.hasAttribute('data-busy')) return
       let arg = r.getAttribute('data-arg') ?? ''
       // an input's button: what's typed is the arg; nothing typed, the box gets the keyboard
-      const box = r.hasAttribute('data-input') && r.closest('[data-inbox]')?.querySelector('input, textarea')
+      const box = r.hasAttribute('data-input') && r.closest('[data-inbox]')?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
       if (box) {
         arg = String(box.value).trim()
         if (!arg) return void box.focus()
@@ -756,14 +761,14 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       const form = r.hasAttribute('data-submit') && r.closest('[data-form]')
       if (form) {
         const v: Record<string, unknown> = {}
-        form.querySelectorAll('input[name], select[name], textarea[name]').forEach((f: any) => (v[f.name] = f.type === 'checkbox' ? f.checked : f.type === 'number' ? (f.value === '' ? null : Number(f.value)) : f.value))
+        form.querySelectorAll<HTMLInputElement>('input[name], select[name], textarea[name]').forEach(f => (v[f.name] = f.type === 'checkbox' ? f.checked : f.type === 'number' ? (f.value === '' ? null : Number(f.value)) : f.value))
         arg = JSON.stringify(v)
       }
-      if (r.hasAttribute('data-bulk-run')) arg = JSON.stringify({ ids: picked(r.closest('.k-table')) }) // K3: the picked rows'
+      if (r.hasAttribute('data-bulk-run')) arg = JSON.stringify({ ids: picked(r.closest('.k-table')!) }) // K3: the picked rows'
       r.setAttribute('data-busy', '')
-      const p: any = send({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.getAttribute('data-label') || r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
+      const p = sent({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.getAttribute('data-label') || r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
       const clear = () => box && !r.hasAttribute('data-keep') && box.value.trim() === arg && (box.value = '')
-      if (p && typeof p.then === 'function') p.then((ok: unknown) => (r.removeAttribute('data-busy'), ok !== false && clear()), () => r.removeAttribute('data-busy'))
+      if (p) p.then(ok => (r.removeAttribute('data-busy'), ok !== false && clear()), () => r.removeAttribute('data-busy'))
       else clear() // a JS page's: the app says when it's done
     } else if (d) {
       // a Laki command: the app says what it will do and asks first
@@ -774,17 +779,17 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       } catch {}
       if (!cmd || typeof cmd !== 'object') return
       // a prompt box's button: what's typed is the prompt; nothing typed, the box gets the keyboard
-      const box = d.hasAttribute('data-input') && d.closest('[data-inbox]')?.querySelector('input, textarea')
+      const box = d.hasAttribute('data-input') && d.closest('[data-inbox]')?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
       if (box) {
         if (d.hasAttribute('data-busy')) return
         cmd.prompt = String(box.value).trim()
         if (!cmd.prompt) return void box.focus()
         d.setAttribute('data-busy', '')
       }
-      const p: any = send({ laki: 'do', cmd, label: (d.getAttribute('data-label') || d.textContent || d.getAttribute('aria-label') || '').trim(), confirm: d.getAttribute('data-confirm') || undefined })
+      const p = sent({ laki: 'do', cmd, label: (d.getAttribute('data-label') || d.textContent || d.getAttribute('aria-label') || '').trim(), confirm: d.getAttribute('data-confirm') || undefined })
       // emptied once it went. ponytail: a JS page's box keeps its words (the app doesn't say back when a do went)
       const done = (ok: unknown) => box && (d.removeAttribute('data-busy'), ok === true && !d.hasAttribute('data-keep') && box.value.trim() === cmd.prompt && (box.value = ''))
-      if (p && typeof p.then === 'function') p.then(done, () => done(false))
+      if (p) p.then(done, () => done(false))
       else done(false)
     } else if (c) e.preventDefault(), send({ laki: 'copy', text: c.getAttribute('data-copy') })
     else if (a) e.preventDefault(), send({ laki: 'open', url: a.getAttribute('href') })
@@ -792,57 +797,60 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     else if (b) e.preventDefault(), send({ laki: b.getAttribute('data-laki') })
     else if (!shut && !t.closest('button, input, select, textarea, label, summary, .k-sc, .k-dd-m, .k-pop-b, .k-cmp, [data-kit="full"]')) send({ laki: 'full' }) // .k-sc: a secret shown, to select; .k-cmp: a drag between pictures
   }
-  const input = (e: any) => {
-    const t = e.target && e.target.closest ? e.target : null
+  const input = (e: Event) => {
+    const t = elOf<HTMLInputElement>(e.target)
     if (!t) return
     if (t.type === 'range') return void (v => v && (v.textContent = t.value))(t.closest('.k-range')?.querySelector('[data-rv]')) // a slider's number as it moves
-    const f = t.closest('[data-filter]')
+    const f = t.closest<HTMLInputElement>('[data-filter]')
     const box = f && f.closest('[data-rows]')
-    if (box) sift(box, String(f.value).trim().toLowerCase())
+    if (box) sift(box, String(f!.value).trim().toLowerCase())
   }
   // a slider let go, an option picked: runs its action with the value
-  const change = (e: any) => {
-    const sel = e.target && e.target.closest ? e.target.closest('[data-sel], [data-sel-all]') : null
+  const isSelect = (x: Element): x is HTMLSelectElement => x.localName === 'select'
+  const change = (e: Event) => {
+    const sel = elOf(e.target)?.closest<HTMLInputElement>('[data-sel], [data-sel-all]') ?? null
     if (sel?.type === 'checkbox') {
-      const tbl: Element = sel.closest('.k-table')
+      const tbl = sel.closest('.k-table')!
       if (sel.hasAttribute('data-sel-all')) tbl.querySelectorAll<HTMLInputElement>('[data-sel]').forEach(x => !x.closest('tr')?.hidden && (x.checked = sel.checked))
       return void picked(tbl)
     }
-    const t = e.target && e.target.closest ? e.target.closest('[data-change]') : null
+    const t = elOf(e.target)?.closest<HTMLInputElement | HTMLSelectElement>('[data-change]') ?? null
     if (!t) return
-    const pick = t.localName === 'select' ? (t.selectedOptions?.[0]?.textContent ?? '').trim() : `${t.getAttribute('aria-label') || ''} ${t.value}`.trim() // its confirm's and note's words
-    const p: any = send({ laki: 'run', action: t.getAttribute('data-change'), arg: String(t.value), label: pick, confirm: t.getAttribute('data-confirm') || undefined })
+    const pick = isSelect(t) ? (t.selectedOptions?.[0]?.textContent ?? '').trim() : `${t.getAttribute('aria-label') || ''} ${t.value}`.trim() // its confirm's and note's words
+    const p = sent({ laki: 'run', action: t.getAttribute('data-change'), arg: String(t.value), label: pick, confirm: t.getAttribute('data-confirm') || undefined })
     // declined or failed: back to what the data says (a done one is drawn again from the new data)
     const back = () => {
-      if (t.localName === 'select') for (const o of t.options) o.selected = o.defaultSelected
+      if (isSelect(t)) for (const o of t.options) o.selected = o.defaultSelected
       else t.value = t.defaultValue
       const v = t.closest('.k-range')?.querySelector('[data-rv]')
       if (v) v.textContent = t.value
     }
-    if (!p || typeof p.then !== 'function') return
+    if (!p) return
     t.disabled = true // one run at a time: a second pick meanwhile would race it
-    p.then((ok: unknown) => ok === false && back(), back).finally(() => (t.disabled = false))
+    p.then(ok => ok === false && back(), back).finally(() => (t.disabled = false))
   }
   // a dropdown left for somewhere else, the rest of the app too: closed
-  const blur = (e: any) => {
-    const dd = e.target && e.target.closest ? e.target.closest('details.k-dd[open]') : null
-    if (dd && !(e.relatedTarget && dd.contains(e.relatedTarget))) dd.open = false
+  const blur = (ev: Event) => {
+    const e = ev as FocusEvent
+    const dd = elOf(e.target)?.closest<HTMLDetailsElement>('details.k-dd[open]') ?? null
+    if (dd && !(e.relatedTarget && dd.contains(e.relatedTarget as globalThis.Node))) dd.open = false
   }
   // Enter in an input's box clicks its button, ⌘ Enter in a textarea's; in a palette ↑ ↓ go through its rows and Enter
   // in its box runs the first
-  const key = (e: any) => {
-    const t = e.target && e.target.closest ? e.target : null
+  const key = (ev: Event) => {
+    const e = ev as KeyboardEvent
+    const t = elOf(e.target)
     if (!t || e.isComposing) return
     if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('th[data-sort]')) return void (e.preventDefault(), t.click()) // K3: a header's sort from the keyboard
     // Esc closes an open popover or dropdown first, not the full view's dialog under it (it waits for a key not taken)
     if (e.key === 'Escape') {
-      const open = all('.k-pop-b:popover-open, details.k-dd[open]')
-      if (open.length) e.preventDefault(), open.forEach((x: any) => (x.localName === 'details' ? (x.open = false) : x.hidePopover()))
+      const open = all<HTMLDetailsElement>('.k-pop-b:popover-open, details.k-dd[open]')
+      if (open.length) e.preventDefault(), open.forEach(x => (x.localName === 'details' ? (x.open = false) : x.hidePopover()))
       return
     }
     const cmd = t.closest('.k-cmd')
     if (cmd && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || (e.key === 'Enter' && t.localName === 'input'))) {
-      const rows = [...cmd.querySelectorAll('.k-mn-i:not([hidden]):not(:disabled)')]
+      const rows = [...cmd.querySelectorAll<HTMLElement>('.k-mn-i:not([hidden]):not(:disabled)')]
       const i = rows.indexOf(t)
       const to = e.key === 'Enter' ? rows[0] : e.key === 'ArrowDown' ? rows[i + 1] : i > 0 ? rows[i - 1] : i === 0 ? cmd.querySelector('input') : null
       if (!to) return
@@ -850,7 +858,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       return void (e.key === 'Enter' ? to.click() : to.focus())
     }
     if (e.key !== 'Enter') return
-    const b = t.closest('[data-inbox]')?.querySelector('[data-input]')
+    const b = t.closest('[data-inbox]')?.querySelector<HTMLElement>('[data-input]')
     if (b && (t.localName === 'input' || (t.localName === 'textarea' && (e.metaKey || e.ctrlKey)))) e.preventDefault(), b.click()
   }
   // a hover card: open while the pointer is on it, unless a click pinned it (data-hov: opened by the pointer); it goes
@@ -885,11 +893,12 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     tip.style.left = `${Math.max(0, Math.min(cb.width - tip.offsetWidth, x - tip.offsetWidth / 2))}px`
     tip.style.top = `${Math.max(0, (big ? e.clientY - 6 : r.top - 4) - cb.top - tip.offsetHeight)}px`
   }
-  const hover = (e: any) => {
+  const hover = (ev: Event) => {
+    const e = ev as MouseEvent
     chartTip(e)
-    const pop = e.target && e.target.closest ? e.target.closest('.k-pop.hover') : null
-    const b = pop && pop.querySelector('[popover]')
-    if (!b || (e.relatedTarget && pop.contains(e.relatedTarget))) return
+    const pop = elOf(e.target)?.closest<HTMLElement & { kHide?: ReturnType<typeof setTimeout> }>('.k-pop.hover') ?? null // kHide: its close a moment after the pointer left
+    const b = pop && pop.querySelector<HTMLElement>('[popover]')
+    if (!pop || !b || (e.relatedTarget && pop.contains(e.relatedTarget as globalThis.Node))) return
     clearTimeout(pop.kHide)
     const shut = () => {
       try {
@@ -903,22 +912,22 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
   }
   // a clock's time, every 15 s (its options are widgetUi.ts' CLOCK's)
   const tick = () =>
-    all('[data-clock]').forEach((c: any) => {
+    all('[data-clock]').forEach(c => {
       try {
         const h12 = c.hasAttribute('data-h12')
         c.textContent = new Intl.DateTimeFormat('en-US', { timeZone: c.getAttribute('data-clock') || undefined, hour: h12 ? 'numeric' : '2-digit', minute: '2-digit', hourCycle: h12 ? 'h12' : 'h23' }).format(new Date())
       } catch {}
     })
-  const clock: any = setInterval(tick, 15_000)
+  const clock = setInterval(tick, 15_000)
   clock?.unref?.() // node's (the tests'): it never holds the process
   // a full view's dropdown opened near its bottom: its menu scrolled into sight (toggle doesn't bubble: caught on the way down)
-  const toggle = (e: any) => {
-    const t = e.target
+  const toggle = (e: Event) => {
+    const t = elOf<HTMLDetailsElement>(e.target)
     if (t && t.open && t.matches && t.matches('details.k-dd') && t.closest('[data-kit="full"]')) t.querySelector('.k-dd-m')?.scrollIntoView({ block: 'nearest' })
   }
-  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true], ['scroll', scroll, true], ['focusout', blur], ['mouseover', hover], ['mouseout', hover]]
-  for (const [k, f, c] of on) (root as any).addEventListener(k, f, c)
-  return () => (clearInterval(clock), mo?.disconnect(), on.forEach(([k, f, c]) => (root as any).removeEventListener(k, f, c)))
+  const on: [string, (e: Event) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true], ['scroll', scroll, true], ['focusout', blur], ['mouseover', hover], ['mouseout', hover]]
+  for (const [k, f, c] of on) root.addEventListener(k, f, c)
+  return () => (clearInterval(clock), mo?.disconnect(), on.forEach(([k, f, c]) => root.removeEventListener(k, f, c)))
 }
 
 // a JS widget's page (the daemon serves it, sandboxed, to a frame of the app): the filled template with window.laki
