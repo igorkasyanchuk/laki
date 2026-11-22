@@ -4,6 +4,7 @@
 // their ≈ cost at API prices (the daemon's meters, View.today); and the words a tab's context and usage are said in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, IconButton, Page, act } from './ui'
+import { ago as agoOf } from './Info'
 
 import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
@@ -17,6 +18,8 @@ export const USAGE_HINTS: Record<string, string> = {
   gemini: 'Runs agy’s own /usage every 5 minutes: it takes no turn and uses no quota (agy 1.1.11 or newer). Off: no numbers',
 }
 const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
+// an agent's own numbers past STALE: dimmed, with Ask <host> (what it used outside Laki, or since, isn't in them)
+const old = (r: AgentUsage, now: number) => r.source === 'own' && !r.error && r.windows.length > 0 && now - r.at > STALE
 const NAMES = USAGE_AGENTS
 
 // a window whose reset has passed starts over
@@ -66,18 +69,20 @@ export function Ring({ p }: { p?: number }) {
 }
 
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
-// asks: Settings' usage, the agents whose endpoint is asked; credits: Laki AI's OpenRouter credits and spend (an amber
+// asks: Settings' usage, the agents whose endpoint is asked; onAsk: turn an agent's on (its own numbers too old); credits: Laki AI's OpenRouter credits and spend (an amber
 // dot on the ring when low)
-export function UsageButton({ load, credits, onUse, onDays, today, asks }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; asks?: Record<string, boolean> }) {
+export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; asks?: Record<string, boolean>; onAsk?: (agent: string) => Promise<unknown> }) {
   const [rows, setRows] = useState<AgentUsage[] | null>(null)
   const [at, setAt] = useState<DOMRect | null>(null)
   const [or, setOr] = useState<AiCredits | null>(null)
   const loader = useRef({ load, credits })
   loader.current = { load, credits }
+  const again = useRef(() => {})
   useEffect(() => {
     let on = true
     // an older daemon has no usage: no ring; a failed ask (the daemon restarting) keeps the last answer
     const get = () => (loader.current.load().then(r => on && setRows(r), () => {}), loader.current.credits?.().then(c => on && setOr(c), () => {}))
+    again.current = get
     get()
     const t = setInterval(get, 60_000) // cheap: the daemon asks the servers at most every 5 minutes
     return () => {
@@ -92,14 +97,14 @@ export function UsageButton({ load, credits, onUse, onDays, today, asks }: { loa
   const known = tops.filter(p => p !== undefined)
   if (!known.length) return null // no agent has given a reading yet (a first run, signed out): no empty ring that looks like a spinner
   const top = Math.max(...known)
-  const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}${or?.low ? ' · OpenRouter credits low' : ''}`
+  const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%${old(r, now) ? ` as of ${hm(r.at)}` : ''}`}`).join(' · ')}${or?.low ? ' · OpenRouter credits low' : ''}`
   return (
     <>
       <button className="usage-btn" data-tip={tip} aria-label={tip} onClick={e => setAt(e.currentTarget.getBoundingClientRect())}>
         <Ring p={top} />
         {or?.low && <i className="usage-low" />}
       </button>
-      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} or={or} asks={asks} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
+      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} or={or} asks={asks} onAsk={onAsk && (a => onAsk(a).then(() => again.current(), () => {}))} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
     </>
   )
 }
@@ -114,7 +119,7 @@ function windowRow(w: UsageWindow, now: number) {
   const p = live(w, now)
   return (
     <div key={w.label} className="usage-row">
-      <span className="usage-label">{w.label}</span>
+      <span className="usage-label" data-tip={w.label.length > 28 ? w.label : undefined /* past 17em: cut, whole on hover */}>{w.label}</span>
       <span className={`usage-bar ${level(p)}`}>
         <i style={{ width: `${Math.min(p, 100)}%` }} />
       </span>
@@ -168,7 +173,7 @@ function creditsPart(c: AiCredits) {
   )
 }
 
-function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; or?: AiCredits | null; asks?: Record<string, boolean>; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
+function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; or?: AiCredits | null; asks?: Record<string, boolean>; onAsk?: (agent: string) => void; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
@@ -195,7 +200,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>
         {rows.map(r => (
-          <section key={`${r.agent}:${r.account ?? ''}`} className={`usage-agent${r.default === false ? ' other' : ''}`}>
+          <section key={`${r.agent}:${r.account ?? ''}`} className={`usage-agent${r.default === false ? ' other' : ''}${old(r, now) ? ' old' : ''}`}>
             <div className="usage-name">
               <b>{nameOf(r, rows)}</b>
               {r.plan && <span className="muted">{r.plan[0].toUpperCase() + r.plan.slice(1)}</span>}
@@ -214,7 +219,21 @@ function UsagePop({ anchor, rows, top, today, or, asks, onUse, onDays, onClose }
             </div>
             {r.windows.map(w => windowRow(w, now))}
             {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
-            {!r.error && r.windows.length > 0 && now - r.at > STALE && <p className="muted small">As of {hm(r.at)}: {r.source === 'own' ? 'the agent says them as it works' : 'not read again since'}.</p>}
+            {old(r, now) ? (
+              <p className="muted small">
+                As of {hm(r.at)} ({agoOf(r.at)}): {NAMES[r.agent] ?? r.agent} says them only as it works in Laki, so what it used since, outside Laki too, isn't in them.
+                {onAsk && USAGE_HOSTS[r.agent] && (
+                  <>
+                    {' '}
+                    <button type="button" className="link small" data-tip={`Settings › Layout › Ask ${USAGE_HOSTS[r.agent]}: ${USAGE_HINTS[r.agent] ?? `reads your ${NAMES[r.agent] ?? r.agent} sign-in and asks ${USAGE_HOSTS[r.agent]} directly: undocumented, may break`}`} onClick={() => onAsk(r.agent)}>
+                      Ask {USAGE_HOSTS[r.agent]}
+                    </button>
+                  </>
+                )}
+              </p>
+            ) : (
+              !r.error && r.windows.length > 0 && now - r.at > STALE && <p className="muted small">As of {hm(r.at)}: not read again since.</p>
+            )}
           </section>
         ))}
         {or && creditsPart(or)}

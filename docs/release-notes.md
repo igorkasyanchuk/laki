@@ -10,6 +10,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - A dropped connection to the terminals' own process no longer ends your tabs: Laki reconnects within 3 seconds and each tab goes on where it was, with what it printed meanwhile and what you typed.
 - Frosted's panels have macOS 26's continuous corners, glass or not (18px inside the window's), and more cards and controls take them: the side panel, profiles, accounts, themes, segmented buttons, Run, the rail's icons.
 - Settings › Appearance › *Diff style*: *Quiet* keeps the code's own color on a light tint with a bar at the line's edge, instead of coloring the whole line (*Filled*, the default).
+- Plan limits: an agent's own numbers older than 20 minutes are dimmed and say how old they are and what they miss (use since, outside Laki too), with *Ask api.anthropic.com* (or chatgpt.com) beside them to read the current ones; model names in the popup show whole.
 - New workspace's agent picker shows what's left of each profile's plan after its name (*62% of week*), in the warning color with its reset at 10% or under.
 - The wrapper sandbox's *Listed hosts* network refuses a listed name that points at this Mac, your network or a cloud's metadata address, and connects to the address it checked, so a name can't be switched after the check.
 - With *Confirm risky actions with Touch ID* on, Laki also asks before a new workspace, tab, race or scheduled task starts an agent that never asks (Bypass permissions, or Codex with approvals off).

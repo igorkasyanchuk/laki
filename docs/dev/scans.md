@@ -523,7 +523,7 @@ Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below ar
 `settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default). Otherwise each
 account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line
 `rate_limits`, Codex's transcripts' `token_count` `rate_limits` (share.ts' `meterOf` keeps the newest as `Meter.limits`,
-`codexRateWindows`), of any age: `at` says when, Usage.tsx shows *As of HH:MM* past 20 minutes), `source: 'own'`;
+`codexRateWindows`), of any age: `at` says when; past 20 minutes Usage.tsx dims them (`old`) with *As of HH:MM (11h ago)*, what they miss (use since, outside Laki too) and *Ask <host>* (`onAsk`: App's `settingsSet` of `usage[agent]` true, then read again; its tip Layout's words); the ring's tip says *as of*), `source: 'own'`;
 none yet: a row with `SAYS`' error. Asked, `source: 'endpoint'`. An install from
 before (state.json there, an agent's `usage` unset) gets `settings.usageNote` true once: Settings › Resources' note,
 OK sets it false. A delayed start's *after the plan limit* (schedule.ts `pendingTick`) reads the same: an own window
