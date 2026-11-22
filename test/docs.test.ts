@@ -22,6 +22,22 @@ test("the docs' numbers: API's range and last entry, the achievements, the theme
   assert.match(read('docs/guide.md'), new RegExp(`\\b${THEMES.length} themes\\b`), 'docs/guide.md: N themes')
 })
 
+// no line over 1,000 characters in the daemon's, main's or the renderer's source: a diff, a review or a blame can't
+// show one. Broken where it changes nothing: between items, or in a string with a line continuation (a backslash and a
+// newline, which its value hasn't). iconPacks.ts (generated) is shared's, outside these
+test('no line over 1,000 characters in src/daemon, src/main or src/renderer/src', () => {
+  const long: string[] = []
+  const walk = (d: string) => {
+    for (const f of readdirSync(d)) {
+      const p = join(d, f)
+      if (statSync(p).isDirectory()) walk(p)
+      else if (/\.tsx?$/.test(f) && f !== 'iconPacks.ts') readFileSync(p, 'utf8').split('\n').forEach((l, i) => l.length > 1000 && long.push(`${p}:${i + 1} (${l.length})`))
+    }
+  }
+  for (const d of ['daemon', 'main', 'renderer/src']) walk(new URL(`../src/${d}/`, import.meta.url).pathname)
+  assert.deepEqual(long, [], 'break these lines where it changes nothing: between items, or a string with a line continuation')
+})
+
 // type holes: ": any" and "as any" in src, counted with one regex, never above test/any-baseline.txt
 test('no more any in src than test/any-baseline.txt', () => {
   const src = new URL('../src/', import.meta.url).pathname
