@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Electron 45.4.1: Chromium 156.0.8078.100 with its security fixes (and V8's, ANGLE's, PDFium's and FFmpeg's), for the window and every page Laki shows.
 - A dropped connection to the terminals' own process no longer ends your tabs: Laki reconnects within 3 seconds and each tab goes on where it was, with what it printed meanwhile and what you typed.
 - Frosted's panels have macOS 26's continuous corners, glass or not (18px inside the window's), and more cards and controls take them: the side panel, profiles, accounts, themes, segmented buttons, Run, the rail's icons.
 - Settings › Appearance › *Diff style*: *Quiet* keeps the code's own color on a light tint with a bar at the line's edge, instead of coloring the whole line (*Filled*, the default).
