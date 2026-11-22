@@ -25,7 +25,10 @@ The daemon listens on 127.0.0.1 only, behind its token and an Origin check ([SEC
 ## Every network destination
 
 What Laki itself connects to. The agents you run (Claude Code, Codex, Antigravity CLI, Grok, OpenCode) talk to their own
-providers on their own; Laki starts them and reads their screens, it doesn't relay their traffic.
+providers on their own; Laki starts them and reads their screens, it doesn't relay their traffic. For Antigravity's
+plan limits Laki runs agy's own `agy -p /usage` every 5 minutes (it takes no turn and uses no quota; agy asks Google
+itself, with its own sign-in, and Laki never reads that token): Settings › Layout › *Ask agy for Antigravity's plan
+limits* turns it off.
 
 ### With nothing set up
 
@@ -45,6 +48,7 @@ providers on their own; Laki starts them and reads their screens, it doesn't rel
 | Your own endpoint (Settings › AI › Your endpoint) | Laki AI's chat, an AI call block's prompt, memories for compaction, *Guess my next prompt*'s last answer: what goes to OpenRouter otherwise (Voice and decision blocks stay OpenRouter's) | Only with *Runs with: Your endpoint*, as each of those runs; https, or http on this Mac only | Pick another backend; Laki AI off; each feature's own switch |
 | `api.anthropic.com` | Claude Code's own sign-in token, asking for your plan's limits (an undocumented endpoint) | At most every 7.5 minutes, only with *Ask api.anthropic.com for Claude Code's plan limits* on (Settings › Appearance) | That switch (off unless you turn it on) |
 | `chatgpt.com` | Codex's own sign-in token, asking for your plan's limits (an undocumented endpoint); `api.openai.com` is only a claim name read from that token, never contacted | At most every 5 minutes, only with *Ask chatgpt.com for Codex's plan limits* on | That switch |
+| `cli-chat-proxy.grok.com` | Grok's own sign-in token (`~/.grok/auth.json`), asking for your plan's limits (an undocumented endpoint, the one Grok's CLI asks); `auth.x.ai` is only the issuer's name in that file, never contacted | At most every 5 minutes, only with *Ask grok.com for Grok's plan limits* on | That switch |
 | Your phone push URL: `ntfy.sh` (or your own ntfy server), `api.telegram.org`, `hooks.slack.com`, any JSON webhook | A push's title, its workspace's name, the question and its choices (secrets masked); ntfy and Telegram are also read for your answer taps | When an agent or a workflow needs you, a run ends, a reminder is due (Settings › Phone pushes) | Clear the webhook |
 | Your phone's push service: `fcm.googleapis.com` (Chrome), `web.push.apple.com` (Safari), `updates.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Edge) | A notification encrypted on your Mac for that phone alone (RFC 8291): the service sees its size and time, not its words | Only with Phone pushes set to *This phone (Web Push)*, for paired phones that turned notifications on | Phone pushes' format, or the phone's own notification settings |
 | Cloudflare (`cloudflared`: `*.trycloudflare.com` quick tunnels, or your named tunnel) | Remote access's page and its traffic, a tunnel to a dev server, a shared tab's view | Only while remote access, a tunnel or a share runs | Stop it (it ends on its own when its time is up) |

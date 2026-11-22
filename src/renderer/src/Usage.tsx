@@ -9,8 +9,13 @@ import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOM
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
-export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' }
-export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com' } // R4: who its usage endpoint asks
+export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', grok: 'Grok', gemini: 'Antigravity' }
+export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com', grok: 'grok.com', gemini: 'agy' } // R4: who its usage endpoint asks (agy: its own /usage)
+// grok's and agy's Settings › Layout hints: no numbers of their own while off (Claude's and Codex's: Settings.tsx)
+export const USAGE_HINTS: Record<string, string> = {
+  grok: 'Reads your Grok sign-in (~/.grok) and asks grok.com directly, as Grok’s own CLI does: undocumented, may break. Off: no numbers',
+  gemini: 'Runs agy’s own /usage every 5 minutes: it takes no turn and uses no quota (agy 1.1.11 or newer). Off: no numbers',
+}
 const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
 const NAMES = USAGE_AGENTS
 

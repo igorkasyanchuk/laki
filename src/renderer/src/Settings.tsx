@@ -23,7 +23,7 @@ import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
-import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
+import { USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
@@ -2466,8 +2466,8 @@ export function SettingsPage(p: {
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
-                  <Switch key={a} className="switch-row" on={s.usage?.[a] === true} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={`Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
+                  <Switch key={a} className="switch-row" on={a === 'gemini' ? s.usage?.[a] !== false : s.usage?.[a] === true} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
+                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={USAGE_HINTS[a] ?? `Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
                   </Switch>
                 ))}
                 <label className="switch-row">

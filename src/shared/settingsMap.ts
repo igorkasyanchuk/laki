@@ -79,6 +79,8 @@ export const FIND: [string, string, string?][] = [
   ['needs', 'Older finishes go under Earlier', 'stale old done finished earlier fold dim minutes seen all bubbles'],
   ['layout', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['layout', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['layout', 'Grok plan limits', 'usage ring weekly grok.com supergrok'],
+  ['layout', 'Antigravity plan limits', 'usage ring 5-hour weekly agy gemini quota'],
   ['layout', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
   ['layout', 'Times in the Reader', 'time timestamp when sent duration how long took cost turn message reader chat'],
   ['layout', 'Tool calls in the Reader', 'hide tool calls steps bash read search successful failed final answer only chat reader quiet'],

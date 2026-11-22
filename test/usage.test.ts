@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { base, claudeWindows, codexWindows, waitOf } from '../src/daemon/usage.ts'
+import { agyRead, base, claudeWindows, codexWindows, grokCred, grokWindows, waitOf } from '../src/daemon/usage.ts'
 import { tools } from '../src/shared/tools.ts'
 import { fresh } from './helpers.ts'
 
@@ -248,4 +248,68 @@ test('laki limits: each agent read or its own error, --agent, --json; the policy
   // the same for agents and Laki AI
   const tool = tools(rig.rpc as any).find(x => x.name === 'laki_limits')!
   assert.deepEqual((await tool.run({}) as any[]).map(u => u.agent), ['codex'])
+})
+
+test('usage: Grok’s sign-in and billing view; agy’s /usage reply, a turn it took, an error', () => {
+  const later = new Date(Date.now() + 3600e3).toISOString()
+  const past = new Date(Date.now() - 1000).toISOString()
+  assert.equal(grokCred({ 'https://other.example': { key: 'o' }, 'https://auth.x.ai::cli': { key: 'old', expires_at: past }, 'https://auth.x.ai': { key: 'new', expires_at: later } })?.key, 'new')
+  assert.equal(grokCred({ 'https://auth.x.ai': { key: 'old', expires_at: past }, 'https://other.example': { key: 'o' } })?.key, 'old', "xAI's own, expired, over another issuer's")
+  assert.equal(grokCred({ 'https://other.example': { key: 'o' } })?.key, 'o')
+  assert.equal(grokCred({ 'https://auth.x.ai': { key: '' } }), undefined)
+  assert.equal(grokCred(null), undefined)
+  assert.deepEqual(grokWindows({ config: { creditUsagePercent: 41.6, currentPeriod: { end: '2026-11-29T00:00:00Z' } } }), [{ label: 'Weekly', used: 42, resets: Date.parse('2026-11-29T00:00:00Z') }])
+  assert.deepEqual(grokWindows({ monthlyLimit: { val: '50' }, used: { val: 12.5 }, billingPeriodEnd: '2026-12-01T00:00:00Z' }), [{ label: 'Monthly', used: 25, resets: Date.parse('2026-12-01T00:00:00Z') }])
+  assert.deepEqual(grokWindows({ config: { monthlyLimit: { val: '0' }, used: { val: '3' } } }), [], 'no limit: no percent')
+  assert.deepEqual(grokWindows({}), [])
+
+  // agy 1.5.14's reply, shortened: the 5-hour windows first (the ring's), a disabled bucket left out
+  const groups = [
+    { name: 'Gemini Models', buckets: [{ window: 'weekly', remaining_fraction: 0.9542791843414307, reset_time: '2026-11-28T21:44:50Z' }, { window: '5h', remaining_fraction: 1, reset_time: '2026-11-22T13:27:41Z' }] },
+    { name: 'Claude and GPT models', buckets: [{ window: 'weekly', remaining_fraction: 1 }, { window: '5h', remaining_fraction: 0.5 }] },
+    { name: 'Gemini 4 Argon', buckets: [{ name: 'Gemini 4 Argon Weekly Limit', window: 'weekly', remaining_fraction: 1 }, { window: '5h', disabled: true, remaining_fraction: 1 }] },
+  ]
+  const real = { conversation_id: '', status: 'SUCCESS', num_turns: 0, command: { name: 'usage', data: { groups } } }
+  const r = agyRead(`agy: a log line\n${JSON.stringify(real)}\n`)
+  assert.deepEqual(r.windows?.map(w => [w.label, w.used]), [['5-hour · Gemini', 0], ['5-hour · Claude and GPT', 50], ['Weekly · Gemini', 5], ['Weekly · Claude and GPT', 0], ['Weekly · Gemini 4 Argon', 0]])
+  assert.equal(r.windows?.[0].resets, Date.parse('2026-11-22T13:27:41Z'))
+  assert.deepEqual(agyRead(JSON.stringify({ ...real, num_turns: 1 })), { billed: true }, 'a turn: billed, never asked again')
+  assert.deepEqual(agyRead(JSON.stringify({ ...real, conversation_id: 'c1' })), { billed: true })
+  assert.deepEqual(agyRead(JSON.stringify({ status: 'ERROR', error: 'not logged in' })), { error: 'not logged in' })
+  assert.deepEqual(agyRead('{"status":"SUCCESS","response":"hi"}\nnot json'), {})
+})
+
+test('usage: Grok asked with its own sign-in only when turned on; Antigravity from agy’s own /usage unless turned off', async t => {
+  const hits: { url: string; auth?: string; cli?: string; user?: string }[] = []
+  const srv = createServer((q, r) => {
+    hits.push({ url: q.url!, auth: q.headers.authorization, cli: q.headers['x-xai-token-auth'] as string, user: q.headers['x-userid'] as string })
+    if (q.url === '/v1/billing?format=credits') return r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ config: { creditUsagePercent: 30, subscriptionTier: 'SuperGrok', currentPeriod: { end: '2099-01-01T00:00:00Z' } } }))
+    r.writeHead(404).end()
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  assert.deepEqual((await rig.rpc('usage')).map((x: any) => x.agent), ['claude', 'codex'], 'neither signed in on this Mac: no rows (agy on PATH alone isn’t enough)')
+  writeFileSync(join(rig.home, 'fake.log'), '', { flag: 'a' }) // none yet: nothing ran
+  assert.equal(rig.fakeLog().filter(l => l.bin === 'agy').length, 0)
+
+  mkdirSync(join(rig.home, '.grok'))
+  writeFileSync(join(rig.home, '.grok', 'auth.json'), JSON.stringify({ 'https://auth.x.ai': { key: 'fake-grok-token', user_id: 'u-1', expires_at: new Date(Date.now() + 3600e3).toISOString() } }))
+  mkdirSync(join(rig.home, '.gemini', 'antigravity-cli'), { recursive: true })
+  let u = await rig.rpc('usage')
+  const row = (a: string) => u.find((x: any) => x.agent === a)
+  assert.deepEqual(u.map((x: any) => x.agent), ['claude', 'codex', 'grok', 'gemini'])
+  assert.equal(row('grok').error, 'Laki asks grok.com for these only when you say so: Settings › Layout › Ask grok.com')
+  assert.equal(hits.length, 0, "Grok's server: not asked by default")
+  assert.deepEqual([row('gemini').source, row('gemini').error, row('gemini').windows.map((w: any) => [w.label, w.used])], ['endpoint', undefined, [['5-hour · Gemini', 60], ['Weekly · Gemini', 25]]])
+  const agy = rig.fakeLog().filter(l => l.bin === 'agy')
+  assert.deepEqual(agy.map(l => l.args), [['--version'], ['-p', '/usage', '--output-format', 'json', '--print-timeout', '20s']])
+  assert.ok(agy.every(l => l.noUpdate === 'true'), 'agy never updates itself mid-check')
+
+  await rig.rpc('settingsSet', { usage: { grok: true, gemini: false } })
+  u = await rig.rpc('usage')
+  assert.deepEqual(u.map((x: any) => x.agent), ['claude', 'codex', 'grok'], 'agy turned off: no row')
+  assert.deepEqual([row('grok').source, row('grok').plan, row('grok').windows.map((w: any) => [w.label, w.used, w.resets])], ['endpoint', 'SuperGrok', [['Weekly', 30, Date.parse('2099-01-01T00:00:00Z')]]])
+  assert.deepEqual(hits, [{ url: '/v1/billing?format=credits', auth: 'Bearer fake-grok-token', cli: 'xai-grok-cli', user: 'u-1' }])
+  assert.equal(rig.fakeLog().filter(l => l.bin === 'agy').length, 2, 'not run again')
 })

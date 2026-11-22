@@ -4,7 +4,14 @@
 // until 1; a /command takes no turn (no report); on exit prints its resume line, agy --conversation=<id>
 const fs = require('fs')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'agy', tab: process.env.LAKI_TAB, args, ...(process.env.HTTPS_PROXY && { proxy: process.env.HTTPS_PROXY }) }) + '\n')
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'agy', tab: process.env.LAKI_TAB, args, ...(process.env.HTTPS_PROXY && { proxy: process.env.HTTPS_PROXY }), ...(process.env.AGY_CLI_DISABLE_AUTO_UPDATE && { noUpdate: process.env.AGY_CLI_DISABLE_AUTO_UPDATE }) }) + '\n')
+// usage.ts' plan limits: --version (FAKE_AGY_VERSION), then -p /usage's print envelope (FAKE_AGY_USAGE: a JSON line of its own)
+if (args[0] === '--version') (process.stdout.write(`${process.env.FAKE_AGY_VERSION || '1.5.14'}\n`), process.exit(0))
+if (args[0] === '-p' && args[1] === '/usage') {
+  const groups = [{ name: 'Gemini Models', buckets: [{ id: 'gemini-weekly', name: 'Weekly Limit Remaining', window: 'weekly', remaining_fraction: 0.75, reset_time: '2099-01-08T00:00:00Z' }, { id: 'gemini-5h', name: 'Five Hour Limit Remaining', window: '5h', remaining_fraction: 0.4, reset_time: '2099-01-01T05:00:00Z' }] }]
+  process.stdout.write('agy: a log line first\n' + (process.env.FAKE_AGY_USAGE || JSON.stringify({ conversation_id: '', status: 'SUCCESS', num_turns: 0, command: { name: 'usage', data: { groups } } })) + '\n')
+  process.exit(0)
+}
 const conv = (args.find(a => a.startsWith('--conversation=')) ?? '').slice(15) || (args.includes('-c') ? 'agy-latest' : 'agy-' + Math.random().toString(36).slice(2, 8))
 let osc = false
 const say = st => osc && process.stdout.write(`\x1b]7501;state=${st}\x07`)

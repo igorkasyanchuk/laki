@@ -289,7 +289,7 @@ for the part you change, and keep it up to date with the change.
 | `src/ptyhost/main.ts` | the pty host (settings.ptyHost): a process that owns the terminals and their last 2 MB, so they outlive the daemon; `proto.ts`: its socket's frames and ops (`docs/dev/agents.md`) |
 | `src/daemon/ptyHost.ts` | the daemon's side of the pty host: its connection, started when missing, a `HostPty` per terminal as Session's `Pty` |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
-| `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 7.5 and 5 minutes |
+| `src/daemon/usage.ts` | plan limits: Claude's, Codex's and Grok's usage endpoints, with the agents' own sign-in, kept 7.5 and 5 minutes; Antigravity's from agy's own /usage |
 | `src/daemon/push.ts` | phone pushes: each format's request (`pushRequest`), the URL's check, `pushTo` |
 | `src/daemon/device.ts` | laki screen's device ops: the iOS Simulator's and apps' windows' screenshots (in points), the simulator's taps, swipes, typing and elements through idb |
 | `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall; a list: no

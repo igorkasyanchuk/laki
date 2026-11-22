@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { flowsOn, HOME_ACCOUNT, isAgent, type OnlyIf, type Project, type TaskEvent, type TaskEventIn, type TaskMarks, type TaskTrigger, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type RunState, type Schedule, type ScheduleRun, type Tab, type TaskAfter, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
+import { flowsOn, HOME_ACCOUNT, isAgent, LIMIT_AGENTS, type OnlyIf, type Project, type TaskEvent, type TaskEventIn, type TaskMarks, type TaskTrigger, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type RunState, type Schedule, type ScheduleRun, type Tab, type TaskAfter, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
 import { nextRun, parseAfter, parseAt, parseWhen, partsOf, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
@@ -684,7 +684,7 @@ function settle(s: Schedule, r: ScheduleRun, o: { asked?: boolean; again?: boole
   failedRun(s, r.what)
 }
 
-// the plan limit of a task's agent (claude's, codex's: usage.ts), reached now: its reset
+// the plan limit of a task's agent (LIMIT_AGENTS': usage.ts), reached now: its reset
 const usageOf = async (preset: string, now: number) => {
   const agent = presetNamed(preset)?.agent ?? preset
   const account = accountFor({ preset: agent } as Tab, presetNamed(preset)?.account) ?? HOME_ACCOUNT // its tab's, now (one removed since: the agent's own)
@@ -693,7 +693,7 @@ const usageOf = async (preset: string, now: number) => {
 }
 async function limitOf(s: Schedule, now: number) {
   const agent = presetNamed(s.preset)?.agent ?? s.preset
-  if (agent !== 'claude' && agent !== 'codex') return
+  if (!LIMIT_AGENTS.includes(agent)) return
   const u = await usageOf(s.preset, now)
   const at = state.settings?.usageAt ?? USAGE_AT
   if (!u?.windows.some(w => !w.note && w.resets && w.used >= at)) return

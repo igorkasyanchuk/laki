@@ -259,6 +259,7 @@ export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 // not known yet); failed: why its start didn't (Start now tries again); the rest is what its agent tab gets
 export type Pending = { at?: number; limit?: boolean; failed?: string; preset: string; cmd?: string; prompt?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; vars?: boolean; agent?: string }
 export type PendingView = { at?: number; limit?: boolean; failed?: string; prompt?: string; agent: string } // the view's: its prompt's first line, the preset
+export const LIMIT_AGENTS = ['claude', 'codex', 'grok', 'gemini'] // the agents whose plan limits Laki reads (usage.ts): the ring, laki limits, a start after the limit resets
 export const USAGE_AT = 90 // a plan limit's % that notifies (settings.usageAt unset), and that a delayed start's limit waits for
 // a plan limit's reset, a delayed start's (schedule.ts pendingTick, the new-workspace page): the soonest among the
 // windows at or past at (%), else the 5-hour window's (one with a note, an amount, isn't a limit)

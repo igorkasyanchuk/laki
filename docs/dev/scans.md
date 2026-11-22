@@ -541,7 +541,20 @@ status line within `STATUS_FRESH` (meters.ts' `statusLimits`, below; main.ts pas
 its 5-hour and weekly windows (`claudeWindows`' labels), the endpoint's others and plan as `last` had them; the endpoint
 is still asked on its TTL (`ask`): only it has the per-model weeks (`limits[]`' `weekly_scoped`: Fable's). The endpoint
 off, the popup says so (Usage.tsx' `asks`, Settings' `usage`).
-Gemini CLI's quota went with it (its successor, Antigravity's `agy`, says nothing of its limits): claude and codex only.
+Gemini CLI's quota went with it. Grok and Antigravity (`othersWho`: no accounts in Laki, their own sign-in, listed
+once it's on this Mac: `~/.grok/auth.json`; `agy` on PATH with `~/.gemini/antigravity-cli`). Grok, asked only when
+`usage.grok` is true (as Claude's and Codex's), as Orca does: `GET cli-chat-proxy.grok.com/v1/billing?format=credits`
+with auth.json's token (`grokCred`: xAI's own issuer first, a live one before an expired one; an expired one isn't
+sent), `X-XAI-Token-Auth: xai-grok-cli` and `x-userid`; `creditUsagePercent` the week's, `monthlyLimit`/`used` a unified
+account's month, else the same without `?format=credits` (`grokWindows`); ponytail: Orca's guesses at a percent the
+server leaves out skipped. Antigravity unless `usage.gemini` is false: agy's own `agy -p /usage --output-format json
+--print-timeout 20s` (Laki reads no token: agy signs in itself), in the temp folder, stdin closed,
+`AGY_CLI_DISABLE_AUTO_UPDATE=true`, 30 s; `agy --version` first (kept 6 hours), under 1.1.11 not run (its /usage took a
+model turn then); never `--disable-slash-commands` (that sends /usage as a billed prompt). `agyRead`: the JSON line
+among log noise; a reply with turns or a conversation id (`billed`) stops asking until the daemon restarts;
+`agyWindows`: a window per group's bucket (`5-hour · Gemini`, `Weekly · Claude and GPT`), disabled ones out, the 5-hour
+ones first (the ring reads a row's first). Measured: 3.4 s, 0.6 s of CPU, every 5 minutes while the window asks.
+Tests: `test/usage.test.ts`, the fake agy's `--version` and `-p /usage` (`FAKE_AGY_VERSION`, `FAKE_AGY_USAGE`).
 
 ### Meters
 
@@ -589,7 +602,7 @@ worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversatio
 `cache/last_conversations.json`'s for the worktree; copied to a temp folder with its WAL, read with node's own sqlite,
 at most every 30 s per tab: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
 and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). Tested in `test/meter.test.ts`. ponytail: agy's
-field numbers are read off its files (Nov 2026); their plan limits aren't read (no endpoint without their sign-in), only
+field numbers are read off its files (Nov 2026); their plan limits: Plan limits, above; and
 a limit notice on their screen (core's `checkLimit` for every agent but claude: limits.ts' `lineRe` takes Grok's *You
 hit your weekly limit*). The renderer (`settings.contextMeter`, `settings.costs`,
 on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): TabBar.tsx' `TabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line

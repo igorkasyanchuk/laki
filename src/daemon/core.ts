@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { AGENT_NAMES, agentBin, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, latin, nonLatin, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, latin, nonLatin, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { VERSION } from '../shared/version.ts'
@@ -3219,7 +3219,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, undefined, undefined, o.sandbox === true || undefined) // all of them before any worktree (a race's agents keep their own permission mode and speed; a sandbox asked for, a sandboxed agent's race: each one's)
     await modelKnown(agent, o.model?.trim() || presetNamed(p)?.model, { path: proj.path, project: proj.id, host: proj.host }, p)
     if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
-    if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: claude and codex only) likewise
+    if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: LIMIT_AGENTS only) likewise
   }
   const base = await fromPRLink(proj, await fromIssue(proj, o))
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
@@ -3471,13 +3471,13 @@ export async function worktreeImport(o: { project: string; paths: string[] }) {
   return made
 }
 
-// a later start: a time from now on (a minute's slack), or limit for claude and codex (their plan limits); an agent to
+// a later start: a time from now on (a minute's slack), or limit for LIMIT_AGENTS (their plan limits); an agent to
 // start, not in a codespace (it may not be up then)
 export function startCheck(at: unknown, preset: string, agent: string, codespace?: string) {
   if (preset === 'none') throw new Error('nothing starts later: pick an agent')
   if (codespace !== undefined) throw new Error("a codespace's agent starts now: no later start there")
   if (at === 'limit') {
-    if (agent !== 'claude' && agent !== 'codex') throw new Error(`after the plan limit resets: claude and codex only, not ${agent}`)
+    if (!LIMIT_AGENTS.includes(agent)) throw new Error(`after the plan limit resets: ${LIMIT_AGENTS.join(', ')} only, not ${agent}`)
     return
   }
   if (typeof at !== 'number' || !Number.isFinite(at)) throw new Error("startAt: a time (ms) or 'limit'")

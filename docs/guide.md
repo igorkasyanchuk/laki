@@ -63,7 +63,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   size, line height, weight, cursor and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots and any other file; the agent
   gets the text and their paths. Prompt templates wrap it (`{{prompt}}`).
-- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans;
+- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude, Codex and Antigravity plans (Grok's week too);
   click it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
 - **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
   Settings › Layout › *Context meter*), and a bar in the status bar, fill as
@@ -1064,7 +1064,7 @@ the 5-hour session of the agents' plans (the busier agent's). Click it for each 
 the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows. Each shows when it resets. They come from what the agents report
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
 once a tab of that agent has run, with *As of* when they're older than 20 minutes. Laki asks no server for them unless
-you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex) in Settings › Layout: undocumented endpoints that may break. Then the daemon
+you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex, grok.com's for Grok) in Settings › Layout: undocumented endpoints that may break. Antigravity's come from agy's own `/usage` (it takes no turn and uses no quota; agy 1.1.11 or newer), each model group's 5-hour and weekly windows, unless you turn off *Ask agy for Antigravity's plan limits*. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in

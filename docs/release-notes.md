@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Plan limits for Grok and Antigravity: Antigravity's 5-hour and weekly windows per model group from agy's own /usage (on by default, no turn, no quota), Grok's week from grok.com with its own sign-in (Settings › Layout › Ask grok.com, off by default); a workspace can start when their limit resets.
 - Grok, Antigravity and OpenCode tabs go to sleep when idle, as Claude Code's and Codex's do, and resume their chat on a look or a message; scheduled tasks and workflow blocks on them are tested end to end.
 - The Usage page and Today count Grok's and Antigravity's tabs too: tokens by day and model (Grok's with its own price), with their own filters; a Grok or Antigravity tab that hits its plan's limit shows when it resets, as Claude's and Codex's do.
 - What it sees lists every agent's skills with their size and rough tokens, marking the large ones and ones only one agent has; `laki skills audit` prints the same.

@@ -3,7 +3,7 @@ import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
-import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -658,7 +658,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
   const [open, setOpen] = useState(false)
   const [reset, setReset] = useState<number | null>() // the limit's: undefined not read yet, null not known
   const box = useRef<HTMLSpanElement>(null)
-  const limits = agent === 'claude' || agent === 'codex'
+  const limits = !!agent && LIMIT_AGENTS.includes(agent)
   useEffect(() => {
     if (!limits || (!open && start !== 'limit')) return
     api.call<AgentUsage[]>('usage').then(
@@ -676,7 +676,7 @@ function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: n
   }, [open])
   useEffect(() => void ((off || (start === 'limit' && !limits)) && start !== undefined && onStart(undefined)), [off, limits]) // a codespace, another agent: now
   const at = typeof start === 'number' ? new Date(start) : null
-  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: claude and codex only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Theme & type turned it off)" : undefined
+  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: ${LIMIT_AGENTS.join(', ')} only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Theme & type turned it off)" : undefined
   const pick = (d: string, t: string) => {
     const ms = new Date(`${d}T${t || '09:00'}`).getTime()
     if (Number.isFinite(ms)) onStart(Math.max(ms, Date.now() + 60_000))
