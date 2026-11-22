@@ -4085,7 +4085,7 @@ html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-
    shape: ui-smoke's Ship sheet */
 @supports (corner-shape: squircle) {
   :root { --r-window: calc(var(--r-xl) * 1.25); --r-panel: calc(var(--r-l) * 1.25); --r-control: calc((var(--r-m) + 1px) * 1.25); }
-  :is(.menu, .modal, .finder, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick, .set-group, .need, .remote-risk, .ws, .menu-item, .palette-item, input, select, textarea, button:not([class]), button.primary, .buttons button),
+  :is(.menu, .modal, .finder, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick, .set-group, .need, .remote-risk, .ws, .menu-item, .palette-item, input, select, textarea, button:not([class]), button.primary, .buttons button, .side-panel, .info, .rd-proof, .preset, .account-row, .theme, .seg, .seg button, .run-btn, .rail-icon, .pin-card, .ext-peek, .ext-layout-bar, .outbox-item, .voice-hist, .set-subgroup, .two-ways > div),
   html.material .app:not([data-dz], .narrow, .full) .main,
   :where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab-list > .tab { corner-shape: squircle; }
   .capsule, .capsule :is(button, textarea) { corner-shape: round; }

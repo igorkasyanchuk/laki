@@ -2263,7 +2263,7 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
    wallpaper where there's none: a browser, Linux; solid under Reduce transparency and in the windows without blur); on it float a sidebar panel and a main card, with
    a hairline edge and a lit top. No backdrop-filter (html.glass' note): the blur is the window's, floats near solid.
    [data-dz]: the frame, not on a phone or in full screen; its traits (Settings.tsx DESIGNS) bring pill tabs and a floating side panel */
-[data-look='frosted'] { --radius: 8px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 5px); --r-m: var(--rs, 8px); --r-l: var(--rs, 13px); --r-xl: var(--rs, 19px); --f-gap: 8px; --f-r: var(--rs, 16px); --f-fill: color-mix(in srgb, var(--fg) 9%, transparent); --f-fill-up: color-mix(in srgb, var(--fg) 15%, transparent);
+[data-look='frosted'] { --radius: 8px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 5px); --r-m: var(--rs, 8px); --r-l: var(--rs, 13px); --r-xl: var(--rs, 19px); --f-gap: 8px; --f-r: var(--rs, 18px); --f-fill: color-mix(in srgb, var(--fg) 9%, transparent); --f-fill-up: color-mix(in srgb, var(--fg) 15%, transparent);
   --f-edge: var(--line); --f-hi: light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.09));
   --f-drop: light-dark(rgb(30 30 50 / 0.16), rgb(0 0 0 / 0.38)); --f-ring: color-mix(in srgb, var(--accent) 38%, transparent);
   --proj-divider: none; }
@@ -2315,8 +2315,9 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
   [data-look='frosted'].glass .app[data-dz].rail-on:not(.list-off, .strip-right) .rail { clip-path: inset(-48px 0 -48px -48px); }
   [data-look='frosted'].glass .app[data-dz].rail-on :is(.sidebar, .side-strip.left) { clip-path: inset(-48px -48px -48px 0); }
   [data-look='frosted'].glass:not(.vibrant) .app[data-dz] :is(.rail, .sidebar, .side-strip) { backdrop-filter: blur(var(--sp-6)) saturate(1.6); }
-  @supports (corner-shape: squircle) { [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar, .side-strip) { corner-shape: squircle; } }
 }
+/* its cards squircles too, glass or not (macOS 26's window corner, about 26px, less --f-gap: --f-r's 18px) */
+@supports (corner-shape: squircle) { [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .side-panel) { corner-shape: squircle; } }
 
 /* the rail: bare icons, a bar of the accent by the one you're on */
 [data-look='frosted'] .rail-kind { position: relative; }
