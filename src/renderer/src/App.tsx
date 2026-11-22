@@ -1,7 +1,7 @@
 import type { Call, Method, ParamsOf } from '../../shared/api'
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type Dispatch, lazy, type SetStateAction, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type AchievementsKept, type Agent, AGENT_NAMES, aiOn, type Annotations, type Blame, flowsOn as flowsOnIn, type Gate, type GateHeld, HOME_ACCOUNT, isAccountAgent, type Project, recorded, rowsOf, type RunScript, type Sep, specsOn as specsOnIn, type Stat, type StudioChat, type TabView, type TurnKept, veiled, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type WorkspaceView, type WsSort } from '../../shared/types'
+import { type AchievementsKept, type Agent, AGENT_NAMES, aiOn, type Annotations, type Blame, flowsOn as flowsOnIn, type Gate, type GateHeld, HOME_ACCOUNT, isAccountAgent, type Project, recorded, rowsOf, type RunScript, type Sep, specsOn as specsOnIn, type Stat, type StudioChat, type TabView, type TurnKept, veiled, type View, type WidgetView, type WorkspaceView, type WsSort } from '../../shared/types'
 import { ruleFrom } from '../../shared/ask'
 import { stamp } from '../../shared/when'
 import { type NewLine, notesOf as newLines, type UpdateState } from '../../shared/update'
@@ -15,7 +15,7 @@ import { DOCK_ICONS, dockPng } from './dock'
 import type { ReviewApi, Talk } from './FullReview'
 import { ago, ciText, prState, REVIEW, showAvatars } from './Info'
 import { Loading, type NewWsParams, type Shot, SnapSkeleton, videoCommand, VIEWED } from './panels'
-import type { AppInfo, SkillInfo, WidgetsApi } from './Settings'
+import type { AppInfo, SkillInfo } from './Settings'
 import { designTraits, FONT_SIZE, isSection, PAGE_ZOOMS } from './settingsBase' // E8: not the Settings page, which loads as it opens
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
@@ -24,7 +24,6 @@ import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/a
 import { hasCap } from '../../shared/caps'
 import { imagesVia, layoutEditor, setLayoutEdit, TurnChips, type WidgetApi } from './Widgets'
 import type { SayModal } from '../../shared/widget'
-import type { UiProblem } from '../../shared/widgetUi'
 import { type WorkflowItem } from '../../shared/workflow'
 import { Glyph } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
@@ -50,7 +49,7 @@ import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
 import { ask, AskHost, askText, choose, copyImage, type Fact, HOTKEY, Icon, keep as store, keyTip, load, type MenuItem, morph, moveId, moveIds, ON, QUICK_KEY, SHOT_KEY, TAB_COLORS, TALK_KEY, TELL_KEY, tipKeys, Tips, Toasts, unchoose, useMenu, useRowDrag, type Verdict } from './ui'
 import { emojiOf } from '../../shared/icons'
-import { type Action, type AppBase, type AppCtx, appIcon, clip, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
+import { type Action, type AppBase, type AppCtx, appIcon, clip, type Dialog, EDITOR_IDS, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { onKey } from './keydown'
 import { layoutOf } from './TabBar'
@@ -63,6 +62,7 @@ import { mainOf } from './MainArea'
 import { chromeOf } from './Chrome'
 import { wsActionsOf } from './WsActions'
 import { widgetsOf } from './AppWidgets'
+import { extCfgOf } from './ExtCfg'
 
 // E8: loaded as it first shows (the floating AI chat): not in the window's first load
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
@@ -1955,75 +1955,13 @@ export function App() {
     return () => (window.removeEventListener('keydown', k, true), setLayoutEdit(null))
   }, [layoutOn])
   const editLayout = (on: boolean) => (on && setDialog(null), setLayoutOn(on))
-  // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
-  const extCfg: WidgetsApi = {
-    editLayout: hasCap(view, 'widget.order') ? () => editLayout(true) : undefined,
-    ...(hasCap(view, 'widget.store') && { storeAll: (id: string, ws?: string) => call('widgetStore', { id, op: 'all', ws }) }),
-    list: view?.widgets ?? [],
-    projects: view?.projects.filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })),
-    ungated: view?.tabs.filter(t => t.ungated).length,
-    gateRestart: () => call<{ restarted: number; left: number }>('gateRestart', {}).then(r => (r.left && toast(`${r.left} still at work or asking: restart once idle`), r)),
-    home: view?.widgetHome,
-    // turned on with a setting it needs still empty: its page, at that field; a repo's (.laki/extensions) shows what
-    // it runs first (repoSheet), on only for the files shown
-    set: async (id, o) => {
-      const rw = view?.widgets?.find(x => x.id === id)
-      if (o.on && !o.seen && (rw?.project || rw?.agentDev)) {
-        const seen = await repoSheet(rw)
-        if (!seen) return
-        o = { ...o, seen }
-      }
-      const r = await call<WidgetView>('widgetSet', { id, ...o })
-      if (o.on && r?.missing?.length) setDialog((e => (e?.extension === id ? { extension: id, back: e.back, key: extKey(e), edit: r.missing![0] } : { extension: id, back: dialog, edit: r.missing![0] }))(extOf(dialog))) // its page already: kept (key), not drawn again
-      return r
-    },
-    desk: settings.desk !== false,
-    nowhere: hasCap(view, 'widget.none'),
-    agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
-    agent: settings.widgetAgent,
-    run: (id, ws) => call('widgetRun', { id, ws }),
-    stop: id => call('resourceStop', { key: `agent:${id}` }),
-    // asked first, then the trash: Undo puts it back
-    rm: async id => {
-      const name = view?.widgets?.find(w => w.id === id)?.name ?? id
-      if (!(await ask(`Delete ${name}?`, { text: 'Its folder, settings and data go to the trash, and it stops running. Undo brings it back.', ok: 'Delete', danger: true }))) return
-      const r = await call<{ trash: string }>('widgetRm', { id })
-      if (r) done(`Deleted ${name}`, () => void call('widgetRestore', { trash: r.trash }))
-    },
-    // Laki AI's extension chats where you left off: the ones with nothing made yet, and the one at work
-    chats: studioOn ? studioChats.filter(c => c.busy || !view?.widgets?.some(w => w.id === c.id)) : [],
-    chatRm: async id => {
-      if (!(await ask('Delete this session?', { text: 'Its chat with Laki AI goes; nothing was saved of the extension yet.', ok: 'Delete', danger: true }))) return
-      await call('studioChatRm', { id })
-      setStudioChats(cs => cs.filter(c => c.id !== id))
-    },
-    reload: () => call('widgetReload'),
-    page: id => setDialog({ extension: id, back: dialog }),
-    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e), undefined, undefined, false, true)), // a copy to change, on its page
-    undo: (id, after) => api.call('widgetUndo', { id, after }),
-    tryOnce: (id, ws) => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true, ws }),
-    folder: (id, e) => {
-      const w = view?.widgets?.find(x => x.id === id)
-      openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
-    },
-    allLogs: settings.widgetLogs === true,
-    hours: settings.widgetHours,
-    logs: id => setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, tab: 'logs' }),
-    log: {
-      read: (id, o) => api.call<{ on: boolean; lines: WidgetLogLine[]; next: number }>('widgetLogs', { id, ...o }),
-      clear: id => api.call('widgetLogClear', { id }),
-      reveal: id => void call('openIn', { widget: id, log: true, app: 'finder' }),
-    },
-    kit: icons => setDialog({ uikit: true, icons, back: dialog }),
-    runs: (id, ws) => api.call<WidgetRuns>('widgetRuns', { id, data: true, ws }),
-    mock: (id, o) => call('widgetMock', { id, ...o }),
-    files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
-    save: (id, path, text, was, force) => api.call('widgetFileSave', { id, path, text, was, force }),
-    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog === 'starters' ? null : dialog }), e => toast(String(e?.message ?? e), undefined, undefined, false, true)), // ⌘K's picker: its page, then nothing behind it
-    check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
-    revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),
-    wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
-  }
+  // repoSheet: widgetsOf's, below; called only in handlers
+  const {
+    extCfg,
+  } = extCfgOf({
+    call, copy, dialog, done, editLayout, openInItems, openMenu, repoSheet: (...a: Parameters<typeof repoSheet>) =>
+    repoSheet(...a), setDialog, setStudioChats, settings, studioChats, studioOn, toast, view,
+  })
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
   // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), a page its own
   // size (below)
