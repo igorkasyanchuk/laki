@@ -1,7 +1,7 @@
 // laki backup / laki restore (Settings › General › Backup): the user's data in one .tgz, by the system's tar (macOS's
 // bsdtar, Linux's GNU tar). In it: manifest.json first (the Laki that made it, the state's schema, counts), then
 // state.json (the view's state as it is in memory, without this Mac's remote access: MACHINE), notes and To-dos, specs
-// and brainstorms, workflows, extensions' folders, Laki AI's chats and the prompt history: KEEP, an allowlist, so the
+// and brainstorms, workflows, extensions' folders, Laki AI's chats, the prompt history and the Review tab's unsent comments: KEEP, an allowlist, so the
 // rest of the data folder (daemon.json's token, pty.json, tap-key, Laki AI's keys, accounts, logs, temp files, the
 // trash: core.ts' DATA_SECRETS and the like) never goes in. Restore takes only KEEP's names back (anything else in the
 // archive, a link or a path out of it, is refused or dropped), refuses one from a newer state schema and, unless
@@ -17,7 +17,7 @@ import { BACKUP_KEEP as KEEP, dir } from './dir.ts'
 
 const MACHINE = ['remote', 'remoteDevices', 'tunnels'] as const // this Mac's remote access and tunnels: their keys stay here
 const SKIP = ['*.tmp', '*.broken-*', '._*'] // writeAtomic's temp files, a store set aside, macOS's AppleDouble copies
-export type Counts = Record<'projects' | 'workspaces' | 'notes' | 'specs' | 'workflows' | 'extensions' | 'aiChats' | 'prompts', number>
+export type Counts = Record<'projects' | 'workspaces' | 'notes' | 'specs' | 'workflows' | 'extensions' | 'aiChats' | 'prompts' | 'reviewComments', number>
 export type Manifest = { laki: string; stateV: number; made: number; counts: Counts }
 
 const entries = (d: string) => {
@@ -45,6 +45,7 @@ export function countsOf(root: string, s: { projects?: unknown[]; workspaces?: u
     extensions: entries(join(root, 'widgets')).length,
     aiChats: entries(join(root, 'ai-chats')).length + (existsSync(join(root, 'ai-chat.json')) ? 1 : 0),
     prompts: (a => (Array.isArray(a) ? a.length : 0))(json(join(root, 'prompts.json'))),
+    reviewComments: entries(join(root, 'review-notes')).reduce((n, f) => n + (a => (Array.isArray(a) ? a.length : 0))(json(join(root, 'review-notes', f))?.notes), 0),
   }
 }
 

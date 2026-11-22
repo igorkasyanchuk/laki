@@ -151,8 +151,11 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `dataBackup` (`file`, a full path, never one already there): the system's `tar -czf`, the archive 0600: `manifest.json`
   first (`laki`, `stateV`: core.ts' `STATE_V`, `made`, `counts`), then `state.json` (the state in memory, without
   `remote`, `remoteDevices`, `tunnels`: this Mac's), and dir.ts' `BACKUP_KEEP` (notes, To-dos, plans, workflows,
-  widgets, Laki AI's chats, prompts.json), `*.tmp`, `*.broken-*` and `._*` left out; an allowlist, so nothing of
-  `DATA_SECRETS` but state.json, notes, prompts and the AI chats goes in. `dataRestore` (`file`, `dryRun`, `force`):
+  widgets, Laki AI's chats, prompts.json, review-notes: the Review tab's unsent comments, `counts.reviewComments`),
+  `*.tmp`, `*.broken-*` and `._*` left out; an allowlist, so nothing of `DATA_SECRETS` but state.json, notes, prompts,
+  the AI chats and review-notes goes in (DATA_SECRETS is what an agent's Read never reads, not what a backup leaves out).
+  Not `turns`: their refs (`refs/laki/turns/*`) live in each repo, so an index copied without them would offer rewinds
+  that fail; the help, Settings and the restore sheet say they stay on this Mac. `dataRestore` (`file`, `dryRun`, `force`):
   its names listed first (only the manifest and `BACKUP_KEEP`'s, none absolute or with `..`), extracted into
   `<data>/.restore-…`, links and other non-files dropped (`dropped`), a manifest with a higher `stateV` refused, refused
   while `agentsBusy` unless `force`; `{ dryRun?, manifest, rows: { what, now, backup }[], dropped, aside }`. Not a dry

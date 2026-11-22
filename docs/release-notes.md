@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- `laki backup` (Settings › General › Backup) carries the Review tab's unsent comments too, and says that kept turns (Undo and rewind history) stay on this Mac.
 - The Review tab's *Walk through*: Laki AI puts a workspace's changes in 3 to 7 steps to read in order, each saying why it comes there and marking what to read with care; click a step to see only its changes, tick it to mark its files viewed.
 - *Walk through* reads past a change too big for it (a new `package-lock.json`, a generated file): the code and tests after it are still put in steps, and *Everything else* says how many changes Laki AI did not read.
 - Electron 45.4.1: Chromium 156.0.8078.100 with its security fixes (and V8's, ANGLE's, PDFium's and FFmpeg's), for the window and every page Laki shows.

@@ -128,7 +128,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               tools listed, laki_more adds a group (--all, LAKI_MCP_ALL=1: every one)
   laki daemon | stop [--keep]                 run the daemon in the foreground | stop it (--keep: the pty host's terminals go on)
   laki backup <file.tgz>                      your data in one file: projects, settings, notes, specs, workflows, extensions,
-                                              Laki AI's chats, prompts (no keys, tokens, sign-ins or logs)
+                                              Laki AI's chats, prompts, review comments (no keys, tokens, sign-ins or logs;
+                                              kept turns, Undo and rewind history, stay on this Mac)
   laki restore <file.tgz> [--dry-run] [--force]
                                               put a backup back: what's here goes aside first, then Laki restarts;
                                               --dry-run: what would change; --force: while agents work (their turns end)
@@ -429,8 +430,9 @@ done, so a page that moved meanwhile isn't typed into.
   laki browser screenshot`,
   backup: `Writes your data to one .tgz (the system's tar): manifest.json first (the Laki that made it, the state's
 version, counts), then projects, workspaces and settings (state.json, without this Mac's remote access), notes and
-To-dos, specs and brainstorms, workflows, extensions' folders, Laki AI's chats and the prompt history. Never in it:
-daemon.json's token, Laki AI's keys, the phone's key, accounts and sign-ins, logs, temp files, the trash. It holds your
+To-dos, specs and brainstorms, workflows, extensions' folders, Laki AI's chats, the prompt history and the Review tab's
+unsent comments. Never in it: daemon.json's token, Laki AI's keys, the phone's key, accounts and sign-ins, logs, temp
+files, the trash. Kept turns (Undo and rewind history) stay on this Mac: their history is in each repo. It holds your
 settings' env values and webhook: keep it as you would a password file (it's written 0600). Refuses a file already
 there. The user's only: refused in an agent's tab.
 

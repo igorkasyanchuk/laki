@@ -551,12 +551,14 @@ test("laki backup and restore: a note and a workflow come back in another world;
   const p = await a.rpc('projectAdd', { path: a.repo })
   const ws = await a.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
   const from = { ws: ws.id, tab: (await until(() => a.tab(ws.id))).id }
+  await a.rpc('reviewNotesSet', { ws: ws.id, notes: [{ id: 'c1', path: 'README.md', line: 1, side: 'RIGHT', body: 'Carry this comment', quote: ' hello' }] })
   const file = join(a.home, 'laki.tgz')
   await assert.rejects(a.rpc('dataBackup', { file, from }), /an agent can't back up the user's data/)
   await assert.rejects(a.rpc('dataRestore', { file, from }), /an agent can't restore the user's data/)
   let r = await a.cli('backup', file)
   assert.equal(r.code, 0, r.err)
   assert.match(r.out, /1 notes, 0 specs, 1 workflows/)
+  assert.match(r.out, /1 reviewComments/, 'the manifest counts the Review tab\'s comments')
   assert.equal(statSync(file).mode & 0o777, 0o600)
   assert.equal((await a.cli('backup', file)).code, 1, 'never over a file already there')
   const names = execFileSync('tar', ['-tzf', file], { encoding: 'utf8' }).split('\n').filter(Boolean).map(n => n.replace(/^\.\//, '').replace(/\/$/, ''))
@@ -568,13 +570,16 @@ test("laki backup and restore: a note and a workflow come back in another world;
     assert.ok(!out.some(g => glob(g).test(n.split('/')[0])), n)
     assert.ok(!n.endsWith('.tmp'), n)
   }
-  assert.ok(names.includes(`notes/${note.id}.json`) && names.includes('workflows/carry.md'), names.join(' '))
+  assert.ok(names.includes(`notes/${note.id}.json`) && names.includes('workflows/carry.md') && names.includes(`review-notes/${ws.id}.json`), names.join(' '))
+  assert.ok(!names.some(n => n.split('/')[0] === 'turns'), 'kept turns stay on this Mac')
+  assert.match((await a.cli('help', 'backup')).out, /Kept turns \(Undo and rewind history\) stay on this Mac/)
 
   // another world: --dry-run says what changes and changes nothing; then it's restored, the daemon restarts on it
   const b = await fresh(t)
   r = await b.cli('restore', file, '--dry-run')
   assert.equal(r.code, 0, r.err)
   assert.match(r.out, /notes\s+0 → 1 \*/)
+  assert.match(r.out, /reviewComments\s+0 → 1 \*/)
   assert.match(r.out, /Nothing changed/)
   assert.deepEqual(await b.rpc('noteList'), [])
   r = await b.cli('restore', file)
@@ -586,6 +591,7 @@ test("laki backup and restore: a note and a workflow come back in another world;
   assert.deepEqual((await b.rpc('noteList')).map((n: any) => n.title), ['Carry me'])
   assert.ok((await b.rpc('flowList', {})).some((w: any) => w.id === 'carry'))
   assert.equal((await b.rpc('state')).projects[0]?.path, p.path)
+  assert.deepEqual((await b.rpc('reviewNotesGet', { ws: ws.id })).notes.map((n: any) => n.body), ['Carry this comment'], 'the review comment came back')
   assert.ok(readdirSync(b.data).some(n => n.startsWith('backup-before-restore-')), 'what was there, set aside')
   assert.ok(!existsSync(join(b.data, 'tap-key')), "the other world's keys never came")
 

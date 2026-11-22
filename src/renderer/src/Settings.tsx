@@ -909,7 +909,7 @@ function UninstallField({ api }: { api: UninstallApi }) {
 // Restore… takes a .tgz, says what changes (a dry run), and its Restore restores it (what's here goes aside; Laki restarts)
 type Restore = { dryRun?: boolean; manifest: { laki: string; made: number }; rows: { what: string; now: number; backup: number }[]; dropped: number; aside: string }
 export type BackupApi = { make: (file: string) => Promise<{ file: string; bytes: number }>; restore: (o: { file: string; dryRun?: boolean }) => Promise<Restore> }
-const KINDS: Record<string, string> = { projects: 'Projects', workspaces: 'Workspaces', notes: 'Notes', specs: 'Specs & brainstorms', workflows: 'Workflows', extensions: 'Extensions', aiChats: 'Laki AI chats', prompts: 'Prompts' }
+const KINDS: Record<string, string> = { projects: 'Projects', workspaces: 'Workspaces', notes: 'Notes', specs: 'Specs & brainstorms', workflows: 'Workflows', extensions: 'Extensions', aiChats: 'Laki AI chats', prompts: 'Prompts', reviewComments: 'Review comments' }
 const stampOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
 function BackupField({ api }: { api: BackupApi }) {
   const [said, setSaid] = useState('')
@@ -933,7 +933,7 @@ function BackupField({ api }: { api: BackupApi }) {
   return (
     <>
       <div className="row cli-row">
-        <Says title="Back up or restore" hint="Your projects, settings, notes, specs, workflows, extensions and Laki AI chats in one .tgz; no keys, sign-ins or logs. It holds your settings' env values: keep it safe" />
+        <Says title="Back up or restore" hint="Your projects, settings, notes, specs, workflows, extensions, Laki AI chats and review comments in one .tgz; no keys, sign-ins or logs. Kept turns (Undo and rewind history) stay on this Mac. It holds your settings' env values: keep it safe" />
         <span className="grow" />
         <button type="button" disabled={busy} onClick={make}>
           Back up…
@@ -957,7 +957,7 @@ function BackupField({ api }: { api: BackupApi }) {
               </span>
             </div>
           ))}
-          <p className="muted small">What's here goes to {plan.r.aside} first, then Laki restarts and its terminals close.</p>
+          <p className="muted small">What's here goes to {plan.r.aside} first, then Laki restarts and its terminals close. Kept turns (Undo and rewind history) stay on this Mac.</p>
           <div className="row-buttons">
             <button type="button" className="danger" disabled={busy} onClick={() => restore(plan.file)}>
               {busy ? 'Restoring…' : 'Restore'}

@@ -579,7 +579,7 @@ async function main() {
         // a backup (laki backup's), not an archived workspace
         type Row = { what: string; now: number; backup: number }
         const r = await rpc<{ dryRun?: boolean; manifest: { laki: string; made: number }; rows: Row[]; dropped: number; aside: string }>('dataRestore', { file: resolve(rest[0]), dryRun: !!flags['dry-run'], force: !!flags.force, from: caller() })
-        const rows = r.rows.map(x => `  ${x.what.padEnd(11)} ${String(x.now).padStart(5)} → ${x.backup}${x.now === x.backup ? '' : ' *'}`).join('\n')
+        const rows = r.rows.map(x => `  ${x.what.padEnd(14)} ${String(x.now).padStart(5)} → ${x.backup}${x.now === x.backup ? '' : ' *'}`).join('\n')
         const head = `Backup made by Laki ${r.manifest.laki} on ${new Date(r.manifest.made).toLocaleString()}; here now → in the backup:\n${rows}${r.dropped ? `\n  ${r.dropped} link${r.dropped === 1 ? '' : 's'} in it left out` : ''}`
         return out(r, r.dryRun ? `${head}\n\nNothing changed. laki restore ${rest[0]} puts it back (what's here goes to ${r.aside})` : `${head}\n\nRestored: Laki restarts now. What was here is in ${r.aside}`)
       }
