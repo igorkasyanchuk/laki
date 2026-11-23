@@ -13,7 +13,7 @@ import { LIMITS, limitsOf } from './clients.ts'
 import { changed, fileSave, imageSave, log, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
-import { askOfMsg, hidden, pickedFor, takeTap } from './phone.ts'
+import { askOfMsg, hidden, pickedFor, takeTap, tgDrop } from './phone.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { type Push, pushText, tapOf } from './push.ts'
 import { redact } from './share.ts'
@@ -146,6 +146,7 @@ function msgMap() {
 function forget() {
   msgs = new Map()
   rmSync(msgFile(), { force: true })
+  tgDrop() // its asks' message ids: never edited or answered in another chat
 }
 function remember(msg: number, tab: string) {
   const m = msgMap()
@@ -180,8 +181,8 @@ export async function tgPush(p: Push): Promise<number | undefined> {
   const msg = (thread?: number) => out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p, !taps.length), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
   const thread = await threadOf(p.tab)
   const m = await msg(thread).catch(async (e: Error) => {
-    // its topic deleted in Telegram (thread not found): forgotten, then a new one (or the chat)
-    if (!thread || !(e instanceof TgError) || e.code !== 400 || !/thread/i.test(e.message)) throw e
+    // its topic deleted or closed in Telegram (thread not found, TOPIC_CLOSED): forgotten, then a new one (or the chat)
+    if (!thread || !(e instanceof TgError) || e.code !== 400 || !/thread|topic/i.test(e.message)) throw e
     for (const [ws, id] of Object.entries(state.telegram?.threads ?? {})) if (id === thread) delete state.telegram!.threads![ws]
     save()
     return msg(await threadOf(p.tab))
@@ -262,7 +263,7 @@ type TgMessage = { message_id: number; from?: User; chat: Chat; date: number; te
 type Update = { update_id: number; message?: TgMessage; callback_query?: { id: string; from: User; message?: { message_id: number; chat: Chat }; data?: string } }
 let ctl: AbortController | undefined
 let offset = 0
-let lastOk = 0 // a poll answered then: a tap in the first batch after a gap may be from hours ago (a callback has no date)
+let lastOk = 0 // a poll answered then: a tap waiting since before a gap may be from hours ago (a callback has no date)
 let ignored = 0 // updates from anyone else, since the last log line
 // it runs while a pairing code waits, or paired, on, and at answer or control
 const wanted = () => !!state.telegram?.keyed && (!!pair && pair.until > Date.now() ? true : tgOn() && levelAtLeast('answer'))
@@ -284,12 +285,15 @@ async function loop() {
   const c = (ctl = new AbortController())
   let wait = 1000
   let failed = ''
+  let behind = false // after a gap: what waited is read at once (timeout 0) until a batch isn't full, and is old
   changed()
   while (!c.signal.aborted) {
     if (!wanted()) break // a pairing code ran out
     try {
-      const ups = await tg<Update[]>('getUpdates', { offset, timeout: POLL_S, allowed_updates: ['message', 'callback_query'] }, { signal: AbortSignal.any([c.signal, AbortSignal.timeout((POLL_S + 15) * 1000)]) })
-      const gap = !lastOk || Date.now() - lastOk > STALE
+      if (!lastOk || Date.now() - lastOk > STALE) behind = true
+      const ups = await tg<Update[]>('getUpdates', { offset, timeout: behind ? 0 : POLL_S, allowed_updates: ['message', 'callback_query'] }, { signal: AbortSignal.any([c.signal, AbortSignal.timeout((POLL_S + 15) * 1000)]) })
+      const gap = behind // a long poll's answer came as you tapped: fresh
+      if (ups.length < 100) behind = false // getUpdates gives 100 at most
       lastOk = Date.now()
       wait = 1000
       if (failed) log('telegram: reached again'), (failed = '')
@@ -391,7 +395,7 @@ async function deliver(tab: string, m: TgMessage) {
   if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
   if (!text) throw new Error('nothing to send')
   await act('send', { target: tab, text, whenIdle: true })
-  if (ask) void sayIn(m, `Queued: ${esc(t.name)} asks something first (reply to its question's message with a choice's number to answer it).`)
+  if (ask) void sayIn(m, `Queued: ${esc(t.name)} asks something first (${tgAnswers() ? "reply to its question's message with a choice's number to answer it" : 'Titles only is on: answer it on the Mac'}).`)
 }
 // a photo or a file from the chat into Laki's images or files (core's imageSave, fileSave): its path. Telegram gives a
 // bot 20 MB at most
@@ -467,7 +471,7 @@ async function command(c: string, arg: string, m: TgMessage) {
     const low = arg.toLowerCase()
     const [p, said] = state.projects
       .filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private))
-      .flatMap(x => [x.name, x.id].filter(n => n && low.startsWith(`${n.toLowerCase()} `)).map(n => [x, n!] as const))
+      .flatMap(x => [x.name, x.id].filter(n => n && low.startsWith(n.toLowerCase()) && /\s/.test(low[n.length] ?? '')).map(n => [x, n!] as const))
       .sort((a, b) => b[1].length - a[1].length)[0] ?? []
     const task = said ? arg.slice(said.length).trim() : ''
     if (!p || !task) return void sayIn(m, `/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
@@ -508,6 +512,8 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
   if (typeof p.token === 'string') {
     const tok = p.token.trim()
     if (!tok) {
+      const old = token()
+      if (old && t.user) void tg('deleteMyCommands', { scope: { type: 'chat', chat_id: t.user.id } }, { tok: old }).catch(() => {}) // its menu, while the token is here
       keyWrite(KEY, keyFile(), '')
       Object.assign(t, { keyed: undefined, bot: undefined, user: undefined, threads: undefined, notice: undefined })
       forget()

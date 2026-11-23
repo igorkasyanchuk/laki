@@ -1307,6 +1307,7 @@ const newOk = (tab: boolean) => (p: Params) => {
   const extra = Object.keys(p ?? {}).find(k => !NEW_KEYS.has(k))
   if (extra) return extra
   if (typeof p?.cmd === 'string' && p.cmd.trim()) return 'a command'
+  if (typeof p?.prompt === 'string' && /^\s*!/m.test(p.prompt)) return "a command (a line that starts with ! is the agent's shell)" // as sendOk's
   const agent = agentOf(p, tab)
   if (!isAgent(agent)) return agent ? `${agent}: not an agent` : 'a shell'
   if (p?.perm !== undefined && neverAsks(agent, String(p.perm))) return 'a mode that never asks'

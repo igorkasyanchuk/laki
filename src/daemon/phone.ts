@@ -110,6 +110,9 @@ const gone = (k: string, said = 'Answered on the Mac, or it moved on') => {
 }
 // the ask a Telegram message is (its buttons', still waiting): its tab and choices as pushed (key); a reply to it may pick one
 export const askOfMsg = (msg: number) => [...awaiting.values()].find(a => a.msg === msg && a.tab && a.tg)
+// unpaired, another person paired, another bot: Telegram's message ids mean nothing now (another chat's could match);
+// the webhook's asks stay
+export const tgDrop = () => awaiting.forEach((a, k) => (a.hook ? Object.assign(a, { msg: undefined, tg: false }) : awaiting.delete(k)))
 // a tab's pushed ask answered some other way (a Telegram reply's number): its message says what was picked
 export const pickedFor = (tab: string, said: string) => awaiting.forEach((a, k) => a.tab === tab && gone(k, said))
 // the webhook's taps come back: Answer from the phone where they can (answerOk), never with titles only
@@ -162,28 +165,29 @@ export async function phoneTick() {
 export async function takeTap(tap: Tap, tg = false): Promise<string | undefined> {
   const a = awaiting.get(tap.nonce)
   if (!a || (tg && (!a.tab || !a.tg))) return
-  awaiting.delete(tap.nonce)
-  const done = (said: string) => (awaiting.set(tap.nonce, a), gone(tap.nonce, said), said) // its message says what was picked
+  awaiting.delete(tap.nonce) // taken: a second tap of it finds nothing
+  // its message says what became of it (said: what was picked; none: it moved on, or failed), its buttons gone
+  const done = <S extends string | undefined>(said: S) => (awaiting.set(tap.nonce, a), gone(tap.nonce, said), said)
   if (a.keep) return (remoteKeepHook.fn?.(), log('remote access kept on from the phone'), done('Kept on'))
   if (a.flow) {
     // a run's choice: its wait as pushed (0-based in flowAnswer)
-    if (flowHooks.waitKey?.(a.flow) !== a.key || !flowHooks.answer) return
+    if (flowHooks.waitKey?.(a.flow) !== a.key || !flowHooks.answer) return done(undefined)
     const label = (JSON.parse(a.key) as { options: string[] }).options[tap.n - 1]
     if (label === undefined) return
     return flowHooks.answer({ id: a.flow, n: tap.n - 1 }).then(
       () => (log(`answered run ${a.flow} from the phone: ${label}`), done(`Picked: ${label}`)),
-      e => void log(`answer from the phone, run ${a.flow}: ${(e as Error).message}`),
+      e => void (log(`answer from the phone, run ${a.flow}: ${(e as Error).message}`), done(undefined)),
     )
   }
   if (!a.tab) return
   const s = sessions.get(a.tab)
   const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? s.ask() : undefined
   const o = now && JSON.stringify(now.options) === a.key ? now.options.find(x => x.n === tap.n) : undefined
-  if (!o) return // it moved on
+  if (!o) return done(undefined) // it moved on
   const perm = rtOf(a.tab).perm // the ask as it was, for F15's count (askStreak.ts), as main.ts' answer does
   return answer({ tab: a.tab, n: o.n, label: o.label }).then(
     r => (answered(state.tabs.find(t => t.id === a.tab)?.workspace, perm, r.picked), log(`answered ${a.tab} from the phone: ${o.label}`), done(`Picked: ${r.picked}`)),
-    e => void log(`answer from the phone ${a.tab}: ${e.message}`),
+    e => void (log(`answer from the phone ${a.tab}: ${e.message}`), done(undefined)),
   )
 }
 

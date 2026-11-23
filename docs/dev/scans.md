@@ -477,8 +477,11 @@ waits or it's paired, on and at answer or control (`wanted`, `sync` as any of th
 errors back off 1 s to 60 s (one log line until it works), a 429 waits `retry_after`, a 409 (another reader, or a
 webhook on the bot) stops with a notice to use a bot only for Laki and touches nothing of the other's, a 401 turns it
 off with a notice; `telegramSet { off: false }` tries again. A message older than 2 minutes (`date`) is dropped with
-*Laki was off*; a callback has no date, so the first batch after a gap of 2 minutes (`lastOk`) drops its taps (*too
-old*). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waited out once. A push (`tgPush`) is HTML
+*Laki was off*; a callback has no date, so after a gap of 2 minutes (`lastOk`) what waited is read at once
+(`timeout: 0`, `behind`, until a batch isn't 100 full) and its taps dropped (*too old*); a long poll's then are fresh.
+Unpair, another person or another bot: `phone.ts` `tgDrop` forgets the asks' Telegram message ids. A tap on an ask that
+moved on edits its message too. A new workspace's prompt with a `!` line is refused from Telegram and remote access's
+answer level (`newOk`, as `sendOk`). Out: `out`, one call at a time, `LAKI_TG_GAP_MS` (1 s) apart, a 429 waited out once. A push (`tgPush`) is HTML
 (`tgHtml`: the title bold, every value escaped by `esc`, secrets' shapes by `redact`, over 300 characters folded in a
 `blockquote expandable`), `disable_notification` when done, `link_preview_options` off, a button per choice
 (`callback_data` `nonce:n`, unsigned: only the paired user's private chat counts) at answer and up unless titles only; its

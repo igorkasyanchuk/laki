@@ -181,6 +181,11 @@ test('P1: a message older than two minutes is dropped with a word; a tap in the 
   b.tap('00112233aabbccdd:1') // made while Laki was off
   await rig.start()
   await until(() => b.of('answerCallbackQuery').some(c => /too old/.test(c.body.text)), 'the old tap dropped')
+  // what waited is read at once (timeout 0); then a long poll, and a tap made during it is fresh
+  const first = b.of('getUpdates').findLast(c => c.body.timeout === 0)!
+  await until(() => b.calls.indexOf(b.of('getUpdates').at(-1)!) > b.calls.indexOf(first) && b.of('getUpdates').at(-1)!.body.timeout === 50, 'a long poll')
+  b.tap('00112233aabbccdd:2')
+  await until(() => b.of('answerCallbackQuery').some(c => c.body.text === 'That ask moved on'), 'a fresh tap: not too old')
 })
 
 test('P1: a 409 stops the poll and says to use a bot only for Laki (no webhook touched); a 401 turns it off with a notice', async t => {
