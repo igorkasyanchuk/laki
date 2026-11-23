@@ -275,5 +275,19 @@ PATH), else their 0600 files. `/usr/bin/security`, 5 s per call: `find-generic-p
 and backslashes escaped), then read back. A file there is the key to keep (not moved yet, or written when the Keychain
 failed): moved in when it reads back equal, then removed; else the file is used. Read once, then kept in memory; a
 read the Keychain didn't answer is asked again after a minute.
-`keysWhere()` is the diagnostics' *Laki AI's keys* line: the Keychain, a key *in file* with why, or files. aiKey's API
-and the view are as before (the view only says whether there's a key). `test/ai.test.ts` fakes `security`.
+`keysWhere()` is the diagnostics' *Keys and secret values* line: the Keychain, a key *in file* with why, or files, by
+name (never a value). aiKey's API and the view are as before (the view only says whether there's a key).
+`test/fakes/keychain-security` fakes `security` (`test/ai.test.ts`, `test/env-keys.test.ts` link it as `$HOME/bin/security`).
+
+**Secret values out of state.json** (`envKeys.ts`, STATE_V 2): a secret-looking variable (env.ts `secretLooking`) in
+Settings' env, a profile's, a project's or one of its MCP servers', and the phone push's URL and reply topic, kept the
+same way (account `env:<NAME>`, `env:profile:<name>:<NAME>`, `env:project:<id>:<NAME>`,
+`env:project:<id>:mcp:<server>:<NAME>`, `push:url`, `push:replyTopic`; without the Keychain a 0600 file each in
+`<data>/env-keys`, named by the account's hash). state.json keeps the name with `null`. In memory the state is whole,
+so childEnv, scripts, ai.ts and the rest read it as before: `load()` fills each null from the store (`envRestore`; one
+the store didn't give: `''` in memory, still null on disk, never removed, until set again), `save()` stores what's new
+or changed and removes what's gone (`envStash`: a `security` call only on a change), then writes the copy with them
+null (`envJson`). A value still in state.json (v1, a restored older backup) moves in as it loads, then state.json and
+its dated copies are saved without it at once (`scrubCopies`). `laki backup` writes the same copy; its manifest's
+`secrets` names them and says the values stay in this Mac's Keychain (on another Mac: set each again). A diagnostics
+bundle and the logs never have a value (`keysWhere`'s names), the view only in your own window (main.ts' `masked`).

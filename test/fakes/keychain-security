@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+// a fake macOS security for keychain.ts (forced by LAKI_KEYCHAIN=1 in a test's daemon; a test links it as $HOME/bin/security):
+// an item a file in $HOME/keychain; $HOME/security-fails: every call exits 1; $HOME/security-garbles: a find answers
+// something else. Each call's arguments in FAKE_LOG (a -i's stdin, where the value is, never)
+const fs = require('fs'), p = require('path')
+const H = process.env.HOME, dir = p.join(H, 'keychain'), a = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG, 'security ' + a.join(' ') + '\n')
+if (fs.existsSync(p.join(H, 'security-fails'))) process.exit(1)
+const opt = (w, k) => w[w.indexOf(k) + 1]
+const file = w => p.join(dir, opt(w, '-s') + '__' + opt(w, '-a'))
+const words = l => { const out = []; let cur = null, q = false; for (let i = 0; i < l.length; i++) { const c = l[i]; if (c === '\\') { cur = (cur ?? '') + l[++i]; continue } if (c === '"') { q = !q; cur ??= ''; continue } if (!q && c === ' ') { if (cur !== null) out.push(cur), (cur = null); continue } cur = (cur ?? '') + c } if (cur !== null) out.push(cur); return out }
+if (a[0] === 'find-generic-password') { const f = file(a); if (!fs.existsSync(f)) process.exit(44); process.stdout.write((fs.existsSync(p.join(H, 'security-garbles')) ? 'garbled' : fs.readFileSync(f, 'utf8')) + '\n'); process.exit(0) }
+if (a[0] === 'delete-generic-password') { const f = file(a); if (!fs.existsSync(f)) process.exit(44); fs.rmSync(f); process.exit(0) }
+if (a[0] === '-i') { for (const l of fs.readFileSync(0, 'utf8').split('\n').filter(Boolean)) { const w = words(l); if (w[0] !== 'add-generic-password') process.exit(1); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file(w), opt(w, '-w')) } process.exit(0) }
+process.exit(1)

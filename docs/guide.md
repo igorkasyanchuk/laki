@@ -2628,7 +2628,9 @@ a click away; one from before keeps its own).
   don't use out of them (its tabs still start and resume). *Hide secret-looking variables from agents* (above the
   profiles; on for a new install) keeps names like `…_TOKEN`, `…_SECRET` and `…_KEY` of the environment Laki was started
   with out of agent tabs; a profile's *Let through* names the ones its agent still gets, and *What it sees* lists what's
-  kept, with *Allow for this profile*. *Network*, beside *Sandbox*, says what the sandbox's commands may
+  kept, with *Allow for this profile*. The values of secret-looking variables you set (Settings' env, a profile's, a
+  project's) and the phone push's URL are kept in the macOS Keychain (a signed release; else a file only you can read),
+  not in Laki's `state.json` or `laki backup`'s archive, which keep their names; on another Mac, set them again. *Network*, beside *Sandbox*, says what the sandbox's commands may
   reach: *All* (the agent's own default: Claude Code asks about each new host, Codex's network is on), *Listed hosts*
   (Claude Code: the package registries the project's files show, GitHub and its API, its model's host, `localhost`, and
   the hosts you allowed for the project; others are asked about) or *Off* (Codex: no network). Each agent has what its

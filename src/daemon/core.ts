@@ -39,6 +39,7 @@ import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
+import { envJson, envRestore, envScrub, envStash } from './envKeys.ts'
 import { keysWhere } from './keychain.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
@@ -212,7 +213,7 @@ export const askPty = { on: false } // R9: an install from before the pty host's
 // R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
 // state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
 // may not survive
-export const STATE_V = 1
+export const STATE_V = 2 // 2: secret values out of it (envKeys.ts), their names null
 let newerData: number | undefined
 // R7: a dated copy of each day's state as it loaded (state.json.bak-YYYY-MM-DD, today's replaced by a later start), the
 // BACKUPS newest kept; an unreadable state.json loads the newest that reads (then 0.47's single state.json.bak)
@@ -224,6 +225,14 @@ const backups = () => {
   } catch {
     return []
   }
+}
+// the dated copies (and 0.47's single one) written as they were: their secret values null too, the Keychain has them
+function scrubCopies() {
+  for (const f of [...backups(), statePath + '.bak'])
+    try {
+      const s = envScrub(readFileSync(f, 'utf8'))
+      if (s) writeFileSync(f, s, { mode: 0o600 })
+    } catch {} // gone, or one that won't parse: left
 }
 const today = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 export function load() {
@@ -294,6 +303,9 @@ export function load() {
   const hook = state.settings?.webhook
   if ((hook?.format as string) === 'telegram') tgMigrate(hook!) // Settings › Telegram since 0.60: its token to the Keychain, off state.json
   else if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
+  // secret values out of state.json (envKeys.ts): read back from the Keychain; one still in it (state v1, a restored
+  // backup) moved into the Keychain, then state.json and its dated copies saved without it, now
+  if (envRestore(state)) setImmediate(() => (save(), scrubCopies()))
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
   if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
   state.cfgTrust = true
@@ -359,7 +371,8 @@ export function save() {
     try {
       fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
       state.v = STATE_V // R7
-      writeFileSync(fd, JSON.stringify(state, null, 2))
+      envStash(state) // secret values into the Keychain: state.json has their names only
+      writeFileSync(fd, envJson(state, 2))
       fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
     } finally {
       closeSync(fd)
@@ -5774,7 +5787,7 @@ export async function diagnostics(): Promise<string> {
     `${process.platform} ${release()} ${process.arch}; node ${process.versions.node}${process.versions.electron ? `, Electron ${process.versions.electron}` : ''}`,
     `${state.projects.filter(p => !p.archived).length} projects, ${live.length} workspaces (${state.workspaces.length - live.length} archived), ${state.tabs.length} tabs (${sessions.size} running)`,
     `Labs on: ${labs.join(', ') || 'none'} (the Labs switch ${s.labs ? 'on' : 'off'})`,
-    `Laki AI's keys: ${keysWhere()}`,
+    `Keys and secret values: ${keysWhere()}`,
     ...(trouble ? [`${trouble.n} uncaught error${trouble.n === 1 ? '' : 's'} since the daemon started, the last: ${trouble.last}`] : []),
     '',
     '## Agents',

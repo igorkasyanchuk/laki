@@ -27,7 +27,7 @@ Dragging Laki to the Trash leaves its pieces behind. Settings › General › De
 and removes them in one click: the `laki` command on your PATH, the agent skills in each agent's folder
 (`~/.claude/skills/laki`…), and the background daemon with the terminals it kept. Tick *Also delete the worktrees*
 for the worktrees Laki made (their uncommitted changes go too) and *Also delete my data* for `~/.laki` (projects,
-notes, settings, kept chats, artifacts; Laki AI's keys and the Telegram bot's token in the Keychain). Your repos always stay, and a second Laki on
+notes, settings, kept chats, artifacts; Laki AI's keys, the Telegram bot's token and your secret env values in the Keychain). Your repos always stay, and a second Laki on
 this Mac (a dev build with its own data folder) keeps its own command and skills. A row that fails says why, with its
 command to copy. Then Laki offers to move itself to the Trash. From a terminal:
 

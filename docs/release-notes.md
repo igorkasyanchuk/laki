@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Secret values you give Laki stay in the macOS Keychain: a variable named like a token, key or secret in Settings' env, a profile's or a project's, and the phone push's URL, out of Laki's state file and its backups, which keep only their names. Your tabs and scripts get them as before.
 - A terminal resized just as it starts keeps its new size: a shell still starting could put its first size back (bash's line editor reads and writes the size as it sets up), so its lines wrapped at the old width until the next resize.
 
 ## 0.61.0 · Nov 24, 2026

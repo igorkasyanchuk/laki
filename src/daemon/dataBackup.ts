@@ -14,11 +14,13 @@ import { isAbsolute, join } from 'node:path'
 import { VERSION } from '../shared/version.ts'
 import { agentsBusy, log, state, STATE_V, view } from './core.ts'
 import { BACKUP_KEEP as KEEP, dir } from './dir.ts'
+import { envJson, envKept } from './envKeys.ts'
 
 const MACHINE = ['remote', 'remoteDevices', 'tunnels'] as const // this Mac's remote access and tunnels: their keys stay here
 const SKIP = ['*.tmp', '*.broken-*', '._*'] // writeAtomic's temp files, a store set aside, macOS's AppleDouble copies
 export type Counts = Record<'projects' | 'workspaces' | 'notes' | 'specs' | 'workflows' | 'extensions' | 'aiChats' | 'prompts' | 'reviewComments', number>
-export type Manifest = { laki: string; stateV: number; made: number; counts: Counts }
+// secrets: the names whose values stay in this Mac's Keychain (envKeys.ts), never in the archive
+export type Manifest = { laki: string; stateV: number; made: number; counts: Counts; secrets?: { names: string[]; note: string } }
 
 const entries = (d: string) => {
   try {
@@ -73,10 +75,11 @@ export async function dataBackup(p: { file?: unknown }) {
   const stage = mkdtempSync(join(dir, '.backup-'))
   const part = `${file}.${process.pid}.part`
   try {
-    const s: Record<string, unknown> = JSON.parse(JSON.stringify({ ...state, v: STATE_V }))
+    const s: Record<string, unknown> = JSON.parse(envJson({ ...state, v: STATE_V })) // secret values null: the Keychain has them (manifest's secrets)
     for (const k of MACHINE) delete s[k]
     const counts = countsOf(dir, state)
-    const manifest: Manifest = { laki: VERSION, stateV: STATE_V, made: Date.now(), counts }
+    const names = envKept()
+    const manifest: Manifest = { laki: VERSION, stateV: STATE_V, made: Date.now(), counts, ...(names.length && { secrets: { names, note: "Their values aren't in this archive: they stay in this Mac's Keychain (or its data folder's env-keys). Restored on this Mac, they're read back from there; on another Mac, set each one again in Settings (its env, a profile's or a project's, the phone push)." } }) }
     writeFileSync(join(stage, 'manifest.json'), JSON.stringify(manifest, null, 2), { mode: 0o600 })
     writeFileSync(join(stage, 'state.json'), JSON.stringify(s, null, 2), { mode: 0o600 })
     const rest = KEEP.filter(n => n !== 'state.json' && existsSync(join(dir, n)))

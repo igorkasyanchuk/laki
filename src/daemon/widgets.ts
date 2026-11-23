@@ -173,8 +173,8 @@ export function writeStore(id: string, s: Store) {
 
 // a secret setting's value (widget.json's "type": "secret"): <data>/widget-secrets.json, 0600, { [id]: { [key]: value } },
 // as <data>/ai-key is kept: never in the store, state.json, the view or an export; only its fetch's and actions' env
-// (and a script's config) get it. ponytail: a file, not the Keychain: security add-generic-password -w <value> would
-// put it on a command line, where ps sees it
+// (and a script's config) get it. ponytail: a file, not the Keychain yet; keychain.ts could keep them (it writes
+// through `security -i`'s stdin, never a command line ps would show), as envKeys.ts does env values
 const secretsPath = () => join(dir, 'widget-secrets.json')
 const readSecrets = () => readJson<Record<string, Record<string, string>>>(secretsPath()) ?? {}
 export const secretsOf = (id: string) => readSecrets()[id] ?? {}

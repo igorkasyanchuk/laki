@@ -234,6 +234,10 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   removed; Keychain trouble keeps the 0600 file, and Copy diagnostics says which. The item trusts `/usr/bin/security`,
   so a program running as you can read it with that tool, as it could the file: the Keychain keeps it off the disk's
   plain files, not from your own programs. An ad-hoc build, a custom `LAKI_HOME` and Linux keep the files.
+- Secret-looking environment values (a name like `*_TOKEN`, `*_KEY`, `*_SECRET`: Settings' env, a profile's, a
+  project's and its MCP servers') and the phone push's URL and reply topic are kept the same way (else a 0600 file each
+  in `env-keys/`); `state.json`, its dated copies and `laki backup`'s archive keep only their names. A backup's manifest
+  lists them: on another Mac they're set again. Tabs and scripts get them as before.
 - Electron's `runAsNode` fuse is off on Laki's own binary: no program can run its JavaScript inside it
   (`ELECTRON_RUN_AS_NODE=1`) to borrow the privacy grants you gave Laki. The daemon, the CLI, hooks and MCP run on Laki
   Node, a binary of its own in the bundle (its own bundle id, no privacy usage strings) that does run as node: anything

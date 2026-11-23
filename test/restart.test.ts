@@ -249,7 +249,7 @@ test('R7: a newer state is copied aside, 7 dated backups, a broken note kept', a
   await rig.stop()
   const statePath = join(rig.data, 'state.json')
   const s = JSON.parse(readFileSync(statePath, 'utf8'))
-  assert.equal(s.v, 1, 'stamped')
+  assert.equal(s.v, 2, 'stamped')
   writeFileSync(statePath, JSON.stringify({ ...s, v: 99, future: 'theirs' }))
   const day = (k: number) => (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(Date.now() - k * 86400_000))
   for (const k of [2, 3, 4, 5, 6, 7, 8]) writeFileSync(join(rig.data, `state.json.bak-${day(k)}`), '{}') // 7 days before
