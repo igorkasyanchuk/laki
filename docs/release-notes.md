@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- A terminal resized just as it starts keeps its new size: a shell still starting could put its first size back (bash's line editor reads and writes the size as it sets up), so its lines wrapped at the old width until the next resize.
+
 ## 0.61.0 · Nov 24, 2026
 
 - Telegram works with buttons: /menu lists your projects, then a project's workspaces, then a workspace's card (its agents, what its agent said last, Screen, Diff, ⬆ ⬇ to the next one). *Talk here* sends whatever you type, or say in a voice note, to that agent with no reply needed; at Control, *New task* starts a workspace from your next message, a screenshot or a file with it. 🤖 *Laki AI* (or /ai) talks to Laki AI from the chat: it looks at your workspaces, messages their agents and starts new ones, nothing the chat itself may not do. Agents' Markdown comes through as bold, code and links.

@@ -266,6 +266,11 @@ first choice is one.
 - The live stream follows on the same socket, in order.
 - Any number of clients can attach. The PTY takes the size of the one that typed or resized last (`resizeFor`,
   `follow`: a phone, then the Mac).
+- **A size before the first output** (`begin`): the mirror takes it at once, the PTY as its program first prints (or
+  `START_WAIT`, 1 s, for one that prints nothing). A shell still starting reads the size and writes it back as its line
+  editor sets up (bash's readline: a get, then a set, before its first prompt), so a size set in between was lost: plain
+  node-pty, bash resized 5 to 13 ms after its start, lost 5 of 3,000 under load (none at 0 ms). `test/shells.test.ts`
+  resizes 50 new shells at once.
 - **Exit**: a signal reports code 128+signal. A shell's exit, or a command's with code 0, closes its tab (`core.ts`
   `onExit`); an AI agent's (`tracked`), any code, leaves it with its screen and *press Enter to start it again* (a
   resume; the tab bar dims it, ✓), unless the daemon ended it: closing, archiving and shutdown drop the session from `sessions`

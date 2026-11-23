@@ -116,9 +116,13 @@ function sweep() {
     } catch {} // another's it can't remove: left
   }
 }
+// never a throw: a process still ending (the pty host, a fake) writes its compile cache as it exits (ENOTEMPTY), and an
+// exit handler's throw failed a file whose tests passed; what's left, the next run's sweep removes
 process.once('exit', () => {
-  repos.forEach(r => rmSync(dirname(r), { recursive: true, force: true }))
-  if (compiled) rmSync(compiled, { recursive: true, force: true })
+  for (const d of [...[...repos.values()].map(r => dirname(r)), compiled])
+    try {
+      if (d) rmSync(d, { recursive: true, force: true })
+    } catch {}
 })
 function repoFor(config: object | undefined, env: Record<string, string>) {
   const key = JSON.stringify(config ?? null)

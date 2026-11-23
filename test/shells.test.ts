@@ -46,6 +46,25 @@ setTimeout(() => {}, 60000)
   await until(async () => !(await sh()).runs && (await sh()).status === 'idle', 'the agent gone', 5000)
 })
 
+// a size sent right after a terminal starts: bash's readline reads the size and writes it back as it sets up, before
+// its first prompt, so one set in between was lost (Session's begin holds it until the first output). The race on
+// purpose: each new shell resized with no wait, to the other of two sizes (a new tab starts at the last size given)
+test('a resize right after a shell starts reaches it: 50 shells, each resized at once and checked by stty size', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { presets: [{ name: 'tests', agent: 'command', cmd: 'exec cat' }] })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'tests' })
+  for (let i = 0; i < 50; i++) {
+    const [cols, rows] = i % 2 ? [100, 40] : [90, 30]
+    const sh = await rig.rpc('tabNew', { ws: ws.id })
+    await rig.rpc('resize', { tab: sh.id, cols, rows })
+    await rig.rpc('send', { target: sh.id, text: 'stty size' })
+    const got = await until(async () => (await rig.screen(sh.id)).match(/^(\d+ \d+)\s*$/m)?.[1], `shell ${i}'s size`)
+    assert.equal(got, `${rows} ${cols}`, `shell ${i}`)
+    await rig.rpc('tabClose', { id: sh.id })
+  }
+})
+
 test("a project's + › Terminal: a local workspace with a shell in the project's own folder, where it's put", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

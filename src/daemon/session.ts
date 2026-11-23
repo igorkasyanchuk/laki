@@ -20,6 +20,10 @@ export type Pty = { pid: number; write(d: string): void; resize(cols: number, ro
 export type PtyOpts = { file: string; args: string[]; cwd: string; env: Record<string, string>; cols: number; rows: number }
 
 const SCROLLBACK = 5000
+// a size given before its program's first output is applied at that output (begin): a shell still starting reads the
+// size and writes it back as its line editor sets up (bash's readline: get, then set, before its first prompt), and a
+// size set in between was lost (1 run in 200 of api.test's resize under load). One that prints nothing gets it this long after it starts
+const START_WAIT = 1000
 const PROGRAM_SETTLE = 2000 // a report has stood this long before it's compared: a hook and a report of one change never come at once
 
 // The serialize addon drops OSC 8 links (claude's [#12](url), with FORCE_HYPERLINK): a reattached terminal would show
@@ -75,6 +79,9 @@ export class Session {
   private clients = new Map<Client, { ready: boolean; ro?: boolean; pending: string[]; size?: [number, number] }>() // size: the client's own
   responder: Client | null = null
   exited = false
+  private started = false // its program printed (begin): a resize goes to the pty at once; before, it's held
+  private held?: [number, number]
+  private startT?: ReturnType<typeof setTimeout>
   exitCode = 0
   note = '' // what end() said: printed instead of the exit line
   readonly born = Date.now()
@@ -139,11 +146,13 @@ export class Session {
       if (!this.responder && !this.exited && !this.muted) this.pty.write(d)
     })
     this.pty = opts.pty ? opts.pty({ file, args, cwd: opts.cwd, env: opts.env, cols, rows }) : pty.spawn(file, args, { name: 'xterm-256color', cols, rows, cwd: opts.cwd, env: opts.env })
-    this.pty.onData(d => this.output(d))
+    this.pty.onData(d => (this.started || this.begin(), this.output(d)))
+    this.startT = setTimeout(() => this.begin(), START_WAIT)
     this.pty.onExit(({ exitCode: code, signal }) => {
       const exitCode = signal ? 128 + signal : code // killed: not a clean exit
       this.exited = true
       this.exitCode = exitCode
+      clearTimeout(this.startT)
       this.program.clear()
       clearTimeout(this.settle)
       this.output(this.note || `\r\n\x1b[90m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
@@ -162,6 +171,7 @@ export class Session {
 
   // R6: what a terminal that outlived the daemon printed before (the pty host's buffer), into the mirror only
   replay(d: string) {
+    this.begin() // it runs already
     this.muted = true
     this.term.write(d, () => (this.muted = false))
   }
@@ -235,7 +245,16 @@ export class Session {
     rows = Math.max(1, Math.min(500, rows | 0))
     if (cols === this.term.cols && rows === this.term.rows) return
     this.term.resize(cols, rows)
-    if (!this.exited) this.pty.resize(cols, rows)
+    if (this.exited) return
+    if (this.started) this.pty.resize(cols, rows)
+    else this.held = [cols, rows] // the last one, as it starts
+  }
+  private begin() {
+    if (this.started) return
+    this.started = true
+    clearTimeout(this.startT)
+    if (this.held && !this.exited) this.pty.resize(...this.held)
+    this.held = undefined
   }
 
   // snapshot is the serialize addon's output plus the state it leaves out: cursor visibility and style,
