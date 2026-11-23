@@ -158,13 +158,19 @@ export function AiPage({
     ) : (
       <span>{label} in Laki › Settings › AI.</span>
     )
+  // the no-key notice's: Settings › AI's backend set here (claude -p or codex exec on your plan), its other settings kept
+  const useBackend = (b: 'claude' | 'codex', label: string) => (
+    <button className="link" onClick={() => api.call('settingsSet', { ai: { ...settings, backend: b, preset: undefined } }).catch(e => setErr(e.message))}>
+      {label}
+    </button>
+  )
   const note = settings.on === false ? (
     <>
       <b>Laki AI is off.</b> Turn it on and pick how it runs: OpenRouter with your API key, or claude -p / codex exec on your plan. {settingsLink('Set it up')}
     </>
   ) : backend === 'openrouter' && d && !d.key ? (
     <>
-      <b>No OpenRouter API key yet.</b> Add one, or run it with claude -p or codex exec instead. {settingsLink('Add a key')}
+      <b>No OpenRouter API key yet.</b> Add one, or run it on your plan instead: {useBackend('claude', 'claude -p')}, {useBackend('codex', 'codex exec')}, or {settingsLink('add a key')}.
     </>
   ) : null
 

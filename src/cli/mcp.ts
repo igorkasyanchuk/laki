@@ -124,7 +124,7 @@ export function promptArgs(t: Template) {
 async function templates() {
   const v = await viewOf()
   const proj = v.projects.find(p => p.id === v.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project)
-  return templatesFor(v.settings?.templates ?? [], proj?.config?.templates ?? []).filter(t => t.name?.trim() && typeof t.text === 'string')
+  return templatesFor(v.settings?.templates ?? [], proj?.config?.templates ?? [], proj?.repoTemplates ?? []).filter(t => t.name?.trim() && typeof t.text === 'string')
 }
 async function resources() {
   if (!(await live())) return []

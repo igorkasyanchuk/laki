@@ -414,7 +414,7 @@ export function chromeOf(r: ChromeIn) {
   // sidebar's foot buttons first (with their words) and AI and Settings at its end; a phone's under the main area.
   // Off (Settings › Appearance › Status bar): none, its foot buttons at the sidebar's foot; a lost connection still
   // says so, as a phone's bar
-  const noBar = settings.statusBar === false
+  const noBar = settings.statusBar === false || (!narrow && !view.workspaces.length) // no workspace ever (a new install, its first project just added): nothing of one to say, the AI button in its corner; all archived keeps it (its usage, extensions, tunnels)
   const wideBar = !narrow && !noBar
   const pageHere = dialog !== null && isPlace(dialog) && view ? placeName({ d: dialog, ws: ws?.id ?? null }) : ''
   const pageBar = wideBar && !!pageHere // a page over the workspace: the bar says only what isn't the workspace's

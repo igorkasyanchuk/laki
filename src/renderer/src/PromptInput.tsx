@@ -4,6 +4,7 @@
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, type RefObject, useEffect, useId, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { type ImproveAt, useImprove } from './Improve'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { sendIs } from '../../shared/keys'
 import { maskSecrets } from '../../shared/secrets'
@@ -198,7 +199,7 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
               [...prs.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'PR' as const, repo: x.repo })), ...issues.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'issue' as const, assignees: x.assignees, prs: x.prs, repo: x.repo }))].sort((a, b) => b.n - a.n),
             )
         : undefined,
-    templates: () => templatesFor(view.settings?.templates, proj.config?.templates),
+    templates: () => templatesFor(view.settings?.templates, proj.config?.templates, proj.repoTemplates),
     commands: o.agent === 'claude' || o.agent === 'codex' ? () => api.call<AgentCommand[]>('agentCommands', { agent: o.agent, project: proj.id }) : undefined,
   }
 }
@@ -253,9 +254,11 @@ export function PromptInput(p: {
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
   complete?: Complete
   ws?: string // a pasted secret's file goes to its storage folder (Pass as a secret; none: the storage root's)
+  improve?: ImproveAt | false // ✨ Improve my prompt (Improve.tsx): whose chat and memory it reads (none: no button)
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const hint = useSecretHint(p.value, p.onChange, { ws: p.ws, send: p.onSubmit })
+  const imp = useImprove(box, p.value, p.onChange, p.improve)
   const [err, setErr] = useState('')
   const [menu, openMenu] = useMenu()
   // dictation types into what macOS sees as the text field, which it learns from the web view a moment after focus:
@@ -397,6 +400,7 @@ export function PromptInput(p: {
         data-history // App's Prompt history key: laki-history
       />
       {hint.line}
+      {imp.pill}
       {cmp.menu}
       {histMenu}
       {p.images.length > 0 && (
@@ -422,6 +426,7 @@ export function PromptInput(p: {
         </label>
         {p.lead}
         {!p.lead && mic}
+        {imp.button}
         {!!p.inserts?.length && (
           <button type="button" className="ib" aria-label="Insert from an extension" aria-haspopup="menu" data-tip="Insert from an extension" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...p.inserts!.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && inserted(t), er => setErr(String(er?.message ?? er))) }))])}>
             <Icon name="panel" />

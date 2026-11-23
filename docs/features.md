@@ -7,10 +7,11 @@ short version.
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR (a fork's: from origin's or upstream's), with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass), fast mode and sandbox picked under the prompt (a model the installed Claude Code is too old for leaves the menus, with a warning on one you typed). Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*. On a Mac, worktrees stay out of Time Machine and Spotlight.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Allow always* with the rule it grants named whole: a broad one, a wildcard, a folder or a whole tool, amber and in words, never picked by Allow all; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a command's ? (or E) has Laki AI say in a sentence what it will do, whether it can't be undone or reaches outside the workspace, only on your click; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it), A turn running longer than you set (off by default) tells you once, with *Stop*.
-  a Dock and menu bar count (a click on the menu bar icon can open an Inbox: what waits on you with its choices, what's at work, New task…), floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
+  a Dock and menu bar count (a click on the menu bar icon can open an Inbox: what waits on you with its choices, what's at work, New task…), floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons; in Telegram, /menu's buttons open any workspace, its 💬 Talk here takes typed or spoken tasks, 🤖 Laki AI answers there too, and agents' Markdown reads as bold, code and links), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card (a finished turn is one line, a click opens its card), the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
-  a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
+  a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets. A project with many
+  workspaces folds after its first 10 (any working, waiting on you or open stays), *Show N more* for the rest.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
@@ -31,7 +32,7 @@ on an event, the last one or a sample (`laki flow run --event`), questions answe
 time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
-  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. A `/goal` (Claude Code, Codex): a band with its state and *Pause*, *Resume*, *Clear*, the tab running until the goal stops and one *Goal reached* then. Signed out mid-turn: a band with *Sign in* (the agent's own login, for that tab's account), and the message goes once you're in, wherever you signed in. Cursor as a ready-made profile (`cursor-agent acp`): its models and effort in the new-workspace menus, its chats resumed after a restart. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. A `/goal` (Claude Code, Codex): a band with its state and *Pause*, *Resume*, *Clear*, the tab running until the goal stops and one *Goal reached* then. An MCP server that needs a sign-in: a band with *Sign in* too (Codex's `codex mcp login`, Claude Code's `/mcp`). Signed out mid-turn: a band with *Sign in* (the agent's own login, for that tab's account), and the message goes once you're in, wherever you signed in. Cursor as a ready-made profile (`cursor-agent acp`): its models and effort in the new-workspace menus, its chats resumed after a restart. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Antigravity** (Google's `agy`, Gemini CLI's successor) as the gemini agent: its model, effort and permission modes (`--mode`), its status from what it tells the terminal (OSC 7501), its chat resumed by the id it prints as it exits.
 - **Notes and memory in the repo**: a project's switch keeps its notes and memory in `.laki/notes.md` and `.laki/memory.md`, shared through git; a worktree's agent reads its own branch's.
 - **Uninstall Laki**: Settings › General › Developer or `laki uninstall` removes the `laki` command, the agent skills and the daemon in one go (the worktrees and your data only when ticked), each a row; then the app to the Trash.
@@ -43,7 +44,8 @@ time and AI money per run (`budget: 60 min, $5`).
   *New session* line; a prompt stopped before an answer: *Edit and resend*; Claude Code waiting out a rate limit says so;
   ←/→ between the questions of one ask; ⏎ or ⌘⏎ sends (Settings › Keys). Any ⌘K command can get its own key there.
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
-  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path; a token or key you paste into a prompt box is flagged, masked, and *Pass as a secret* puts it in such a file instead. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
+  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card (kept for the project or all projects if you
+  like, one click next time), it gets a file's path; a token or key you paste into a prompt box is flagged, masked, and *Pass as a secret* puts it in such a file instead. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
   *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*),
   and the status bar's *n running* lists the workspace's, finished ones too;
@@ -53,7 +55,11 @@ time and AI money per run (`budget: 60 min, $5`).
   window and the plan limits come from Claude itself; your own status line still shows. Numbers older than 20 minutes
   are dimmed and say how old, with *Ask api.anthropic.com* beside them for the current ones.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits and Laki AI's OpenRouter credits and spend (an amber dot when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
+  beside each plan's limits and Laki AI's OpenRouter credits and spend (*running low* when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
+- **Prompt templates**: yours, a project's, and a repo's own in `.laki/prompts/` (Markdown files, reviewed in PRs, trusted
+  with its `.laki.json`, tagged *repo*); `/` in a prompt box lists them.
+- **Improve my prompt**: ✨ in a prompt box has Laki AI rewrite your draft with what the chat knows; it stays in the box
+  for you to read, and Restore or ⌘Z brings yours back.
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Notifications** (Settings › Notifications, after General): Quiet, macOS notifications and their sound, then a table
   of what tells you where: a row per event (an agent waits, a turn finished, CI failing, a plan limit, a long turn, a
@@ -77,7 +83,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Reader's box**: text you haven't sent stays, tab by tab, through ⇧⌘T, a restart or an archive; a chip changes a running Claude Code tab's permission mode, mid-turn too; a turn that ended on an API error offers *Continue* (or does it once by itself).
 - **Tidy on its own**: worktrees nobody touched for 3 to 30 days archived with Undo (off by default), never one with unsaved work or anything running.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
-- **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and its questions show in the tab that started it, answered there. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
+- **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and the tab that started it has a workers dock: each worker's state, progress and question (answered there), failed ones until cleared. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
   makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; ⇧⌘T reopens a tab you closed, its chat resumed (the + menu lists the last 10); their dev servers' ports in the status bar (not
@@ -101,12 +107,12 @@ time and AI money per run (`budget: 60 min, $5`).
   (<img src="icons/pr-open.svg" width="13" alt="GitHub's mark"> its state,
   <img src="icons/approved.svg" width="13" alt="✓"> approved, <img src="icons/approved-you.svg" width="13" alt="✓✓"> by you
   too, 👀 you commented), sent to the agent if you like; a failing check's log a click away; ship (commit, push, PR) in one step; merge
-  (squash, merge or rebase), approve, close or turn back into a draft from the app, or merge when green, and revert a merged one with a new PR, each allowed per project; archived once
-  merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
+  (squash, merge or rebase), approve, close or turn back into a draft from the app, or merge when green, and revert a merged one with a new PR, each allowed per project; a fork's CI that GitHub holds for approval shows as
+  waiting, with *Approve and run*; archived once merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`. GitLab too, through `glab`: a
   merge request's state, its pipeline as checks, Ship, merge, approve, close, draft and issues (not yet review threads
   or the PR switches).
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too, with an outline of its headings; a changed HTML file as a page; CSV as a table you can edit, an Excel workbook's sheets as tables), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too, with an outline of its headings; a changed HTML file as a page; CSV as a table you can edit, an Excel workbook's sheets as tables), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after; In a window of its own too (its head's window button, ⌘K): it follows Laki's workspace, its comments go to that agent, and closing it puts it back.
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots to the agent, and a design mode: pick an element (⌥⌘P), say what to change, and its
   selector, text, styles, a screenshot and its likely source file go to the agent. Drag a file's row (Changes, Files,
@@ -135,7 +141,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([headless.md](headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
-  look; the video, extensions, the preview or the floating bubbles stop with a click.
+  look; the video, extensions, the preview or the floating bubbles stop with a click. A notice before the disk fills up
+  (a worktree's disk under 5 GB free, or what you set), *Make room…* opening what each workspace takes, biggest first.
 - **Hidden browser pages**: an optional memory budget unloads the oldest Browsers page you aren't on; it never touches one playing,
   downloading, being inspected, or with typing or form edits.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.

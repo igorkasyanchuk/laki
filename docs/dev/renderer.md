@@ -254,6 +254,9 @@ are tested in `test/units-more.test.ts`.
       extension off), then removes every `laki.*` key but `UI_KEEP` (timers, stopwatches, drafts; Get started shows
       again), then reloads: add a key that holds what the user made there, and a setting that's set up or written to
       `SETTINGS_KEPT`.
+    - `laki.dockCleared`: the workers dock's cleared failed workers, per orchestrator tab (`panels.tsx` `WorkersDock`;
+      its rows and summary `workers.ts` `dockRows`, `dockSum`, tested in `test/layout.test.ts`; the workers are
+      `WsActions.tsx` `workerAsks`: the workspaces whose `fromTab` is the tab), the last 100.
     - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
       `seen` (it opened once by itself, after the first project: Welcome's checks come first), `off` (Don't show again:
@@ -686,6 +689,19 @@ are tested in `test/units-more.test.ts`.
   its ⌘-clicked files through main's `open-path`, which takes these windows too), closed when the
   tab goes. Main sends `floating` (the ids) as one opens or closes; App's `floated` shows `.floated` in that pane
   instead of a `Term`.
+- **The side panel in its own window** (L5; main's `panelOpen`, `panel-float` / `panel-floating` IPC from the app window
+  only, `onPanelFloating`): SidePanel's `float` (its head's `popOut`, ⌘K's *Move the side panel to its own window*) asks
+  main for a plain window (not a panel: it can go to another screen) loading `?window=panel`, `NewWindow.tsx`
+  `PanelWindow`. Its bounds, and `open` (true at quit: reopened as the app window asks `panel-floating` on load), in
+  userData's `panel.json`. `panelWin.ts`: the app window's `usePanelHost` posts `{ say: { ws, info (infoOf), git, sim,
+  turn } }` on a BroadcastChannel (`laki.panel`) after each render it changed, answers the window's `hello`, and runs its
+  `do`s (`act` prAct, `fix`, `log`, `auto` setAuto, `rename`, `attach`, `go`, `sees`) with `window.focus()` first;
+  `showPanel` while out switches that window's tab (`tab`). App's `panelShown` is false while out; main's `closed` sends
+  `panel-floating` false and App opens its panel again. The window's own panelApi (`PanelWindow` `papi`: the daemon's
+  calls, its own toasts, asks and a small file menu, a file's preview in place of the panel), its tab
+  `laki.panelWinTab`. Main lets it `open-external`, `quick-look`, `drag-out`, `reveal`, `open-path`, `menu-popup`,
+  `accent` and `scrollbars` (`from(e, …, 'panel')`). No extensions' panel tabs there, and the Preview's Pick and
+  screenshots stay the app window's (main's `capture`). test:ui's `panel-window` and `panel-back` steps.
 - **The global hotkey** (`settings.hotkeyOn`, unset on; `hotkey`, unset `HOTKEY` ⌃⌥⌘L, keyLabel's text): App sends it
   to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`
   through `bindKey`, `keys.open`; it shows the app's window), Settings' `HotkeyField` too, which says when another app (or
@@ -1199,6 +1215,10 @@ as `accent`. themes.ts asks once as it loads and keeps it (`setSystemAccent`, `s
 repaint (the paint key is the settings'). Behind another app (`html.away`, main's `front`), styles.css' `html.away .app`
 sets `--accent`, `--accent-fg` and `--sel` to neutrals of the text's color: fills, the picked row and focus rings go
 grey; `--accent-ink` (resolved on `<html>`) and the status colors stay. ui-smoke's `inactive` step sends `front` false.
+Its endless animations stop where they are (motion.ts `away`: `getAnimations()`' infinite ones, and each that starts
+meanwhile); a finite one plays out, so a row or page that comes in meanwhile never stays at an unseen first frame (a CSS
+pause of every animation did that: the filter's rows blank, a page there to type in but not seen). The page's `focus` is
+front too: main says so only on a change.
 
 The floating surface (V8): styles.css' `--surface-a`, `--surface-bg` (the panel at 72%), `--surface-blur` (`blur(24px)
 saturate(1.6)`), `--surface-edge` (a 0.5px hairline of the text's color) and `--surface-lift` (`--lift-1` and `--lift-3`),
@@ -1284,7 +1304,18 @@ done), a step that isn't waiting on you (`t-go`: Merge, Ship) neutral. Status ma
 pack's shapes, not a font's characters: ◆ the pack's square on its corner and ● filled, ○ ✖ ✓ ◷ as lines; the PR's
 *you commented* mark stays the 👀 emoji (asked for back). Other themes take the same rules; their own colors stay theirs.
 
-Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).
+Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`; the
+change map's `at`: `checkVisibility({ contentVisibilityAuto: true })` false, its `.sp-change` instead, a comment its
+top: 228 such children were 740 ms a measure).
+
+Big diffs (R14): the Review tab's files and a commit's (Diff.tsx `Near`) draw their rows only within `NEAR_MARGIN` (1.5
+screens) of the scroller's view, by an IntersectionObserver; off it, a box as tall as the rows were (before they're first
+drawn, `ROW_H` a line) with `data-map` (its file's kind) for the change map. `on` draws one wherever it is: a line gone to
+(`goLine`'s `goneTo`, looked for until drawn) and find's files (`DiffFind`'s `onWord`: the first 40 with the words, let
+go as the bar closes);
+`first` the top three, with no empty frame. FullReview's `spy` sets the file in view once the scroll rests (120 ms): a new
+one draws the whole page again. On 231 files and 19,427 lines (dev build): open 11.9 s, then 0.7 s; 110,000 nodes, then
+12,000; a 36,000 px scroll 20 s of the main thread, then 0.45 s.
 
 ### The quick bar (Q1)
 

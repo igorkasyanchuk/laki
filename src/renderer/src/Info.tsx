@@ -25,6 +25,7 @@ export type PRInfo = {
   approved?: string[] // who approved it (each one's latest review); an older daemon: none
   changes?: string[] // who asked for changes
   conflict?: boolean // merge conflicts with its base branch
+  held?: number // a fork's: its runs GitHub holds for a maintainer's approval (Approve and run)
   ready?: boolean // GitHub would merge it now; false: blocked, behind, unstable…
   base?: string
   additions?: number
@@ -69,7 +70,7 @@ export type WsInfo = {
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
-export type PRAct = 'approve' | 'close' | 'merge' | 'draft' | 'revert' // prAct: gh as you, after a confirm (draft: Convert to draft / Ready for review, none)
+export type PRAct = 'approve' | 'close' | 'merge' | 'draft' | 'revert' | 'ci' // prAct: gh as you, after a confirm (draft: Convert to draft / Ready for review, none; ci: a fork's held runs, Approve and run)
 // the PR's labels: the repo's (prLabels), and one put on or taken off (prLabel)
 export type LabelApi = { list: () => Promise<PRLabel[]>; set: (name: string, on: boolean) => void }
 export const MERGE_WORDS: Record<MergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' }
@@ -447,6 +448,19 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
                 <button className="pr-label-add" aria-label="Labels" data-tip="Put a label on it or take one off (gh pr edit)" onClick={labelMenu}>
                   <Icon name="tag" />
                   {!pr.labels?.length && 'Label'}
+                </button>
+              )}
+            </div>
+          )}
+          {open && !!pr.held && (
+            <div className="pr-held" role="status">
+              <Icon name="clock" />
+              <span>
+                CI waits for approval: GitHub holds {pr.held === 1 ? 'its run' : `its ${pr.held} runs`} of this fork&apos;s code
+              </span>
+              {can('approve') && (
+                <button className="small" onClick={() => onAct('ci')} data-tip="Approves the held runs of its head on GitHub as you, after a confirm: the fork's code runs in your CI">
+                  Approve and run
                 </button>
               )}
             </div>

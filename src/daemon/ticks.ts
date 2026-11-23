@@ -26,6 +26,8 @@
 //   pendingTick    30 s   keep   workspaces' later starts due
 //   reminderTick   30 s   keep   reminders due
 //   diskTick       30 s   keep   the state saved again after a full disk (core.ts save), only while it's full
+//   mcpAuthTick    20 s   slow   claude's and codex's screens: an MCP server that needs a sign-in (mcpAuth.ts)
+//   diskLowTick    5 min  slow   a worktree's volume under settings.diskLow GB: a notice once a low spell (resources.ts)
 //   widgetTick     30 s   slow   extensions' fetches, each when due
 //   issueTick      60 s   slow   issue.labeled: GitHub's issue events, while something listens (inbound.ts)
 //   prTick         60 s   slow   PR scans (gh), each workspace every settings.prScan minutes

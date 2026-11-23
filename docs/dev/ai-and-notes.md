@@ -228,6 +228,15 @@ first JSON object's `questions`: at most 3 (`ASK_FIRST`), each `q` 140 character
 ANSWER_NO, REMOTE_OK); agents and trusted clients refused (AGENT_NO; CLIENT_SCOPE has no class for it). The page's picks
 go after the prompt as `Answers:` lines as it's made (`submit`); *You decide* adds none.
 
+Improve my prompt (`promptImprove { prompt, tab?, project? }`, ai.ts; Improve.tsx `useImprove`, the ✨ in PromptInput
+(the New workspace page passes `improve`) and the Reader's box (ReaderApi's `improve`)): one `aiOnce` (`ask: 'Improve
+prompt'`, no tools) with the draft (8,000 characters), the tab's chat since its last New session (the Reader's `chatRead`,
+the newest 12,000 characters) and the project's memory (4,000), each between `<<<` `>>>` as data (`shared/improve.ts`
+`IMPROVE_SYSTEM`). `improvedOf` takes fences and quotes off and puts back on a last line any of the draft's @mentions,
+links, code spans, `{{variables}}` and #numbers the answer dropped. The box's text is replaced by `execCommand('insertText')`,
+so ⌘Z undoes it; editing the box while it runs, a second click or Esc cancels (its answer is dropped). The user's and
+remote access's, never an agent's or a client's (as Ask me first).
+
 Walk through (`reviewSteps { ws, uncommitted?, again?, kept? }`, ai.ts, R13): the Review tab's steps by one `aiOnce`
 (`ask: 'Walk through'`), the user's and remote access's at the answer level, never an agent's (gates.ts `AGENT_NO`: it
 spends the user's Laki AI) nor a trusted client's (no scope has it). The model reads 200 KB of whole hunks

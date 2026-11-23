@@ -2,12 +2,15 @@ import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo
 import { type ArtBlocked, artHostOk, artSay } from '../../shared/artHosts'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
+import { hasCap } from '../../shared/caps'
 import { version } from '../../../package.json'
 import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
 import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageOld, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
-import { Glyph } from './Glyph'
+import { Glyph, rollup } from './Glyph'
+import { dockRows, dockSum } from './workers'
+import type { Worker } from './workers'
 import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
 import { Markdown, outlineItems } from './MarkdownView'
@@ -1226,6 +1229,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               onBusy={setSaving}
               rows={8}
               placeholder="Message the agent: paste or drop screenshots and files"
+              improve={!askOff && hasCap(view, 'prompt.improve') && { project: p.project }}
               lead={lead || <span />}
               tools={
                 <>
@@ -1905,7 +1909,9 @@ const CLOUDFLARED_WHY =
 
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target).
 // U4: what passes is one line; each failing row has one button that fixes it: Install or Sign in opens a terminal with
-// the command typed, not run (App's onRun: as that terminal exits, Welcome is back and checks again); Check again last.
+// the command typed, not run (App's onRun: as that terminal exits, Welcome is back and checks again), and they're checked
+// again as Laki's window comes back (an install or sign-in done in another app). A row: its mark, its name and words as one
+// line that wraps, its button
 // sample: Try it on a sample repo (a daemon with the sample cap)
 const LOGIN: Partial<Record<Agent, string>> = { claude: 'claude auth login', codex: 'codex login', gemini: 'agy' } // each agent's own sign-in (Antigravity CLI asks as it starts)
 // U13: What's new after an update: the version's first three lines of its release notes (shared/update.ts notesOf),
@@ -1940,9 +1946,13 @@ export function WhatsNew({ version, lines, onTry, onAll, onClose }: { version: s
 
 export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor>; onRun?: (cmd: string) => void; onSample?: (agent?: Agent) => void }) {
   const [d, setD] = useState<Doctor | null>(null)
-  const [busy, setBusy] = useState(false)
-  const again = () => (setBusy(true), void check().then(setD, () => {}).finally(() => setBusy(false))) // R12: no restart of Laki to see a new install
-  useEffect(again, [])
+  const busy = useRef(false)
+  const again = () => void (busy.current || ((busy.current = true), check().then(setD, () => {}).finally(() => (busy.current = false)))) // R12: no restart of Laki to see a new install
+  useEffect(() => {
+    again()
+    addEventListener('focus', again)
+    return () => removeEventListener('focus', again)
+  }, [])
   const mac = /Mac/.test(navigator.userAgent) // Linux's (and WSL's) hints: apt
   const fix = (label: 'Install' | 'Sign in', cmd?: string) => cmd && onRun && (
     <button type="button" className="sm" data-tip={`A terminal with ${cmd} typed: press Return to run it`} onClick={() => onRun(cmd)}>
@@ -1952,13 +1962,15 @@ export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { on
   const row = (name: string, hint: string, button?: ReactNode, why?: string, optional = false) => (
     <div className="check" key={name}>
       <Glyph s={optional ? 'idle' : 'exited'} />{/* optional: missing it is no failure */}
-      <b>{name}</b>
-      {why && (
-        <span className="check-why" data-tip={why} aria-label={why} tabIndex={0}>
-          <Icon name="help" size={13} />
-        </span>
-      )}
-      <span className="muted grow">{hint}</span>
+      <span>
+        <b>{name}</b>
+        {why && (
+          <span className="check-why" data-tip={why} aria-label={why} tabIndex={0}>
+            <Icon name="help" size={13} />
+          </span>
+        )}{' '}
+        <span className="muted">{hint}</span>
+      </span>
       {button}
     </div>
   )
@@ -2017,9 +2029,6 @@ export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { on
           )}
           {d.hooks && !d.hooks.ok && row('hooks', d.hooks.why!)}
           {d.hookFiles && !d.hookFiles.ok && row('hook files', d.hookFiles.why!)}
-          <button type="button" className="sm welcome-again" disabled={busy} onClick={again}>
-            {busy ? 'Checking…' : 'Check again'}
-          </button>
         </div>
       )}
     </div>
@@ -2423,31 +2432,61 @@ export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from:
 // a button per thing to open, which opens only on your click (a folder in Finder, a file in its app, a page in the
 // browser); ✕ closes it. In a browser elsewhere (no bridge) a path's button copies it
 // laki secret: what an agent asks you for, typed into a masked field; it gets only a file's path (daemon/secrets.ts)
-export function SecretStrip({ tab, onGive }: { tab: TabView; onGive: (id: string, value?: string) => Promise<unknown> }) {
+// keep: the value kept for next time (Keep: this project, all projects); saved: the one kept for it given (its card said
+// so). kept: the daemon can keep one (an older daemon can't)
+export type SecretGiveO = { value?: string; keep?: 'project' | 'all'; saved?: true }
+export function SecretStrip({ tab, onGive, kept = true }: { tab: TabView; onGive: (id: string, o?: SecretGiveO) => Promise<unknown>; kept?: boolean }) {
   const [v, setV] = useState('')
   const [busy, setBusy] = useState(false)
+  const [keep, setKeep] = useState<'' | 'project' | 'all'>('')
+  const [other, setOther] = useState(false) // a saved one: Type another shows the field
   const s = tab.secret
-  useEffect(() => setV(''), [s?.id])
+  useEffect(() => (setV(''), setKeep(''), setOther(false)), [s?.id])
   if (!s) return null
-  const give = (value?: string) => (setBusy(true), void onGive(s.id, value).then(() => setV(''), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
+  const give = (o?: SecretGiveO) => (setBusy(true), void onGive(s.id, o).then(() => setV(''), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
+  const saved = s.saved && !other
   return (
-    <form className="queue-strip secret-strip" data-dock="bottom" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), v && give(v))}>
+    <form className="queue-strip secret-strip" data-dock="bottom" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), saved ? give({ saved: true }) : v && give({ value: v, ...(keep && { keep }) }))}>
       <div className="queue-head">
         <Icon name="lock" size={13} />
         <span className="queue-what">
           <b>{tab.name}</b> asks for <b>{s.label}</b>
         </span>
       </div>
-      <div className="secret-row">
-        <input type="password" value={v} autoComplete="off" spellCheck={false} placeholder="Paste or type it" aria-label={s.label} onChange={e => setV(e.target.value)} />
-        <button type="submit" className="primary" disabled={!v || busy}>
-          Give it
-        </button>
-        <button type="button" disabled={busy} onClick={() => give()}>
-          Refuse
-        </button>
-      </div>
-      <div className="muted small">It goes to a file only you and the agent's commands can read, deleted after 24 hours; the agent gets the file's path, never the value.</div>
+      {saved ? (
+        <div className="secret-row">
+          <span className="secret-saved">
+            <Icon name="check" size={12} /> Saved {s.saved === 'all' ? 'for all projects' : 'for this project'}
+          </span>
+          <button type="submit" className="primary" disabled={busy} autoFocus>
+            Give it
+          </button>
+          <button type="button" disabled={busy} onClick={() => setOther(true)}>
+            Type another
+          </button>
+          <button type="button" disabled={busy} onClick={() => give()}>
+            Refuse
+          </button>
+        </div>
+      ) : (
+        <div className="secret-row">
+          <input type="password" value={v} autoComplete="off" spellCheck={false} placeholder="Paste or type it" aria-label={s.label} onChange={e => setV(e.target.value)} />
+          {kept && (
+            <select value={keep} aria-label="Keep it" data-tip="Kept for next time: an agent asking for the same name there gets the card with one click to give it (Settings › General › Kept secrets)" onChange={e => setKeep(e.target.value as '' | 'project' | 'all')}>
+              <option value="">Only this time</option>
+              <option value="project">Keep for this project</option>
+              <option value="all">Keep for all projects</option>
+            </select>
+          )}
+          <button type="submit" className="primary" disabled={!v || busy}>
+            Give it
+          </button>
+          <button type="button" disabled={busy} onClick={() => give()}>
+            Refuse
+          </button>
+        </div>
+      )}
+      <div className="muted small">It goes to a file only you and the agent's commands can read, deleted after 24 hours; the agent gets the file's path, never the value.{keep || saved ? ' A kept one stays in the Keychain, never sent on its own.' : ''}</div>
     </form>
   )
 }
@@ -2629,6 +2668,37 @@ export function SignInStrip({ tab, onAct }: { tab: TabView; onAct: (act: 'open' 
   )
 }
 
+// an MCP server its agent uses that needs a sign-in (the daemon's mcpAuth.ts): a band each. Sign in runs the agent's
+// own login (codex: codex mcp login in a terminal tab, the tab restarted once it's in; claude: /mcp at its prompt)
+export function McpStrip({ tab, onAct }: { tab: TabView; onAct: (name: string, act: 'open' | 'dismiss') => void }) {
+  const a = tab.mcpAuth
+  if (!a?.names.length) return null
+  return (
+    <>
+      {a.names.map(name => (
+        <div key={name} className="queue-strip show-strip signin-strip mcp-strip" data-dock="bottom" role="region" aria-label={`The ${name} MCP server needs a sign-in`}>
+          <div className="queue-head">
+            <Icon name="lock" size={13} />
+            <span className="queue-what">
+              {a.login === name ? (
+                <>Finish signing in to <b>{name}</b> in its terminal tab: {tab.name} restarts with its chat once it&apos;s in</>
+              ) : (
+                <><b>{name}</b> MCP server needs a sign-in: {tab.name} works without its tools until then</>
+              )}
+            </span>
+            <button type="button" className={a.login === name ? '' : 'primary'} onClick={() => onAct(name, 'open')} data-tip={tab.preset === 'claude' ? "Claude's own /mcp, at its prompt: pick the server, then sign in" : `codex mcp login ${name}, in a terminal tab`}>
+              {a.login === name ? 'Open again' : 'Sign in'}
+            </button>
+            <button type="button" className="ib" aria-label="Dismiss" data-tip="Hide this until the agent starts again" onClick={() => onAct(name, 'dismiss')}>
+              <Icon name="x" size={12} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
 // R12: a tab whose agent isn't installed (the shell's "command not found"): how to get it, and a way on (C6: Cursor's too)
 export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent | 'cursor'; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
   const i = agent === 'cursor' ? CURSOR_INSTALL : INSTALL[agent]
@@ -2703,33 +2773,82 @@ export function HookStrip({ tab, onCopy, onHide }: { tab: TabView; onCopy: (text
 // last option (keep planning) and sends the plan as you wrote it
 // the asks of workers this tab's agent started (their workspaces' fromTab): each waiting tab's question and options,
 // answered here (answer, its label checked), or Open to go there; a wait with no menu read: Open only
-export function WorkerAsks({ asks, onAnswer, onOpen }: { asks: { ws: string; name: string; tab: TabView }[]; onAnswer: (tab: string, n: number, label: string) => Promise<unknown>; onOpen: (ws: string, tab: string) => void }) {
+// the workspaces an orchestrator tab's agent started (laki new, /laki:orchestrate: their fromTab), docked over its box: one
+// line folded (how many, then what needs you first: waiting, failed, done since you looked), each worker's row open (its
+// status, how far along, its last line, Open; a waiting one's ask with its buttons). A waiting one's ask shows folded too.
+// A failed row stays until its × (kept per tab in this window)
+const DOCK_CLEARED = 'laki.dockCleared'
+export function WorkersDock({ tab, workers, onAnswer, onOpen }: { tab: string; workers: Worker[]; onAnswer: (tab: string, n: number, label: string) => Promise<unknown>; onOpen: (ws: string, tab: string) => void }) {
   const [busy, setBusy] = useState('')
-  if (!asks.length) return null
+  const [open, setOpen] = useState(false)
+  const [cleared, setCleared] = useState<string[]>(() => load<Record<string, string[]>>(DOCK_CLEARED, {})[tab] ?? [])
+  const clear = (ws: string) => setCleared(c => (x => (keep(DOCK_CLEARED, { ...load<Record<string, string[]>>(DOCK_CLEARED, {}), [tab]: x }), x))([...c, ws].slice(-100)))
+  const rows = dockRows(workers, cleared, rollup)
+  if (!rows.length) return null
+  const sum = dockSum(rows.map(w => w.state))
+  const askRow = (t: TabView) =>
+    t.ask && (
+      <div className="plan-acts">
+        {t.ask.options.map(o => (
+          <button key={o.n} type="button" className={o.n === t.ask!.at ? 'primary' : ''} disabled={busy === t.id} data-tip={o.label} onClick={() => (setBusy(t.id), void onAnswer(t.id, o.n, o.label).catch(() => {}).finally(() => setBusy('')))}>
+            {o.n}. {o.label.length > 60 ? `${o.label.slice(0, 58)}…` : o.label}
+          </button>
+        ))}
+      </div>
+    )
+  // a waiting tab's question: folded, under the head; open, under its worker's row
+  const askOf = (w: (typeof rows)[number], t: TabView) => (
+    <div key={t.id} className="plan-ask">
+      <div className="queue-head">
+        <Icon name="help" size={13} />
+        <span className="queue-what" data-tip={t.ask?.question}>
+          <b>{w.name}</b> · {t.name} asks{t.ask?.question ? `: ${t.ask.question}` : ' you something'}
+        </span>
+        <button type="button" onClick={() => onOpen(w.ws, t.id)}>
+          Open
+        </button>
+      </div>
+      {askRow(t)}
+    </div>
+  )
   return (
-    <div className="queue-strip worker-asks" data-dock="bottom" role="region" aria-label="Your workers ask">
-      {asks.map(({ ws, name, tab: t }) => (
-        <div key={t.id} className="plan-ask">
-          <div className="queue-head">
-            <Icon name="help" size={13} />
-            <span className="queue-what" data-tip={t.ask?.question}>
-              <b>{name}</b> · {t.name} asks{t.ask?.question ? `: ${t.ask.question}` : ' you something'}
-            </span>
-            <button type="button" onClick={() => onOpen(ws, t.id)}>
-              Open
-            </button>
-          </div>
-          {t.ask && (
-            <div className="plan-acts">
-              {t.ask.options.map(o => (
-                <button key={o.n} type="button" className={o.n === t.ask!.at ? 'primary' : ''} disabled={busy === t.id} data-tip={o.label} onClick={() => (setBusy(t.id), void onAnswer(t.id, o.n, o.label).catch(() => {}).finally(() => setBusy('')) /* call() said why */)}>
-                  {o.n}. {o.label.length > 60 ? `${o.label.slice(0, 58)}…` : o.label}
+    <div className="queue-strip worker-asks workers-dock" data-dock="bottom" role="region" aria-label="Your workers">
+      <button type="button" className="queue-head dock-head" aria-expanded={open} onClick={() => setOpen(o => !o)} data-tip="The workspaces this agent started: each one's state, open one, or answer it here">
+        <Icon name={open ? 'chevron' : 'chevronRight'} size={12} />
+        <span className="queue-what">
+          <b>
+            {rows.length} {rows.length === 1 ? 'worker' : 'workers'}
+          </b>
+          {sum && ` · ${sum}`}
+        </span>
+      </button>
+      {rows.map(w =>
+        open ? (
+          <div key={w.ws} className={`dock-row ${w.state}`}>
+            <div className="queue-head">
+              <Glyph s={w.state} />
+              <span className="queue-what" data-tip={w.failed ?? w.line}>
+                <b>{w.name}</b>
+                {w.pct >= 0 && <span className="muted"> · {w.pct}%</span>}
+                {(w.failed || w.line) && <span className="muted"> · {w.failed ?? w.line}</span>}
+              </span>
+              {w.first && (
+                <button type="button" onClick={() => onOpen(w.ws, w.first!)}>
+                  Open
                 </button>
-              ))}
+              )}
+              {w.failed && (
+                <button type="button" className="ib" aria-label="Clear" data-tip="Clear this failed one from the dock" onClick={() => clear(w.ws)}>
+                  <Icon name="x" size={12} />
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      ))}
+            {w.asks.map(t => (t.ask ? <div key={t.id}>{askRow(t)}</div> : null))}
+          </div>
+        ) : (
+          w.asks.map(t => askOf(w, t))
+        ),
+      )}
     </div>
   )
 }

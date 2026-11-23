@@ -16,6 +16,8 @@ if (args[0] === 'app-server') {
     if (buf.includes('"model/list"')) process.stdout.write(JSON.stringify({ id: 2, result: { data: [{ model: 'gpt-x', displayName: 'GPT-X', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'medium' }, { reasoningEffort: 'ultra' }] }, { model: 'hidden-1', hidden: true }] } }) + '\n')
   })
 }
+// mcp login <name> (an MCP server's Sign in): FAKE_MCP_LOGIN=fail fails it
+if (args[0] === 'mcp' && args[1] === 'login') return process.exit(process.env.FAKE_MCP_LOGIN === 'fail' ? 1 : 0)
 // exec --json (Laki's AI): one laki_state call through the -c mcp_servers.laki server; "fail…" fails
 if (args[0] === 'exec') {
   const out = o => process.stdout.write(JSON.stringify(o) + '\n')

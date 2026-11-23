@@ -8,7 +8,7 @@ import { pixelDiff } from '../shared/pixelDiff.ts'
 import { rpc } from '../shared/conn.ts'
 import { spawnSync } from 'node:child_process'
 import type { View } from '../shared/types.ts'
-import { openLink, quickW, RENDERER, tellWith } from './index.ts'
+import { openLink, panelW, quickW, RENDERER, tellWith } from './index.ts'
 
 // R8 --laki-smoke=<dir> (npm run test:ui): the real window walked page by page. Each step opens a page (its laki://
 // link, a click, a key), waits for something only that page draws, and fails on ui.tsx' Boundary (.boom) or an error
@@ -108,6 +108,18 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('[role=tab][aria-label="Preview"]'), 'the Preview tab')
       await click('[role=tab][aria-label="Preview"]')()
     }, '.web-tools .web-pick-btn'],
+    // L5: the side panel moved to its own window (its head's button): this window's panel goes, that one shows the
+    // workspace's Changes (the app window's facts over BroadcastChannel); closed, the panel is back here
+    ['panel-window', async () => {
+      await click('.side-panel button[aria-label="Move to its own window"]')()
+      const p = <T>(code: string) => (panelW && !panelW.isDestroyed() ? (panelW.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => p<boolean>("!!document.querySelector('.panel-window .side-panel [role=tab][aria-selected=true]')"), 'the panel in its own window', 15000)
+      await p("document.querySelector('.panel-window [role=tab][aria-label=\"Changes\"]')?.click()")
+      await waitFor(() => p<boolean>("!!document.querySelector('.panel-window .side-panel :is(.sp-row, .sp-change)')"), "its Changes' files", 15000)
+      await nap(500) // its page's fade in
+      if (panelW && !panelW.isDestroyed()) writeFileSync(join(dir, 'panel-window.png'), (await panelW.webContents.capturePage()).toPNG())
+    }, async () => !(await has('.side-panel'))],
+    ['panel-back', async () => panelW?.close(), async () => (!panelW || panelW.isDestroyed()) && (await has('.side-panel'))],
     ['preview-shut', () => js("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', metaKey: true, altKey: true, bubbles: true, cancelable: true }))"), async () => !(await has('.web-tools'))],
     // V9: behind another app the accent's fills and the picked row go neutral (the status colors don't); then back
     ['inactive', async () => (await key('Escape')(), w.webContents.send('front', false)), () => js<boolean>("document.documentElement.classList.contains('away') && getComputedStyle(document.querySelector('.app')).getPropertyValue('--accent').trim() !== getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()")],

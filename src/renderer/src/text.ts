@@ -807,7 +807,7 @@ export function completions(t: Trigger, o: { files?: string[]; changed?: string[
       .map(r => ({ label: `#${r.n} ${r.title}`, sub: refSub(r), value: r.url }))
   }
   // your templates first, then the agent's own commands and skills (picked: /name as typed for the agent to run)
-  const tpl = (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).map(x => ({ label: `/${x.name}`, sub: x.text.split('\n')[0].slice(0, 60), value: x.text, template: x }))
+  const tpl = (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).map(x => ({ label: `/${x.name}`, sub: `${x.repo ? 'repo · ' : ''}${x.text.split('\n')[0].slice(0, 60)}`, value: x.text, template: x }))
   const cmd = (o.commands ?? []).filter(c => c.name.toLowerCase().replace(/^\$/, '').includes(q)).map(c => (n => ({ label: n, sub: [c.skill ? 'skill' : 'command', c.sub].filter(Boolean).join(' · '), value: n }))(c.name.startsWith('$') ? c.name : `/${c.name}`))
   return [...tpl, ...cmd].slice(0, max)
 }

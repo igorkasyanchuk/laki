@@ -4,7 +4,7 @@ import type { AppCtx } from './appCtx'
 import { type AgentDid, type Doctor, placesOf, type TabView } from '../../shared/types'
 import { Backdrop } from './Backdrop'
 import { BrowserPane } from './Browser'
-import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, PlanStrip, QueueStrip, Ready, SecretStrip, ShowStrip, SignInStrip, StarLaki, Welcome, WorkerAsks } from './panels'
+import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, McpStrip, PlanStrip, QueueStrip, Ready, SecretStrip, ShowStrip, SignInStrip, StarLaki, Welcome, WorkersDock } from './panels'
 import { Glyph as ExtGlyph, inWs, status as extStatus, WidgetBody, WidgetPanel } from './Widgets'
 import { edited, type FileContent, FilePreview, type FilesRoot, SidePanel } from './SidePanel'
 import { Glyph, rollup } from './Glyph'
@@ -35,7 +35,8 @@ import { lazy } from 'react'
 const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.FullReview })))
 
 export function bodyOf(app: AppCtx) {
-  const { artsIn, attachable, browsed, byId, call, checkHid, ciLog, closeFile, closePreview, closeTabs, copy, detachPr, dialog, done, fail, finds, floated, floatTab, full, git, group, groups, guests, hookHid, infoOf, inReader, kh, kt, label, labelApi, laterCancel, laterChange, laterNow, live, narrow, newTabActions, newWs, noBar, openIn, openProject, ownWidgets, pageSeen, paneDeps, panelApi, panelShown, panelTab, panelW, paneNow, prAct, previewed, previewW, prFix, project, queueRemove, queueSave, quickNew, railKind, readerLive, readSwitch, replyTo, reviewApi, reviewGo, reviewOn, reviewTight, ring, selectTab, setArtsIn, setAuto, setCheckHid, setDialog, setGroups, setHookHid, setOpenFiles, setPanelOpen, setPanelTab, setPanelW, setPreviewW, setReply, setReveal, setReviewTight, setShownFile, setTimer, settings, setWsId, sizeOf, start, statKey, tab, tabMenu, tabsAt, theme, timers, toast, turnLive, view, welcomeRun, welcomeSample, widgetApi, workerAsks, ws, wsFiles, wsTabMenu, drag } = app
+  const { artsIn, attachable, browsed, byId, call, checkHid, ciLog, closeFile, closePreview, closeTabs, copy, detachPr, dialog, done, fail, finds, floated, floatTab, full, git, group, groups, guests, hookHid, infoOf, inReader, kh, kt, label, labelApi, laterCancel, laterChange, laterNow, live, narrow, newTabActions, newWs, noBar, openIn, openProject, ownWidgets, pageSeen, paneDeps, panelApi,
+    panelHost, panelShown, panelTab, panelW, paneNow, prAct, previewed, previewW, prFix, project, queueRemove, queueSave, quickNew, railKind, readerLive, readSwitch, replyTo, reviewApi, reviewGo, reviewOn, reviewTight, ring, selectTab, setArtsIn, setAuto, setCheckHid, setDialog, setGroups, setHookHid, setOpenFiles, setPanelOpen, setPanelTab, setPanelW, setPreviewW, setReply, setReveal, setReviewTight, setShownFile, setTimer, settings, setWsId, sizeOf, start, statKey, tab, tabMenu, tabsAt, theme, timers, toast, turnLive, view, welcomeRun, welcomeSample, widgetApi, workerAsks, ws, wsFiles, wsTabMenu, drag } = app
   return (
         <div className="body">
           {tabsAt === 'left' && <TabStrip app={app} />}
@@ -93,8 +94,8 @@ export function bodyOf(app: AppCtx) {
                   (t =>
                     t && (
                       <>
-                        <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
-                        <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
+                        <SecretStrip tab={t} kept={hasCap(view, 'secret.kept')} onGive={(id, o) => call('secretGive', o ? { id, ...o } : { id, refuse: true })} />
+                        <WorkersDock tab={t.id} workers={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnLive(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
@@ -109,6 +110,7 @@ export function bodyOf(app: AppCtx) {
                           />
                         ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' && isCursor(view?.presets.find(x => x.name === t.profile)) ? ('cursor' as const) : undefined))}
                         <SignInStrip tab={t} onAct={act => void call('signIn', { tab: t.id, act }).catch(fail)} />
+                        <McpStrip tab={t} onAct={(name, act) => void call<{ ws?: string; tab?: string }>('mcpSignIn', { tab: t.id, name, act }).then(r => r.ws && r.tab && (setReveal(x => [...x, r.ws!]), selectTab({ id: r.tab, workspace: r.ws })), fail)} />
                         <GoalStrip tab={t} onCmd={cmd => void call('send', { target: t.id, text: cmd }).catch(fail)} onOwn={a => void call(a === 'clear' ? 'goalClear' : 'goalSet', { tab: t.id, ...(a === 'resume' && { resume: true }) }).catch(fail)} />
                         {!hookHid.includes(t.id) && <HookStrip tab={t} onCopy={copy} onHide={() => setHookHid(h => [...h, t.id])} />}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
@@ -210,6 +212,7 @@ export function bodyOf(app: AppCtx) {
               api={panelApi(ws)}
               sim={project?.config?.simulator ?? settings.simulator === true} /* the project's own over Settings' */
               turn={view.tabs.some(t => t.workspace === ws.id && t.changes)}
+              float={bridge?.floatPanel ? { out: false, go: () => panelHost.float() } : undefined}
               width={panelW}
               onWidth={setPanelW}
               onClose={() => setPanelOpen(false)}

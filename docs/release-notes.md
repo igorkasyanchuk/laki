@@ -3,6 +3,27 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Telegram works with buttons: /menu lists your projects, then a project's workspaces, then a workspace's card (its agents, what its agent said last, Screen, Diff, ⬆ ⬇ to the next one). *Talk here* sends whatever you type, or say in a voice note, to that agent with no reply needed; at Control, *New task* starts a workspace from your next message, a screenshot or a file with it. 🤖 *Laki AI* (or /ai) talks to Laki AI from the chat: it looks at your workspaces, messages their agents and starts new ones, nothing the chat itself may not do. Agents' Markdown comes through as bold, code and links.
+- *Move to group › New group…* names a group and moves the workspace (or the picked ones) into it, in one step; a project with no groups yet has it too.
+- Big PRs open fast: the Review tab and a commit's diff draw only the files near what you see, so a 20,000-line change opens in under a second and scrolls smoothly; the change map still shows every file, and find and a click on a comment draw the files they need.
+- ✨ Improve my prompt, in the Reader's box and the New workspace page: Laki AI rewrites your rough draft into a clear, specific prompt with what the chat already knows, then leaves it in the box for you; Restore or ⌘Z brings yours back.
+- Laki AI without an OpenRouter key: its notice has *claude -p* and *codex exec*, a click each, to run it on your plan instead.
+- A row, a page or a card that comes in while Laki isn't the front app now shows: the sidebar after a filter, or the New workspace page, could stay blank yet take clicks and typing. Only the endless animations (spinners, a look's effects) wait while you're away.
+- A contributor's PR from a fork whose CI GitHub holds for approval shows *CI waits for approval* with **Approve and run** in Info, instead of counting those checks as failed.
+- Laki warns before the disk fills up: when a disk holding your worktrees drops under 5 GB free, a notice says so once, and *Make room…* opens Settings › Resources › Disk. The threshold is there too. [Try it](laki://settings/resources?spot=Disk)
+- Prompt templates can live in the repo: each Markdown file in `.laki/prompts/` is one for everyone on the project, reviewed in PRs and trusted with its `.laki.json`; one of yours with the same name overrides it.
+- The side panel can move to a window of its own (its head's window button, or ⌘K): the diff on the big screen, the agents on the laptop. It follows Laki's workspace and comes back when you close it.
+- An agent that starts workers (`/laki:orchestrate`, `laki new`) shows a workers dock under its tab: how many work, wait on you or failed at a glance, their questions answered in place, each one a click away.
+- A project with many workspaces shows its first 10, plus any working, waiting on you or open, and *Show N more* for the rest (Sidebar rows › Fold long projects).
+- A secret an agent asks for (`laki secret`) can be kept for the project or all projects: next time its card says *Saved for this project* and one click hands it over. Settings › General › Kept secrets lists them, with Remove.
+- An MCP server that needs a sign-in shows a band on its agent's tab with *Sign in* (Codex's `codex mcp login`, then the tab reconnects it; Claude Code's `/mcp`), instead of the agent quietly going without its tools.
+- The window's buttons no longer sit on a line: the one between the rail and the sidebar (or Terminals' and Browsers' strip) starts under the title bar, and on Frosted a rail alone beside a page (Board, Schedule) starts under the title row, level with the page's first row (the Board's columns, the Calendar's bar, Schedule, My Desk…). Frosted on glass: the terminals and the side panel get rounded corners, the sidebar shown or hidden.
+- The plan limits' popup lines up every section on one set of columns, with the OpenRouter credits as a used share and dollars left, and no dot on the ring.
+- A new install opens on the Welcome page alone: the rail and the sidebar show up once there's a project, the status bar once there's a workspace. Get started sits at the sidebar's very bottom then, with no empty row under it. Its checks line up, and run again as you come back to Laki's window (no more Check again).
+- A new install starts on Laki's own look: the Frosted design in Laki's orange (macOS's accent color is in Settings › Appearance). On Frosted, a page's title (Scheduled tasks, Settings) no longer sits on a dark band of its own.
+
 ## 0.60.0 · Nov 23, 2026
 
 - Telegram has its own section: make a bot in @BotFather, paste its token, scan a one-time QR, and Laki's pushes reach your phone, with a tap on a button answering the agent and a reply to a push (a photo or a file too) going to it; /status, /screen, /diff and /quiet from the chat. Only your account in its private chat counts; the token stays in the Keychain. [Try it](laki://settings/telegram)

@@ -1,7 +1,7 @@
 // The ⋯ and right-click menus of a workspace, a tab, a file and a project: App builds them each render (menusOf)
 // from what appCtx.ts says it reads.
 import { type AppBase, colorOf, WEB, wsName } from './appCtx'
-import { type TabView, type WorkspaceView, againOnEnter, HOME_ACCOUNT, type Project } from '../../shared/types'
+import { type TabView, type WorkspaceView, againOnEnter, FOLD_AFTER, HOME_ACCOUNT, type Project } from '../../shared/types'
 import { ask, type MenuItem, ON, iconItems, TAB_COLORS, askText, type IconName } from './ui'
 import { isPage, pendingWords, shortPath } from './text'
 import { isIconName } from '../../shared/icons'
@@ -215,7 +215,11 @@ export function menusOf(app: AppBase) {
   }
   const canOverlap = (w: WorkspaceView) => w.kind === 'worktree' && !w.host && !w.archived && projOf(w)?.git !== false
 
-  const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: [...ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })), null, { label: 'Group counts', tip: 'How many workspaces a group has, after its name', hint: settings.groupCount === false ? undefined : ON, run: () => void call('settingsSet', { groupCount: settings.groupCount === false }).catch(() => {}) }, { label: 'Empty projects', tip: 'Projects with no workspace to show (none, all archived, or all pinned); off: only ones with rows', hint: settings.hideEmpty === true ? undefined : ON, run: () => void call('settingsSet', { hideEmpty: settings.hideEmpty !== true }).catch(() => {}) }] }]
+  const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: [...ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })),
+    null,
+    { label: 'Group counts', tip: 'How many workspaces a group has, after its name', hint: settings.groupCount === false ? undefined : ON, run: () => void call('settingsSet', { groupCount: settings.groupCount === false }).catch(() => {}) },
+    { label: 'Empty projects', tip: 'Projects with no workspace to show (none, all archived, or all pinned); off: only ones with rows', hint: settings.hideEmpty === true ? undefined : ON, run: () => void call('settingsSet', { hideEmpty: settings.hideEmpty !== true }).catch(() => {}) },
+    { label: 'Fold long projects', tip: `A project's first ${FOLD_AFTER} rows, plus any working, waiting on you or open, and Show N more for the rest`, hint: settings.foldAfter === 0 ? undefined : ON, run: () => void call('settingsSet', { foldAfter: settings.foldAfter === 0 ? FOLD_AFTER : 0 }).catch(() => {}) }] }]
   // D7: a phone at answer only (its view's remote.level): only what that level may do (main.ts' ANSWER), so nothing
   // fails on a click: a workspace's name, color, pins and reminders, Info, copies, a new agent. ponytail: by label
   const answerOnly = view?.remote?.level === 'answer'

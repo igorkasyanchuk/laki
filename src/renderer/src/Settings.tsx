@@ -8,7 +8,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { CURSOR, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -32,7 +32,7 @@ import { version } from '../../../package.json'
 import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import type { AllowRule } from '../../shared/ask'
-import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
+import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, KeptSecrets, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, TelegramSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
@@ -136,6 +136,7 @@ export type AppSettings = Paint & {
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   groupCount?: boolean // Layout › Sidebar rows › Group counts: a group's count of workspaces (on unless false)
   hideEmpty?: boolean // Appearance › Sidebar rows › Empty projects off: a project with no row to show is left out
+  foldAfter?: number // Appearance › Sidebar rows › Long projects: its first this many rows, then Show N more (unset: FOLD_AFTER; 0: all)
   simpleRow?: boolean // B4: a row is its name and one chip
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // the sidebar rows' other marks (ROW_MARKS)
   timers?: boolean // a turn's time on its tab and row (unset: off)
@@ -231,6 +232,7 @@ export type AppSettings = Paint & {
   prTries?: number // fix CI's and fix conflicts' tries in a row
   prBots?: string[] // review bots whose threads go to the agent (unset: PR_BOTS)
   gitTidy?: boolean // B8: Resources › Disk: each project's git tidied weekly (unset: on)
+  diskLow?: number // Resources › Disk: a worktree's disk under this many GB free says so once (unset: DISK_LOW; 0: never)
   browserBudget?: number // Resources: MB of hidden pages before the oldest is unloaded (shared/browserBudget.ts)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
@@ -1005,6 +1007,7 @@ export function SettingsPage(p: {
   remote?: RemoteApi
   tunnels?: (n: NamedTunnel) => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck) of the name and domain as typed
   call?: Call // Settings › Tunnels › Webhooks' (inbound.ts)
+  kept?: SecretKept[] // the secrets kept for next time (secrets.ts): names only; General's and each project's list, Remove
   widgets?: WidgetsApi
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
@@ -1497,6 +1500,7 @@ export function SettingsPage(p: {
               global={{ actions: s.actions, templates: s.templates, simulator: s.simulator === true, flows: flowsOn(s) }}
               taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
+              kept={p.call && p.kept && { list: p.kept.filter(k => k.scope === project.id), forget: k => p.call!('secretForget', { scope: k.scope, label: k.label }) }}
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
               onSave={o => p.onSaveProject?.(project.id, o)}
               onAllow={p.onAllowProject && (a => p.onAllowProject!(project.id, a))}
@@ -1769,6 +1773,11 @@ export function SettingsPage(p: {
                 <Group title="Developer" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki screen…; the skill teaches agents the same">
                   <CliField api={p.cli} onSkill={() => openSec('skill')} />
                   {p.uninstall && <UninstallField api={p.uninstall} />}
+                </Group>
+              )}
+              {p.call && p.kept && (
+                <Group title="Kept secrets" hint="Secrets an agent asked for (laki secret) that you kept for next time: their names here, the values in the Keychain. Never given on their own: the agent's card still asks, one click gives it">
+                  <KeptSecrets list={p.kept} projects={p.projects} onForget={k => p.call!('secretForget', { scope: k.scope, label: k.label })} />
                 </Group>
               )}
               {p.backup && (
@@ -2432,6 +2441,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.hideEmpty !== true} onChange={v => set({ hideEmpty: !v })}>
                   <Says title="Empty projects" hint="Projects with no workspace to show: none, all archived, or all in Pinned. Off keeps the list short; the selected workspace's project and a filter's hits still show, and the new-workspace page still lists them all" />
                 </Switch>
+                <Switch className="switch-row" on={s.foldAfter !== 0} onChange={v => set({ foldAfter: v ? FOLD_AFTER : 0 })}>
+                  <Says title="Fold long projects" hint={`A project with more than ${FOLD_AFTER} workspaces shows its first ${FOLD_AFTER}, plus any working, waiting on you or open, and Show N more for the rest (Show less folds it again). The filter and ⌘K still find them all`} />
+                </Switch>
                 <Switch className="switch-row" on={s.groupCount !== false} onChange={v => set({ groupCount: v })}>
                   <Says title="Group counts" hint="How many workspaces a group has, after its name. Custom CSS styles it as .group-count" />
                 </Switch>
@@ -2956,7 +2968,7 @@ export function SettingsPage(p: {
               </button>
             </div>
           )}
-          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} browserBudget={s.browserBudget ?? 0} onBrowserBudget={p.resources.procs && (browserBudget => set({ browserBudget }))} gitTidy={s.gitTidy !== false} onGitTidy={p.resources.gitNow && (gitTidy => set({ gitTidy }))} />}
+          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} browserBudget={s.browserBudget ?? 0} onBrowserBudget={p.resources.procs && (browserBudget => set({ browserBudget }))} gitTidy={s.gitTidy !== false} onGitTidy={p.resources.gitNow && (gitTidy => set({ gitTidy }))} diskLow={s.diskLow} onDiskLow={diskLow => set({ diskLow })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (
             <>

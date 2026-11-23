@@ -195,7 +195,7 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
 
 // ⌘K's items: for the workspace you're in first, then every workspace, tab and action
 export function paletteItems(app: AppCtx): PaletteItem[] {
-  const { reviewGo, accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editLayout, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
+  const { reviewGo, accountsOf, achKept, aiDock, allows, call, canOverlap, checkOverlaps, closePreview, closeTabs, copyTab, devRunning, devTab, dock, done, fail, editLayout, editor, editScripts, extMenus, extRun, find, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, full, gallery, git, hereCtx, keyText, kh, layoutMenu, live, needing, newTabActions, newWs, nextNeed, openIn, openPort, openProject, order, panelHost, prAct, previewed, prFix, project, projOf, quickNew, restore, run, runFlow, runScript, selectTab, sendLater, setDialog, setFind, setFolded, setOnboard, setSharing, setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, specsOn, staleMin, tab, tabMenu, targets, timers, toast, toggleArtifacts, toggleFull, video, view, ws, wsActions, wsMenu } = app
   const items: PaletteItem[] = []
   const cmds = cmdMap(settings.cmdKeys)
   const a = (x: Action & { id?: string; on?: string }) => items.push({ ...x, hint: (x.id && cmds[x.id] && keyShow(cmds[x.id])) || (x.hint ?? 'action') }) // id: a key can be given it (Settings › Keys)
@@ -312,6 +312,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     for (const x of targets) aw({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
     aw({ id: 'openPort', label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
     aw({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
+    if (bridge?.floatPanel) aw(panelHost.out ? { label: 'Bring the side panel back', icon: 'popIn', tip: 'From its own window into this one', run: () => panelHost.float(false) } : { label: 'Move the side panel to its own window', icon: 'popOut', tip: 'Changes, Files, Review and Preview in a window of their own, say on another screen; it follows this window\'s workspace', run: () => panelHost.float() })
     if (git) aw({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
     if (git) aw({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })
     aw({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })

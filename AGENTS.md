@@ -84,7 +84,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   `LAKI_QUIET_MS`, `LAKI_ANSWER_HOLD_MS`, `LAKI_CODEX_LATER_MS`, `LAKI_FALLBACK_MS` (core.ts), `LAKI_KILL_AFTER_MS`
   (resources.ts), `LAKI_SWEEP_MS`, `LAKI_PARENT_MS`, `LAKI_LOOP_REPORT_MS` (main.ts), `LAKI_PR_SOON_MS`, `LAKI_PR_SCAN_MS`, `LAKI_PORT_SCAN_MS`,
   `LAKI_FLOW_RESUME_MS`, `LAKI_RUN_ENDED_MS`, `LAKI_PUSH_WAIT_MS`, `LAKI_CLIENT_LOG_MS`, `LAKI_WIDGET_LOG_MS`,
-  `LAKI_REPO_WATCH_MS`, `LAKI_HINT_MS` (the CLI's "Approve this terminal"), `LAKI_TG_GAP_MS`, `LAKI_TG_PAIR_MS`, `LAKI_TG_LIMITS` (telegram.ts). A sleep over a second says why.
+  `LAKI_REPO_WATCH_MS`, `LAKI_DISK_LOW_MS` (resources.ts' diskLowTick), `LAKI_MCP_AUTH_MS` (mcpAuth.ts), `LAKI_HINT_MS` (the CLI's "Approve this terminal"), `LAKI_TG_GAP_MS`, `LAKI_TG_PAIR_MS`, `LAKI_TG_LIMITS` (telegram.ts). A sleep over a second says why.
   `LAKI_TEST_SLEEPS=<file>`: each sleep's place and ms appended to it (the whole run's: 90 s in 213 calls, from 226 in 246).
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
@@ -154,7 +154,7 @@ for the part you change, and keep it up to date with the change.
 
 - [docs/dev/api.md](docs/dev/api.md): the daemon's API (`src/daemon/main.ts` `api`): each method over `/rpc` and the
   WebSocket, its events and the view; `laki mcp`, the MCP server.
-- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 222. Bump `API` (`src/shared/types.ts`)
+- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 223. Bump `API` (`src/shared/types.ts`)
   when the renderer starts relying on a new method or daemon behavior (a setting needs no bump); the next one goes at its end.
 - [docs/dev/agents.md](docs/dev/agents.md): profiles and accounts, layouts, agent variables, turns, asks, sessions, sleep,
   terminal queries, agents and their hooks, projects and their trust, presets, interrupts, resume after a restart.
@@ -225,6 +225,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/agentUsage.ts` | Grok's and Antigravity's chats by day and model, read only from their own files (Grok's `usage.json`, agy's conversation DB through node's sqlite: cloned, only its new steps read, past 32 MB in a worker, `agyWorker.ts`): the Usage page's and Today's rows |
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them, to the webhook and Telegram |
+| `src/shared/tgmd.ts` | an agent's Markdown as Telegram's HTML (`mdToTg`): telegram.ts' pushes and a workspace card's last reply |
 | `src/daemon/telegram.ts` | Settings › Telegram: your own bot (its token by keychain.ts), pairing by a one-time code, the long poll (getUpdates), pushes and edits, taps from the paired user's private chat only, the old webhook format migrated; `LAKI_TELEGRAM_API`: tests' fake |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
 | `src/daemon/askStreak.ts` | F15: your Allows in a row per project and kind of ask (shared/ask.ts `streakOf`), at 5 a notice suggesting a rule (Make it a rule through `projectSet`'s allow, No, Don't suggest again); core's `streakReset` starts a project's over |
@@ -306,7 +307,8 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/Ship.tsx` | the Ship sheet (U5): the uncommitted files with boxes and their diffs, the commit's and the PR's words (`shipDraft`'s), base, reviewers, Draft, Merge when green, Send CI failures; Commit only, Push, Open PR (⌘↵) |
 | `src/renderer/src/ExtCfg.tsx` | `extCfgOf(r)`: what Settings › Extensions and the Extension page call (`WidgetsApi`): each extension's settings, page, folder, logs, its repo's sheet; computed inline in App's render (`ExtCfgIn`) |
 | `src/renderer/src/Extension.tsx` | an extension's page, the one place to make, change and set one up: its preview (live or its sample), settings, the inspector, Laki AI's chat (starters, Undo to here), Undo, Try it live, Turn on; New extension |
-| `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab, floated simulator and quick bar windows (`?window=new`, `ai`, `tab`, `sim`, `quick`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
+| `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab, floated simulator, quick bar and side panel windows (`?window=new`, `ai`, `tab`, `sim`, `quick`, `panel`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
+| `src/renderer/src/panelWin.ts` | L5: the side panel in its own window (main's `panelOpen`, panel.json: its bounds, open at quit): the app window's `usePanelHost` (its workspace and facts, said as they change; the panel's asks for what only App does) and the window's `usePanelGuest`, over a BroadcastChannel |
 | `src/shared/browserBudget.ts` | the memory budget's step: which hidden Browsers page goes (`unloadStep`, main measures and guards) |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
 | `src/renderer/src/Backdrop.tsx` | an empty page's background (Settings › Appearance › Empty page background, `settings.backdrop`): stars (default), stardust, dots, a net, a grid or fireflies on a canvas under `.empty` (App's `.empty-wrap`) and the New workspace page (`Page`'s `backdrop`), stirred by the pointer, the page's see-through cards cut out; Motion high animates it, low only as the pointer moves, none (or Reduce motion) draws it once |

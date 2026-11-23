@@ -13,13 +13,14 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   askExplain: "explain the user's ask (an agent spends no Laki AI on its own asks)", reviewSteps: "walk the user through a diff (it spends the user's Laki AI)",
   aiCredits: "read Laki AI's OpenRouter credits and spend (the user's)", scheduleCopy: 'duplicate a scheduled task (the user does, in Scheduled tasks)',
   promptQuestions: "ask Laki AI what a task leaves open (the New workspace page's Ask me first: it spends the user's AI money)",
+  promptImprove: "have Laki AI rewrite the user's draft (a prompt box's ✨: it spends the user's AI money)",
   gitTidy: "tidy a project's git (the user does: Settings › Resources › Disk, Tidy now)",
   goalSet: "set or raise an agent's goal (the user does, from its tab's menu)", goalClear: "clear an agent's goal (the user does, from its band)",
   flowExport: "export the user's workflow (the user shares it: its ⋯ › Share…)", flowImport: 'import a workflow (the user does: Workflows › New › Import…)',
   flowImportSave: 'import a workflow (the user does: Workflows › New › Import…)',
   flowWaitEnd: "continue or cancel a workflow run's wait (the user does, from the run)",
   dataBackup: "back up the user's data (the user does: laki backup, Settings › General)",
-  dataRestore: "restore the user's data from a backup (the user does: laki restore, Settings › General)", signIn: 'signing an agent in is yours',
+  dataRestore: "restore the user's data from a backup (the user does: laki restore, Settings › General)", signIn: 'signing an agent in is yours', mcpSignIn: "signing an agent's MCP server in is yours",
   keptOpen: 'open a file on the user\'s Mac (the user does, from Settings › Resources)',
   keptRm: 'delete the kept artifacts of deleted workspaces (the user does, in Settings › Resources)',
   uninstall: 'uninstall Laki (the user does, in Settings › General › Developer or laki uninstall)',
@@ -48,7 +49,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)",
   sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)",
   turnRewind: "rewind a workspace's files (the user does, from a turn's menu)", turnFork: 'start a workspace from a kept turn (the user does)',
-  tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)',
+  tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', secretForget: 'forget a kept secret (the user does, in Settings)',
   alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions",
   answer: "answer an agent's question", widgetFileSave: "edit an extension's files", widgetTerm: "start an extension's terminal (the user's window shows it)",
   widgetFromTerm: "make an extension from a terminal's command and what it printed (the user does, from the tab)", remoteStart: 'start remote access',
@@ -106,13 +107,13 @@ flowHold flowGet flowForget'.split(' '))
 // Telegram (telegram.ts tgHooks: main.ts' gate): what a message from the paired chat may make Laki do, and the level each
 // needs. Anything else is refused, so a new method is never Telegram's by default. Never: Stop, Ship, merge, archive or
 // delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID (test/telegram.test.ts)
-export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer', state: 'answer', screen: 'answer', diff: 'answer', dndSet: 'answer', wsNew: 'control' }
+export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer', state: 'answer', screen: 'answer', diff: 'answer', chatRead: 'answer', voiceText: 'answer', dndSet: 'answer', wsNew: 'control' } // chatRead: a workspace card's last reply; voiceText: a voice note heard
 
 // remote access at Full (a phone's page): REMOTE_NO is what outlives its session or opens Laki wider: its own set-up and
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
 // install, apps' windows: device's and Laki AI's aiShot, an app opened: aiOpenApp), the clock. hookAdd: a new webhook and its secret; presetSave: a profile's args and env, as
 // REMOTE_KEYS' presets; hook: agents' own (hookWho); tunnelStart, scheduleSet: S11
-export const REMOTE_NO = new Set(['scheduleCopy', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
+export const REMOTE_NO = new Set(['scheduleCopy', 'secretForget', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
   'skillOpen', 'wsRepair', 'events', 'clientLog', 'tabUnbox', 'projectNetAllow', 'ticketMint', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',
@@ -122,8 +123,8 @@ export const REMOTE_NO = new Set(['scheduleCopy', 'gitTidy', 'goalSet', 'flowImp
   'widgetMock', 'widgetCheck', ...TICKS])
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of
 // REMOTE_KEYS, a share with no end, a project's scripts and auto-answer rules)
-export const REMOTE_OK = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'goalClear',
-  'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentLog', 'diskUsage',
+export const REMOTE_OK = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
+  'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'mcpSignIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentLog', 'diskUsage',
   'mergeQueueStart', 'mergeQueueStop', 'archivedKeep', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet',
   ...'ping state projectAdd sampleNew sampleRm projectRm projectArchive updateIdle agentModels projectSet memoryAdd memoryRm projectFile projectTrust branches csMachines wsNew quickNew wsRm wsPeek overlapCheck wsStat wsArchive doctor hooksSeen wsFan answer unread seen show showDone browse timer browseDone wsRestore wsFork tabNew layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompact \
 memoryCompactLog cliState reminderAdd reminderSet reminderRm tabClose tabReopen tabDraft failDismiss gateRestart tabMode hookList tabSet settingsSet storageInfo openIn apps termShells wsSet reorder imageSave bgSet bgGet fileSave prFix wsUpdate prLog logs scriptLogs progress tabHandover turnDiff turnUndo turnList turnRewind turnFork sideAsk sideState sideNew alertShow noticeShow alertAnswer \
@@ -158,7 +159,7 @@ export const AGENT_SETTINGS_OK = new Set('theme themeAuto updateDot termPictures
 // the user's (each a reason: what runs, as whom and where; what's kept or deleted; what reaches a model, the network or
 // the user's attention; keys and answers; secrets): Global memory, workflows' variables, the storage and worktree
 // folders, notifications among them
-export const AGENT_SETTINGS_NO = new Set('artifactHosts gitTidy touchId termShell editor editors customCss editorCmd agent branchPrefix copyOnSelect editKeys fileClick notify needsList staleAfter ownAvatar avatars notifyOn edgeGlow dockBounce usageAt scheduleMaxMinutes scheduleAtOnce notifySound quietMinutes timerAlert timerSound presets hideSecrets hideSecretsAsked voiceNote secretHint sandboxNew \
+export const AGENT_SETTINGS_NO = new Set('artifactHosts diskLow foldAfter gitTidy touchId termShell editor editors customCss editorCmd agent branchPrefix copyOnSelect editKeys fileClick notify needsList staleAfter ownAvatar avatars notifyOn edgeGlow dockBounce usageAt scheduleMaxMinutes scheduleAtOnce notifySound quietMinutes timerAlert timerSound presets hideSecrets hideSecretsAsked voiceNote secretHint sandboxNew \
 accounts accountUse mcpApps limitFallback templates actions env tunnelMails tunnel usage usageNote seenVersion labs specs workflows birdView calendar desk notes todoList cloud simulator emuWindow history planTemplates remoteMail remoteIdleOff remoteWhen remoteAwake remoteAuth remoteHost remoteTries remoteTsPin remoteFunnel remotePasskey remotePinFallback remoteIdle remoteHandoff remotePush \
 remoteLevel remoteWrong remoteDeviceDays diffStat doneCheck readerTools sendKey nextStep livePlan radar fullReview aiEndpoint menuBarClick hoverFocus closeNoAsk storageDir keepStorage storageDays tmExclude spotlightExclude worktrees syncBase prPrompts prScan prQuiet bgRefresh keepAwake turnsKept turnChanges nextPrompt whenDone copyIgnored copyUntracked cloneDeps ptyHost ptyHostAsked spareWorktree \
 archivedDays prTries prBots browserBudget sleepAfter webhook inHooks continueOnError longTurn archiveMerged archiveIdle archiveIdleKeepPR menuBar trayState floater floaterRecent floaterRecentHours floaterVoiceTo floaterMax floaterCards hideFloats floaterDone floaterAt floaterNew floaterMenu widgetDirs widgetDev widgetDevAgent imageDays artifactsIn memory memoryCompact workHours flowVars progress \

@@ -71,6 +71,7 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   const from = { ws: one.id, tab }
   await assert.rejects(rig.rpc('prAct', { ws: one.id, act: 'merge', from }), /an agent can't merge a PR as you \(turn on Merge when green yourself\)/)
   await assert.rejects(rig.rpc('prAct', { ws: one.id, act: 'revert', from }), /an agent can't revert a PR as you/)
+  await assert.rejects(rig.rpc('prAct', { ws: one.id, act: 'ci', from }), /an agent can't approve a fork PR's held CI runs as you/)
   for (const k of ['autoFix', 'autoReview', 'autoMerge', 'autoLand']) await assert.rejects(rig.rpc('wsSet', { id: one.id, [k]: true, from }), /an agent can't turn a workspace's PR switches/, k)
   await rig.rpc('wsSet', { id: one.id, autoFix: true }) // yours
   await rig.rpc('wsSet', { id: one.id, color: 'red', from }) // a look stays an agent's to change

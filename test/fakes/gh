@@ -33,7 +33,8 @@ case "$1 $2" in
     e=$(f issue-etag); case "$*" in *"If-None-Match: $e"*) [ -n "$e" ] && { printf 'HTTP/2.0 304 Not Modified\r\nEtag: %s\r\n\r\n' "$e"; exit 0; } ;; esac
     printf 'HTTP/2.0 200 OK\r\nEtag: %s\r\n\r\n' "$e"; f issue-events.json || echo '[]'
     exit 0 ;;
-  "api -X") # a codespace started: POST user/codespaces/<name>/start
+  "api -X") # a fork's held run approved (POST repos/o/r/actions/runs/<id>/approve), else a codespace started: POST user/codespaces/<name>/start
+    case "$4" in *"/approve") f refuse >&2 && exit 1; echo '{}'; exit 0 ;; esac
     n=${4#user/codespaces/}; n=${n%/start}; [ -f "$FAKE_GH/cs-$n" ] || exit 1; echo Available > "$FAKE_GH/cs-$n"; echo '{}' ;;
   "api repos/"*"/codespaces/machines") # $FAKE_GH/cs-noscope: gh's words for a token without the codespace scope
     [ -f "$FAKE_GH/cs-noscope" ] && { echo 'gh: This API operation needs the "codespace" scope. To request it, run:  gh auth refresh -h github.com -s codespace' >&2; exit 1; }
@@ -69,6 +70,7 @@ case "$1 $2" in
   "auth status") f auth || exit 1 ;;
   "issue list") f issues.json || exit 1 ;;
   "issue view") f issue.json || { echo "GraphQL: Could not resolve to an issue" >&2; exit 1; } ;;
+  "api repos/"*"/actions/runs?"*) f held.json || echo '[]' ;; # a fork's PR: the ids of its runs held for approval (--jq's answer)
   "api repos/"*) f comment.json || { echo 'HTTP 422: Unprocessable Entity' >&2; exit 1; } ;;
   *) exit 1 ;;
 esac

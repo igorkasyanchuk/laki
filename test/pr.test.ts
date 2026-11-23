@@ -497,7 +497,7 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [] }
   writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
-  await assert.rejects(act('rebase'), /approve, close, merge or revert/)
+  await assert.rejects(act('rebase'), /approve, close, merge, revert or ci/)
   await act('approve')
   writeFileSync(join(gh, 'refuse'), 'failed to create review: GraphQL: Can not approve your own pull request (addPullRequestReview)')
   await assert.rejects(act('approve'), /^Error: gh: failed to create review: GraphQL: Can not approve your own pull request/)

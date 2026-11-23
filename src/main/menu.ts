@@ -17,7 +17,7 @@ import { COMBO, accel, from, keys, mac, openLink, quickWin, quitCompletely, shot
 // Settings › Layout's Menus: macOS: a workspace's or a tab's menu drawn by macOS (the renderer's menuModel, checked by
 // guards.ts menuModelOk), popped up at the point; the picked item's id back, or nothing (closed). The app window only
 ipcMain.handle('menu-popup', (e, model: unknown, x: unknown, y: unknown) => {
-  if (!from(e)) return undefined
+  if (!from(e, 'panel')) return undefined
   const m = menuModelOk(model)
   const w = BrowserWindow.fromWebContents(e.sender)
   if (!m || !w || typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return undefined

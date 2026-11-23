@@ -50,6 +50,23 @@ export function exits(root: Node) {
   }).observe(root, { childList: true, subtree: true })
 }
 
+// another app in front (App's away, html.away): the endless animations (spinners, lines, a look's effects) stop where
+// they are, one that starts meanwhile too, and go on as Laki comes back. One that ends (a row, a page, a card coming in)
+// plays out: a CSS pause of every animation left it at its first frame, unseen yet there to click and type in (a filter
+// closed, a page opened while the window wasn't the key one). ponytail: one paused and played here no longer follows
+// CSS' animation-play-state (.sidebar[data-away]'s): it runs behind a rail page until it's drawn again
+const held = new Set<Animation>()
+const hold = () => {
+  for (const a of document.getAnimations()) if (a.playState === 'running' && a.effect?.getComputedTiming().iterations === Infinity) (a.pause(), held.add(a))
+}
+export function away(on: boolean) {
+  document.documentElement.classList.toggle('away', on)
+  if (on) return void (hold(), document.addEventListener('animationstart', hold, true))
+  document.removeEventListener('animationstart', hold, true)
+  for (const a of held) if (a.playState === 'paused') a.play() // one that's gone since is idle: left so
+  held.clear()
+}
+
 // whether a view transition may run (ui.tsx' morph, themes.ts' paintTheme): the API there, a window that draws, not
 // under Reduce motion, Motion: Off or ui-smoke. Here, not in themes.ts: its table stays out of ui.tsx' first load
 export const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && !still()

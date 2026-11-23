@@ -68,8 +68,8 @@ export function Ring({ p }: { p?: number }) {
 }
 
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
-// asks: Settings' usage, the agents whose endpoint is asked; onAsk: turn an agent's on (its own numbers too old); credits: Laki AI's OpenRouter credits and spend (an amber
-// dot on the ring when low)
+// asks: Settings' usage, the agents whose endpoint is asked; onAsk: turn an agent's on (its own numbers too old); credits: Laki AI's OpenRouter credits and spend (low:
+// said in the ring's tip and the popup's tag, no mark on the ring: it's the plans' meter)
 export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }: { load: () => Promise<AgentUsage[]>; credits?: () => Promise<AiCredits | null>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; asks?: Record<string, boolean>; onAsk?: (agent: string) => Promise<unknown> }) {
   const [rows, setRows] = useState<AgentUsage[] | null>(null)
   const [at, setAt] = useState<DOMRect | null>(null)
@@ -101,7 +101,6 @@ export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }
     <>
       <button className="usage-btn" data-tip={tip} aria-label={tip} onClick={e => setAt(e.currentTarget.getBoundingClientRect())}>
         <Ring p={top} />
-        {or?.low && <i className="usage-low" />}
       </button>
       {at && <UsagePop anchor={at} rows={rows} top={top} today={today} or={or} asks={asks} onAsk={onAsk && (a => onAsk(a).then(() => again.current(), () => {}))} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
     </>
@@ -129,7 +128,7 @@ function windowRow(w: UsageWindow, now: number) {
 }
 
 // Laki AI's OpenRouter: credits left (a bar of what's used), the key's spend, its own limit
-const usd = (n: number) => `$${n.toFixed(2)}`
+const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: n >= 1000 ? 0 : 2, maximumFractionDigits: n >= 1000 ? 0 : 2 })}` // $2,224, $24.99
 function creditsPart(c: AiCredits) {
   const used = c.credits?.total ? Math.round((c.credits.used / c.credits.total) * 100) : 0 // none bought: an empty bar, not a red one
   return (
@@ -146,8 +145,8 @@ function creditsPart(c: AiCredits) {
           <span className={`usage-bar ${c.low ? 'high' : level(used)}`}>
             <i style={{ width: `${Math.min(used, 100)}%` }} />
           </span>
-          <span className="usage-pct">{usd(Math.max(0, c.credits.total - c.credits.used))}</span>
-          <span className="muted small usage-when">left of {usd(c.credits.total)}</span>
+          <span className="usage-pct">{used}%</span>
+          <span className="muted small usage-when">{usd(Math.max(0, c.credits.total - c.credits.used))} left of {usd(c.credits.total)}</span>
         </div>
       )}
       {c.key &&
@@ -259,7 +258,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
             ))}
           </section>
         )}
-        <p className="muted small">
+        <p className="muted small usage-foot">
           {asked.length ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Layout says so${rows.some(r => r.source === 'own') ? "; the others are the agents' own numbers" : ''}.` : "The agents' own numbers: Claude Code's status line, Codex's reports."}{rows.some(r => r.agent === 'claude' && r.windows.length > 0) && asks?.claude !== true && ` Claude's week per model (Fable's) only comes from Anthropic: Settings › Layout › Ask ${USAGE_HOSTS.claude}.`} Settings › Agents & profiles has the accounts.
         </p>
       </div>

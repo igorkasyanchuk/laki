@@ -6,7 +6,7 @@ import { bridge } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown, outlineItems } from './MarkdownView'
-import { SplitToggle, useSplit, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
+import { Near, SplitToggle, useSplit, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { Annotations, MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -549,6 +549,7 @@ function CommitView({ api, c, onBack }: { api: PanelApi; c: Commit; onBack: () =
   const [shut, setShut] = useState<Set<string>>(new Set())
   const split = localStore('laki.diffSplit') === 'split'
   const toggle = (p: string) => setShut(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
+  const scroller = useRef<HTMLDivElement>(null)
   return (
     <>
       <div className="sp-tools">
@@ -558,11 +559,11 @@ function CommitView({ api, c, onBack }: { api: PanelApi; c: Commit; onBack: () =
         </span>
         <span className={`tag ${c.pushed ? '' : 'warn'}`}>{c.pushed ? 'pushed' : 'not pushed'}</span>
       </div>
-      <div className="sp-body">
+      <div className="sp-body" ref={scroller}>
         {err && <div className="warn small pad">{err}</div>}
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {d && !files.length && <div className="muted small pad">This commit changes no file's text.</div>}
-        {files.map(f => (
+        {files.map((f, i) => (
           <div key={f.path} className="sp-change">
             <div className="sp-row" {...act(() => toggle(f.path))} data-tip={f.path}>
               <span className="sp-chev">
@@ -577,9 +578,13 @@ function CommitView({ api, c, onBack }: { api: PanelApi; c: Commit; onBack: () =
               </span>
             </div>
             {!shut.has(f.path) && (
-              <div className={`sp-diff ${split ? 'split' : ''}`}>
-                <DiffRows fd={byFile.get(f.path) ?? NO_DIFF} split={split} cls={l => lineClass(l)} row={() => ({})} head={l => l.text} />
-              </div>
+              <Near root={scroller} lines={(byFile.get(f.path) ?? NO_DIFF).lines.length} first={i < 3}>
+                {() => (
+                  <div className={`sp-diff ${split ? 'split' : ''}`}>
+                    <DiffRows fd={byFile.get(f.path) ?? NO_DIFF} split={split} cls={l => lineClass(l)} row={() => ({})} head={l => l.text} />
+                  </div>
+                )}
+              </Near>
             )}
           </div>
         ))}
@@ -649,13 +654,14 @@ export function SidePanel(p: {
   ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
   sim?: boolean // the Simulator tab (settings.simulator)
   turn?: boolean // an agent's last turn changed files: Changes' This turn
+  float?: { out: boolean; go: () => void } // Move to its own window (main's panelOpen), or Back in Laki (out: this is that window)
 }) {
   const tabs = TABS.filter(t => (t.id === 'device' ? p.sim : t.id === 'side' ? !!p.side : p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview'))
   const ext = p.ext?.find(x => x.id === p.tab)
   const tab = ext || tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
-    <div className="side-panel" style={{ width: p.width }}>
-      <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />
+    <div className="side-panel" style={p.float?.out ? undefined : { width: p.width }}>
+      {!p.float?.out && <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />}
       <div
         className="sp-tabs edge-blur"
         role="tablist"
@@ -683,7 +689,8 @@ export function SidePanel(p: {
           </button>
         ))}
         <span className="grow" />
-        <IconButton icon="x" title={keyTip('Close', 'panel')} onClick={p.onClose} />
+        {p.float && <IconButton icon={p.float.out ? 'popIn' : 'popOut'} title={p.float.out ? 'Back in Laki' : 'Move to its own window'} onClick={p.float.go} />}
+        {!p.float?.out && <IconButton icon="x" title={keyTip('Close', 'panel')} onClick={p.onClose} />}
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}

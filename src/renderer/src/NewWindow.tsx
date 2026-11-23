@@ -3,7 +3,7 @@
 // workspace made, or Esc: it closes; the app's sidebar shows the new one. Its Ask Laki AI: the AI page, compact, in one
 // too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
 import { type ActionFile, aiOn, veiled, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, daemonBase, openExternal, reportView } from './api'
 import { setSecretHint } from './secretHint'
@@ -11,12 +11,19 @@ import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
 import { type Img, type Inserts, PromptInput, VoiceBar, withImages } from './PromptInput'
 import { LAST_NEW, type LastNew, NewWorkspace } from './panels'
-import { DeviceTab } from './SidePanel'
+import { DeviceTab, FilePreview, SidePanel } from './SidePanel'
+import type { Changes, Commits, Edit, FileContent, FileList, FilesRoot, PanelApi, PanelTab, PRFiles, Thread } from './SidePanel'
+import type { Annotations, TurnKept } from '../../shared/types'
+import { InfoTab } from './Info'
+import { SideChat } from './SideChat'
+import { useToasts } from './AppParts'
+import { usePanelGuest } from './panelWin'
+import { applySuggestions } from './text'
 import { FONT_SIZE, termLook } from './settingsBase'
 import { Term } from './Term'
 import { setSendKey } from '../../shared/keys'
 import { applyTheme, LESS_CLEAR, macApp, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
-import { ask, AskHost, askText, Icon, IconButton, load, Tips } from './ui'
+import { ask, AskHost, askText, Icon, IconButton, keep, load, Tips, Toasts, useMenu } from './ui'
 import { handOff } from './tell'
 import { cloudVoice, voiceStart } from './voice'
 import { imagesVia, insertMenus } from './Widgets'
@@ -25,7 +32,7 @@ import { imagesVia, insertMenus } from './Widgets'
 const paint = (p: Paint) => applyTheme(p, true)
 // only in those windows: main.tsx imports this module in the app's too
 const which = new URLSearchParams(location.search).get('window')
-if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim' || which === 'quick') {
+if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim' || which === 'quick' || which === 'panel') {
   const last = load<string | Paint>('laki.theme', '') // the app's, until the daemon's settings arrive
   paint(typeof last === 'string' ? { theme: last } : last)
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
@@ -348,6 +355,180 @@ export function QuickWindow() {
       )}
       <AskHost />
       <VoiceBar />
+      <Tips />
+    </div>
+  )
+}
+
+// the side panel in a window of its own (main's panelOpen, ?window=panel; panelWin.ts): the workspace the app window
+// shows, with the facts it says. Changes, Files, Review, Preview, Simulator, Side chat and Info work here; a file opens
+// in its preview here; comments go to the workspace's agent. What only the app does (a PR's merge, close or approve, Fix,
+// a check's log, the PR switches, rename, attach, going to a workspace) goes to the app window, which comes forward.
+// Its tab is its own (laki.panelWinTab); Back in Laki (or closing it) puts the panel back there
+// ponytail: no extensions' panel tabs, the Preview's element picking and screenshots here (main's capture: the app window's)
+const PANEL_TAB = 'laki.panelWinTab'
+export function PanelWindow() {
+  const view = useView()
+  const [tab, setTab] = useState<PanelTab>(() => load<PanelTab>(PANEL_TAB, 'changes'))
+  const pick = (t: PanelTab) => (setTab(t), keep(PANEL_TAB, t))
+  const { says, ask: appDo } = usePanelGuest(pick)
+  const [root, setRoot] = useState<FilesRoot>('ws')
+  const [shown, setShown] = useState<{ path: string; line?: number; storage?: boolean; n: number; edit?: Edit } | null>(null)
+  const [menu, openMenu] = useMenu()
+  const { notes, setNotes, toast, done, fail } = useToasts()
+  const w = says?.ws ? view?.workspaces.find(x => x.id === says.ws && !x.archived) : undefined
+  useEffect(() => void (document.title = `${w ? w.name || w.id : 'Side panel'} — Laki`), [w?.id, w?.name])
+  useEffect(() => setShown(null), [says?.ws])
+  if (!view) return null
+  const head = (
+    <div className="tab-win-head">
+      <b>{w ? w.name || w.id : 'Side panel'}</b>
+      <span className="grow" />
+      <IconButton icon="popIn" title="Back in Laki" onClick={() => window.close()} />
+    </div>
+  )
+  if (!w || !says?.info) return <div className="tab-window panel-window">{head}<div className="muted pad">{says ? 'No workspace open in Laki’s window.' : 'Waiting for Laki’s window…'}</div></div>
+  const ws = w.id
+  const agentTabs = view.tabs.filter(t => t.workspace === ws && t.kind === 'agent' && t.status !== 'exited')
+  const preview = (path: string, line?: number, storage?: boolean) => setShown(s => ({ path, line, storage, n: (s?.n ?? 0) + 1 }))
+  const revertOk = (file: string, part?: string, uncommitted?: boolean) => ask(part ? `Revert ${part} in ${file.split('/').pop()}?` : `Revert ${file.split('/').pop()}?`, { text: `Back to how it is ${uncommitted ? 'in the last commit' : `on ${w.base ?? 'the base'}`}. Nothing is committed; Undo is in the toast.${agentTabs.some(t => t.status === 'running') ? ' Its agent is working here: it may write it again.' : ''}`, ok: 'Revert', danger: true })
+  const redo = (id: string, then?: () => void) => api.call('hunkRedo', { ws, id }).then(() => (then?.(), done('Back as it was')), fail)
+  const fileMenu = (e: ReactMouseEvent, path: string, storage?: boolean) =>
+    openMenu(e, [
+      { label: 'Preview', icon: 'eye', run: () => preview(path, undefined, storage) },
+      { label: storage ? 'Open' : 'Open in editor', icon: 'file', run: () => void api.call('openIn', { ws, app: storage ? 'default' : 'editor', file: path, storage }).catch(fail) },
+      { label: 'Show in Finder', icon: 'folder', run: () => void api.call('openIn', { ws, app: 'finder', file: path, storage }).catch(fail) },
+      { label: 'Copy path', icon: 'copy', run: () => void navigator.clipboard.writeText(path).then(() => done('Copied')) },
+    ])
+  const papi: PanelApi = {
+    files: () => api.call<FileList>('files', { ws }),
+    ...(w.annotAt && { annots: () => api.call<Annotations>('widgetAnnotations', { ws }), annotAt: w.annotAt }),
+    newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws, path, dir }).then(r => r.path),
+    openFile: file => void api.call('openIn', { ws, app: 'editor', file }).catch(fail),
+    preview: (path, line) => preview(path, line),
+    changes: uncommitted => api.call<Changes>('diff', { ws, uncommitted }),
+    prChanges: () => api.call<Changes>('prDiff', { ws }),
+    sinceChanges: () => api.call<Changes>('diff', { ws, since: true }),
+    commitChanges: sha => api.call<Changes>('diff', { ws, since: sha }),
+    turnChanges: n => api.call<Changes>('turnDiff', { ws, ...(n !== undefined && { n }) }),
+    turns: () => api.call<TurnKept[]>('turnList', { ws }),
+    ...(w.kind === 'worktree' && { bases: () => api.call('baseBranches', { ws }), setBase: (base: string) => api.call('wsBase', { ws, base }) }),
+    commits: () => api.call<Commits>('commits', { ws }),
+    commitDiff: sha => api.call<Changes>('commitDiff', { ws, sha }),
+    prFiles: () => api.call<PRFiles>('prFiles', { ws }),
+    setViewed: (path, viewed, id) => api.call('prViewed', { ws, path, viewed, id }),
+    read: (path, base, uncommitted) => api.call<FileContent>('fileRead', { ws, path, base, uncommitted }),
+    prFile: path => api.call<FileContent>('prFile', { ws, path }),
+    agents: agentTabs.map(t => ({ id: t.id, name: t.name })),
+    threads: () => api.call<Thread[]>('prThreads', { ws }),
+    apply: async (path, edits, then) => {
+      const was = (await api.call<FileContent>('fileRead', { ws, path })).text
+      if (was === undefined) return toast(`${path} isn't text`)
+      let text: string
+      try {
+        text = applySuggestions(was, edits)
+      } catch (e) {
+        return toast(`${path.split('/').pop()}: ${(e as Error).message}: nothing applied`)
+      }
+      await api.call('fileWrite', { ws, path, text, was })
+      then?.()
+      done(`Applied ${edits.length === 1 ? 'the suggestion' : `${edits.length} suggestions`}`, () => void api.call('fileWrite', { ws, path, text: was, was: text }).then(() => (then?.(), done('Back as it was')), fail))
+    },
+    comment: c => api.call('prComment', { ws, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
+    toAgent: (text, _line, to) => api.call('send', { target: to ?? ws, text, whenIdle: true, steer: true }).then(() => toast(`Sent to ${(to && view.tabs.find(t => t.id === to)?.name) || 'the agent'}`)),
+    saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
+    toPrompt: text => api.call('send', { target: agentTabs[0]?.id ?? ws, text, enter: false }),
+    sourceGuess: words => api.call<string[]>('sourceGuess', { ws, words }).catch(() => []),
+    sim: p => api.call('sim', p),
+    menu: (e, path) => fileMenu(e, path),
+    look: bridge?.quickLook && !w.host ? (path, storage) => (r => r && bridge!.quickLook!(`${r}/${path}`))(storage ? w.storage : w.path) : undefined,
+    drag: bridge?.dragOut && !w.host ? (path, storage) => (r => r && bridge!.dragOut!(`${r}/${path}`, r))(storage ? w.storage : w.path) : undefined,
+    web: (path, at, line) => void api.call<{ url: string }>('fileWeb', { ws, path, at, line }).then(r => openExternal(r.url), fail),
+    undoHunk: async (path, hunk, lines, then, uncommitted) => {
+      if (!(await revertOk(path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk', uncommitted))) return false
+      const { id } = await api.call<{ id: string }>('hunkUndo', { ws, path, hunk, lines, uncommitted })
+      then?.()
+      done(`Reverted ${lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : '1 hunk'} in ${path.split('/').pop()}`, () => void redo(id, then))
+      return true
+    },
+    undoFile: async (path, then, uncommitted) => {
+      if (!(await revertOk(path, undefined, uncommitted))) return false
+      const { id } = await api.call<{ id: string }>('fileUndo', { ws, path, uncommitted })
+      then?.()
+      done(`Reverted ${path.split('/').pop()}`, () => void redo(id, then))
+      return true
+    },
+    redo: id => redo(id),
+    artifacts: w.storage
+      ? {
+          files: () => api.call<{ path: string }[]>('artifactList', { ws }).then(l => ({ files: l.map(f => f.path), changed: {} })),
+          preview: path => preview(path, undefined, true),
+          open: path => void api.call('openIn', { ws, app: 'default', file: path, storage: true }).catch(fail),
+          menu: (e, path) => fileMenu(e, path, true),
+        }
+      : undefined,
+  }
+  const side = agentTabs[0]
+  return (
+    <div className="tab-window panel-window">
+      {shown ? (
+        <FilePreview
+          key={shown.n}
+          path={shown.path}
+          line={shown.line}
+          load={() => api.call<FileContent>('fileRead', { ws, path: shown.path, storage: shown.storage, media: true })}
+          onOpen={() => void api.call('openIn', { ws, app: shown.storage ? 'default' : 'editor', file: shown.path, storage: shown.storage }).catch(fail)}
+          onReveal={() => void api.call('openIn', { ws, app: 'finder', file: shown.path, storage: shown.storage }).catch(fail)}
+          openLabel={shown.storage ? 'Open' : undefined}
+          readOnly={shown.storage}
+          onClose={() => setShown(null)}
+          edit={shown.edit}
+          onEdit={edit => setShown(s => s && { ...s, edit })}
+          save={(text, was, force) => api.call('fileWrite', { ws, path: shown.path, text, was, force })}
+        />
+      ) : (
+        <SidePanel
+          w={says.info}
+          git={says.git !== false}
+          tab={tab}
+          onTab={pick}
+          api={papi}
+          sim={says.sim}
+          turn={says.turn}
+          width={0}
+          onWidth={() => {}}
+          onClose={() => window.close()}
+          float={{ out: true, go: () => window.close() }}
+          onOpen={openExternal}
+          onToggle={(k, v) => appDo({ op: 'auto', ws, k, v })}
+          onFix={what => appDo({ op: 'fix', ws, what })}
+          onLog={check => appDo({ op: 'log', ws, check })}
+          onAct={(act, method) => appDo({ op: 'act', ws, act, method })}
+          root={w.storage ? root : 'ws'}
+          onRoot={setRoot}
+          side={side && <SideChat key={side.id} tab={side} onSent={done} />}
+          info={
+            <InfoTab
+              w={says.info}
+              onOpen={openExternal}
+              onToggle={(k, v) => appDo({ op: 'auto', ws, k, v })}
+              onFix={what => appDo({ op: 'fix', ws, what })}
+              onLog={check => appDo({ op: 'log', ws, check })}
+              onAct={(act, method) => appDo({ op: 'act', ws, act, method })}
+              onRename={() => appDo({ op: 'rename', ws })}
+              onAttach={!w.pr && w.branch && !w.term ? () => appDo({ op: 'attach', ws }) : undefined}
+              onCopy={text => void navigator.clipboard.writeText(text).then(() => done('Copied'))}
+              onWs={id => appDo({ op: 'go', ws: id })}
+              onTab={(to, t) => appDo({ op: 'go', ws: to, tab: t })}
+              onSees={agent => appDo({ op: 'sees', agent, project: w.project })}
+              tabName={id => view.tabs.find(t => t.id === id)?.name ?? id}
+            />
+          }
+        />
+      )}
+      {menu}
+      <AskHost />
+      <Toasts toasts={notes} drop={id => setNotes(l => (id === undefined ? [] : l.filter(x => x.id !== id)))} Busy={<Glyph s="running" />} />
       <Tips />
     </div>
   )

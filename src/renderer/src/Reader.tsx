@@ -18,6 +18,7 @@ import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { useSecretHint } from './secretHint'
+import { useImprove } from './Improve'
 import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, toolSummary, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
 import { optLabel, ruleFrom } from '../../shared/ask'
@@ -31,7 +32,7 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { explain?: (tab: string) => Promise<AskExplained> /* a command ask's ? and E (Laki AI on): Diff.tsx useExplain */;
+export type ReaderApi = { explain?: (tab: string) => Promise<AskExplained> /* a command ask's ? and E (Laki AI on): Diff.tsx useExplain */; improve?: true /* ✨ in its box (Laki AI on): Improve.tsx */;
   dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string,
   text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean;
   v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[]; kept?: boolean }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string,
@@ -167,6 +168,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     return () => removeEventListener('keydown', on)
   }, [steps, tab.id])
   const hint = useSecretHint(text, setText, { ws: tab.workspace, send: () => send() })
+  const imp = useImprove(box, text, setText, !!api.improve && { tab: tab.id })
   const why = useSayWhy(tab.status === 'waiting' ? tab.ask : undefined, (n, label, say) => api.answer(tab.id, n, label, say)) // No, and say why
   const explain = useExplain(tab.id, tab.status === 'waiting' ? tab.ask : undefined, api.explain && (() => api.explain!(tab.id))) // ? or E: what its command will do
   const send = () => {
@@ -407,6 +409,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
       ) : (
         <>
         {hint.line}
+        {imp.pill}
         <form className="rd-box capsule" ref={fabOver} onSubmit={e => (e.preventDefault(), send())}>
           {tab.mode && (
             <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip={tab.modeUnknown ? `Claude's footer isn't on screen (a menu, a transcript view or a narrow pane hides it). Last seen: ${modeLabel(tab.mode)}` : 'Its permission mode: change it without restarting'} onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
@@ -432,6 +435,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
               if (sendIs(e) && !e.nativeEvent.isComposing) (e.preventDefault(), hint.guard(send)) // Settings › Keys › Send with; a pasted secret's line first
             }}
           />
+          {imp.button}
           <button type="submit" className="primary" disabled={!text.trim()}>
             Send
           </button>

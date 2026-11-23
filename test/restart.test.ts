@@ -415,7 +415,7 @@ test('U1, U2: a new install starts small (Labs off, no achievements game); one f
   assert.deepEqual(s.achievements, { off: true })
   assert.deepEqual([s.theme, s.themeAuto, s.themeLight, s.themeDark], ['laki', true, 'laki-light', 'laki']) // B2: Laki's own pair, as the system is
   assert.equal(s.design, process.platform === 'darwin' ? 'frosted' : undefined) // a Mac's window: the Frosted design
-  assert.equal(s.accent, process.platform === 'darwin' ? 'system' : undefined) // and macOS's accent color
+  assert.equal(s.accent, undefined) // in Laki's orange: macOS's accent color only when picked
   // U10: the base from origin, the row's next-step chip, memory compaction off, no notification as a turn finishes
   assert.deepEqual([s.syncBase, s.rowMarks, s.memoryCompact, s.notifyOn], ['origin', { step: true }, { on: false }, { done: false }])
   await assert.rejects(rig.rpc('noteList', {}), /Notes are off/)

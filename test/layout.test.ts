@@ -128,3 +128,48 @@ test('V18 flipMoves: the rows that moved, from where they were; new ones and sti
   assert.equal(flipMoves(many(0), many(30)), null) // 41 moved: a re-sort, no glide
   assert.equal(flipMoves(many(0), many(30), 50)?.length, 41)
 })
+
+test('Fold long projects (foldRows): the first cap rows and any that matters in place, a group folded away goes, an empty one stays', async () => {
+  const { foldRows } = await import('../src/renderer/src/fold.ts')
+  const rows = ['#a', '1', '2', '#b', '3', '4', '5', '#c', '#d', '6']
+  const isWs = (x: string) => !x.startsWith('#')
+  const names = (cap: number, hot: string[] = []) => (r => `${r.rows.join(' ')} +${r.more}`)(foldRows(rows, isWs, cap, x => hot.includes(x)))
+  assert.equal(names(0), '#a 1 2 #b 3 4 5 #c #d 6 +0') // off
+  assert.equal(names(10), '#a 1 2 #b 3 4 5 #c #d 6 +0') // short enough
+  assert.equal(names(3), '#a 1 2 #b 3 #c +3') // #d's only row folded: #d goes; #c had none: it stays
+  assert.equal(names(3, ['6']), '#a 1 2 #b 3 #c #d 6 +2') // a working one shows in its place
+  assert.equal(names(1), '#a 1 #c +5') // #b and #d folded away whole
+})
+
+test("Workers dock (dockRows, dockSum): an ask first, then failed, else the tabs' state; a cleared failed one gone", async () => {
+  const { dockRows, dockSum } = await import('../src/renderer/src/workers.ts')
+  const tab = (id: string, o: object = {}) => ({ id, workspace: 'w', name: id, kind: 'agent', status: 'running', ...o }) as never
+  const roll = (tabs: { status: string }[]) => (tabs.some(t => t.status === 'running') ? 'running' : 'done')
+  const rows = dockRows(
+    [
+      { ws: 'a', name: 'a', tabs: [tab('a1', { status: 'waiting' })], failed: 'its Done check still fails' }, // an ask wins over failed
+      { ws: 'b', name: 'b', tabs: [tab('b1', { status: 'exited' })] }, // every agent ended
+      { ws: 'c', name: 'c', tabs: [tab('c1', { progress: { pct: 40, note: 'tests\nhalf way' } })] },
+      { ws: 'd', name: 'd', tabs: [tab('d1', { status: 'idle' })] },
+      { ws: 'e', name: 'e', tabs: [tab('e1')], failed: 'its Done check still fails' }, // cleared
+    ],
+    ['e', 'c'], // c: cleared but not failed, stays
+    roll as never,
+  )
+  assert.deepEqual(rows.map(r => [r.ws, r.state]), [['a', 'waiting'], ['b', 'exited'], ['c', 'running'], ['d', 'done']])
+  assert.equal(rows[1].failed, 'its agent ended')
+  assert.deepEqual(rows[0].asks.map(t => t.id), ['a1'])
+  assert.deepEqual([rows[2].pct, rows[2].line, rows[0].first], [40, 'half way', 'a1'])
+  assert.equal(dockSum(rows.map(r => r.state)), '1 needs you · 1 failed · 1 working · 1 done')
+  assert.equal(dockSum(['waiting', 'waiting']), '2 need you')
+})
+
+test('Move to group › New group (newGroupRows): before the first group, the moved in the list order, no group split', async () => {
+  const { newGroupRows } = await import('../src/shared/types.ts')
+  const isSep = (x: string) => x.startsWith('S')
+  // ungrouped a b, group S1 with c d, group S2 with e
+  const ids = ['a', 'b', 'S1', 'c', 'd', 'S2', 'e']
+  assert.deepEqual(newGroupRows(ids, isSep, ['d', 'a'], 'N'), ['b', 'N', 'a', 'd', 'S1', 'c', 'S2', 'e']) // S1 keeps c, the new one a and d
+  assert.deepEqual(newGroupRows(['a', 'b', 'c'], isSep, ['b'], 'N'), ['a', 'c', 'N', 'b']) // no groups yet: at the end, a and c stay ungrouped
+  assert.deepEqual(newGroupRows(['S1', 'a'], isSep, ['a'], 'N'), ['N', 'a', 'S1']) // its only one out: S1 left empty
+})

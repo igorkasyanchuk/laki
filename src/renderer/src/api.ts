@@ -80,6 +80,9 @@ type Bridge = {
   simFloating?(): Promise<string[]> // the devices in windows of their own
   onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
+  floatPanel?(on?: boolean): void // the side panel in a window of its own (main's panelOpen, ?window=panel), or back (on false)
+  panelFloating?(): Promise<boolean> // whether it is out, as the app window loads (main opens it again if it was at quit)
+  onPanelFloating?(cb: (on: boolean) => void): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean, state?: Partial<TrayInfo>, progress?: number, inbox?: InboxItem[]): void // the Dock's count; the menu bar's item (its Recording Mode ticked; state: Q8, its picture, title and tooltip); progress: U15's Dock bar (tray.ts dockProgress)
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>

@@ -5,7 +5,7 @@ import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
-import { aiOn, GOAL_SAYS } from '../../shared/types'
+import { aiOn, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
 import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
@@ -25,6 +25,7 @@ import { bulkGroups, bulkPick } from '../../shared/ask'
 import type { SpendView } from './Spend'
 import { hasCap } from '../../shared/caps'
 import { fresh } from './motion'
+import { foldRows } from './fold'
 import { BLOCK, type Clash, portClashes } from '../../shared/isolation'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
@@ -561,6 +562,8 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           <span className="ws-going">creating…</span>
         </div>
       ))
+  // a workspace a fold never hides: the open one, one working or being set up or made, or one waiting on you
+  const matters = (w: WorkspaceView) => w.id === ws?.id || !!w.setup || !!going[w.id] || view.tabs.some(t => t.workspace === w.id && (spins(t) || needsYou(t)))
   // a project's rows as shown: none under a folded sep, the selected one too (each folded sep's in hidden)
   const shownRows = (p: Project, mine: WorkspaceView[]) => {
     const hidden = new Map<string, WorkspaceView[]>()
@@ -574,7 +577,23 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       hidden.get(under)?.push(x) ?? hidden.set(under, [x])
       return false
     })
-    return [...makingRows(p, ''), ...shown.flatMap(x => ('path' in x ? [wsRow(x)] : [sepRow(p, x, count.get(x.id) ?? 0, hidden.get(x.id)), ...makingRows(p, x.id)]))]
+    // a long project (Fold long projects, fold.ts): then Show N more, or Show less. The filter (hits) and ⌘K never fold
+    const cap = settings.foldAfter ?? FOLD_AFTER
+    const whole = folded.includes(`more:${p.id}`)
+    const { rows, more } = foldRows(shown, x => 'path' in x, whole ? 0 : cap, x => 'path' in x && matters(x))
+    const long = cap > 0 && whole && shown.filter(x => 'path' in x).length > cap
+    return [
+      ...makingRows(p, ''),
+      ...rows.flatMap(x => ('path' in x ? [wsRow(x)] : [sepRow(p, x, count.get(x.id) ?? 0, hidden.get(x.id)), ...makingRows(p, x.id)])),
+      ...(more || long
+        ? [
+            <div key={`more-${p.id}`} className="ws ws-new ws-fold" role="treeitem" aria-level={2} tabIndex={-1} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fold(`more:${p.id}`))} data-tip={more ? 'The rest of its workspaces (the filter and ⌘K find them too)' : `Only its first ${cap} again, and any working, waiting on you or open`} onClick={() => fold(`more:${p.id}`)}>
+              <Icon name={more ? 'chevron' : 'chevronUp'} size={12} />
+              <span className="ws-name">{more ? `Show ${more} more` : 'Show less'}</span>
+            </div>,
+          ]
+        : []),
+    ]
   }
   // the rail's list: its kind's (a filter looks through all of them)
   const listed = rail && !find ? view.projects.filter(p => railOf(p.kind) === railKind) : view.projects
@@ -689,7 +708,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
           <span className="grow" />
           <IconButton icon="archive" title="Archive them" onClick={pickedArchive} />
           <IconButton icon="bellOff" title="Mute or unmute them" onClick={pickedMute} />
-          <IconButton icon="sep" title="Move to group" onClick={e => (items => (items.length ? openMenu(e, items) : toast('Pick workspaces of one project with groups to move them')))(groupMoves(pickedWs()))} />
+          <IconButton icon="sep" title="Move to group" onClick={e => (items => (items.length ? openMenu(e, items) : toast('Pick workspaces of one project to move them')))(groupMoves(pickedWs()))} />
           <IconButton icon="trash" title="Delete them…" onClick={pickedRm} />
           <IconButton icon="x" title="Clear (Esc)" onClick={() => setPicked([])} />
         </div>

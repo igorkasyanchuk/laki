@@ -2,9 +2,9 @@
 // with it. Settings.tsx re-exports it.
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
-import { Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
+import { ask, Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
-import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
+import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows, type SecretKept } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
 import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
@@ -124,7 +124,7 @@ export function FolderField({ value, placeholder, label, onChange }: { value?: s
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[] }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; repoTemplates?: Template[]; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[] }
 
 // a project's MCP servers (shared/mcp.ts): each a name, a command (its args one per line) or a URL, its env, and the
 // profiles it's on for (all when none is picked); Claude Code and Codex take them by flags as a tab starts, the others
@@ -235,7 +235,8 @@ export function VarChips({ vars, value, onChange }: { vars: [string, string][]; 
   )
 }
 
-export function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange: (v: Template[]) => void }) {
+// repo: the repo's .laki/prompts names: one here of the same name says it overrides that one
+export function TemplatesField({ value = [], onChange, repo }: { value?: Template[]; onChange: (v: Template[]) => void; repo?: Template[] }) {
   const keys = useRef<number[]>([]) // like ActionsField's
   while (keys.current.length < value.length) keys.current.push(Math.random())
   const setAt = (i: number, t: Partial<Template>) => onChange(value.map((x, j) => (j === i ? { ...x, ...t } : x)))
@@ -246,6 +247,7 @@ export function TemplatesField({ value = [], onChange }: { value?: Template[]; o
         <div key={keys.current[i]} className="preset">
           <div className="row">
             <input value={t.name} placeholder="name" onChange={e => setAt(i, { name: e.target.value })} />
+            {repo?.some(r => r.name.trim() === t.name.trim()) && <span className="tag" data-tip="The repo's .laki/prompts has one of this name: this one is used here instead">Overrides the repo&apos;s</span>}
             <IconButton icon="trash" title="Remove template" onClick={() => drop(i)} />
           </div>
           <textarea className="mono" rows={5} spellCheck={false} value={t.text} placeholder="Fix this: {{prompt}}" onChange={e => setAt(i, { text: e.target.value })} />
@@ -469,6 +471,7 @@ export function ProjectSection(p: {
   onAllow?: (allow: AllowRule[]) => Promise<unknown> // F14: its auto-answer rules, the whole list (refused: the daemon says why)
   onAlwaysAsk?: (globs: string[]) => Promise<unknown> // F15: its Always ask for, the whole list
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
+  kept?: { list: SecretKept[]; forget: (k: SecretKept) => Promise<unknown> } // the secrets kept for this project (laki secret's Keep)
 }) {
   const [name, setName] = useState(p.project.name)
   const name0 = useRef(name) // sent only once changed here: the sidebar's Rename may have saved since
@@ -628,8 +631,46 @@ export function ProjectSection(p: {
           {count(named(p.global?.templates).length, named(c.templates).length, named(templatesFor(p.global?.templates, c.templates)).length)}. One here with a
           global one's name replaces it.
         </Scope>
-        <TemplatesField value={c.templates} onChange={templates => setC(y => ({ ...y, templates }))} />
+        <TemplatesField value={c.templates} repo={p.project.repoTemplates} onChange={templates => setC(y => ({ ...y, templates }))} />
+        {!!p.project.repoTemplates?.length && (
+          <div className="repo-tpls">
+            <p className="muted small">From the repo&apos;s .laki/prompts, for everyone on it: change them there, in a pull request.</p>
+            {p.project.repoTemplates.map(t => (
+              <div key={t.name} className="row small" data-tip={t.text.slice(0, 300)}>
+                <span className="tag">repo</span>
+                <span className="grow">{t.name}</span>
+                {named(c.templates).some(x => x.name.trim() === t.name.trim()) && <span className="muted">overridden here</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </Group>
+      {p.kept && (
+        <Group title="Kept secrets">
+          <Scope tag="This project">Secrets an agent here asked for that you kept for this project; ones kept for all projects are in Settings › General.</Scope>
+          <KeptSecrets list={p.kept.list} onForget={p.kept.forget} />
+        </Group>
+      )}
     </>
+  )
+}
+
+// the secrets kept for next time (laki secret's card: Keep for this project, or all projects): names only, never their
+// values (the Keychain has them); Remove forgets one. In Settings › General (every one) and a project's settings (its own)
+export function KeptSecrets({ list, projects, onForget }: { list: SecretKept[]; projects?: { id: string; name: string }[]; onForget: (k: SecretKept) => Promise<unknown> }) {
+  if (!list.length) return <p className="muted small">None yet. When an agent asks for a secret (laki secret), its card can keep it for the project or for all projects.</p>
+  return (
+    <div className="kept-secrets">
+      {list.map(k => (
+        <div key={`${k.scope}:${k.label}`} className="row small">
+          <Icon name="lock" size={12} />
+          <span className="grow">{k.label}</span>
+          <span className="muted">{k.scope === '*' ? 'all projects' : (projects?.find(p => p.id === k.scope)?.name ?? 'a removed project')} · kept {new Date(k.at).toLocaleDateString()}</span>
+          <button type="button" className="link small danger" onClick={() => void ask(`Remove ${k.label}?`, { text: "Its value goes from the Keychain: next time an agent asks for it, you type it again.", ok: 'Remove', danger: true }).then(ok => ok && onForget(k)).catch(() => {})}>
+            Remove
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }

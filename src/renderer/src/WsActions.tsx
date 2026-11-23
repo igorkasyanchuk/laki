@@ -3,8 +3,9 @@
 // App's render (r: App's values this render), as they were in App
 import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixWhat, type LabelApi, MERGE_WORDS, type PRAct, REVIEW, type WsInfo } from './Info'
 import { ask, askText, choose, type Fact, type MenuItem, moveIds, type Verdict } from './ui'
-import { creatorOf, type Gate, jobOf, type MergeMethod, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, rowsOf, type Settings, type View, type WorkspaceView } from '../../shared/types'
+import { creatorOf, FOLD_AFTER, type Gate, jobOf, type MergeMethod, newGroupRows, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, rowsOf, type Settings, type View, type WorkspaceView } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
+import type { Worker } from './workers'
 import { bridge, openExternal } from './api'
 import { forgeName, pendingWords, prName, prNo } from './text'
 import { hasCap } from '../../shared/caps'
@@ -28,10 +29,11 @@ export type WsActionsIn = {
   settings: Settings
   toast: (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean, ms?: number) => void
   view: View | null
+  viewNow: () => View | null // the view as it is now (App's viewRef): after a prompt, not this render's
 }
 
 export function wsActionsOf(r: WsActionsIn) {
-  const { call, checking, copy, done, flowItems, flowsOn, fold, folded, gated, rawKind, setDialog, settings, toast, view } = r
+  const { call, checking, copy, done, flowItems, flowsOn, fold, folded, gated, rawKind, setDialog, settings, toast, view, viewNow } = r
   // right click on a workspace in the sidebar
   // a delayed start (wsNew startAt): its agent now, at another time (when.ts parseAt's words, or limit), or never
   const laterNow = (w: WorkspaceView) => void call('wsSet', { id: w.id, start: true }).catch(() => {})
@@ -45,17 +47,32 @@ export function wsActionsOf(r: WsActionsIn) {
   const laterCancel = (w: WorkspaceView) => call('wsSet', { id: w.id, pending: null }).then(() => done(`${w.pending?.agent ?? 'Its agent'} won't start in ${wsName(w)}`), () => {})
   const detachPr = (w: WorkspaceView) => void call('prDetach', { ws: w.id }).then(() => done(w.prLinked ? 'Only related now: its own PR, once opened, is its PR' : `PR #${w.pr?.number ?? ''} detached: only related`), () => {}) // call toasts a failure
 
-  // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
-  // of its group (last before the first one); no groups: nothing (they're made from the project's ⋯)
+  // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), out
+  // of its group (last before the first one), or into a new one (New group…: named, made before the first group with them)
   // Move to group: a workspace's, or several picked ones of one project (groupMoves: [] when they aren't)
   const groupMoves = (ws_: WorkspaceView[]): MenuItem[] => {
     const p = view?.projects.find(p => p.id === ws_[0]?.project)
-    if (!p?.seps?.length || ws_.some(w => w.project !== p.id)) return []
+    if (!p || ws_.some(w => w.project !== p.id)) return []
     const ids = rowsOf(p, view!.workspaces).map(x => x.id)
     const seps = p.seps ?? []
     const isSep = (x: string) => seps.some(s => s.id === x)
     const groupOf = (id: string) => ids.slice(0, ids.indexOf(id)).reverse().find(isSep)
     const inSep = ws_.length === 1 ? groupOf(ws_[0].id) : undefined
+    // its rows and groups as they are once it's named (a workspace made, a group renamed meanwhile, kept); past a long
+    // project's fold (Fold long projects) the project shows whole, so the new group is in sight
+    const fresh = async () => {
+      const name = (await askText('New group', { placeholder: 'Release, Bugs, Ideas…', ok: 'Move' }))?.trim()
+      const v = viewNow()
+      const q = v?.projects.find(x => x.id === p.id)
+      if (!name || !v || !q) return
+      const now = q.seps ?? []
+      const id = `sep-${Math.random().toString(36).slice(2, 10)}`
+      const rows = newGroupRows(rowsOf(q, v.workspaces).map(x => x.id), x => now.some(s => s.id === x), ws_.map(w => w.id), id)
+      if ((await call('projectSet', { id: q.id, seps: [...now, { id, name }], rows }).then(() => true, () => false)) === false) return
+      const cap = settings.foldAfter ?? FOLD_AFTER
+      const before = rows.slice(0, rows.indexOf(id)).filter(x => v.workspaces.some(w => w.id === x && !w.archived)).length
+      if (cap > 0 && before >= cap && !folded.includes(`more:${q.id}`)) fold(`more:${q.id}`)
+    }
     const to = (target: string, into: boolean) => {
       call('reorder', { workspaces: moveIds(ids, ws_.map(w => w.id), { kind: 'ws', id: ws_[0].id, target, after: into, into }) }).catch(() => {})
       if (into && folded.includes(target)) fold(target) // as a drop does: it opens, to show it there
@@ -63,6 +80,8 @@ export function wsActionsOf(r: WsActionsIn) {
     return [
       ...seps.filter(s => s.id !== inSep).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', run: () => to(s.id, true) }) as MenuItem),
       ...(ws_.some(w => groupOf(w.id)) ? [{ label: 'Out of its group', icon: 'minus', run: () => to(ids.find(isSep)!, false) } as MenuItem] : []),
+      ...(seps.length ? [null] : []),
+      { label: 'New group…', icon: 'plus', run: () => void fresh() },
     ]
   }
   // Run workflow ›: the project's workflows and yours, a pick its Run sheet in this workspace (Workflows on; not a
@@ -168,15 +187,24 @@ export function wsActionsOf(r: WsActionsIn) {
       if ((await choose(`${verb} ${prName(pr)} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w), mergeVerdict(pr))) !== 1) return
       return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged ${prName(pr)}`, undefined, undefined, true))
     }
+    if (act === 'ci') {
+      if (!(await ask(`Approve and run CI on ${prName(pr)}?`, { text: `${pr.title ?? ''}\nIt's from a fork: its code runs in your CI. GitHub runs ${pr.held === 1 ? 'its held run' : `its ${pr.held} held runs`} now.`.trim(), facts: prFacts(w), ok: 'Approve and run' }))) return
+      return void call<{ approved: number }>('prAct', { ws: w.id, act, head: pr.head }).then(r => toast(`Approved ${r.approved} ${r.approved === 1 ? 'run' : 'runs'} of ${prName(pr)}`, undefined, undefined, true), () => {})
+    }
     const close = act === 'close'
     if (!(await ask(close ? `Close ${prName(pr)}?` : `Approve ${prName(pr)}?`, { text: [pr.title, close && `Without merging; it can be reopened on ${forgeName(pr)}.`].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? (pr.forge === 'gitlab' ? 'Close merge request' : 'Close pull request') : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed ${prName(pr)}` : `Approved ${prName(pr)}`, undefined, undefined, true), () => {})
   }
   // the waiting tabs of the workspaces this tab's agent started (fromTab), for its pane's foot (WorkerAsks)
-  const workerAsks = (tab: string) => {
-    const mine = view?.workspaces.filter(w => w.fromTab === tab && !w.archived) ?? []
-    return mine.flatMap(w => (view?.tabs ?? []).filter(t => t.workspace === w.id && t.status === 'waiting').map(t => ({ ws: w.id, name: wsName(w), tab: t })))
-  }
+  // the workspaces this tab's agent started (fromTab), each with its tabs and a failed Done check, for its pane's dock
+  // (WorkersDock)
+  const workerAsks = (tab: string): Worker[] =>
+    (view?.workspaces.filter(w => w.fromTab === tab && !w.archived) ?? []).map(w => ({
+      ws: w.id,
+      name: wsName(w),
+      tabs: (view?.tabs ?? []).filter(t => t.workspace === w.id),
+      ...(w.check?.status === 'over' && { failed: 'its Done check still fails' }),
+    }))
   const prDraft = (w: WorkspaceView) => {
     const pr = w.pr
     if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `${prName(pr)} is ready for review` : `${prName(pr)} is a draft`, undefined, undefined, true), () => {})

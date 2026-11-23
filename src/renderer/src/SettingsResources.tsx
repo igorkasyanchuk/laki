@@ -1,6 +1,6 @@
 // Settings › Resources: Laki and each tab by memory and CPU, with their processes, and when idle agents sleep.
 // Settings.tsx re-exports it.
-import { type DiskTidyWhat, type DiskUsage, type GitTidied, type KeptArts, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
+import { DISK_LOW, type DiskTidyWhat, type DiskUsage, type GitTidied, type KeptArts, type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
 import { BUDGET_DEFAULT } from '../../shared/browserBudget'
 import { Icon, Switch, act, ask } from './ui'
@@ -74,7 +74,7 @@ function ResGraph() {
   )
 }
 
-export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget, onBrowserBudget, gitTidy, onGitTidy }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void; browserBudget: number; onBrowserBudget?: (mb: number) => void; gitTidy?: boolean; onGitTidy?: (on: boolean) => void }) {
+export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget, onBrowserBudget, gitTidy, onGitTidy, diskLow, onDiskLow }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void; browserBudget: number; onBrowserBudget?: (mb: number) => void; gitTidy?: boolean; onGitTidy?: (on: boolean) => void; diskLow?: number; onDiskLow?: (gb: number) => void }) {
   const [r, setR] = useState<Resources | null>(null)
   const [named, setNamed] = useState<{ pid: number; name: string; stop?: string }[]>([])
   const [open, setOpen] = useState<string | null>(null) // the row whose processes show
@@ -263,7 +263,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget,
           {api.budgetSaid?.() && <div className="muted small">{api.budgetSaid()}</div>}
         </Group>
       )}
-      {api.disk && api.tidy && <Disk load={api.disk} tidy={api.tidy} gitNow={api.gitNow} weekly={gitTidy} onWeekly={onGitTidy} />}
+      {api.disk && api.tidy && <Disk load={api.disk} tidy={api.tidy} gitNow={api.gitNow} weekly={gitTidy} onWeekly={onGitTidy} low={diskLow} onLow={onDiskLow} />}
       {api.kept && <KeptArtifacts api={api.kept} />}
       <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host. After a restart, one unused this long stays asleep until you open it.">
         <label>
@@ -293,7 +293,7 @@ const TIDY: [DiskTidyWhat, string, string][] = [
 ]
 // B8: a project's git: its .git, loose objects and packs, when it was last tidied (or why not)
 const tidiedWords = (t?: GitTidied) => (!t ? 'not tidied yet' : `${t.failed ? 'tidy failed' : t.skipped ? 'tidy skipped' : 'tidied'} ${new Date(t.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`)
-function Disk({ load, tidy, gitNow, weekly, onWeekly }: { load: (again?: boolean) => Promise<DiskUsage>; tidy: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }>; gitNow?: (project: string) => Promise<unknown>; weekly?: boolean; onWeekly?: (on: boolean) => void }) {
+function Disk({ load, tidy, gitNow, weekly, onWeekly, low, onLow }: { load: (again?: boolean) => Promise<DiskUsage>; tidy: (what: DiskTidyWhat, days: number, dry: boolean) => Promise<{ goes: string[] }>; gitNow?: (project: string) => Promise<unknown>; weekly?: boolean; onWeekly?: (on: boolean) => void; low?: number; onLow?: (gb: number) => void }) {
   const [tidying, setTidying] = useState('')
   const now = (project: string) => (setTidying(project), gitNow!(project).then(() => get(true), e => setErr(String(e?.message ?? e))).finally(() => setTidying('')))
   const [d, setD] = useState<DiskUsage | null>(null)
@@ -366,6 +366,20 @@ function Disk({ load, tidy, gitNow, weekly, onWeekly }: { load: (again?: boolean
               </button>
             ))}
           </div>
+          {onLow && (
+            <label className="row" data-tip="Each disk a worktree is on, every few minutes: under this, a notice once (Make room… comes here), quiet again once it has twice that">
+              Warn when the disk has under
+              <span className="grow" />
+              <select value={low ?? DISK_LOW} onChange={e => onLow(Number(e.target.value))}>
+                {[...new Set([2, 5, 10, 20, 50, low ?? DISK_LOW])].sort((a, b) => a - b).filter(n => n > 0).map(n => (
+                  <option key={n} value={n}>
+                    {n} GB free{n === DISK_LOW ? ' (default)' : ''}
+                  </option>
+                ))}
+                <option value={0}>Never</option>
+              </select>
+            </label>
+          )}
           {onWeekly && (
             <Switch className="switch-row" on={weekly !== false} onChange={onWeekly}>
               Tidy each project's git weekly

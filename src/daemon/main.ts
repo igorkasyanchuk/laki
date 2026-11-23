@@ -12,7 +12,7 @@ import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
-import { askExplain, reviewSteps, promptQuestions, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
+import { askExplain, reviewSteps, promptQuestions, promptImprove, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
@@ -33,6 +33,7 @@ import * as backupMod from './dataBackup.ts'
 import * as gitTidyMod from './gitTidy.ts'
 import * as askStreak from './askStreak.ts'
 import { signIn } from './signin.ts'
+import { mcpAuthTick, mcpSignIn } from './mcpAuth.ts'
 import { dir, inRig } from './dir.ts'
 import * as scheduleMod from './schedule.ts'
 import * as hostsMod from './hosts.ts'
@@ -62,7 +63,7 @@ import { noteFile, noteGet, noteList, noteNew, noteRestore, noteRm, noteSave, no
 import { checkAgain, checkStop, checkTidy, goalClear, goalSet, proofShot } from './verify.ts'
 import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideState, tabHandover, turnDiff, turnFork, turnList, turnRewind, turnsDrop, turnsKept, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
 import { alertAnswer, alertShow, alertsSeen, noticesTo } from './alerts.ts'
-import { secretAsk, secretGive, secretKeep, secretsTidy } from './secrets.ts'
+import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
@@ -509,6 +510,7 @@ const api = {
   alertAnswer: p => alertAnswer(p),
   secretAsk: p => secretAsk(p), // laki secret: resolves as you answer (secrets.ts)
   secretGive: p => secretGive(p),
+  secretForget: p => secretForget(p), // Settings' kept secrets: Remove (the user's)
   secretKeep: p => secretKeep(p), // a prompt box's Pass as a secret: the value into a 0600 file, its path back (the user's, a phone's)
   secretsTidy: p => secretsTidy(p.now), // tests move the clock
   prAttach: (p: In<typeof prMod.prAttach>) => prMod.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
@@ -525,6 +527,7 @@ const api = {
   portKill: p => resourcesMod.portKill(p),
   meme: () => meme(),
   promptQuestions: p => promptQuestions(p), // Ask me first (the New workspace page): the user's and their phone's
+  promptImprove: p => promptImprove(p), // ✨ Improve my prompt (a prompt box): the user's and their phone's
   askExplain: (p: In<typeof askExplain>) => askExplain(p), // the ? on an ask's card: what its command does, by Laki AI; the user's and their phone's
   reviewSteps: (p: In<typeof reviewSteps>) => reviewSteps(p), // R13: the Review tab's Walk through, by Laki AI; the user's and their phone's
   artifactHosts: (p: In<typeof artifactHosts>) => artifactHosts(p), // S18: what a report's page loads that its CSP blocks
@@ -585,7 +588,7 @@ const api = {
   prComment: (p: In<typeof prMod.prComment>) => prMod.prComment(p),
   prReview: (p: In<typeof prMod.prReview>) => prMod.prReview(p),
   issueList: p => prMod.issueList(p),
-  prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
+  prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, head: p.head, force: p.force === true, from: p.from }),
   mergeQueueStart: p => prMod.mergeQueueStart({ wss: p.wss }), // the user's only (gates.ts AGENT_NO): each PR's project allows merging, its merge gates apply
   mergeQueueStop: p => prMod.mergeQueueStop({ project: p.project }),
   usageDays: async () => (async u => ({ ...u, ai: await aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
@@ -628,6 +631,7 @@ const api = {
   keptList: () => artifactsMod.keptList(), // C5: Artifacts of deleted workspaces
   keptRm: p => artifactsMod.keptRm(p),
   signIn: p => signIn({ tab: p.tab, act: p.act }),
+  mcpSignIn: p => mcpSignIn({ tab: p.tab, name: p.name, act: p.act }), // an MCP server's band: Sign in (the agent's own login), Dismiss
   keptOpen: p => artifactsMod.keptOpen(p),
   dataBackup: p => backupMod.dataBackup(p), // laki backup: the user's data in a .tgz (dataBackup.ts)
   dataRestore: p => backupMod.dataRestore(p, () => shutdown()), // laki restore: dryRun says what changes; else staged, moved in as the daemon restarts
@@ -866,9 +870,9 @@ const remoteNo = (method: string, p: Params) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'gitTidy',
-  'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'keptOpen', 'keptRm',
-  'uninstall', 'skillOpen', 'secretKeep', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
+const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
+  'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
+  'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
   'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
@@ -1302,7 +1306,7 @@ for (const k of [...CLIENT_READ, ...Object.values(CLIENT_SCOPE).flat()]) if (!Ob
 // default. Laki AI's tools for a remote ask go through the same gates (aiAsk's rpc with its Conn)
 // a new tab's or workspace's agent: its profile's, else what it names; none: wsNew's default agent, tabNew's a shell (tabSpec)
 const agentOf = (p: Params, tab: boolean) => (name => (name ? core.presetNamed(name)?.agent ?? name : ''))(typeof p?.preset === 'string' && p.preset ? p.preset : tab ? '' : core.state.settings?.agent || 'claude')
-const NEW_KEYS = new Set(['caller', 'from', 'fromTab', 'project', 'ws', 'preset', 'cmd', 'prompt', 'name', 'base', 'local', 'another', 'model', 'effort', 'perm', 'fast', 'sandbox', 'issue', 'pr', 'place', 'named', 'guessed', 'link', 'linked', 'vars', 'startAt', 'beside', 'edge', 'focus'])
+const NEW_KEYS = new Set(['caller', 'from', 'fromTab', 'project', 'ws', 'preset', 'cmd', 'prompt', 'name', 'base', 'local', 'another', 'model', 'effort', 'perm', 'fast', 'sandbox', 'issue', 'pr', 'place', 'named', 'guessed', 'link', 'linked', 'vars', 'startAt', 'beside', 'edge', 'focus', 'agent', 'noSetup'])  // agent: who started it, as said (Laki AI's laki_new_workspace); noSetup: its setup script skipped
 const newOk = (tab: boolean) => (p: Params) => {
   const extra = Object.keys(p ?? {}).find(k => !NEW_KEYS.has(k))
   if (extra) return extra
@@ -1352,8 +1356,8 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   tabNew: newOk(true),
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
 }
-const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
-  'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
+const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+  'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet',
@@ -1379,6 +1383,7 @@ for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, 
 // Telegram's (telegram.ts tgHooks.call): only TELEGRAM_OK's methods, at the level each needs, with ANSWER's checks of
 // what a call says (an agent tab's whole message, never a ! line; no say), then as the user's own call
 for (const k of Object.keys(TELEGRAM_OK)) if (!Object.hasOwn(api, k)) throw new Error(`TELEGRAM_OK's ${k} isn't a method of api`)
+tgMod.tgHooks.ai = (p, rpc) => aiAsk(p, rpc) // Laki AI from the chat: its tools through rpc, telegram.ts' act (this gate)
 tgMod.tgHooks.call = (method, p) => {
   const need = Object.hasOwn(TELEGRAM_OK, method) ? TELEGRAM_OK[method] : undefined
   if (!need || !tgMod.levelAtLeast(need)) return Promise.reject(new Error(`not from Telegram (${method}): do it on the Mac`))
@@ -1440,7 +1445,7 @@ function agentNo(method: string, p: Params) {
   else if (method === 'queueNow' && core.agentCaller(p.from)) keyTail.set(core.resolveTarget(String(p.tab ?? '')).id, '\x1b') // it presses Esc for the agent
   else if (method === 'tabMode') notAgent(p, 'change a permission mode')
   else if (method === 'tabDraft') notAgent(p, "read or change what the user is typing")
-  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close' || p.act === 'merge' || p.act === 'revert')) notAgent(p, `${p.act} a PR as you${p.act === 'merge' ? ' (turn on Merge when green yourself)' : ''}`) // S3: merge too: code into the base with no one reading it
+  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close' || p.act === 'merge' || p.act === 'revert' || p.act === 'ci')) notAgent(p, p.act === 'ci' ? "approve a fork PR's held CI runs as you (its code would run in your CI)" : `${p.act} a PR as you${p.act === 'merge' ? ' (turn on Merge when green yourself)' : ''}`) // S3: merge too: code into the base with no one reading it
   else if (method === 'wsSet' && ['autoFix', 'autoReview', 'autoMerge', 'autoLand'].some(k => p[k] !== undefined)) notAgent(p, "turn a workspace's PR switches on or off (Fix CI, Address reviews, Merge when green: the user's, in the status bar)")
   else if (method === 'prDraft' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can draft or ready its own workspace's PR only")
   else if ((method === 'prAttach' || method === 'prDetach' || method === 'prLabel') && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can attach, detach or label its own workspace's PR only") // S5
@@ -2255,6 +2260,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick()), { idle: 'slow' }) // LAKI_PR_BG: tests of the timer's own (bg) scans
   ticks.register('diskTick', 30_000, () => void (core.diskFullNow() && core.save()), { idle: 'keep' }) // R4: a full disk: the state written once there's room
+  ticks.register('mcpAuthTick', Number(process.env.LAKI_MCP_AUTH_MS) || 20_000, () => mcpAuthTick(), { idle: 'slow' }) // an MCP server that needs a sign-in, read off a claude or codex tab's screen (mcpAuth.ts)
+  ticks.register('diskLowTick', Number(process.env.LAKI_DISK_LOW_MS) || 5 * 60_000, () => resourcesMod.diskLowTick(), { idle: 'slow' }) // before it's full: a notice once a low spell (tests' shorter)
   ticks.register('dndTick', 20_000, () => core.dndTick(), { idle: 'keep' }) // U8: Do not disturb ends on time, its digest shown
   ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log

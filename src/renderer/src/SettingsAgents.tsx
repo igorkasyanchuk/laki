@@ -871,6 +871,7 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
                     {' '}
                     · {s.transport} · {s.scope === 'laki' ? 'from Laki' : s.scope}
                     {s.off && ' · off'}
+                    {s.signIn && <span className="warn"> · needs a sign-in (its tab says so)</span>}
                   </span>
                   <span className="mono small sees-cmd" title={s.file}>
                     {s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ')}

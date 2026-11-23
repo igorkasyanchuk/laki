@@ -2280,6 +2280,20 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 [data-look='frosted'] .app[data-dz] .sidebar { position: relative; z-index: 1; border-radius: var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), 14px 10px 44px -14px var(--f-drop); }
 [data-look='frosted'] .app[data-dz] .rail { border-right: none; border-radius: var(--f-r) 0 0 var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), -14px 10px 44px -14px var(--f-drop); }
 [data-look='frosted'] .app[data-dz].rail-on .sidebar { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept: a hairline between the rail and the list, one panel still */
+/* that hairline from under the title bar down (styles.css' .electron .rail): the traffic lights on one panel, no line through them */
+[data-look='frosted'] .app[data-dz].electron .rail::before { display: none; }
+/* a rail alone (a page over the list, the list hidden, Terminals' strip on the right): its own panel, under the title
+   row (the page's head, 40px), so the traffic lights sit above it with the page's title, none over its edge */
+[data-look='frosted'] .app[data-dz].electron:is(.list-off, .strip-right) .rail { margin-top: 41px; padding-top: var(--sp-3); }
+/* every page's first row on that line too (the Board's columns, the Calendar's bar, My Desk's tabs), as the AI page's
+   and Notes' (no padding of their own): 3px of room for a focus ring there (the page scrolls, so it clips), the body
+   that much higher */
+[data-look='frosted'] .app[data-dz].electron.list-off .page-body { margin-top: -3px; padding-top: 3px; }
+[data-look='frosted'] .app[data-dz].electron.rail-on:not(.list-off, .strip-right) .sidebar { border-left-color: transparent; }
+/* Terminals' and Browsers' strip beside the rail: the same, its left edge a line from 46px down (a background: the strip
+   scrolls, a pseudo-element would go with it) */
+[data-look='frosted'] .app[data-dz].electron.rail-on.strip-left .side-strip { border-left-color: transparent; background: linear-gradient(var(--f-edge), var(--f-edge)) 0 46px / 1px calc(100% - 46px) no-repeat border-box, var(--side); }
+[data-look='frosted'] .app[data-dz].electron.rail-on:not(.list-off, .strip-right) .sidebar::before { content: ''; position: absolute; top: 46px; left: -1px; bottom: 0; width: 1px; background: var(--f-edge); pointer-events: none; }
 [data-look='frosted'] .app[data-dz]:is(.list-off, .strip-right) .rail { border-right: 1px solid var(--f-edge); border-radius: var(--f-r); }
 [data-look='frosted'] .app[data-dz] .side-strip { border: 1px solid var(--f-edge); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi); } /* Terminals' and Browsers' strip: the rail's panel goes on (left), or a panel of its own (right) */
 [data-look='frosted'] .app[data-dz].strip-left .side-strip { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept, as the sidebar's */
@@ -2311,13 +2325,20 @@ html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-h
 @media (prefers-reduced-transparency: no-preference) {
   [data-look='frosted'].glass .app[data-dz] { background: var(--app-bg, var(--bg)); }
   [data-look='frosted'].glass .app[data-dz] .main { border-color: transparent; border-radius: 0; background: none; box-shadow: none; }
+  /* what's under the tab bar (the terminals, the side panel) a card with the panels' corners, not a square box: clipped
+     (menus and tips are fixed, out of it) */
+  [data-look='frosted'].glass .app[data-dz] .main > .body { border-radius: var(--rs, calc(var(--r-window) - var(--sp-2))); overflow: clip; }
+  [data-look='frosted'].glass .app[data-dz][data-pad='tiny'] .main > .body { border-radius: var(--r-s); } /* Terminal padding Tiny (2px): a corner's letters clear of it */
   [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar, .side-strip) { --f-r: var(--rs, calc(var(--r-window) - var(--sp-2))); box-shadow: inset 0 1px 0 var(--f-hi), var(--lift-2); }
   [data-look='frosted'].glass .app[data-dz].rail-on:not(.list-off, .strip-right) .rail { clip-path: inset(-48px 0 -48px -48px); }
   [data-look='frosted'].glass .app[data-dz].rail-on :is(.sidebar, .side-strip.left) { clip-path: inset(-48px -48px -48px 0); }
   [data-look='frosted'].glass:not(.vibrant) .app[data-dz] :is(.rail, .sidebar, .side-strip) { backdrop-filter: blur(var(--sp-6)) saturate(1.6); }
+  /* a page's head (Scheduled tasks, Settings…) on that see-through main area: no band of its own (glass' edge-blur is a
+     solid panel, styles.css), only its words: nothing scrolls under it */
+  [data-look='frosted'].glass .app[data-dz] .settings-head.edge-blur { background: none; border-bottom-color: transparent; }
 }
 /* its cards squircles too, glass or not (macOS 26's window corner, about 26px, less --f-gap: --f-r's 18px) */
-@supports (corner-shape: squircle) { [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .side-panel) { corner-shape: squircle; } }
+@supports (corner-shape: squircle) { [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .main > .body, .side-panel) { corner-shape: squircle; } }
 
 /* the rail: bare icons, a bar of the accent by the one you're on */
 [data-look='frosted'] .rail-kind { position: relative; }

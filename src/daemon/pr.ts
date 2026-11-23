@@ -85,12 +85,15 @@ export function prSoon(ws: string) {
   setTimeout(() => void scanPRs(false, new Set([ws])), Number(process.env.LAKI_PR_SOON_MS) || 2000) // tests' shorter
 }
 
-// one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)
+// one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state). ACTION_REQUIRED:
+// GitHub holds it for a maintainer's approval (a fork's PR): waiting, not failed (the PR's held, Approve and run)
 function checkOf(c: any): Check {
   const s = String(c.conclusion || c.state || '').toUpperCase()
   const state: Check['state'] = s === 'CANCELLED'
     ? 'cancelled'
-    : ['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(s)
+    : s === 'ACTION_REQUIRED'
+      ? 'pending'
+    : ['FAILURE', 'ERROR', 'TIMED_OUT', 'STARTUP_FAILURE'].includes(s)
       ? 'fail'
       : (c.status && c.status !== 'COMPLETED') || s === 'PENDING' || s === 'EXPECTED'
         ? 'pending'
@@ -406,6 +409,7 @@ async function scanPR(ws: Workspace) {
         updated: j.updatedAt,
         labels: Array.isArray(j.labels) && j.labels.length ? j.labels.map((l: PRLabel) => labelOf({ name: l.name, color: l.color })) : undefined, // the menu has their words
       }
+      if (pr.cross && pr.state === 'OPEN' && pr.head) (n => n && (pr.held = n))((await heldRuns(ws, pr.url, pr.head).catch(() => [])).length)
     }
   } catch (e) {
     wsLog(ws, `PR: ${lab ? 'glab mr' : 'gh pr'} view ${ws.prUrl ?? ws.branch}: ${lab ? glabSays(e, 'the MR') : firstLine(e)}`)
@@ -908,15 +912,21 @@ function diffLines(text: string) {
 // prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
 // as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
 // scan, for its new state. revert: a merged one undone by a new PR (prRevert), its answer
-export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge' | 'revert'; method?: MergeMethod; deleteBranch?: boolean } & GateOpts) {
+// ci: a fork's held workflow runs approved (Approve and run), under the project's Approve switch, pinned to head
+export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge' | 'revert' | 'ci'; method?: MergeMethod; deleteBranch?: boolean; head?: string } & GateOpts) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
-  if (o.act !== 'approve' && o.act !== 'close' && o.act !== 'merge' && o.act !== 'revert') throw new Error('approve, close, merge or revert?')
+  if (o.act !== 'approve' && o.act !== 'close' && o.act !== 'merge' && o.act !== 'revert' && o.act !== 'ci') throw new Error('approve, close, merge, revert or ci?')
   const proj = state.projects.find(p => p.id === ws.project)
-  if (!prAllows(proj?.config, o.act)) throw new Error(`${o.act === 'merge' ? 'merging' : o.act === 'close' ? 'closing' : o.act === 'revert' ? 'reverting' : 'approving'} PRs is off for this project: its settings' Pull requests`)
+  const perm = o.act === 'ci' ? 'approve' : o.act
+  if (!prAllows(proj?.config, perm)) throw new Error(`${perm === 'merge' ? 'merging' : perm === 'close' ? 'closing' : perm === 'revert' ? 'reverting' : 'approving'} PRs is off for this project: its settings' Pull requests`)
   if (o.act === 'revert') return prRevert(ws, pr)
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
+  if (o.act === 'ci') {
+    if (isLab(pr)) throw new Error('GitLab holds no fork pipelines for approval here: run it on GitLab')
+    return approveRuns(ws, pr, typeof o.head === 'string' ? o.head : undefined)
+  }
   if (o.act === 'merge') {
     const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
     const h = await gated('merge', ws, o)
@@ -933,6 +943,28 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge' 
     })
   void scanPRs()
   return {}
+}
+
+// a fork's PR: the workflow runs GitHub holds on its head until a maintainer approves them (a first-time contributor's,
+// by the repo's settings). Its repo from the PR's URL (a fork's worktree has the fork as origin). ponytail: one more gh
+// call per scan of an open fork PR
+const repoOfPr = (url: string) => /github\.com\/([^/]+\/[^/]+)\/pull\//.exec(url)?.[1]
+async function heldRuns(at: At, url: string, head: string): Promise<number[]> {
+  const repo = repoOfPr(url)
+  if (!repo || !/^[0-9a-f]{40}$/.test(head)) return []
+  const { stdout } = await exec(at, 'gh', ['api', `repos/${repo}/actions/runs?head_sha=${head}&status=action_required&per_page=100`, '--jq', '[.workflow_runs[].id]'], { timeout: 20000 })
+  const ids = JSON.parse(stdout || '[]')
+  return Array.isArray(ids) ? ids.filter((x): x is number => Number.isInteger(x)) : []
+}
+// Approve and run: each held run of the head the app showed (pinned: a push since asks again), by gh as you
+async function approveRuns(ws: Workspace, pr: PR, head?: string): Promise<{ approved: number }> {
+  if (!pr.cross) throw new Error(`PR #${pr.number} isn't from a fork: GitHub holds no runs of it`)
+  if (!pr.head || (head && head !== pr.head)) throw new Error(`PR #${pr.number} has a new head since: look again`)
+  const ids = await heldRuns(ws, pr.url, pr.head).catch(e => Promise.reject(new Error(ghSays(e, `PR #${pr.number}`))))
+  if (!ids.length) throw new Error(`PR #${pr.number}: no runs wait for approval`)
+  for (const id of ids) await exec(ws, 'gh', ['api', '-X', 'POST', `repos/${repoOfPr(pr.url)}/actions/runs/${id}/approve`], { timeout: 30000 }).catch(e => Promise.reject(new Error(ghSays(e, `PR #${pr.number}`))))
+  void scanPRs(false, new Set([ws.id]))
+  return { approved: ids.length }
 }
 
 // a merged PR undone: a new PR that reverts it, opened on the forge, nothing changed here. GitHub: its own Revert

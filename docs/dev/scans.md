@@ -500,7 +500,27 @@ number or its words, only in a reply to that ask's own push (`askOfMsg`: a "yes"
 Allow; `answer` with `label`, its push then *Picked*), else `send` with `whenIdle` (and *Queued* when an ask waits), a 👍
 (`setMessageReaction`, refused quietly) its receipt, a failure said back (*Not sent: …*); a photo (its biggest size) or a
 document: `getFile`, then `/file/bot<token>/<path>` read up to 20 MB (`readCapped`) into core's `imageSave` or `fileSave`,
-its path after the caption. A message that replies to nothing gets how to reply. Every action goes through `tgHooks.call`
+its path after the caption. 🤖 Laki AI (`focus` `@ai`: `/ai [question]`, the projects view's button, `nav:a`; *Where
+should this go?*'s `nav:ta`): `askAi`/`aiGo` hand the words (a photo as `images`) to main.ts' `tgHooks.ai`, aiAsk in the
+AI page's chat with `AI_WHERE` as its context and `act` as its rpc, so each tool call is the chat's (TELEGRAM_OK at its
+level, the limits, What Telegram did); `sendChatAction` typing every 4.5 s, the answer as `mdToTg` (3,500 characters,
+redacted); one ask at a time; refused with a claude or codex backend (`aiNo`: their tools call Laki as you, through laki
+mcp) and with Titles only. A message that replies to nothing and isn't in a topic: a pending ➕ New task's (`newIn`, 10
+minutes: `started`, `wsNew` then talked to), else the workspace you talk to (`state.telegram.focus`: a card's 💬 Talk
+here, `/talk <workspace>`; `/talk off`; gone with the workspace, Unpair or another bot), else *Where should this go?*
+(`whereTo`: the words kept 10 minutes under a key, `pend`; a button per agent's workspace, the newest six, and at
+Control ➕ New in each project: `nav:to` sends and talks there, `nav:mk` starts one; refused after a gap). Buttons
+(`/menu`, `/help`'s 📂 Projects; `nav:` callbacks, never an ask's `nonce:n`): `projectsView` › `projectView` (a page of
+`PAGE` 8, ◀ ▶) › `wsView` (its agents' state, a waiting one's ask, the last thing its agent said by `chatRead` as
+Markdown, unless titles only; 💬 Talk here, 📺 Screen, 📝 Diff (`screenOf`, `diffOf`, /screen's and /diff's too), ⬆ ⬇
+the workspace before or after, ⬅ its project), each edited in place (`editMessageText`; *not modified* ignored); a
+button names a project or workspace by a short key (`kOf`, `nav:<kind>:<key>`, under Telegram's 64 bytes), one from
+before a restart says to open /menu again. A voice note or audio (`heard`): `getFile`, through `ffmpeg` to 16 kHz WAV
+when this Mac has it (`LAKI_FFMPEG`: tests' none), else as it came (`format` ogg), then `voiceText` (Settings › Voice's
+cloud, OpenRouter's key), its words shown back (🎙) and routed as typed. An agent's words (a push's body, a card's last
+reply) go as Markdown (`shared/tgmd.ts` `mdToTg`: code, bold, italic, struck, links, headings, lists, quotes; the rest
+escaped; a body with code or a quote isn't folded, as a blockquote can't hold them); Telegram refusing the tags (*can't
+parse entities*) gets the same words plain (`out`'s `plainOf`). Every action goes through `tgHooks.call`
 (main.ts): only `gates.ts` `TELEGRAM_OK`'s methods at their level, with `ANSWER`'s checks of what they say (`sendOk`: an
 agent tab's, the whole message, never a `!` line; `answer` without `say`), then as the user's call. A done push to
 Telegram carries the turn's last line and the workspace's diff (`files.ts` `stats`: `+add −del · n files`). P3: the
@@ -584,7 +604,7 @@ changes sets `seenVersion`. A version with no section (a build between releases)
 
 ### Usage
 
-Laki AI's OpenRouter credits (ai.ts `aiCredits`, `Usage.tsx` `creditsPart`, the ring's `.usage-low` dot): `GET /key`
+Laki AI's OpenRouter credits (ai.ts `aiCredits`, `Usage.tsx` `creditsPart`; low: the ring's tip and the popup's tag): `GET /key`
 (`usage_daily`, `usage_weekly`, `usage_monthly`, `limit`, `limit_remaining`) and `GET /credits` (`total_credits`,
 `total_usage`: a key that may read them) with the key, at most every 5 minutes as the ring asks (each minute); each part
 shown when the other is refused; `creditsLow`: under $1 or 10% left of the credits or of the key's own limit.

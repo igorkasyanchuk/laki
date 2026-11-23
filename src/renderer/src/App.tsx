@@ -8,6 +8,7 @@ import { type NewLine, notesOf as newLines, type UpdateState } from '../../share
 import { version as appVersion } from '../../../package.json'
 import { Outbox } from './OutboxStrip'
 import { api, bridge, daemonBase, type Msg, notify, openExternal, reportView, setQuiet } from './api'
+import { usePanelHost } from './panelWin'
 import { setSecretHint } from './secretHint'
 import type { Walk } from '../../shared/walk'
 import { maskSecrets } from '../../shared/secrets'
@@ -48,6 +49,7 @@ import { type AgentUsage, USAGE_AGENTS } from './Usage'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
 import { ask, AskHost, askText, choose, copyImage, type Fact, HOTKEY, Icon, keep as store, keyTip, load, type MenuItem, morph, moveId, moveIds, ON, QUICK_KEY, SHOT_KEY, TAB_COLORS, TALK_KEY, TELL_KEY, tipKeys, Tips, Toasts, unchoose, useMenu, useRowDrag, type Verdict } from './ui'
+import { away as awayNow } from './motion'
 import { emojiOf } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, type Dialog, EDITOR_IDS, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -132,13 +134,16 @@ export function App() {
   useEffect(() => {
     // main says when another app is in front (a click into a Browsers page or the preview blurs the window, but Laki is
     // still in front); a browser: the page's focus, read once it has moved (into one of its frames: still focused)
-    const away = (on: boolean) => (document.documentElement.classList.toggle('away', on), setFront(!on))
+    const away = (on: boolean) => (awayNow(on), setFront(!on))
     away(!document.hasFocus())
+    // the page's focus is Laki in front, either way: main says so only on a change, so a reload that came up away (no
+    // focus yet) stayed away while in use
+    const back = () => away(false)
+    window.addEventListener('focus', back)
     if (bridge?.onFront) return void bridge.onFront(on => away(!on))
     const f = () => void setTimeout(() => away(!document.hasFocus()))
-    window.addEventListener('focus', f)
     window.addEventListener('blur', f)
-    return () => (window.removeEventListener('focus', f), window.removeEventListener('blur', f))
+    return () => (window.removeEventListener('focus', back), window.removeEventListener('blur', f))
   }, [])
   const [dialog, setDialogNow] = useState<Dialog>(null)
   // V13: pages and dialogs change in a view transition (ui.tsx morph): Ship, New workspace and a rename grow from the
@@ -239,12 +244,17 @@ export function App() {
   const small = useSyncExternalStore(SMALL.on, SMALL.now)
   const [drawer, setDrawer] = useState(() => !SMALL.now() && load<boolean>('laki.drawer', false) === true)
   useEffect(() => void (narrow && !small && localStorage.setItem('laki.drawer', JSON.stringify(drawer))), [drawer])
-  const sideOpen = narrow ? drawer : (sideOpens[sideKey] ?? sideOpens.projects ?? true)
+  // no project yet (a new install): no rail and no list, the Welcome page alone, with a strip at the top to move the
+  // window by (the rail was its handle); a project, and both are back. Pages still open by their keys (⌘, ⌘K)
+  const bare = !narrow && !!view && !view.projects.length && !view.settings?.recording // Recording mode's veiled view drops private projects: not a new install
+  const bareNow = useRef(bare)
+  bareNow.current = bare // the sidebar key while bare: nothing to show, nothing kept
+  const sideOpen = !bare && (narrow ? drawer : (sideOpens[sideKey] ?? sideOpens.projects ?? true))
   const keyNow = useRef(sideKey)
   keyNow.current = sideKey // the kind in sight when it's called: a timer's ring is an older render's
   const narrowNow = useRef(narrow)
   narrowNow.current = narrow
-  const setSideOpen = (v: boolean | ((o: boolean) => boolean)) => (narrowNow.current ? setDrawer(v) : setSideOpens(m => (k => ({ ...m, [k]: typeof v === 'function' ? v(m[k] ?? m.projects ?? true) : v }))(keyNow.current)))
+  const setSideOpen = (v: boolean | ((o: boolean) => boolean)) => bareNow.current || (narrowNow.current ? setDrawer(v) : setSideOpens(m => (k => ({ ...m, [k]: typeof v === 'function' ? v(m[k] ?? m.projects ?? true) : v }))(keyNow.current)))
   useDrawerSwipe(narrow, sideOpen, setSideOpen)
   useEffect(() => {
     if (!narrow || !sideOpen) return
@@ -1361,8 +1371,27 @@ export function App() {
     if (k === 'deploy' && !(await ask(`Deploy ${w.name ?? w.id}?`, { text: "Runs the project's deploy script in a deploy tab.", ok: 'Deploy' }))) return
     call<TabView>('run', { ws: w.id, script: k }).then(selectTab, () => {})
   }
-  // the panel on the right, on a tab: Info (⌘I), Files, Changes, Review, Preview
-  const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true), setReviewTight(false)) // asked for: it shows, beside a narrow Review tab too
+  // the side panel in a window of its own (panelWin.ts): what it shows there, its asks for what only App does (this
+  // window comes forward for their dialogs), and the panel back here once it closes
+  const panelHost = usePanelHost(
+    () => (ws && view ? { ws: ws.id, info: infoOf(ws), git, sim: project?.config?.simulator ?? settings.simulator === true, turn: view.tabs.some(t => t.workspace === ws.id && t.changes) } : { ws: null }),
+    d => {
+      window.focus()
+      if (d.op === 'sees') return setDialog({ sees: d.agent, in: d.project })
+      const w = viewRef.current?.workspaces.find(x => x.id === d.ws)
+      if (!w) return
+      if (d.op === 'act') void prAct(w, d.act, d.method)
+      else if (d.op === 'fix') void prFix(w, d.what)
+      else if (d.op === 'log') ciLog(w, d.check)
+      else if (d.op === 'auto') void setAuto(w, d.k, d.v)
+      else if (d.op === 'rename') setDialog({ renameWs: w.id })
+      else if (d.op === 'attach') setDialog({ attachPr: w.id })
+      else if (d.op === 'go') (setReveal(r => [...r, w.id]), d.tab ? selectTab({ id: d.tab, workspace: w.id }) : setWsId(w.id))
+    },
+    () => setPanelOpen(true),
+  )
+  // the panel on the right, on a tab: Info (⌘I), Files, Changes, Review, Preview; in its own window: shown there
+  const showPanel = (t: PanelTab) => (panelHost.out ? panelHost.tabTo(t) : (setPanelTab(t), setPanelOpen(true), setReviewTight(false))) // asked for: it shows, beside a narrow Review tab too
   uiRef.current = m => {
     if (m.do === 'show' && m.tab) return void (setDialog(null), selectTab(m.tab))
     if (m.do === 'link' && m.link) return void setLink(m.link)
@@ -1370,7 +1399,7 @@ export function App() {
     if (m.do === 'panel') return void (m.panel === 'none' ? setPanelOpen(false) : showPanel(m.panel as PanelTab))
     if (m.do === 'close') return void (full ? toggleFull(false) : setDialog(null))
   }
-  const panelShown = panelOpen
+  const panelShown = panelOpen && !panelHost.out
   const togglePanel = (t = panelTab) => (panelShown && !(reviewOn && reviewTight) && t === panelTab ? setPanelOpen(false) : showPanel(t)) // one U6 hid: a click brings it back
   const info = panelOpen && panelTab === 'info'
   const showInfo = (on = !info) => (on ? showPanel('info') : setPanelOpen(false))
@@ -1837,7 +1866,7 @@ export function App() {
     return bridge?.onUpdate?.(s => (setUpd(s), void (s.found && s.latest && toast(`Laki ${s.latest.version} is out`, () => setDialog({ section: 'general', spot: 'Updates' }), "See what's new"))))
   }, [])
   // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
-  const rail = !narrow
+  const rail = !narrow && !bare
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)
   const railW = railWords ? 68 : 52
   const sideKind: RailKind = rail ? railKind : 'projects' // a phone's drawer, or no rail: one width
@@ -2089,6 +2118,7 @@ export function App() {
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
     ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
     ...(aiOn(view?.settings) && hasCap(view, 'ask.explain') && { explain: tab => call('askExplain', { tab }) }), // a command ask's ?: Laki AI's words for it
+    ...(aiOn(view?.settings) && hasCap(view, 'prompt.improve') && { improve: true as const }), // ✨ in its box: Improve my prompt
     answer: (tab, n, label, say) => void call('answer', { tab, n, label, ...(say && { say }) }).catch(() => {}), // say: No, and say why; label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
     undo: t =>
@@ -2330,13 +2360,13 @@ export function App() {
         rmItem(ws) as Action,
       ]
   // fold a project's workspaces away, or back; ids of removed projects go
-  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => x === 'needs' || view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x)))) // needs: the Needs you list
+  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => x === 'needs' || view?.projects.some(p => p.id === x || x === `more:${p.id}` || p.seps?.some(s => s.id === x)))) // needs: the Needs you list; more:<project>: its long list shown whole (Show N more)
   // a workspace's actions and its PR's (WsActions.tsx); after fold: only functions, so nothing runs sooner or later
   const {
     allows, attachable, ciLog, detachPr, flowMenu, flowsHere, groupMoves, infoOf, labelApi, laterCancel,
     laterChange, laterNow, prAct, prFix, prMenu, refreshPR, runFlow, setAuto, shortBranch, workerAsks,
   } = wsActionsOf({
-    call, checking, copy, done, flowItems, flowsOn, fold, folded, gated, rawKind, setDialog, settings, toast, view,
+    call, checking, copy, done, flowItems, flowsOn, fold, folded, gated, rawKind, setDialog, settings, toast, view, viewNow: () => viewRef.current,
   })
   // App's side of extensions (AppWidgets.tsx), after fold as wsActionsOf: railColor and railColors are the rail's (below), read only in handlers
   const {
@@ -2387,7 +2417,7 @@ export function App() {
     listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
     openInItems, openMenu, wsTabMenu, openPort, openProject, openReview, reviewGo, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
-    panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
+    panelHost, panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
     pinPlan, placeName, notices, answerNotice, pops, prAct, setAuto, previewed, prFix, prMenu, project, projOf, quickNew, termType, radarKey, radarOf, rail, updateWs,
     railBar, railKind, railOf, rawKind, readerOn, readSwitch, onePane, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
     reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
@@ -2415,8 +2445,9 @@ export function App() {
     <div style={{ ...(rail && { '--rail-w': `${railW}px` }), ...(!(aiFab && (!aiDock || noBar)) && { '--fab-room': '0px' }) /* no button in the corner
       (minimized to the status bar, or off): no room kept for it */, '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the
       list pages' size (styles.css), as Settings'; the open page's own
-      */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow phone-bar-on' : ''} \
+      */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow phone-bar-on' : ''} ${bare ? 'bare' : ''} \
 ${bridge && /Mac/.test(navigator.userAgent) && !narrow ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} data-glow={settings.edgeGlow === true && !narrow && waitsElsewhere(view, tab?.id, front) ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
+      {bare && <div className="bare-drag drag" aria-hidden="true" />}
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}

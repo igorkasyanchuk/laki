@@ -270,6 +270,7 @@ export type AppBase = {
   panelApi: (w: WorkspaceView) => PanelApi
   panelOpen: boolean
   panelShown: boolean
+  panelHost: { out: boolean; float: (on?: boolean) => void } // the side panel in a window of its own (panelWin.ts usePanelHost)
   panelTab: PanelTab
   panelW: number
   peek: { id: string; top: number; left: number; oy?: number } | null
@@ -475,7 +476,7 @@ export type AppBase = {
   turnLive: (ws: string) => TurnApi
   welcomeRun: (cmd: string) => Promise<void>
   welcomeSample: (agent?: string) => Promise<void>
-  workerAsks: (tab: string) => { ws: string; name: string; tab: TabView; }[]
+  workerAsks: (tab: string) => { ws: string; name: string; tabs: TabView[]; failed?: string }[] // the workers a tab's agent started (WorkersDock)
   wsFiles: Opened[]
   drag: Drag | null
   alwaysAllow: (t: TabView) => Promise<void>

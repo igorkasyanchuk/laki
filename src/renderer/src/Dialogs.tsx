@@ -198,6 +198,7 @@ export function Pages({ app }: { app: AppCtx }) {
             call('settingsSet', s).catch(() => {})
           }}
           projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
+          kept={view.secretsKept ?? []}
           archived={view.archivedProjects}
           updateIdle={!!view.updateIdle}
           managed={view.managed}
@@ -955,7 +956,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
       {dialog && typeof dialog === 'object' && 'sep' in dialog && (() => {
         const p = view.projects.find(p => p.id === dialog.sep)
         const s = p?.seps?.find(x => x.id === dialog.id)
-        const tpls = templatesFor(settings.templates, p?.config?.templates)
+        const tpls = templatesFor(settings.templates, p?.config?.templates, p?.repoTemplates)
         const keys: string[] = [] // each pick's field, in order
         return (
         <Prompt

@@ -234,7 +234,6 @@ html.away ::selection { background: color-mix(in srgb, var(--fg) 16%, transparen
 .pin-card > :nth-child(2) { animation-delay: 0.08s; } .pin-card > :nth-child(3) { animation-delay: 0.13s; } .pin-card > :nth-child(4) { animation-delay: 0.17s; }
 .pin-card > :nth-child(5) { animation-delay: 0.21s; } .pin-card > :nth-child(n + 6) { animation-delay: 0.25s; }
 @keyframes pin-rise { from { opacity: 0; transform: translateY(8px); } }
-html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
 .pin-brand { align-self: stretch; display: flex; align-items: center; gap: var(--sp-4); margin: 0 -28px 6px; padding: var(--sp-5) var(--sp-6); border-bottom: 1px solid var(--line); font-size: var(--fs-4); }
 .pin-brand img { width: 24px; height: 24px; }
 .pin-tag { display: inline-flex; align-items: center; gap: var(--sp-3); margin-left: auto; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill); font-size: var(--fs-2); color: var(--muted); background: color-mix(in srgb, var(--fg) 6%, transparent); }
@@ -304,6 +303,12 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 :root { --neutral-strong: color-mix(in srgb, var(--fg) 72%, var(--bg)); --sel-fill: color-mix(in srgb, var(--fg) 9%, transparent); }
 .rail { flex: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-4); background: var(--rail-bg); border-right: 1px solid var(--line); }
 .electron .rail { padding-top: 46px; }
+/* the line between the rail and what's beside it starts under the title bar: the traffic lights (76px from the window's
+   edge, past a rail of 52 or 68) sit on one surface, no line through them (looks.css: Frosted's is the list's left edge).
+   ::before: the grain's overlay is the rail's ::after */
+.app.electron.rail-on .rail { position: relative; border-right-color: transparent; }
+.app.electron.rail-on .rail::before { content: ''; position: absolute; top: 46px; right: -1px; bottom: 0; width: 1px; background: var(--line); pointer-events: none; }
+.app.electron[data-dz~='chrome'][data-dz~='side-card'] .rail::before { display: none; } /* its rail has no line */
 .electron.rail-on .side-head { padding-left: max(6px, calc(76px - var(--rail-w, 68px))); } /* past the traffic lights (76px from the window's edge) */
 .rail-kind { width: 60px; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-2) 0; border: none; background: none; color: var(--muted); font: 600 var(--fs-1)/1.2 var(--ui-font); cursor: var(--cur-act); }
 .rail-kind:hover, .rail-kind.on { color: var(--fg); }
@@ -364,6 +369,7 @@ html[data-scrollbars='overlay'] :where(:hover, :focus-within, [data-scrolling]) 
 html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb { --sb: inherit; background-color: var(--sb); }
 html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:is(:hover, :active) { background-color: color-mix(in srgb, var(--fg) 34%, transparent); }
 .side-foot { flex: none; display: flex; align-items: center; gap: var(--sp-1); min-width: 0; height: var(--h-m); padding: 0 var(--sp-3); border-top: 1px solid var(--line); overflow: hidden; }
+.side-foot:empty { display: none; } /* the rail has its buttons and Video, Meme and Timer are off (a new install's): no empty row under Get started */
 /* the foot in one row: App's fit drops the last data-bare buttons' words (Settings' first) until it fits */
 .side-foot > button[data-bare].labeled { width: 24px; padding: 0; }
 .side-foot > button[data-bare] .ib-label { display: none; }
@@ -668,7 +674,6 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .g-ok { color: var(--muted); }
 .glyph.spin { width: 10px; height: 10px; margin: 0 2px; border: 2px solid color-mix(in srgb, var(--running) 25%, transparent); border-top-color: var(--running); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-html.away *, html.away *::before, html.away *::after { animation-play-state: paused !important; } /* Laki in the background (App's away): nothing animates */
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 /* the status bar, full width (App's wideBar; not on a phone): under the rail, the sidebar and the main area, over pages
@@ -1117,7 +1122,6 @@ button.danger:focus-visible { outline: 2px solid var(--error); outline-offset: 2
 @keyframes voice-pulse { 50% { opacity: 0.45; } }
 .voice-bar { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: var(--z-page); display: flex; align-items: center; gap: var(--sp-4); max-width: min(560px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-5); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel); color: var(--fg); font-size: var(--fs-2); box-shadow: var(--lift-3); animation: voice-in 0.18s ease-out; }
 @keyframes voice-in { from { opacity: 0; transform: translate(-50%, 8px); } }
-html.away .voice-bar { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
 .voice-bar.listening { border-color: var(--error); }
 .voice-bar.listening .icon-svg { color: var(--error); animation: voice-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ib.voice-listening, .voice-bar, .voice-bar .icon-svg { animation: none; } }
@@ -1483,6 +1487,10 @@ kbd { font-family: var(--mono); }
 .pr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); font-size: var(--fs-2); color: var(--muted); margin-top: -4px; }
 /* the PR's labels: GitHub's color as a dot (its fill could be unreadable on any theme), the theme's text */
 .pr-labels { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+/* a fork's PR whose workflow runs GitHub holds (pr.held): a line with Approve and run */
+.pr-held { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid color-mix(in srgb, var(--waiting) 45%, transparent); border-radius: var(--r-m); background: color-mix(in srgb, var(--waiting) 10%, transparent); font-size: var(--fs-2); }
+.pr-held > .icon-svg { color: var(--waiting); }
+.pr-held > span { flex: 1; min-width: 12em; }
 .pr-label { display: inline-flex; align-items: center; gap: var(--sp-3); padding: 1px var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-pill); font-size: var(--fs-2); line-height: 18px; }
 .pr-label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--lc, var(--muted)); }
 .pr-label-add { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 1px var(--sp-4); border-radius: var(--r-pill); font-size: var(--fs-2); line-height: 18px; color: var(--muted); }
@@ -2175,7 +2183,6 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .phone-sheet { width: 100%; max-height: 70dvh; overflow-y: auto; padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + var(--safe-b)); box-sizing: border-box; background: var(--panel); border-top: 1px solid var(--line); border-radius: var(--r-xl) var(--r-xl) 0 0; }
 @media (prefers-reduced-motion: no-preference) { .phone-sheet { animation: sheet-up var(--t-mid) var(--ease-out); } }
 @keyframes sheet-up { from { transform: translateY(100%); } }
-html.away :is(.narrow .sidebar, .phone-sheet) { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
 .ps-row { display: flex; align-items: center; gap: var(--sp-4); width: 100%; min-height: 44px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-l); background: none; color: var(--fg); font-size: var(--fs-4); text-align: left; }
 .ps-row.on { color: var(--accent-ink); background: var(--sel-fill); }
 .ps-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2526,6 +2533,9 @@ button[data-scope='broad'] .choice-rule, button[data-scope='broad'] .choice-plai
 .tab-win-head button { -webkit-app-region: no-drag; }
 .tab-win-body { position: relative; flex: 1; min-height: 0; background: var(--term-bg, var(--bg)); }
 .sim-win-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); } /* a floated simulator: the panel's tab alone */
+.panel-window { background: var(--panel); } /* the side panel in its own window (NewWindow.tsx PanelWindow): it fills it */
+.panel-window > .side-panel { flex: 1; max-width: none; border-left: 0; }
+.panel-window > .preview { flex: 1; min-height: 0; } /* a file's preview, in place of the panel */
 /* Settings › General › Developer: the CLI's links under its row */
 .custom-css { width: 100%; min-height: 96px; resize: vertical; font-size: var(--fs-2); tab-size: 2; } /* Appearance › Custom CSS */
 .cli-row { align-items: center; } /* its buttons as tall as a button, not as the words beside them (Updates' too) */
@@ -2592,7 +2602,6 @@ button[data-scope='broad'] .choice-rule, button[data-scope='broad'] .choice-plai
 .main:has(> .settings-page) > .ai-fab-wrap { bottom: 16px; } /* a page covers the status bar (and the strip) */
 .ai-float { position: absolute; right: 16px; bottom: 84px; z-index: calc(var(--z-ask) + 1); width: min(440px, calc(100% - 32px)); height: min(620px, calc(100% - 110px)); display: flex; border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--line)); border-radius: calc(var(--r-l) + var(--r-s)); overflow: hidden; box-shadow: var(--lift-3), var(--lift-2); background: var(--panel); transform-origin: 100% 100%; animation: ai-pop 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ai-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } } /* out of the button below it */
-html.away .ai-float { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
 .main:has(> .settings-page) > .ai-float { bottom: 66px; height: min(620px, calc(100% - 90px)); }
 .ai-float .ai-win-head, .ai-float .ai-win-head * { -webkit-app-region: no-drag; } /* in the main window a drag region would move the window */
 .ai-float .ai-win-head { cursor: grab; } /* App's AiFloat: dragged by its head */
@@ -2813,13 +2822,14 @@ html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the 
 .welcome-ssh { display: inline-flex; align-items: center; gap: var(--sp-3); border: 0; background: none; color: var(--muted); }
 .welcome-ssh:hover { color: var(--fg); }
 .welcome-checks { display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; margin-top: 8px; text-align: left; }
-.welcome-checks .check { display: flex; align-items: center; gap: var(--sp-4); color: var(--fg); }
-.welcome-checks .check .muted { margin-left: auto; text-align: right; }
-.welcome-checks .check .muted.grow { margin-left: 0; text-align: left; } /* U4: a failing row: its words, then its one button */
+/* U4: a row: its mark, then its name and words as one line that wraps under the name, then its one button */
+.welcome-checks .check { display: grid; grid-template-columns: var(--sp-6) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-4); color: var(--fg); }
+.welcome-install .check { grid-template-columns: auto minmax(0, 1fr) auto; } /* an agent not installed: its name, its command, Install */
 .welcome-ready { color: var(--muted); }
-.welcome-again { align-self: flex-start; margin-top: 4px; }
+.bare-drag { position: fixed; inset: 0 0 auto; height: 38px; pointer-events: none; } /* App's bare: no rail to move the window by */
+.app.bare .side-show { display: none; } /* nor a list to show */
 .project-sample { margin-left: 4px; }
-.welcome-checks .check-why { display: inline-flex; color: var(--muted); cursor: help; }
+.welcome-checks .check-why { display: inline-flex; margin-left: var(--sp-2); vertical-align: middle; color: var(--muted); cursor: help; }
 .welcome-checks .check-why:hover, .welcome-checks .check-why:focus-visible { color: var(--fg); }
 /* Find a setting */
 .settings-find { margin: 0 2px 8px; width: auto; } /* stretched by its column: 100% plus the margins made Help's nav scroll sideways */
@@ -3120,9 +3130,6 @@ button.board-name:hover { background: none; }
 /* macOS's Reduce motion: no transitions, and animations end where they would (the per-component rules above too) */
 @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 
-/* the ring's amber dot: Laki AI's OpenRouter credits running low (Usage.tsx) */
-.usage-btn { position: relative; }
-.usage-low { position: absolute; top: 1px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--waiting); }
 /* the plan limits' popup with several accounts: the ones other than the default a little dimmer */
 .usage-agent.other .usage-row { opacity: 0.8; }
 /* the Usage page (Usage.tsx UsagePage): filters, tiles, a bar a day stacked by agent (each its --tc- color, a 2px gap,
@@ -3176,7 +3183,6 @@ button.board-name:hover { background: none; }
 /* its popover (ShownPops): cards in the window's corner, over where a toast goes, under a dialog (its buttons stay reachable) */
 .shown-pops { position: fixed; right: 8px; bottom: 60px; z-index: 9; display: flex; flex-direction: column; gap: var(--sp-4); width: min(376px, calc(100vw - 16px)); max-height: calc(100vh - 96px); overflow-y: auto; padding: 0 var(--sp-4) 24px; pointer-events: none; } /* notices can be many: they scroll; the padding is the cards' shadow, which a scroller would cut, and clicks go through it */
 .shown-pop { pointer-events: auto; }
-html.away .shown-pop { animation-play-state: running !important; } /* one that comes while Laki is in the background: paused at its first frame it would stay unseen */
 .shown-pop { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); animation: toast-in 0.2s ease-out; }
 .shown-pop-head { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
 .shown-pop-head > .icon-svg { flex: none; color: var(--accent-ink); }
@@ -3715,7 +3721,6 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   :where(html[data-motion='high'] .glyph[data-fx='ask']) { animation: fx-ask var(--t-slow) var(--ease-out); } /* Motion: low (unset), only done */
   :where(html[data-motion='high'] .glyph[data-fx='err']) { animation: fx-err var(--t-slow) linear; }
 }
-html.away :is(.sidebar, .side-panel, .overlay, .menu, .modal, .toast, .needs-cards > div, .needs-cards > button, .ws.needs, .ws.v-new, .tab.v-new, .glyph[data-fx], .glyph[data-fx] path) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
 
 /* V9: the window behind another app (html.away: main's 'front'): the accent's fills, the picked row and the focus ring
    go to a neutral, as AppKit's do when a window isn't key. The accent as text (links: --accent-ink, resolved on <html>)
@@ -3902,6 +3907,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .rd-box textarea.rd-ghost::placeholder { font-style: italic; } /* settings.nextPrompt's guess: Tab takes it */
 .secret-strip .secret-row { display: flex; gap: var(--sp-3); margin: 4px 0; } /* laki secret's card (panels.tsx SecretStrip) */
 .secret-strip .secret-row input { flex: 1; min-width: 0; font-family: var(--mono); }
+.secret-strip .secret-row :is(select, button) { flex: none; width: auto; white-space: nowrap; } /* Keep it's select and the buttons as wide as their words: the field takes the rest */
 /* the Reader's card of a turn's changes (Reader.tsx TurnCard) */
 .rd-turn { margin: 4px 0 12px; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); }
 .rd-turn-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); }
@@ -4308,3 +4314,16 @@ html.panel-glass .quick-bar, html.panel-glass.new-window .settings-page { backgr
   @starting-style { html:not([data-motion='none']) .rd-live :is(.rd-agent, .rd-you) { opacity: 0; translate: 0 6px; } } /* .rd-live: set after its first paint, so the turns there already don't */
 }
 .sees-skills > summary { cursor: var(--cur-act); } .sees-skills > summary > h4 { display: inline; }
+
+/* ✨ Improve my prompt (Improve.tsx): its button while Laki AI works, the line over the box while it works and after
+   (Restore) */
+.improve-btn.busy .icon-svg { color: var(--accent); animation: v-breathe 1.2s ease-in-out infinite; }
+.improve-pill { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-1); color: var(--muted); }
+.improve-pill > .icon-svg { color: var(--accent); }
+/* a secret's card with one kept for it (SecretStrip): Saved for this project, one click gives it */
+.secret-saved { display: inline-flex; align-items: center; gap: var(--sp-2); flex: 1; color: var(--done, var(--fg)); font-size: var(--fs-2); }
+/* an orchestrator tab's workers (panels.tsx WorkersDock): one line folded, a row a worker open */
+.workers-dock .dock-head { width: 100%; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-act); }
+.workers-dock .dock-head:hover { background: none; color: var(--fg); }
+.workers-dock .dock-row + .dock-row { border-top: 1px solid var(--line); padding-top: var(--sp-2); }
+.workers-dock .dock-row.exited .queue-what { color: var(--error); }

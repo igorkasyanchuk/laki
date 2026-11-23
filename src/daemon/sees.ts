@@ -8,7 +8,7 @@ import { closeSync, constants, existsSync, fstatSync, openSync, readdirSync, rea
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { type AgentContext, type AgentRule, type AgentServer, type AgentSkill, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
-import { findProject, memoryNote, memoryOf, openPath, state, heldFrom, presets } from './core.ts'
+import { findProject, memoryNote, memoryOf, openPath, rt, state, heldFrom, presets } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
 import { redact } from './share.ts'
 
@@ -258,12 +258,14 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
   const mem = (l: Memory[] | undefined, auto: boolean) => (Array.isArray(l) ? l.filter(m => m && typeof m.text === 'string' && !!m.auto === auto).length : 0)
   const note = memoryNote(proj)
   const list = memoryOf(proj) // B6: the repo's, when it's there
+  // the servers a live tab of this agent in this project says need a sign-in (mcpAuth.ts' band)
+  const waiting = new Set(state.tabs.filter(t => t.preset === agent && (!proj || state.workspaces.find(w => w.id === t.workspace)?.project === proj.id)).flatMap(t => rt.get(t.id)?.mcpAuth?.names ?? []))
   return {
     agent,
     ...(proj && { project: proj.id, path: tilde(proj.path) }),
     rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
     memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
-    servers: [...mcpFor(proj?.config?.mcp, p.profile ?? agent).map(s => server(s.name, s, 'laki', "Laki: the project's settings")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))], // Laki's: passed by flags (shared/mcp.ts)
+    servers: [...mcpFor(proj?.config?.mcp, p.profile ?? agent).map(s => server(s.name, s, 'laki', "Laki: the project's settings")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))].map(s => (waiting.has(s.name) ? { ...s, signIn: true as const } : s)), // Laki's: passed by flags (shared/mcp.ts); waiting: mcpAuth.ts'
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
     skills: skillsAudit(path),
   }

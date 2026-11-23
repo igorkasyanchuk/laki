@@ -457,7 +457,7 @@ async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string;
     const args = ['pr', 'list', '--state', 'open', '--limit', '100', '--json', 'number,isDraft,reviewDecision,statusCheckRollup']
     ghCount(args)
     const prs = JSON.parse((await run('gh', args, { cwd: p.path, timeout: 60000 })).stdout || '[]') as P[]
-    const failing = (x: P) => (x.statusCheckRollup ?? []).some(c => /^(FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE)$/.test(c.conclusion || c.state || ''))
+    const failing = (x: P) => (x.statusCheckRollup ?? []).some(c => /^(FAILURE|ERROR|TIMED_OUT|CANCELLED|STARTUP_FAILURE)$/.test(c.conclusion || c.state || ''))
     const hit = prs.filter(x => (o.what === 'any' ? true : o.what === 'failing' ? failing(x) : !x.isDraft && x.reviewDecision === 'REVIEW_REQUIRED'))
     if (!hit.length) return { skip: o.what === 'failing' ? 'no PR with failing checks' : o.what === 'review' ? 'no PR waiting for review' : 'no open PR', check: '' }
     return { check: hit.map(x => `#${x.number}`).join(' ') }

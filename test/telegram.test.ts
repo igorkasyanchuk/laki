@@ -8,7 +8,8 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { AGENT_NO, clientMethod, REMOTE_NO, TELEGRAM_OK } from '../src/daemon/gates.ts'
 import { esc, scrub, tgHtml } from '../src/daemon/telegram.ts'
-import { fresh, sleep, until } from './helpers.ts'
+import { mdToTg } from '../src/shared/tgmd.ts'
+import { fresh, openrouter, reply, sleep, until } from './helpers.ts'
 
 const TOKEN = '11111:fake-secret-fake-secret-fake-secret'
 const ME = 42 // the paired user (a private chat's id is its user's)
@@ -27,6 +28,7 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
     for await (const c of q) body += c
     if (q.url === `/file/bot${TOKEN}/photos/file_1.jpg`) return void r.writeHead(200).end(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]))
     if (q.url === `/file/bot${TOKEN}/documents/notes.txt`) return void r.writeHead(200).end('my notes')
+    if (q.url === `/file/bot${TOKEN}/voice/file_2.oga`) return void r.writeHead(200).end(Buffer.from('OggS fake opus'))
     const m = /^\/bot([^/]+)\/(\w+)$/.exec(q.url ?? '')
     const call: Call = { method: m?.[2] ?? '', tok: decodeURIComponent(m?.[1] ?? ''), body: body ? JSON.parse(body) : {} }
     calls.push(call)
@@ -40,7 +42,7 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
       if (r.socket?.destroyed) return // its daemon gone meanwhile: the updates wait for the next one
       return ok(queue.splice(0).filter((u: any) => u.update_id >= (call.body.offset ?? 0)))
     }
-    if (call.method === 'getFile') return ok({ file_id: call.body.file_id, file_unique_id: 'u', file_path: call.body.file_id === 'big' ? undefined : call.body.file_id === 'doc' ? 'documents/notes.txt' : 'photos/file_1.jpg' })
+    if (call.method === 'getFile') return ok({ file_id: call.body.file_id, file_unique_id: 'u', file_path: call.body.file_id === 'big' ? undefined : call.body.file_id === 'doc' ? 'documents/notes.txt' : call.body.file_id === 'voice' ? 'voice/file_2.oga' : 'photos/file_1.jpg' })
     if (call.method === 'sendMessage' && gone.has(call.body.message_thread_id)) return void r.writeHead(400).end(JSON.stringify({ ok: false, error_code: 400, description: 'Bad Request: message thread not found' }))
     if (call.method === 'sendMessage') return ok({ message_id: (call.id = ++msg), chat: { id: call.body.chat_id, type: 'private' }, date: Math.floor(Date.now() / 1000) })
     ok(true)
@@ -55,8 +57,8 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
     of: (method: string) => calls.filter(c => c.method === method),
     fail: (e: object) => (next = e),
     // an update from someone (from, a chat), at a time (date: seconds ago)
-    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number; photo?: object[]; document?: object; thread?: number } = {}) =>
-      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), ...(o.photo || o.document ? { caption: text } : { text }), ...(o.photo && { photo: o.photo }), ...(o.document && { document: o.document }), ...(o.reply && { reply_to_message: { message_id: o.reply } }), ...(o.thread && { message_thread_id: o.thread, is_topic_message: true }) } }),
+    message: (text: string, o: { from?: number; chat?: number; type?: string; ago?: number; reply?: number; photo?: object[]; document?: object; voice?: object; thread?: number } = {}) =>
+      queue.push({ update_id: ++id, message: { message_id: 1000 + id, from: { id: o.from ?? ME, first_name: 'Ada' }, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' }, date: now() - (o.ago ?? 0), ...(o.voice ? {} : o.photo || o.document ? { caption: text } : { text }), ...(o.photo && { photo: o.photo }), ...(o.document && { document: o.document }), ...(o.voice && { voice: o.voice }), ...(o.reply && { reply_to_message: { message_id: o.reply } }), ...(o.thread && { message_thread_id: o.thread, is_topic_message: true }) } }),
     tap: (data: string, o: { from?: number; chat?: number; type?: string } = {}) =>
       queue.push({ update_id: ++id, callback_query: { id: `q${id}`, from: { id: o.from ?? ME }, data, message: { message_id: 1, chat: { id: o.chat ?? o.from ?? ME, type: o.type ?? 'private' } } } }),
   }
@@ -248,11 +250,12 @@ test('P2: a reply to a push goes to its tab (a waiting ask: a choice by its numb
   await until(() => b.of('sendMessage').some(c => /Not sent: .*a line that starts with !/.test(c.body.text)), 'a ! line refused')
   b.message('look at this\n!rm -rf /', { reply: done.id })
   await until(() => b.of('sendMessage').filter(c => /Not sent: .*a line that starts with !/.test(c.body.text)).length === 2, 'a later ! line too')
-  b.message('hello') // not a reply: how to send one
-  await until(() => b.of('sendMessage').some(c => /Reply to one of my messages/.test(c.body.text)), 'the hint')
+  b.message('hello') // not a reply, no Talk here: where should it go? an agent's button each
+  const where = (await until(() => b.of('sendMessage').find(c => /Where should this go/.test(c.body.text)), 'where to'))!
+  assert.ok(where.body.reply_markup.inline_keyboard.some((r: any) => r[0].text.startsWith('💬 ')))
   // a waiting menu: its push, and a reply with a choice's number picks it
   await rig.rpc('send', { target: tab.id, text: 'menu' })
-  const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length), 'the ask'))!
+  const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length && !/Where should this go/.test(c.body.text)), 'the ask'))!
   // "yes" to the older push is words for later, never an Allow of what it asks now
   b.message('Yes', { reply: done.id })
   await until(() => b.of('sendMessage').some(c => /^Queued: claude asks something first/.test(c.body.text)), 'queued')
@@ -287,7 +290,7 @@ test('P2: a photo or a file in a reply is saved through Laki and its path goes t
 })
 
 test('P3: TELEGRAM_OK is the whole of what a chat can do: never Stop, Ship, merge, archive, delete, settings, secrets, terminals, remote access', () => {
-  assert.deepEqual(Object.keys(TELEGRAM_OK).sort(), ['answer', 'diff', 'dndSet', 'screen', 'send', 'state', 'wsNew'])
+  assert.deepEqual(Object.keys(TELEGRAM_OK).sort(), ['answer', 'chatRead', 'diff', 'dndSet', 'screen', 'send', 'state', 'voiceText', 'wsNew'])
   for (const m of ['stopAll', 'longStop', 'input', 'run', 'ship', 'prAct', 'wsArchive', 'wsRm', 'settingsSet', 'secretGive', 'remoteStart', 'telegramSet', 'tabNew', 'turnRewind']) assert.ok(!Object.hasOwn(TELEGRAM_OK, m), m)
   assert.equal(TELEGRAM_OK.wsNew, 'control')
 })
@@ -295,7 +298,7 @@ test('P3: TELEGRAM_OK is the whole of what a chat can do: never Stop, Ship, merg
 test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /quiet at answer, titles only and Recording mode kept; /new only at control; limits; the log", async t => {
   const { b, rig } = await paired(t, { LAKI_TG_LIMITS: 'ws=1,send=2' })
   const menu = (await until(() => b.of('setMyCommands').at(-1), 'the menu'))!
-  assert.deepEqual([menu.body.commands.map((c: any) => c.command), menu.body.scope], [['status', 'screen', 'diff', 'quiet'], { type: 'chat', chat_id: ME }])
+  assert.deepEqual([menu.body.commands.map((c: any) => c.command), menu.body.scope], [['menu', 'status', 'screen', 'diff', 'talk', 'ai', 'quiet'], { type: 'chat', chat_id: ME }])
   const { ws, tab } = await claude(rig)
   await rig.rpc('send', { target: tab.id, text: 'menu' })
   const ask = (await until(() => b.of('sendMessage').find(c => c.body.reply_markup?.inline_keyboard?.length), 'the ask'))!
@@ -312,7 +315,7 @@ test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /qu
   assert.match(await ask2('/screen'), /Which one\?/)
   assert.match(await ask2(`/diff ${ws.name ?? ws.id}`), /no changes|file/)
   assert.match(await ask2('/new laki fix it'), /needs the Control level/)
-  assert.match(await ask2('/nope'), /^No \/nope\. \/status: /)
+  assert.match(await ask2('/nope'), /^No \/nope\. \/menu: /)
   assert.match(await ask2('/quiet 2h'), /Do not disturb until/)
   assert.ok((await rig.rpc('state')).dnd?.until > Date.now() + 3600_000)
   assert.match(await ask2('/quiet off'), /is off/)
@@ -394,4 +397,133 @@ test("P4: topics refused until the bot has them; Telegram refusing one turns the
   await until(async () => (await rig.rpc('state')).telegram.topics === false, 'topics off')
   assert.match((await rig.rpc('state')).telegram.notice, /Topics are off: Telegram didn't make one/)
   await until(() => b.of('sendMessage').some(c => c.body.disable_notification && !c.body.message_thread_id), 'the push in the chat anyway')
+})
+
+test("Markdown to Telegram's HTML: code, bold, italic, links, lists, quotes, headings; escaped elsewhere; snake_case and URLs left alone", () => {
+  assert.equal(mdToTg('# Done\nFixed **cart** in `src/a_b.js` (a < b && c).'), '<b>Done</b>\nFixed <b>cart</b> in <code>src/a_b.js</code> (a &lt; b &amp;&amp; c).')
+  assert.equal(mdToTg('- one *thing*\n- [PR](https://x.io/p?a=1&b=2)'), '• one <i>thing</i>\n• <a href="https://x.io/p?a=1&amp;b=2">PR</a>')
+  assert.equal(mdToTg('> quoted _here_\n> more'), '<blockquote>quoted <i>here</i>\nmore</blockquote>')
+  assert.equal(mdToTg('```ts\nconst x = a<b\n```'), '<pre><code class="language-ts">const x = a&lt;b</code></pre>')
+  assert.equal(mdToTg('snake_case_name, 2*3*4, https://x.io/a/_b_/c'), 'snake_case_name, 2*3*4, https://x.io/a/_b_/c')
+  // a push: the agent's words as Markdown; one with code isn't folded (a blockquote can't hold it)
+  const p = { event: 'done', workspace: 'w', tab: 't', agent: 'claude', question: '**Ready**: run `npm test`' } as const
+  assert.equal(tgHtml(p), '<b>claude in w is done</b>\n<b>Ready</b>: run <code>npm test</code>')
+  assert.doesNotMatch(tgHtml({ ...p, question: `${'x'.repeat(400)}\n\`\`\`\ncode\n\`\`\`` }), /blockquote/)
+})
+
+test('buttons: /menu › a project › a workspace (⬆ ⬇ ⬅); Talk here; where to?; a new task; a voice note heard', async t => {
+  const or = await openrouter(t, [{ text: ' fix the flaky test ' }])
+  const { b, rig } = await paired(t, { LAKI_AI_API: or.url, LAKI_FFMPEG: '/nonexistent-ffmpeg' })
+  await rig.rpc('telegramSet', { level: 'control' })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-voice' }) // Settings › Voice's cloud: OpenRouter's key
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'two' })
+  const t1 = await until(async () => (x => x?.status === 'idle' && x)(await rig.tab(one.id)), 'one up')
+  const t2 = await until(async () => (x => x?.status === 'idle' && x)(await rig.tab(two.id)), 'two up')
+  const keys = (c: Call) => (c.body.reply_markup?.inline_keyboard ?? []).flat() as { text: string; callback_data: string }[]
+  const press = async (c: Call, label: RegExp) => {
+    const k = keys(c).find(x => label.test(x.text))
+    assert.ok(k, `${label} in ${keys(c).map(x => x.text).join(' | ')}`)
+    const n = b.of('editMessageText').length
+    b.tap(k.callback_data)
+    return (await until(() => b.of('editMessageText')[n], `${label}'s view`))!
+  }
+  b.message('/menu')
+  const menu = (await until(() => b.of('sendMessage').find(c => /<b>Projects<\/b>/.test(c.body.text)), 'the menu'))!
+  const proj = await press(menu, /^📁 /)
+  assert.deepEqual(keys(proj).filter(k => k.callback_data.startsWith('nav:w:')).map(k => k.text.replace(/^\S+ /, '')), ['one', 'two'])
+  const card1 = await press(proj, /one$/)
+  assert.match(card1.body.text, /^<b>one<\/b> in /)
+  const card2 = await press(card1, /⬇ Next/)
+  assert.match(card2.body.text, /^<b>two<\/b>/)
+  const back = await press(await press(card2, /⬆ Previous/), /^⬅ /)
+  assert.ok(keys(back).some(k => k.text === '➕ New task'), 'Control: a new task')
+  // Talk here: plain words go to its agent
+  await press(await press(back, /one$/), /Talk here/)
+  b.message('please add tests')
+  await until(async () => /please add tests/.test(await rig.screen(t1.id)), 'to one, no reply needed')
+  // a voice note: heard (ogg as it came: no ffmpeg), shown back, then to the same agent
+  b.message('', { voice: { file_id: 'voice', duration: 2, mime_type: 'audio/ogg' } })
+  await until(async () => /fix the flaky test/.test(await rig.screen(t1.id)), 'the voice note to one')
+  assert.equal(or.hits[0].body.input_audio.format, 'ogg')
+  assert.ok(b.of('sendMessage').some(c => c.body.text === '🎙 <i>fix the flaky test</i>'))
+  // nowhere to go: where to? its button sends it, and talks there from then on
+  b.message('/talk off')
+  await until(() => b.of('sendMessage').some(c => /go nowhere now/.test(c.body.text)), 'talk off')
+  b.message('check the logs')
+  const where = (await until(() => b.of('sendMessage').find(c => /Where should this go/.test(c.body.text)), 'where to'))!
+  b.tap(keys(where).find(k => k.text === '💬 two')!.callback_data)
+  await until(async () => /check the logs/.test(await rig.screen(t2.id)), 'to two by its button')
+  assert.equal((await rig.rpc('state')).telegram.focus, two.id)
+  // ➕ New task: the next message is its task, a workspace started and talked to
+  const before = (await rig.rpc('state')).workspaces.length
+  b.tap(keys(back).find(k => k.text === '➕ New task')!.callback_data)
+  await until(() => b.of('sendMessage').some(c => /Send the task for/.test(c.body.text)), 'asks for the task')
+  b.message('build a login page like this', { photo: [{ file_id: 'p1', file_size: 7 }] }) // a screenshot with its words
+  await until(() => b.of('sendMessage').some(c => /^Started <b>/.test(c.body.text)), 'started')
+  const v = await rig.rpc('state')
+  assert.equal(v.workspaces.length, before + 1)
+  assert.equal(v.telegram.focus, v.workspaces.at(-1).id)
+  const made = v.tabs.find((x: any) => x.workspace === v.workspaces.at(-1).id && x.kind === 'agent')
+  await until(async () => /build a login page like this .*images\/\d+-\w+\.jpg/s.test((await rig.screen(made.id)).replace(/\n/g, ' ')), "the task and its picture's path in the new agent's prompt")
+})
+
+test('🤖 Laki AI from the chat: its tools only what the chat may do, its answer as HTML, a photo as its picture; not with a CLI backend or Titles only', async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [])
+  const { b, rig } = await paired(t, { LAKI_AI_API: or.url })
+  await rig.rpc('telegramSet', { level: 'control' })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-tg' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const before = (await rig.rpc('state')).workspaces.length
+  b.message('/ai')
+  await until(() => b.of('sendMessage').some(c => /Laki AI<\/b>: ask it anything/.test(c.body.text)), 'the hello')
+  assert.equal((await rig.rpc('state')).telegram.focus, '@ai')
+  // a workspace started through its tool (at Control); an archive refused (not the chat's), said to the model
+  or.answers.push(
+    call('c1', 'laki_new_workspace', { project: p.id, prompt: 'build a login page', name: 'login' }),
+    call('c2', 'laki_archive', { id: 'nope' }), // its ask (aiQuestion) isn't the chat's
+    reply({ content: '**Started** `login`: it builds the page.' }),
+  )
+  b.message('start a task to build a login page')
+  await until(() => b.of('sendMessage').some(c => c.body.text === '<b>Started</b> <code>login</code>: it builds the page.'), 'its answer as HTML')
+  assert.ok(b.of('sendChatAction').length, 'typing… while it works')
+  assert.equal((await rig.rpc('state')).workspaces.length, before + 1)
+  assert.match(JSON.stringify(or.hits[2].body.messages), /not from Telegram/, "the archive refused, and the model told")
+  assert.match(JSON.stringify(or.hits[0].body.messages), /Telegram, on their phone/, 'it knows where you are')
+  assert.equal((await rig.rpc('aiState', {})).chat.find((x: any) => x.role === 'user')?.text, 'start a task to build a login page', "the AI page's chat has it")
+  // a photo goes as its picture
+  or.answers.push(reply({ content: 'A tiny JPEG.' }))
+  b.message('what is this?', { photo: [{ file_id: 'p1', file_size: 7 }] })
+  await until(() => b.of('sendMessage').some(c => c.body.text === 'A tiny JPEG.'), 'about the photo')
+  assert.match(JSON.stringify(or.hits.at(-1)!.body.messages.at(-1)), /image_url/)
+  // Recording mode: a private workspace stays out of it, though its id is known
+  const priv = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'secret' })
+  await until(async () => (await rig.tab(priv.id))?.status === 'idle', 'secret up')
+  await rig.rpc('wsSet', { id: priv.id, private: true })
+  await rig.rpc('settingsSet', { recording: true })
+  or.answers.push(call('c3', 'laki_screen', { target: priv.id }), reply({ content: 'Hidden.' }))
+  b.message('show its screen')
+  await until(() => b.of('sendMessage').some(c => c.body.text === 'Hidden.'), 'answered')
+  assert.match(JSON.stringify(or.hits.at(-1)!.body.messages), /hidden from Telegram/)
+  await rig.rpc('settingsSet', { recording: false })
+  // Notify: nothing is read, but a pairing code's poll: then a menu's button answers nothing
+  await rig.rpc('telegramSet', { level: 'notify' })
+  await rig.rpc('telegramPair')
+  b.tap('nav:a')
+  await until(() => b.of('answerCallbackQuery').some(c => /pushes only/.test(c.body.text ?? '')), 'a tap refused')
+  await rig.rpc('telegramSet', { level: 'control' })
+  // Titles only, or a CLI backend: refused before anything goes
+  const n = or.hits.length
+  await rig.rpc('telegramSet', { detail: 'titles' })
+  b.message('and now?')
+  await until(() => b.of('sendMessage').some(c => /Titles only is on/.test(c.body.text)), 'titles only')
+  await rig.rpc('telegramSet', { detail: 'full' })
+  await rig.rpc('settingsSet', { ai: { backend: 'claude' } })
+  b.message('and now?')
+  await until(() => b.of('sendMessage').some(c => /doesn't answer from Telegram/.test(c.body.text)), 'a CLI backend')
+  assert.equal(or.hits.length, n, 'nothing asked')
+  b.message('/talk off')
+  await until(async () => !(await rig.rpc('state')).telegram.focus, 'stopped')
 })

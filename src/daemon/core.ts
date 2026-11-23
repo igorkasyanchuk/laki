@@ -47,9 +47,10 @@ import { procParent, procPeer, procSession, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { AcpPty } from './acp.ts'
-import { SECRETS_DIR } from './secrets.ts'
+import { SECRETS_DIR, secretsDrop } from './secrets.ts'
 import { CURSOR } from '../shared/install.ts'
 import { type SignedOut, signedOutView, turnSignedOut } from './signin.ts'
+import type { McpAuth } from './mcpAuth.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
 import { appBinOk, appOf, helperBin, launcherOurs, lsAppExe } from '../shared/helper.ts'
 import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MAX } from '../shared/prTemplate.ts'
@@ -155,13 +156,13 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
 export type Runtime = { held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
-  stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; boxed?: Boxed /* a command its sandbox stopped this turn
+  stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; mcpAuth?: McpAuth /* an MCP server that needs a sign-in (mcpAuth.ts) */; boxed?: Boxed /* a command its sandbox stopped this turn
   (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number;
   waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a
   project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm;
   permCmd?: string; permCut?: boolean; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number;
   last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string;
-  published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string };
+  published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string; saved?: 'project' | 'all' };
   changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait;
   // permCmd: a Bash ask's whole command (2,000 characters at most; perm's what is a line of 300), with it, for askExplain; permCut: it was longer than that;
   // changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit,
@@ -327,7 +328,7 @@ export function load() {
   // test's daemon, as with Labs below, only with LAKI_TEST_LEAN=1: the rest of the tests are of agents without one
   if (!had && state.settings?.sandboxNew === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1')) state.settings = { ...state.settings, sandboxNew: true }
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
-    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted', accent: 'system' }), ...NEW_DEFAULTS }) } // macOS's accent color (themes.ts: the theme's where it wouldn't show); B2: and Laki's own theme pair, light or dark as the system is
+    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki', ...(process.platform === 'darwin' && { design: 'frosted' }), ...NEW_DEFAULTS }) } // B2: Laki's own theme pair, light or dark as the system is, with its orange (macOS's accent color is a click away in Appearance), on a Mac the Frosted design
   slugActions() // actions from before slugs
 }
 
@@ -956,6 +957,7 @@ function tabView(t: Tab, status: Status): TabView {
   const planOn = state.settings?.livePlan !== false
   const needAt = waiting ? r.waitAt : r.done && idle ? r.idleAt : undefined
   const signedOut = signedOutView(r)
+  const mcpAuth = (a => a?.names.length ? { names: a.names, ...(a.login && { login: a.login.name }) } : undefined)(r?.mcpAuth) // the servers waiting, the one whose login runs (mcpAuth.ts)
   const card = cards.get(t.id)
   const share = shareLink(t.id)
   const hookless = deafOf(t.id) // hooks not heard (hookTick)
@@ -972,6 +974,7 @@ function tabView(t: Tab, status: Status): TabView {
     ...(t.draft && { drafted: true }),
     ...(uncovered(t) && { ungated: true }),
     ...(signedOut && { signedOut }),
+    ...(mcpAuth && { mcpAuth }),
     ...(r.failed && idle && !r.signedOut && { failed: r.failed }),
     ...(r.boxed && (waiting || idle) && { boxed: r.boxed }),
     // claude's permission mode, while it runs
@@ -1051,7 +1054,8 @@ function projectView(p: Project) {
   return {
     ...p,
     ...(h && { cfgWait: h }),
-    ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }),
+    ...((c => c.setup && { hasSetup: true })(projectConfig({ project: p.id } as Workspace))),
+    ...((t => t?.length && { repoTemplates: t })(projectConfig({ project: p.id } as Workspace).prompts)),
     ...(!p.host && onGitHub(p.path) && { github: true }),
     ...(inRepo(p) && { memory: memoryOf(p), notes: notesOf(p) }),
   }
@@ -1095,6 +1099,7 @@ export function view(): View {
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
     ...(diskFull && { diskFull }),
+    ...(state.secretsKept?.length && { secretsKept: state.secretsKept }),
     ...(dndOn() && { dnd: { until: state.dnd!.until } }), // U8
     ...(state.digest && { digest: state.digest }),
     caps: CAPS,
@@ -1434,17 +1439,60 @@ function cfgRead(p: Project): { c: ProjectConfig; h: string } {
   if (p.host) return (c => ({ c, h: cfgHash(c) }))(hostCfg.get(`${p.host}:${p.path}`) ?? {})
   const f = join(p.path, '.laki.json')
   const st = statSync(f, { throwIfNoEntry: false })
-  const sig = st ? `${st.mtimeMs}:${st.size}` : ''
+  const pr = promptFiles(p)
+  const sig = `${st ? `${st.mtimeMs}:${st.size}` : ''}|${pr.map(x => `${x.name}:${x.at}:${x.size}`).join(',')}`
   const had = cfgSeen.get(f)
   if (had?.sig === sig) return had
   let c: ProjectConfig = {}
   const j = readJson(f)
   if (j && typeof j === 'object' && !Array.isArray(j)) c = j
+  const prompts = repoPrompts(p, pr)
+  if (prompts.length) c = { ...c, prompts } // in what's hashed: an edit to the folder waits for your trust, as .laki.json does
   const r = { sig, c, h: cfgHash(c) }
   cfgSeen.set(f, r)
   return r
 }
 export const fileCfg = (p: Project) => cfgRead(p).c
+// a repo's prompt templates: .laki/prompts/*.md in the main checkout (a team reviews them in PRs), each a template named by
+// its front matter's name: (else the file's name), its text the rest; REPO_PROMPTS_MAX files of PROMPT_MAX bytes at most
+export const REPO_PROMPTS = join('.laki', 'prompts')
+const REPO_PROMPTS_MAX = 50
+const PROMPT_MAX = 64 * 1024
+// each file lstat'd: a link (or a folder of them linked out of the repo) is left out, never read, so no file outside the
+// project reaches the view. Read again at most every PROMPTS_FRESH ms (views ask per workspace)
+const PROMPTS_FRESH = 2000
+const promptsSeen = new Map<string, { at: number; files: { name: string; at: number; size: number }[] }>()
+function promptFiles(p: Project) {
+  const had = promptsSeen.get(p.path)
+  if (had && Date.now() - had.at < PROMPTS_FRESH) return had.files
+  const d = join(p.path, REPO_PROMPTS)
+  let files: { name: string; at: number; size: number }[] = []
+  try {
+    if (realpathSync(d) === join(realpathSync(p.path), REPO_PROMPTS)) // .laki and prompts themselves no links
+      files = readdirSync(d)
+        .filter(n => n.endsWith('.md'))
+        .sort()
+        .slice(0, REPO_PROMPTS_MAX)
+        .flatMap(name => (st => (st?.isFile() && st.size <= PROMPT_MAX ? [{ name, at: st.mtimeMs, size: st.size }] : []))(lstatSync(join(d, name), { throwIfNoEntry: false })))
+  } catch {} // none
+  promptsSeen.set(p.path, { at: Date.now(), files })
+  return files
+}
+export function promptOf(file: string, text: string): Template | undefined {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
+  const name = (m && /^name:\s*(.+)$/m.exec(m[1])?.[1].trim().replace(/^(['"])(.*)\1$/, '$2')) || file.replace(/\.md$/, '')
+  const body = (m ? text.slice(m[0].length) : text).trim()
+  return name && body ? { name: name.slice(0, 80), text: body, repo: true } : undefined
+}
+function repoPrompts(p: Project, files = promptFiles(p)): Template[] {
+  return files.flatMap(f => {
+    try {
+      return (t => (t ? [t] : []))(promptOf(f.name, readFileSync(join(p.path, REPO_PROMPTS, f.name), 'utf8')))
+    } catch {
+      return []
+    }
+  })
+}
 // its trust (projectTrust, the app's sheet): the hash of what it says. One you haven't trusted as it is gives its port
 // names only: none of its setup, teardown, run, scripts, env, copy or expose. Projects from before this were trusted
 // as they were (load)
@@ -1945,6 +1993,7 @@ export function projectRm(ref: string) {
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
+  secretsDrop(p.id) // and the secrets kept for it (secrets.ts): a project later named the same gets the same id
   flowTrustDrop(Object.keys(state.flowTrust ?? {}).filter(k => k.startsWith(`project:${p.id}:`)), state.flowTrust) // its workflows' trust and trusted texts (workflow.ts' agentKey)
   if (state.settings?.railPlans) state.settings.railPlans = state.settings.railPlans.filter(x => x.project !== p.id) // and its specs' rail pins
   if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last

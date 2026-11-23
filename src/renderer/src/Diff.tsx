@@ -175,6 +175,38 @@ function hunkSpans(el: HTMLElement, top: (n: Element) => { top: number; h: numbe
   }
   return out
 }
+// R14: a file's rows drawn only near the screen (NEAR_MARGIN above and below), else a box as tall as they were (an estimate
+// by its lines until they're first drawn), marked whole on the change map (data-map: its kind). A 20,000-line diff draws
+// a few files' rows, and a scroll or a click redraws only those; the browser's scroll anchoring keeps what you look at
+// still as a box above turns into rows. on: drawn wherever it is (a line gone to, find's matches). first: drawn from the
+// start (the top files: no empty frame before the observer says)
+export const NEAR_MARGIN = '150% 0px'
+export const ROW_H = 17.4 // a diff row's px at the default size: the estimate's
+export function Near({ root, lines, map, on, first, children }: { root: RefObject<HTMLElement | null>; lines: number; map?: MapKind | 'both'; on?: boolean; first?: boolean; children: () => ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [near, setNear] = useState(!!first)
+  const h = useRef(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') return setNear(true)
+    const io = new IntersectionObserver(
+      es => {
+        const e = es[es.length - 1] // the newest: a fast scroll can bring out and back in at once
+        if (!e.isIntersecting && el.firstChild) h.current = el.offsetHeight // as tall as it was: the box keeps its place
+        setNear(e.isIntersecting)
+      },
+      { root: root.current, rootMargin: NEAR_MARGIN },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  const drawn = near || on
+  return (
+    <div ref={ref} className={drawn ? undefined : 'near-box'} style={drawn ? undefined : { height: h.current || Math.round(lines * ROW_H + 44) }} data-map={drawn ? undefined : map}>
+      {drawn ? children() : null}
+    </div>
+  )
+}
 export function ChangeMap({ at }: { at: RefObject<HTMLElement | null> }) {
   const [m, setM] = useState<{ marks: MapMark[]; left: number; top: number; h: number; frame: [number, number] } | null>(null)
   const drag = useRef(false)
@@ -188,8 +220,15 @@ export function ChangeMap({ at }: { at: RefObject<HTMLElement | null> }) {
       if (total <= h + 1 || innerWidth < 600 || matchMedia('(pointer: coarse)').matches) return setM(null), el.classList.remove('cmap-on')
       el.classList.add('cmap-on')
       const box = el.getBoundingClientRect()
-      const at = (n: Element) => (r => ({ top: r.top - box.top + el.scrollTop, h: r.height }))(n.getBoundingClientRect())
-      const spans = [...hunkSpans(el, at), ...MAP_PICK.flatMap(([q, kind]) => [...el.querySelectorAll(q)].map(n => ({ ...at(n), kind })))]
+      // inside a file the browser skips now (.sp-change's content-visibility, off screen): its file's box. Asking for the
+      // element itself lays that file out, again on every ask: 228 such were 740 ms a measure on a 19,000-line diff
+      // A comment there (point) marks its file's top, not all of it
+      const at = (n: Element, point = false) => {
+        const seen = n.checkVisibility?.({ contentVisibilityAuto: true }) ?? true
+        const r = (seen ? n : (n.closest('.sp-change') ?? n)).getBoundingClientRect()
+        return { top: r.top - box.top + el.scrollTop, h: seen || !point ? r.height : 0 }
+      }
+      const spans = [...hunkSpans(el, at), ...[...el.querySelectorAll<HTMLElement>('[data-map]')].map(n => ({ ...at(n), kind: n.dataset.map as MapKind | 'both' })), ...MAP_PICK.flatMap(([q, kind]) => [...el.querySelectorAll(q)].map(n => ({ ...at(n, true), kind })))] // [data-map]: a file not drawn now (Near), marked whole
       setM({ marks: marksOf(spans, total, h), left: el.offsetLeft + el.clientLeft + el.clientWidth, top: el.offsetTop + el.clientTop, h, frame: [(el.scrollTop / total) * h, (h / total) * h] })
     }
     const soon = () => void (raf ||= requestAnimationFrame(measure))
@@ -984,7 +1023,7 @@ const FIND_MAX = 2000
 let finding: object | null = null // the bar whose marks the highlights are: the last to search (Changes' and the review's share them)
 // unfold: the folded files whose lines have the words opened, so they're drawn and found (two characters at least: one
 // would open nearly every file)
-export function DiffFind({ at, within = at, unfold }: { at: RefObject<HTMLElement | null>; within?: RefObject<HTMLElement | null>; unfold?: (word: string) => void }) {
+export function DiffFind({ at, within = at, unfold, onWord }: { at: RefObject<HTMLElement | null>; within?: RefObject<HTMLElement | null>; unfold?: (word: string) => void; onWord?: (word: string) => void }) {
   const [seq, setSeq] = useState(0) // 0: closed; each ⌘F: focused again
   const [q, setQ] = useState('')
   const [hit, setHit] = useState({ i: 0, n: 0 })
@@ -1047,6 +1086,7 @@ export function DiffFind({ at, within = at, unfold }: { at: RefObject<HTMLElemen
     cur.current = 0
     search(true)
     if (seq && q.length > 1) unfold?.(q.toLowerCase())
+    onWord?.(seq && q.length > 1 ? q.toLowerCase() : '') // '': the bar closed or the word gone (FullReview lets its files go)
   }, [q, seq > 0])
   // files opened, folded or read again: the same words found again, where it was
   useEffect(() => {

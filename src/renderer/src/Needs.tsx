@@ -202,7 +202,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api:
       </div>
       {!open ? null : waiting ? (
         <>
-          <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
+          <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}${t.secret.saved ? " (kept: one click gives it)" : ""}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
           {t.held && <div className="muted small">Asked because it touches {t.held}</div>}
           {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} netAllow={api.netAllow} />}
           {t.ask?.steps && api.keys && <div className="need-steps muted small">One of several questions: ← → (the card focused) go between them</div>}

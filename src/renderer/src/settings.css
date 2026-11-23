@@ -24,3 +24,8 @@
 .tg-pair-says { display: flex; flex-direction: column; gap: var(--sp-2); flex: 1 1 240px; min-width: 0; }
 .tg-link { overflow-wrap: anywhere; }
 .tg-log { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-2); max-height: 280px; overflow: auto; }
+/* a project's Prompt templates: its repo's .laki/prompts, read only, each tagged repo */
+.repo-tpls { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+/* Settings' kept secrets (KeptSecrets): a row each, its name, where it's kept, Remove */
+.kept-secrets { display: flex; flex-direction: column; gap: var(--sp-2); }
+.kept-secrets .row { align-items: center; gap: var(--sp-3); }

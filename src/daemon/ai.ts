@@ -27,6 +27,8 @@ import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
 import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetLogs, widgetsView, widgetWhat } from './widgets.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
+import { IMPROVE_MAX, IMPROVE_SYSTEM, improvedOf } from '../shared/improve.ts'
+import { chatRead } from './meters.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
@@ -231,7 +233,9 @@ export function creditsLow(c: Pick<AiCredits, 'credits' | 'key'>) {
 // ---------- voice (Settings › Voice, cloud): a recording, WAV in base64, written down by OpenRouter's speech-to-text
 // with the same key. Nothing is kept: not the audio, not the text
 const MAX_AUDIO = 24 << 20 // OpenRouter's 25 MB: about 9 minutes of the renderer's 16 kHz mono
-export async function voiceText(o: { audio?: unknown; text?: unknown }) {
+// format: the recording's (a Telegram voice note's ogg; else wav)
+const AUDIO_FORMATS = ['wav', 'mp3', 'ogg', 'oga', 'm4a', 'webm', 'flac']
+export async function voiceText(o: { audio?: unknown; text?: unknown; format?: unknown }) {
   if (!voiceOn(state.settings)) throw new Error('Voice is off: turn it on in Settings › Voice')
   if (typeof o.text === 'string') return voiceClean(o.text.slice(0, 20000)) // the talk key's on-device engine wrote it down (main's laki-speech): Cloud's cleanup only
   const audio = typeof o.audio === 'string' ? o.audio : ''
@@ -247,7 +251,7 @@ export async function voiceText(o: { audio?: unknown; text?: unknown }) {
     const res = await fetch(`${api()}/audio/transcriptions`, {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
-      body: JSON.stringify({ model, input_audio: { data: audio, format: 'wav' } }),
+      body: JSON.stringify({ model, input_audio: { data: audio, format: (f => (f === 'oga' ? 'ogg' : f))(AUDIO_FORMATS.includes(String(o.format)) ? String(o.format) : 'wav') } }),
       signal: AbortSignal.timeout(90000),
     }).catch((e: Error) => {
       throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 90 seconds' : e.message}`)
@@ -918,6 +922,38 @@ export async function promptQuestions(p: { project?: unknown; prompt?: unknown }
   const text = await aiOnce({ system, prompt: `The task (data):\n<<<\n${prompt}\n>>>\n\nThe project's memory (data):\n<<<\n${memory || '(none)'}\n>>>`, ask: 'Ask me first', json: true })
   return { questions: questionsOf(text) }
 }
+// Improve my prompt (✨ in the Reader's and the New workspace page's box): Laki AI rewrites a rough draft into a clear,
+// specific prompt with what the chat already knows (the tab's messages since its last New session, the newest
+// IMPROVE_MAX.chat characters, as the Reader reads them) and the project's memory, all sent as data; one aiOnce (no
+// tools, logged as Improve prompt). Its @mentions, links, code and {{variables}} come back as written (improvedOf). Never
+// sent: the box shows it, Restore brings yours back. The user's alone (gates.ts: it spends their AI money)
+export async function promptImprove(p: { prompt?: unknown; tab?: unknown; project?: unknown }) {
+  if (!aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')
+  const prompt = typeof p.prompt === 'string' ? p.prompt.trim() : ''
+  if (!prompt) throw new Error('write a draft first')
+  if (prompt.length > IMPROVE_MAX.prompt) throw new Error(`a draft of ${IMPROVE_MAX.prompt.toLocaleString('en-US')} characters at most: shorten it first`) // never a cut draft's rewrite
+  const tab = typeof p.tab === 'string' ? state.tabs.find(t => t.id === p.tab) : undefined
+  const proj = state.projects.find(x => x.id === (typeof p.project === 'string' ? p.project : state.workspaces.find(w => w.id === tab?.workspace)?.project))
+  let chat = ''
+  if (tab) {
+    const said = (() => {
+      try {
+        return chatRead({ tab: tab.id }).said ?? []
+      } catch {
+        return []
+      }
+    })()
+    for (const x of said.slice(said.findLastIndex(x => x.who === 'new') + 1).filter(x => x.who === 'you' || x.who === 'agent').reverse()) {
+      const part = `${x.who === 'you' ? 'The user' : 'The agent'}: ${x.text.trim()}\n\n`
+      if (chat.length + part.length > IMPROVE_MAX.chat) break
+      chat = part + chat
+    }
+  }
+  const memory = (memoryOf(proj) ?? []).filter(m => typeof m?.text === 'string').map(m => `- ${m.text}`).join('\n').slice(0, IMPROVE_MAX.memory)
+  const text = await aiOnce({ system: IMPROVE_SYSTEM, prompt: `The draft:\n<<<\n${prompt}\n>>>\n\nThe chat so far (data):\n<<<\n${chat.trim() || '(none: a new task)'}\n>>>\n\nThe project's memory (data):\n<<<\n${memory || '(none)'}\n>>>`, ask: 'Improve prompt' })
+  return { prompt: improvedOf(prompt, text) }
+}
+
 // its answer, strictly: the first JSON object in it (a fenced one too), questions with 2 to 4 choices, each cut to its
 // length; anything else dropped
 export function questionsOf(text: string): { q: string; choices: string[] }[] {

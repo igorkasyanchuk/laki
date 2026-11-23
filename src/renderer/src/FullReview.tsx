@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEv
 import type { Blame, PR } from '../../shared/types'
 import { hunkKey, REST, risksOf, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
-import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
+import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -156,10 +156,10 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       for (const p of ps) viewed(p) === open ? n.add(p) : n.delete(p)
       return n
     })
-  const mark = (ps: string[], on: boolean) => {
+  const mark = (ps: string[], on: boolean, at = here) => {
     if (only && on) {
-      const i = listed.findIndex(f => f.path === here)
-      const to = ps.includes(here ?? '') ? (listed.slice(i + 1).find(f => !ps.includes(f.path) && !viewed(f.path)) ?? listed.slice(0, i).findLast(f => !ps.includes(f.path) && !viewed(f.path))) : undefined
+      const i = listed.findIndex(f => f.path === at)
+      const to = ps.includes(at ?? '') ? (listed.slice(i + 1).find(f => !ps.includes(f.path) && !viewed(f.path)) ?? listed.slice(0, i).findLast(f => !ps.includes(f.path) && !viewed(f.path))) : undefined
       setLeaving(new Set(ps))
       requestAnimationFrame(() => (setLeaving(new Set()), to && go(to.path)))
     }
@@ -414,6 +414,12 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   // the file in view: the last whose head is at the top (j/k move it and scroll there)
   const body = useRef<HTMLDivElement>(null)
   const [cur, setCur] = useState('')
+  const [goneTo, setGoneTo] = useState('') // a line gone to: its file drawn (Near)
+  // find's files: drawn, so it sees their words, the diff read again too ('': the bar closed). ponytail: the first 40
+  const [findWord, setFindWord] = useState('')
+  const found = useMemo(() => new Set(findWord ? files.filter(f => byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(findWord))).slice(0, 40).map(f => f.path) : []), [findWord, files, byFile])
+  // R14: once the scroll rests (120 ms): a new file in view draws the whole page again, so not at every file passed
+  const spyAt = useRef<ReturnType<typeof setTimeout>>(undefined)
   const spy = () => {
     const el = body.current
     if (!el) return
@@ -421,6 +427,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     const top = el.getBoundingClientRect().top + 8
     const h = heads.filter(x => (x.parentElement ?? x).getBoundingClientRect().top <= top).at(-1) ?? heads[0] // its section's box (R10: a head inside one off screen isn't laid out; asking would lay every file out each frame)
     if (h) setCur(h.dataset.file!)
+    return h?.dataset.file
   }
   const go = (p: string) => (setCur(p), body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(p)}"]`)?.scrollIntoView({ block: 'start' }))
   const pinGo = (p: string) => (pin(p), setTimeout(() => go(p), 0)) // the lists move: the file stays in view
@@ -445,16 +452,27 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     if (!matches(path)) setQ('')
     setShown([path], true)
     setCur(path)
-    setTimeout(() => {
+    setGoneTo(path) // drawn wherever it is (Near)
+    const look = (k: number) => setTimeout(() => {
       const sec = body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(path)}"]`)?.parentElement
       const el = n ? sec?.querySelector<HTMLElement>(`[data-${side === 'LEFT' ? 'old' : 'new'}="${n}"]`) : null
+      if (!el && n && k < 8) return void look(k + 1) // its rows not drawn yet
       if (!el) return sec?.scrollIntoView({ block: 'start' })
       el.scrollIntoView({ block: 'center' })
       el.classList.add('fr-flash')
       setTimeout(() => el.classList.remove('fr-flash'), 1600)
     }, 60)
+    look(0)
   }
   const here = cur && listed.some(f => f.path === cur) ? cur : listed[0]?.path
+  // the file in view right now: a key just after a scroll (its spy still waiting) acts on the one it shows, not the last
+  const hereNow = () => {
+    if (!spyAt.current) return here
+    clearTimeout(spyAt.current)
+    spyAt.current = undefined
+    const p = spy()
+    return p && listed.some(f => f.path === p) ? p : here
+  }
 
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState('')
@@ -510,13 +528,14 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   keys.current = e => {
     const t = e.target as HTMLElement | null
     if (e.defaultPrevented || e.altKey || e.ctrlKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) || document.querySelector('.overlay, .ask-overlay, .menu, .settings-page')) return
-    const i = listed.findIndex(f => f.path === here)
     if (e.metaKey) return void (e.key === 'Enter' && api.agents[0] && (e.preventDefault(), send(api.agents[0].id)))
     if (e.shiftKey) return
     const k = e.key.toLowerCase()
+    const here = 'jkvbpc'.includes(k) && k.length === 1 ? hereNow() : undefined // only the keys about the file in view look now
+    const i = listed.findIndex(f => f.path === here)
     if (k === 'j' || k === 'k') listed[i + (k === 'j' ? 1 : -1)] && go(listed[i + (k === 'j' ? 1 : -1)].path)
     else if (k === ']' || k === '[') hunk(k === ']' ? 1 : -1)
-    else if (k === 'v' && here) mark([here], !viewed(here))
+    else if (k === 'v' && here) mark([here], !viewed(here), here)
     else if (k === 'b' && here && !all) blame(here)
     else if (k === 'p' && here) pinGo(here)
     else if (k === 'c' && here) {
@@ -771,8 +790,13 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         </div>
         )}
         {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
-        <div className="fr-diff" ref={el => void ((body.current = el), sp.room(el))} onScroll={() => requestAnimationFrame(spy)}>
-          <DiffFind at={root} within={body} unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)} />
+        <div className="fr-diff" ref={el => void ((body.current = el), sp.room(el))} onScroll={() => (clearTimeout(spyAt.current), (spyAt.current = setTimeout(() => ((spyAt.current = undefined), spy()), 120)))}>
+          <DiffFind
+            at={root}
+            within={body}
+            unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)}
+            onWord={setFindWord}
+          />
           {err && <div className="warn small pad">{err}</div>}
           {gh.err && <div className="warn small pad">{gh.err}</div>}
           {walkErr && <div className="warn small pad">Walk through: {walkErr}</div>}
@@ -788,7 +812,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             </div>
           )}
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
-          {(picked ? stepFiles : listed).map(f => {
+          {(picked ? stepFiles : listed).map((f, i) => {
             const fd = inStep(f.path, byFile.get(f.path) ?? NO_DIFF)
             const fdx = xp.expanded(f.path, fd)
             const tail = xp.expander(f.path, fd, 'down')
@@ -821,6 +845,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 </div>
                 {shown(f.path) && IMAGE.test(f.path) && !all && <ImageDiff api={api} path={f.path} status={f.status} />}
                 {shown(f.path) && (!IMAGE.test(f.path) || all) && (
+                  <Near root={body} lines={fdx.lines.length} map={f.del ? (f.add ? 'both' : 'del') : 'add'} on={goneTo === f.path || found.has(f.path)} first={i < 3}>
+                    {() => (
                   <div className={`sp-diff ${split ? 'split' : ''} ${blaming ? 'blamed' : ''}`}>
                     <DiffRows
                       fd={fdx}
@@ -854,6 +880,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                     />
                     {tail && <div className="fr-more">{tail}</div>}
                   </div>
+                    )}
+                  </Near>
                 )}
               </section>
             )

@@ -50,7 +50,7 @@ export const RENDERER = fileURLToPath(new URL('../renderer/', import.meta.url))
 export const pageURL = (file: string, more = '') => (dev ? `${new URL(file === 'index.html' ? '' : file, `${process.env.ELECTRON_RENDERER_URL}/`).href}${more}` : `${APP_ORIGIN}/${file}${more}`)
 // from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
 // tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
-type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' | 'inbox' // quick: the quick bar (Q1); inbox: the menu bar's Inbox (ask.html)
+type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' | 'inbox' | 'panel' // quick: the quick bar (Q1); inbox: the menu bar's Inbox (ask.html); panel: the side panel's window
 export const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: Page[]) =>
   fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : pageIs(e.senderFrame?.url, p))))
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
@@ -691,7 +691,7 @@ ipcMain.on('glass', (e, on: boolean, light?: boolean | null, frosted?: boolean, 
 // V9: macOS's accent color (System Settings › Appearance) for Settings › Appearance › Accent color: System; none off a
 // Mac (the option is hidden there). A change goes to the app's own windows ('accent'); themes.ts paints them again
 const sysAccent = () => (mac ? `#${systemPreferences.getAccentColor().slice(0, 6)}` : null)
-ipcMain.handle('accent', e => (from(e, 'new', 'ai', 'tab', 'quick') ? sysAccent() : null))
+ipcMain.handle('accent', e => (from(e, 'new', 'ai', 'tab', 'quick', 'panel') ? sysAccent() : null))
 const accentNow = () => {
   const c = sysAccent()
   for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('accent', c)
@@ -701,7 +701,7 @@ systemPreferences.on('accent-color-changed', accentNow)
 // macOS's Show scroll bars (System Settings › Appearance): 'overlay' (a thumb only while scrolling, hovered or focused:
 // styles.css html[data-scrollbars]) unless Always; off a Mac always. A change goes to the app's windows
 const sysScroll = () => (mac && systemPreferences.getUserDefault('AppleShowScrollBars', 'string') !== 'Always' ? 'overlay' : 'always')
-ipcMain.handle('scrollbars', e => (from(e, 'new', 'ai', 'tab', 'quick') ? sysScroll() : 'always')) // the app's pages only, as accent
+ipcMain.handle('scrollbars', e => (from(e, 'new', 'ai', 'tab', 'quick', 'panel') ? sysScroll() : 'always')) // the app's pages only, as accent
 if (mac) systemPreferences.subscribeNotification('AppleShowScrollBarsSettingChanged', () => { for (const w of BrowserWindow.getAllWindows()) if (appPage(w.webContents.getURL())) w.webContents.send('scrollbars', sysScroll()) })
 // Settings › General › Start Laki at login (macOS): a login item; opened by it, the window is made, not shown
 ipcMain.handle('login-item', e => (from(e) && mac ? app.getLoginItemSettings().openAtLogin : null))
@@ -916,6 +916,67 @@ ipcMain.on('sim-float', (e, device: unknown, ws: unknown, on: unknown) => {
   simFloating()
 })
 
+// the side panel in a window of its own (its head's Move to its own window, ⌘K): the app's page in panel mode
+// (?window=panel: App.tsx' PANEL_WIN, the side panel alone, following the app window's workspace), a plain window to
+// put on another screen. Its bounds and whether it was open at quit in panel.json (userData): the app window asks
+// (panel-floating) as it loads and it opens again then. Closed: the panel is back in the app window
+export let panelW: BrowserWindow | null = null
+const panelFile = () => join(app.getPath('userData'), 'panel.json')
+const panelAt = (): Partial<WinAt> & { open?: boolean } => {
+  try {
+    const p = JSON.parse(readFileSync(panelFile(), 'utf8'))
+    return p && typeof p === 'object' ? p : {}
+  } catch {
+    return {}
+  }
+}
+const panelSave = (open: boolean) => {
+  try {
+    writeFileSync(panelFile(), JSON.stringify({ ...(panelW && !panelW.isDestroyed() ? panelW.getNormalBounds() : panelAt()), open }))
+  } catch {}
+}
+const panelFloating = () => win && !win.isDestroyed() && win.webContents.send('panel-floating', !!panelW)
+function panelOpen() {
+  if (panelW && !panelW.isDestroyed()) return void panelW.focus()
+  const at = panelAt()
+  const a = [at.x, at.y, at.width, at.height].every(Number.isFinite) ? screen.getDisplayMatching(at as Electron.Rectangle).workArea : null
+  const on = a && Math.min(at.x! + at.width!, a.x + a.width) - Math.max(at.x!, a.x) >= 100 && Math.min(at.y! + at.height!, a.y + a.height) - Math.max(at.y!, a.y) >= 50 // a monitor unplugged: macOS places it
+  const w = (panelW = new BrowserWindow({
+    width: 760,
+    height: 900,
+    ...(on && { x: at.x, y: at.y, width: Math.min(at.width!, a.width), height: Math.min(at.height!, a.height) }),
+    minWidth: 380,
+    minHeight: 320,
+    title: 'Side panel — Laki',
+    backgroundColor: '#0e1014',
+    ...(!mac && { autoHideMenuBar: true }),
+    show: false,
+    webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true }, // the Preview tab's webview (will-attach-webview's guard)
+  }))
+  w.webContents.setWindowOpenHandler(({ url }) => (typeof url === 'string' && /^(https?:\/\/|mailto:)/i.test(url) && shell.openExternal(url), { action: 'deny' }))
+  w.webContents.on('will-navigate', e => e.preventDefault())
+  spellMenu(w.webContents)
+  let keep: ReturnType<typeof setTimeout> | undefined
+  for (const ev of ['resize', 'move'] as const) w.on(ev as 'resize', () => (clearTimeout(keep), (keep = setTimeout(() => panelW === w && panelSave(true), 500))))
+  w.on('close', () => (clearTimeout(keep), panelSave(quitting))) // at quit: open again at the next start
+  w.on('closed', () => panelW === w && ((panelW = null), panelFloating()))
+  w.once('ready-to-show', () => w.show())
+  w.loadURL(pageURL('index.html', '?window=panel'))
+  panelSave(true)
+  panelFloating()
+}
+// the app window as it loads: whether the panel is out (opened again if it was at quit)
+ipcMain.handle('panel-floating', e => {
+  if (!win || e.sender !== win.webContents) return false
+  if (!panelW && panelAt().open === true) panelOpen()
+  return !!panelW
+})
+ipcMain.on('panel-float', (e, on: unknown) => {
+  if (!win || e.sender !== win.webContents) return
+  if (on === false) return void panelW?.close()
+  panelOpen()
+})
+
 // a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the
 // mouse is on, a third down (down: how far, of the room left)
 function panelWin(query: Record<string, string>, width: number, height: number, more: BrowserWindowConstructorOptions, down = 1 / 3) {
@@ -958,7 +1019,7 @@ ipcMain.on('new-fit', (e, h: unknown) => {
 
 
 ipcMain.on('open-external', (e, url: string) => {
-  if (!from(e, 'new', 'ai', 'tab')) return
+  if (!from(e, 'new', 'ai', 'tab', 'panel')) return
   const to = externalOf(url)
   if (to === 'web') shell.openExternal(url)
   else if (to === 'laki') openLink(url) // the AI window's link to a tab: the app window, there
@@ -973,7 +1034,7 @@ const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|a
 // a file shown in its folder in Finder (a terminal's recent picture's Reveal in Finder): the app's window or a floated
 // tab's, an absolute path that's there; it opens nothing
 ipcMain.handle('reveal', async (e, path: unknown) => {
-  const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender)
+  const from = (win && e.sender === win.webContents) || [...tabWins.values(), panelW].some(w => !!w && !w.isDestroyed() && w.webContents === e.sender)
   if (!from || typeof path !== 'string' || !path.startsWith('/')) return false
   const real = await realpath(path).catch(() => '')
   if (!real) return false
@@ -981,7 +1042,7 @@ ipcMain.handle('reveal', async (e, path: unknown) => {
   return true
 })
 ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
-  const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender) // the app's window, or a floated tab's
+  const from = (win && e.sender === win.webContents) || [...tabWins.values(), panelW].some(w => !!w && !w.isDestroyed() && w.webContents === e.sender) // the app's window, or a floated tab's
   if (!from || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
   const real = await realpath(path).catch(() => '')
   const st = real && (await stat(real).catch(() => null))
@@ -1000,7 +1061,7 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
 // app.getFileIcon has it (async), a generic document's meanwhile
 const dragIcons = new Map<string, Electron.NativeImage>()
 ipcMain.on('drag-out', (e, path: unknown, root: unknown) => {
-  if (!from(e, 'tab') || typeof path !== 'string' || typeof root !== 'string') return
+  if (!from(e, 'tab', 'panel') || typeof path !== 'string' || typeof root !== 'string') return
   const real = (p: string) => {
     try {
       return realpathSync(p)
@@ -1024,7 +1085,7 @@ app.whenReady().then(() => void app.getFileIcon(join(app.getAppPath(), 'package.
 // U14: Space on a file's row (Changes, the full review, Files, Artifacts), or its menu's Quick Look: macOS's own preview
 // panel, from the app window or a floated tab's. A regular file only (links followed), off a Mac nothing
 ipcMain.on('quick-look', async (e, path: unknown) => {
-  if (!mac || !from(e, 'tab') || typeof path !== 'string' || !path.startsWith('/')) return
+  if (!mac || !from(e, 'tab', 'panel') || typeof path !== 'string' || !path.startsWith('/')) return
   const real = await realpath(path).catch(() => '')
   if (!real || !(await stat(real).catch(() => null))?.isFile()) return
   BrowserWindow.fromWebContents(e.sender)?.previewFile(real, basename(path))

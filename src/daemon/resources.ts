@@ -2,13 +2,15 @@
 // agents put to sleep. core.ts imports it, and its users import it directly.
 
 import { type ChildProcess, spawn } from 'node:child_process'
-import { existsSync, lstatSync, statfsSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, statfsSync } from 'node:fs'
+import { stat, statfs } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { type DiskPart, type DiskTidyWhat, type DiskUsage, type DiskWs, type Proc, type ProcUse, type Resources, SLEEP_AFTER, type Tab } from '../shared/types.ts'
-import { dir } from './dir.ts'
+import { DISK_LOW, type DiskPart, type DiskTidyWhat, type DiskUsage, type DiskWs, type Proc, type ProcUse, type Resources, SLEEP_AFTER, type Tab } from '../shared/types.ts'
+import { dir, inRig } from './dir.ts'
+import { alertShow } from './alerts.ts'
 import { agyChat } from './agentUsage.ts'
 import { scanArtifacts } from './artifacts.ts'
-import { archivedTidy, bgTell, changed, CLONE_DIRS, findTab, findWs, log, ports, prs, procs, projectConfig, queued, restoreNow, rt, rtOf, run, save, sessions, spawnTab, state, storageFull, storageTrash, tabStatus } from './core.ts'
+import { archivedTidy, bgTell, broadcast, changed, CLONE_DIRS, findTab, findWs, log, ports, prs, procs, projectConfig, queued, restoreNow, rt, rtOf, run, save, sessions, spawnTab, state, storageFull, storageTrash, tabStatus } from './core.ts'
 import { syncBranches } from './pr.ts'
 import { gitFacts } from './gitTidy.ts'
 import { Session } from './session.ts'
@@ -464,4 +466,36 @@ export async function diskTidy(o: { what?: unknown; days?: unknown; dry?: unknow
   } else throw new Error('tidy what? turns, storage or archives')
   if (!dry && goes.length) (disk = undefined), save(), changed(), log(`disk: tidied ${what}: ${goes.length}`)
   return { goes }
+}
+
+// before the disk fills (R4 only reacts once it's full): each volume a worktree (or the data folder) is on, every few
+// minutes (main.ts' diskLowTick); under settings.diskLow GB free (unset: DISK_LOW; 0: never) a notice once a low spell,
+// Make room… opening Settings › Resources › Disk (each project's workspaces biggest first), quiet again once it has twice
+// that. Each folder's stat and statfs async, DISK_ASK ms at most: a hung mount is left out, never waited on.
+// <data>/test-disk-low: a test's free bytes (a rig's daemon only). ponytail: the threshold only, no 5% rule: one knob
+const DISK_ASK = 3000
+const lowVols = new Set<number>() // the volumes (st_dev) said low this spell
+const within = <T>(p: Promise<T>) => Promise.race([p, new Promise<undefined>(ok => setTimeout(ok, DISK_ASK))]).catch(() => undefined)
+export async function diskLowTick() {
+  const gb = state.settings?.diskLow ?? DISK_LOW
+  if (!(gb > 0)) return void lowVols.clear()
+  const at = new Map<number, string>() // a volume, by one of its folders
+  const dirs = [...new Set([dir, ...state.workspaces.filter(w => !w.archived && !w.host && w.kind === 'worktree').map(w => w.path)])]
+  const sts = await Promise.all(dirs.map(f => within(stat(f)))) // at once: a hung mount costs one DISK_ASK, not one per worktree
+  dirs.forEach((f, i) => (st => st && !at.has(st.dev) && at.set(st.dev, f))(sts[i]))
+  const fake = inRig() && existsSync(join(dir, 'test-disk-low')) ? Number(readFileSync(join(dir, 'test-disk-low'), 'utf8')) : undefined
+  const fs = fake === undefined ? await Promise.all([...at.values()].map(f => within(statfs(f)))) : []
+  for (const [i, [dev, f]] of [...at].entries()) {
+    const s = fs[i]
+    const free = fake ?? (s ? s.bavail * s.bsize : undefined)
+    if (free === undefined) continue
+    if (free >= gb * 2e9) lowVols.delete(dev)
+    if (free >= gb * 1e9 || lowVols.has(dev)) continue
+    lowVols.add(dev)
+    const holds = f === dir ? "Laki's data" : 'your worktrees'
+    log(`disk low: ${(free / 1e9).toFixed(1)} GB free on the volume of ${f}`)
+    void Promise.resolve(alertShow({ title: 'The disk is filling up', text: `${(free / 1e9).toFixed(1)} GB free on the disk that holds ${holds}: new workspaces, installs and builds may fail soon.`, choices: ['Make room…', 'Later'] }, 'notice', 'Laki'))
+      .then(a => (a as { choice?: string }).choice === 'Make room…' && broadcast({ ev: 'ui', do: 'link', link: 'laki://settings/resources?spot=Disk' }))
+      .catch(e => log(`disk low: ${(e as Error).message}`))
+  }
 }
