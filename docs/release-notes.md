@@ -6,6 +6,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 ## Next
 
 - Telegram has its own section: make a bot in @BotFather, paste its token, scan a one-time QR, and Laki's pushes reach your phone, with a tap on a button answering the agent and a reply to a push (a photo or a file too) going to it; /status, /screen, /diff and /quiet from the chat. Only your account in its private chat counts; the token stays in the Keychain. [Try it](laki://settings/telegram)
+- Do not disturb also holds a long turn's and a workflow's phone pushes (an important workspace's asks still come), and remote access at Answer refuses a message or a new workspace's prompt with a line that starts with `!` anywhere in it, not only the first.
 
 ## 0.59.0 · Nov 22, 2026
 
