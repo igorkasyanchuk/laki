@@ -51,7 +51,14 @@ class TgError extends Error {
     this.retry = retry
   }
 }
-const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>(r => (signal?.aborted ? r() : (t => signal?.addEventListener('abort', () => (clearTimeout(t), r()), { once: true }))(setTimeout(r, ms))))
+// signal: over at once as it aborts; its listener goes either way (a long offline run adds none up)
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>(r => {
+    if (signal?.aborted) return r()
+    const done = () => (clearTimeout(t), signal?.removeEventListener('abort', done), r())
+    const t = setTimeout(done, ms)
+    signal?.addEventListener('abort', done, { once: true })
+  })
 // one Bot API call: POST JSON, its result, or a TgError with Telegram's code (-1: no answer) and words, scrubbed
 async function tg<R = unknown>(method: string, body: object = {}, o: { signal?: AbortSignal; tok?: string } = {}): Promise<R> {
   const tok = o.tok ?? token()
@@ -170,8 +177,15 @@ export async function tgPush(p: Push): Promise<number | undefined> {
   p = shown(p)
   const taps = p.nonce && p.options?.length && tgAnswers() ? p.options : []
   const markup = taps.length ? { inline_keyboard: taps.map(o => [{ text: cut(`${o.n}. ${o.label}`, 60), callback_data: `${p.nonce}:${o.n}` }]) } : p.url ? { inline_keyboard: [[{ text: 'Open it', url: p.url }]] } : undefined
+  const msg = (thread?: number) => out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p, !taps.length), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
   const thread = await threadOf(p.tab)
-  const m = await out<Msg>('sendMessage', { chat_id: chat(), text: tgHtml(p, !taps.length), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread && { message_thread_id: thread }), ...(p.event === 'done' && { disable_notification: true }), ...(markup && { reply_markup: markup }) })
+  const m = await msg(thread).catch(async (e: Error) => {
+    // its topic deleted in Telegram (thread not found): forgotten, then a new one (or the chat)
+    if (!thread || !(e instanceof TgError) || e.code !== 400 || !/thread/i.test(e.message)) throw e
+    for (const [ws, id] of Object.entries(state.telegram?.threads ?? {})) if (id === thread) delete state.telegram!.threads![ws]
+    save()
+    return msg(await threadOf(p.tab))
+  })
   if (m?.message_id && p.tab) remember(m.message_id, p.tab) // a reply to it goes to its tab
   return m?.message_id
 }
@@ -206,7 +220,13 @@ async function threadOf(tab?: string) {
             save()
             return r.message_thread_id
           },
-          e => void ((T().topics = false), (T().notice = `Topics are off: Telegram didn't make one (${scrub((e as Error).message)}). Turn topics on for the bot in @BotFather, then here again`), log(`telegram: ${scrub((e as Error).message)}`), save(), changed()),
+          (e: TgError): undefined => {
+            log(`telegram: ${scrub(e.message)}`)
+            if (e.code !== 400 && e.code !== 403) return // offline, or Telegram busy: this push in the chat, a topic next time
+            Object.assign(T(), { topics: false, notice: `Topics are off: Telegram didn't make one (${scrub(e.message)}). Turn topics on for the bot in @BotFather, then here again` })
+            save()
+            changed()
+          },
         )
         .finally(() => making.delete(ws.id)),
     )
@@ -284,6 +304,7 @@ async function loop() {
       const err = e as TgError
       if (err.code === 409) return stop('Another program reads this bot (or it has a webhook): use a bot made only for Laki. Laki stopped listening; nothing of the other one was changed')
       if (err.code === 401) return stop("Telegram refused the bot's token (revoked, or the bot deleted): paste a new one", true)
+      if (!token()) return stop("Laki has no bot token now (the Keychain didn't give it, or a backup from another Mac): Try again, else Remove bot and paste its token again")
       if (err.code === 429 && err.retry) await sleep(Math.min(err.retry, 300) * 1000, c.signal)
       else {
         if (err.message !== failed) log(`telegram: ${(failed = err.message)}`)
@@ -308,7 +329,7 @@ async function take(u: Update, gap: boolean) {
   if (m && code && pair && pair.until > Date.now() && same(code, pair.code) && Date.now() / 1000 - m.date < STALE / 1000) {
     pair = undefined
     const was = state.telegram?.user
-    if (was?.id !== from.id) forget(), (T().level = 'answer') // another person: from Answer, as every pairing starts
+    if (was?.id !== from.id) commandsGone(), forget(), (T().level = 'answer') // another person: from Answer, as every pairing starts; the old chat's menu gone
     Object.assign(T(), { user: { id: from.id, name: nameOf(from), at: Date.now() }, notice: undefined, off: undefined, threads: was?.id === from.id ? state.telegram?.threads : undefined })
     T().level ??= 'answer'
     save()
@@ -322,7 +343,7 @@ async function take(u: Update, gap: boolean) {
   if (from.id !== state.telegram?.user?.id) return void ignore()
   if (!tgOn()) return // turned off (a pairing code's poll reads the chat): nothing acted on
   if (q) {
-    const tap = !gap && levelAtLeast('answer') ? tapOf(q.data, '', false) : undefined
+    const tap = !gap && tgAnswers() ? tapOf(q.data, '', false) : undefined // titles only: an old push's buttons answer nothing
     let did: string | undefined
     try {
       if (tap) spend('send') // a tap is an answer: the same minute's limit
@@ -332,7 +353,7 @@ async function take(u: Update, gap: boolean) {
       did = (e as Error).message
       said(`refused a tap: ${did}`)
     }
-    return void out('answerCallbackQuery', { callback_query_id: q.id, text: gap ? 'Laki was off: that tap is too old' : did || 'That ask moved on' }).catch(() => {})
+    return void out('answerCallbackQuery', { callback_query_id: q.id, text: cut(gap ? 'Laki was off: that tap is too old' : !tgAnswers() ? 'Titles only is on: answer it on the Mac' : did || 'That ask moved on', 200) }).catch(() => {})
   }
   if (!m) return
   if (Date.now() / 1000 - m.date > STALE / 1000) return void sayIn(m, 'Laki was off when you sent that: send it again.')
@@ -360,10 +381,12 @@ async function deliver(tab: string, m: TgMessage) {
   let text = (m.text ?? m.caption ?? '').trim().slice(0, 8000)
   const f = m.photo?.length ? m.photo.at(-1)! : m.document
   const s = sessions.get(tab)
-  const ask = !f && rtOf(tab).status === 'waiting' && s && !s.exited ? s.ask() : undefined
-  // a choice only in a reply to that ask's own push: "yes" to an older one is words, never an Allow
-  const own = !!m.reply_to_message && askOfMsg(m.reply_to_message.message_id) === tab
-  const o = own ? ask?.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase()) : undefined
+  const ask = rtOf(tab).status === 'waiting' && s && !s.exited ? s.ask() : undefined
+  // a choice only in a reply to that ask's own push, still the same menu, where Telegram answers (not titles only): "yes"
+  // to an older one is words, never an Allow
+  const a = m.reply_to_message && askOfMsg(m.reply_to_message.message_id)
+  const own = !f && !!ask && tgAnswers() && a?.tab === tab && a.key === JSON.stringify(ask.options)
+  const o = own ? ask.options.find(x => String(x.n) === text || x.label.toLowerCase() === text.toLowerCase()) : undefined
   if (o) return void (await act('answer', { tab, n: o.n, label: o.label }), pickedFor(tab, `Picked: ${o.label}`))
   if (f) text = `${text ? `${text}\n` : ''}${await fileIn(f, !m.photo?.length && m.document?.file_name)}`
   if (!text) throw new Error('nothing to send')
@@ -399,6 +422,10 @@ const COMMANDS: [string, string, TgLevel][] = [
 const commandsSet = () => {
   if (!state.telegram?.user) return
   out('setMyCommands', { commands: COMMANDS.filter(c => levelAtLeast(c[2])).map(([command, description]) => ({ command, description })), scope: { type: 'chat', chat_id: chat() } }).catch(e => log(`telegram: ${(e as Error).message}`))
+}
+// unpaired, or another person paired: the old chat's menu gone (its commands would do nothing there)
+const commandsGone = () => {
+  if (state.telegram?.user) out('deleteMyCommands', { scope: { type: 'chat', chat_id: chat() } }).catch(e => log(`telegram: ${(e as Error).message}`))
 }
 const shownWs = (id: string) => (w => (w && !w.archived && !hidden(w) ? w : undefined))(state.workspaces.find(x => x.id === id))
 // a command's agent tab: the push it replies to, else the workspace it names (its first agent tab)
@@ -436,9 +463,13 @@ async function command(c: string, arg: string, m: TgMessage) {
     return void sayIn(m, `Do not disturb until ${new Date(r.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: only an important workspace's asks come.`)
   }
   if (c === 'new') {
-    const [name, ...words] = arg.split(/\s+/)
-    const task = words.join(' ').trim()
-    const p = state.projects.find(x => !x.kind && !x.archived && !(state.settings?.recording && x.private) && [x.name, x.id].some(n => n?.toLowerCase() === name?.toLowerCase()))
+    // its project: the longest name (or id) the words start with, so a name with spaces works
+    const low = arg.toLowerCase()
+    const [p, said] = state.projects
+      .filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private))
+      .flatMap(x => [x.name, x.id].filter(n => n && low.startsWith(`${n.toLowerCase()} `)).map(n => [x, n!] as const))
+      .sort((a, b) => b[1].length - a[1].length)[0] ?? []
+    const task = said ? arg.slice(said.length).trim() : ''
     if (!p || !task) return void sayIn(m, `/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
     const w = await act<{ id: string; name?: string }>('wsNew', { project: p.id, prompt: task })
     return void sayIn(m, `Started <b>${esc(w.name ?? w.id)}</b> in ${esc(p.name)}. Its pushes come here; reply to one to talk to it.`)
@@ -489,6 +520,8 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
       t.keyed = true
       if (t.bot?.id !== me.id) Object.assign(t, { user: undefined, threads: undefined }), forget() // another bot: pair again
       Object.assign(t, { bot: { id: me.id, username: me.username, name: me.first_name ?? me.username, topics: !!me.has_topics_enabled }, notice: undefined, off: undefined })
+      ctl?.abort() // a poll of the old token's: its updates' ids aren't this bot's
+      ctl = undefined
       offset = 0
     }
   }
@@ -502,10 +535,11 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
     t.bot.topics = !!me.has_topics_enabled
     if (!t.bot.topics) throw new Error(`turn topics on for @${t.bot.username} in @BotFather first (its Bot Settings), then here`)
   }
+  if (p.topics === true && t.notice?.startsWith('Topics are off')) t.notice = undefined
   for (const k of ['off', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
   if (p.off === false) t.notice = undefined // on again (Try again after a 409): its notice read
   if (p.detail !== undefined) t.detail = p.detail === 'titles' ? 'titles' : undefined
-  if (p.unpair === true) Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), forget(), log('telegram: unpaired'), said('unpaired')
+  if (p.unpair === true) commandsGone(), Object.assign(t, { user: undefined, threads: undefined }), (pair = undefined), forget(), log('telegram: unpaired'), said('unpaired')
   if (p.level !== undefined) commandsSet(), said(`level ${t.level}`)
   save()
   sync()

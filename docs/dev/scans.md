@@ -515,8 +515,12 @@ private chat (`threadOf`: `createForumTopic`, its name, one of the six icon colo
 workspace, `making`), kept in `threads` (ws → `message_thread_id`); its pushes go there (`message_thread_id`), answers
 to a message in a topic go in it (`sayIn`); words in a topic that reply to nothing go to that workspace's first agent tab
 (`wsOfThread`), and `/screen` or `/diff` there with no name are that workspace's; `dropWs` (core) deletes it
-(`tgWsGone`: `deleteForumTopic`). Telegram refusing to make one turns topics off with a notice; the push goes to the
-chat as before. Remote access's Keep
+(`tgWsGone`: `deleteForumTopic`). Telegram refusing to make one (a 400 or 403) turns topics off with a notice; offline
+or busy, only that push goes to the chat. A topic deleted in Telegram (`sendMessage`'s "thread not found") is forgotten
+and made again for that push. A reply picks a choice only when it answers that ask's own push (`askOfMsg`: its
+`awaiting` entry, `tg` where Telegram's push had buttons) with the same menu still on screen (its `key`), and not with
+titles only; a tap neither. A token gone from the key store (a backup from another Mac) stops the poll with a notice
+and Try again. Unpair, or another person pairing, deletes the old chat's menu (`deleteMyCommands`). Remote access's Keep
 never goes there (`tgTaps: false`). Migration (`tgMigrate`, core's `load`): a `settings.webhook` of the old `telegram`
 format: its token to the key store, the webhook gone from state.json; a positive `chat_id` (a private chat: its user's)
 paired at answer with its When, a group's (or a URL with no token of a bot's shape) only a notice; saved at once (the
@@ -531,7 +535,7 @@ uncommitted work in a submodule, ignored files of its own: `unsaved`, `docs/dev/
 PR (`autoArchived`: an Undo stays). It broadcasts `archived`, which App toasts with Undo (`wsRestore`); a merged PR's
 row says *merged* while the setting is on.
 
-A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minutes): only ticks where the tab is `running` and not at a limit add up, each at most `LONG_GAP` (a Mac asleep); once per turn the `long` event (Open, Stop: main's `stop` action, `longStop`: its Esc through `input`, only while that turn runs and asks nothing), `phoneLong` (no Stop on a phone) and `turn.long`.
+A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minutes): only ticks where the tab is `running` and not at a limit add up, each at most `LONG_GAP` (a Mac asleep); once per turn the `long` event (Open, Stop: main's `stop` action, `longStop`: its Esc through `input`, only while that turn runs and asks nothing), `phoneLong` (no Stop on a phone; Do not disturb holds it, as it does a workflow's pushes: `phone.ts` `quiet`, only an important workspace's ask goes) and `turn.long`.
 
 How long a turn usually takes (`core.ts` `turnTook`, `shared/nextStep.ts` `usual`): `turn` times each turn by its hooks'
 `at` (else the daemon's clock): `turnFrom` at its prompt (or its first hook), an ask's wait (`waitFrom` to the next

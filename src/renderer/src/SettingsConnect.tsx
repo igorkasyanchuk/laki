@@ -152,7 +152,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
       {tg?.notice && (
         <p className="warn small">
           {tg.notice}{' '}
-          {tg.user && (
+          {tg.user && (tg.off || !tg.polling) && ( // stopped (a 409, a refused token): listen again; a topic's notice isn't
             <button type="button" className="link" disabled={busy} onClick={() => set({ off: false }, 'Listening again')}>
               Try again
             </button>

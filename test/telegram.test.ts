@@ -21,6 +21,7 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
   let id = 0
   let msg = 100
   let next: object | undefined
+  const gone = new Set<number>() // topics deleted in Telegram: a message there is refused
   const srv = createServer(async (q, r) => {
     let body = ''
     for await (const c of q) body += c
@@ -40,6 +41,7 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
       return ok(queue.splice(0).filter((u: any) => u.update_id >= (call.body.offset ?? 0)))
     }
     if (call.method === 'getFile') return ok({ file_id: call.body.file_id, file_unique_id: 'u', file_path: call.body.file_id === 'big' ? undefined : call.body.file_id === 'doc' ? 'documents/notes.txt' : 'photos/file_1.jpg' })
+    if (call.method === 'sendMessage' && gone.has(call.body.message_thread_id)) return void r.writeHead(400).end(JSON.stringify({ ok: false, error_code: 400, description: 'Bad Request: message thread not found' }))
     if (call.method === 'sendMessage') return ok({ message_id: (call.id = ++msg), chat: { id: call.body.chat_id, type: 'private' }, date: Math.floor(Date.now() / 1000) })
     ok(true)
   })
@@ -48,6 +50,7 @@ async function bot(t: { after: (f: () => void) => void }, o: { topics?: boolean;
   const now = () => Math.floor(Date.now() / 1000)
   return {
     calls,
+    gone,
     url: `http://127.0.0.1:${(srv.address() as { port: number }).port}`,
     of: (method: string) => calls.filter(c => c.method === method),
     fail: (e: object) => (next = e),
@@ -238,6 +241,8 @@ test('P2: a reply to a push goes to its tab (a waiting ask: a choice by its numb
   await until(async () => /answer: \/Users\/me\/app\/log\.txt has it/.test(await rig.screen(tab.id)), 'a path sent as words')
   b.message('!rm -rf /', { reply: done.id })
   await until(() => b.of('sendMessage').some(c => /Not sent: .*a line that starts with !/.test(c.body.text)), 'a ! line refused')
+  b.message('look at this\n!rm -rf /', { reply: done.id })
+  await until(() => b.of('sendMessage').filter(c => /Not sent: .*a line that starts with !/.test(c.body.text)).length === 2, 'a later ! line too')
   b.message('hello') // not a reply: how to send one
   await until(() => b.of('sendMessage').some(c => /Reply to one of my messages/.test(c.body.text)), 'the hint')
   // a waiting menu: its push, and a reply with a choice's number picks it
@@ -353,12 +358,21 @@ test("P4: a topic per workspace: needs the bot's topics; its pushes in it, plain
   await until(() => b.of('sendMessage').filter(c => c.body.disable_notification).length === 2, 'a second push')
   assert.equal(b.of('createForumTopic').length, 1, 'one topic, however many pushes')
   assert.equal(b.of('sendMessage').filter(c => c.body.disable_notification)[1].body.message_thread_id, thread)
-  b.message('words in the topic', { thread })
+  // its topic deleted in Telegram: a new one, the push in it
+  b.gone.add(thread)
+  await rig.rpc('send', { target: tab.id, text: 'hi' })
+  await until(() => b.of('createForumTopic').length === 2, 'a new topic')
+  const pushes = () => b.of('sendMessage').filter(c => c.body.disable_notification && c.id) // sent (a refused one has no id)
+  const again = (await until(() => (pushes().length === 3 ? pushes()[2] : undefined), 'the push in the new topic'))!
+  assert.ok(again.body.message_thread_id > thread)
+  b.gone.clear()
+  b.message('words in the topic', { thread: again.body.message_thread_id })
   await until(async () => /answer: words in the topic/.test(await rig.screen(tab.id)), 'to its agent, no reply needed')
-  b.message('/screen', { thread })
-  await until(() => b.of('sendMessage').some(c => c.body.message_thread_id === thread && /^<b>claude<\/b> in .*<pre>/s.test(c.body.text)), 'its screen, in its topic')
+  const now = again.body.message_thread_id
+  b.message('/screen', { thread: now })
+  await until(() => b.of('sendMessage').some(c => c.body.message_thread_id === now && /^<b>claude<\/b> in .*<pre>/s.test(c.body.text)), 'its screen, in its topic')
   await rig.rpc('wsRm', { id: ws.id })
-  await until(() => b.of('deleteForumTopic').some(c => c.body.message_thread_id === thread), 'the topic gone with it')
+  await until(() => b.of('deleteForumTopic').some(c => c.body.message_thread_id === now), 'the topic gone with it')
 })
 
 test("P4: topics refused until the bot has them; Telegram refusing one turns them off with a notice", async t => {

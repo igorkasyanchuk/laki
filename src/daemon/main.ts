@@ -1323,7 +1323,7 @@ const sendOk = (p: Params) => {
   }
   if (!core.tracked(t)) return "a shell's (only an agent's)"
   if (p?.enter === false) return 'keys without Enter'
-  return /^\s*!/.test(String(p?.text ?? '')) ? "a command (a line that starts with ! is the agent's shell)" : ''
+  return /^\s*!/m.test(String(p?.text ?? '')) ? "a command (a line that starts with ! is the agent's shell)" : '' // any line: without bracketed paste each goes as its own
 }
 const WS_SET = new Set(['id', 'name', 'color', 'pinned', 'railPin', 'from', 'asked'])
 const ANSWER: Record<string, true | ((p: Params) => string)> = {

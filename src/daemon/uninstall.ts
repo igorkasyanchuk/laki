@@ -67,7 +67,7 @@ export function uninstall(p: { data?: boolean; worktrees?: boolean; run?: boolea
   const trees = state.workspaces.filter(w => w.kind === 'worktree' && !w.host && !w.imported && existsSync(w.path)).map(w => w.path) // an imported one is yours (Laki never removes it)
   rows.push({ id: 'worktrees', label: 'Worktrees', detail: trees.length ? `${trees.length} worktree${trees.length === 1 ? '' : 's'} Laki made: their uncommitted changes go too` : 'none', state: !trees.length ? 'none' : !p.worktrees ? 'kept' : p.run ? (p.stop ? 'done' : 'later') : 'todo' })
   const storage = typeof state.settings?.storageDir === 'string' && state.settings.storageDir.trim() ? state.settings.storageDir.trim() : ''
-  rows.push({ id: 'data', label: 'My data', detail: `${tilde(dir)} (projects, notes, settings, kept chats${storage ? '' : ', artifacts'})${keychainOn() ? " and Laki AI's keys in the Keychain" : ''}${storage ? `; artifacts in ${storage} stay` : ''}${!p.worktrees && existsSync(join(dir, 'worktrees')) ? `; ${tilde(join(dir, 'worktrees'))} stays` : ''}`, state: !p.data ? 'kept' : p.run ? (p.stop ? 'done' : 'later') : 'todo' })
+  rows.push({ id: 'data', label: 'My data', detail: `${tilde(dir)} (projects, notes, settings, kept chats${storage ? '' : ', artifacts'})${keychainOn() ? " and Laki AI's keys and the Telegram bot's token in the Keychain" : ''}${storage ? `; artifacts in ${storage} stay` : ''}${!p.worktrees && existsSync(join(dir, 'worktrees')) ? `; ${tilde(join(dir, 'worktrees'))} stays` : ''}`, state: !p.data ? 'kept' : p.run ? (p.stop ? 'done' : 'later') : 'todo' })
   const cask = CASKS.some(c => existsSync(c))
   rows.push({ id: 'next', label: 'Then', detail: cask ? 'brew uninstall --cask laki (it was installed with Homebrew)' : 'Quit Laki and move it to the Trash', state: 'todo', ...(cask && { cmd: 'brew uninstall --cask laki' }) })
   if (p.run) {
@@ -87,7 +87,7 @@ export function wipe() {
   for (const w of wiping.worktrees) rmSync(w, { recursive: true, force: true })
   if (wiping.worktrees.length) for (const r of wiping.repos) try { execFileSync('git', ['-C', r, 'worktree', 'prune'], { timeout: 10000, stdio: 'ignore' }) } catch {}
   if (!wiping.data) return
-  for (const k of ['openrouter', 'endpoint']) if (keychainOn()) kcRm(k)
+  for (const k of ['openrouter', 'endpoint', 'telegram']) if (keychainOn()) kcRm(k) // Laki AI's keys, the Telegram bot's token
   if (dir === '/' || dir === homedir() || !existsSync(join(dir, 'state.json'))) return log(`uninstall: ${dir} doesn't look like Laki's data folder: kept`)
   // its own worktrees/ stays unless they were picked (they hold your branches' work)
   const keep = !wiping.worktrees.length && existsSync(join(dir, 'worktrees'))

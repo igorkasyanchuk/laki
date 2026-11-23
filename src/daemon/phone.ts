@@ -22,6 +22,8 @@ import { register } from './ticks.ts'
 // within the 30 ms before a view is built looks like the same one, and its end isn't pushed
 export const pushed = new Map<string, string>()
 export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
+// U8: Do not disturb holds every push but an important workspace's ask (ask: a wait for you)
+const quiet = (ws?: Workspace, ask = false) => (state.dnd?.until ?? 0) > Date.now() && !(ask && ws?.important)
 // where a push goes: the webhook (Settings › Phone pushes) and Telegram (Settings › Telegram), each by its own When
 // (any: a workflow's, remote access's: not a turn's); bell: T16's one-time bell, whatever they say
 type To = { hook?: Webhook; tg: boolean }
@@ -37,7 +39,7 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
   const hook = !!t.hook && hookAnswers(t.hook)
   const tg = t.tg && tgAnswers() && o.tgTaps !== false
   const nonce = ask && p.options?.length && (hook || tg) ? randomBytes(8).toString('hex') : undefined
-  if (nonce) awaiting.set(nonce, { ...ask!, until: Date.now() + (o.ms ?? 864e5), hook, push: p }), hook && listen(t.hook!)
+  if (nonce) awaiting.set(nonce, { ...ask!, until: Date.now() + (o.ms ?? 864e5), hook, tg, push: p }), hook && listen(t.hook!)
   const what = o.what ?? p.tab
   if (t.hook) pushTo(t.hook, { ...p, ...(nonce && hook && { nonce, key: tapKey() }) }).catch(e => log(`push ${what}: ${e.message}`))
   if (t.tg)
@@ -48,7 +50,7 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
 }
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = false) {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
-  if ((state.dnd?.until ?? 0) > Date.now() && !(kind === 'waiting' && ws?.important)) return // U8: Do not disturb: an important workspace's ask only
+  if (quiet(ws, kind === 'waiting')) return // U8: Do not disturb: an important workspace's ask only
   const t = to(kind, bell)
   if ((!t.hook && !t.tg) || pushed.get(tab.id) === kind || (!bell && (tab.muted || ws?.muted)) || hidden(ws)) return
   pushed.set(tab.id, kind)
@@ -77,7 +79,7 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
 export function phoneLong(tab: Tab, text: string) {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   const t = to('any')
-  if ((!t.hook && !t.tg) || tab.muted || ws?.muted || hidden(ws)) return
+  if ((!t.hook && !t.tg) || tab.muted || ws?.muted || hidden(ws) || quiet(ws)) return
   send(t, { event: 'long', workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, title: text })
 }
 
@@ -96,9 +98,9 @@ function tapKey() {
 // Answer from the phone (webhook.answer, Telegram at answer or control): a push with buttons leaves its nonce here, with
 // the tab (or a workflow run, flow) and its choices as pushed, until a tap answers it, the tab or run stops waiting or
 // asks something else, or a day goes by. While a webhook's is here, phoneTick asks ntfy for taps every 5 s; none: it
-// stops (Telegram's come with its long poll). hook: the webhook's taps answer it; msg: its Telegram message (push: what
-// it said), edited as it goes (gone)
-type Awaits = { tab?: string; flow?: string; keep?: boolean; key: string; until: number; hook?: boolean; msg?: number; push?: Push }
+// stops (Telegram's come with its long poll). hook: the webhook's taps answer it; tg: Telegram's (its push had buttons);
+// msg: its Telegram message (push: what it said), edited as it goes (gone)
+type Awaits = { tab?: string; flow?: string; keep?: boolean; key: string; until: number; hook?: boolean; tg?: boolean; msg?: number; push?: Push }
 const awaiting = new Map<string, Awaits>()
 // an ask's nonce done with (said: the pick's words, else it moved on): its Telegram message edited, buttons gone
 const gone = (k: string, said = 'Answered on the Mac, or it moved on') => {
@@ -106,8 +108,8 @@ const gone = (k: string, said = 'Answered on the Mac, or it moved on') => {
   awaiting.delete(k)
   if (a?.msg && a.push) tgDone(a.msg, a.push, said)
 }
-// the tab a Telegram message asks for (its buttons' ask, still waiting): a reply to it may pick a choice
-export const askOfMsg = (msg: number) => [...awaiting.values()].find(a => a.msg === msg && a.tab)?.tab
+// the ask a Telegram message is (its buttons', still waiting): its tab and choices as pushed (key); a reply to it may pick one
+export const askOfMsg = (msg: number) => [...awaiting.values()].find(a => a.msg === msg && a.tab && a.tg)
 // a tab's pushed ask answered some other way (a Telegram reply's number): its message says what was picked
 export const pickedFor = (tab: string, said: string) => awaiting.forEach((a, k) => a.tab === tab && gone(k, said))
 // the webhook's taps come back: Answer from the phone where they can (answerOk), never with titles only
@@ -159,7 +161,7 @@ export async function phoneTick() {
 // only, never a workflow's (its confirm may merge) nor remote access's Keep (gates.ts TELEGRAM_OK has neither)
 export async function takeTap(tap: Tap, tg = false): Promise<string | undefined> {
   const a = awaiting.get(tap.nonce)
-  if (!a || (tg && !a.tab)) return
+  if (!a || (tg && (!a.tab || !a.tg))) return
   awaiting.delete(tap.nonce)
   const done = (said: string) => (awaiting.set(tap.nonce, a), gone(tap.nonce, said), said) // its message says what was picked
   if (a.keep) return (remoteKeepHook.fn?.(), log('remote access kept on from the phone'), done('Kept on'))
@@ -189,7 +191,7 @@ export async function takeTap(tap: Tap, tg = false): Promise<string | undefined>
 // what: how it says it (shows you, is done, failed)
 export function flowPhone(name: string, ws: string | undefined, what: string, text: string, kind = 'Workflow') {
   const t = to('any')
-  if (t.hook || t.tg) send(t, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `${kind} ${name}`, title: `${kind} ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }, undefined, { what: name })
+  if ((t.hook || t.tg) && !quiet()) send(t, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `${kind} ${name}`, title: `${kind} ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }, undefined, { what: name })
 }
 // a workflow's Ask you, confirm, stuck or unsure decision (workflow.ts' ask, unsure): a waiting push like a tab's, its
 // choices as text, and buttons with Answer from the phone (a tap is flowHooks.answer; ponytail: ntfy shows the first 3);
@@ -197,7 +199,7 @@ export function flowPhone(name: string, ws: string | undefined, what: string, te
 export function flowAsk(run: { id: string; name: string; ws?: string }, question: string, options: string[], show?: string) {
   const ws = run.ws ? state.workspaces.find(x => x.id === run.ws) : undefined
   const t = to('waiting')
-  if ((!t.hook && !t.tg) || ws?.muted || hidden(ws)) return
+  if ((!t.hook && !t.tg) || ws?.muted || hidden(ws) || quiet(ws, true)) return
   const key = flowHooks.waitKey?.(run.id) // its block, question and choices, as phoneTick checks them
   const where = ws ? ws.name || ws.id : undefined
   send(t, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })) }, key ? { flow: run.id, key } : undefined, { what: run.name, tgTaps: false }) // Telegram: its choices as text (a workflow's answer isn't Telegram's)
