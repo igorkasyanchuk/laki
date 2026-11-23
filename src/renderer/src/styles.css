@@ -3907,6 +3907,8 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .rd-box textarea.rd-ghost::placeholder { font-style: italic; } /* settings.nextPrompt's guess: Tab takes it */
 .secret-strip .secret-row { display: flex; gap: var(--sp-3); margin: 4px 0; } /* laki secret's card (panels.tsx SecretStrip) */
 .secret-strip .secret-row input { flex: 1; min-width: 0; font-family: var(--mono); }
+.secret-strip .secret-given { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-1); } /* a kept one's last give, and a workspace that never got it */
+.secret-first { color: var(--waiting); }
 .secret-strip .secret-row :is(select, button) { flex: none; width: auto; white-space: nowrap; } /* Keep it's select and the buttons as wide as their words: the field takes the rest */
 /* the Reader's card of a turn's changes (Reader.tsx TurnCard) */
 .rd-turn { margin: 4px 0 12px; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); }

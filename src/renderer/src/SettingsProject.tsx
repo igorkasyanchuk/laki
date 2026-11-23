@@ -9,6 +9,7 @@ import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
 import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
 import { MCP_AGENTS, MCP_NAME, type McpServer } from '../../shared/mcp'
+import { ago } from '../../shared/widget'
 
 const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
@@ -665,7 +666,10 @@ export function KeptSecrets({ list, projects, onForget }: { list: SecretKept[]; 
         <div key={`${k.scope}:${k.label}`} className="row small">
           <Icon name="lock" size={12} />
           <span className="grow">{k.label}</span>
-          <span className="muted">{k.scope === '*' ? 'all projects' : (projects?.find(p => p.id === k.scope)?.name ?? 'a removed project')} · kept {new Date(k.at).toLocaleDateString()}</span>
+          <span className="muted">
+            {k.scope === '*' ? 'all projects' : (projects?.find(p => p.id === k.scope)?.name ?? 'a removed project')} · kept {new Date(k.at).toLocaleDateString()} ·{' '}
+            {k.given?.length ? `given ${k.count ?? k.given.length} time${(k.count ?? k.given.length) === 1 ? '' : 's'}, last ${ago(k.given[0].at)} to ${k.given[0].name}` : 'not given yet'}
+          </span>
           <button type="button" className="link small danger" onClick={() => void ask(`Remove ${k.label}?`, { text: "Its value goes from the Keychain: next time an agent asks for it, you type it again.", ok: 'Remove', danger: true }).then(ok => ok && onForget(k)).catch(() => {})}>
             Remove
           </button>

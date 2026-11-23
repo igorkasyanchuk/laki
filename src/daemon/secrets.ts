@@ -18,7 +18,8 @@ const SECRET_HOURS = 24
 const SECRET_MAX = 64 << 10
 export const SECRETS_DIR = '.laki-secrets'
 const DIR = SECRETS_DIR
-const asks = new Map<string, { tab: string; folder: string; label: string; project?: string; done: (r: { path?: string; refused?: string }) => void }>()
+const asks = new Map<string, { tab: string; ws: string; folder: string; label: string; project?: string; done: (r: { path?: string; refused?: string }) => void }>()
+const GIVEN_MAX = 20 // a kept one's gives remembered (SecretKept's given), the newest
 
 // a secret kept for next time (the card's Keep: this project, all projects): its value by keychain.ts (the Keychain, as
 // Laki AI's keys, else a 0600 file in <data>/secrets), its name in state.secretsKept (Settings lists the names, Remove
@@ -39,13 +40,18 @@ function keep(scope: string, label: string, value: string) {
   save()
   changed()
 }
-// the open asks' cards say again whether one is kept for them (one kept or forgotten since they asked)
+// an ask's card: whether one is kept for it, when and to which workspace it was last given, and whether this workspace
+// never got it (first: a new place asking for it is worth a look)
+const cardOf = (id: string, label: string, ws: string, project?: string) => {
+  const k = keptFor(project, label)
+  const last = k?.given?.[0]
+  return { id, label, ...(k && { saved: k.scope === '*' ? ('all' as const) : ('project' as const), first: !(k.given ?? []).some(g => g.ws === ws), ...(last && { last: { at: last.at, name: last.name } }) }) }
+}
+// the open asks' cards say again whether one is kept for them (one kept, given or forgotten since they asked)
 function resaved() {
   for (const a of asks.values()) {
     const r = rtOf(a.tab)
-    if (!r.secret) continue
-    const k = keptFor(a.project, a.label)
-    r.secret = { id: r.secret.id, label: r.secret.label, ...(k && { saved: k.scope === '*' ? ('all' as const) : ('project' as const) }) }
+    if (r.secret) r.secret = cardOf(r.secret.id, r.secret.label, a.ws, a.project)
   }
 }
 const forget = (had: { scope: string; label: string }) => {
@@ -83,8 +89,7 @@ export function secretAsk(o: { label?: unknown; from?: { tab?: string } }) {
   if (r.secret) throw new Error(`${tab.name} asks for ${r.secret.label} already`)
   const id = randomUUID()
   const was = r.status
-  const saved = keptFor(ws?.project, label)
-  r.secret = { id, label, ...(saved && { saved: saved.scope === '*' ? ('all' as const) : ('project' as const) }) }
+  r.secret = cardOf(id, label, tab.workspace, ws?.project)
   if (tracked(tab) && was === 'running') r.status = 'waiting' // Needs you, the Dock's count, a notification
   broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: `${tab.name} asks for a secret: ${label}` })
   phone(tab, 'waiting', `asks for a secret: ${label}`)
@@ -100,7 +105,7 @@ export function secretAsk(o: { label?: unknown; from?: { tab?: string } }) {
       if (res.path) ok({ path: res.path })
       else no(new Error(`the user didn't give ${label}: ${res.refused}`))
     }
-    asks.set(id, { tab: tab.id, folder, label, project: ws?.project, done: finish })
+    asks.set(id, { tab: tab.id, ws: tab.workspace, folder, label, project: ws?.project, done: finish })
   })
 }
 
@@ -121,6 +126,15 @@ export function secretGive(o: { id?: string; value?: unknown; refuse?: boolean; 
   }
   const path = writeSecret(a.folder, a.label, value)
   log(`secret: ${a.label} for ${a.tab} in ${path}`) // the path, never the value
+  // who got a kept one (this give, or the first of one kept just now): its workspace's id and name as it is now
+  const kk = k ?? (o.keep === 'project' || o.keep === 'all' ? keptFor(a.project, a.label) : undefined)
+  if (kk) {
+    const w = state.workspaces.find(x => x.id === a.ws)
+    kk.given = [{ at: Date.now(), ws: a.ws, name: w?.name || a.ws }, ...(kk.given ?? [])].slice(0, GIVEN_MAX)
+    kk.count = (kk.count ?? 0) + 1
+    resaved()
+    save()
+  }
   a.done({ path })
   return { ok: true }
 }

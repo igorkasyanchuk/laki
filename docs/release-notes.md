@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A kept secret's card says when it was last given and to which workspace, and *First time this workspace asks for it* when that workspace never got it; Settings › General › Kept secrets shows how many times each was given and to whom last.
 - With *Confirm risky actions with Touch ID* on, pairing a Telegram chat and letting Telegram start workspaces (*Control*) ask for Touch ID first, as pairing a remote access device does.
 - Secret values you give Laki stay in the macOS Keychain: a variable named like a token, key or secret in Settings' env, a profile's or a project's, and the phone push's URL, out of Laki's state file and its backups, which keep only their names. Your tabs and scripts get them as before.
 - A terminal resized just as it starts keeps its new size: a shell still starting could put its first size back (bash's line editor reads and writes the size as it sets up), so its lines wrapped at the old width until the next resize.

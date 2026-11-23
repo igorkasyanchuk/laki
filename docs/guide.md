@@ -2110,8 +2110,10 @@ its chat or the model's context. *Refuse* says no; after 15 minutes it's a no.
 *Keep* beside the field (*Only this time*, *Keep for this project*, *Keep for all projects*) keeps the value for next
 time, in the Keychain (else a 0600 file in Laki's data). When an agent asks for the same name again there, the card
 says *Saved for this project* (or *for all projects*): *Give it* hands it over in one click, *Type another* asks as
-before. It's never given on its own, a project's own comes before the one for all projects, and an agent can't list,
-read or forget them. Settings › General › *Kept secrets* lists their names (every one) with *Remove*; a project's
+before. The card also says when it was last given and to which workspace, and *First time this workspace asks for it*
+when that workspace never got it. It's never given on its own, a project's own comes before the one for all projects, and an agent can't list,
+read or forget them. Settings › General › *Kept secrets* lists their names (every one), how many times each was given
+and the last time and workspace (or *not given yet*), with *Remove*; a project's
 settings list its own. Removing a project forgets the ones kept for it.
 
 Paste a token, key or password into a prompt box and a line under it says what it looks like (a GitHub token, an AWS

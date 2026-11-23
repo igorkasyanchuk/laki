@@ -77,3 +77,57 @@ test('kept secrets: kept for a project or all, given with one click, the project
   assert.deepEqual((await rig.rpc('stateOwn')).secretsKept ?? [], [])
   assert.ok(!existsSync(dt), 'its value gone')
 })
+
+test("kept secrets: who got one: each give's workspace newest first, the count, 20 kept; a card says the last give and a workspace's first; never to an agent", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const up = async () => {
+    const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+    const tab = await until(async () => (x => x?.resumeId && x.status === 'idle' && x)(await rig.tab(ws.id)), 'claude up')
+    return { ws, tab }
+  }
+  const ask = async (who: { ws: any; tab: any }) => {
+    const asked = rig.rpc('secretAsk', { label: 'Stripe key', from: { tab: who.tab.id } })
+    asked.catch(() => {})
+    const card = await until(async () => (await rig.rpc('stateOwn')).tabs.find((x: any) => x.id === who.tab.id)?.secret, 'the card') // your own window's
+    return { asked, card }
+  }
+  const kept = async () => (await rig.rpc('stateOwn')).secretsKept[0]
+  const a = await up()
+  const b = await up()
+  // kept with its first give: a's
+  const one = await ask(a)
+  await rig.rpc('secretGive', { id: one.card.id, value: 'sk_test_given', keep: 'project' })
+  await one.asked
+  assert.deepEqual([(await kept()).count, (await kept()).given.map((g: any) => g.ws)], [1, [a.ws.id]])
+  // b asks: its first time; the last give was a's
+  const two = await ask(b)
+  assert.equal(two.card.first, true)
+  assert.equal(two.card.last.name, (w => w.name || w.id)((await rig.rpc('state')).workspaces.find((w: any) => w.id === a.ws.id)), 'its name as shown')
+  // an agent's view (the masked one) has neither the list nor the last give's workspace
+  const masked = (await rig.rpc('state')).tabs.find((x: any) => x.id === b.tab.id).secret
+  assert.equal(masked.last, undefined)
+  assert.equal((await rig.rpc('state')).secretsKept, undefined)
+  await rig.rpc('secretGive', { id: two.card.id, saved: true })
+  await two.asked
+  const k = await kept()
+  assert.equal(k.count, 2)
+  assert.deepEqual(k.given.map((g: any) => g.ws), [b.ws.id, a.ws.id], 'the newest first')
+  assert.ok(k.given[0].at >= k.given[1].at)
+  // a asks again: not its first
+  const three = await ask(a)
+  assert.equal(three.card.first, false)
+  await rig.rpc('secretGive', { id: three.card.id, saved: true })
+  await three.asked
+  // 20 kept, every one counted
+  for (let i = 0; i < 20; i++) {
+    const x = await ask(i % 2 ? a : b)
+    await rig.rpc('secretGive', { id: x.card.id, saved: true })
+    await x.asked
+  }
+  const all = await kept()
+  assert.equal(all.count, 23)
+  assert.equal(all.given.length, 20)
+  assert.ok(!JSON.stringify(all).includes('sk_test_given'), 'no value')
+  assert.ok(!JSON.stringify(all).includes('.laki-secrets'), 'no path')
+})

@@ -2468,7 +2468,18 @@ export function SecretStrip({ tab, onGive, kept = true }: { tab: TabView; onGive
             Refuse
           </button>
         </div>
-      ) : (
+      ) : null}
+      {saved && (s.first || s.last) && (
+        <div className="secret-given">
+          {s.first && <span className="secret-first">First time this workspace asks for it</span>}
+          {s.last && (
+            <span className="muted">
+              Last given {ago(s.last.at)} to {s.last.name}
+            </span>
+          )}
+        </div>
+      )}
+      {saved ? null : (
         <div className="secret-row">
           <input type="password" value={v} autoComplete="off" spellCheck={false} placeholder="Paste or type it" aria-label={s.label} onChange={e => setV(e.target.value)} />
           {kept && (

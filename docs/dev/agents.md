@@ -192,6 +192,12 @@ field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<
 (hidden: no artifact) and the agent gets its path (S10: only into a real folder of the storage folder, `ownDir`: a
 `.laki-secrets` link is refused and never tidied through; the file opened `O_EXCL | O_NOFOLLOW`); `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
 memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
+A kept one (`state.secretsKept`: `{ scope, label, at }`, its value by keychain.ts) also has `given` (each give's
+`at`, workspace id and its name as shown then, the newest `GIVEN_MAX`, 20) and `count`, set as `secretGive` gives it (or
+keeps it with its first give); never a value or a path. The card (`cardOf`, again on each change: `resaved`) carries
+`last` (the newest give's `at` and name) and `first` (none of its gives went to this workspace): the window draws
+*Last given … to …* and *First time this workspace asks for it*. `masked` drops `last` with `secretsKept`: an agent,
+remote access, a trusted client and Telegram see neither. `test/secrets-kept.test.ts`.
 
 A secret pasted into a prompt box (renderer's `secretHint.tsx`, in `PromptInput` (New workspace, the quick bar, Laki
 AI's, the Board's) and the Reader's box, the phone's too): `shared/secrets.ts` `secretsIn` (the share mask's `SECRETS`
