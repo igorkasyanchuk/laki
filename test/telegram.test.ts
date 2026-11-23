@@ -111,6 +111,27 @@ test('P1: a bot token checked with getMe and kept off state.json, the view and t
   }
 })
 
+test('Touch ID on: pairing a chat and raising Telegram to control each take a ticket of their own; a lower level, a token or unpair none', async t => {
+  const b = await bot(t)
+  const rig = await fresh(t, { env: { LAKI_TELEGRAM_API: b.url, LAKI_TG_GAP_MS: '0' } })
+  await rig.rpc('telegramSet', { token: TOKEN })
+  await rig.rpc('settingsSet', { touchId: true })
+  const ticket = async (what: string) => (await rig.rpc('ticketMint', { what })).ticket as string
+  await assert.rejects(rig.rpc('telegramPair'), /to pair a Telegram chat with Laki, Laki asks for Touch ID first \(Settings › General\): do it in Laki's window/)
+  await assert.rejects(rig.rpc('telegramPair', { touchTicket: await ticket('bypassNew') }), /Touch ID first/, "another action's")
+  await assert.rejects(rig.rpc('telegramPair', { touchTicket: await ticket('telegramControl') }), /Touch ID first/, "control's")
+  assert.match((await rig.rpc('telegramPair', { touchTicket: await ticket('telegramPair') })).link, /start=/)
+  await assert.rejects(rig.rpc('telegramSet', { level: 'control' }), /to let Telegram start workspaces, Laki asks for Touch ID first/)
+  await assert.rejects(rig.rpc('telegramSet', { level: 'control', touchTicket: await ticket('bypassNew') }), /Touch ID first/)
+  await rig.rpc('telegramSet', { level: 'control', touchTicket: await ticket('telegramControl') })
+  assert.equal((await rig.rpc('state')).telegram.level, 'control')
+  await rig.rpc('telegramSet', { level: 'control' }) // already control: nothing more let in
+  await rig.rpc('telegramSet', { level: 'answer' })
+  await rig.rpc('telegramSet', { detail: 'titles' })
+  await rig.rpc('telegramSet', { token: TOKEN }) // the same bot again
+  await rig.rpc('telegramSet', { unpair: true })
+})
+
 test('P1: pairing: only a private /start with the live code pairs, once; a wrong, reused, group or expired code: nothing at all', async t => {
   const b = await bot(t)
   const rig = await fresh(t, { env: { LAKI_TELEGRAM_API: b.url, LAKI_TG_GAP_MS: '0', LAKI_TG_PAIR_MS: '2500' } })

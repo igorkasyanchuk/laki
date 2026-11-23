@@ -1571,6 +1571,17 @@ test('confirmOf: a start with Bypass on is bypassNew; a shell, a command or one 
   assert.equal(confirmOf('wsFan', { presets: ['calm', 'codex'] }, cur), undefined)
 })
 
+test("confirmOf: Telegram's pairing, and its level raised to control; a lower level, a token, unpair: nothing", async () => {
+  const { confirmOf } = await import('../src/shared/confirm.ts')
+  assert.equal(confirmOf('telegramPair', {}, {}), 'telegramPair')
+  assert.equal(confirmOf('telegramSet', { level: 'control' }, { telegram: 'answer' }), 'telegramControl')
+  assert.equal(confirmOf('telegramSet', { level: 'control' }, {}), 'telegramControl', 'none set yet')
+  assert.equal(confirmOf('telegramSet', { level: 'control' }, { telegram: 'control' }), undefined, 'already control')
+  assert.equal(confirmOf('telegramSet', { level: 'answer' }, { telegram: 'control' }), undefined, 'a lower level')
+  assert.equal(confirmOf('telegramSet', { unpair: true }, { telegram: 'control' }), undefined)
+  assert.equal(confirmOf('telegramSet', { token: '1:x', off: true, detail: 'titles', topics: true }, { telegram: 'answer' }), undefined)
+})
+
 // New workspace's profile list: a usage row's tightest window, what's left, its short name and a reset still ahead
 test('planLeft: the tighter of two windows; an error row nothing; a reset past none', async () => {
   const { planLeft, usageOld, usageRow } = await import('../src/shared/types.ts')

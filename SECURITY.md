@@ -125,6 +125,32 @@ the Mac. *Full* is as before: everything but what never goes over remote access.
 method is marked as a phone's or not (the daemon won't start with one nobody placed), and a phone at Full can't change
 accounts, reset settings, send a test push, clone a repository, change an extension's files or move Laki's clock.
 
+### Telegram
+
+Settings › Telegram is a second way in from outside: your own bot, paired with one Telegram account in its private chat.
+Only the Mac calls Telegram (one long poll to `api.telegram.org`); no port opens and no tunnel runs.
+
+- **What leaves the Mac**, through Telegram's servers (bots aren't end-to-end encrypted, so Telegram can read it): a
+  push's title and its workspace's name, an ask's question and choices, an agent's last words, and on request a tab's
+  screen (`/screen`) and a diff (`/diff`); secrets' shapes masked. *Titles only* sends who needs you and nothing off the
+  screen (`/screen` and `/diff` send nothing); Recording mode keeps private workspaces out of all of it.
+- **What each level may do** (gates.ts' `TELEGRAM_OK`, an allowlist the daemon checks on every call from the chat):
+  *Notify* reads nothing from the chat; *Answer* answers asks, messages an agent, reads the state, a screen, a diff and
+  an agent's reply, turns Do not disturb on or off; *Control* also starts a workspace (`wsNew`). Stop, Ship, merge,
+  archive or delete, settings, secrets, terminals and commands, remote access and anything behind Touch ID are never
+  Telegram's. A message to an agent can't start with `!`.
+- **Limits and the log**: 50 messages and answers a minute, 10 new workspaces an hour; a tap or message older than two
+  minutes is dropped. *What Telegram did* lists each thing done or refused from the chat.
+- **Who gets in**: pairing takes a code of 128 random bits, good once for 10 minutes, made only in Laki's window; the
+  account that sends it is the one let in, in its private chat; anyone else gets no answer. With *Confirm risky actions
+  with Touch ID* on, making a pairing code and raising the level to *Control* each ask for Touch ID first (a lower
+  level, a new token, *Unpair* and *Titles only* don't: they let no one more in). An agent, remote access or a trusted
+  client can't change this section.
+- **The bot's token** is in the Keychain (else a 0600 file), never in `state.json`, the view, a log or an error. Someone
+  who has it can read the bot's updates (what the paired chat sends it, while Laki isn't polling) and send messages as
+  the bot; it doesn't make them the paired user, so they can't answer an ask or start anything in Laki. If it leaks,
+  revoke it in @BotFather and connect the new one.
+
 ### Auto-answer rules
 
 A project's auto-answer rules (Settings › the project, or *Always allow in this project* on an ask's card) answer a

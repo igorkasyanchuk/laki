@@ -17,7 +17,8 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
 `unknown method <it>` once more by the old name, by that one from then on. Achievements match by the old name.
 
 Touch ID (`shared/confirm.ts`, `settings.touchId`, Settings › General, a Mac with Touch ID and the `touch.id` cap):
-`CONFIRM` names the actions (remote access started, a device paired, Bypass permissions on a running tab, `tabMode`, or
+`CONFIRM` names the actions (remote access started, a device paired, a Telegram chat paired (`telegramPair`), Telegram's
+level raised to control (`telegramControl`: `telegramSet`'s `level: 'control'` while `cur.telegram`, its level now, isn't), Bypass permissions on a running tab, `tabMode`, or
 a profile that didn't have it, `presetSave` or Settings' whole list, `bypassNew`: a workspace, tab, race or scheduled task that starts
 with an agent that never asks, `wsNew`, `tabNew` and `wsFan` by the call's `perm` or its profile's (`tabNew`'s `kind:
 'agent'`: its preset the agent, no profile), `scheduleSet` by its profile, the default agent when it names none (`cur.agent`), a webhook's secret shown, `uiReset`, the setting

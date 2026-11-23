@@ -166,7 +166,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   workspace's in Recording mode gets a card saying *Open Laki to answer this one*, and nothing is sent. None waiting:
   *Nothing is waiting*.
 - **Confirm risky actions with Touch ID** (off until you turn it on: Settings › General, on a Mac with Touch ID): Laki
-  asks for your finger before it starts remote access, pairs a device, turns a tab or a profile to Bypass permissions,
+  asks for your finger before it starts remote access, pairs a device or a Telegram chat, lets Telegram start workspaces (*Control*), turns a tab or a profile to Bypass permissions,
   starts a workspace or a tab whose agent never asks, shows a webhook's secret or resets the interface, and before this switch goes off. Then only Laki's window can do
   these: the `laki` command, a phone and agents are told to do it there.
 - **Show and tell** (off until you turn it on: Settings › General or Keys › Global hotkey, ⌃⌥⌘T suggested; the menu
@@ -2784,7 +2784,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   @BotFather, send `/newbot`, give it a name and a username that ends in `bot`, and paste the token it answers with
   (`123456789:AA…`); *Connect* checks it with Telegram. **2 · Pair your phone**: *Show pairing code* shows a QR and a
   `t.me/<your bot>?start=…` link; scan it with the phone's camera (or open the link there) and tap *Start* in Telegram:
-  Laki says *Paired*. The code is 128 random bits, works once, for 10 minutes, and only the Telegram account that sends
+  Laki says *Paired* (with *Confirm risky actions with Touch ID* on, the code and *Control* each ask for Touch ID first). The code is 128 random bits, works once, for 10 minutes, and only the Telegram account that sends
   it is let in, in its private chat with the bot; anyone else who finds the bot gets no answer at all. **3 · What
   Telegram may do**: *Notify* (pushes only; Laki doesn't read the chat), *Answer* (the default: a tap on a push's
   button picks that choice, as a click in Laki would; a reply to a push, swiped left or long-pressed › Reply, goes to its

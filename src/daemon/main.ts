@@ -1687,7 +1687,7 @@ function ticketNo(method: string, params: unknown) {
   if (!params || typeof params !== 'object') return params
   const { touchTicket, ...p } = params as Record<string, unknown>
   if (!core.state.settings?.touchId) return 'touchTicket' in params ? p : params
-  const what = confirmOf(method, p, { touchId: true, presets: core.presets(), agent: core.state.settings?.agent })
+  const what = confirmOf(method, p, { touchId: true, presets: core.presets(), agent: core.state.settings?.agent, telegram: core.state.telegram?.level })
   if (!what) return 'touchTicket' in params ? p : params
   const t = typeof touchTicket === 'string' ? tickets.get(touchTicket) : undefined
   if (typeof touchTicket === 'string') tickets.delete(touchTicket)
