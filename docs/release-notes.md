@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.61.0 · Nov 24, 2026
 
 - Telegram works with buttons: /menu lists your projects, then a project's workspaces, then a workspace's card (its agents, what its agent said last, Screen, Diff, ⬆ ⬇ to the next one). *Talk here* sends whatever you type, or say in a voice note, to that agent with no reply needed; at Control, *New task* starts a workspace from your next message, a screenshot or a file with it. 🤖 *Laki AI* (or /ai) talks to Laki AI from the chat: it looks at your workspaces, messages their agents and starts new ones, nothing the chat itself may not do. Agents' Markdown comes through as bold, code and links.
 - *Move to group › New group…* names a group and moves the workspace (or the picked ones) into it, in one step; a project with no groups yet has it too.
