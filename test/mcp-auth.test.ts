@@ -34,7 +34,7 @@ test("an MCP server's sign-in: the band, codex mcp login for it, the tab restart
       return 0
     }
   }
-  const was = await until(() => runs() || undefined, "codex's start in the fake's log")
+  const was = await until(() => runs() || 0, "codex's start in the fake's log") // 0: not yet, until's falsy
   const r = await rig.rpc('mcpSignIn', { tab: tab.id, name: 'planetscale', act: 'open' })
   assert.equal(r.cmd, "codex mcp login 'planetscale'")
   await until(async () => (await rig.tab(ws.id)).mcpAuth === undefined, 'signed in: the band gone')
