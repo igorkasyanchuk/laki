@@ -26,8 +26,15 @@ test("an MCP server's sign-in: the band, codex mcp login for it, the tab restart
   const a = await until(async () => (await rig.tab(ws.id)).mcpAuth, 'the band')
   assert.deepEqual(a.names, ['planetscale'])
   await assert.rejects(rig.rpc('mcpSignIn', { tab: tab.id, name: 'planetscale', act: 'open', from: { ws: ws.id, tab: tab.id } }), /signing an agent's MCP server in is yours/)
-  const runs = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] !== 'mcp').length
-  const was = runs()
+  // the fake's log, none yet under load (a release's run: ENOENT): codex's own start in it first, then counted
+  const runs = () => {
+    try {
+      return rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] !== 'mcp').length
+    } catch {
+      return 0
+    }
+  }
+  const was = await until(() => runs() || undefined, "codex's start in the fake's log")
   const r = await rig.rpc('mcpSignIn', { tab: tab.id, name: 'planetscale', act: 'open' })
   assert.equal(r.cmd, "codex mcp login 'planetscale'")
   await until(async () => (await rig.tab(ws.id)).mcpAuth === undefined, 'signed in: the band gone')
