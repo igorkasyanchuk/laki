@@ -263,7 +263,10 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
 - Secret-looking environment values (a name like `*_TOKEN`, `*_KEY`, `*_SECRET`: Settings' env, a profile's, a
   project's and its MCP servers') and the phone push's URL and reply topic are kept the same way (else a 0600 file each
   in `env-keys/`); `state.json`, its dated copies and `laki backup`'s archive keep only their names. A backup's manifest
-  lists them: on another Mac they're set again. Tabs and scripts get them as before.
+  lists them: on another Mac they're set again. Tabs and scripts get them as before. Extensions' secret settings are
+  one item too (`widget-secrets`; else `widget-secrets.json`, 0600). A name or value with a line break or a NUL never
+  goes to `security -i` (its stdin takes a command a line: the rest would run as another command): it stays in its
+  0600 file.
 - Electron's `runAsNode` fuse is off on Laki's own binary: no program can run its JavaScript inside it
   (`ELECTRON_RUN_AS_NODE=1`) to borrow the privacy grants you gave Laki. The daemon, the CLI, hooks and MCP run on Laki
   Node, a binary of its own in the bundle (its own bundle id, no privacy usage strings) that does run as node: anything

@@ -124,7 +124,7 @@ action's prompt reads (`{{config.x}}`): those steer what it runs with your tools
 #### Secrets
 
 A token or a key is a `secret`: `"apiToken": { "type": "secret", "label": "API token" }`. Settings shows a password
-box (*Set: type to replace* once it has one, and *Clear*). Laki keeps it in `<data>/widget-secrets.json` (0600), not
+box (*Set: type to replace* once it has one, and *Clear*). Laki keeps it in the Keychain (else `<data>/widget-secrets.json`, 0600), not
 with the other settings: only its fetch and its actions get it (`$WIDGET_APITOKEN`, `$LAKI_WIDGET_CONFIG`), and a
 `script`'s `config`. Its page, templates, `ui`, the app, `laki ls --json` and MCP see it empty; the inspector's Env
 shows `••••`. A remix starts without it. A setting called `token`, `key`, `secret` or `password` kept as `text` gets
@@ -1117,7 +1117,7 @@ and commit it. Folders and one-file extensions both work.
   mailto). Its https pictures (and the UI kit's) come through Laki's daemon, from a public site only (not this Mac or
   your network), 10 MB at most; an http one or a `srcset` isn't loaded. A JS one runs in a sandboxed frame with an
   opaque origin, `default-src 'none'`, and only the network you allow.
-- Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in
-  `<data>/widget-secrets.json` (0600), given only to its fetch and actions.
+- Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in the Keychain (else
+  `<data>/widget-secrets.json`, 0600), given only to its fetch and actions.
 - An agent's `laki widget action` asks you; `laki widget on` is yours only. ponytail: a process of yours can still read
   the daemon's token and call its API directly: these close the CLI's paths, not a determined program.

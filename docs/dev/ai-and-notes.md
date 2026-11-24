@@ -276,7 +276,10 @@ says (Laki's own launcher and tabs set it to that), and `codesign -dv` on
 `process.execPath` says *Developer ID Application*, once; a test's daemon: `LAKI_KEYCHAIN=1` and the `security` on its
 PATH), else their 0600 files. `/usr/bin/security`, 5 s per call: `find-generic-password -w` (44: none),
 `delete-generic-password`, and a write as `security -i` with `add-generic-password -U … -w "<key>"` on its stdin (quotes
-and backslashes escaped), then read back. A file there is the key to keep (not moved yet, or written when the Keychain
+and backslashes escaped; a name or key with `\r`, `\n` or a NUL never: `-i` takes a command a line, the rest would run
+as another command, so `kcSet` is false and the file keeps it), then read back. A file's write is `writeAtomic`. Also
+`widget-secrets` (widgets.ts `readSecrets`/`setSecrets`: every extension's secret settings as one JSON, its file
+`<data>/widget-secrets.json`). A file there is the key to keep (not moved yet, or written when the Keychain
 failed): moved in when it reads back equal, then removed; else the file is used. Read once, then kept in memory; a
 read the Keychain didn't answer is asked again after a minute.
 `keysWhere()` is the diagnostics' *Keys and secret values* line: the Keychain, a key *in file* with why, or files, by

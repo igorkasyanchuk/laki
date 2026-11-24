@@ -1305,7 +1305,7 @@ test("Laki AI's keys in the Keychain: set, read after a restart, delete; a file 
   assert.equal(readFileSync(item, 'utf8'), KEY)
   assert.throws(() => statSync(file))
   assert.equal(readFileSync(rig.env.FAKE_LOG, 'utf8').includes('fake-'), false, 'the key is in no argument')
-  assert.match(await rig.rpc('diagnostics'), /Keys and secret values: the Keychain: openrouter in Keychain/)
+  assert.match(await rig.rpc('diagnostics'), /Keys and secret values: the Keychain: (.+, )?openrouter in Keychain/)
   // read after a restart, from the Keychain
   await rig.stop()
   await rig.start()

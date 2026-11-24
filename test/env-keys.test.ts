@@ -3,7 +3,7 @@
 // old state.json migrates
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -100,4 +100,32 @@ test('an old state.json with secret values migrates: into the Keychain, out of s
   const files = readdirSync(join(plain.data, 'env-keys')).map(f => join(plain.data, 'env-keys', f))
   assert.deepEqual(files.map(f => readFileSync(f, 'utf8').trim()), [SECRETS[0]])
   assert.equal(statSync(files[0]).mode & 0o777, 0o600)
+})
+
+test("a value with a line break never goes to security -i (its next line would run as another command): kept in its 0600 file; extensions' secrets move into the Keychain", async t => {
+  const rig = await fresh(t, { env: { LAKI_KEYCHAIN: '1' } })
+  writeFileSync(join(rig.home, 'bin', 'security'), SECURITY, { mode: 0o755 })
+  const two = 'x\nadd-generic-password -s injected -a evil -w 1'
+  await rig.rpc('settingsSet', { env: { PRIVATE_KEY: two } })
+  assert.throws(() => statSync(join(rig.home, 'keychain', 'injected__evil')), 'its second line never ran')
+  assert.throws(() => statSync(join(rig.home, 'keychain', 'Laki AI__env:PRIVATE_KEY')), 'not in the Keychain')
+  assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('-i'), 'security -i never called for it')
+  assert.ok(!onDisk(rig.data).includes('add-generic-password'), 'not in state.json either')
+  const kept = readdirSync(join(rig.data, 'env-keys')).map(f => readFileSync(join(rig.data, 'env-keys', f), 'utf8'))
+  assert.deepEqual(kept, [`${two}\n`], 'its own 0600 file has it whole')
+  assert.match(await rig.rpc('diagnostics'), /env:PRIVATE_KEY in file \(the Keychain didn't take it\)/)
+
+  // an extension's secret settings: one Keychain item, an old widget-secrets.json moved in at its first read
+  const d = join(rig.data, 'widgets', 'sec')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Sec', config: { apiToken: { type: 'secret' } }, fetch: 'echo {}', sample: {} }))
+  writeFileSync(join(d, 'widget.html'), '<template preview>hi</template>')
+  const file = join(rig.data, 'widget-secrets.json')
+  await rig.stop() // an older Laki's file, there as this one starts
+  writeFileSync(file, JSON.stringify({ old: { token: 'fake-old-widget-secret' } }), { mode: 0o600 })
+  await rig.start()
+  await rig.rpc('widgetSet', { id: 'sec', config: { apiToken: 'fake-new-widget-secret' } })
+  assert.equal(existsSync(file), false, 'the file moved into the Keychain')
+  assert.deepEqual(JSON.parse(readFileSync(join(rig.home, 'keychain', 'Laki AI__widget-secrets'), 'utf8')), { old: { token: 'fake-old-widget-secret' }, sec: { apiToken: 'fake-new-widget-secret' } })
+  assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('fake-new-widget-secret'), 'on no command line')
 })

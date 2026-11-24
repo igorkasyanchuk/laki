@@ -88,7 +88,7 @@ export function wipe() {
   for (const w of wiping.worktrees) rmSync(w, { recursive: true, force: true })
   if (wiping.worktrees.length) for (const r of wiping.repos) try { execFileSync('git', ['-C', r, 'worktree', 'prune'], { timeout: 10000, stdio: 'ignore' }) } catch {}
   if (!wiping.data) return
-  for (const k of ['openrouter', 'endpoint', 'telegram', ...envKept()]) if (keychainOn()) kcRm(k) // Laki AI's keys, the Telegram bot's token, your secret env values (envKeys.ts)
+  for (const k of ['openrouter', 'endpoint', 'telegram', 'widget-secrets', ...envKept()]) if (keychainOn()) kcRm(k) // Laki AI's keys, the Telegram bot's token, extensions' secrets, your secret env values (envKeys.ts)
   if (dir === '/' || dir === homedir() || !existsSync(join(dir, 'state.json'))) return log(`uninstall: ${dir} doesn't look like Laki's data folder: kept`)
   // its own worktrees/ stays unless they were picked (they hold your branches' work)
   const keep = !wiping.worktrees.length && existsSync(join(dir, 'worktrees'))

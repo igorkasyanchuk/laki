@@ -24,6 +24,7 @@ import { aiOnce } from './ai.ts'
 import { alertShow } from './alerts.ts'
 import { hidden } from './phone.ts'
 import { dir, realOf } from './dir.ts'
+import { keyRead, keyWrite } from './keychain.ts'
 import { agentCaller, annotAt, broadcast, sessions, git, ghSaid, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
 import { headOf } from './pr.ts'
 import { diff, inside, stats } from './files.ts'
@@ -171,12 +172,18 @@ export function writeStore(id: string, s: Store) {
   writeAtomic(storePath(id), JSON.stringify(s))
 }
 
-// a secret setting's value (widget.json's "type": "secret"): <data>/widget-secrets.json, 0600, { [id]: { [key]: value } },
-// as <data>/ai-key is kept: never in the store, state.json, the view or an export; only its fetch's and actions' env
-// (and a script's config) get it. ponytail: a file, not the Keychain yet; keychain.ts could keep them (it writes
-// through `security -i`'s stdin, never a command line ps would show), as envKeys.ts does env values
+// a secret setting's value (widget.json's "type": "secret"): { [id]: { [key]: value } } as one item kept by keychain.ts,
+// as Laki AI's keys are (the Keychain on a signed release with the default data folder; else, and before it's moved in,
+// <data>/widget-secrets.json, 0600): never in the store, state.json, the view or an export; only its fetch's and
+// actions' env (and a script's config) get it
 const secretsPath = () => join(dir, 'widget-secrets.json')
-const readSecrets = () => readJson<Record<string, Record<string, string>>>(secretsPath()) ?? {}
+const readSecrets = (): Record<string, Record<string, string>> => {
+  try {
+    return (s => (s && typeof s === 'object' && !Array.isArray(s) ? s : {}))(JSON.parse(keyRead('widget-secrets', secretsPath()) || '{}'))
+  } catch {
+    return {} // one that won't parse: none (its file stays as it is)
+  }
+}
 export const secretsOf = (id: string) => readSecrets()[id] ?? {}
 export function setSecrets(id: string, f: (s: Record<string, string>) => void) {
   masks.delete(id)
@@ -185,7 +192,7 @@ export function setSecrets(id: string, f: (s: Record<string, string>) => void) {
   f(s)
   if (Object.keys(s).length) all[id] = s
   else delete all[id]
-  writeAtomic(secretsPath(), JSON.stringify(all), 0o600)
+  keyWrite('widget-secrets', secretsPath(), JSON.stringify(all))
 }
 
 const instDir = (id: string) => join(dir, 'widget-data', id, 'ws')

@@ -1564,7 +1564,7 @@ what the command printed last, or what the script threw).
 
 An extension's settings each have a kind: text, a number, an on/off, one of a few choices, a list (logins, labels:
 typed as chips, Enter or a comma after each), or a secret (a token: a password box, *Set: type to replace* once it has
-one, *Clear*; kept apart, in `<data>/widget-secrets.json`, and given only to its fetch and actions, never to its page,
+one, *Clear*; kept apart, in the Keychain (else `<data>/widget-secrets.json`), and given only to its fetch and actions, never to its page,
 the app or MCP).
 
 *Working hours* (Settings › Extensions › *Fetch only*): when extensions fetch on their own, in plain English: `9am-9pm

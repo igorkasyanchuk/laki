@@ -7,12 +7,15 @@
 // write goes through `security -i` on stdin (never on a command line: ps shows those), then is read back. Each call
 // waits 5 s at most; a value is never logged. A file there is the key to keep (not moved yet, or written when the
 // Keychain failed): moved in once it reads back the same, then removed. Read once, then kept in memory (a read the
-// Keychain didn't answer: asked again after a minute).
+// Keychain didn't answer: asked again after a minute). A name or value with a line break or a NUL never goes in: on
+// security -i's stdin it would end the command there and run the rest as more commands (kcSet false: its file keeps
+// it). Widget secrets are kept here too (widgets.ts, one item: their JSON).
 // ponytail: the first read is a sync spawn (a few ms; 5 s at worst) on the event loop
 import { spawnSync } from 'node:child_process'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { writeAtomic } from '../shared/conn.ts'
 import { dir, inRig } from './dir.ts'
 
 const SERVICE = 'Laki AI'
@@ -32,7 +35,8 @@ export function kcGet(name: string): string | undefined {
   return r.status === 0 ? r.stdout.replace(/\n$/, '') : r.status === 44 ? '' : undefined
 }
 const q = (s: string) => `"${s.replace(/[\\"]/g, c => `\\${c}`)}"`
-export const kcSet = (name: string, value: string) => sec(['-i'], `add-generic-password -U -s ${q(SERVICE)} -a ${q(name)} -w ${q(value)}\n`).status === 0 && kcGet(name) === value
+const ONE_LINE = /^[^\r\n\0]*$/ // security -i reads a command a line
+export const kcSet = (name: string, value: string) => ONE_LINE.test(name) && ONE_LINE.test(value) && sec(['-i'], `add-generic-password -U -s ${q(SERVICE)} -a ${q(name)} -w ${q(value)}\n`).status === 0 && kcGet(name) === value
 export const kcRm = (name: string) => (s => s === 0 || s === 44)(sec(['delete-generic-password', '-s', SERVICE, '-a', name]).status)
 
 const kept = new Map<string, string>()
@@ -66,7 +70,7 @@ export function keyWrite(name: string, path: string, key: string) {
     rmSync(path, { force: true })
     where.set(name, 'Keychain')
   } else {
-    if (key) writeFileSync(path, `${key}\n`, { mode: 0o600 })
+    if (key) writeAtomic(path, `${key}\n`, 0o600) // never half written: a crash keeps the one before
     else rmSync(path, { force: true })
     where.set(name, keychainOn() ? "file (the Keychain didn't take it)" : 'file')
   }
