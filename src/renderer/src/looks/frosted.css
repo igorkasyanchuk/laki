@@ -128,11 +128,11 @@
 [data-look='frosted'] select:not([multiple], [size]):hover { background-color: var(--f-fill-up); }
 [data-look='frosted'] kbd { border-radius: var(--rs, 5px); border-color: var(--f-edge); background: var(--f-fill); }
 /* what floats: near solid, big soft corners, a menu's choice in the accent as on a Mac */
-[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
+[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 22%)), transparent); /* near solid, by Glass › Strength (Regular: 94%) */ box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
 [data-look='frosted'] .menu { border-radius: var(--rs, 13px); }
 [data-look='frosted'] :is(.modal, .tunnel-pop) { border-radius: var(--rs, 16px); }
 [data-look='frosted'] .toast { border-radius: var(--rs, 13px); }
-[data-look='frosted'] .tip { border-color: var(--f-edge); border-radius: var(--rs, 7px); background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 6px 20px var(--f-drop); }
+[data-look='frosted'] .tip { border-color: var(--f-edge); border-radius: var(--rs, 7px); background: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 24%)), transparent); box-shadow: 0 6px 20px var(--f-drop); }
 [data-look='frosted'] .overlay { background: light-dark(rgb(40 40 60 / 0.18), rgb(0 0 0 / 0.32)); }
 [data-look='frosted'] .menu-item { border-radius: var(--rs, 7px); }
 [data-look='frosted'] .menu-item:hover, [data-look='frosted'] .menu-item.sel { background: var(--accent); color: var(--accent-fg); }

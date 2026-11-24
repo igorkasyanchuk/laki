@@ -134,7 +134,11 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
 :is(.menu, .modal, .finder, .tip, .help-card, .toast, .whats-new, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
 :root { --pane-dim: 0.88; } /* Dim other panes: how much a split's other panes keep */
 :root { --snap-dim: 0.6; } /* the start-up snapshot: how much of the last layout shows until the first view */
-:root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
+:root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --glass-blur: 24px; --surface-blur: blur(var(--glass-blur)) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
+/* Glass › Strength (themes.ts GLASS_LEVELS: applyTheme sets --surface-a from it, html[data-glass-level]): Clear a
+   little more blur, Tinted a little less; Regular as above. Opaque, glass and Reduce transparency: no blur at all */
+html[data-glass-level='clear'] { --glass-blur: 30px; }
+html[data-glass-level='tinted'] { --glass-blur: 20px; }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
 /* V17: Refraction (Settings › Appearance › Window, html.lens: on unless false): a menu bends what's under its edges, as
@@ -4028,7 +4032,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
    Opaque as before under Reduce transparency and in the looks marked opaque; in glass (the window's own blur) nearly
    opaque, no backdrop-filter (components.css: it flickers there); never a blur over a terminal (its WebGL canvas
    would repaint the blur every frame it prints). Its own name, not .glass: that's html's, the window's glass mode */
-:root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(20px) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); --cap-spec: color-mix(in srgb, var(--glass-hi) 60%, var(--cap-hi)); } /* --cap-spec: a capsule's one specular top edge (the glass's and the capsule's own, once) */
+:root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(calc(var(--glass-blur) * 0.84)) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); --cap-spec: color-mix(in srgb, var(--glass-hi) 60%, var(--cap-hi)); } /* --cap-spec: a capsule's one specular top edge (the glass's and the capsule's own, once) */
 /* its depth (Liquid Glass): a lit top edge inside, a shade along the bottom, a hairline rim, and a soft light under the
    pointer (ui.tsx sets --mx, --my on the capsule it's over). All off where it's drawn flat or still: the opaque looks,
    Reduce transparency, Motion: None, and while the window is behind another app (html.away) */
@@ -4052,7 +4056,7 @@ html[data-motion='none'] .main { transition: none; }
 html[data-motion='none'] { --glass-light: transparent; }
 @media (prefers-reduced-transparency: reduce) { :root { --glass-hi: transparent; --glass-lo: transparent; --glass-rim: transparent; --glass-light: transparent; } }
 html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
-html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-blur: none; }
+html.glass { --cap-bg: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 18%)), transparent); --cap-blur: none; } /* no blur there: near solid, by Strength (Regular's 72%: 90%) */
 @media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
 .capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-spec), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
 .capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle 110px at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent 70%); opacity: 0; transition: opacity 0.2s; } /* the pointer's light: a soft pool, wider than the capsule is tall */

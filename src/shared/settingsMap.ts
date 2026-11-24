@@ -134,6 +134,7 @@ export const FIND: [string, string, string?][] = [
   ['layout', 'Translucent sidebar', 'material vibrancy macos native card blur desktop see-through'],
   ['layout', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
   ['layout', 'Background image', 'wallpaper picture photo backdrop dim blur'],
+  ['layout', 'Strength', 'glass clear regular tinted liquid frosted opacity how much color menus capsules macos 26'],
   ['layout', 'Glow', 'glass colors'],
   ['layout', 'Grain', 'glass noise texture frosted film'],
   ['layout', 'Refraction', 'lens bend edge glass menus toasts liquid'],

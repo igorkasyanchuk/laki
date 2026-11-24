@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, accentFits, glassOf, onAccent, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
+import { GLASS_LEVELS, MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, accentFits, glassLevelOf, glassOf, onAccent, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
 
 // what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
 // 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
@@ -88,12 +88,18 @@ test('contrast: every theme is readable', () => {
     need('material: hints under the text', ink.fg, ink.muted, 1.1) // both made to read: less apart than on a solid sidebar
     // V8's floating surface: the panel at its strength over the window, the sidebar and a blurred busy terminal (a
     // quarter of its text over its background); the text and hints on it pass AA
+    // at each of Glass › Strength's levels (Clear, Regular, Tinted: themes.ts GLASS_LEVELS), from where it starts
+    const under = [c.bg, over(c.side, c.bg), ...[c.bg, c.side, c.fg].map(x => over(x.slice(0, 7) + '40', c.bg))]
+    for (const [level, from] of Object.entries(GLASS_LEVELS)) {
+      const la = surfaceAlpha(c.panel, c.bg, c.side, c.fg, c.muted, from)
+      assert.ok(la >= from && la <= 100, `${t.name} ${level}: ${la}`)
+      const lt = c.panel.slice(0, 7) + Math.round((la / 100) * 255).toString(16).padStart(2, '0')
+      on(`surface (${level}): fg`, c.fg, under.map(u => over(lt, u)), 4.5)
+      on(`surface (${level}): muted`, c.muted, under.map(u => over(lt, u)), 4.5)
+    }
     const sa = surfaceAlpha(c.panel, c.bg, c.side, c.fg, c.muted)
     assert.ok(sa >= SURFACE && sa <= 100)
     const top = c.panel.slice(0, 7) + Math.round((sa / 100) * 255).toString(16).padStart(2, '0')
-    const under = [c.bg, over(c.side, c.bg), ...[c.bg, c.side, c.fg].map(x => over(x.slice(0, 7) + '40', c.bg))]
-    on('surface: fg', c.fg, under.map(u => over(top, u)), 4.5)
-    on('surface: muted', c.muted, under.map(u => over(top, u)), 4.5)
     // V11's capsules (the tab bar's buttons, the Reader's composer, the status bar's groups) are the same fill: covered above
     // the open workspace's color in the glass (styles.css: --ws-mix, 8%): the selected tab's label on its tinted fill,
     // a capsule's text and hints on its tinted surface, for each workspace color (themes.ts' --tc-*; lime, brown and
@@ -185,16 +191,32 @@ test('contrast: on glass, text, hints and inactive tabs read over a white deskto
   const bad: string[] = []
   for (const t of THEMES) {
     const c = (t.c ?? { panel: v('panel'), side: v('side'), bg: v('bg'), fg: v('fg'), muted: v('muted') }) as Record<string, string>
-    const g = glassOf({ panel: c.panel, side: c.side, bg: c.bg, fg: c.fg, muted: c.muted }, !!t.light)
+    for (const glassLevel of Object.keys(GLASS_LEVELS)) {
+    const g = glassOf({ panel: c.panel, side: c.side, bg: c.bg, fg: c.fg, muted: c.muted }, !!t.light, { glassLevel })
     const desk = t.light ? '#000000' : '#ffffff'
     for (const [what, col, a] of [['surface', c.panel, g.surface], ['sidebar', c.side, g.side], ['window', c.bg, g.window]] as const) {
       const on = over(col.slice(0, 7) + pct(a), desk)
       for (const [k, ink, min] of [['text', c.fg.slice(0, 7), 4.5], ['hints and inactive tabs', g.muted, 4.5], ['the faintest hint, an icon', over(g.muted + pct(80), on), 3]] as const) {
         const r = ratio(ink, on)
-        if (r < min) bad.push(`${t.name}: ${k} on its ${what} at ${a}% over ${desk} is ${r.toFixed(2)}, needs ${min}`)
+        if (r < min) bad.push(`${t.name} (${glassLevel}): ${k} on its ${what} at ${a}% over ${desk} is ${r.toFixed(2)}, needs ${min}`)
       }
     }
     assert.ok(ratio(c.fg.slice(0, 7), g.muted) >= 1.1 || c.fg.slice(0, 7) === g.muted, `${t.name}: the hints a step below the text`)
+    }
   }
   assert.deepEqual(bad, [])
+})
+
+test("Glass › Strength: clear, regular and tinted start at 56, 72 and 88%; anything else is regular", () => {
+  assert.deepEqual(GLASS_LEVELS, { clear: 56, regular: 72, tinted: 88 })
+  assert.equal(SURFACE, GLASS_LEVELS.regular)
+  for (const x of [undefined, '', 'Clear', 'frosted', 3, null, {}]) assert.equal(glassLevelOf(x), 'regular', String(x))
+  assert.equal(glassLevelOf('clear'), 'clear')
+  assert.equal(glassLevelOf('tinted'), 'tinted')
+  // the glass floor starts from it: a clearer level is never stronger than a more tinted one
+  const t = THEMES.find(x => x.id === 'laki')!.c!
+  const [c, r, k] = (['clear', 'regular', 'tinted'] as const).map(glassLevel => glassOf({ panel: t.panel, side: t.side, bg: t.bg, fg: t.fg, muted: t.muted }, false, { glassLevel }).surface)
+  assert.ok(c <= r && r <= k && k >= 88, `${c} ${r} ${k}`)
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+  assert.match(css, /html\.glass \{ --cap-bg: color-mix\(in srgb, var\(--panel\) min\(100%, calc\(var\(--surface-a\) \+ 18%\)\), transparent\);/, "glass's capsules by --surface-a, no alpha of their own")
 })

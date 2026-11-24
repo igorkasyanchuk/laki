@@ -1123,11 +1123,16 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual); vertText: --vt, the writing-mode of every sideways label
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; refraction?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; density?: 'compact' | 'regular' | 'roomy'; pointerHand?: boolean; vertText?: 'down' | 'up'; diffLook?: 'quiet'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'refraction', 'sideClear', 'translucent', 'motion', 'vertText', 'diffLook', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark', 'density', 'pointerHand'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; glassGrain?: boolean; glassLevel?: string; refraction?: boolean; sideClear?: number; translucent?: boolean; motion?: 'high' | 'low' | 'none'; density?: 'compact' | 'regular' | 'roomy'; pointerHand?: boolean; vertText?: 'down' | 'up'; diffLook?: 'quiet'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'glassGrain', 'glassLevel', 'refraction', 'sideClear', 'translucent', 'motion', 'vertText', 'diffLook', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark', 'density', 'pointerHand'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
+// Glass › Strength (glassLevel, as macOS 26's Clear, Regular and Tinted): the floating surfaces' strength (--surface-a)
+// to start from; a theme whose text needs more gets more (surfaceAlpha, glassInk). Anything else: regular
+export const GLASS_LEVELS = { clear: 56, regular: 72, tinted: 88 } as const
+export type GlassLevel = keyof typeof GLASS_LEVELS
+export const glassLevelOf = (v: unknown): GlassLevel => (v === 'clear' || v === 'tinted' ? v : 'regular')
 // Settings › Appearance › Background image: the picture's blob URL in this window (App's, from the daemon's bgGet; none
 // in the other windows), and its sliders' defaults: how much the theme's color covers it (%), its blur (px)
 let bgImage = ''
@@ -1179,10 +1184,10 @@ const flat = (top: string, under: string) => {
 // is the window (its background, the sidebar) or a busy terminal, blurred to its background with a quarter of its text;
 // a theme whose text or hints wouldn't read at that gets more of its panel, up to solid
 export const SURFACE = 72
-export function surfaceAlpha(panel: string, bg: string, side: string, fg: string, muted: string) {
-  if (![panel, bg, side, fg, muted].every(c => /^#[\da-f]{6}([\da-f]{2})?$/i.test(c))) return SURFACE
+export function surfaceAlpha(panel: string, bg: string, side: string, fg: string, muted: string, from: number = SURFACE) {
+  if (![panel, bg, side, fg, muted].every(c => /^#[\da-f]{6}([\da-f]{2})?$/i.test(c))) return from
   const under = [bg, side, fg].map(x => flat(x.slice(0, 7) + '40', bg.slice(0, 7))).concat(bg.slice(0, 7), flat(side, bg.slice(0, 7)))
-  for (let a = SURFACE; a < 100; a += 4) {
+  for (let a = from; a < 100; a += 4) {
     const on = under.map(u => flat(alpha(panel.slice(0, 7), a), u))
     if (on.every(b => contrast(fg.slice(0, 7), b) >= 4.5 && contrast(muted.slice(0, 7), b) >= 4.5)) return a
   }
@@ -1207,9 +1212,9 @@ export function glassInk(surface: string, fg: string, muted: string, light: bool
 // glass's surfaces (applyTheme): the floating surface, the sidebar and rail (its Sidebar slider) and the window's
 // tint the tab bar sits on (its Window slider), each at least what glassInk needs; the hints (--muted) by the most any
 // of them needs
-export function glassOf(c: { panel: string; side: string; bg: string; fg: string; muted: string }, light: boolean, o: { glassSide?: number; glassWindow?: number } = {}) {
+export function glassOf(c: { panel: string; side: string; bg: string; fg: string; muted: string }, light: boolean, o: { glassSide?: number; glassWindow?: number; glassLevel?: unknown } = {}) {
   const solid = (k: 'glassSide' | 'glassWindow') => 100 - Math.min(100, Math.max(0, o[k] ?? GLASS[k]))
-  const [p, s, w] = [glassInk(c.panel, c.fg, c.muted, light), glassInk(c.side, c.fg, c.muted, light, solid('glassSide')), glassInk(c.bg, c.fg, c.muted, light, solid('glassWindow'))]
+  const [p, s, w] = [glassInk(c.panel, c.fg, c.muted, light, GLASS_LEVELS[glassLevelOf(o.glassLevel)]), glassInk(c.side, c.fg, c.muted, light, solid('glassSide')), glassInk(c.bg, c.fg, c.muted, light, solid('glassWindow'))]
   return { surface: p.alpha, side: s.alpha, window: w.alpha, muted: [p, s, w].sort((a, b) => b.mix - a.mix)[0].muted }
 }
 // the selection (styles.css ::selection, --sel-a): the accent at SEL_A% over what text sits on (a light theme's
@@ -1442,7 +1447,10 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // V8: the floating surface's strength, where its text needs more than 72% (a light theme's panel over a dark terminal)
   {
     const cv = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
-    const a = surfaceAlpha(cv('panel', '--panel'), cv('bg', '--bg'), cv('side', '--side'), cv('fg', '--fg'), cv('muted', '--muted'))
+    // Glass › Strength: where it starts (its blur: styles.css' html[data-glass-level]); Reduce transparency: solid anyway
+    const level = asked(LESS_CLEAR) ? 'regular' : glassLevelOf(o.glassLevel)
+    root.dataset.glassLevel = level
+    const a = surfaceAlpha(cv('panel', '--panel'), cv('bg', '--bg'), cv('side', '--side'), cv('fg', '--fg'), cv('muted', '--muted'), GLASS_LEVELS[level])
     if (a !== SURFACE) st.setProperty('--surface-a', `${a}%`)
   }
   // labels on a waiting or error fill (the restart bar, a count, Delete)
@@ -1453,7 +1461,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
     const solid = (k: keyof typeof GLASS) => 100 - Math.min(100, Math.max(0, o[k] ?? GLASS[k])) // the slider says how see-through
     // readable whatever the desktop shows (glassOf: a white one under a dark theme, a black one under a light one): the
     // sidebar, the rail and the window's tint at least that strong, the hints toward the text; the floats' strength too
-    const gl = glassOf({ panel: v('panel', '--panel'), side: v('side', '--side'), bg: v('bg', '--bg'), fg: v('fg', '--fg'), muted: v('muted', '--muted') }, !!t.light, o)
+    const gl = glassOf({ panel: v('panel', '--panel'), side: v('side', '--side'), bg: v('bg', '--bg'), fg: v('fg', '--fg'), muted: v('muted', '--muted') }, !!t.light, { ...o, glassLevel: root.dataset.glassLevel })
     const sa = parseFloat(st.getPropertyValue('--surface-a')) || SURFACE
     if (gl.surface > sa) st.setProperty('--surface-a', `${gl.surface}%`)
     if (/^#[\da-f]{6}$/i.test(gl.muted)) st.setProperty('--muted', gl.muted)

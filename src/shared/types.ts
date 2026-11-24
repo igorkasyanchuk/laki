@@ -714,6 +714,7 @@ export type Settings = {
   glassSide?: number
   glassTerm?: number
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
+  glassLevel?: 'clear' | 'regular' | 'tinted' // Glass › Strength, as macOS 26's: its floating surfaces at 56, 72 or 88% (unset or anything else: regular); none with Reduce transparency
   refraction?: boolean // menus bend what's under their edges where they blur (on unless false)
   glassGrain?: boolean // with glass, a fine noise over its floating surfaces, the sidebar and the splash (on unless false)
   sideClear?: number // without glass: how see-through the sidebar and the rail are, the rest solid: % (unset or 0: the translucent sidebar's own tint; off macOS: 0)

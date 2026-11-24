@@ -16,7 +16,7 @@ import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, paintTheme, preview, systemAccent, termTheme, themeFor, THEMES, transparent } from './themes'
+import { applyTheme, BG, GLASS, GLASS_LEVELS, glassLevelOf, macApp, type Paint, paintKey, paintOf, paintTheme, preview, systemAccent, termTheme, themeFor, THEMES, transparent } from './themes'
 import './floater.css'
 import './settings.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
@@ -2258,6 +2258,21 @@ export function SettingsPage(p: {
                 )}
                 {glassy && (
                   <>
+                    {/* Glass › Strength, as macOS 26's: the floating surfaces (menus, capsules, cards) clearer or more tinted;
+                        a sample of each over a busy background. Reduce transparency: solid whatever it says */}
+                    <div className="row" style={{ alignItems: 'center' }}>
+                      <Says title="Strength" hint="How much of the theme's color the floating surfaces have: Clear shows more of what's behind them, Tinted less" />
+                      <span className="seg" role="radiogroup" aria-label="Glass strength">
+                        {(['clear', 'regular', 'tinted'] as const).map(l => (
+                          <button key={l} type="button" role="radio" aria-checked={glassLevelOf(s.glassLevel) === l} className={glassLevelOf(s.glassLevel) === l ? 'on' : ''} onClick={() => paint({ glassLevel: l === 'regular' ? undefined : l })}>
+                            <span aria-hidden style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 'var(--sp-2)', padding: '0 var(--sp-2)', borderRadius: 'var(--r-pill)', background: 'repeating-linear-gradient(135deg, var(--tc-blue) 0 4px, var(--tc-pink) 4px 8px)' }}>
+                              <span style={{ display: 'inline-block', padding: '0 var(--sp-2)', borderRadius: 'var(--r-pill)', background: `color-mix(in srgb, var(--panel) ${GLASS_LEVELS[l]}%, transparent)`, color: 'var(--fg)', fontSize: 'var(--fs-1)' }}>Aa</span>
+                            </span>
+                            {l === 'clear' ? 'Clear' : l === 'regular' ? 'Regular' : 'Tinted'}
+                          </button>
+                        ))}
+                      </span>
+                    </div>
                     <div className="sliders">
                       <span className="muted small">
                         How see-through{' '}
