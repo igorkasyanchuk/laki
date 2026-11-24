@@ -2047,7 +2047,8 @@ each turn's last answer). The steps at work now always show. *Scroll to latest w
 you where you were reading. *Times in the Reader* (on): under your messages, when you sent each (today's as 14:02, an
 older one's with its day); under a finished answer, when it ended, how long the turn took and about what it cost
 (`14:04 · 2m 10s · $0.21`; the cost for Claude, at API prices). Settings › Keys › *Send with*: ⏎ (⇧⏎ a new line) or ⌘⏎ (⏎ a new line), in the Reader and
-every chat box (Laki AI's, an extension's, a spec's, Side chat).
+every chat box (Laki AI's, an extension's, a spec's, Side chat). The Reader's box has the mic too (Voice's cloud, else
+macOS dictation), on your phone's page as well, an *Answer only* device included.
 
 `/clear` (or Codex's `/new`) starts a new chat in the same tab: the Reader keeps the earlier one above a *New session*
 line. A prompt you stopped (Esc) before any answer says *Stopped before an answer* with *Edit and resend*: it goes back in

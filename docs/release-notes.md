@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Reader's message box has a mic, on your phone's page too: an Answer only device may dictate now.
 - Allow all, Deny all and the hotkeys never pick Antigravity's choices that hold for the whole conversation or persist ("always grant", "always deny … (Persist to …)", Auto mode), and OpenCode's skills go under `$XDG_CONFIG_HOME` when you set it.
 - Telegram › What it sends › Only when I ask: nothing comes on its own; `/status`, `/screen` and the menu show what's going on, and the workspace you talk to there still says when its turn ends.
 - A Markdown file's hover card in a terminal is twice as wide, its text at the size you read elsewhere.

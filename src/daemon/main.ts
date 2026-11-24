@@ -1353,6 +1353,7 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   diskUsage: true, // Disk, read from the phone too
   reviewNotesGet: true, // R10: the Review tab's comments, read and kept from the phone too
   reviewNotesSet: true,
+  voiceText: true, // the mic on the phone's prompt boxes (Reader's too): your words written down, nothing sent; Telegram's Answer has it
   ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess \
 artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet \
 chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer alertAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
@@ -1372,7 +1373,7 @@ const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'promptImprove', '
   'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet',
   'fileSave', 'prFix', 'wsUpdate', 'tabHandover', 'turnUndo', 'turnRewind', 'turnFork', 'sideAsk', 'sideNew', 'alertShow', 'noticeShow', 'secretAsk',
   'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
-  'aiEndpointKey', 'aiEndpointTest', 'voiceText', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook',
+  'aiEndpointKey', 'aiEndpointTest', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook',
   'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct',
   'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
   'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart',

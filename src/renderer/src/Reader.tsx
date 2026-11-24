@@ -13,7 +13,8 @@ import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } 
 import { Modal } from './panels'
 import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
-import { daemonBase, openExternal } from './api'
+import { bridge, daemonBase, openExternal } from './api'
+import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
@@ -123,6 +124,24 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   const box = useRef<HTMLTextAreaElement>(null)
   const [histMenu, history] = usePromptHistory(box, setText) // ↑ in the empty box: your prompts
   const at = useComplete(box, api.mentions && { key: tab.id, mentions: () => api.mentions!(tab) }, setText) // @ a workspace or project
+  // the mic, as the prompt box's (PromptInput): Voice's cloud records into this box (a click starts, the next writes it
+  // down; the phone's page too, voiceText at Answer), else macOS dictation in the app
+  const voice = useVoice()
+  const cloud = cloudVoice()
+  const dictate = !cloud && bridge?.dictate ? () => (box.current?.focus(), setTimeout(() => bridge!.dictate!(), 150)) : undefined
+  const mic = (cloud || dictate) && (
+    <button
+      type="button"
+      className={`ib rd-mic${cloud && voice.phase !== 'idle' ? ` voice-${voice.phase}` : ''}`}
+      aria-label={cloud && voice.phase === 'listening' ? 'Stop and insert' : 'Dictate'}
+      data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert; Esc drops it' : 'Dictate: tap, talk, then tap again') : 'Dictate (macOS dictation)'}
+      disabled={cloud && voice.phase === 'writing'}
+      onMouseDown={e => e.preventDefault() /* the box keeps the focus */}
+      onClick={cloud ? () => (voice.phase === 'listening' ? voiceStop() : (box.current?.focus(), void voiceStart())) : dictate}
+    >
+      <Icon name="mic" />
+    </button>
+  )
   const pinned = useRef(true) // at the bottom: it stays there as the chat grows
   const [opened, setOpened] = useState<Set<number>>(new Set()) // the hidden runs shown by a click, by their first line
   const [jump, setJump] = useState<{ who: string; text: string; at?: number }>() // Search chats' message to scroll to
@@ -436,6 +455,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
             }}
           />
           {imp.button}
+          {mic}
           <button type="submit" className="primary" disabled={!text.trim()}>
             Send
           </button>

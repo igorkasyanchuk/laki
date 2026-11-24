@@ -464,7 +464,7 @@ test('D7: answer only: what a phone may do at each level, set on the Mac only, i
   for (const [m, p] of refused) assert.match((await far(m, p)).error ?? '', /answer only from here[^]*give this device full access there/, `${m} ${JSON.stringify(p)}`)
   await assert.rejects(c.call('input', { tab: shell, data: 'x' }), /answer only from here/, 'the socket too')
   // what it may: read, an agent's message, a new agent, a name and a pin, a reminder
-  for (const [m, p] of [['state', {}], ['screen', { target: agent }], ['diff', { ws: ws.id }], ['send', { target: agent, text: 'hi', whenIdle: true }], ['wsSet', { id: ws.id, name: 'from the phone', pinned: true }], ['reminderAdd', { text: 'look', at: Date.now() + 3600e3 }]] as const)
+  for (const [m, p] of [['state', {}], ['screen', { target: agent }], ['diff', { ws: ws.id }], ['send', { target: agent, text: 'hi', whenIdle: true }], ['voiceText', { text: 'hi' }], ['wsSet', { id: ws.id, name: 'from the phone', pinned: true }], ['reminderAdd', { text: 'look', at: Date.now() + 3600e3 }]] as const)
     assert.doesNotMatch((await far(m, p)).error ?? '', /answer only/, m)
   const made = await far('wsNew', { project: pr.id, preset: 'claude', prompt: 'a task', place: 'top' })
   assert.ok(made.result?.id, `a new agent: ${made.error}`)

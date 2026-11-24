@@ -333,7 +333,8 @@ REMOTE_NO and AGENT_NO; unset: full, today's rules). `levelOf(device)`: the devi
 ask runs) is answer. main.ts' `call`:
 after REMOTE_NO, at answer `answerNo` lets only `ANSWER`'s methods through, an allowlist (as S5's for agents): reading
 (the view, `screen`, diffs, files, turns, chats, PRs, extensions' and workflows' reads), answering (`answer`,
-`aiAnswer`, `alertAnswer`, `widgetToolAnswer`, `flowAnswer`, `secretGive`), `send` to an agent tab only (`sendOk`:
+`aiAnswer`, `alertAnswer`, `widgetToolAnswer`, `flowAnswer`, `secretGive`), `voiceText` (the mic: words written down,
+nothing sent, as Telegram's Answer), `send` to an agent tab only (`sendOk`:
 `resolveTarget` as `send` does, `tracked`, never `enter: false`, never a text that starts with `!`: the agents' shell
 mode) and its draft (`tabDraft`),
 Laki AI (`aiAsk` and its chat's own), `wsNew` and `tabNew` with an agent profile (`agentPreset`: no `cmd`, no `kind`,
