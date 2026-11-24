@@ -7,7 +7,7 @@ import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
-import { askScope, denyOf, diffCounts } from '../../shared/ask'
+import { askScope, denyOf, diffCounts, explainWhat } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 import type { Annotation, Annotations, Ask, AskExplained } from '../../shared/types'
 
@@ -533,7 +533,7 @@ export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Pr
     return () => removeEventListener('laki-explained', f)
   }, [])
   const k = `${tab}\n${ask?.what ?? ''}`
-  const can = !!explain && ask?.tool === 'Bash'
+  const can = !!explain && !!ask && typeof explainWhat(ask) !== 'string' // a command, another agent's menu, a bigger change
   const got = can ? explained.get(k) : undefined
   const go = () => {
     if (!can || (got && !(typeof got === 'object' && 'err' in got))) return // asked once: its line stays; a failure asks again
@@ -550,7 +550,7 @@ export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Pr
     </button>
   ) : null
   const line = !got ? null : got === 'loading' ? (
-    <div className="ask-explained muted ai-shimmer" aria-busy="true">Laki AI is reading the command…</div>
+    <div className="ask-explained muted ai-shimmer" aria-busy="true">Laki AI is reading the {ask?.tool && ask.tool !== 'Bash' ? 'change' : 'command'}…</div>
   ) : 'err' in got ? (
     <div className="ask-explained err">{got.err}</div>
   ) : (

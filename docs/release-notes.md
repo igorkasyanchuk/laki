@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- *What will this do?* explains Codex's, Antigravity's and Grok's command asks and bigger file changes too.
 - Frosted: the terminal sits in a rounded well that fades under the tab bar, the rail and sidebar catch the pointer's light, and the selected rail icon is drawn a little bolder.
 - Messages waiting for Laki AI's answer are kept through a restart and go once Laki is back.
 - A secret under a plain name (a `DATABASE_URL` with a password, a token) is kept in the Keychain too, and values a locked Keychain held back at start are read as you come back to Laki.

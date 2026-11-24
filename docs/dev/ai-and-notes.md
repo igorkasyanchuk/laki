@@ -252,8 +252,10 @@ asked anew). `docs/dev/renderer.md` has the rest.
 
 Explain an ask (`askExplain { tab }`, ai.ts): the ? on a command ask and E on its card (Diff.tsx `useExplain`: the ask
 bar's `AskWrap`, the Reader's card, Needs you's; the cards on screen through main's `ask-explain`, a card `explain` when
-App's notify says so). Claude's Bash asks only (`perm.tool === 'Bash'`: a codex or agy menu names no tool); an Edit
-or Write is refused (its diff shows it). The command is core's `permCmd` (the PermissionRequest's whole command, 2,000
+App's notify says so). Which asks: shared/ask.ts `explainWhat`, the window's guard too: claude's Bash; another agent's
+menu with no tool named (codex's, agy's, grok's: the screen's last 16 lines as the data, *The agent's screen as it asks*);
+an Edit's, Write's or MultiEdit's change of `EXPLAIN_LINES` (6) changed lines or more (its diff, with the file, under
+*The change as a diff (data)*; a smaller one is refused: its diff shows it). What's sent is share.ts' `redact`ed first. The command is core's `permCmd` (the PermissionRequest's whole command, 2,000
 characters, kept beside `perm` and cleared with it, with `permCut` when it was longer; `perm.what` is a 300-character
 line), else `what` (cut when it ends with the … `ask.ts`' `cut` adds). Cut: a line after the command says so (*The
 command was cut at 2,000 characters; the rest is not shown.*), and the answer comes back with `cut: true` and `undo`

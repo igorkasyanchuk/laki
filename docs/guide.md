@@ -672,7 +672,8 @@ selected workspace's PR is in the status bar.
   the notification (over 200 characters) is cut there with … and gets no buttons, as does one with an invisible or
   right-to-left character in it (the floating bubbles' card and reply window too): you answer it in the tab, where it
   shows as it is.
-- *What will this do?*: the ? beside a command Claude Code asks to run (or E on its card), on the ask bar, in the
+- *What will this do?*: the ? beside a command an agent asks to run (Claude Code's, or the menu Codex, Antigravity or
+  Grok shows), or a bigger file change (or E on its card), on the ask bar, in the
   Reader, Needs you and the cards on screen, has Laki AI say in a sentence what the command does, then *Can't be undone*
   (in red) when what it changes can't be put back and *Reaches outside this workspace* when it touches more than the
   workspace's folder or the network. It never runs on its own, answers nothing and leaves the choices as they were; the

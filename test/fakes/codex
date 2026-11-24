@@ -44,6 +44,11 @@ process.stdin.on('data', d => {
     if (ch === '\r') {
       const t = line; line = ''
       const tell = (id, msg) => notify && execFileSync(notify[0], [...notify.slice(1), JSON.stringify({ type: 'agent-turn-complete', 'thread-id': id, 'last-assistant-message': msg })], { stdio: 'ignore' })
+      // "approve <command>": codex's approval menu for a command (no notify: it waits, as the real one does)
+      if (t.startsWith('approve ')) {
+        process.stdout.write(`\r\nWould you like to run the following command?\r\n\r\n  $ ${t.slice(8)}\r\n\r\n› 1. Yes, proceed (y)\r\n  2. No, and tell Codex what to do differently (esc)\r\n`)
+        continue
+      }
       // "sub…": a sub-agent's turn ends (its notify) while the chat's own goes on, then that one ends
       if (t.startsWith('sub')) {
         process.stdout.write('\r\n• Working (0s • esc to interrupt)')

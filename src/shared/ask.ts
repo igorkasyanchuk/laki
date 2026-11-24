@@ -377,3 +377,18 @@ export function groupAsks<T>(cards: readonly T[], of: (c: T) => { project: strin
   }
   return [...m.values()].filter(g => g.items.length > 1)
 }
+
+// what an ask is about, to explain: a command (claude's Bash; another agent's menu with no tool named: codex's, agy's,
+// grok's ask on its screen, the screen's text over it), or an Edit's or Write's change when it's more than a few lines (a
+// small one: its diff says it). screen: the daemon's, the lines the menu is on; the window passes none (any menu goes)
+export function explainWhat(a: { tool?: string; what?: string; diff?: string }, screen = ' '): { kind: 'command' | 'change'; text: string; file?: string } | string {
+  if (a.tool === 'Bash') return { kind: 'command', text: a.what ?? '' }
+  if (a.tool && /^(Edit|Write|MultiEdit)$/.test(a.tool)) {
+    const lines = (a.diff ?? '').split('\n').filter(l => /^[+-]/.test(l)).length
+    if (lines < EXPLAIN_LINES) return `only a command or a bigger change is explained (${a.tool}: its diff shows the change)`
+    return { kind: 'change', text: a.diff!, file: a.what }
+  }
+  if (a.tool) return `only a command or a bigger change is explained (${a.tool}: not a command)`
+  return screen.trim() || screen === ' ' ? { kind: 'command', text: screen.trim() } : 'only a command is explained (this ask says no command)'
+}
+const EXPLAIN_LINES = 6 // changed lines that make a change worth a line of words
