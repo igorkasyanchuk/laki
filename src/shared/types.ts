@@ -847,6 +847,7 @@ export type Settings = {
   floaterCards?: boolean // a bubble's card on hover (unset: on)
   hideFloats?: boolean // 10c: the floating windows kept out of screen recording and screenshots (on only if true: a new install's, NEW_DEFAULTS; Recording mode does it too)
   floaterDone?: boolean // a finished agent you haven't seen: a green, pulsing bubble until a click or a look (unset: on)
+  islandOn?: 'main' | 'pointer' // the island's screen: the built-in one (unset), the main one, or the one the pointer is on (shared/island.ts islandDisplay)
   floaterAt?: 'edge' | 'notch' // where the bubbles go: the screen's edge (unset), or an island at the top, in the notch or under the menu bar, that opens into a card when an agent asks or finishes
   floaterNew?: boolean // the bubbles' +: New task, Say it, Screenshot area, Whole screen (unset: on)
   floaterMenu?: 'stack' | 'card' // the +'s actions: stacked in the drop over it, or a menu beside it (unset: stack)

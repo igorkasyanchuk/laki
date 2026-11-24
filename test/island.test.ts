@@ -18,6 +18,9 @@ test('island: a notch from the menu bar, the pill in it or under the menu bar, t
   assert.equal(fullScreen(macbook), false)
   assert.equal(islandDisplay([external, macbook], external), macbook) // the built-in one first
   assert.equal(islandDisplay([external], external), external) // else the main one
+  assert.equal(islandDisplay([external, macbook], external, 'main'), external, "Main: the menu bar's screen")
+  assert.equal(islandDisplay([external, macbook], macbook, 'pointer', external), external, "Pointer: the one it's on")
+  assert.equal(islandDisplay([external, macbook], external, 'pointer'), external, 'none known: the main one')
   const p = pillRect(macbook)
   assert.deepEqual(p, { x: Math.round(756 - (NOTCH + 2 * WING) / 2), y: 0, width: NOTCH + 2 * WING, height: 38 })
   const q = pillRect(external)

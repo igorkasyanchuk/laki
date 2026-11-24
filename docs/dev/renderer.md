@@ -588,7 +588,9 @@ are tested in `test/units-more.test.ts`.
   which `will-navigate` would block): one renderer process, one row in Settings › Resources.
   `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer; `[data-done='on']`: a done one filled green with a slow pulse, `floaterDone` unset or true: App keeps an unseen done one a bubble past `floaterRecent` and its hours),
   also Settings › Appearance's live previews.
-- **The island** (`settings.floaterAt` `notch`; unset `edge`, the drop above): shared/island.ts (its pure parts:
+- **The island** (`settings.floaterAt` `notch`; unset `edge`, the drop above; its screen `settings.islandOn`, main's
+  `islandScreen`: `islandDisplay`'s built-in one when unset, `main` the primary display, `pointer` the one under
+  `getCursorScreenPoint` as it's placed): shared/island.ts (its pure parts:
   `hasNotch` by a built-in screen's menu bar over 24 points, `pillRect` (`NOTCH` 200, ponytail: Electron doesn't say the
   notch's width), `cardRect`, `cardQueue` (asks first, then finished ones, newest first by the float's `at`, its
   `needAt`), `lifeStep` (an ask folds only on Esc; a finished one `DONE_FOLD` 6 s after it showed unless the pointer is

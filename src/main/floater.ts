@@ -5,7 +5,7 @@
 import { AI_TO, NOTE_TO, SEL_SKIP, selectionOf, selLabel, talkDefault, talkShot, TODO_TO, withSelection } from '../shared/talk.ts'
 import { app, BrowserWindow, type BrowserWindowConstructorOptions, ipcMain, Menu, screen, session, systemPreferences, webContents } from 'electron'
 import { BROWSER, floatTimes, local, protectedKind } from './guards.ts'
-import { type CardEvent, type CardLife, cardQueue, cardRect, fullScreen, hasNotch, islandDisplay, lifeStep, pillRect, type Pin, type PinEv, pinStep, type Rect } from '../shared/island.ts'
+import { type CardEvent, type CardLife, cardQueue, cardRect, fullScreen, hasNotch, islandDisplay, type IslandOn, lifeStep, pillRect, type Pin, type PinEv, pinStep, type Rect } from '../shared/island.ts'
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { dirname, join } from 'node:path'
@@ -35,7 +35,8 @@ const mac = process.platform === 'darwin' // index.ts' too: this module's own, r
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { speak?: boolean /* Settings › Voice: Laki AI's answer to a talk-key question read out by the pill (off in Quiet and Recording mode) */; hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */ } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
+type FloatOpts = { speak?: boolean /* Settings › Voice: Laki AI's answer to a talk-key question read out by the pill (off in Quiet and Recording mode) */; hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */; islandOn?: IslandOn /* the island's screen (island.ts islandDisplay): unset, the built-in one */
+} // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string; note?: boolean; todo?: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -195,7 +196,7 @@ app.whenReady().then(() => {
 })
 export function placeFloater() {
   const notch = floats.at === 'notch'
-  const d = notch ? islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay()) : undefined
+  const d = notch ? islandScreen() : undefined
   // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange); the island also while
   // nothing runs, waits or is done (idle recent ones don't keep it up) and over a full-screen app
   if ((notch ? !floats.items.some(f => f.status !== 'idle') : !floats.items.length && !floats.add) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), pinned.tab && pinGo({ kind: 'esc' }), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
@@ -227,6 +228,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     doneAlert: o.doneAlert !== false,
     ai: o.ai === true,
     at: o.at === 'notch' ? 'notch' : 'edge',
+    ...((o.islandOn === 'main' || o.islandOn === 'pointer') && { islandOn: o.islandOn }),
     ...(Array.isArray(o.talk) && { talk: o.talk.slice(0, 12) }),
     ...(o.talkAi === true && { talkAi: true }),
     ...(o.selection === true && { selection: true }),
@@ -265,7 +267,9 @@ let islSent = '' // what the shown card was last sent: the same again isn't (its
 // ponytail: then the island shows over full-screen apps too
 const menuBarHides = () => process.platform === 'darwin' && systemPreferences.getUserDefault('_HIHideMenuBar', 'boolean') === true
 const islSeen = new Map<string, string>() // each float's status at the last list: a turn to waiting or done opens its card
-function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay())) {
+// the island's screen as Settings say (islandOn): the built-in one, the main one, or the one the pointer is on now
+const islandScreen = () => islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay(), floats.islandOn, floats.islandOn === 'pointer' ? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) : undefined)
+function islandAt(d = islandScreen()) {
   if (!floater) return
   pill = pillRect(d)
   flush = hasNotch(d)

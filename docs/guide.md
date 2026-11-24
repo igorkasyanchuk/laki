@@ -2537,7 +2537,8 @@ a click away; one from before keeps its own).
   (the new-workspace window with it). With + the drop stays even when no agent is at work. macOS shows
   another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead.
   *Where*: *Edge* (the drop) or *Notch*: a black pill at the top of the built-in screen, around its notch (or under the
-  menu bar on a screen without one), a thin bar per agent (waiting ones pulse, finished ones are green) and how many
+  menu bar on a screen without one; *Screen*: *Built-in*, *Main* (the one with macOS's menu bar), or *Pointer* (the
+  screen your pointer is on as it shows, an external one you work on)), a thin bar per agent (waiting ones pulse, finished ones are green) and how many
   need you. It opens into a card by itself when an agent asks (its question and options, or what a permission is for:
   a click answers; after a click on the card, *1-9* do too and Esc folds it) or finishes (its first lines, how long it took, a reply box, *Review
   changes*, *Open tab*; it folds after 6 seconds unless the pointer is on it); one card at a time, *1 of 3* when more

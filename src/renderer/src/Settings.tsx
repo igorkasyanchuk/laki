@@ -261,6 +261,7 @@ export type AppSettings = Paint & {
   floaterNew?: boolean // the bubbles' + (unset: on)
   floaterMenu?: 'stack' | 'card' // its actions: stacked in the drop, or a menu beside it (unset: stack)
   floaterAt?: 'edge' | 'notch' // where: the screen's edge (unset), or the island at the top
+  islandOn?: 'main' | 'pointer' // the island's screen: the built-in one (unset)
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   labs?: boolean // Pages' Labs switch: LABS, all at once
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
@@ -2591,6 +2592,22 @@ export function SettingsPage(p: {
                         </button>
                       ))}
                     </div>
+                    {s.floaterAt === 'notch' && (
+                      <div className="switch-row sub fl-styles" role="radiogroup" aria-label="The island's screen">
+                        <span className="muted small">Screen</span>
+                        {(
+                          [
+                            ['', 'Built-in', "The Mac's own screen, in its notch (with the lid closed: the main screen)"],
+                            ['main', 'Main', "The screen with macOS's menu bar (System Settings › Displays: the main display)"],
+                            ['pointer', 'Pointer', "The screen your pointer is on as it shows: the external one you work on"],
+                          ] as const
+                        ).map(([k, name, what]) => (
+                          <button key={k || 'builtin'} role="radio" aria-checked={(s.islandOn ?? '') === k} className={(s.islandOn ?? '') === k ? 'on' : ''} data-tip={what} onClick={() => set({ islandOn: k || undefined })}>
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
                       <span className="muted small">While working</span>
                       {FLOATER_STYLES.map(([k, name, what]) => (

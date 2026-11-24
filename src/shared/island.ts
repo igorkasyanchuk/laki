@@ -12,8 +12,10 @@ export const menuBarOf = (d: Display) => d.workArea.y - d.bounds.y
 export const hasNotch = (d: Display) => !!d.internal && menuBarOf(d) > 24
 // a full-screen app's screen has no menu bar: its work area is all of it. ponytail: by the screen, not the front window
 export const fullScreen = (d: Display) => d.workArea.y === d.bounds.y && d.workArea.height === d.bounds.height
-// the screen it goes on: the built-in one, else the main one
-export const islandDisplay = <D extends Display>(all: D[], main: D) => all.find(d => d.internal) ?? main
+// the screen it goes on (Settings' Screen, islandOn): the built-in one (unset), else the main one; main: the one with
+// macOS's menu bar; pointer: the one the pointer is on as it shows (an external one you work on), else the main one
+export type IslandOn = 'main' | 'pointer'
+export const islandDisplay = <D extends Display>(all: D[], main: D, on?: IslandOn, pointer?: D) => (on === 'main' ? main : on === 'pointer' ? (pointer ?? main) : (all.find(d => d.internal) ?? main))
 // the pill: wings either side of the notch, as tall as the menu bar; no notch, under the menu bar, its own height
 export const WING = 76
 export function pillRect(d: Display): Rect {

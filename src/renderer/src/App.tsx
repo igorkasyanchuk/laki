@@ -825,7 +825,7 @@ export function App() {
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
   const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false,
     menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs),
-    ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(fs?.hideFloats === true && { hide: true }),
+    ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(fs?.islandOn && { islandOn: fs.islandOn }), ...(fs?.hideFloats === true && { hide: true }),
     ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }),
     ...(talkOn && fs?.voice?.selection === true && { selection: true }), ...(talkOn && fs?.voice?.talkEngine === 'mac' && { speech: fs.voice.locale || 'en-US' }),
     ...(talkOn && fs?.voice?.answers === false && { noAnswers: true }),
