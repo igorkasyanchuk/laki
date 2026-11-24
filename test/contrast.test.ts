@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, accentFits, onAccent, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
+import { MATERIAL, SEL_A, SEL_A_LIGHT, SURFACE, THEMES, accentFits, glassOf, onAccent, contrast as ratio, materialInk, pickTint, readable, selAlpha, surfaceAlpha } from '../src/renderer/src/themes.ts'
 
 // what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
 // 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
@@ -172,4 +172,29 @@ test("contrast: macOS's accent on Laki and Laki Light: its label reads and its r
   }
   assert.ok(fell.includes('laki-light yellow'), `yellow falls back on Laki Light (fell back: ${fell.join(', ')})`)
   assert.ok(!fell.includes('laki blue') && !fell.includes('laki-light blue'), 'blue fits both')
+})
+
+// glass (Frosted, Settings › Appearance › Glass): the worst the desktop can be under a surface, pure white under a
+// dark theme and pure black under a light one. Each glass surface (the floating one, the sidebar and rail, the window's
+// tint the tab bar sits on) at the strength applyTheme gives it (themes.ts glassOf) over that: the text, the hints
+// (--muted: muted text, inactive tabs' labels, the rail's) 4.5:1, the faintest hint and an icon (--muted at 80%) 3:1
+test('contrast: on glass, text, hints and inactive tabs read over a white desktop (dark themes) or a black one (light)', () => {
+  const root = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8').match(/:root\s*{([^}]*)}/)![1]
+  const v = (k: string) => root.match(new RegExp(`--${k}:\\s*(#[0-9a-fA-F]+)`))![1]
+  const pct = (a: number) => Math.round((a / 100) * 255).toString(16).padStart(2, '0')
+  const bad: string[] = []
+  for (const t of THEMES) {
+    const c = (t.c ?? { panel: v('panel'), side: v('side'), bg: v('bg'), fg: v('fg'), muted: v('muted') }) as Record<string, string>
+    const g = glassOf({ panel: c.panel, side: c.side, bg: c.bg, fg: c.fg, muted: c.muted }, !!t.light)
+    const desk = t.light ? '#000000' : '#ffffff'
+    for (const [what, col, a] of [['surface', c.panel, g.surface], ['sidebar', c.side, g.side], ['window', c.bg, g.window]] as const) {
+      const on = over(col.slice(0, 7) + pct(a), desk)
+      for (const [k, ink, min] of [['text', c.fg.slice(0, 7), 4.5], ['hints and inactive tabs', g.muted, 4.5], ['the faintest hint, an icon', over(g.muted + pct(80), on), 3]] as const) {
+        const r = ratio(ink, on)
+        if (r < min) bad.push(`${t.name}: ${k} on its ${what} at ${a}% over ${desk} is ${r.toFixed(2)}, needs ${min}`)
+      }
+    }
+    assert.ok(ratio(c.fg.slice(0, 7), g.muted) >= 1.1 || c.fg.slice(0, 7) === g.muted, `${t.name}: the hints a step below the text`)
+  }
+  assert.deepEqual(bad, [])
 })

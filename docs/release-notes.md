@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Glass reads over any wallpaper: the sidebar, the rail and the tab bar stay strong enough, and the hints a step lighter than the text, so a dark theme over a bright desktop (or a light one over a dark desktop) no longer fades out.
 - The Review tab's head on the Default and Frosted designs: two capsules (which changes; the actions), as the window's top bar, the diff fading under it.
 - A file's head in the Review tab is quieter: pin, blame and its open buttons show as you point at it or reach it by keyboard (always for a pinned file and the one you're on); a touch screen gets one ⋯ instead.
 - A Review tab comment sent to an agent stays, with what its next turn did: *changed here* (What changed lights it) or *not changed* (Remind the agent sends those again); Accept puts it under Done.

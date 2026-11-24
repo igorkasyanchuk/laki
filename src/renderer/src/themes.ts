@@ -1188,6 +1188,30 @@ export function surfaceAlpha(panel: string, bg: string, side: string, fg: string
   }
   return 100
 }
+// glass (Settings › Appearance › Glass, Frosted): a surface (the panel, the sidebar, the window's tint) at a% over
+// whatever the desktop shows, at worst pure white under a dark theme and pure black under a light one. The least a
+// (from `from`) at which the text reads (4.5:1) there with the hints mixed toward it by at most GLASS_MIX% (mix: the
+// least that reads), so the hints stay a step below the text: applyTheme's floor for those surfaces and its --muted
+export const GLASS_MIX = 60
+export function glassInk(surface: string, fg: string, muted: string, light: boolean, from = SURFACE) {
+  if (![surface, fg, muted].every(c => /^#[\da-f]{6}([\da-f]{2})?$/i.test(c))) return { alpha: from, mix: 0, muted }
+  const w = light ? '#000000' : '#ffffff'
+  const tone = (k: number) => '#' + rgbOf(fg).map((v, i) => Math.round(v * k + rgbOf(muted)[i] * (1 - k)).toString(16).padStart(2, '0')).join('')
+  for (let a = Math.min(100, Math.max(0, from)); a <= 100; a += 4) {
+    const on = flat(alpha(surface.slice(0, 7), a), w)
+    if (contrast(fg.slice(0, 7), on) < 4.5) continue
+    for (let k = 0; k <= GLASS_MIX; k += 5) if (contrast(tone(k / 100), on) >= 4.5) return { alpha: a, mix: k, muted: tone(k / 100) }
+  }
+  return { alpha: 100, mix: GLASS_MIX, muted: tone(GLASS_MIX / 100) }
+}
+// glass's surfaces (applyTheme): the floating surface, the sidebar and rail (its Sidebar slider) and the window's
+// tint the tab bar sits on (its Window slider), each at least what glassInk needs; the hints (--muted) by the most any
+// of them needs
+export function glassOf(c: { panel: string; side: string; bg: string; fg: string; muted: string }, light: boolean, o: { glassSide?: number; glassWindow?: number } = {}) {
+  const solid = (k: 'glassSide' | 'glassWindow') => 100 - Math.min(100, Math.max(0, o[k] ?? GLASS[k]))
+  const [p, s, w] = [glassInk(c.panel, c.fg, c.muted, light), glassInk(c.side, c.fg, c.muted, light, solid('glassSide')), glassInk(c.bg, c.fg, c.muted, light, solid('glassWindow'))]
+  return { surface: p.alpha, side: s.alpha, window: w.alpha, muted: [p, s, w].sort((a, b) => b.mix - a.mix)[0].muted }
+}
 // the selection (styles.css ::selection, --sel-a): the accent at SEL_A% over what text sits on (a light theme's
 // SEL_A_LIGHT%), less where the text over it wouldn't read (min:1), 8% at the least
 export const SEL_A = 30
@@ -1427,14 +1451,20 @@ export function applyTheme(p: string | Paint = '', solid = false) {
     // the window's blur shows through: backgrounds at part strength (the default theme's from the stylesheet)
     const v = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
     const solid = (k: keyof typeof GLASS) => 100 - Math.min(100, Math.max(0, o[k] ?? GLASS[k])) // the slider says how see-through
-    const w = solid('glassWindow')
+    // readable whatever the desktop shows (glassOf: a white one under a dark theme, a black one under a light one): the
+    // sidebar, the rail and the window's tint at least that strong, the hints toward the text; the floats' strength too
+    const gl = glassOf({ panel: v('panel', '--panel'), side: v('side', '--side'), bg: v('bg', '--bg'), fg: v('fg', '--fg'), muted: v('muted', '--muted') }, !!t.light, o)
+    const sa = parseFloat(st.getPropertyValue('--surface-a')) || SURFACE
+    if (gl.surface > sa) st.setProperty('--surface-a', `${gl.surface}%`)
+    if (/^#[\da-f]{6}$/i.test(gl.muted)) st.setProperty('--muted', gl.muted)
+    const w = gl.window
     const base = t.grad ? `linear-gradient(135deg, ${alpha(t.grad[0], w)}, ${alpha(t.grad[1], w)})` : `linear-gradient(${alpha(v('bg', '--bg'), w)} 0 0)`
     // the glow: the theme's accent and violet, lit from two corners behind everything
     const glow = (at: string, c: string) => `radial-gradient(70% 60% at ${at}, color-mix(in srgb, var(${c}) 26%, transparent), transparent 70%)`
     st.setProperty('--app-bg', o.glassGlow === false ? base : `${glow('0% 0%', '--accent')}, ${glow('100% 100%', '--tc-purple')}, ${base}`)
     st.setProperty('--term-bg', alpha(v('bg', '--bg'), solid('glassTerm')))
-    st.setProperty('--side', alpha(v('side', '--side'), solid('glassSide')))
-    st.setProperty('--rail-bg', rail(v('side', '--side'), solid('glassSide'))) // the rail as see-through as the sidebar
+    st.setProperty('--side', alpha(v('side', '--side'), gl.side))
+    st.setProperty('--rail-bg', rail(v('side', '--side'), gl.side)) // the rail as see-through as the sidebar
     // the selected tab as the terminal, joined to it; a see-through terminal: a lift instead, the bar's tint is under it
     // ponytail: the bar's tint stays under the tab, so it matches the terminal only when that's mostly solid
     st.setProperty('--tab-sel', solid('glassTerm') >= 50 ? alpha(v('bg', '--bg'), solid('glassTerm')) : alpha(v('fg', '--fg'), 10))

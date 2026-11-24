@@ -378,6 +378,8 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
     ['first-welcome', null, '.welcome'],
     ['first-sample', () => clickText('.welcome button', 'Try it on a sample repo'), async () => (await has('.nw-composer')) && (await js<boolean>("[...document.querySelectorAll('.nw-composer textarea')].some(t => t.value.includes('Fix the failing test'))"))],
   ]
+  // the README stills' desktop: a bright, macOS-like wallpaper (soft light from the top left, warm at the bottom right)
+  const WALL = 'radial-gradient(60% 70% at 15% 10%, #bfe3ff, transparent 70%), radial-gradient(55% 60% at 85% 20%, #f6c6e8, transparent 70%), radial-gradient(70% 70% at 75% 95%, #ffd9a8, transparent 70%), linear-gradient(160deg, #9fc8f2, #e9b8d8 55%, #f7c99a)'
   // M1: the rich demo world (LAKI_DEMO_RICH): the README's stills instead of the walk, each in Laki's two themes (dark,
   // then light): Needs you with its answer buttons, a workspace's Done check and Collision radar, the phone's view
   const readme: typeof steps = []
@@ -395,6 +397,9 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
   if (process.env.LAKI_DEMO_RICH) {
     readme.push(['readme-setup', async () => {
       await size(1440, 900)
+      // a desktop behind the glass (a capture has none: the window's vibrancy isn't in it): a bright wallpaper, the
+      // hardest for a dark theme's text, so the stills show what glass reads like on a real one (themes.ts glassOf)
+      await js(`document.head.insertAdjacentHTML('beforeend', ${q(`<style>html[data-wall] body::before { content: ''; display: block !important; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: ${WALL} !important; }</style>`)}); document.documentElement.dataset.wall = ''`)
       ws.cart = await named('fix-cart-total')
       ws.co = await named('checkout-flow')
       await rpc('settingsSet', { radar: true })
@@ -416,8 +421,9 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
     }, () => hasText('.needs-allow-all', 'Allow all (2)')])
     for (const [theme, look] of [['laki', 'dark'], ['laki-light', 'light']]) {
       readme.push([`readme-needs-you-${look}`, async () => (await size(1440, 900), await key('Escape')(), await rpc('settingsSet', { theme, themeAuto: false }), await click(row(ws.co.id))(), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(800)), '.needs-cards']) // Needs you from its head (the row's click scrolls; a still's sticky head isn't redrawn)
-      // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock)
-      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !!f && [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))")) && (await aligned())])
+      // T7: the AI button over the check's strip, not on it (nothing docked at the bottom under it: data-dock); docked in
+      // the status bar (its default), nothing floats there
+      readme.push([`readme-check-radar-${look}`, async () => (await click(row(ws.cart.id))(), await waitFor(async () => (await has('.check-strip')) && (await has(`${row(ws.cart.id)} .ws-radar`)), 'its check and the radar', 30000)), async () => (await has('.check-strip')) && (await js<boolean>("(f => !f || [...document.querySelectorAll('[data-dock=\"bottom\"]')].every(d => (a => (b => b.height === 0 || b.right <= a.left || b.left >= a.right || b.bottom <= a.top || b.top >= a.bottom)(d.getBoundingClientRect()))(f.getBoundingClientRect())))(document.querySelector('.ai-fab-wrap'))")) && (await aligned())])
       readme.push([`readme-phone-${look}`, async () => (await click(row(ws.co.id))(), await size(390, 844), await waitFor(() => has('.phone-bar'), 'the bottom bar'), (await has('.sidebar')) || (await click('.phone-bar .pb-item')()), await waitFor(() => has('.side-scroll'), 'the drawer'), await js("document.querySelector('.side-scroll').scrollTop = 0"), await nap(1500)), '.app.narrow']) // the drawer (Projects on the bottom bar), Needs you at its top, its cards settled
     }
     readme.push(['readme-done', () => size(1440, 900), async () => true])

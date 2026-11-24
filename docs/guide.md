@@ -2555,7 +2555,7 @@ a click away; one from before keeps its own).
   *Background image* (a picture behind the sidebar and terminals in any theme, with *Dim* and *Blur*; Glass shows the
   desktop instead), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
-  terminals are, *Glow*: the theme's colors lit from two corners behind it, and *Grain* (on by default): a fine noise over menus, dialogs and the sidebar, as frosted glass has; every theme's rows, lines, hovers and
+  terminals are (as see-through as text on it still reads over any wallpaper: past that it stays as it is), *Glow*: the theme's colors lit from two corners behind it, and *Grain* (on by default): a fine noise over menus, dialogs and the sidebar, as frosted glass has; every theme's rows, lines, hovers and
   selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
   (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Refraction* (on by default: a menu bends what's under its edges, as thick glass does; not in a flat look, with Reduce transparency or Motion: None) and *Translucent sidebar* (macOS, the Classic
   design; on by default: the sidebar and the rail over macOS's sidebar material, the main area a card on it, their words

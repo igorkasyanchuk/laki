@@ -113,9 +113,14 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual([term.background, term.red, term.brightWhite, term.cursor], ['#dcc39a', kraft.ansi![1], kraft.ansi![15], kraft.c!.accent])
   assert.equal(props.get('--rail-bg'), `color-mix(in srgb, color-mix(in srgb, ${kraft.c!.side} 94%, #000) 100%, transparent)`) // a light theme's rail: a shade darker, not grey
 
-  // glass: the window at 100 - 50%, the sidebar at 100 - 60% (its default), solid terminals; no glow
+  // glass: the window asked at 100 - 50% and the sidebar at 100 - 60% (its default), each raised to what reads over a
+  // white desktop (themes.ts glassOf: 74% and 72% for this dark theme), solid terminals; no glow
   applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
-  assert.deepEqual([props.get('--app-bg'), props.get('--side'), props.get('--term-bg'), props.get('--bg')], ['linear-gradient(#06261c80 0 0)', '#05201766', '#06261cff', '#06261c'])
+  assert.deepEqual([props.get('--app-bg'), props.get('--side'), props.get('--term-bg'), props.get('--bg')], ['linear-gradient(#06261cbd 0 0)', '#052017b8', '#06261cff', '#06261c'])
+  // and a slider past that (less see-through) is as asked
+  applyTheme({ theme: 'circuit', glass: true, glassWindow: 10, glassSide: 5, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
+  assert.deepEqual([props.get('--app-bg'), props.get('--side')], ['linear-gradient(#06261ce6 0 0)', '#052017f2'])
+  applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
   assert.equal(props.get('--ui-font'), `"Futura", ${UI_FALLBACK}`)
   assert.ok(classes.has('glass'))
   assert.equal(transparent(), false) // nothing shows through the terminals
