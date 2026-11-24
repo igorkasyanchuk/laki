@@ -19,6 +19,8 @@ import { hasCap } from '../../shared/caps'
 import { noteCut, noteWhole } from './text'
 import { settle } from './motion'
 import { viewShare } from './viewShare'
+import { spokenNote } from '../../shared/speak'
+import { sayInit } from './say'
 import { toolLine, toolOn } from './AppParts'
 const QUIET = new Set(['turn', 'long', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 
@@ -127,7 +129,8 @@ export function useDaemon(a: DaemonCtx) {
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: scopes.has(o) ? 'Allow always' : `${o.n}. ${o.label}`, n: o.n, label: o.label, ...(scopes.has(o) && { scope: optLabel(t.ask!, o) }) })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : [{ text: 'Reply', reply: true }] // U15: a free-text question: a Reply field
           const card = !w?.important && !m.bell ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }), ...(perm?.tool === 'Bash' && aiOn(s) && hasCap(viewRef.current, 'ask.explain') && { explain: true }) } : { tone: m.kind === 'limit' || m.kind === 'signedout' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
+          const speak = m.kind === 'waiting' || m.kind === 'done' ? spoken(viewRef.current, m.kind === 'waiting' ? 'ask' : 'done', w, (m.kind === 'waiting' && perm?.what) || m.text || '', shown) : undefined
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card, speak)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
@@ -142,7 +145,7 @@ export function useDaemon(a: DaemonCtx) {
         if (!t || m.status === 'failed' || (!m.bell && (s?.notify === false || t.muted || w?.muted))) return
         if (m.status !== 'over' && ((!m.bell && s?.notifyOn?.done === false) || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important || m.bell ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined)
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important || m.bell ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined, spoken(viewRef.current, 'done', w, m.status === 'skipped' ? t.last || '' : String(m.text ?? ''), document.hasFocus() && shownTabs.current.includes(m.tab)))
       } else if (m.ev === 'scheduled') {
         // T1: a scheduled run waits for you, failed, or (Tell me: always) is done: a notification and a toast to it
         const s = viewRef.current?.settings
@@ -272,3 +275,9 @@ export function useDaemon(a: DaemonCtx) {
     return off
   }, [a.selectTab])
 }
+
+// Settings › Voice › Speak asks, Speak when done: what an ask or a finish says out loud (shared/speak.ts spokenNote;
+// main reads it out unless the talk key is down), the app window's own speaker (say.ts) listening for it
+const spoken = (v: View | null | undefined, kind: 'ask' | 'done', w: WorkspaceView | undefined, text: string, inView: boolean) =>
+  spokenNote({ kind, ws: w ? wsName(w) : '', text, on: kind === 'ask' ? v?.settings.voice?.speakAsks : v?.settings.voice?.speakDone, quiet: !!v?.dnd, recording: !!v?.settings.recording, private: !!w?.private || !!v?.projects.find(p => p.id === w?.project)?.private, inView })
+if (bridge?.onSpeak) sayInit(bridge.onSpeak)

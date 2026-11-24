@@ -3103,6 +3103,16 @@ export function SettingsPage(p: {
               )}
             </Group>
           )}
+          {sec === 'voice' && bridge && (
+            <Group title="Out loud" hint="Laki says it as it tells you: the workspace and the first sentence, 20 words at most, no code, links, paths or secrets. Never in Quiet or Recording mode, for a private workspace, while you hold the talk key, or for the tab you're looking at. Esc or the talk key stops it">
+              <Switch className="switch-row" on={s.voice?.speakAsks === true} onChange={on => set({ voice: { ...s.voice, speakAsks: on || undefined } })}>
+                <Says title="Speak asks" hint='"web asks: May I run the tests?"' />
+              </Switch>
+              <Switch className="switch-row" on={s.voice?.speakDone === true} onChange={on => set({ voice: { ...s.voice, speakDone: on || undefined } })}>
+                <Says title="Speak when done" hint='"web finished: Added the CSV export."' />
+              </Switch>
+            </Group>
+          )}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'telegram' && p.call && p.telegram && <TelegramSection tg={p.telegram} call={p.call} />}
           {on('pr') && (

@@ -5,7 +5,7 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, Notification, screen, shell } from 'electron'
 import { appendFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { floatOpts, floats, guardFloat } from './floater.ts'
+import { floatOpts, floats, guardFloat, talkW } from './floater.ts'
 import { rpc } from '../shared/conn.ts'
 import { from, fromApp, mac, notifyLog, pageURL, quickWin, show, win } from './index.ts'
 import { tray } from './menu.ts'
@@ -21,8 +21,10 @@ const notes = new Set<Notification>()
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
 // its edge's color
 type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown; origin?: unknown; explain?: unknown }
-ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[], card?: CardOpts) => {
+ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[], card?: CardOpts, speak?: unknown) => {
   if (!fromApp(e)) return
+  // Settings › Voice › Speak asks, Speak when done: the renderer's spokenNote, read out by the app window, never over the talk key
+  if (typeof speak === 'string' && speak && !(talkW && !talkW.isDestroyed()) && win && !win.isDestroyed()) win.webContents.send('speak', speak.slice(0, 400))
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
   const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.reply === true || a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9).map(a => (a.scope === undefined || typeof a.scope === 'string' ? a : { ...a, scope: undefined }))

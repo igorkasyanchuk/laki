@@ -656,6 +656,7 @@ function grabSelection(): Promise<string> {
 const routeFor = () => floats.route && { ...floats.route, aiOn: floats.ai, last: talkProject, lastTab: talkLast }
 export function talk() {
   if (talkW && !talkW.isDestroyed()) return void talkW.webContents.send('talk-key') // the second press: stop, send
+  if (win && !win.isDestroyed()) win.webContents.send('speak', '') // an ask or a finish being read out (cards.ts notify) stops
   const sel = grabSelection() // first: the pill takes the focus as it shows
   const p = screen.getCursorScreenPoint()
   const d = screen.getDisplayNearestPoint(p).workArea

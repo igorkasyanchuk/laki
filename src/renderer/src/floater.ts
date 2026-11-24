@@ -16,7 +16,7 @@ import type { SpeechLine } from '../../shared/speech'
 import { spokenMode } from '../../shared/ask'
 import { AI_TO, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
 import { voiceFix } from '../../shared/types'
-import { langOf } from '../../shared/speak'
+import { utter } from './say'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -776,7 +776,7 @@ function talkPage() {
   const close = () => bridge?.talkClose()
   const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
   // Settings › Voice › Speak Laki AI's answers: its answer's first sentences (main's speakable), in a voice of its
-  // language (langOf: by its script, yours first) else the default; Esc, the key again or the pill closing stops it
+  // language (say.ts utter); Esc, the key again or the pill closing stops it
   let waitSpeak: ReturnType<typeof setTimeout> | undefined
   const hush = () => (clearTimeout(waitSpeak), speechSynthesis.cancel(), close())
   addEventListener('pagehide', () => speechSynthesis.cancel())
@@ -784,11 +784,7 @@ function talkPage() {
     if (phase !== 'speak') return
     clearTimeout(waitSpeak)
     if (!text) return close() // nothing to read out (code, a link) or no answer: it's on the AI page
-    const u = new SpeechSynthesisUtterance(text)
-    const l = langOf(text, navigator.languages)
-    const v = l && speechSynthesis.getVoices().find(x => x.lang.toLowerCase().split(/[-_]/)[0] === l.toLowerCase().split('-')[0])
-    if (l) u.lang = l
-    if (v) u.voice = v
+    const u = utter(text)
     u.onend = u.onerror = () => close()
     box.classList.add('speaking')
     say(text)

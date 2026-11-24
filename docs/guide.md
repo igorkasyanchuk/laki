@@ -2939,6 +2939,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   key gets its answer read out by the pill, the first two sentences only, without code, links, paths or anything
   secret-shaped, in a voice of the answer's language when macOS has one; Esc or the key again stops it, and it never
   speaks in Quiet or Recording mode.
+  *Out loud* (Settings › Voice, both off until on): *Speak asks* says "web asks: May I run the tests?" as an agent
+  asks, *Speak when done* "web finished: Added the CSV export." as one finishes: the workspace and the first
+  sentence, 20 words at most, without code, links, paths or anything secret-shaped. Never in Quiet or Recording mode,
+  for a private workspace, while the talk key's pill is open, or for the tab you're looking at; two at most wait their
+  turn (older ones dropped), and Esc in Laki or the talk key stops it. An agent can't turn them on.
   *Include the selected text* (off until on): what's selected in the app you're in goes with your words, quoted (to
   Laki AI fenced as data): the pill says *+ selection · 3 lines*, and its × leaves it out. It's copied with ⌘C and the
   clipboard put back (Accessibility for Laki; never from a password manager or Keychain Access); in Laki, the page's

@@ -24,3 +24,23 @@ test('langOf: by its script, the user\'s languages first; Latin: theirs', () => 
   assert.equal(langOf('Hello there', ['de-DE']), 'de-DE')
   assert.equal(langOf('Hello', []), undefined)
 })
+
+test('spokenNote: "<workspace> asks: <first sentence>", 20 words at most, never quiet, private, recording, dictating or in view', async () => {
+  const { spokenNote, SPOKEN_WORDS } = await import('../src/shared/speak.ts')
+  const { AGENT_SETTINGS_OK } = await import('../src/daemon/gates.ts')
+  const ask = { kind: 'ask' as const, ws: 'web', text: 'May I run the tests? They take a minute.', on: true }
+  assert.equal(spokenNote(ask), 'web asks: May I run the tests?')
+  assert.equal(spokenNote({ ...ask, kind: 'done', text: 'Added the CSV export. Tests pass.' }), 'web finished: Added the CSV export.')
+  assert.equal(spokenNote({ ...ask, text: '' }), 'web asks.')
+  for (const k of ['quiet', 'recording', 'private', 'dictating', 'inView'] as const) assert.equal(spokenNote({ ...ask, [k]: true }), '', k)
+  assert.equal(spokenNote({ ...ask, on: false }), '', 'off unless on')
+  assert.equal(spokenNote({ ...ask, on: undefined }), '', 'unset: off')
+  // a secret, code, a path or a link never said
+  const s = spokenNote({ ...ask, text: 'Use sk-abcdefghijklmnopqrstuv1234 and `rm -rf /` at /Users/me/x.ts or https://x.dev/a now' })
+  assert.doesNotMatch(s, /sk-|abcdef|rm -rf|\/Users|https/)
+  // the 20-word cut
+  const long = spokenNote({ ...ask, text: Array.from({ length: 40 }, (_, i) => `w${i}`).join(' ') + '.' })
+  assert.equal(long.split(' ').length, SPOKEN_WORDS)
+  assert.match(long, /^web asks: w0 w1 .* w17…$/)
+  assert.ok(!AGENT_SETTINGS_OK.has('voice'), "the settings are the user's: an agent's settingsSet can't turn them on")
+})

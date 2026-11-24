@@ -20,7 +20,8 @@ type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   restartDaemon?(hung?: boolean): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown; hung: one that doesn't answer)
   onDaemonHung?(cb: (hung: boolean) => void): void // main's pings: the daemon hasn't answered 3 in a row (true), or answered again
-  notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card): void
+  notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card, speak?: string): void
+  onSpeak?(cb: (text: string) => void): void // notify's speak, back from main unless the talk key is down ('': stop)
   asking?(tabs: string[]): void // the tabs that wait (cards on screen)
   cardGone?(key: string): void // a laki alert over: its card goes
   sound?(name: string): void
@@ -446,9 +447,9 @@ type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' 
 // (their cards: tray.ts quietLets)
 let quiet = false
 export const setQuiet = (on: boolean) => void (quiet = on)
-export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[], card?: Card) {
+export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[], card?: Card, speak?: string) {
   if (quiet && !quietLets(card)) return
-  if (bridge) return bridge.notify(title, body, tab, sound, actions, card)
+  if (bridge) return bridge.notify(title, body, tab, sound, actions, card, quiet ? undefined : speak)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()
   if (Notification.permission === 'granted') new Notification(title, { body, silent: sound === 'none' }).onclick = onClick

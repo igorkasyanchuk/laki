@@ -51,3 +51,17 @@ export function langOf(text: string, prefer: readonly string[] = []): string | u
   for (const [re, langs] of SCRIPTS) if (letters && (text.match(re)?.length ?? 0) > letters * 0.3) return langs.find(mine) ?? langs[0]
   return prefer[0]
 }
+
+// Settings › Voice › Speak asks / Speak when done (voice.speakAsks, voice.speakDone): what's said as an agent asks or
+// finishes (useDaemon's notify, main's notify speaks it unless the talk key is down): "<workspace> asks: <its first
+// sentence>", speakable's (no code, links, paths or secrets), 20 words at most; '' says nothing: the setting off, Quiet,
+// Recording mode, a private workspace, the user dictating, or Laki in front with that tab in view
+export const SPOKEN_WORDS = 20
+export type Spoken = { kind: 'ask' | 'done'; ws: string; text: string; on?: boolean; quiet?: boolean; recording?: boolean; private?: boolean; dictating?: boolean; inView?: boolean }
+export function spokenNote(n: Spoken): string {
+  if (!n.on || n.quiet || n.recording || n.private || n.dictating || n.inView) return ''
+  const first = speakable(n.text).match(/^[^.!?。！？]+[.!?。！？]*/)?.[0].trim() ?? ''
+  const said = `${speakable(n.ws, 60).replace(/[.!?…]+$/, '') || 'An agent'} ${n.kind === 'ask' ? 'asks' : 'finished'}${first ? `: ${first}` : '.'}`
+  const words = said.split(' ')
+  return words.length > SPOKEN_WORDS ? `${words.slice(0, SPOKEN_WORDS).join(' ').replace(/[,;:]$/, '')}…` : said
+}

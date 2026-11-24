@@ -403,6 +403,15 @@ others run after throws unless `dependents: 'off'` (the page asks; the CLI's `--
 
 ### Notifications
 
+Out loud (Settings › Voice › *Speak asks*, *Speak when done*: `voice.speakAsks`, `voice.speakDone`, the user's alone:
+`voice` is in gates.ts' AGENT_SETTINGS_NO): a waiting turn's or a finished one's notification (useDaemon's `spoken`)
+carries `shared/speak.ts` `spokenNote`'s sentence, "<workspace> asks: <first sentence>" through `speakable` (no code,
+links, paths, secrets.ts' shapes), cut at `SPOKEN_WORDS` (20); none in Quiet (api.ts' `quiet` drops it too), Recording
+mode, for a private workspace (its own or its project's), or for a tab in view in the focused window. Main's `notify`
+sends it back to the app window (`speak`) unless the talk pill is open; renderer `say.ts` reads it (`utter`: the
+talk pill's voice pick), two at most waiting (the older dropped), Esc or the talk key (main's `talk`: `speak` '') stops it.
+Unit test: test/speak.test.ts.
+
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
 T16's one-time bell (`tab.bell`, `tabBell`: the user's or a phone's, AGENT_NO; a workspace's sets its running agents',

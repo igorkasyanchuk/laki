@@ -139,6 +139,8 @@ export const FIND: [string, string, string?][] = [
   ['layout', 'Grain', 'glass noise texture frosted film'],
   ['layout', 'Refraction', 'lens bend edge glass menus toasts liquid'],
   ['voice', "Speak Laki AI's answers", 'read aloud speech say out loud tts spoken answer talk key'],
+  ['voice', 'Speak asks', 'read aloud out loud speech say tts spoken ask waiting agent needs you voice'],
+  ['voice', 'Speak when done', 'read aloud out loud speech say tts spoken done finished turn agent voice'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
   ['appearance', 'Favorites', 'theme star starred favorite'],
   ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],

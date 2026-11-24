@@ -1,0 +1,36 @@
+// speech out loud: Laki AI's answer in the talk pill (floater.ts) and, in the app window, an agent's ask or finish
+// (Settings › Voice › Speak asks, Speak when done: shared/speak.ts spokenNote, sent back by main's notify): a voice of
+// the text's language (langOf: by its script, yours first) else the default. The app window's: two at most wait, the
+// older dropped; Esc or the talk key ('' from main) stops it
+import { langOf } from '../../shared/speak'
+
+export function utter(text: string) {
+  const u = new SpeechSynthesisUtterance(text)
+  const l = langOf(text, navigator.languages)
+  const v = l && speechSynthesis.getVoices().find(x => x.lang.toLowerCase().split(/[-_]/)[0] === l.toLowerCase().split('-')[0])
+  if (l) u.lang = l
+  if (v) u.voice = v
+  return u
+}
+
+const waiting: string[] = []
+let talking = false
+const next = () => {
+  const t = waiting.shift()
+  if (!(talking = !!t)) return
+  const u = utter(t!)
+  u.onend = u.onerror = next
+  speechSynthesis.speak(u)
+}
+export const hush = () => ((waiting.length = 0), (talking = false), speechSynthesis.cancel())
+export function sayQueued(text: string) {
+  if (!text) return hush()
+  waiting.push(text)
+  waiting.splice(0, waiting.length - 2)
+  if (!talking) next()
+}
+export function sayInit(on?: (cb: (text: string) => void) => void) {
+  on?.(sayQueued)
+  addEventListener('keydown', e => e.key === 'Escape' && talking && hush(), true)
+  addEventListener('pagehide', hush)
+}
