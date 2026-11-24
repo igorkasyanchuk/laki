@@ -74,8 +74,23 @@
        solid panel, styles.css), only its words: nothing scrolls under it */
   [data-look='frosted'].glass .app[data-dz] .settings-head.edge-blur { background: none; border-bottom-color: transparent; }
 }
+/* each terminal a well with the card's corners (clipped: no blur over its WebGL canvas, xterm's fit and the pane
+   padding as they are); with the glass, a short shade under its top edge and its text fading out a few pixels under
+   the tab bar and above the status bar (a mask: cheap), none of that under Reduce transparency */
+[data-look='frosted'] .app[data-dz] .term-wrap { border-radius: var(--rs, calc(var(--r-window) - var(--sp-2))); overflow: clip; }
+[data-look='frosted'] .app[data-dz][data-pad='tiny'] .term-wrap { border-radius: var(--r-s); } /* Terminal padding Tiny: a corner's letters clear of it */
+@media (prefers-reduced-transparency: no-preference) {
+  [data-look='frosted'] .app[data-dz] .term-wrap { box-shadow: inset 0 var(--sp-3) var(--sp-3) calc(-1 * var(--sp-3)) var(--f-drop); }
+  [data-look='frosted'] .app[data-dz] .term { mask-image: linear-gradient(transparent, #000 3px, #000 calc(100% - 3px), transparent); }
+}
+/* the pointer's light on the rail and the list, as on the capsules (styles.css' --glass-light: none under Motion: None
+   and Reduce transparency; not with Reduce motion here either): the panel's own background image, no layer or blur of
+   its own; ui.tsx' one pointermove sets the panel's --mx and --my */
+@media (prefers-reduced-transparency: no-preference) and (prefers-reduced-motion: no-preference) {
+  [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar)[data-lit] { background-image: radial-gradient(circle 180px at var(--mx, 50%) var(--my, 0%), var(--glass-light), transparent 70%); }
+}
 @supports (corner-shape: squircle) {
-  [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .main > .body, .side-panel) { corner-shape: squircle; }
+  [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .main > .body, .side-panel, .term-wrap) { corner-shape: squircle; }
 }
 /* the rail: bare icons, a bar of the accent by the one you're on */
 [data-look='frosted'] .rail-kind { position: relative; }

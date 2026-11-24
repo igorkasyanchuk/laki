@@ -1365,8 +1365,10 @@ export function Num({ value, format }: { value: number | string; format?: (v: nu
 }
 
 // the capsules' light (styles.css .capsule::after, and their rim's and ⌘K's: ::before): one listener for the window,
-// the capsule (or ⌘K) under the pointer lit where it is (--mx, --my, a frame at most), the one it left unlit
+// the capsule (or ⌘K) under the pointer lit where it is (--mx, --my, a frame at most), the one it left unlit; Frosted's
+// glass rail and list too, as one panel each (looks/frosted.css), never a row
 let lit: HTMLElement | null = null
+const LIT = ".capsule, .finder, .modal.palette, html[data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar)"
 let litAt: { x: number; y: number } | null = null
 let litFrame = 0
 if (typeof window !== 'undefined' && typeof document !== 'undefined')
@@ -1374,7 +1376,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined')
     'pointermove',
     e => {
       litAt = { x: e.clientX, y: e.clientY }
-      const over = (e.target as Element | null)?.closest?.('.capsule, .finder, .modal.palette') as HTMLElement | null
+      const over = (e.target as Element | null)?.closest?.(LIT) as HTMLElement | null
       if (over !== lit) lit?.removeAttribute('data-lit'), (lit = over), over?.setAttribute('data-lit', '')
       if (!lit || litFrame) return
       litFrame = requestAnimationFrame(() => {

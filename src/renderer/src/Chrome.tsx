@@ -16,7 +16,7 @@ import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react'
 import { nextStep, type Step } from '../../shared/nextStep'
 import { api, openExternal, pageNow } from './api'
 import { initials, spins } from './text'
-import { isIconName } from '../../shared/icons'
+import { ICON_WIDTHS, iconLook, isIconName } from '../../shared/icons'
 import { isKeyId, type KeyId } from '../../shared/keys'
 import { onDesk } from './Desk'
 import { portsOf } from './Tunnel'
@@ -206,11 +206,13 @@ export function chromeOf(r: ChromeIn) {
     void call('settingsSet', { railColors: c === 'none' ? rest : { ...rest, [key]: c } }).catch(fail)
   }
   const tinted = (key: string) => (railColors[key] ? { className: 'rail-icon tinted', style: colorVar(railColors[key]) } : { className: 'rail-icon' })
+  // Frosted's selected rail icon: Settings › Appearance › Icons' width a step up (the same pack, the same path), the rest as set
+  const bolder = settings.design === 'frosted' ? (l => ({ ...l, width: ICON_WIDTHS.find(w => w > l.width) ?? l.width }))(iconLook()) : undefined
   // a rail button: its icon, words (Labels), and a count or a dot on the icon
   const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode, menu?: (e: React.MouseEvent) => void) => (
     <button key={key} type="button" data-rail={key} data-key={isKeyId(key) ? key : undefined} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run} onPointerEnter={() => key in PRELOAD && void PRELOAD[key as keyof typeof PRELOAD]().catch(() => {}) /* E8: its page's code, before the click */}>
       <span {...tinted(key)}>
-        <Icon name={icon} size={18} />
+        <Icon name={icon} size={18} look={on ? bolder : undefined} />
         {mark}
       </span>
       {railWords && <span className="rail-label">{label}</span>}

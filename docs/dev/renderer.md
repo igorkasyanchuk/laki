@@ -1669,6 +1669,12 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
 - **Frosted's status bar** (looks/frosted.css): no outline or fill of its own, its two groups the capsules (one level), an empty
   `.sb-foot` (the rail has the buttons) not drawn; the context meter's track `--fg` 18%, its fill green, amber past 70%,
   red past 90%.
+- **Frosted's terminal well, light and rail** (looks/frosted.css): `.term-wrap` (every pane's box) clipped to the card's
+  corners (squircle where `corner-shape` is), no blur over the WebGL canvas, the fit and padding untouched; with no
+  Reduce transparency a 6px inner shade at its top and each `.term` masked 3px in at its top and bottom. The rail and
+  the list on the glass take ui.tsx' pointer light (`LIT`: the same one listener as the capsules', `--mx`/`--my` on the
+  panel, never a row) as their own `background-image` (`--glass-light`; not with Reduce motion). The selected rail icon
+  (Chrome.tsx `railButton`, `bolder`) is drawn at the next of `ICON_WIDTHS` past Settings › Icons' width, the same pack.
 
 ## Toasts and submenus
 
