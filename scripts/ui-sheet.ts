@@ -1,7 +1,8 @@
 // npm run test:sheet (npm run build first): a contact sheet of the UI. scripts/ui-smoke.ts' walk (one demo world, one
 // Electron) with LAKI_SHEET: its pages in every look (settingsBase' DESIGNS) × the default dark and light themes
 // (LAKI_SHEET_THEMES=all: every theme id in themes.ts), at 1440×900 and the phone's 390×844; no flows. Then
-// dist/ui-sheet/index.html: looks as columns, pages as rows, each with its layout facts (a report, not a gate). Each
+// dist/ui-sheet/index.html: looks as columns, pages as rows, each with its layout facts (a report, not a gate); a
+// page that fails its selectors (src/shared/sheetPages.ts) fails the run. Each
 // run's pictures are compared with the last run's (moved to dist/ui-sheet/prev first; main's uiSmoke compares them by
 // pixels, shared/pixelDiff.ts): Changed (n) first, before and after side by side, then new and removed pages, the rest
 // folded; "changed: n of m" at the end. LAKI_SHEET_SET='{"diffLook":"quiet"}': settings of every page's, a look
@@ -118,6 +119,9 @@ document.getElementById('f').addEventListener('input', e => { const q = e.target
 </script>
 `,
 )
-const failed = [...steps.values()].filter(s => !s.ok).length
-console.log(`${steps.size} pictures in ${((Date.now() - at) / 60e3).toFixed(1)} min${failed ? `, ${failed} failed` : ''}: ${join(dir, 'index.html')}`)
+const failed = [...steps.values()].filter(s => !s.ok)
+console.log(`${steps.size} pictures in ${((Date.now() - at) / 60e3).toFixed(1)} min${failed.length ? `, ${failed.length} failed` : ''}: ${join(dir, 'index.html')}`)
 console.log(`changed: ${changed.length} of ${steps.size}${before.length ? '' : ' (no earlier run)'}`)
+// a page that didn't show what it must (or showed what it mustn't: sheetPages.ts) fails the run, named
+for (const s of failed) console.error(`✖ ${s.name}: ${s.why ?? 'failed'}`)
+if (failed.length) process.exitCode = 1

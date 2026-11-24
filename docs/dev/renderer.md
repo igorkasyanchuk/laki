@@ -1624,7 +1624,11 @@ since a capture doesn't advance the sticky heads' scroll timeline (`ph-stuck`), 
 
 `npm run test:sheet` (`scripts/ui-sheet.ts`, after `npm run build`): the same walk with `LAKI_SHEET` (`{ looks, themes }`):
 its pages in every look × the dark and light defaults (`LAKI_SHEET_THEMES=all`: every theme), at 1440×900 and then the
-phone's 390×844 for `PHONE`'s pages; no flows. `dist/ui-sheet/<look>-<theme>-<page>.png` and `index.html`: looks as
+phone's 390×844 for `SHEET_PHONE`'s pages; no flows. Each page (`src/shared/sheetPages.ts` `sheetSel`) names what must
+show (some match visible) and what must not (none visible: what the page before it can leave over it, the Review tab on
+Projects and the Reader once did), checked before its picture; a page that fails either fails the run, its page, look
+and theme named (`test/sheet-pages.test.ts` holds every page to both). Projects again (`back`) closes a rail page by its
+× and the Review tab by its agent's tab, as you would, before the workspace's row and its Terminal. `dist/ui-sheet/<look>-<theme>-<page>.png` and `index.html`: looks as
 columns, pages as rows, lazy thumbnails, a click for full size, arrows to step, a filter by page, and each picture's
 layout facts (`facts`: words cut short under `text-overflow: clip`, boxes past the window's sides), a report, not a gate.
 

@@ -5,6 +5,7 @@ import { card, floater, floats, pinGo, pinned, setFront, talk, talkW } from './f
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pixelDiff } from '../shared/pixelDiff.ts'
+import { SHEET_PAGES, SHEET_PHONE, sheetSel } from '../shared/sheetPages.ts'
 import { rpc } from '../shared/conn.ts'
 import { spawnSync } from 'node:child_process'
 import type { View } from '../shared/types.ts'
@@ -422,26 +423,39 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
     readme.push(['readme-done', () => size(1440, 900), async () => true])
   }
   // test:sheet (scripts/ui-sheet.ts' LAKI_SHEET, JSON: { looks, themes }): the walk's pages in each look and theme at
-  // 1440×900, then the phone's (390×844) for PHONE's, each named <look>-<theme>-<page> with its layout facts; no flows.
-  // ponytail: PHONE by hand, the pages a phone gets to from the remote page's rail
+  // 1440×900, then the phone's (390×844) for SHEET_PHONE's, each named <look>-<theme>-<page> with its layout facts; no
+  // flows. Each page's picture waits for its sheetSel: what must show visible, what must not (left over from the page
+  // before) gone; else the step fails, named
   const sheet: typeof steps = []
+  const sheetWhy = new Map<string, () => Promise<string>>()
+  const shown = (sel: string) => js<boolean>(`[...document.querySelectorAll(${q(sel)})].some(e => e.checkVisibility({ visibilityProperty: true }) && e.getBoundingClientRect().width > 0)`)
   if (process.env.LAKI_SHEET) {
     const { looks, themes, set } = JSON.parse(process.env.LAKI_SHEET) as { looks: string[]; themes: string[]; set?: Record<string, unknown> } // set: LAKI_SHEET_SET's settings
-    const PAGES = ['projects', 'reader', 'review', 'new-workspace', 'settings', 'board', 'schedule', 'ai', 'workflows', 'palette']
-    const PHONE = ['projects', 'reader', 'settings', 'board']
-    const back = async () => (await key('Escape')(), (ws.cart ??= await named('fix-cart-total')), await click(row(ws.cart.id))(), await click('.reader-switch button:first-child')())
+    // Projects again: the Review tab closed as you would (its agent's tab clicked: the review's own key opens it), then
+    // the workspace's row and its Terminal
+    const back = async () => {
+      await key('Escape')()
+      if (await has('.settings-page[role=dialog]')) await click('.settings-page[role=dialog] .settings-head button[aria-label^="Close"]')() // a rail page (the Board: Esc stays) by its ×
+      if (await has('.full-review')) await clickText('.tab-list > .tab[data-gi]', 'claude')
+      ws.cart ??= await named('fix-cart-total')
+      await click(row(ws.cart.id))()
+      await click('.reader-switch button:first-child')()
+    }
     // every wide one first: a phone's row click hides the sidebar and the rail, which a wide page then lacks
-    for (const [wd, h, pages] of [[1440, 900, PAGES], [390, 844, PHONE]] as const)
+    for (const [wd, h, pages] of [[1440, 900, SHEET_PAGES], [390, 844, SHEET_PHONE]] as const)
       for (const look of looks)
         for (const theme of themes)
           for (const n of pages) {
-            const [, go, sel] = steps.find(x => x[0] === n)!
+            const [, go] = steps.find(x => x[0] === n)!
             const first = n === pages[0]
-            sheet.push([`${look}-${theme}-${wd < 500 ? 'phone-' : ''}${n}`, async () => {
+            const name = `${look}-${theme}-${wd < 500 ? 'phone-' : ''}${n}`
+            const { want, not } = sheetSel(n, wd < 500)!
+            sheetWhy.set(name, async () => `${n}${wd < 500 ? ' (phone)' : ''} in ${look}, ${theme}: ${!(await shown(want)) ? `no ${want} shown` : `${not} still shown`}`)
+            sheet.push([name, async () => {
               if (first) await rpc('settingsSet', { ...set, design: look, theme, themeAuto: false }), await size(wd, h)
               if (n === 'projects') return back()
               return go?.()
-            }, n === 'projects' ? (wd < 500 ? '.app.narrow' : '.sidebar .ws') : sel])
+            }, async () => (await shown(want)) && !(await shown(not))])
           }
   }
   // the sheet's layout facts, a report: text cut short where it doesn't fit (text-overflow: clip, its own words wider
@@ -472,7 +486,7 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       const ok = () => (typeof sel === 'string' ? has(sel) : sel())
       while (!(await ok()) && !(await has('.boom')) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
       if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
-      else if (!(await ok())) why = typeof sel === 'string' ? `no ${sel} after 8 s` : 'not done after 8 s'
+      else if (!(await ok())) why = (await sheetWhy.get(name)?.()) ?? (typeof sel === 'string' ? `no ${sel} after 8 s` : 'not done after 8 s')
       else if (errors.length > seen) why = `console: ${errors.slice(seen).join(' | ').slice(0, 300)}`
       else if (/^readme-(needs|check|phone)/.test(name)) why = await leftovers().then(bad => bad && `it shows "${bad}"`)
     } catch (e) {
