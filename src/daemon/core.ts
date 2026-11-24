@@ -2341,16 +2341,16 @@ export function gitTampered(path: string): string | undefined {
     }
   }
   for (const f of ['rebase-merge/git-rebase-todo', 'sequencer/todo']) if (/^\s*(x|exec)\s/m.test(read(f))) return `${f} has an exec line (a command git would run as you)`
-  // a submodule's git folder is modules/<its name>, and a name with a slash is a folder per part: a folder with a config
-  // is one (its own submodules in its modules/), any other a part of a name; a link followed (git follows it), depth-bound
+  // a submodule's git folder is modules/<its name> (a name with a slash a folder per part, one named config too; one
+  // nested in another's), its own submodules in its modules/: every config file under modules/, objects/ left out; a
+  // link followed (git follows it), depth-bound
   const configs = (rel: string, depth: number): string[] => {
     if (depth < 0) return []
     let es: string[] = []
     try {
       es = readdirSync(join(d!.own, rel))
     } catch {}
-    if (es.includes('config')) return [`${rel}/config`, ...configs(`${rel}/modules`, depth - 1)]
-    return es.filter(e => statSync(join(d!.own, rel, e), { throwIfNoEntry: false })?.isDirectory()).flatMap(e => configs(`${rel}/${e}`, depth - 1))
+    return es.flatMap(e => (st => (st?.isDirectory() ? (e === 'objects' ? [] : configs(`${rel}/${e}`, depth - 1)) : e === 'config' && st?.isFile() ? [`${rel}/${e}`] : []))(statSync(join(d!.own, rel, e), { throwIfNoEntry: false })))
   }
   for (const f of configs('modules', 8)) {
     const k = /^\s*(fsmonitor|hookspath|sshcommand)\s*=|^\s*\[\s*include/im.exec(read(f))

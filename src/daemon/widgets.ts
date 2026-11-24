@@ -513,7 +513,11 @@ function moveSecrets(id: string, m: Manifest): Store {
   const st = readStore(id)
   const keys = Object.entries(m.config ?? {}).filter(([k, v]) => st.config && Object.hasOwn(st.config, k) && isObj(v) && v.type === 'secret').map(([k]) => k)
   if (!keys.length) return st
-  setSecrets(id, kept => keys.forEach(k => st.config![k] && !kept[k] && (kept[k] = st.config![k])))
+  try {
+    setSecrets(id, kept => keys.forEach(k => st.config![k] && !kept[k] && (kept[k] = st.config![k])))
+  } catch {
+    return st // the Keychain didn't answer: moved at a later load, the rest of the load goes on
+  }
   for (const k of keys) delete st.config![k]
   writeStore(id, st)
   return st

@@ -148,7 +148,7 @@ const filesUnder = (d: string, max = 500, skip: string[] = [], keep: string[] = 
       const n = rel ? `${rel}/${x.name}` : x.name
       const to = x.isSymbolicLink() ? (() => { try { return realpathSync(join(d, n)) } catch { return undefined } })() : undefined
       const dir = x.isDirectory() || (!!to && under(to, top) && !!statSync(to, { throwIfNoEntry: false })?.isDirectory())
-      if (dir) subs.push(n) // a state folder too: a script it runs from there still counts
+      if (dir) (!stateHas(skip, n, true) || keep.some(k => k.startsWith(`${n}/`))) && subs.push(n) // a state folder only for a script it runs from there (as repoFiles)
       else if (stateHas(skip, n) && !keep.includes(n) && !((statSync(join(d, n), { throwIfNoEntry: false })?.mode ?? 0) & 0o111)) continue // its state, unless it runs it or it's an executable (as repoFiles)
       else if (out.length < max && (x.isFile() || x.isSymbolicLink())) out.push(n)
     }
