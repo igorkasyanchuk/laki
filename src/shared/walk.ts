@@ -56,6 +56,10 @@ export function riskWords(h: HunkRef & { text?: string }): string[] {
   return out
 }
 
+// Hide tests (Changes, Review: Diff.tsx useHideTests): a test's path: *.test.*, *.spec.*, _test.go, test_*.py, or one
+// under __tests__/, test/, tests/, spec/ (any depth)
+export const isTestPath = (p: string) => /(^|\/)(__tests__|tests?|spec)\//.test(p) || /\.(test|spec)\.[\w]+$|_test\.go$|(^|\/)test_[^/]*\.py$/.test(p)
+
 // a file's riskWords, each once, from its hunks (hunksOf's): the Review tab's files and the Ship sheet's mark, no model
 export const fileRisk = (hunks: (HunkRef & { text?: string })[]) => [...new Set(hunks.flatMap(riskWords))]
 // fileRisk of every file in a diff that has one

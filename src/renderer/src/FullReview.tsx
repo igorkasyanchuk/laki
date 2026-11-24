@@ -18,7 +18,7 @@ import type { Blame, PR } from '../../shared/types'
 import type { ReviewNote } from '../../shared/reviewNotes'
 import { hunkKey, REST, risksOf, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
-import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
+import { HideTests, OnlyTests, useHideTests, SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -91,7 +91,7 @@ const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous fil
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
 // (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, notesAt, caps, onOpen, onTight, next }: { ws: string; notesAt?: number; caps?: boolean; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
+export function FullReview({ ws, project, base, branch, pr, linked, empty, worktree, api: wsApi, stat, notesAt, caps, onOpen, onTight, next }: { ws: string; project?: string; notesAt?: number; caps?: boolean; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -129,13 +129,14 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const nCare = files.filter(f => risks.has(f.path)).length
   const [care, setCare] = useState(false)
   const careOn = care && nCare > 0
-  const narrowed = !!query || careOn
+  const ht = useHideTests(project, files) // Hide tests: kept for the project, Changes' too
+  const narrowed = !!query || careOn || ht.hides
   const matched = useMemo(() => {
-    const ls = files.filter(f => matches(f.path) && (!careOn || risks.has(f.path)))
+    const ls = files.filter(f => matches(f.path) && (!careOn || risks.has(f.path)) && ht.keep(f))
     const at = (p: string) => pins.indexOf(p)
     const rest = ls.filter(f => at(f.path) < 0)
     return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...(tree ? fileTree(rest).flatMap(r => ('file' in r ? [r.file] : [])) : rest)]
-  }, [files, matches, pins, tree, careOn, risks])
+  }, [files, matches, pins, tree, careOn, risks, ht.hides])
   const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
 
@@ -792,6 +793,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             <span className="grow">
               {nViewed} of {files.length} viewed{narrowed && ` · ${listed.length} shown`}
             </span>
+            <HideTests h={ht} />
             {listed.length > 0 && (
               <button type="button" className="link small" onClick={() => mark(listed.map(f => f.path), !listedViewed)} data-tip={narrowed ? `The ${listed.length} the filter shows` : 'Every file'}>
                 {listedViewed ? (narrowed ? 'Unmark these' : 'Unmark all') : narrowed ? `Mark ${listed.length} viewed` : 'Mark all viewed'}
@@ -818,7 +820,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 }),
               ]
             : listed.map(f => fileRow(f))}
-          {narrowed && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
+          {ht.all && !query && !careOn ? <OnlyTests h={ht} /> : narrowed && !listed.length && <div className="muted small pad">{only && matched.length ? 'Every file it matches is viewed.' : 'No file matches.'}</div>}
           {only && !narrowed && files.length > 0 && !listed.length && <div className="muted small pad">Every file viewed.</div>}
           </>
           )}

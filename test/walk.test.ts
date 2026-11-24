@@ -301,3 +301,9 @@ test("walk: Ship's reading order: shipDraft gives a kept walk's Markdown and nev
   assert.doesNotMatch(pr, /Say so|README/, 'a file the PR leaves out: no step for it')
   assert.equal(or.hits.length, 1, 'ship asked Laki AI nothing')
 })
+
+test('isTestPath: Hide tests in Changes and Review', async () => {
+  const { isTestPath } = await import('../src/shared/walk.ts')
+  for (const p of ['src/a.test.ts', 'b.spec.tsx', 'pkg/x_test.go', 'tools/test_parse.py', '__tests__/a.js', 'test/helpers.ts', 'pkg/tests/fixture.json', 'spec/models/user_spec.rb', 'app/spec/x.rb']) assert.ok(isTestPath(p), p)
+  for (const p of ['src/testing.ts', 'src/contest/a.ts', 'latest.ts', 'specs.md', 'docs/spec.md', 'src/attest.ts', 'protest/test.ts.bak']) assert.equal(isTestPath(p), false, p)
+})

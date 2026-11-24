@@ -36,6 +36,7 @@ export type PRInfo = {
 }
 export type WsInfo = {
   id: string
+  project?: string // its project (Hide tests is kept per project)
   name?: string
   branch: string
   base: string

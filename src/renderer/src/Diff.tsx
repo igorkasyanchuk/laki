@@ -8,6 +8,7 @@ import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf, type WordSpans, wordDiff, isPage } from './text'
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
 import { askScope, denyOf, diffCounts, explainWhat } from '../../shared/ask'
+import { isTestPath } from '../../shared/walk'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 import type { Annotation, Annotations, Ask, AskExplained } from '../../shared/types'
 
@@ -85,6 +86,41 @@ export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn
 }
 
 // localStorage, or nothing (a private window, blocked storage)
+// Hide tests (Changes, Review): test files (walk.ts isTestPath) out of the list, each project's choice kept here
+// (laki.hideTests: project → true); n: how many it hides, all: only tests changed (the list says so, Show tests)
+const HIDE_TESTS = 'laki.hideTests'
+export function useHideTests(project: string | undefined, files: { path: string }[]) {
+  const [on, setOn] = useState(() => !!project && (JSON.parse(localStore(HIDE_TESTS) || '{}') as Record<string, boolean>)[project] === true)
+  const pick = (v: boolean) => {
+    setOn(v)
+    if (!project) return
+    const all = JSON.parse(localStore(HIDE_TESTS) || '{}') as Record<string, boolean>
+    if (v) all[project] = true
+    else delete all[project]
+    localStore(HIDE_TESTS, JSON.stringify(all))
+  }
+  const n = files.filter(f => isTestPath(f.path)).length
+  const hides = on && n > 0
+  return { on, pick, n, hides, all: hides && n === files.length, keep: <T extends { path: string }>(f: T) => !hides || !isTestPath(f.path) }
+}
+export function HideTests({ h }: { h: ReturnType<typeof useHideTests> }) {
+  if (!h.n) return null
+  return (
+    <button type="button" className={`link small sp-tests ${h.on ? 'on' : ''}`} aria-pressed={h.on} data-tip={h.on ? `${h.n} test file${h.n === 1 ? '' : 's'} hidden · click: show them` : 'Hide test files (*.test.*, *.spec.*, test/, spec/, __tests__/): the product code first; kept for this project'} onClick={() => h.pick(!h.on)}>
+      {h.on ? `${h.n} test${h.n === 1 ? '' : 's'} hidden` : 'Hide tests'}
+    </button>
+  )
+}
+export const OnlyTests = ({ h }: { h: ReturnType<typeof useHideTests> }) =>
+  h.all ? (
+    <div className="muted small pad">
+      Only tests changed ({h.n}).{' '}
+      <button type="button" className="link small" onClick={() => h.pick(false)}>
+        Show tests
+      </button>
+    </div>
+  ) : null
+
 export function localStore(k: string, v?: string) {
   try {
     if (v === undefined) return localStorage.getItem(k)

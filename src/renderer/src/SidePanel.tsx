@@ -6,7 +6,7 @@ import { bridge } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown, outlineItems } from './MarkdownView'
-import { Near, SplitToggle, useSplit, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
+import { HideTests, OnlyTests, useHideTests, Near, SplitToggle, useSplit, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { Annotations, MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -253,7 +253,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
-function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewed, stat, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; reviewed?: number; stat?: string; turn?: boolean; onOpen: (url: string) => void }) {
+function ChangesTab({ api: wsApi, ws, project, pr, linked, empty, worktree, turn, reviewed, stat, onOpen }: { api: PanelApi; ws: string; project?: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; reviewed?: number; stat?: string; turn?: boolean; onOpen: (url: string) => void }) {
   const [scope, setScope] = useScope('laki.changesScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, turn, empty)
   // R11: Since I reviewed's count: asked as the mark or the workspace's files move, only while there's a mark
   const [since, setSince] = useState(0)
@@ -346,7 +346,8 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
   const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
   const sp = useSplit() // side by side, as GitHub's split view; the last one picked, one column under 900px (T18)
   const split = sp.split
-  const files = d?.files ?? []
+  const ht = useHideTests(project, d?.files ?? []) // Hide tests: kept for the project, Review's too
+  const files = (d?.files ?? []).filter(ht.keep)
   // expand arrows (the full review's): the worktree's file, or the PR head's for the PR's diff
   const keys = useMemo(() => new Map([...byFile].map(([p, fd]) => [p, `${all}#${fd.hunks.join('\n')}`])), [byFile, all]) // once per diff: the arrows ask it often
   const annotsAll = useAnnots(wsApi)
@@ -466,6 +467,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
             <span className="sp-viewed-w"> viewed</span>
           </span>
         )}
+        <HideTests h={ht} />
         {files.length > 1 && <IconButton icon={tree ? 'list' : 'tree'} title={tree ? 'A list: every file with its folder' : 'A tree: the files by folder'} on={tree} onClick={() => pickTree(!tree)} />}
         <SplitToggle s={sp} />
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
@@ -485,7 +487,8 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, reviewe
           </div>
         )}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
-        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `${prName(pr!)} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr && pr.forge !== 'gitlab' ? ` ${prName(pr)} above shows the PR's.` : ''}</div>}
+        <OnlyTests h={ht} />
+        {d && !files.length && !ht.all && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `${prName(pr!)} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr && pr.forge !== 'gitlab' ? ` ${prName(pr)} above shows the PR's.` : ''}</div>}
         {tree
           ? fileTree(files, dirsShut).map(r =>
               'dir' in r ? (
@@ -694,7 +697,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
-      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} empty={p.w.stat && !p.w.stat.files} worktree={p.w.kind === 'worktree'} turn={p.turn} reviewed={p.w.reviewed?.at} stat={p.w.stat ? JSON.stringify(p.w.stat) : ''} onOpen={p.onOpen} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} project={p.w.project} pr={p.w.pr} linked={p.w.prLinked} empty={p.w.stat && !p.w.stat.files} worktree={p.w.kind === 'worktree'} turn={p.turn} reviewed={p.w.reviewed?.at} stat={p.w.stat ? JSON.stringify(p.w.stat) : ''} onOpen={p.onOpen} />}
       {tab === 'commits' && <CommitsTab key={p.w.id} api={p.api} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}

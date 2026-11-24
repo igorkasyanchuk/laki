@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Hide tests in Changes and Review: read the product code first; the choice is kept per project.
 - Mute a whole project from its ⋯ menu: none of its workspaces notifies you, new ones included.
 - The talk key can answer the ask card on your screen: say its number, its words, yes, or no and why (Settings › Voice › Answer cards).
 - Laki can say out loud when an agent asks or finishes: Settings › Voice › Out loud.

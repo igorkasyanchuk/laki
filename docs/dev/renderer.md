@@ -161,7 +161,9 @@ are tested in `test/units-more.test.ts`.
     live. Recording mode's private workspaces: `null`. Tested in `test/units-more.test.ts`.
   - Ship (U5): `Ship.tsx`' sheet, Dialogs' `ship`: `shipDraft` and the `diff` (uncommitted) as it opens (`load`), a
     file's diff on a click (`diffByFile`), Diff.tsx' `RiskMark` after a file's name from walk.ts `risksOf` (`fileRisk`:
-    every hunk's `riskWords`, each once; the Review tab's files and its *Read with care (n)* chip too, `useMemo` on the
+    every hunk's `riskWords`, each once; the Review tab's files and its *Read with care (n)* chip too (beside it Diff.tsx'
+    `useHideTests`: walk.ts `isTestPath` files out of Review's and Changes' lists, `laki.hideTests` per project, `OnlyTests`
+    when that's all; test/walk.test.ts), `useMemo` on the
     diff's text, per window), `gated` around `ship`; the banner's *Update from <base>* (AppCtx `updateWs`, the status
     bar's ↓n merge: `wsUpdate`, its toast; meanwhile the sheet's buttons wait, then `load(true)`: the files and secret
     finds anew, the words and picks kept; a failure in its error line) and *N overlaps* (Dialogs' `setOverlapsAt`, Check

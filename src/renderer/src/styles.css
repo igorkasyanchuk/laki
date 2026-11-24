@@ -1654,6 +1654,8 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .sp-change > .sp-row:hover { background: linear-gradient(var(--hover), var(--hover)), var(--panel); }
 .sp-change > .sp-row:not(:last-child) { box-shadow: 0 1px 0 var(--line); }
 .sp-viewed-n { font-family: var(--mono); font-size: var(--fs-1); margin-right: 4px; white-space: nowrap; flex: none; }
+.sp-tests { white-space: nowrap; flex: none; margin-right: var(--sp-1); }
+.sp-tests.on { color: var(--accent); }
 /* Changes' head on one line: the summary gives way (cut, whole in its tip), the buttons keep their size; narrower, shorter words */
 .sp-tools:has(> .sp-sum) { container-type: inline-size; } /* nothing in it opens a fixed menu */
 .sp-tools > .seg, .sp-tools > .ib { flex: none; }

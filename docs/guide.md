@@ -626,6 +626,9 @@ selected workspace's PR is in the status bar.
   too): one you mark viewed leaves and the next takes its place; with all viewed, the bar names the next workspace.
   A mark after a file's name says to read it with care (a migration, auth, a lockfile, deletes), from the diff alone, no
   Laki AI needed (*PR #n*'s too); *Read with care (n)* over the files shows only those, with the filter and *Unviewed*.
+  *Hide tests* (here and in Changes, kept per project) takes test files (`*.test.*`, `*.spec.*`, `test/`, `spec/`,
+  `__tests__/`) out of the list to read the product code first, and says how many it hid; when only tests changed, it
+  says so, with *Show tests*.
   *Walk through* (Laki AI on: Settings › AI) puts the changes in 3 to 7 steps to read in order, each with a title and
   why it comes there, marking what to read with care (a migration, auth, a lockfile, deletes); what no step names is
   in a last *Everything else*, with any change too big for Laki AI to read (a lockfile, a generated file: it says how
