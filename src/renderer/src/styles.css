@@ -1716,6 +1716,9 @@ html[data-diff='quiet'] .dl-del .dl-mk { color: var(--del); }
 .sp-diff .dl-line:hover .dl-plus::before { content: '+'; display: block; text-align: center; line-height: 14px; font-weight: 700; color: var(--accent-fg, #fff); }
 .dl-comment .split { display: inline-flex; }
 .dl-comment .row button { white-space: nowrap; } /* a narrow panel wraps whole buttons, never their words */
+.dl-files { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin: var(--sp-1) 0; }
+.dl-file { display: inline-flex; align-items: center; gap: var(--sp-1); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-file .x { padding: 0 var(--sp-1); color: var(--muted); }
 .dl-comment .split > button:first-child:not(:only-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .dl-comment .split .ib { width: 24px; height: auto; border: 1px solid var(--line); border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .sp-diff .dl-line:hover { box-shadow: inset 2px 0 var(--accent); }

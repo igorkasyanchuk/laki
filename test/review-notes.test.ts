@@ -118,3 +118,11 @@ test("sent comments: the daemon marks each by the agent's next turn (changed her
   await rig.rpc('reviewNotesSet', { ws: ws.id, notes: [{ ...base, id: 'near', line: 5, state: 'changed', done: true }] })
   assert.equal((await rig.rpc('reviewNotesGet', { ws: ws.id })).notes[0].done, true)
 })
+
+test('attachments: a comment\'s pictures and files as 📎 lines; GitHub gets the words and how many stayed', async () => {
+  const { attachments, forGitHub } = await import('../src/shared/reviewNotes.ts')
+  const body = 'This button looks wrong\n📎 /data/images/a.png\n📎 /data/files/1/spec.pdf\n📎 '
+  assert.deepEqual(attachments(body), ['/data/images/a.png', '/data/files/1/spec.pdf'])
+  assert.equal(forGitHub(body), 'This button looks wrong\n\n_(2 attachments with this comment went to the agent only)_')
+  assert.equal(forGitHub('just words'), 'just words')
+})

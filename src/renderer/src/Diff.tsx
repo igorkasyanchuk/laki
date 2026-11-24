@@ -9,6 +9,9 @@ import { type Gap, gapsOf, linesAt, type MapKind, type MapMark, marksOf, reviewe
 import { closeTo, escapes, Icon, IconButton, type MenuItem, openFrom, useMenu, act } from './ui'
 import { askScope, denyOf, diffCounts, explainWhat } from '../../shared/ask'
 import { isTestPath } from '../../shared/walk'
+import { ATTACH, attachments, forGitHub } from '../../shared/reviewNotes'
+import { keepFile } from './PromptInput'
+import { api as daemon } from './api'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 import type { Annotation, Annotations, Ask, AskExplained } from '../../shared/types'
 
@@ -682,7 +685,19 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
     setErr('')
     f().then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
   }
-  const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: text }))
+  const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: forGitHub(text) }))
+  // a pasted or dropped picture or file: kept by the daemon (imageSave, fileSave), its path a 📎 line of the comment
+  const [keeping, setKeeping] = useState(0)
+  const attach = (fs: File[]) => {
+    if (!fs.length) return false
+    setKeeping(k => k + fs.length)
+    for (const f of fs)
+      void keepFile(f, (data, ext) => daemon.call<string>('imageSave', { data, ext }), (data, name) => daemon.call<string>('fileSave', { data, name }))
+        .then(r => setText(`${text.replace(/\s+$/, '')}\n${ATTACH}${r.path}`.replace(/^\n/, '')), e => setErr(`${f.name}: ${(e as Error).message}`))
+        .finally(() => setKeeping(k => k - 1))
+    return true
+  }
+  const files = attachments(text)
   // to an agent of the workspace: the focused one first, another from the ▾ (agents: the workspace's live agent tabs)
   const [to, setTo] = useState(api.agents[0]?.id)
   const agent = api.agents.find(a => a.id === to) ?? api.agents[0]
@@ -705,12 +720,29 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
         value={text}
         placeholder={`A comment on ${where} · ⌘⏎ ${onAdd ? 'adds it to the review' : pr ? 'posts it' : 'sends it to the agent'}`}
         onChange={e => setText(e.target.value)}
+        onPaste={e => attach([...e.clipboardData.files]) && e.preventDefault()}
+        onDragOver={e => e.dataTransfer.types.includes('Files') && e.preventDefault()}
+        onDrop={e => attach([...e.dataTransfer.files]) && e.preventDefault()}
         onKeyDown={e => {
           e.stopPropagation() // the full review's keys: not while typing
           if (e.key === 'Escape') onClose()
           else if (e.key === 'Enter' && e.metaKey) onAdd ? add() : pr ? toPR() : agent && toAgent()
         }}
       />
+      {(files.length > 0 || keeping > 0) && (
+        <div className="dl-files">
+          {files.map(f => (
+            <span key={f} className="chip dl-file" data-tip={f}>
+              <Icon name={/\.(png|jpe?g|gif|webp)$/i.test(f) ? 'image' : 'file'} size={12} /> {f.split('/').pop()}
+              <button type="button" className="x" aria-label={`Remove ${f.split('/').pop()}`} onClick={() => setText(text.split('\n').filter(l => l !== `${ATTACH}${f}`).join('\n'))}>
+                ×
+              </button>
+            </span>
+          ))}
+          {keeping > 0 && <span className="muted small">Keeping {keeping}…</span>}
+          {pr && files.length > 0 && <span className="muted small">to the agent only: GitHub gets the words</span>}
+        </div>
+      )}
       {err && <div className="warn small">{err}</div>}
       <div className="row">
         {onAdd ? (

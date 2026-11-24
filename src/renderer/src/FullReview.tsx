@@ -15,7 +15,7 @@
 // first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
-import type { ReviewNote } from '../../shared/reviewNotes'
+import { forGitHub, type ReviewNote } from '../../shared/reviewNotes'
 import { hunkKey, REST, risksOf, startOf, type Walk, walkDoc } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
 import { HideTests, OnlyTests, useHideTests, SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
@@ -540,7 +540,7 @@ export function FullReview({ ws, project, base, branch, pr, linked, empty, workt
     setSent('')
     const out = notDone
     api
-      .post(out.map(({ path, line, startLine, side, body }) => ({ path, line, startLine, side, body })))
+      .post(out.map(({ path, line, startLine, side, body }) => ({ path, line, startLine, side, body: forGitHub(body) })))
       .then(() => (setNotes(n => n.filter(x => !out.includes(x))), void api.mark().catch(() => {})), e => setSent(String(e?.message ?? e))) // GitHub's no: all of them stay
       .finally(() => setBusy(false))
   }

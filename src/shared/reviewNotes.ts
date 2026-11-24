@@ -17,6 +17,17 @@ export type ReviewNote = {
   hunk?: [number, number] // the turn's lines there, in the worktree's file as it left it (the review's new side)
   done?: boolean // Accept: under Done
 }
+// Pictures and files on a comment (Diff.tsx CommentBox: pasted or dropped, kept by the daemon's imageSave or
+// fileSave): a line each in its text, "📎 <path>", so the agent gets each path with the comment; GitHub's copy
+// (Post on #n, Comment on PR) goes without them, saying how many stayed here: GitHub has no upload for an app's API.
+// test/review-notes.test.ts
+export const ATTACH = '📎 '
+export const attachments = (body: string) => body.split('\n').flatMap(l => (l.startsWith(ATTACH) && l.slice(ATTACH.length).trim() ? [l.slice(ATTACH.length).trim()] : []))
+export function forGitHub(body: string) {
+  const n = attachments(body).length
+  const text = body.split('\n').filter(l => !l.startsWith(ATTACH)).join('\n').trim()
+  return n ? `${text}\n\n_(${n} attachment${n === 1 ? '' : 's'} with this comment went to the agent only)_` : text
+}
 // the lines around a comment a change still counts for
 export const NOTE_CONTEXT = 3
 
