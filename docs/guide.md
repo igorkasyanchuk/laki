@@ -358,7 +358,11 @@ selected workspace's PR is in the status bar.
   asks; then each is answered as its card would be, and any that asks something else by then is named. Never in it: a
   question, a secret, a command that deletes, force pushes, rewrites history, runs as root or pipes the web into a
   shell, one cut short, or (unless the tab's sandbox is on) one that touches a path outside the worktree; those stay
-  on their cards. ⇧A, with a card focused, is Allow all (Settings › Keys).
+  on their cards. ⇧A, with a card focused, is Allow all (Settings › Keys). Several agents of one project asking the same
+  thing (the same command or file, the same choices) show as one card: its words once, *×n*, each workspace's name (a
+  click opens its tab), each choice *for all n* (answered one tab at a time; one that fails gets its own card back, with
+  why), and *Separately* for a card each again (until the group changes). A risky or chained command, a question, a
+  plan, a secret and a *don't ask again* choice are never answered for all. Not on a phone.
 - **Auto-answer rules**: *Always allow in this project* on a permission ask's card (the ask bar's *Always allow here*,
   the Reader's) turns its command or path into a rule of the project's, which you can edit first; from then on the
   same ask from any agent there (Claude Code's permission asks) is answered Allow as your click would, no one

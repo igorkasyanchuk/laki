@@ -559,6 +559,8 @@ html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:i
 .need-q { color: var(--fg); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .need-last { color: var(--muted); -webkit-line-clamp: 2; }
 .need-opts { display: flex; flex-direction: column; gap: var(--sp-2); }
+.need-group-ws { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin: var(--sp-1) 0 var(--sp-2); } /* a group's workspaces (Needs.tsx NeedGroup), each a link to its tab */
+.need-err { color: var(--error); }
 .need-opts button, .need-acts button { font: inherit; font-size: var(--fs-2); text-align: left; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-in); border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: var(--cur-act); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .need-opts button:hover, .need-acts button:hover { border-color: var(--muted); }
 .need-opts button.on { border-color: color-mix(in srgb, var(--waiting) 60%, var(--line)); }

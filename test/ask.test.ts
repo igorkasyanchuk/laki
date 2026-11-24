@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type AllowRule, allowRuleOf, alwaysAskOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, denyOf, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, sayable, standing, streakOf } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, alwaysAskOf, askOf, askScope, bulkGroups, bulkOk, bulkPick, denyOf, groupAsks, hotkeyAnswer, optLabel, risky, ruleFrom, rulePattern, sayable, standing, streakOf } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -223,4 +223,32 @@ test("No, and say why: the agent's tell-why choice, else a last No; nothing to s
   assert.equal(denyOf(o('Red', 'Green', 'Blue')), undefined)
   assert.equal(denyOf(o('No')), undefined, 'one choice: no menu to say no in')
   assert.ok(sayable('No') && sayable('No, and tell Claude what to do differently (esc)') && !sayable('Yes'))
+})
+
+test('groupAsks: one ask in several workspaces of a project is a group; never a risky or chained command, a question, a plan, a secret, another project or other words; a standing choice left out', () => {
+  const menu = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again for npm test commands" }, { n: 3, label: 'No' }]
+  const ask = (what: string, o: object = {}) => ({ tool: 'Bash', what, options: menu, ...o }) as any
+  const card = (id: string, project: string, t: object) => ({ id, project, t: { status: 'waiting', ...t } })
+  const cards = [
+    card('a', 'shop', { ask: ask('npm test') }),
+    card('b', 'shop', { ask: ask('npm test') }),
+    card('c', 'api', { ask: ask('npm test') }), // another project
+    card('d', 'shop', { ask: ask('npm test -- --watch') }), // other words
+    card('e', 'shop', { ask: ask('rm -rf build') }),
+    card('f', 'shop', { ask: ask('rm -rf build') }), // risky: never
+    card('g', 'shop', { ask: ask('npm test && npm run lint') }),
+    card('h', 'shop', { ask: ask('npm test && npm run lint') }), // chained: never
+    card('i', 'shop', { ask: ask('npm test'), secret: { id: 's' } }), // a secret ask
+    card('j', 'shop', { ask: ask('npm test'), planAsk: {} }), // a plan
+    card('k', 'shop', { ask: { question: 'Which database?', options: menu } }),
+    card('l', 'shop', { ask: { question: 'Which database?', options: menu } }), // questions: no tool
+    card('m', 'shop', { ask: ask('npm test'), status: 'idle' }), // not waiting
+    card('n', 'shop', { ask: ask('npm test') }),
+  ]
+  const gs = groupAsks(cards, c => c)
+  assert.deepEqual(gs.map(g => g.items.map(c => c.id)), [['a', 'b', 'n']])
+  assert.deepEqual(gs[0].choices.map(o => o.label), ['Yes', 'No'], "don't ask again: never for all")
+  assert.deepEqual(groupAsks([cards[0]], c => c), [], 'one alone: no group')
+  // the same words but another menu: apart
+  assert.deepEqual(groupAsks([cards[0], card('x', 'shop', { ask: ask('npm test', { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }] }) })], c => c), [])
 })

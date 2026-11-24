@@ -7,8 +7,8 @@
 // detail (open but for a stale one); anywhere else on a card opens the tab, whatever its state. With a card focused,
 // 1–9 answer and Enter opens.
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { AskExplained, TabView, WorkspaceView } from '../../shared/types'
-import { bulkOk, optLabel } from '../../shared/ask'
+import type { Ask, AskExplained, TabView, WorkspaceView } from '../../shared/types'
+import { bulkOk, groupAsks, optLabel } from '../../shared/ask'
 import { AskDiff, Choice, choiceProps, useExplain, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
@@ -22,6 +22,7 @@ export type NeedsApi = {
   dismiss: (t: TabView) => void
   open: (t: TabView) => void
   answer: (t: TabView, n: number, label: string, say?: string) => void // say: No, and say why (Diff.tsx useSayWhy)
+  answerFor?: (t: TabView, n: number, label: string) => Promise<unknown> // a group's choice, one tab at a time: its failure that tab's own
   pick: (t: TabView, pick: 'first' | 'last') => void // a permission prompt with no menu read: Allow / Deny
   permission: (t: TabView) => boolean // its last wait said "permission" (the turn event's text)
   review: (t: TabView) => void
@@ -69,6 +70,8 @@ const unfolded = () => {
 export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = STALE_AFTER }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi; next?: string; staleAfter?: number }) {
   const [early, setEarly] = useState(unfolded)
   const [one, setOne] = useState('') // a phone's finished row tapped open (its tab and since when)
+  const [apart, setApart] = useState<Set<string>>(new Set()) // groups shown Separately (by their asks and tabs: one that changes groups again)
+  const [errs, setErrs] = useState<Map<string, string>>(new Map()) // a group's answer that failed for a tab (its id and wait): its own card, with why
   if (!given.length) return null
   const g = phoneGroups(given)
   const items = api.phone ? [...g.asks, ...g.fails, ...g.done] : given
@@ -88,7 +91,12 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   const many = items.map(x => x.t).filter(t => bulkOk(t, t.sandbox === true && t.perm !== 'bypassPermissions'))
   // the key: a new wait or finish, or one going stale, starts the card over (its detail open or not)
   const newest = items.reduce<Need | undefined>((m, x) => ((x.t.needAt ?? 0) > (m?.t.needAt ?? 0) ? x : m), undefined)?.t.id // its card's ring (styles.css)
-  const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} newest={x.t.id === newest} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
+  // one ask in several workspaces of a project (shared/ask.ts groupAsks): one card; not on a phone (its swipe rows)
+  const errOf = (t: TabView) => errs.get(`${t.id}:${t.needAt ?? ''}`)
+  const groups = api.phone || !api.answerFor ? [] : groupAsks(fresh.filter(x => !errOf(x.t)), x => ({ project: x.w.project, t: x.t })).map(g => ({ ...g, id: `${g.key}\0${g.items.map(x => x.t.id).join(',')}` })).filter(g => !apart.has(g.id))
+  const grouped = new Map(groups.flatMap(g => g.items.map(x => [x.t.id, g] as const)))
+  const failed = (t: TabView, e: string) => setErrs(m => new Map(m).set(`${t.id}:${t.needAt ?? ''}`, e))
+  const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} err={errOf(x.t)} api={api} next={x.t.id === next} newest={x.t.id === newest} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
   return (
     <div className="project needs-list" role="group" aria-label="Needs you">
       <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
@@ -115,7 +123,7 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
       </div>
       {!shut && (
         <div className="needs-cards">
-          {fresh.map(x => card(x))}
+          {fresh.map(x => (g => (!g ? card(x) : g.items[0] === x ? <NeedGroup key={g.id} items={g.items} choices={g.choices} api={api} onApart={() => setApart(s => new Set(s).add(g.id))} onFail={failed} /> : null))(grouped.get(x.t.id)))}
           {api.phone && g.done.length > 1 && (
             <button type="button" className="needs-all-seen" onClick={() => void allSeen()}>
               Mark all finished as seen
@@ -139,7 +147,51 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   )
 }
 
-function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api: NeedsApi; next: boolean; newest?: boolean; stale: boolean; shown?: boolean; show?: () => void }) {
+// several agents of one project asking the same (groupAsks): the ask's words once, ×n, each workspace a link to its
+// tab, each choice for all n (in order, one at a time: one that fails stays as its own card, with why), Separately
+function NeedGroup({ items, choices, api, onApart, onFail }: { items: Need[]; choices: Ask['options']; api: NeedsApi; onApart: () => void; onFail: (t: TabView, e: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const a = items[0].t.ask!
+  const n = items.length
+  const since = Math.min(...items.map(x => x.t.needAt ?? Date.now()))
+  const all = async (o: Ask['options'][number]) => {
+    setBusy(true)
+    for (const x of items) await api.answerFor!(x.t, o.n, o.label).catch((e: Error) => onFail(x.t, e?.message || 'not answered'))
+    setBusy(false)
+  }
+  return (
+    <div className="need need-wait need-group" role="group" aria-label={`${n} agents ask: ${a.what}`}>
+      <div className="need-head">
+        <Glyph s="waiting" />
+        <b className="need-ws">{a.question || `${a.tool} asks`}</b>
+        <span className="need-tab">×{n}</span>
+        <Elapsed since={since} />
+      </div>
+      <div className="need-cmd">
+        <span className="mono small muted" data-tip={a.what}>{a.what}</span>
+      </div>
+      <div className="need-group-ws">
+        {items.map(x => (
+          <button key={x.t.id} type="button" className="link small" data-tip={`Open ${x.t.name}`} onClick={() => api.open(x.t)}>
+            {api.name(x.w)}
+          </button>
+        ))}
+      </div>
+      <div className="need-opts">
+        {choices.map(o => (
+          <button key={o.n} type="button" className={o.n === a.at ? 'on' : ''} disabled={busy} onClick={() => void all(o)}>
+            {optLabel(a, o)} for all {n}
+          </button>
+        ))}
+        <button type="button" disabled={busy} data-tip="One card for each again" onClick={onApart}>
+          Separately
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & { api: NeedsApi; next: boolean; newest?: boolean; stale: boolean; shown?: boolean; show?: () => void; err?: string }) {
   const [open, setOpen] = useState(!stale) // detail open for what needs you, a stale finish one line
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
@@ -204,6 +256,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show }: Need & { api:
         <>
           <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}${t.secret.saved ? " (kept: one click gives it)" : ""}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
           {t.held && <div className="muted small">Asked because it touches {t.held}</div>}
+          {err && <div className="need-err small">For all didn't answer this one: {err}</div>}
           {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} netAllow={api.netAllow} />}
           {t.ask?.steps && api.keys && <div className="need-steps muted small">One of several questions: ← → (the card focused) go between them</div>}
           {x.button && (

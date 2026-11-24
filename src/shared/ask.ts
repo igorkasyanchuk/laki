@@ -348,3 +348,26 @@ export function streakOf(a: { tool?: string; what?: string }, globs?: string[]):
   const p = rulePattern(a.tool, pattern)
   return p ? { key: `${a.tool} ${p}`, tool: a.tool, pattern: p } : undefined
 }
+
+// Needs you's groups: waiting asks of one project that are one ask (streakOf's kind, the same words and the same
+// choices), several agents asking the same thing, as one card (Needs.tsx). Never a risky or chained command, a path out
+// of the worktree (streakOf has none for those), a question (no tool), one of several (steps), a plan, a secret ask;
+// choices: the menu's minus any that grants a standing rule (don't ask again: one click never makes that for n tabs).
+// Two or more in a group, in the order the first came. Pure: test/ask.test.ts
+// ponytail: the same words too, not only streakOf's kind: one card for npm test and npm test --watch would hide what differs
+export function groupAsks<T>(cards: readonly T[], of: (c: T) => { project: string; t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown } }) {
+  const m = new Map<string, { key: string; items: T[]; choices: Ask['options'] }>()
+  for (const c of cards) {
+    const { project, t } = of(c)
+    const a = t.ask
+    if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || a.steps || !a.options.length) continue
+    const s = streakOf(a)
+    if (!s) continue
+    const choices = a.options.filter(o => !standing(o.label))
+    if (!choices.length) continue
+    const key = [project, s.key, a.what, ...a.options.map(o => `${o.n} ${o.label}`)].join('\0')
+    const g = m.get(key) ?? (m.set(key, { key, items: [], choices }), m.get(key)!)
+    g.items.push(c)
+  }
+  return [...m.values()].filter(g => g.items.length > 1)
+}

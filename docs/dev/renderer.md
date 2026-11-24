@@ -333,6 +333,12 @@ are tested in `test/units-more.test.ts`.
     `needsApi.bulk`: Allow's confirm lists `bulkGroups` (one line per tool and text), then `answer` each one after
     another (`n` and `label`, or `pick`), the ones refused named in the toast. ⇧A (`KEYS` `allowAll`): keydown.ts
     clicks it, only with the focus in `.needs-list`.
+    One ask in several workspaces of a project (shared/ask.ts `groupAsks`: the same `streakOf` kind, the same `what` and
+    the same menu; never risky, chained, outside the worktree, a question, `steps`, a plan or a secret) is one
+    `NeedGroup` card: its words once, ×n, each workspace a link (`open`), each choice but a standing one (`standing`:
+    don't ask again) *for all n* through `needsApi.answerFor`, one tab after another; a failure keeps that tab out of
+    groups with its card's `need-err` line (`errs`, by its id and `needAt`). *Separately*: `apart`, by the group's key
+    and tabs (a change groups it again). Not on a phone (`api.phone`: its swipe rows). Allow all and 1–9 act per ask.
     App's `minute` tick moves one across while nothing else changes. The Dock's count is all of them.
   - Picked rows (`picked`, ⌘-click and ⇧-click, `pickRow`, `anchor`; `pickable`: a project's live workspaces, not
     terminals' or browsers'; not on a phone): `.ws.ws-picked`, `.pick-bar` over the list (Archive: `wsArchive` `ifClean`
