@@ -301,7 +301,11 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `proof: true` (`laki ship --proof`) adds it also when stale, as *Checked before the latest changes*; `proof: false`
   (`--no-proof`) never; a body with the heading already gets none. `shipDraft` gives `proof` (`yes` or `stale`) and
   `checked`, the section, which the sheet puts at the body's end to edit (*Add what Laki checked*, on when `yes`) and
-  ships with `proof: false`. A repo with a PR template (core.ts `prTemplate`: the first of shared/prTemplate.ts'
+  ships with `proof: false`. `walk: true` (`laki ship --walk`, the sheet's *Add reading order*, off unless ticked, kept
+  per project in `laki.shipWalk`) adds the Review tab's kept Walk through (ai.ts `reviewSteps` `kept`: no model call)
+  as shared/walk.ts `walkMd`'s *How to read this*, masked by `redact`, after the proof; only one of this diff that
+  `walkFresh` calls current (no more than a quarter of its hunks in Everything else); `shipDraft` gives it as `walk`
+  (none: no box). The daemon writes it: the call carries a flag, never the text. A repo with a PR template (core.ts `prTemplate`: the first of shared/prTemplate.ts'
   `PR_TEMPLATES`, GitLab's `MR_TEMPLATES`, a regular file inside the worktree through `inside`, its first 20 KB; on a
   host one that isn't a link) gets `fillTemplate`'s body: its HTML comments gone, the answer and the task under its first
   heading like a description (What, Summary, Description, Changes), else before its first heading, its checklists as

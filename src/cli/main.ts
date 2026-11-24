@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['any', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof'])
+const BOOL = new Set(['any', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -881,7 +881,7 @@ async function main() {
     case 'ship': {
       // --force: past the extensions' gates; yours only (the daemon refuses it from an agent's tab)
       const str = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined)
-      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller(), title: str('title'), body: str('body'), draft: !!flags.draft, base: str('base'), ...(shipFiles.length && { files: shipFiles }), ...(flags['allow-secrets'] && { allowSecrets: true }), ...(flags['no-proof'] ? { proof: false } : flags.proof && { proof: true }) })
+      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller(), title: str('title'), body: str('body'), draft: !!flags.draft, base: str('base'), ...(shipFiles.length && { files: shipFiles }), ...(flags['allow-secrets'] && { allowSecrets: true }), ...(flags['no-proof'] ? { proof: false } : flags.proof && { proof: true }), ...(flags.walk && { walk: true }) })
       if (t.held) held('ship', t)
       if (t.secrets) {
         out(t, ['Not shipped: possible secrets in what it would commit:', ...t.secrets.map((f: SecretFound) => `  ${f.file}:${f.line}  ${f.kind}  ${f.masked}`), 'Leave the file out (--files), or laki ship --allow-secrets ships it anyway (you, not an agent)'].join('\n'))

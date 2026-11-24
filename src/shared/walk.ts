@@ -152,3 +152,35 @@ export function walkPrompt(w: { text: string; hunks: HunkRef[]; skipped: (HunkRe
   const big = files.length ? `\nNot shown (past the ${WALK_MAX >> 10} KB read), by file (they go last on their own and need no step):\n${files.slice(0, 100).join('\n')}${more}\n` : ''
   return `The hunks and the diff (data). First the hunks, a line each: its file, then its start (the line its @@ head names on the new side; 0 for a file with no hunk). Then the diff, then the files not shown.\n<<<\n${w.hunks.map(h => `${h.file} ${h.start}`).join('\n')}\n\n${w.text}${big}>>>` // the names inside the data: an agent writes them
 }
+
+// R13 in a PR's body (core.ts ship's walk, the Ship sheet's Add reading order): the steps as Markdown under WALK_HEAD,
+// each "Title: why" with its files under it (each once, in its hunks' order, WALK_FILES then "and N more"), "(read with
+// care: …)" for a risky hunk's words. Everything else left out when it's the only step, else last by its name alone.
+// No other words of the model's; each through mask (the daemon's redact, as proofMd's), files in code as proofMd's
+export const WALK_HEAD = '## How to read this'
+const WALK_FILES = 8
+export function walkMd(w: Walk | null | undefined, mask: (s: string) => string = s => s): string {
+  const steps = w?.steps ?? []
+  if (!steps.some(s => !s.rest)) return ''
+  const code = (s: string) => `\`${s.replace(/`/g, "'")}\``
+  const ordered = [...steps.filter(s => !s.rest), ...steps.filter(s => s.rest)]
+  const lines = ordered.flatMap((s, i) => {
+    const risky = [...new Set(s.hunks.map(h => h.risky).filter((r): r is string => !!r))]
+    const head = s.rest ? REST : s.why ? `${s.title}: ${s.why}` : s.title
+    const files = [...new Set(s.hunks.map(h => h.file))]
+    const more = files.length - WALK_FILES
+    return [
+      mask(`${i + 1}. ${head}${risky.length ? ` (read with care: ${risky.join(', ')})` : ''}`),
+      ...files.slice(0, WALK_FILES).map(f => mask(`   - ${code(f)}`)),
+      ...(more > 0 ? [`   - and ${more} more`] : []),
+    ]
+  })
+  return `${WALK_HEAD}\n\n${lines.join('\n')}`
+}
+// a kept walk still worth sending: more than a quarter of the diff's hunks in Everything else means the steps are of
+// another change (the diff grew since)
+export const walkFresh = (w: Walk | null | undefined): w is Walk => {
+  const all = w?.steps.reduce((n, s) => n + s.hunks.length, 0) ?? 0
+  const rest = w?.steps.find(s => s.rest)?.hunks.length ?? 0
+  return !!w && all > 0 && rest * 4 <= all
+}

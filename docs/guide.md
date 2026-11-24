@@ -721,6 +721,9 @@ working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach t
   *Add what Laki checked* (on when the last Done check saw what ships) puts *Checked by Laki* at the description's end,
   there to edit: each script, pass or fail and how long, the second opinion's verdict and what the turn touched; changed
   since, it says only that it was checked before (`laki ship` adds it when current, `--proof` also when not, `--no-proof` never);
+  *Add reading order* (when the Review tab's Walk through has one for these changes; off until you tick it, then kept
+  for the project) adds *How to read this* after it: each step's title and why, its files, a risky one marked *read with
+  care*. Laki writes it from the kept walk, never asking Laki AI again (`laki ship --walk`);
 - search: the command palette (⌘K);
 - ⋯: the next step first (One next step, below), then split right/down, fork, archive, delete;
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,

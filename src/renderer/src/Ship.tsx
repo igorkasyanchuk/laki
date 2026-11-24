@@ -9,10 +9,19 @@ import { risksOf } from '../../shared/walk'
 import { Modal } from './panels'
 import { shipPrimary } from './text'
 
-type Draft = { title: string; message: string; body: string; files: { path: string; status: string; add: number; del: number }[]; ahead: number; base: string; branch: string; secrets?: SecretFound[]; proof?: 'yes' | 'stale'; checked?: string }
+type Draft = { title: string; message: string; body: string; files: { path: string; status: string; add: number; del: number }[]; ahead: number; base: string; branch: string; secrets?: SecretFound[]; proof?: 'yes' | 'stale'; checked?: string; walk?: string }
 export type ShipMode = 'commit' | 'push' | 'pr'
 const withProof = (body: string, md: string) => (md && !body.includes(md) ? [body.trimEnd(), md].filter(Boolean).join('\n\n') : body) // the section at the end, once
-export type ShipAsk = { message: string; files?: string[]; title?: string; body?: string; draft: boolean; base?: string; reviewers?: string[]; mode: ShipMode; autoLand: boolean; autoFix: boolean; allowSecrets?: string[]; proof?: boolean }
+export type ShipAsk = { message: string; files?: string[]; title?: string; body?: string; draft: boolean; base?: string; reviewers?: string[]; mode: ShipMode; autoLand: boolean; autoFix: boolean; allowSecrets?: string[]; proof?: boolean; walk?: boolean }
+// Add reading order, per project (laki.shipWalk: the ones it's on for): off until you tick it
+const WALK_KEY = 'laki.shipWalk'
+const walkSaved = (): Record<string, true> => {
+  try {
+    return JSON.parse(localStorage.getItem(WALK_KEY) ?? '{}') ?? {}
+  } catch {
+    return {}
+  }
+}
 
 export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip, onMerge, onLand, onUpdate, onOverlaps }: { ws: WorkspaceView; title: string; busy?: string; land: boolean; merge: boolean; call: Call; onClose: () => void; onShip: (a: ShipAsk) => Promise<unknown>; onMerge: () => void; onLand: () => void; onUpdate?: () => Promise<unknown>; onOverlaps?: () => void }) {
   const [d, setD] = useState<Draft | null>(null)
@@ -24,6 +33,8 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
   const [reviewers, setReviewers] = useState('')
   const [draft, setDraft] = useState(false)
   const [proofOn, setProofOn] = useState(false) // Add what Laki checked: the last Done check's section at the body's end, there to edit (on as it opens when it's current)
+  const [walkOn, setWalkOn] = useState(() => !!walkSaved()[ws.project]) // Add reading order: the daemon adds the kept Walk through (ship's walk), never text from here
+  const walkSet = (on: boolean) => (setWalkOn(on), localStorage.setItem(WALK_KEY, JSON.stringify((s => (on ? (s[ws.project] = true) : delete s[ws.project], s))(walkSaved()))))
   const [autoLand, setAutoLand] = useState(!!ws.autoLand)
   const [autoFix, setAutoFix] = useState(!!ws.autoFix)
   const [on, setOn] = useState<Set<string>>(new Set())
@@ -74,7 +85,7 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
     setTried(mode)
     try {
       // the files as ticked, always: one an agent wrote since the sheet opened isn't in it, so it stays out
-      const r = await onShip({ message: msg.trim(), files: picked.map(f => f.path), title: prTitle.trim() || undefined, body, draft, base: base.trim() && base.trim() !== d?.base ? base.trim() : undefined, reviewers: reviewers.split(/[\s,]+/).filter(Boolean), mode, autoLand, autoFix, ...(allow.size && { allowSecrets: [...allow] }), proof: false /* the section is in the body, as you left it */ })
+      const r = await onShip({ message: msg.trim(), files: picked.map(f => f.path), title: prTitle.trim() || undefined, body, draft, base: base.trim() && base.trim() !== d?.base ? base.trim() : undefined, reviewers: reviewers.split(/[\s,]+/).filter(Boolean), mode, autoLand, autoFix, ...(allow.size && { allowSecrets: [...allow] }), proof: false /* the section is in the body, as you left it */, ...(walkOn && d?.walk && { walk: true }) })
       const again = (r as { secrets?: SecretFound[] } | undefined)?.secrets
       if (again) setFound(again)
     } catch (e) {
@@ -201,6 +212,11 @@ export function ShipSheet({ ws, title, busy, land, merge, call, onClose, onShip,
             {d?.proof && (
               <label className="small" data-tip={d.proof === 'stale' ? 'The branch changed since the last Done check: the PR would say only that' : "The last Done check's scripts, pass or fail, at the description's end"}>
                 <input type="checkbox" checked={proofOn} onChange={e => (setProofOn(e.target.checked), setBody(b => (e.target.checked ? withProof(b, d.checked ?? '') : b.replace(d.checked ?? '', '').trimEnd())))} /> Add what Laki checked{d.proof === 'stale' ? ' (changed since)' : ''}
+              </label>
+            )}
+            {d?.walk && (
+              <label className="small" data-tip="The Review tab's Walk through as a reading order at the description's end: its steps and their files">
+                <input type="checkbox" checked={walkOn} onChange={e => walkSet(e.target.checked)} /> Add reading order
               </label>
             )}
             {land && (

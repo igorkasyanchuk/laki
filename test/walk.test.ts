@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fileRisk, hunkKey, hunksOf, REST, riskOf, risksOf, WALK_MAX, walkCheck, walkFold, walkInput, walkPrompt, type WalkStep } from '../src/shared/walk.ts'
+import { fileRisk, hunkKey, hunksOf, REST, riskOf, risksOf, type Walk, WALK_MAX, walkCheck, walkFold, walkFresh, walkInput, walkMd, walkPrompt, type WalkStep } from '../src/shared/walk.ts'
 import { fresh, openrouter, reply, until } from './helpers.ts'
 
 const DIFF = [
@@ -220,4 +221,74 @@ test("walk: reviewSteps: the diff to Laki AI as data, every hunk in one step, ke
   await assert.rejects(rig.rpc('reviewSteps', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't walk the user through a diff/)
   await rig.rpc('settingsSet', { ai: { on: false } })
   await assert.rejects(rig.rpc('reviewSteps', { ws: ws.id, again: true }), /Laki AI is off/)
+})
+
+test('walk: walkMd: a numbered step a line, "Title: why", its files under it once each (8, then and N more), a risky one read with care; Everything else last, or nothing when alone', () => {
+  const w = (steps: WalkStep[]): Walk => ({ steps, hash: 'h', at: 1 })
+  const md = walkMd(
+    w([
+      { title: 'Add the table', why: 'The schema first', hunks: [{ file: 'db/migrate/001.sql', start: 1, risky: 'migration' }, { file: 'db/migrate/001.sql', start: 9 }] },
+      { title: 'Use it', why: '', hunks: Array.from({ length: 11 }, (_, i) => ({ file: `src/f${i}.ts`, start: 1 })) },
+      { title: REST, why: 'What no step named: read it last', hunks: [{ file: 'package-lock.json', start: 1, risky: 'lockfile' }], rest: true },
+    ]),
+  )
+  assert.equal(
+    md,
+    [
+      '## How to read this',
+      '',
+      '1. Add the table: The schema first (read with care: migration)',
+      '   - `db/migrate/001.sql`',
+      '2. Use it',
+      ...Array.from({ length: 8 }, (_, i) => `   - \`src/f${i}.ts\``),
+      '   - and 3 more',
+      '3. Everything else (read with care: lockfile)',
+      '   - `package-lock.json`',
+    ].join('\n'),
+  )
+  assert.equal(walkMd(w([{ title: REST, why: 'x', hunks: [{ file: 'a', start: 1 }], rest: true }])), '', 'Everything else alone: nothing')
+  assert.equal(walkMd(null), '')
+  assert.match(walkMd(w([{ title: 'Key ghp_' + 'a'.repeat(36), why: 'w', hunks: [{ file: 'a`b', start: 1 }] }]), s => s.replace(/ghp_\w+/, '•••')), /1\. Key •••: w\n {3}- `a'b`/, 'masked, a backtick in a name kept out of the code')
+  // stale: more than a quarter of the hunks in Everything else
+  const of = (named: number, rest: number) => w([{ title: 'A', why: '', hunks: Array.from({ length: named }, (_, i) => ({ file: 'a', start: i })) }, { title: REST, why: '', hunks: Array.from({ length: rest }, (_, i) => ({ file: 'b', start: i })), rest: true }])
+  assert.equal(walkFresh(of(3, 1)), true)
+  assert.equal(walkFresh(of(2, 1)), false)
+})
+
+test("walk: Ship's reading order: shipDraft gives a kept walk's Markdown and never asks Laki AI; ship adds it to the PR's body only with walk: true", async t => {
+  const steps = { steps: [
+    { title: 'Add the table', why: 'The schema first', hunks: [{ file: 'db/migrate/001.sql', start: 1 }] },
+    { title: 'Use it', why: 'The app reads it', hunks: [{ file: 'src/app.ts', start: 1 }] },
+    { title: 'Say so', why: 'The README', hunks: [{ file: 'README.md', start: 1 }] },
+  ] }
+  const or = await openrouter(t, [reply({ content: JSON.stringify(steps) })])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-fakesecret' })
+  const remote = join(rig.home, 'remote.git')
+  execFileSync('git', ['init', '-q', '--bare', remote], { env: rig.env })
+  execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: rig.repo, env: rig.env })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  writeFileSync(join(ws.path, 'README.md'), 'hello there\n')
+  mkdirSync(join(ws.path, 'src'))
+  writeFileSync(join(ws.path, 'src/app.ts'), 'export const n = 1\n')
+  mkdirSync(join(ws.path, 'db/migrate'), { recursive: true })
+  writeFileSync(join(ws.path, 'db/migrate/001.sql'), 'create table t (id int);\n')
+  assert.equal((await rig.rpc('shipDraft', { ws: ws.id })).walk, undefined, 'none kept: none')
+  await rig.rpc('reviewSteps', { ws: ws.id })
+  assert.equal(or.hits.length, 1)
+  const draft = await rig.rpc('shipDraft', { ws: ws.id })
+  assert.match(draft.walk, /^## How to read this\n\n1\. Add the table: The schema first \(read with care: migration\)\n {3}- `db\/migrate\/001\.sql`\n2\. Use it: The app reads it/)
+  assert.equal(or.hits.length, 1, 'shipDraft asked Laki AI nothing')
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  const creates = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\ngh ').filter(l => l.startsWith('pr create'))
+  const shipped = async (o: object) => {
+    writeFileSync(join(rig.env.FAKE_GH, `pr-${ws.branch.replace(/\//g, '_')}.json`), 'no pull requests found')
+    const tab = await rig.rpc('ship', { ws: ws.id, ...o })
+    await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === tab.id)?.status === 'exited', 'ship done', 15000)
+    return creates().at(-1)!
+  }
+  assert.doesNotMatch(await shipped({ message: 'Add the table', body: 'my words' }), /How to read this/, 'not without walk: true')
+  assert.match(await shipped({ message: 'Again', body: 'my words', walk: true }), /--body my words\n\n## How to read this\n\n1\. Add the table/)
+  assert.equal(or.hits.length, 1, 'ship asked Laki AI nothing')
 })

@@ -26,6 +26,8 @@ import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type T
   type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
+import { WALK_HEAD, walkFresh, walkMd } from '../shared/walk.ts'
+import { reviewSteps } from './ai.ts'
 import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -5994,7 +5996,7 @@ const swapped = async (ws: Workspace, links: string[]) => (links.length ? (await
 // U5: the Ship sheet's, all optional (laki ship's flags; none: as before, every change, gh pr create --fill). files: the
 // changed paths to commit (treeOf's, the others stay uncommitted); mode: stop after the commit or the push; title and
 // body: the PR's (else gh's --fill); base: the PR's base branch; reviewers: GitHub logins or org/team names
-export type ShipOpts = GateOpts & { files?: string[]; title?: string; body?: string; draft?: boolean; base?: string; reviewers?: string[]; mode?: 'commit' | 'push' | 'pr'; allowSecrets?: true | string[]; proof?: boolean } // proof: the last Done check's facts in the PR's body (proofOf): unset when current, true a stale one's note too, false none
+export type ShipOpts = GateOpts & { files?: string[]; title?: string; body?: string; draft?: boolean; base?: string; reviewers?: string[]; mode?: 'commit' | 'push' | 'pr'; allowSecrets?: true | string[]; proof?: boolean; walk?: boolean } // walk: the Review tab's kept Walk through as a reading order in the PR's body (walkOf), only when true; proof: the last Done check's facts in the PR's body (proofOf): unset when current, true a stale one's note too, false none
 const NAME_OK = /^[A-Za-z0-9][\w.-]*(\/[A-Za-z0-9][\w.-]*)?$/
 // what treeOf's tree changes against HEAD, each path once (no renames: a rename is its old path gone and its new one)
 async function changedIn(ws: Workspace, tree: string) {
@@ -6109,6 +6111,10 @@ function proofOf(ws: Workspace, tree: string, stale: boolean) {
   return proofMd(p, { stale: staleProof(ws, tree), mask: redact, review: c?.at === p.turn ? c.review : undefined })
 }
 
+// the Review tab's kept Walk through (ai.ts reviewSteps' kept: never a model call) as a PR's reading order, masked:
+// only one of this diff (kept by its hash) that still covers it (walkFresh); none, '' (Laki AI never used too)
+const walkOf = async (ws: Workspace) => (w => (walkFresh(w) ? walkMd(w, redact) : ''))(await reviewSteps({ ws: ws.id, kept: true }).catch(() => null))
+
 // U5: the Ship sheet's start: what ship would commit (each uncommitted file, +/−), the commits already on the branch,
 // and shipWords' title and body
 export async function shipDraft(ref: string) {
@@ -6121,7 +6127,8 @@ export async function shipDraft(ref: string) {
   const secrets = await shipSecrets(ws, tree).catch(() => [])
   const checked = proofOf(ws, tree, true) // the sheet's Add what Laki checked: on when it's current
   const proof = checked ? (staleProof(ws, tree) ? 'stale' : 'yes') : undefined
-  return { title, message: title, body, files, ahead, base: ws.base.replace(/^origin\//, ''), branch: ws.branch, secrets, ...(proof && { proof, checked }) }
+  const walk = await walkOf(ws) // the sheet's Add reading order (off unless you tick it)
+  return { title, message: title, body, files, ahead, base: ws.base.replace(/^origin\//, ''), branch: ws.branch, secrets, ...(proof && { proof, checked }), ...(walk && { walk }) }
 }
 
 export async function ship(ref: string, message: string, o: ShipOpts = {}): Promise<Tab | { held: GateHeld[] } | { secrets: SecretFound[] }> {
@@ -6179,7 +6186,9 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   // A body that has the section already (the sheet's, edited there) gets none
   const given = o.body ?? filled
   const checked = mode === 'pr' && o.proof !== false && !given?.includes(PROOF_HEAD) ? proofOf(ws, tree, o.proof === true) : ''
-  const body = checked ? [(given ?? (await shipWords(ws)).body).trim(), checked].filter(Boolean).join('\n\n') : given
+  // the reading order only when asked for (walk: true; the daemon writes it, never the caller's text), after the proof
+  const walked = mode === 'pr' && o.walk === true && !given?.includes(WALK_HEAD) ? await walkOf(ws) : ''
+  const body = checked || walked ? [(given ?? (await shipWords(ws)).body).trim(), checked, walked].filter(Boolean).join('\n\n') : given
   const prTitle = o.title?.trim() || (body?.trim() ? message.trim() : '') // a body without a title: the commit's message as it (--fill has no room for a body)
   const index = await turnIndex(ws, 'ship')
   await exec(ws, 'cp', [await turnIndex(ws), index]) // now: a turn's treeOf rewrites that one
