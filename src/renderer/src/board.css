@@ -4,7 +4,7 @@
 .board-count { font-weight: 400; }
 .board-card.opens { cursor: var(--cur-act); }
 .board-card.opens:hover { border-color: var(--muted); }
-.board-col h3 { align-items: center; }
+.board-col h3 { align-items: center; flex-wrap: wrap; } /* the Merge column's Merge in order, one per project: each on a line of its own when they don't fit */
 .board-card:hover .board-more, .board-more:focus-visible { opacity: 1; }
 .board-more:hover { color: var(--fg); background: var(--hover); }
 .board-card.todo { cursor: grab; }

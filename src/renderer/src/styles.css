@@ -2903,7 +2903,8 @@ button.board-name { min-width: 0; padding: 0; border: none; background: none; co
 button.board-name:hover { background: none; }
 .board-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: hidden; }
 .board-last { font-size: var(--fs-2); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.board-queue { margin-left: auto; font: inherit; font-size: var(--fs-1); font-weight: 600; padding: 0 var(--sp-3); height: var(--h-s); border-radius: var(--r-pill); } /* the Merge column's Merge in order (n) */
+.board-queue { margin-left: auto; font: inherit; font-size: var(--fs-1); font-weight: 600; padding: 0 var(--sp-3); height: var(--h-s); border-radius: var(--r-pill); display: inline-flex; align-items: center; white-space: nowrap; max-width: 100%; } /* the Merge column's Merge in order (n) */
+.board-queue-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* a long project name cut, the count kept */
 .board-add.nw-card.nw-composer textarea { resize: none; field-sizing: content; min-height: 64px; max-height: 12em; padding: var(--sp-4) var(--sp-5) var(--sp-2); font: inherit; font-size: var(--fs-3); }
 .board-add .prompt-tools select { width: auto; min-width: 0; max-width: 140px; height: 26px; padding-block: 0; }
 /* a browser without field-sizing (remote access in another one): the prompts can't grow, so they keep the grip (after the rules it undoes) */

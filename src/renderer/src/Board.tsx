@@ -148,8 +148,8 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                     const mine = ws.map(c => c.w).filter(w => w.project === pid && w.pr?.state === 'OPEN' && !w.pr.forge && api.merge(w))
                     const on = view.mergeQueues?.some(q => q.project === pid && !q.stopped && !q.done)
                     return mine.length > 0 && !on ? (
-                      <button key={pid} className="board-queue" data-tip="Merge these PRs one after another in this order, each once its checks pass" onClick={() => api.queue(mine)}>
-                        Merge in order{new Set(ws.map(c => c.w.project)).size > 1 ? `: ${name(pid)}` : ''} ({mine.length})
+                      <button key={pid} className="board-queue" data-tip={`Merge ${name(pid)}'s PRs one after another in this order, each once its checks pass`} onClick={() => api.queue(mine)}>
+                        Merge in order{new Set(ws.map(c => c.w.project)).size > 1 && <span className="board-queue-name">: {name(pid)}</span>}&nbsp;({mine.length})
                       </button>
                     ) : null
                   })}
