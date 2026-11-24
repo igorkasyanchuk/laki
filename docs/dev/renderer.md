@@ -1244,6 +1244,9 @@ changed* (`goLine` with an end: the turn's `hunk` lit, `fr-flash`), *Accept* (`d
 the counts and of Post); *Remind the agent (n)* resends the unchanged ones to the tab they went to (the first agent if
 it's gone). A note without the fields is drawn as before.
 
+Walk through's ⋯ (FullReview's `walkSave`): walk.ts `walkDoc` as Markdown (copied, or a download) or one HTML page
+(a CSP of `default-src 'none'`, no scripts, every word escaped), a download through `<a download>` (Electron's save
+dialog); test/walk.test.ts.
 Walk through (R13): the Review tab head's *Walk through* (ReviewApi's `walk`, App's `reviewApi`: the daemon's
 `reviewSteps`, `review.steps` cap; `walkOff`: Laki AI is off, the button says so; on *PR #n* it says to pick Branch, the
 daemon's diff being the branch's or Uncommitted's). The daemon (ai.ts `reviewSteps`) reads the diff (files.ts `diff`),

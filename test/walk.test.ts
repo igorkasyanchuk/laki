@@ -307,3 +307,15 @@ test('isTestPath: Hide tests in Changes and Review', async () => {
   for (const p of ['src/a.test.ts', 'b.spec.tsx', 'pkg/x_test.go', 'tools/test_parse.py', '__tests__/a.js', 'test/helpers.ts', 'pkg/tests/fixture.json', 'spec/models/user_spec.rb', 'app/spec/x.rb']) assert.ok(isTestPath(p), p)
   for (const p of ['src/testing.ts', 'src/contest/a.ts', 'latest.ts', 'specs.md', 'docs/spec.md', 'src/attest.ts', 'protest/test.ts.bak']) assert.equal(isTestPath(p), false, p)
 })
+
+test('walkDoc: a Walk through as Markdown or one HTML page, no scripts, escaped', async () => {
+  const { walkDoc, REST } = await import('../src/shared/walk.ts')
+  const w = { hash: 'h', at: 1, steps: [{ title: 'Everything else', why: 'last', rest: true as const, hunks: [{ file: 'README.md', start: 3 }] }, { title: 'The schema <first>', why: 'the rest builds on it', hunks: [{ file: 'db/migrate/1.rb', start: 1, risky: 'a migration' }, { file: 'db/migrate/1.rb', start: 40 }] }, { title: 'The API', why: '', hunks: [{ file: 'app/api.ts', start: 12 }] }] }
+  const md = walkDoc(w, 'md', 'web · Walk through')
+  assert.equal(md, ['# web · Walk through', '', '3 steps.', '', '## 1. The schema <first>', '', 'the rest builds on it', '', '**Read with care:** a migration', '', '- `db/migrate/1.rb` (lines 1, 40)', '', '## 2. The API', '', '- `app/api.ts` (line 12)', '', `## ${REST}`, '', 'last', '', '- `README.md` (line 3)', ''].join('\n'))
+  const html = walkDoc(w, 'html', 'web <b>')
+  assert.match(html, /^<!doctype html>/)
+  assert.doesNotMatch(html, /<script|<first>|web <b>/, 'no scripts; the words escaped')
+  assert.match(html, /default-src 'none'/)
+  assert.match(html, /<h2>1\. The schema &#60;first&#62;<\/h2><p>the rest builds on it<\/p><p class="care"><b>Read with care:<\/b> a migration<\/p><ul><li><code>db\/migrate\/1\.rb<\/code> \(lines 1, 40\)<\/li><\/ul>/)
+})

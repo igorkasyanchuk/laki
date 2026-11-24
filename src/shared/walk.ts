@@ -181,6 +181,26 @@ export function walkMd(w: Walk | null | undefined, mask: (s: string) => string =
   })
   return `${WALK_HEAD}\n\n${lines.join('\n')}`
 }
+// Save a Walk through (the Review tab's steps' ⋯: Copy as Markdown, Export as Markdown or HTML): every step in its
+// order with its reason, what to read with care and its files with the lines each change starts at, Everything else
+// last; no model call, none of the diff's text. The HTML is one page, no scripts, everything escaped. test/walk.test.ts
+export function walkDoc(w: Walk, as: 'md' | 'html', title: string): string {
+  const ordered = [...w.steps.filter(s => !s.rest), ...w.steps.filter(s => s.rest)]
+  const steps = ordered.map((s, i) => {
+    const files = new Map<string, number[]>()
+    for (const h of s.hunks) files.set(h.file, [...(files.get(h.file) ?? []), h.start])
+    return { head: s.rest ? REST : `${i + 1}. ${s.title}`, why: s.why, care: [...new Set(s.hunks.flatMap(h => (h.risky ? [h.risky] : [])))], files: [...files].map(([f, at]) => ({ f, at: at.filter(n => n > 0) })) }
+  })
+  const lines = (at: number[]) => (at.length ? ` (line${at.length === 1 ? '' : 's'} ${at.join(', ')})` : '')
+  const note = w.cut ? `${w.skipped ? `${w.skipped} changes` : 'Part of it'} past 200 KB not read: under ${REST}.` : ''
+  if (as === 'md') {
+    const code = (x: string) => `\`${x.replace(/`/g, "'")}\``
+    return [`# ${title}`, '', `${steps.length} step${steps.length === 1 ? '' : 's'}.${note ? ` ${note}` : ''}`, ...steps.flatMap(s => ['', `## ${s.head}`, ...(s.why ? ['', s.why] : []), ...(s.care.length ? ['', `**Read with care:** ${s.care.join(', ')}`] : []), '', ...s.files.map(x => `- ${code(x.f)}${lines(x.at)}`)])].join('\n') + '\n'
+  }
+  const e = (x: string) => x.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
+  const body = steps.map(s => `<section><h2>${e(s.head)}</h2>${s.why ? `<p>${e(s.why)}</p>` : ''}${s.care.length ? `<p class="care"><b>Read with care:</b> ${e(s.care.join(', '))}</p>` : ''}<ul>${s.files.map(x => `<li><code>${e(x.f)}</code>${e(lines(x.at))}</li>`).join('')}</ul></section>`).join('')
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${e(title)}</title><style>body{font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1d1f24}h2{font-size:17px;margin:28px 0 6px}code{font:13px ui-monospace,Menlo,monospace;background:#f1f2f4;padding:1px 4px;border-radius:4px}.care{color:#9a5b00}ul{padding-left:20px}@media (prefers-color-scheme:dark){body{background:#16171a;color:#e6e7ea}code{background:#24262b}.care{color:#e2a54a}}</style></head><body><h1>${e(title)}</h1><p>${steps.length} step${steps.length === 1 ? '' : 's'}.${note ? ` ${e(note)}` : ''}</p>${body}</body></html>\n`
+}
 // the walk without the hunks of these files (what a ship leaves uncommitted: its PR doesn't have them), a step left
 // with none gone
 export function walkWithout(w: Walk | null | undefined, files: Iterable<string>): Walk | null | undefined {

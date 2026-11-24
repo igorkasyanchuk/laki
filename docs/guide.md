@@ -635,6 +635,8 @@ selected workspace's PR is in the status bar.
   many) while the code after it is still read. The files column shows the steps (*Files | Steps* goes back): click one to see only its
   changes, tick its *Viewed* and its files are viewed once all their changes are in viewed steps. Kept until the
   changes do; *Again* asks anew. It reads the branch's changes (or *Uncommitted*), not *PR #n*'s, and only on your click.
+  The ⋯ by *Again*: *Copy as Markdown* (for a PR description), *Export as Markdown* or *Export as HTML* (one page, no
+  scripts): every step, its reason, what to read with care and its files, *Everything else* last; no Laki AI call.
   Kept on this Mac. It reads the diff again as the workspace's files change, keeping your place and comments.
   The files show as a tree by folder unless you pick the list (the List | Tree switch over them, remembered): each
   folder folds with a click, says how many of its files are viewed and has a *Viewed* box for all of them; its right

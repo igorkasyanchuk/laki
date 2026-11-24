@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Save a Walk through as Markdown or HTML, or copy it as Markdown for a PR description.
 - Copy a table from an answer as Markdown, CSV or HTML: its button shows on hover.
 - Hide tests in Changes and Review: read the product code first; the choice is kept per project.
 - Mute a whole project from its ⋯ menu: none of its workspaces notifies you, new ones included.

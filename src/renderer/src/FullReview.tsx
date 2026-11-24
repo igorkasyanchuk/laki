@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import type { ReviewNote } from '../../shared/reviewNotes'
-import { hunkKey, REST, risksOf, startOf, type Walk } from '../../shared/walk'
+import { hunkKey, REST, risksOf, startOf, type Walk, walkDoc } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
 import { HideTests, OnlyTests, useHideTests, SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
@@ -494,6 +494,22 @@ export function FullReview({ ws, project, base, branch, pr, linked, empty, workt
 
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState('')
+  // the steps as a file (walk.ts walkDoc: no model call): Copy as Markdown, or a download (the app's save dialog)
+  const walkSave = (w: Walk): MenuItem[] => {
+    const title = `${branch || 'Changes'} · Walk through`
+    const file = (as: 'md' | 'html') => {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([walkDoc(w, as, title)], { type: as === 'md' ? 'text/markdown' : 'text/html' }))
+      a.download = `${(branch || 'changes').replace(/[^\w.-]+/g, '-')}-walk-through.${as}`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    }
+    return [
+      { label: 'Copy as Markdown', icon: 'copy', tip: 'Every step, its reason and files: for a PR description', run: () => void navigator.clipboard.writeText(walkDoc(w, 'md', title)).catch(() => {}) },
+      { label: 'Export as Markdown', icon: 'download', run: () => file('md') },
+      { label: 'Export as HTML', icon: 'download', tip: 'One page, no scripts: to send to a colleague', run: () => file('html') },
+    ]
+  }
   const [menu, openMenu] = useMenu()
   // sent: kept, stamped (its tab, when), so the turn that answers says what it changed (state); remind: the ones it
   // didn't, sent again to the tab they went to
@@ -723,6 +739,7 @@ export function FullReview({ ws, project, base, branch, pr, linked, empty, workt
                 <button type="button" className="link small" onClick={() => !walking && !walkWhy && walkAsk(true)} aria-disabled={walking || !!walkWhy || undefined} data-tip={walkWhy ?? 'Laki AI puts the changes in steps again'}>
                   {walking ? 'Reading…' : 'Again'}
                 </button>
+                <IconButton icon="more" title="Copy or export the steps" onClick={e => openMenu(e, walkSave(walk))} />
               </div>
               {stale && <div className="warn small pad">The changes moved since these steps: a step may miss some, or name ones gone. Again asks anew.</div>}
               {walk.cut && <div className="muted small pad">{walk.skipped ? `${walk.skipped} change${walk.skipped === 1 ? '' : 's'} Laki AI did not read (past its 200 KB): under ${REST}.` : `Over 200 KB: Laki AI read the first part, the rest is under ${REST}.`}</div>}
