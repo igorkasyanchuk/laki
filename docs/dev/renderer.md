@@ -1325,6 +1325,15 @@ Where: the artifacts gallery, the terminal's link card, an image diff (Changes, 
 Reader's pictures (a click on one not in a link opens it). styles.css: `::view-transition-group(zoom)` at `--t-slow` on
 `--spring-soft`, the old and new pictures `object-fit: cover` so a cropped thumbnail grows without a stretch.
 
+A Needs you card opening its tab (a click or Enter on the card: Needs.tsx' `api.open(t, el)`, Sidebar's `cardMorph`):
+the card gets a name of its own (`need-<random>`, `view-transition-class: need`), the tab is opened in a view
+transition, then the tab's ask bar (`.ask-bar`) or, when the ask shows only in the terminal (the sidebar's card has
+its choices), the selected tab takes the name; motion.ts `namer` keeps what it named and clears it as the change ends
+or is skipped, and a second click clears the first's before anything. Same switches as `morph` (`morphOk`: none in a
+window away, ui-smoke, Motion: None, Reduce motion), and none over one still running (`carding`); a choice answered on
+the card opens nothing and doesn't morph. styles.css: `::view-transition-group(*.need)` on `--spring-soft` at 90% of
+`--t-slow`, both snapshots `object-fit: none` from the top left (they cross-fade, no text stretched). No layout at rest.
+
 Springs (V14): styles.css' `--spring` (ζ 0.55, ω 16, 600 ms: an overshoot) and `--spring-soft` (ζ 1, ω 22, 350 ms),
 `linear()` points from `scripts/spring.ts` (run once, pasted; times kept where a point on a straight stretch was
 dropped), `--t-spring` and `--t-spring-soft` beside them; `linear` under Reduce motion (and the catch-all makes every

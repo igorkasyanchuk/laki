@@ -1626,3 +1626,24 @@ test("Smooth scrolling: xterm's glide unless it's off, Motion is None or the sys
   assert.equal(smoothMs(true, 'none', false), 0, 'Motion: None')
   assert.equal(smoothMs(true, 'high', true), 0, 'Reduce motion')
 })
+
+test("a Needs you card's morph: its names kept, a second click clears the first's, the end clears them all", async () => {
+  const { namer } = await import('../src/renderer/src/motion.ts')
+  const el = () => ({ style: { viewTransitionName: '', viewTransitionClass: '' } })
+  const n = namer()
+  const [card, bar, other] = [el(), el(), el()]
+  n.name(card, 'need-a', 'need')
+  assert.deepEqual(card.style, { viewTransitionName: 'need-a', viewTransitionClass: 'need' })
+  // a second click: the first's name goes before the next is set
+  n.clear()
+  n.name(other, 'need-b', 'need')
+  assert.equal(card.style.viewTransitionName, '')
+  assert.equal(n.size, 1)
+  // the change: the card's name off, the ask bar's on; finished: none left
+  n.name(bar, 'need-b', 'need')
+  n.clear()
+  assert.ok([card, bar, other].every(x => x.style.viewTransitionName === '' && x.style.viewTransitionClass === ''))
+  assert.equal(n.size, 0)
+  n.name(null, 'x') // nothing to name (no ask bar, no tab): nothing kept
+  assert.equal(n.size, 0)
+})

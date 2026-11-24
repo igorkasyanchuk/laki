@@ -22,7 +22,7 @@ export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
   keep: (t: TabView) => void // a turn that ended on an API error: goes on
   dismiss: (t: TabView) => void
-  open: (t: TabView) => void
+  open: (t: TabView, from?: HTMLElement) => void // from: the card clicked (it flies into the tab: ui.tsx cardMorph)
   answer: (t: TabView, n: number, label: string, say?: string) => void // say: No, and say why (Diff.tsx useSayWhy)
   answerFor?: (t: TabView, n: number, label: string) => Promise<unknown> // a group's choice, one tab at a time: its failure that tab's own
   pick: (t: TabView, pick: 'first' | 'last') => void // a permission prompt with no menu read: Allow / Deny
@@ -230,7 +230,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
     const o = opts.find(o => String(o.n) === e.key)
     if (o) e.preventDefault(), api.answer(t, o.n, o.label)
     else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && waiting && t.ask?.steps && api.keys) e.preventDefault(), api.keys(t, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C') // its other questions
-    else if (e.key === 'Enter') e.preventDefault(), api.open(t)
+    else if (e.key === 'Enter') e.preventDefault(), api.open(t, e.currentTarget as HTMLElement)
   }
   const last = t.failed ?? t.last?.trim().split('\n').find(l => l.trim())?.trim()
   const stat = w.stat && (w.stat.add > 0 || w.stat.del > 0) ? w.stat : undefined
@@ -265,7 +265,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
     )
   }
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={e => api.open(t, e.currentTarget)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : 'done'} />
         <b className="need-ws">

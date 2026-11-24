@@ -67,6 +67,28 @@ export function away(on: boolean) {
   held.clear()
 }
 
+// view transitions' names (ui.tsx cardMorph): each element named is kept, so the next one clears what an earlier left
+// (a second click before the first finished) and the end clears them all
+type Named = { style: { viewTransitionName: string; viewTransitionClass?: string } }
+export function namer() {
+  const named = new Set<Named>()
+  return {
+    name(el: Named | null | undefined, n: string, cls = '') {
+      if (!el) return
+      el.style.viewTransitionName = n
+      el.style.viewTransitionClass = cls
+      named.add(el)
+    },
+    clear() {
+      for (const el of named) (el.style.viewTransitionName = ''), (el.style.viewTransitionClass = '')
+      named.clear()
+    },
+    get size() {
+      return named.size
+    },
+  }
+}
+
 // whether something may move now (ui.tsx Num): not under Reduce motion or Motion: Off, nor with the window away
 export const moving = () => !still() && !document.documentElement.classList.contains('away')
 

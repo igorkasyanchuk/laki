@@ -184,3 +184,17 @@ test("the Review tab's file head: its secondary buttons quiet by opacity, never 
   root.walkRules(r => void (r.selectors.some(s => /\.sp-row:is\(:hover, :focus-within\) \.fr-file-acts/.test(s)) && (lit = true)))
   assert.ok(lit, 'on :hover and :focus-within')
 })
+
+test("a Needs you card's morph (::view-transition-*(*.need)) runs on the motion tokens, no raw durations", () => {
+  const root = postcss.parse(readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8'))
+  let n = 0
+  root.walkRules(r => {
+    if (!r.selectors.some(s => s.includes('(*.need)'))) return
+    n++
+    r.walkDecls(/^animation-(duration|timing-function)$/, d => {
+      assert.doesNotMatch(d.value, /\d+m?s\b(?![^(]*\))/, `${d.prop}: ${d.value}`)
+      assert.match(d.value, /var\(--(t-|spring)/, `${d.prop} on a token: ${d.value}`)
+    })
+  })
+  assert.ok(n >= 2, 'the group and its snapshots')
+})

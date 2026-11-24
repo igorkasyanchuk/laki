@@ -6,7 +6,7 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { aiOn, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
-import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
+import { Num, ask, cardMorph, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { bulkAnswer, type NeedsApi, NeedsList } from './Needs'
@@ -144,7 +144,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     explain: aiOn(view.settings) && hasCap(view, 'ask.explain') ? t => call('askExplain', { tab: t.id }) : undefined, // a command ask's ?: Laki AI's words for it
     keep: t => void call('send', { target: t.id, text: 'continue' }).catch(() => {}),
     dismiss: t => void call('failDismiss', { tab: t.id }).catch(() => {}),
-    open: t => (setDialog(null), selectTab(t), narrow && setSideOpen(false)),
+    open: (t, from) => cardMorph(from, () => (setDialog(null), selectTab(t), narrow && setSideOpen(false)), () => document.querySelector<HTMLElement>('.ask-bar') ?? document.querySelector<HTMLElement>('.tab-list > .tab.sel')),
     answer: (t, n, label, say) => void api.call('answer', { tab: t.id, n, label, ...(say && { say }) }).catch(() => toast('It asks something else now: open it', () => needsApi.open(t), 'Open')),
     answerFor: (t, n, label) => api.call('answer', { tab: t.id, n, label }),
     pick: (t, pick) => void api.call('answer', { tab: t.id, pick }).catch(e => toast((e as Error).message, () => needsApi.open(t), 'Open', false, true)),

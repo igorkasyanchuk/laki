@@ -8,7 +8,7 @@ import { createPortal, flushSync } from 'react-dom'
 import { inAim, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
-import { morphOk, moving } from './motion'
+import { morphOk, moving, namer } from './motion'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -98,6 +98,30 @@ export function morph(fn: () => void, grow?: 'open' | 'close') {
   })
   void t.finished.finally(() => (clear(), root.style.removeProperty('--vt-cut')))
   t.ready.catch(() => {}) // skipped: its ready rejects
+  setTimeout(() => ran || t.skipTransition(), 400)
+}
+// a Needs you card opening its tab (Sidebar's needs api open): the card flies into what shows its ask there, the tab's ask
+// bar or, when the ask is only in the terminal (the card had its choices), the tab: both named the same for the change
+// (a unique name, class need: styles.css' soft spring), cleared when it ends or is skipped. As morph, never without
+// view transitions, under Reduce motion or Motion: Off, in a window away or in ui-smoke, nor over one still running (a
+// second click only clears the first's names); answering from the card opens nothing, so it doesn't morph
+const cardNames = namer()
+let carding = false
+export function cardMorph(from: HTMLElement | null | undefined, fn: () => void, to: () => HTMLElement | null) {
+  cardNames.clear()
+  if (!from || carding || !morphOk()) return fn()
+  carding = true
+  const id = `need-${Math.random().toString(36).slice(2, 8)}`
+  cardNames.name(from, id, 'need')
+  let ran = false
+  const t = document.startViewTransition(() => {
+    ran = true
+    cardNames.clear()
+    flushSync(fn)
+    cardNames.name(to(), id, 'need')
+  })
+  void t.finished.finally(() => (cardNames.clear(), (carding = false)))
+  t.ready.catch(() => {})
   setTimeout(() => ran || t.skipTransition(), 400)
 }
 // a picture opening large from its thumbnail (a shared element: it grows into place): the thumbnail's <img> named zoom,
