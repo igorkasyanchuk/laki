@@ -593,7 +593,7 @@ test('a submodule in the base, checked out, still ships', async t => {
 })
 
 for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['GitLab', 'https://gitlab.com/o/repo.git']])
-  test(`a real submodule an agent got at (${forge}): its own config never runs in Ship, gh gets --head and --base; its .git swapped for another repo, Ship refuses; put back, it ships`, async t => {
+  test(`a real submodule an agent got at (${forge}): its own config naming a program, Ship refuses (it never runs); gone, gh gets --head and --base; its .git swapped for another repo, Ship refuses; put back, it ships`, async t => {
     const rig = await fresh(t)
     const ran = join(rig.home, 'ran')
     const evil = join(rig.home, 'evil.sh')
@@ -632,6 +632,9 @@ for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['Gi
     git(join(ws.path, 'lib'), 'config', 'core.fsmonitor', evil)
     trapped()
     writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+    await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'Shipped' }), /git folder modules\/lib\/config sets core\.fsmonitor/, 'Ship refuses (gitGuard), before any git of its')
+    assert.ok(!existsSync(ran), 'it never ran')
+    git(join(ws.path, 'lib'), 'config', '--unset', 'core.fsmonitor')
     await shipped('Shipped')
     assert.match(git(ws.path, 'ls-tree', 'HEAD', 'lib'), /^160000 commit/) // still a submodule in what was shipped
     assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), forge === 'GitHub' ? new RegExp(`^gh pr create --fill --head o:${ws.branch} --base main$`, 'm') : new RegExp(`^glab mr create --fill --yes --source-branch ${ws.branch} --target-branch main$`, 'm'))
@@ -1171,4 +1174,39 @@ test('a workspace named in Cyrillic: its id and branch transliterated, the sideb
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === b.id).name, 'Виправ помилку в кошику, будь ласка')
   const c = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'fix login' })
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === c.id).name, undefined, 'a Latin name: as before, its id shows')
+})
+
+test("Ship and Update refuse a worktree whose git folder an agent could have planted: a rebase todo's exec line, a submodule's config naming a program", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'planted' })
+  await until(() => rig.tab(ws.id))
+  const own = execFileSync('git', ['-C', ws.path, 'rev-parse', '--absolute-git-dir'], { encoding: 'utf8', env: rig.env }).trim()
+  assert.notEqual(realpathSync(own), realpathSync(join(rig.repo, '.git')), "a worktree's own git folder")
+  writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+  const pwned = join(rig.home, 'pwned')
+  const refused = async (re: RegExp) => {
+    await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'commit' }), re)
+    await assert.rejects(rig.rpc('wsUpdate', { ws: ws.id }), re)
+  }
+  mkdirSync(join(own, 'rebase-merge'), { recursive: true })
+  writeFileSync(join(own, 'rebase-merge', 'git-rebase-todo'), `pick abc123 x\nexec touch ${pwned}\n`)
+  await refused(/not (shipped|updated): planted's git folder rebase-merge\/git-rebase-todo has an exec line/)
+  rmSync(join(own, 'rebase-merge'), { recursive: true })
+  mkdirSync(join(own, 'sequencer'), { recursive: true })
+  writeFileSync(join(own, 'sequencer', 'todo'), `x touch ${pwned}\n`)
+  await refused(/sequencer\/todo has an exec line/)
+  rmSync(join(own, 'sequencer'), { recursive: true })
+  for (const [key, why] of [['\tsshCommand = touch ' + pwned, /core\.sshcommand/i], ['\tfsmonitor = touch ' + pwned, /core\.fsmonitor/i], ['\thooksPath = /tmp/evil', /core\.hookspath/i]] as const) {
+    mkdirSync(join(own, 'modules', 'lib'), { recursive: true })
+    writeFileSync(join(own, 'modules', 'lib', 'config'), `[core]\n\tbare = false\n${key}\n`)
+    await refused(new RegExp(`modules/lib/config sets ${why.source}`, 'i'))
+  }
+  writeFileSync(join(own, 'modules', 'lib', 'config'), '[include]\n\tpath = /tmp/evil.config\n')
+  await refused(/modules\/lib\/config sets an include/)
+  rmSync(join(own, 'modules'), { recursive: true })
+  assert.ok(!existsSync(pwned), 'nothing of it ran')
+  // clean again: Ship commits
+  await rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'commit' })
+  await until(() => execFileSync('git', ['-C', ws.path, 'log', '-1', '--format=%s'], { encoding: 'utf8', env: rig.env }).trim() === 'x', 'committed')
 })

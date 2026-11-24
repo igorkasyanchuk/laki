@@ -2307,16 +2307,63 @@ const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD'
 // gitdir and config.worktree say where git finds the repo and its config (one the agent wrote: core.fsmonitor or
 // core.hooksPath, a program run as you by Laki's scans and your git); codex keeps the folder read-only itself. claude's
 // --add-dir takes folders: it gets the folder, and its sandbox guards .git, commondir and config.worktree (2.1.319, checked
-// with claude -p). ponytail: an older claude's isn't checked, and claude's leaves that folder's rebase-merge and sequencer
-// writable (a todo's exec line runs as you when you continue that rebase)
+// with claude -p). ponytail: an older claude's isn't checked, and claude's leaves that folder's rebase-merge, sequencer and
+// modules/ writable (a todo's exec line runs as you when you continue that rebase): Laki's Ship and Update refuse
+// such a folder (gitGuard), your own git in a terminal doesn't
+// a checkout's git folders: its own (a worktree's .git file names it) and the shared one (its commondir); undefined:
+// not a repo here
+function gitDirs(path: string) {
+  const dotGit = join(path, '.git')
+  const st = statSync(dotGit, { throwIfNoEntry: false })
+  if (!st?.isDirectory() && !st?.isFile()) return
+  const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
+  const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
+  return { own, common }
+}
+// what a sandboxed claude can leave in a worktree's own git folder (gitWrites' ponytail: its rebase-merge and sequencer,
+// its submodules' modules/) that git Laki runs there would act on as you: a rebase's or cherry-pick's todo with an exec
+// line, a submodule's config naming a program (core.fsmonitor, core.hooksPath, core.sshCommand) or another config
+// (include). Ship and Update refuse while there's one, its file named; a worktree's only (a repo's own .git is yours,
+// read-only to an agent), on this Mac. ponytail: modules/ three levels deep
+export function gitTampered(path: string): string | undefined {
+  let d: ReturnType<typeof gitDirs>
+  try {
+    d = gitDirs(path)
+  } catch {
+    return
+  }
+  if (!d || d.own === d.common) return
+  const read = (f: string) => {
+    try {
+      return readFileSync(join(d!.own, f), 'utf8')
+    } catch {
+      return ''
+    }
+  }
+  for (const f of ['rebase-merge/git-rebase-todo', 'sequencer/todo']) if (/^\s*(x|exec)\s/m.test(read(f))) return `${f} has an exec line (a command git would run as you)`
+  const configs = (rel: string, depth: number): string[] => {
+    let es: string[] = []
+    try {
+      es = readdirSync(join(d!.own, rel))
+    } catch {}
+    return es.flatMap(e => [`${rel}/${e}/config`, ...(depth > 1 ? configs(`${rel}/${e}/modules`, depth - 1) : [])])
+  }
+  for (const f of configs('modules', 3)) {
+    const k = /^\s*(fsmonitor|hookspath|sshcommand)\s*=|^\s*\[\s*include/im.exec(read(f))
+    if (k) return `${f} sets ${k[1] ? `core.${k[1]}` : 'an include'} (a program git would run as you)`
+  }
+}
+// what in a worktree's git folder an agent left that Ship or Update would run: refused, said where
+export function gitGuard(ws: Workspace, what: string) {
+  const bad = ws.host ? undefined : gitTampered(ws.path)
+  if (bad) throw new Error(`not ${what}: ${ws.name || ws.id}'s git folder ${bad}. Look at it and remove it (git rebase --abort, or the file), then try again`)
+}
 export function gitWrites(path?: string, files = false): string[] {
   if (!path) return []
-  const dotGit = join(path, '.git')
   try {
-    const st = statSync(dotGit, { throwIfNoEntry: false })
-    if (!st?.isDirectory() && !st?.isFile()) return []
-    const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
-    const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
+    const d = gitDirs(path)
+    if (!d) return []
+    const { own, common } = d
     const packed = files ? ['packed-refs', 'packed-refs.lock', 'packed-refs.new'].map(f => join(common, f)) : [] // ref data as refs/ is: without it, each commit says "Unable to create packed-refs.lock"; .new: a rewrite (a packed branch deleted, fetch --prune)
     return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...packed, ...(common === own ? [] : files ? OWN_WRITES.map(f => join(own, f)) : [own])]
   } catch {
@@ -6137,6 +6184,7 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
   if (!message?.trim()) throw new Error('a commit message is needed')
+  gitGuard(ws, 'shipped') // before any git of its runs
   const mode = o.mode ?? 'pr'
   if (!['commit', 'push', 'pr'].includes(mode)) throw new Error(`mode ${mode}? commit, push or pr`)
   const reviewers = (o.reviewers ?? []).map(r => String(r).trim().replace(/^@/, '')).filter(Boolean)

@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type MergeQueue, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, gitGuard, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { fenced } from '../shared/fence.ts'
 import { inside, MAX_TEXT, mergeClean, scanStats, textOf } from './files.ts'
@@ -660,6 +660,7 @@ function tellAgent(ws: Workspace, text: string) {
 export async function wsUpdate(o: { ws: string; how?: unknown; from?: { tab?: string } }) {
   const ws = findWs(o.ws)
   if (ws.kind !== 'worktree' || !ws.base) throw new Error(`${ws.id} has no base branch to update from`)
+  gitGuard(ws, 'updated') // a planted rebase todo or submodule config: before its git runs
   // git under an agent's turn: HEAD and files would move while it writes (its own call, from its turn, is its own doing)
   const busy = () => {
     const t = tabsOf(ws.id).find(t => t.kind === 'agent' && t.id !== o.from?.tab && rtOf(t.id).status === 'running')

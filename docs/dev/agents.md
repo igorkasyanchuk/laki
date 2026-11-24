@@ -498,8 +498,11 @@ scans and your git (a nested repo the agent makes in its worktree has a config o
 and asks, as do `git stash` and `git commit <paths>` (their temp index is named by its pid: `index.stash.<pid>`,
 `next-index-<pid>.lock`) (codex keeps that folder and `.git` read-only itself; checked with `codex sandbox`, 0.162.1). claude gets the folder
 (`--add-dir` takes folders): its sandbox keeps `.git`, `commondir`, `config.worktree` and `.git/config` read-only itself
-(2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked, and claude's leaves `rebase-merge` and
-`sequencer` writable there (a todo's `exec` runs as you when you continue that rebase). Hooks
+(2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked, and claude's leaves `rebase-merge`,
+`sequencer` and `modules/` writable there (a todo's `exec` runs as you when you continue that rebase): Ship and Update
+refuse a worktree whose own git folder has one (core.ts `gitTampered`, `gitGuard`: a todo's `exec`/`x` line, a
+submodule config's `core.fsmonitor`, `core.hooksPath`, `core.sshCommand` or an include), your own git in a terminal
+doesn't. Hooks
 and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git
 folders aren't added. A new install's default profiles (`presets()` with no saved list) start claude and codex in their
 sandbox (claude's network on its list, `net: 'list'`): `settings.sandboxNew`, set by `load` only when there was no state before (a test's daemon only with
