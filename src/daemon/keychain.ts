@@ -64,6 +64,9 @@ export function keyRead(name: string, path: string): string {
   kept.set(name, v)
   return v
 }
+// a read the Keychain didn't answer (keyRead gave the file's, likely ''): a store of several values written now would
+// lose the rest (widgets.ts' secrets)
+export const keyUnread = (name: string) => retry.has(name)
 // '': none (removed)
 export function keyWrite(name: string, path: string, key: string) {
   if (keychainOn() && (key ? kcSet(name, key) : kcRm(name))) {

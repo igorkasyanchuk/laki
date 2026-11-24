@@ -2324,7 +2324,7 @@ function gitDirs(path: string) {
 // its submodules' modules/) that git Laki runs there would act on as you: a rebase's or cherry-pick's todo with an exec
 // line, a submodule's config naming a program (core.fsmonitor, core.hooksPath, core.sshCommand) or another config
 // (include). Ship and Update refuse while there's one, its file named; a worktree's only (a repo's own .git is yours,
-// read-only to an agent), on this Mac. ponytail: modules/ three levels deep
+// read-only to an agent), on this Mac. ponytail: modules/ eight folders deep
 export function gitTampered(path: string): string | undefined {
   let d: ReturnType<typeof gitDirs>
   try {
@@ -2341,14 +2341,18 @@ export function gitTampered(path: string): string | undefined {
     }
   }
   for (const f of ['rebase-merge/git-rebase-todo', 'sequencer/todo']) if (/^\s*(x|exec)\s/m.test(read(f))) return `${f} has an exec line (a command git would run as you)`
+  // a submodule's git folder is modules/<its name>, and a name with a slash is a folder per part: a folder with a config
+  // is one (its own submodules in its modules/), any other a part of a name; a link followed (git follows it), depth-bound
   const configs = (rel: string, depth: number): string[] => {
+    if (depth < 0) return []
     let es: string[] = []
     try {
       es = readdirSync(join(d!.own, rel))
     } catch {}
-    return es.flatMap(e => [`${rel}/${e}/config`, ...(depth > 1 ? configs(`${rel}/${e}/modules`, depth - 1) : [])])
+    if (es.includes('config')) return [`${rel}/config`, ...configs(`${rel}/modules`, depth - 1)]
+    return es.filter(e => statSync(join(d!.own, rel, e), { throwIfNoEntry: false })?.isDirectory()).flatMap(e => configs(`${rel}/${e}`, depth - 1))
   }
-  for (const f of configs('modules', 3)) {
+  for (const f of configs('modules', 8)) {
     const k = /^\s*(fsmonitor|hookspath|sshcommand)\s*=|^\s*\[\s*include/im.exec(read(f))
     if (k) return `${f} sets ${k[1] ? `core.${k[1]}` : 'an include'} (a program git would run as you)`
   }

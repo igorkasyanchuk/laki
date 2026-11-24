@@ -123,7 +123,7 @@ export function runsOf(d: string) {
 }
 // its own files' hash (cached by their times and sizes): a repo's extension's trust
 // every file under its folder, relative, a folder's files before its subfolders: none hidden (.git neither), no
-// node_modules (a repo's: repoFiles), none of skip's (its state: stateHas' globs) but keep's. A link to a file as the
+// node_modules (a repo's: repoFiles), none of skip's (its state: stateHas' globs) but keep's and executables. A link to a file as the
 // file; to a folder, walked while it stays inside (realpath, each folder once), else as a name. ponytail: max files at
 // most, a change past them isn't seen
 const filesUnder = (d: string, max = 500, skip: string[] = [], keep: string[] = []) => {
@@ -148,8 +148,8 @@ const filesUnder = (d: string, max = 500, skip: string[] = [], keep: string[] = 
       const n = rel ? `${rel}/${x.name}` : x.name
       const to = x.isSymbolicLink() ? (() => { try { return realpathSync(join(d, n)) } catch { return undefined } })() : undefined
       const dir = x.isDirectory() || (!!to && under(to, top) && !!statSync(to, { throwIfNoEntry: false })?.isDirectory())
-      if (stateHas(skip, n, dir) && !keep.includes(n)) continue
-      if (dir) subs.push(n)
+      if (dir) subs.push(n) // a state folder too: a script it runs from there still counts
+      else if (stateHas(skip, n) && !keep.includes(n) && !((statSync(join(d, n), { throwIfNoEntry: false })?.mode ?? 0) & 0o111)) continue // its state, unless it runs it or it's an executable (as repoFiles)
       else if (out.length < max && (x.isFile() || x.isSymbolicLink())) out.push(n)
     }
     for (const n of subs) if (out.length < max) walk(n, up)
@@ -168,6 +168,14 @@ const filesUnder = (d: string, max = 500, skip: string[] = [], keep: string[] = 
 const REPO_MAX = 2000
 const SCRIPT = /\.(sh|bash|zsh|fish|py|rb|pl|php|js|mjs|cjs|ts|mts|lua)$/i
 const STATE = ['.DS_Store', '__pycache__/', '*.pyc'] // every folder's; a repo's node_modules/ too (not an agent's)
+// the files its commands name (sh do.sh, node lib/x.js), relative and inside it: what it runs counts, state or not
+const cmdNames = (m: Manifest) =>
+  [m.fetch, ...Object.values(m.actions ?? {}).map(a => actionCmd(a))]
+    .filter(Boolean)
+    .join(' ')
+    .split(/[\s'"`;|&()<>=]+/)
+    .map(t => t.replace(/^\.\//, ''))
+    .filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
 const stateOf = (m: Manifest) => (Array.isArray(m.state) ? m.state.filter((g): g is string => typeof g === 'string' && !!g.trim()) : [])
 // a glob of state: without a /, any file or folder by name; with one, by its path; a trailing /, a folder and all in it
 function stateHas(globs: string[], n: string, dir = false) {
@@ -181,8 +189,7 @@ export function repoFiles(w: Entry): { names: string[]; bad?: string } {
   try {
     top = realpathSync(d)
   } catch {}
-  const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
-  const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
+  const named = cmdNames(w.m)
   const stats = new Map<string, Stats | undefined>()
   const file = (n: string) => (stats.has(n) ? stats.get(n) : (st => (stats.set(n, st), st))(statSync(join(d, n), { throwIfNoEntry: false }))) // each file once a scan
   const runs = new Set(['widget.json', w.m.script ?? '', ...named.filter(n => SCRIPT.test(n) || ((file(n)?.mode ?? 0) & 0o111) !== 0)].filter(n => n && file(n)?.isFile())) // a cache.json a command cats isn't code
@@ -290,7 +297,7 @@ function repoNames(w: Entry, fresh: boolean) {
   return names
 }
 export function dirHash(w: Entry, fresh = false, known?: string[]) {
-  const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir, 500, stateOf(w.m), ['widget.json', w.m.script ?? ''])).sort() // its subfolders too: a lib/ script a fetch runs; not what it writes (its state)
+  const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir, 500, stateOf(w.m), ['widget.json', w.m.script ?? '', ...cmdNames(w.m).filter(n => SCRIPT.test(n))])).sort() // its subfolders too: a lib/ script a fetch runs; not what it writes (its state)
   // S8: ctime and inode too: an edit of the same size with its mtime put back (utimes) still changes its ctime, and a
   // file swapped in by a rename its inode
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size, st?.ctimeMs, st?.ino])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))

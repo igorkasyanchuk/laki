@@ -24,7 +24,7 @@ import { aiOnce } from './ai.ts'
 import { alertShow } from './alerts.ts'
 import { hidden } from './phone.ts'
 import { dir, realOf } from './dir.ts'
-import { keyRead, keyWrite } from './keychain.ts'
+import { keyRead, keyUnread, keyWrite } from './keychain.ts'
 import { agentCaller, annotAt, broadcast, sessions, git, ghSaid, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
 import { headOf } from './pr.ts'
 import { diff, inside, stats } from './files.ts'
@@ -186,6 +186,8 @@ const readSecrets = (): Record<string, Record<string, string>> => {
 }
 export const secretsOf = (id: string) => readSecrets()[id] ?? {}
 export function setSecrets(id: string, f: (s: Record<string, string>) => void) {
+  readSecrets()
+  if (keyUnread('widget-secrets')) throw new Error("the Keychain didn't answer: try again in a minute (the other extensions' secrets would be lost)")
   masks.delete(id)
   const all = readSecrets()
   const s = { ...all[id] }

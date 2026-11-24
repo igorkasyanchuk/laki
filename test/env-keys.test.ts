@@ -3,7 +3,7 @@
 // old state.json migrates
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -128,4 +128,11 @@ test("a value with a line break never goes to security -i (its next line would r
   assert.equal(existsSync(file), false, 'the file moved into the Keychain')
   assert.deepEqual(JSON.parse(readFileSync(join(rig.home, 'keychain', 'Laki AI__widget-secrets'), 'utf8')), { old: { token: 'fake-old-widget-secret' }, sec: { apiToken: 'fake-new-widget-secret' } })
   assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('fake-new-widget-secret'), 'on no command line')
+  // the Keychain not answering as Laki starts: a save refused, not written over the others' (they'd be gone)
+  await rig.stop()
+  writeFileSync(join(rig.home, 'security-fails'), '')
+  await rig.start()
+  await assert.rejects(rig.rpc('widgetSet', { id: 'sec', config: { apiToken: 'fake-third-widget-secret' } }), /the Keychain didn't answer/)
+  rmSync(join(rig.home, 'security-fails'))
+  assert.deepEqual(JSON.parse(readFileSync(join(rig.home, 'keychain', 'Laki AI__widget-secrets'), 'utf8')), { old: { token: 'fake-old-widget-secret' }, sec: { apiToken: 'fake-new-widget-secret' } }, 'every one kept')
 })

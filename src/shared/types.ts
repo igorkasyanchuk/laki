@@ -1457,17 +1457,17 @@ export function recorded(v: View): View {
   return viewWithout(v, off, gone)
 }
 // S7: an event Recording mode keeps from an agent's or a remote page's socket, as recorded() keeps their workspaces
-// from its state: one that names a private workspace or one of a private project, by its ws, tab, project, or the ws
-// or tab a notice is about (to). Pure: test/agent-gates.test.ts
+// from its state: one that names a private workspace or one of a private project, by its ws, tab, project (a
+// workflow's: wf.project), or the ws or tab a notice is about (to). Pure: test/agent-gates.test.ts
 type Seen = { settings?: { recording?: boolean }; projects: { id: string; private?: boolean }[]; workspaces: { id: string; project: string; private?: boolean }[]; tabs: { id: string; workspace: string }[] }
 export function isHiddenEvent(msg: unknown, s: Seen): boolean {
   if (!s.settings?.recording || !msg || typeof msg !== 'object') return false
-  const m = msg as { ev?: unknown; ws?: unknown; tab?: unknown; project?: unknown; to?: { ws?: unknown; tab?: unknown } }
+  const m = msg as { ev?: unknown; ws?: unknown; tab?: unknown; project?: unknown; to?: { ws?: unknown; tab?: unknown }; wf?: { project?: unknown } }
   if (m.ev === 'state') return false // recorded()'s
   const off = (id: unknown) => typeof id === 'string' && !!s.projects.find(p => p.id === id)?.private
   const ws = (id: unknown) => typeof id === 'string' && (w => !!w && (!!w.private || off(w.project)))(s.workspaces.find(w => w.id === id))
   const tab = (id: unknown) => typeof id === 'string' && ws(s.tabs.find(t => t.id === id)?.workspace)
-  return ws(m.ws) || tab(m.tab) || off(m.project) || (!!m.to && typeof m.to === 'object' && (ws(m.to.ws) || tab(m.to.tab)))
+  return ws(m.ws) || tab(m.tab) || off(m.project) || (!!m.wf && typeof m.wf === 'object' && off(m.wf.project)) || (!!m.to && typeof m.to === 'object' && (ws(m.to.ws) || tab(m.to.tab)))
 }
 // a view without some projects and workspaces: their tabs, layouts, today's and the digest's rows too
 const viewWithout = (v: View, off: Set<string>, gone: Set<string>): View => ({ ...v, projects: v.projects.filter(p => !off.has(p.id)), workspaces: v.workspaces.filter(w => !gone.has(w.id)), tabs: v.tabs.filter(t => !gone.has(t.workspace)), layouts: v.layouts && Object.fromEntries(Object.entries(v.layouts).filter(([k]) => !gone.has(k))), today: v.today && { ...v.today, ws: v.today.ws.filter(x => !gone.has(x.ws)) }, digest: v.digest && { ...v.digest, rows: v.digest.rows.filter(r => !gone.has(r.ws)) } })

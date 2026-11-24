@@ -1205,6 +1205,17 @@ test("Ship and Update refuse a worktree whose git folder an agent could have pla
   writeFileSync(join(own, 'modules', 'lib', 'config'), '[include]\n\tpath = /tmp/evil.config\n')
   await refused(/modules\/lib\/config sets an include/)
   rmSync(join(own, 'modules'), { recursive: true })
+  // a submodule named vendor/lib: its git folder modules/vendor/lib (a folder per part); one linked in too
+  mkdirSync(join(own, 'modules', 'vendor', 'lib'), { recursive: true })
+  writeFileSync(join(own, 'modules', 'vendor', 'lib', 'config'), `[core]\n\tfsmonitor = touch ${pwned}\n`)
+  await refused(/modules\/vendor\/lib\/config sets core\.fsmonitor/)
+  rmSync(join(own, 'modules'), { recursive: true })
+  mkdirSync(join(rig.home, 'elsewhere'), { recursive: true })
+  writeFileSync(join(rig.home, 'elsewhere', 'config'), `[core]\n\thooksPath = /tmp/evil\n`)
+  mkdirSync(join(own, 'modules'))
+  symlinkSync(join(rig.home, 'elsewhere'), join(own, 'modules', 'linked'))
+  await refused(/modules\/linked\/config sets core\.hookspath/i)
+  rmSync(join(own, 'modules'), { recursive: true })
   assert.ok(!existsSync(pwned), 'nothing of it ran')
   // clean again: Ship commits
   await rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'commit' })

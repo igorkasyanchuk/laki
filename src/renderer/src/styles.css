@@ -4019,7 +4019,8 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .lp-big-md { max-height: calc(92vh - 70px); overflow: auto; }
 .lp-big-text { margin: 0; max-height: calc(92vh - 70px); overflow: auto; font: var(--fs-2)/1.45 var(--mono); white-space: pre; tab-size: 2; user-select: text; } /* the card scrolls: the pointer on it keeps it */
 .link-peek .lp-md .md { font-size: var(--fs-3); line-height: 1.6; padding: 0 var(--sp-2); }
-.link-peek .lp-md .md :is(h1, h2) { font-size: 1.3em; } /* a card's headings a step down from a page's */
+.link-peek .lp-md .md h1 { font-size: 1.4em; } /* a card's headings a step down from a page's */
+.link-peek .lp-md .md h2 { font-size: 1.2em; }
 
 /* V11: macOS 26's glass. A capsule floats over what's under it, apart from the edges: the panel at the floating
    surface's strength (--surface-a: made to read over a busy background, test/contrast.test.ts), a blur and more

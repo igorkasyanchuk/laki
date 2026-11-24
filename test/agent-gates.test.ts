@@ -129,7 +129,7 @@ test('S7: Recording mode: an agent gets no private workspace, its tabs or a priv
 test("S7: Recording mode: a private workspace's events (its turns, its output) reach your window, not an agent's or a phone's socket", async t => {
   const v = { settings: { recording: true }, projects: [{ id: 'p' }, { id: 'q', private: true }], workspaces: [{ id: 'a', project: 'p' }, { id: 'b', project: 'p', private: true }, { id: 'c', project: 'q' }], tabs: [{ id: 't1', workspace: 'a' }, { id: 't2', workspace: 'b' }, { id: 't3', workspace: 'c' }] }
   const hid = (m: object) => isHiddenEvent(m, v)
-  assert.deepEqual([hid({ ev: 'turn', ws: 'b', tab: 't2' }), hid({ ev: 'data', tab: 't3' }), hid({ ev: 'notice', tab: 't1', to: { ws: 'b' } }), hid({ ev: 'toolAsk', ws: 'c' }), hid({ ev: 'flow', project: 'q' })], [true, true, true, true, true])
+  assert.deepEqual([hid({ ev: 'turn', ws: 'b', tab: 't2' }), hid({ ev: 'data', tab: 't3' }), hid({ ev: 'notice', tab: 't1', to: { ws: 'b' } }), hid({ ev: 'toolAsk', ws: 'c' }), hid({ ev: 'flow', project: 'q' }), hid({ ev: 'flow', kind: 'paused', wf: { id: 'w', project: 'q' } }), hid({ ev: 'scheduled', project: 'q', state: 'failed' })], [true, true, true, true, true, true, true])
   assert.deepEqual([hid({ ev: 'turn', ws: 'a', tab: 't1' }), hid({ ev: 'remote', text: 'x' }), hid({ ev: 'state', ws: 'b' }), isHiddenEvent({ ev: 'turn', ws: 'b' }, { ...v, settings: {} })], [false, false, false, false], "a public one's, one of none, the state (recorded()'s), not recording")
 
   const rig = await fresh(t)

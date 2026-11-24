@@ -583,7 +583,7 @@ async function onEvent(s: Schedule, ev: TaskEventIn, now: number) {
     const quiet = mine.some(r => r.held && now - r.at < gap)
     const r = logRun({ ...base, what: `held: ${ev.words}, from a fork: it runs only when you start it`, held: ev })
     log(`scheduled task ${s.id}: ${r.what}`)
-    if (!quiet) broadcast({ ev: 'scheduled', run: r.id, state: 'waiting', name: r.name, text: `${r.name}: ${ev.words} is from a fork, held until you start it (Scheduled tasks)` })
+    if (!quiet) broadcast({ ev: 'scheduled', run: r.id, project: s.project, state: 'waiting', name: r.name, text: `${r.name}: ${ev.words} is from a fork, held until you start it (Scheduled tasks)` })
     return
   }
   if (s.last !== undefined && now - s.last < gap) return void logRun({ ...base, skipped: true, what: `skipped: ${ev.words}, ${Math.round((now - s.last) / 60e3)} min after its last run (at least ${t.gap ?? EVENT_GAP} apart)` })
@@ -666,7 +666,7 @@ function failedRun(s: Schedule, why: string) {
   changed()
   const name = cur.name ?? runName(cur, Date.now())
   log(`scheduled task ${cur.id}: off, it failed ${FAILS_OFF} times in a row: ${why}`)
-  broadcast({ ev: 'scheduled', state: 'failed', name, text: `${name} is off: it failed ${FAILS_OFF} times in a row (${why})` })
+  broadcast({ ev: 'scheduled', project: cur.project, state: 'failed', name, text: `${name} is off: it failed ${FAILS_OFF} times in a row (${why})` })
   flowPhone(name, undefined, `is off: it failed ${FAILS_OFF} times in a row`, why, 'Scheduled')
 }
 const goodRun = (s: Schedule) => (cur => cur?.fails && (delete cur.fails, save()))(live(s))
