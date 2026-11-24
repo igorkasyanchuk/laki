@@ -620,7 +620,7 @@ const GB = (n?: number) => (n ? `${Math.round(n / 2 ** 30)} GB` : '')
 // short: the chip's (its cores and price; the menu has the rest)
 const machineText = (m: CsMachine, short = false) => (m.cpus ? [`${m.cpus} cores`, !short && m.memory && `${GB(m.memory)} RAM`, !short && m.storage && `${GB(m.storage)} disk`, m.perHour !== undefined && `≈ $${m.perHour.toFixed(2)}/h`].filter(Boolean).join(' · ') : m.display)
 const CS_FIX = 'gh auth refresh -s codespace' // codespace.ts SCOPE's fix: copied from the page
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit'; cap?: string } // cap: its spend cap as typed ($5, 2M tokens: the daemon's cap.ts); startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -1108,7 +1108,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       {fan && !busy && <span className="nw-send-n">{fan.length}</span>}
     </button>
   )
-  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`].filter(Boolean).join(' · ')
+  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`, p.cap?.trim() && `cap ${p.cap.trim()}`].filter(Boolean).join(' · ')
+  const capRow = isAgent(starts) && !inCs // a spend cap: an agent's workspace
   const toggle = () => setAdv(o => !o)
   // its colors: the project's (its own, else the accent) on its pick, the prompt's edge and the send; the agent's on its
   // pick (a claude orange, a codex teal: the tabs'); a heading in both
@@ -1206,8 +1207,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               <input className="nw-chip-input" value={p.name ?? ''} placeholder={prompting && p.prompt?.trim() ? 'name: from the prompt' : 'name'} aria-label="Name" spellCheck={false} onChange={e => set({ name: e.target.value })} />
             </label>
           )}
-          {(modelRow || canRace) && (
-            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race" onClick={toggle}>
+          {(modelRow || canRace || capRow) && (
+            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race; a spend cap" onClick={toggle}>
               <span>More{more && <span className="muted"> · {more}</span>}</span>
               <Icon name={adv ? 'chevronUp' : 'chevron'} size={11} />
             </button>
@@ -1270,8 +1271,15 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                 </button>
               </div>
             ))(typed || prof?.model?.trim())}
-        {adv && (modelRow || canRace) && (
+        {adv && (modelRow || canRace || capRow) && (
           <div className="nw-card nw-more">
+            {capRow && (
+              <label className="nw-line">
+                <span>Spend cap</span>
+                <input value={p.cap ?? ''} spellCheck={false} placeholder="none: $5, or 2M tokens" onChange={e => set({ cap: e.target.value || undefined })} />
+                <span className="muted small">past it Laki stops its agents and asks; only you raise it</span>
+              </label>
+            )}
             {modelRow && (
               <label className="nw-line">
                 <span>Model</span>

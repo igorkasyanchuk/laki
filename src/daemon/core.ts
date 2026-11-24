@@ -66,6 +66,7 @@ import { phone, prune, pushed } from './phone.ts'
 import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { capOver, capParse, capSet, capToolEnd, capView } from './cap.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, broken, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -160,7 +161,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
+export type Runtime = { inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
   stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; mcpAuth?: McpAuth /* an MCP server that needs a sign-in (mcpAuth.ts) */; boxed?: Boxed /* a command its sandbox stopped this turn
   (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number;
   waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a
@@ -1040,6 +1041,7 @@ function wsView(w: Workspace) {
   const ticket = ticketOf(w.id)
   return {
     ...wsOut(w),
+    spend: capView(w),
     setup: existsSync(setupMarker(w)),
     // what runs there
     ports: ports.get(w.id) ?? [],
@@ -1573,8 +1575,9 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown }) {
   const p = findProject(ref)
+  if (o.cap !== undefined) p.cap = (c => (c.usd || c.tokens ? c : undefined))(capParse(o.cap)) // its new workspaces' spend cap (cap.ts); not an agent's (main.ts)
   // F15: Always ask for, the whole list as Settings has it (main.ts refuses it to agents and remote access): path globs
   if (o.alwaysAsk !== undefined) {
     if (!Array.isArray(o.alwaysAsk) || o.alwaysAsk.length > 50 || o.alwaysAsk.some(g => typeof g !== 'string' || !g.trim() || g.trim().length > 200)) throw new Error('alwaysAsk: a list of up to 50 path globs (migrations/**, .github/**, yarn.lock)')
@@ -2939,8 +2942,9 @@ export function tabBell(o: { id?: string; ws?: string; on?: unknown }) {
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean; cap?: unknown }) {
   const w = findWs(o.id)
+  if (o.cap !== undefined) capSet(w, capParse(o.cap)) // cap.ts; an agent's only a lower one (main.ts' agentNo)
   // a name you gave it stays: an agent's rename is refused unless you asked for it (asked: laki rename --asked), a
   // Browsers page's title (auto) passes it by
   const agent = o.name !== undefined && !!agentCaller(o.from)
@@ -3149,6 +3153,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
     else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
     else if (k === 'net') next.net = String(v)
+    else if (k === 'cap') (c => (c.usd || c.tokens ? (next.cap = c) : delete next.cap))(capParse(v)) // its workspaces' spend cap (cap.ts)
     else if (k === 'wrap') v === false ? delete next.wrap : (next.wrap = 'macos') // the macOS wrapper sandbox (shared/wrap.ts)
     else if (k === 'envAllow' && Array.isArray(v)) next.envAllow = [...new Set(v.map(String).filter(e => ENV_KEY.test(e)))].slice(0, 100)
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
@@ -3481,7 +3486,7 @@ export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; b
   local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean;
   race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string;
   from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string;
-  startAt?: number | 'limit'; outside?: boolean; byClient?: string } // outside: its prompt quotes an outsider's text (a scheduled task's event): no PR guessed
+  startAt?: number | 'limit'; outside?: boolean; byClient?: string; cap?: unknown } // cap: its spend cap (cap.ts capParse: $5, 2M tokens); outside: its prompt quotes an outsider's text (a scheduled task's event): no PR guessed
   // from it (prIn); startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud
   // workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its
   // prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow
@@ -3599,6 +3604,7 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 export const saidFrom = (v: unknown) => (typeof v === 'string' && v.trim()) || undefined
 export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, fromTab: ___, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? saidFrom(o.from), fromTab: agentTab(caller)?.id, agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
 export async function wsNew(o: NewWs): Promise<Workspace> {
+  if (o.cap !== undefined) capParse(o.cap) // its error before anything is made
   const said: string[] = []
   const step = (text: string | (() => string)) => {
     if (!state.settings?.devMode) return // nothing built for a log no one keeps
@@ -3731,6 +3737,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
   if (o.flow && ws.kind === 'worktree') ws.flow = o.flow // the run's, before workspace.new and its setup tab's tab.new
   if (o.noSetup && ws.kind === 'worktree') ws.noSetup = true // its setup skipped: Run ▾ runs it later (run's setup)
+  if (o.cap !== undefined) ws.cap = capParse(o.cap)
   // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
   for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)
@@ -4758,6 +4765,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         if (next) r.plan = next.items.length ? next : undefined
         if (pl.tool_name === 'ExitPlanMode') r.planAsk = post ? undefined : String(pl.tool_input?.plan ?? '').slice(0, 20000) || undefined
       }
+      if (pl.hook_event_name === 'PreToolUse' && !pl.agent_id) r.inTool = now
+      if ((pl.hook_event_name === 'PostToolUse' || pl.hook_event_name === 'PostToolUseFailure') && !pl.agent_id) delete r.inTool, capToolEnd(tab) // over its cap: stopped as the call ends
       if (pl.hook_event_name === 'PostToolUse') {
         const got = publishedBy(pl)
         if (got) (r.published ??= []).push(got)
@@ -4986,6 +4995,13 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
     if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // the text would be keys to its question
     return typeInto(s, textFor(tab, p.text), false), { tab: tab.id, sent: true }
   }
+  if (tracked(tab) && capOver(tab.workspace)) {
+    // over its workspace's spend cap (cap.ts): it waits in the queue until you add to the cap or remove it
+    tab.queue = [...(tab.queue ?? []), p.text]
+    save()
+    changed()
+    return { tab: tab.id, queued: tab.queue.length, over: true }
+  }
   if (p.whenIdle || woke) {
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
     // its profile's Send into the running turn (claude, codex, on unless false: both read what's typed while they work): typed now,
@@ -5029,7 +5045,7 @@ function deliver(id: string) {
   const tab = state.tabs.find(t => t.id === id)
   const s = sessions.get(id)
   const r = rt.get(id)
-  if (!tab?.queue?.length || tab.queueHeld || !s || s.exited || r?.status !== 'idle' || r.limit) return false
+  if (!tab?.queue?.length || tab.queueHeld || !s || s.exited || r?.status !== 'idle' || r.limit || capOver(tab.workspace)) return false
   const msg = tab.queue.shift()!
   if (!tab.queue.length) delete tab.queue
   save()

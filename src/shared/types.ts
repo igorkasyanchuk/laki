@@ -212,6 +212,7 @@ export type Project = {
   inRepo?: boolean // B6: its notes and memory in its repo (.laki/notes.md, .laki/memory.md: core's notesOf, memoryOf), this Mac's choice; notes and memory here stay as they were meanwhile
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
+  cap?: Cap // a new workspace's spend cap here, unless its agent's profile has one (cap.ts)
   memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start
   compacted?: CompactRun // its learned memories' last compaction (daemon/memory.ts): when, how many before and after, why, or what failed
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
@@ -300,6 +301,9 @@ export type ChatHit = { ws: string; tab?: string; name: string; agent: string; a
 export type ClosedTab = { draft?: string; name: string; kind: 'agent' | 'shell'; preset?: string; profile?: string; resumeId?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; cmd?: string; cwd?: string; at: number }
 export type Workspace = {
   id: string
+  cap?: Cap // its spend cap (cap.ts): its own, {} none; unset: its agent's profile's, else its project's
+  capOver?: number // when it went over its cap: its turns stopped, sends wait in its tabs' queues until you add to it or remove it
+  capTold?: boolean // its 80% notice sent (for the cap as it is)
   project: string
   path: string
   host?: string // its project's SSH host: path is there
@@ -615,7 +619,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; cap?: Cap /* its workspaces' spend cap, unless the workspace has its own (cap.ts) */; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -1179,6 +1183,16 @@ export type RunState = 'running' | 'done' | 'waiting' | 'failed' | 'stopped'
 // T4: what a task can start on: CI failing on a branch, a PR opened, a PR's review, an issue opened, a push to a branch;
 // branch (unset: the repo's main), label (issues), by (whose: others, me, any; unset any); gap: minutes between its runs
 // (unset 30), perDay: runs a day at most (unset 10)
+// a spend cap (cap.ts): dollars of its priced chats, tokens of its unpriced ones; either, both, or none ({})
+export type Cap = { usd?: number; tokens?: number }
+// cap: the one that holds (its own, its profile's, its project's); usd, tokens: what its tabs' meters say; measured: none of
+// its agents is priced or counts tokens (a command profile): the cap shows not measured
+export type CapView = { cap: Cap; usd?: number; tokens?: number; measured: boolean; share?: number }
+const capBig = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
+const capMoney = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
+export const capText = (c: Cap) => [c.usd && capMoney(c.usd), c.tokens && `${capBig(c.tokens)} tokens`].filter(Boolean).join(' or ') || 'none'
+// what a workspace spent against its cap, in words: $4.10, 1.2M tokens, not measured
+export const capSpent = (v: CapView) => (v.measured ? [v.usd !== undefined && capMoney(v.usd), v.tokens !== undefined && `${capBig(v.tokens)} tokens`].filter(Boolean).join(' and ') : 'not measured')
 export type TaskEvent = 'ci.failed' | 'pr.opened' | 'pr.review' | 'issue.opened' | 'push' | 'webhook' | 'comment'
 // webhook: hook, one of Settings › Webhooks (inbound.ts) by its name; hookEvent, only that event of it (X-GitHub-Event, a body's type or action)
 export type TaskTrigger = { event: TaskEvent; branch?: string; label?: string; by?: 'others' | 'me' | 'any'; gap?: number; perDay?: number; hook?: string; hookEvent?: string; logins?: string[]; word?: string; reply?: boolean } // comment's: logins who may start it besides your gh login, word the one after /laki that picks it (/laki fix), reply: its agent's last answer posted back as a comment as the turn ends
@@ -1288,7 +1302,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number; mad
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)
 export type Ticket = { key: string; title?: string; status?: string; url?: string }
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; broken?: Broken /* T13: its worktree broke (wsRepair) */; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; spend?: CapView /* its spend cap and what its agents spent against it (cap.ts) */; broken?: Broken /* T13: its worktree broke (wsRepair) */; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -1538,7 +1552,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 225
+export const API = 226
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

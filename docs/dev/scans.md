@@ -702,7 +702,20 @@ folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<nam
 in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
 per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
-(`todayView`: tokens, cost, the 5 workspaces that used most). Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
+(`todayView`: tokens, cost, the 5 workspaces that used most).
+A workspace's spend cap (`daemon/cap.ts`; `Workspace.cap` as `Cap` `{ usd?, tokens? }`, `{}` none; unset: its first agent
+tab's profile's `cap`, else its project's: `capOf`; `capParse`: a number or `$5`, `2M tokens`; `wsNew`'s and `laki new`'s
+`cap`, `wsSet`'s, `projectSet`'s, `presetSave`'s): `capView` sums its agent tabs' `meterView` usage, dollars of a priced
+chat and tokens of an unpriced one (the view's `spend`: `share`, the larger part spent; `measured` false when nothing it
+has counts against it: *not measured*). `capTick` after each `meterTick`: at 80% one notice (`capTold`, reset as the cap
+changes), at 100% `capOver`, a push (`flowPhone`) and one notice with *Add $5 again* (the cap doubled), *Leave it
+stopped*, *Remove the cap* (`alertShow`'s `mac`: those two refused to remote access at Answer only, main.ts' ANSWER
+`alertAnswer`); each running agent turn gets Stop's Esc once as its tool call ends (claude's PostToolUse, `Runtime.inTool`
+from its PreToolUse, `capToolEnd`; another agent's, or a call past 60 s, at the tick). While over, `send` queues what it's
+given (`over: true`) and `deliver` holds the queue; `capSet` under the cap lets them go (`queueResume`). An agent may set a
+lower cap only (`capRaises`, main.ts' `agentNo`), never a project's or profile's; remote access at Answer only can't set
+one (`WS_SET`, `NEW_KEYS`). A workflow's budget holds in its runs too: whichever ends first stops it. ponytail: a closed
+tab's spend leaves the sum; a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
 their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
 `endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
 worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else

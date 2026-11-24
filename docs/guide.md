@@ -72,6 +72,11 @@ changing it: [AGENTS.md](../AGENTS.md).
   chat loaded, in the order it loaded them (a Skill call, a `/skill`, a SKILL.md it read), and one opens its
   SKILL.md in your editor: you see whether the agent used your project's skill or skipped it. The Reader marks the
   step that loaded one (*skill · name*).
+- **Spend cap**: a workspace's menu › *Spend cap…* (or New workspace › More, `laki new --cap 5`; a project's or a
+  profile's for every new one): dollars ($5), or tokens (2M tokens) for an agent Laki can't price. At 80% Laki tells
+  you; past it, it stops the workspace's agents as their tool call ends, marks the workspace, and asks: *Add $5 again*,
+  *Leave it stopped* or *Remove the cap*. What you send meanwhile waits in the queue. Agents can lower a cap, never raise
+  it; a workflow's own budget holds too, whichever comes first. With no meter for its agents the cap says *not measured*.
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.

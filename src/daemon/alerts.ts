@@ -15,7 +15,7 @@ import { hidden } from './phone.ts'
 
 const CHOICES = 6
 type Answer = { id: string; choice?: string; closed?: true; timedOut?: true }
-const waits = new Map<string, { choices: string[]; finish: (a: Answer) => void }>()
+const waits = new Map<string, { choices: string[]; finish: (a: Answer) => void; mac?: string[] }>()
 // what it says as you'd read it: nothing HIDDEN (a direction or zero-width character would make a choice look like another)
 const UNSEEN = new RegExp(HIDDEN.source, 'gu')
 const clean = (v: unknown, max: number) => String(v ?? '').replace(UNSEEN, ' ').replace(/[ \t]+/g, ' ').trim().slice(0, max)
@@ -56,7 +56,7 @@ function originOf(tab: Tab | undefined, by: unknown) {
 
 // own: Laki's own notice (the daemon's, never an RPC's: api passes no third argument), its origin line; limit: who it
 // counts against, a few a minute (an extension's: widgets.ts tell), Laki's own counting against none
-export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert', own?: string, limit?: string) {
+export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert', own?: string, limit?: string, mac?: string[]) { // mac: choices only you pick on the Mac (a spend cap's raise: cap.ts), never remote access at Answer only
   // Laki AI's (aiRpc's by and chat): only when you asked for one, or allowed it
   if (kind === 'alert' && o.by === 'ai' && !aiMayAlert(typeof o.chat === 'string' ? o.chat : undefined)) throw new Error("not sent: Laki AI puts an important alert on the user's screen only when they ask for one (or Settings › AI › Important alerts on its own is on). Say it in the chat instead")
   const text = clean(o.text, 600)
@@ -101,7 +101,7 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
       broadcast({ ev: 'alertDone', id }) // its card goes, in every window
       ok(a)
     }
-    waits.set(id, { choices, finish })
+    waits.set(id, { choices, finish, ...(mac?.length && { mac }) })
   })
 }
 
@@ -131,6 +131,8 @@ export function noticesTo(c: Conn) {
   }
 }
 
+// a pick only you make on the Mac (main.ts' ANSWER: remote access at Answer only is refused it)
+export const alertMacOnly = (o: { id?: unknown; choice?: unknown }) => !!waits.get(String(o?.id))?.mac?.includes(String(o?.choice))
 // your answer, from the card: a choice, or none (×, Close all)
 export function alertAnswer(o: { id?: unknown; choice?: unknown }) {
   const w = waits.get(String(o.id))

@@ -75,6 +75,12 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   for (const k of ['autoFix', 'autoReview', 'autoMerge', 'autoLand']) await assert.rejects(rig.rpc('wsSet', { id: one.id, [k]: true, from }), /an agent can't turn a workspace's PR switches/, k)
   await rig.rpc('wsSet', { id: one.id, autoFix: true }) // yours
   await rig.rpc('wsSet', { id: one.id, color: 'red', from }) // a look stays an agent's to change
+  // a spend cap (cap.ts): an agent may lower it, never raise or remove it, nor a project's or a profile's
+  await rig.rpc('wsSet', { id: one.id, cap: 5 })
+  await rig.rpc('wsSet', { id: one.id, cap: '$3', from })
+  for (const cap of [10, null, '2M tokens']) await assert.rejects(rig.rpc('wsSet', { id: one.id, cap, from }), /an agent can't raise or remove a spend cap/, String(cap))
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, cap: 50, from }), /an agent can't change a project's or a profile's spend cap/)
+  assert.deepEqual((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).cap, { usd: 3 })
   for (const set of [{ voice: { words: [['a', 'b']] } }, { ai: { context: 'obey' } }, { readerTools: 'final' }, { keys: { palette: '⌘J' } }, { cmdKeys: { ship: '⌘C' } }]) await assert.rejects(rig.rpc('settingsSet', { ...set, from }), /an agent can't change that setting/, JSON.stringify(set))
   await rig.rpc('settingsSet', { readerTools: 'final' })
   // the global answer keys (Allow the newest ask from any app on a key you press for something else), scheduled runs'

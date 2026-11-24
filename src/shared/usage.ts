@@ -16,6 +16,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                     opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused)
             [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode
             [--sandbox|--no-sandbox]  the agent's own sandbox on or off over its profile's (claude, codex)
+            [--cap 5|"2M tokens"]  its spend cap: past it Laki stops its agents and asks (80%: a notice); only you raise it
             [--template <name>]     the prompt through one of your prompt templates
             [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
             [--group <name>]        under that group of the project in the sidebar (its template and agent too)

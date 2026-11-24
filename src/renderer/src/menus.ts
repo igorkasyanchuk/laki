@@ -1,7 +1,7 @@
 // The ⋯ and right-click menus of a workspace, a tab, a file and a project: App builds them each render (menusOf)
 // from what appCtx.ts says it reads.
 import { type AppBase, colorOf, WEB, wsName } from './appCtx'
-import { type TabView, type WorkspaceView, againOnEnter, FOLD_AFTER, HOME_ACCOUNT, type Project } from '../../shared/types'
+import { type TabView, type WorkspaceView, againOnEnter, capSpent, capText, FOLD_AFTER, HOME_ACCOUNT, type Project } from '../../shared/types'
 import { ask, type MenuItem, ON, iconItems, TAB_COLORS, askText, type IconName } from './ui'
 import { isPage, pendingWords, shortPath } from './text'
 import { isIconName } from '../../shared/icons'
@@ -45,6 +45,13 @@ export function menusOf(app: AppBase) {
   const aiRename = (w: WorkspaceView, t: TabView) =>
     void call<{ sent?: boolean }>('send', { target: t.id, whenIdle: true, text: `Rename this workspace after its task, in 2 to 5 words a person would say: from its pull request's title and description if it has one${w.pr ? ` (#${w.pr.number})` : ' (gh pr view)'}, else from what you're working on here. Run \`laki rename . "<the name>"\`, say the new name in one line, and change nothing else.` })
       .then(r => done(r?.sent ? `Asked ${t.name} to name it` : `${t.name} names it when its turn ends`), fail)
+  // its spend cap (the daemon's cap.ts): $5, 2M tokens; empty: none
+  const capAsk = async (w: WorkspaceView) => {
+    const now = w.spend ? capText(w.spend.cap) : ''
+    const v = await askText(`Spend cap · ${w.name || w.id}`, { text: `Past it, Laki stops its agents and asks; at 80% it tells you.${w.spend ? ` Spent: ${capSpent(w.spend)}.` : ''} Dollars ($5) or tokens (2M tokens); empty: none.`, value: now === 'none' ? '' : now.split(' or ')[0], placeholder: '$5', ok: 'Set' })
+    if (v === null) return
+    call('wsSet', { id: w.id, cap: v.trim() || null }).then(() => done(v.trim() ? `Spend cap: ${v.trim()}` : 'No spend cap'), fail)
+  }
 
   // Workspace ›: its own settings and copies, a submenu, so the menu's top level is what you do with it
   const wsOwn = (w: WorkspaceView): MenuItem[] => [
@@ -59,6 +66,7 @@ export function menusOf(app: AppBase) {
     ...(agentTab(w.id) ? [(on => ({ label: on ? 'Bell off' : 'Tell me when it finishes', icon: on ? 'bellOff' : 'bell', tip: on ? 'No one-time notification from it' : 'One notification and phone push when its running agents next finish or ask, even with finish notifications off', run: () => call('tabBell', { ws: w.id, on: !on }) }) as MenuItem)(!!view?.tabs.some(t => t.workspace === w.id && t.bell))] : []),
     { label: 'Important: cards on screen', icon: 'alertCircle', key: 'n', hint: w.important ? ON : undefined, tip: w.important ? 'On: a click turns it off (macOS notifications again)' : "Its agents' asks and finishes as cards at the bottom right, over every app, until you answer or close them", run: () => call('wsSet', { id: w.id, important: !w.important }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
+    ...(w.browser === undefined && !isTerm(w) ? [{ label: 'Spend cap…', icon: 'alertCircle', hint: w.spend ? `${capSpent(w.spend)} of ${capText(w.spend.cap)}` : undefined, sub: w.capOver ? 'Over it: its agents are stopped' : undefined, tip: 'Past it, Laki stops its agents and asks (80%: a notice). Dollars ($5) or tokens (2M tokens)', run: () => capAsk(w) } as MenuItem] : []),
     { label: 'Private', icon: 'lock', hint: w.private ? ON : undefined, tip: w.private ? 'Recording mode shows it again' : "Recording mode (⌘K, the menu bar) hides it: from the sidebar, the Board, bubbles, counts, notifications and phone pushes; it keeps running", run: () => call('wsSet', { id: w.id, private: !w.private }) },
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', tip: w.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },

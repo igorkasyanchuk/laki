@@ -62,7 +62,8 @@ import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planU
 import { noteFile, noteGet, noteList, noteNew, noteRestore, noteRm, noteSave, noteTrashTidy, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy, goalClear, goalSet, proofShot } from './verify.ts'
 import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideState, tabHandover, turnDiff, turnFork, turnList, turnRewind, turnsDrop, turnsKept, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
-import { alertAnswer, alertShow, alertsSeen, noticesTo } from './alerts.ts'
+import { alertAnswer, alertMacOnly, alertShow, alertsSeen, noticesTo } from './alerts.ts'
+import { capRaises, capTick } from './cap.ts'
 import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -1356,12 +1357,13 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   voiceText: true, // the mic on the phone's prompt boxes (Reader's too): your words written down, nothing sent; Telegram's Answer has it
   ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess \
 artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet \
-chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer alertAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
+chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
   send: sendOk,
   answer: p => (typeof p?.say === 'string' && p.say.trim() ? 'say why (a message to the agent)' : ''), // No, and say why: a full device's
   wsNew: newOk(false),
   tabNew: newOk(true),
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
+  alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
 const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
@@ -1454,6 +1456,8 @@ function agentNo(method: string, p: Params) {
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined || p.inRepo !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : p.memory !== undefined ? 'memory list (laki memory add adds to it)' : 'notes and memory place (in its repo or in Laki)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
+  else if (method === 'wsSet' && p?.cap !== undefined && capRaises(p.id, p.cap)) notAgent(p, 'raise or remove a spend cap') // a lower one is fine
+  else if ((method === 'projectSet' && p?.cap !== undefined) || (method === 'presetSave' && p.set && typeof p.set === 'object' && 'cap' in p.set)) notAgent(p, "change a project's or a profile's spend cap")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'net' in p.set) notAgent(p, "change a profile's network (what its sandbox lets it reach)")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'envAllow' in p.set) notAgent(p, "let secret-looking variables through to agents")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'wrap' in p.set) notAgent(p, "change a profile's wrapper sandbox")
@@ -2298,7 +2302,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('policyTick', 300000, policyTick)
   ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats, { idle: 'slow' })
   ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps, { idle: 'slow' }) // Collision radar
-  ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick, { idle: 'slow' }) // claude's and codex's transcripts: the tabs' context and usage
+  ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), () => (metersMod.meterTick(), capTick()), { idle: 'slow' }) // claude's and codex's transcripts: the tabs' context and usage
   ticks.register('watchLimits', 30000, () => core.watchLimits())
   ticks.register('remoteTick', 15000, () => (remoteMod.remoteTick(), idleLock()))
   ticks.register('shareTick', 15000, () => remoteMod.shareTick())
