@@ -1484,7 +1484,11 @@ A workspace an agent started (`laki new`, `/laki:new`, `/laki:orchestrate`) says
 (the tab's `laki name`, else its name; a click goes to that tab), in Info and in `laki ls`. The tab that started
 them shows a workers dock under its terminal: folded, one line (*3 workers · 1 needs you · 1 failed · 1 working*) and
 any worker's question with its buttons; open, a row per worker with its state, its progress and last line, and *Open*.
-A failed one (its agent ended or failed, or its Done check still fails) stays until you clear it with ×.
+A failed one (its agent ended or failed, or its Done check still fails) stays until you clear it with ×. Its head
+also says what their agents spent (*· $1.75*, at API prices) and, when there are some, three buttons, each asking
+first: *Allow N safe* (their plain permission asks: none risky, none outside the worktree without a sandbox, none
+whose first choice would always allow; it names each), *Archive N done* (the finished ones with nothing uncommitted:
+one with changes stays and is named; Undo brings them back) and *Stop all (N)* (Esc to each turn under way).
 
 With *Progress on tabs* on (Settings › Terminal), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):

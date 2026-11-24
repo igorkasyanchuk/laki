@@ -7,8 +7,10 @@
 // detail (open but for a stale one); anywhere else on a card opens the tab, whatever its state. With a card focused,
 // 1–9 answer and Enter opens.
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { Ask, AskExplained, TabView, WorkspaceView } from '../../shared/types'
-import { bulkOk, groupAsks, optLabel } from '../../shared/ask'
+import type { Ask, AskExplained, TabView, View, WorkspaceView } from '../../shared/types'
+import { bulkGroups, bulkOk, bulkPick, groupAsks, optLabel } from '../../shared/ask'
+import { api } from './api'
+import { wsName } from './appCtx'
 import { AskDiff, Choice, choiceProps, useExplain, useSayWhy } from './Diff'
 import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
@@ -65,6 +67,29 @@ const unfolded = () => {
   } catch {
     return false
   }
+}
+
+// U8: Allow all and Deny all (Needs you's; the workers dock's Allow safe): asked first, naming each (allow), then each
+// answered as its card would be (its first option or Allow; its last or Deny), one after another, by the asks as they
+// are after the confirm: one that changed meanwhile (a new command behind the same Yes), or whose menu isn't a plain
+// yes … no (a standing permission's choice: bulkPick has none), isn't answered, and the toast names it
+export async function bulkAnswer(ts: TabView[], allow: boolean, o: { view: View; toast: (text: string) => void; done: (text: string) => void }) {
+  const nameOf = (t: TabView) => (w => (w ? wsName(w) : t.workspace))(o.view.workspaces.find(w => w.id === t.workspace))
+  if (allow && !(await ask(`Allow ${ts.length} permission asks?`, { text: 'Each agent goes on with what it asked for:', facts: bulkGroups(ts, nameOf).map(g => ({ label: g.names.join(', '), value: `${g.tool}: ${g.what}` })), ok: `Allow all (${ts.length})` }))) return
+  const failed: string[] = []
+  const now = await api.call<View>('state').then(v => new Map(v.tabs.map(x => [x.id, x])), () => new Map<string, TabView>())
+  for (const t of ts) {
+    const cur = now.get(t.id)
+    const pick = cur?.ask?.options.length ? bulkPick(cur.ask, allow) : undefined
+    if (!cur || cur.status !== 'waiting' || cur.ask?.tool !== t.ask?.tool || cur.ask?.what !== t.ask?.what || (cur.ask?.options.length && !pick)) {
+      failed.push(`${nameOf(t)} · ${t.name}`)
+      continue
+    }
+    await api.call('answer', pick ? { tab: t.id, n: pick.n, label: pick.label } : { tab: t.id, pick: allow ? 'first' : 'last' }).catch(() => failed.push(`${nameOf(t)} · ${t.name}`))
+  }
+  const word = allow ? 'Allowed' : 'Denied'
+  if (failed.length) o.toast(`${word} ${ts.length - failed.length}; not answered (it asks something else now): ${failed.join(', ')}`)
+  else o.done(`${word} ${ts.length}`)
 }
 
 export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = STALE_AFTER }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi; next?: string; staleAfter?: number }) {

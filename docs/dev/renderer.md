@@ -255,8 +255,11 @@ are tested in `test/units-more.test.ts`.
       again), then reloads: add a key that holds what the user made there, and a setting that's set up or written to
       `SETTINGS_KEPT`.
     - `laki.dockCleared`: the workers dock's cleared failed workers, per orchestrator tab (`panels.tsx` `WorkersDock`;
-      its rows and summary `workers.ts` `dockRows`, `dockSum`, tested in `test/layout.test.ts`; the workers are
-      `WsActions.tsx` `workerAsks`: the workspaces whose `fromTab` is the tab), the last 100.
+      its rows and summary `workers.ts` `dockRows`, `dockSum`, its head's spend and bulk buttons `dockFleet` (Allow N
+      safe: `shared/ask.ts` `bulkOk`, as Needs you's, answered by `Needs.tsx` `bulkAnswer`; Archive N done: done and
+      not dirty, `wsArchive` with `ifClean`; Stop all: `stopAll` per tab; Body.tsx asks first), tested in
+      `test/layout.test.ts`; the workers are `WsActions.tsx` `workerAsks`: the workspaces whose `fromTab` is the tab,
+      with their stat's `dirty`), the last 100.
     - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
       `seen` (it opened once by itself, after the first project: Welcome's checks come first), `off` (Don't show again:

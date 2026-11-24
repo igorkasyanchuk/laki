@@ -164,6 +164,27 @@ test("Workers dock (dockRows, dockSum): an ask first, then failed, else the tabs
   assert.equal(dockSum(['waiting', 'waiting']), '2 need you')
 })
 
+test("Workers dock's head (dockFleet): their spend, the plain asks one click may allow, the turns under way, the clean done ones", async () => {
+  const { dockFleet } = await import('../src/renderer/src/workers.ts')
+  const yes = [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }]
+  const ask = (what: string, options = yes, tool = 'Bash') => ({ status: 'waiting', ask: { tool, what, options, at: 1 } })
+  const tab = (id: string, o: object = {}) => ({ id, workspace: 'w', name: id, kind: 'agent', status: 'running', ...o }) as never
+  const f = dockFleet([
+    { ws: 'a', state: 'waiting', tabs: [tab('a1', { ...ask('npm test'), usage: { tokens: 10, cost: 0.25 } }), tab('a2', { kind: 'shell', usage: { tokens: 1, cost: 9 } })] }, // a shell's: not an agent's spend
+    { ws: 'b', state: 'waiting', tabs: [tab('b1', ask('rm -rf build')), tab('b2', ask('npm test', [{ n: 1, label: "Yes, and don't ask again for npm commands" }, { n: 2, label: 'No' }]))] }, // risky; a standing first choice
+    { ws: 'c', state: 'waiting', tabs: [tab('c1', { status: 'waiting', ask: { question: 'Which one?', options: yes, at: 1 } }), tab('c2', { ...ask('npm test'), secret: { id: 's' } })] }, // a question; a secret
+    { ws: 'd', state: 'running', tabs: [tab('d1', { usage: { tokens: 5, cost: 1.5 } })] },
+    { ws: 'e', state: 'done', tabs: [tab('e1', { status: 'idle' })] },
+    { ws: 'f', state: 'done', tabs: [tab('f1', { status: 'idle' })], dirty: 2 }, // done, with uncommitted changes: kept
+    { ws: 'g', state: 'done', tabs: [tab('g1', { ...ask('cat ../../etc/hosts', yes, 'Read') })] }, // outside the worktree, no sandbox
+  ])
+  assert.equal(f.spend, 1.75)
+  assert.deepEqual(f.safe.map((t: { id: string }) => t.id), ['a1'], 'only the plain, safe permission ask')
+  assert.deepEqual(f.running.map((t: { id: string }) => t.id), ['d1'])
+  assert.deepEqual(f.done, ['e', 'g'])
+  assert.equal(dockFleet([{ ws: 'x', state: 'running', tabs: [tab('x1')] }]).spend, undefined, 'none known: none shown')
+})
+
 test('Move to group › New group (newGroupRows): before the first group, the moved in the list order, no group split', async () => {
   const { newGroupRows } = await import('../src/shared/types.ts')
   const isSep = (x: string) => x.startsWith('S')

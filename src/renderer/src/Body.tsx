@@ -8,7 +8,8 @@ import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, McpStrip, P
 import { Glyph as ExtGlyph, inWs, status as extStatus, WidgetBody, WidgetPanel } from './Widgets'
 import { edited, type FileContent, FilePreview, type FilesRoot, SidePanel } from './SidePanel'
 import { Glyph, rollup } from './Glyph'
-import { Icon, IconButton } from './ui'
+import { ask, Icon, IconButton } from './ui'
+import { bulkAnswer } from './Needs'
 import { InfoTab } from './Info'
 import { PanelHandle, Panes } from './Panes'
 import { Reader } from './Reader'
@@ -37,6 +38,28 @@ const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.Ful
 export function bodyOf(app: AppCtx) {
   const { artsIn, attachable, browsed, byId, call, checkHid, ciLog, closeFile, closePreview, closeTabs, copy, detachPr, dialog, done, fail, finds, floated, floatTab, full, git, group, groups, guests, hookHid, infoOf, inReader, kh, kt, label, labelApi, laterCancel, laterChange, laterNow, live, narrow, newTabActions, newWs, noBar, openIn, openProject, ownWidgets, pageSeen, paneDeps, panelApi,
     panelHost, panelShown, panelTab, panelW, paneNow, prAct, previewed, previewW, prFix, project, queueRemove, queueSave, quickNew, railKind, readerLive, readSwitch, replyTo, reviewApi, reviewGo, reviewOn, reviewTight, ring, selectTab, setArtsIn, setAuto, setCheckHid, setDialog, setGroups, setHookHid, setOpenFiles, setPanelOpen, setPanelTab, setPanelW, setPreviewW, setReply, setReveal, setReviewTight, setShownFile, setTimer, settings, setWsId, sizeOf, start, statKey, tab, tabMenu, tabsAt, theme, timers, toast, turnLive, view, welcomeRun, welcomeSample, widgetApi, workerAsks, ws, wsFiles, wsTabMenu, drag } = app
+  // the workers dock's Stop all: each turn under way gets Esc (stopAll's one tab, as its Stop), after you say so
+  const stopWorkers = async (ts: TabView[]) => {
+    if (!(await ask(`Stop ${ts.length} ${ts.length === 1 ? "worker's turn" : "workers' turns"}?`, { text: 'Each agent gets Esc, as its own Stop: what it was doing ends there; its tab and its work stay.', ok: `Stop ${ts.length}`, danger: true }))) return
+    let n = 0
+    for (const t of ts) await call('stopAll', { tab: t.id }).then(() => n++, () => {})
+    done(`Stopped ${n}`)
+  }
+  // its Archive done: each done worker archived only while nothing of it is uncommitted (wsArchive's ifClean: one with
+  // changes, or an extension's gate holding it, stays, named); Undo brings them back
+  const archiveWorkers = async (ids: string[]) => {
+    const name = (id: string) => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id))
+    if (!(await ask(`Archive ${ids.length} finished ${ids.length === 1 ? 'worker' : 'workers'}?`, { text: 'Their tabs stop and their worktrees go (their branches stay); one with uncommitted changes stays as it is.', facts: [{ label: 'Workers', value: ids.map(name).join(', ') }], ok: 'Archive' }))) return
+    const gone: string[] = []
+    const kept: string[] = []
+    for (const id of ids) {
+      const r: { dirty?: number; held?: unknown[] } | null = await call<{ dirty?: number; held?: unknown[] } | null>('wsArchive', { id, ifClean: true }).catch(() => ({ dirty: -1 }))
+      ;(r && (r.dirty || r.held?.length) ? kept : gone).push(id)
+    }
+    const undo = gone.length ? () => void Promise.all(gone.map(id => app.restore(id))) : undefined
+    if (kept.length) toast(`Archived ${gone.length}; kept (uncommitted changes, or held): ${kept.map(name).join(', ')}`, undo)
+    else done(`Archived ${gone.length}`, undo)
+  }
   return (
         <div className="body">
           {tabsAt === 'left' && <TabStrip app={app} />}
@@ -95,7 +118,7 @@ export function bodyOf(app: AppCtx) {
                     t && (
                       <>
                         <SecretStrip tab={t} kept={hasCap(view, 'secret.kept')} onGive={(id, o) => call('secretGive', o ? { id, ...o } : { id, refuse: true })} />
-                        <WorkersDock tab={t.id} workers={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
+                        <WorkersDock tab={t.id} workers={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} onAllow={ts => bulkAnswer(ts, true, { view, toast, done })} onStop={stopWorkers} onArchive={hasCap(view, 'archive.dirty') ? archiveWorkers : undefined /* an older daemon archives whatever is there: no bulk */} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnLive(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />

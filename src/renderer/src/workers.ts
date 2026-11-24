@@ -3,8 +3,9 @@
 // shows even folded), then failed (its Done check still fails, an agent failed or ended), else the tabs' rollup.
 // Pure: test/layout.test.ts; roll is Glyph's rollup (a .tsx, kept out of the test)
 import type { TabView } from '../../shared/types'
+import { bulkOk } from '../../shared/ask.ts'
 
-export type Worker = { ws: string; name: string; tabs: TabView[]; failed?: string }
+export type Worker = { ws: string; name: string; tabs: TabView[]; failed?: string; dirty?: number } // dirty: its uncommitted files (its stat's)
 
 export function dockRows(workers: Worker[], cleared: string[], roll: (tabs: TabView[]) => string) {
   return workers
@@ -26,4 +27,19 @@ export function dockSum(states: string[]) {
   const n = (s: string) => states.filter(x => x === s).length
   const w = n('waiting')
   return [w && `${w} ${w === 1 ? 'needs' : 'need'} you`, n('exited') && `${n('exited')} failed`, n('running') && `${n('running')} working`, n('done') && `${n('done')} done`].filter(Boolean).join(' · ')
+}
+
+// the dock's head: what the workers' agents spent (their chats' cost at API prices, as each tab's meter has it; none
+// known: undefined), the asks one click may allow (ask.ts bulkOk: a plain yes … no permission ask, none risky, none
+// outside the worktree unless its sandbox is on; Allow answers its plain yes, never a standing one: bulkPick), the agent
+// tabs at work (Stop all) and the workers done with nothing uncommitted (Archive done; the daemon's ifClean decides)
+export function dockFleet(rows: { ws: string; state: string; tabs: TabView[]; dirty?: number }[]) {
+  const agents = rows.flatMap(w => w.tabs.filter(t => t.kind === 'agent'))
+  const costs = agents.map(t => t.usage?.cost).filter((c): c is number => typeof c === 'number' && Number.isFinite(c))
+  return {
+    spend: costs.length ? costs.reduce((a, b) => a + b, 0) : undefined,
+    safe: agents.filter(t => bulkOk(t, t.sandbox === true && t.perm !== 'bypassPermissions')),
+    running: agents.filter(t => t.status === 'running'),
+    done: rows.filter(w => w.state === 'done' && !w.dirty).map(w => w.ws),
+  }
 }

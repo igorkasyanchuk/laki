@@ -9,7 +9,7 @@ import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type Ch
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph, rollup } from './Glyph'
-import { dockRows, dockSum } from './workers'
+import { dockFleet, dockRows, dockSum } from './workers'
 import type { Worker } from './workers'
 import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
@@ -2787,9 +2787,12 @@ export function HookStrip({ tab, onCopy, onHide }: { tab: TabView; onCopy: (text
 // the workspaces an orchestrator tab's agent started (laki new, /laki:orchestrate: their fromTab), docked over its box: one
 // line folded (how many, then what needs you first: waiting, failed, done since you looked), each worker's row open (its
 // status, how far along, its last line, Open; a waiting one's ask with its buttons). A waiting one's ask shows folded too.
-// A failed row stays until its × (kept per tab in this window)
+// A failed row stays until its × (kept per tab in this window). Its head: what they spent, Allow N safe (the plain
+// permission asks one click may answer: dockFleet's, asked first naming each), Archive N done (done, nothing
+// uncommitted) and Stop all (their turns under way): each only when there's some, each asking first (Body's)
 const DOCK_CLEARED = 'laki.dockCleared'
-export function WorkersDock({ tab, workers, onAnswer, onOpen }: { tab: string; workers: Worker[]; onAnswer: (tab: string, n: number, label: string) => Promise<unknown>; onOpen: (ws: string, tab: string) => void }) {
+const usdOf = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleString('en-US')}`
+export function WorkersDock({ tab, workers, onAnswer, onOpen, onAllow, onStop, onArchive }: { tab: string; workers: Worker[]; onAnswer: (tab: string, n: number, label: string) => Promise<unknown>; onOpen: (ws: string, tab: string) => void; onAllow?: (ts: TabView[]) => Promise<unknown>; onStop?: (ts: TabView[]) => Promise<unknown>; onArchive?: (ws: string[]) => Promise<unknown> }) {
   const [busy, setBusy] = useState('')
   const [open, setOpen] = useState(false)
   const [cleared, setCleared] = useState<string[]>(() => load<Record<string, string[]>>(DOCK_CLEARED, {})[tab] ?? [])
@@ -2797,6 +2800,8 @@ export function WorkersDock({ tab, workers, onAnswer, onOpen }: { tab: string; w
   const rows = dockRows(workers, cleared, rollup)
   if (!rows.length) return null
   const sum = dockSum(rows.map(w => w.state))
+  const fleet = dockFleet(rows)
+  const bulk = (what: string, f: () => Promise<unknown>) => (setBusy(what), void f().catch(() => {}).finally(() => setBusy('')))
   const askRow = (t: TabView) =>
     t.ask && (
       <div className="plan-acts">
@@ -2824,15 +2829,35 @@ export function WorkersDock({ tab, workers, onAnswer, onOpen }: { tab: string; w
   )
   return (
     <div className="queue-strip worker-asks workers-dock" data-dock="bottom" role="region" aria-label="Your workers">
-      <button type="button" className="queue-head dock-head" aria-expanded={open} onClick={() => setOpen(o => !o)} data-tip="The workspaces this agent started: each one's state, open one, or answer it here">
-        <Icon name={open ? 'chevron' : 'chevronRight'} size={12} />
-        <span className="queue-what">
-          <b>
-            {rows.length} {rows.length === 1 ? 'worker' : 'workers'}
-          </b>
-          {sum && ` · ${sum}`}
-        </span>
-      </button>
+      <div className="dock-top">
+        <button type="button" className="queue-head dock-head" aria-expanded={open} onClick={() => setOpen(o => !o)} data-tip="The workspaces this agent started: each one's state, open one, or answer it here">
+          <Icon name={open ? 'chevron' : 'chevronRight'} size={12} />
+          <span className="queue-what">
+            <b>
+              {rows.length} {rows.length === 1 ? 'worker' : 'workers'}
+            </b>
+            {sum && ` · ${sum}`}
+            {fleet.spend !== undefined && <span className="muted" data-tip="What their agents' chats cost so far, at API prices"> · {usdOf(fleet.spend)}</span>}
+          </span>
+        </button>
+        <div className="dock-acts">
+          {onAllow && fleet.safe.length > 0 && (
+            <button type="button" disabled={!!busy} data-tip="Allow their plain permission asks (none risky, none that would always allow): it asks first, naming each" onClick={() => bulk('allow', () => onAllow(fleet.safe))}>
+              Allow {fleet.safe.length} safe
+            </button>
+          )}
+          {onArchive && fleet.done.length > 0 && (
+            <button type="button" disabled={!!busy} data-tip="Archive the finished ones with nothing uncommitted (one with changes stays): it asks first" onClick={() => bulk('archive', () => onArchive(fleet.done))}>
+              Archive {fleet.done.length} done
+            </button>
+          )}
+          {onStop && fleet.running.length > 0 && (
+            <button type="button" className="danger" disabled={!!busy} data-tip="Stop each agent's turn under way (Esc, its own Stop): it asks first" onClick={() => bulk('stop', () => onStop(fleet.running))}>
+              Stop all ({fleet.running.length})
+            </button>
+          )}
+        </div>
+      </div>
       {rows.map(w =>
         open ? (
           <div key={w.ws} className={`dock-row ${w.state}`}>

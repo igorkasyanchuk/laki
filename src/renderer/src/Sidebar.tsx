@@ -4,12 +4,12 @@
 import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
-import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
+import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { aiOn, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
 import { Num, ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
-import { type NeedsApi, NeedsList } from './Needs'
+import { bulkAnswer, type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
 import { type Collision, spanText } from '../../shared/overlap'
@@ -21,7 +21,6 @@ import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
 import { usualText } from '../../shared/nextStep'
-import { bulkGroups, bulkPick } from '../../shared/ask'
 import type { SpendView } from './Spend'
 import { hasCap } from '../../shared/caps'
 import { fresh } from './motion'
@@ -163,29 +162,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     keys: (t, data) => void api.call('input', { tab: t.id, data }).catch(() => {}),
     // U8: each answered as its card would be (its first option or Allow; its last or Deny), one after another; the
     // daemon refuses a menu that changed since, named in the toast
-    bulk: async (ts, allow) => {
-      const nameOf = (t: TabView) => (w => (w ? wsName(w) : t.workspace))(view.workspaces.find(w => w.id === t.workspace))
-      if (allow && !(await ask(`Allow ${ts.length} permission asks?`, { text: 'Each agent goes on with what it asked for:', facts: bulkGroups(ts, nameOf).map(g => ({ label: g.names.join(', '), value: `${g.tool}: ${g.what}` })), ok: `Allow all (${ts.length})` }))) return
-      const failed: string[] = []
-      // the asks as they are now, after the confirm: one that changed meanwhile (a new command behind the same Yes) is skipped
-      const now = await api.call<View>('state').then(v => new Map(v.tabs.map(x => [x.id, x])), () => new Map<string, TabView>())
-      for (const t of ts) {
-        const cur = now.get(t.id)
-        if (!cur || cur.status !== 'waiting' || cur.ask?.tool !== t.ask?.tool || cur.ask?.what !== t.ask?.what) {
-          failed.push(`${nameOf(t)} · ${t.name}`)
-          continue
-        }
-        const o = cur.ask?.options.length ? bulkPick(cur.ask, allow) : undefined // never a standing permission's choice
-        if (cur.ask?.options.length && !o) {
-          failed.push(`${nameOf(t)} · ${t.name}`)
-          continue
-        }
-        await api.call('answer', o ? { tab: t.id, n: o.n, label: o.label } : { tab: t.id, pick: allow ? 'first' : 'last' }).catch(() => failed.push(`${nameOf(t)} · ${t.name}`))
-      }
-      const word = allow ? 'Allowed' : 'Denied'
-      if (failed.length) toast(`${word} ${ts.length - failed.length}; not answered (it asks something else now): ${failed.join(', ')}`)
-      else done(`${word} ${ts.length}`)
-    },
+    bulk: (ts, allow) => bulkAnswer(ts, allow, { view, toast, done }),
     allowKey: kh('allowAll'),
     netAllow: (t, host) => void call('projectNetAllow', { project: view.workspaces.find(w => w.id === t.workspace)?.project, host }).then(() => done(`${host} allowed in this project: its sandboxed agents reach it as they start`), e => toast((e as Error).message)),
     unbox: async t => {

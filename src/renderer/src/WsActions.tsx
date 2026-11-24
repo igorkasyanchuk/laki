@@ -203,6 +203,7 @@ export function wsActionsOf(r: WsActionsIn) {
       ws: w.id,
       name: wsName(w),
       tabs: (view?.tabs ?? []).filter(t => t.workspace === w.id),
+      ...(w.stat && { dirty: w.stat.dirty }),
       ...(w.check?.status === 'over' && { failed: 'its Done check still fails' }),
     }))
   const prDraft = (w: WorkspaceView) => {

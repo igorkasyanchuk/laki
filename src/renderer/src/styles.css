@@ -4333,7 +4333,10 @@ html.panel-glass .quick-bar, html.panel-glass.new-window .settings-page { backgr
 /* a secret's card with one kept for it (SecretStrip): Saved for this project, one click gives it */
 .secret-saved { display: inline-flex; align-items: center; gap: var(--sp-2); flex: 1; color: var(--done, var(--fg)); font-size: var(--fs-2); }
 /* an orchestrator tab's workers (panels.tsx WorkersDock): one line folded, a row a worker open */
-.workers-dock .dock-head { width: 100%; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-act); }
+.workers-dock .dock-top { display: flex; align-items: center; gap: var(--sp-3); } /* the head, then its bulk buttons (WorkersDock) */
+.workers-dock .dock-acts { display: flex; flex: none; gap: var(--sp-2); }
+.workers-dock .dock-acts button { height: var(--h-s); padding: 0 var(--sp-3); font: inherit; font-size: var(--fs-1); white-space: nowrap; }
+.workers-dock .dock-head { flex: 1; min-width: 0; width: 100%; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-act); }
 .workers-dock .dock-head:hover { background: none; color: var(--fg); }
 .workers-dock .dock-row + .dock-row { border-top: 1px solid var(--line); padding-top: var(--sp-2); }
 .workers-dock .dock-row.exited .queue-what { color: var(--error); }
