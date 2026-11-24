@@ -17,7 +17,7 @@ import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
 import { probablyDone, snoozeTimes } from '../../shared/nextStep'
-import { ask, Elapsed, Icon, MidText, Num, useMenu } from './ui'
+import { ask, Elapsed, Icon, type MenuItem, MidText, Num } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
@@ -31,6 +31,7 @@ export type NeedsApi = {
   review: (t: TabView) => void
   seen: (t: TabView) => void
   snooze?: (t: TabView, until?: number) => void // ✕ (none: till it asks something new) and Snooze (a time): core.ts tabSnooze
+  menu?: (e: MouseEvent, items: MenuItem[]) => void // Snooze's times: the sidebar's own menu (a card's would sit under the terminal)
   seenAll: (ts: TabView[]) => void // Earlier's Seen all
   name: (w: WorkspaceView) => string
   keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
@@ -234,7 +235,6 @@ function NeedGroup({ items, choices, api, onApart, onFail }: { items: Need[]; ch
 }
 
 function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & { api: NeedsApi; next: boolean; newest?: boolean; stale: boolean; shown?: boolean; show?: () => void; err?: string }) {
-  const [menu, openMenu] = useMenu() // Snooze's times
   const [open, setOpen] = useState(!stale) // detail open for what needs you, a stale finish one line
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
@@ -291,12 +291,12 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
         </b>
         <span className="need-tab">{t.name}</span>
         {t.needAt && <Elapsed since={t.needAt} />}
-        {api.snooze && (
+        {api.snooze && api.menu && (
           <>
             <button type="button" className="need-x" aria-label="Not now" data-tip={waiting ? "Out of Needs you till it asks something new or works again (it still waits in its tab)" : 'Out of Needs you till its next turn'} onClick={e => (e.stopPropagation(), api.snooze!(t))}>
               <Icon name="x" size={12} />
             </button>
-            <button type="button" className="need-x" aria-label="Snooze" aria-haspopup="menu" data-tip="Snooze: back on time, or sooner if it asks something new" onClick={e => (e.stopPropagation(), openMenu(e, [{ head: 'Snooze till' }, ...snoozeTimes().map(s => ({ label: s.label, icon: 'clock' as const, sub: new Date(s.at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }), run: () => api.snooze!(t, s.at) })), null, { label: 'Open', icon: 'arrowRight' as const, run: () => api.open(t) }]))}>
+            <button type="button" className="need-x" aria-label="Snooze" aria-haspopup="menu" data-tip="Snooze: back on time, or sooner if it asks something new" onClick={e => (e.stopPropagation(), api.menu!(e, [{ head: 'Snooze till' }, ...snoozeTimes().map(s => ({ label: s.label, icon: 'clock' as const, sub: new Date(s.at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }), run: () => api.snooze!(t, s.at) })), null, { label: 'Open', icon: 'arrowRight' as const, run: () => api.open(t) }]))}>
               <Icon name="clock" size={12} />
             </button>
           </>
@@ -304,7 +304,6 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
         <button type="button" className="need-chev" aria-expanded={open} aria-label={open ? 'Hide detail' : 'Show detail'} onClick={e => (e.stopPropagation(), setOpen(!open))}>
           <Icon name={open ? 'chevron' : 'chevronRight'} size={12} />
         </button>
-        {menu}
       </div>
       {!open ? null : waiting ? (
         <>

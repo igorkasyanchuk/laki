@@ -151,6 +151,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     permission: t => /permission/i.test(waits.current.get(t.id) ?? ''),
     review: t => (setDialog(null), setWsId(t.workspace), showPanel('changes'), narrow && setSideOpen(false)),
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
+    menu: (e, items) => openMenu(e, items),
     // ✕ (until: none: till it asks something new) and Snooze (a time): out of Needs you and the counts, with Undo
     snooze: (t, until) => {
       const name = wsName(live.find(w => w.id === t.workspace) ?? { id: t.workspace })
