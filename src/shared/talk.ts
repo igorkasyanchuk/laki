@@ -1,5 +1,7 @@
 // Q2: the talk key's pill (main's talkWin, floater.ts talkPage): who a recording goes to, pure (test/talk.test.ts)
 import { SECRETS } from './secrets.ts'
+import type { Ask } from './types.ts'
+import { denyOf, risky, sayable, standing, YES } from './ask.ts'
 
 // a recording's limits, the app's mic and hold Fn's too (voice.ts): it stops by itself after MAX; shorter than SHORT,
 // nothing to write down
@@ -177,8 +179,9 @@ export const quietSay = (device?: string) => `I can't hear you: check the input$
 // The talk key answering a waiting ask: the whole transcript one of a few words for yes or no (fillers and punctuation
 // aside), in English, Ukrainian or a language the filler list knows (German, French, Russian, Japanese, Chinese); never
 // a longer sentence ("yes but use pnpm" is a message). lang: a locale or language ('uk-UA', 'en'); none: every one
-const SPOKEN: Record<string, { yes: string[]; no: string[] }> = {
-  en: { yes: ['yes', 'yeah', 'yep', 'allow', 'approve', 'ok', 'okay', 'allow it', 'approve it'], no: ['no', 'nope', 'deny', "don't", 'do not', 'deny it'] },
+// n and lead (cardPick's): a choice's number said as a word (one … nine) and what may come before it ("option 2")
+const SPOKEN: Record<string, { yes: string[]; no: string[]; n?: string[]; lead?: string[] }> = {
+  en: { yes: ['yes', 'yeah', 'yep', 'allow', 'approve', 'ok', 'okay', 'allow it', 'approve it'], no: ['no', 'nope', 'deny', "don't", 'do not', 'deny it'], n: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'], lead: ['option', 'number', 'choice', 'pick'] },
   uk: { yes: ['так', 'дозволяю', 'дозволити', 'гаразд', 'ок', 'окей'], no: ['ні', 'не треба', 'заборонити', 'відхилити', 'не дозволяю'] },
   ru: { yes: ['да', 'разрешаю', 'разрешить', 'хорошо', 'ок', 'окей'], no: ['нет', 'не надо', 'запретить', 'отклонить', 'не разрешаю'] },
   de: { yes: ['ja', 'erlauben', 'okay', 'ok'], no: ['nein', 'ablehnen', 'nicht'] },
@@ -187,8 +190,9 @@ const SPOKEN: Record<string, { yes: string[]; no: string[] }> = {
   zh: { yes: ['是', '好', '可以', '允许'], no: ['不', '不要', '拒绝'] },
 }
 const FILLER_WORDS = new Set(['um', 'umm', 'uh', 'uhh', 'er', 'hm', 'hmm', 'äh', 'ähm', 'euh', 'э', 'ээ', 'эээ', 'ну', 'えーと', 'ええと', 'えっと', '嗯'])
+const wordsOf = (text: string) => text.toLowerCase().replace(/[’`]/g, "'").replace(/[^\p{L}\p{N}'\s]+/gu, ' ').split(/\s+/).filter(w => w && !FILLER_WORDS.has(w))
 export function spokenAnswer(text: string, lang?: string): 'yes' | 'no' | undefined {
-  const words = text.toLowerCase().replace(/[’`]/g, "'").replace(/[^\p{L}\p{N}'\s]+/gu, ' ').split(/\s+/).filter(w => w && !FILLER_WORDS.has(w))
+  const words = wordsOf(text)
   const said = words.join(' ')
   if (!said || words.length > 3) return
   const l = lang?.toLowerCase().split(/[-_]/)[0]
@@ -197,6 +201,41 @@ export function spokenAnswer(text: string, lang?: string): 'yes' | 'no' | undefi
     if (w.yes.includes(said)) return 'yes'
     if (w.no.includes(said)) return 'no'
   }
+}
+
+// Settings › Voice › Answer cards (talkCards): the talk key's words for the newest ask card on screen (main's
+// cardHeard), one of its choices: its number ("2", "two", "option 2") or its exact words; a yes word: the first plain
+// allow (never a standing one); a no word and more: the no, the rest its reason (say: core's answer). Anything else:
+// nothing. refuse: never by voice, click it: a secret, a plan to approve, a risky or cut command, a choice that holds
+// from now on ("don't ask again", "always"). Word lists: SPOKEN's (English's numbers first)
+export type CardPick = { n: number; label: string; say?: string } | { refuse: string }
+export function cardPick(text: string, t: { status?: string; ask?: Pick<Ask, 'options' | 'what'>; secret?: unknown; planAsk?: unknown }, lang?: string): CardPick | undefined {
+  const a = t.ask
+  const words = wordsOf(text)
+  if (t.status !== 'waiting' || !a?.options.length || !words.length) return
+  const said = words.join(' ')
+  const l = lang?.toLowerCase().split(/[-_]/)[0]
+  const sets = Object.entries(SPOKEN).filter(([k]) => !l || k === l || !Object.hasOwn(SPOKEN, l)).map(x => x[1])
+  const num = (w = '') => (/^[1-9]$/.test(w) ? Number(w) : sets.reduce((n, s) => n || (s.n?.indexOf(w) ?? -1) + 1, 0))
+  const n = words.length === 1 ? num(words[0]) : words.length === 2 && sets.some(s => s.lead?.includes(words[0])) ? num(words[1]) : 0
+  let o = n ? a.options.find(x => x.n === n) : a.options.find(x => wordsOf(x.label).join(' ') === said)
+  let say = ''
+  if (!o && sets.some(s => s.yes.includes(said))) o = a.options.find(x => YES.test(x.label) && !standing(x.label))
+  if (!o) {
+    const no = sets.flatMap(s => s.no).sort((x, y) => y.length - x.length).find(w => said === w || said.startsWith(`${w} `))
+    if (no) {
+      o = denyOf(a as Ask)
+      const lead = new RegExp(`^[^\\p{L}\\p{N}]*${no.split(' ').join('\\s+')}(?![\\p{L}\\p{N}'])[\\s,.;:!—-]*`, 'iu') // the no word, its words after it kept as said
+      say = text.trim().replace(/[’`]/g, "'").replace(lead, '').trim()
+    }
+  }
+  if (!o) return
+  if (t.secret) return { refuse: 'it asks for a secret' }
+  if (t.planAsk) return { refuse: 'a plan to approve' }
+  if (a.what?.endsWith('…')) return { refuse: "its command isn't all there" }
+  if (a.what && risky(a.what)) return { refuse: 'a risky command' }
+  if (standing(o.label)) return { refuse: 'that choice holds from now on' }
+  return { n: o.n, label: o.label, ...(say && sayable(o.label) && { say: say.slice(0, 2000) }) }
 }
 
 // Q11: what's selected in the app in front, carried with the talk key's words (Settings › Voice › Talk key › Include

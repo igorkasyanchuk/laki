@@ -52,6 +52,10 @@
       .choice-plain { font-size: 11px; }
       button.opt[data-scope='broad'] { border-color: color-mix(in srgb, var(--waiting, #e0af68) 55%, var(--line)); }
       button.opt[data-scope='broad'] .choice-rule, button.opt[data-scope='broad'] .choice-plain { color: var(--waiting, #e0af68); }
+      .heard { margin-top: 8px; padding: 6px 8px; border-radius: 6px; font-size: 12px; background: color-mix(in srgb, var(--fg) 6%, transparent); position: relative; overflow: hidden; }
+      .heard.go::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--waiting); transform-origin: left; animation: heard 2s linear forwards; }
+      @keyframes heard { to { transform: scaleX(0); } }
+      @media (prefers-reduced-motion: reduce) { .heard.go::after { animation: none; } }
       .foot { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
       .foot .err { color: var(--waiting); }
       .open { margin-left: auto; font: inherit; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; }

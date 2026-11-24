@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The talk key can answer the ask card on your screen: say its number, its words, yes, or no and why (Settings › Voice › Answer cards).
 - Laki can say out loud when an agent asks or finishes: Settings › Voice › Out loud.
 - GitHub Copilot's CLI as a ready-made profile (over ACP): Settings › Agents & profiles › Add a profile for…, or found on its own when it's installed.
 - The Proof card compares the Preview's before and after with a slider, side by side or overlaid, and says how much of the picture changed.

@@ -2935,6 +2935,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   can't be), Esc to drop it. Say just *yes* or *no* (allow, deny, так, ні…) while an agent waits on a permission and the
   pill answers it: it shows what it answers, ⏎ answers (a plain command: by itself in 1.5 s), Tab sends your words as a
   message instead; a question, a plan, a secret or a risky command stays for Laki's window (*Answer asks* turns it off).
+  *Answer cards* (off until on): while an ask's card is on screen (an important workspace's), the key answers the
+  newest card instead: say a choice's number ("2", "option two") or its words, *yes* (its first plain Allow), or *no*
+  and why ("no, run lint first": the words go to the agent as the reason). The card shows what it heard and answers
+  in 2 s; any key or the talk key stops it. A choice that holds from now on ("don't ask again", "always"), a risky
+  command, a secret or a plan is never answered by voice: the card says *click to answer*. Neither an agent nor
+  remote access can turn it on.
   *Speak Laki AI's answers* (off until on, with Laki AI on; *Try* plays a sample): a question you asked Laki AI with the
   key gets its answer read out by the pill, the first two sentences only, without code, links, paths or anything
   secret-shaped, in a voice of the answer's language when macOS has one; Esc or the key again stops it, and it never

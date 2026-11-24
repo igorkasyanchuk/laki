@@ -213,6 +213,7 @@ export const FIND: [string, string, string?][] = [
   ['ai', 'Show its work', 'laki ai window open talk key say it command output tab shown result'],
   ['voice', 'Talk key', 'global hotkey talk agent voice mic microphone from any app pill press record send push to talk laki ai screenshot screen it goes to'],
   ['voice', 'Answer asks', 'talk key say yes no allow deny answer permission ask waiting spoken voice pill'],
+  ['voice', 'Answer cards', 'talk key card on screen important ask choice number say yes no why voice answer'],
   ['voice', 'Include the selected text', 'talk key selection selected text copy clipboard quote context highlight frontmost app pill'],
   ['voice', 'Writes it down', 'talk key on this mac on device apple speech recognition offline local language locale cloud engine'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],

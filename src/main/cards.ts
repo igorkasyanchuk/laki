@@ -7,6 +7,7 @@ import { appendFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { floatOpts, floats, guardFloat, talkW } from './floater.ts'
 import { rpc } from '../shared/conn.ts'
+import { cardPick } from '../shared/talk.ts'
 import { from, fromApp, mac, notifyLog, pageURL, quickWin, show, win } from './index.ts'
 import { tray } from './menu.ts'
 
@@ -73,7 +74,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 // no focus taken, a click lands at once), stacked, the newest on top. key: one per tab (its ask, its finish: the newer
 // replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
 // waiting), any card until it's opened or closed (×, Close all)
-export type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said; askAt?: number /* the Inbox's: which ask (an explanation is its own) */ } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
+export type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said; askAt?: number /* the Inbox's: which ask (an explanation is its own) */; heard?: Heard } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
 type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string; cut?: boolean }
 const CARD_W = 380
 export let cards: Card[] = []
@@ -175,6 +176,7 @@ ipcMain.handle('ask-act', async (e, key: unknown, i: unknown) => {
   const c = cardOf(e, key)
   const a = c && typeof i === 'number' ? c.actions[i] : undefined
   if (!c || !a) return
+  if (c.heard) unheard() // a click: the spoken answer waiting on it doesn't go
   try {
     if (a.alert) await rpc('alertAnswer', { id: a.alert.id, choice: a.alert.choice })
     else await rpc('answer', { tab: c.tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) })
@@ -186,6 +188,41 @@ ipcMain.handle('ask-act', async (e, key: unknown, i: unknown) => {
     else sendCards()
   }
 })
+// Settings › Voice › Answer cards (floats.talkCards): the talk pill's words for the newest ask card on screen, one of
+// its tab's choices (talk.ts cardPick on floats' ask for it), shown on the card HEARD_MS, then answered as its click
+// would (with a no's words as say); the pill's any key (talk-card-stop), a click on the card or its × stops it. A
+// refused one (a standing choice, a risky command, a secret, a plan) or no match: the card says so, nothing is sent
+type Heard = { said: string; pick?: string; refuse?: string; none?: boolean }
+const HEARD_MS = 2000
+let heardT: ReturnType<typeof setTimeout> | undefined
+const unheard = () => ((heardT = void clearTimeout(heardT)), cards.forEach(c => delete c.heard))
+const fromPill = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => !!talkW && !talkW.isDestroyed() && e.sender === talkW.webContents
+ipcMain.handle('talk-card', (e, text: unknown) => {
+  if (!fromPill(e) || !floats.talkCards || typeof text !== 'string' || !text.trim() || !cardWin?.isVisible()) return {}
+  const c = cards.find(x => x.ask && x.tab)
+  if (!c) return {}
+  const f = [...(floats.talk ?? []), ...floats.items].find(x => x.tab === c.tab)
+  const pick = cardPick(text.slice(0, 2000), { status: f?.status, ask: f?.ask, ...(f?.held && { secret: true }) })
+  unheard()
+  const said = text.trim().replace(/\s+/g, ' ').slice(0, 160)
+  c.heard = !pick ? { said, none: true } : 'refuse' in pick ? { said, refuse: pick.refuse } : { said, pick: `${pick.n}. ${pick.label}${pick.say ? ` · “${pick.say.slice(0, 120)}”` : ''}` }
+  sendCards()
+  if (pick && !('refuse' in pick))
+    heardT = setTimeout(async () => {
+      heardT = undefined
+      if (!cards.includes(c) || !c.heard) return // closed, clicked or stopped meanwhile
+      delete c.heard
+      try {
+        await rpc('answer', { tab: c.tab, n: pick.n, label: pick.label, ...(pick.say && { say: pick.say }) })
+        dropCards(x => x !== c)
+      } catch (err) {
+        c.error = `${(err as Error).message}: open its tab`
+        sendCards()
+      }
+    }, HEARD_MS)
+  return { card: c.title, ...c.heard }
+})
+ipcMain.on('talk-card-stop', e => fromPill(e) && heardT && (unheard(), sendCards()))
 // a command ask's ? (or E): Laki AI's words for it, from the daemon (askExplain: kept per command), on the card; it
 // answers nothing
 ipcMain.handle('ask-explain', async (e, key: unknown) => {

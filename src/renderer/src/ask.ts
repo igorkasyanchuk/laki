@@ -9,7 +9,7 @@ import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 import { askScope } from '../../shared/ask'
 type Action = { text: string; scope?: string } // scope: a standing permission's choice in full (askScope): its rule drawn whole
 type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string; cut?: boolean }
-type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string; explain?: boolean; said?: Said }
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: Action[]; error?: string; explain?: boolean; said?: Said; heard?: { said: string; pick?: string; refuse?: string; none?: boolean } }
 type Bridge = {
   ask: {
     onCards(cb: (cards: Card[], colors: Record<string, string>) => void): void
@@ -96,6 +96,10 @@ function cardEl(c: Card) {
   if (c.body) box.append(c.key.startsWith('alert:') ? Object.assign(el('div', '', 'what md'), { innerHTML: imgsAsLinks(markdownHtml(lineBreaks(c.body))) }) : el('pre', c.body, 'what'))
   if (c.explain) box.append(explainEl(c))
   if (c.diff) box.append(diffEl(c.diff))
+  // Answer cards: what the talk key heard for it: the choice it answers in 2 s (main's HEARD_MS; the pill's any key
+  // stops it), or why it won't (click to answer)
+  const h = c.heard
+  if (h) box.append(el('div', h.pick ? `Heard “${h.said}”: ${h.pick}` : h.refuse ? `Heard “${h.said}”: click to answer (${h.refuse})` : `Heard “${h.said}”: not one of its choices`, `heard${h.pick ? ' go' : ''}`))
   if (c.actions.length) {
     const opts = el('div', '', 'opts')
     c.actions.forEach((a, i) => {

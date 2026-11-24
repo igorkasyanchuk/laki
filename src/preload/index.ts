@@ -167,6 +167,8 @@ contextBridge.exposeInMainWorld('laki', {
     talkListenStop: (keep: boolean) => ipcRenderer.send('talk-listen-stop', keep),
     talkFix: (text: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-fix', text),
     talkAnswer: (tab: string, n: number, label: string): Promise<{ error?: string }> => ipcRenderer.invoke('talk-answer', tab, n, label), // a spoken yes or no to a waiting ask
+    talkCard: (text: string): Promise<{ card?: string; pick?: string; refuse?: string; none?: boolean }> => ipcRenderer.invoke('talk-card', text), // Answer cards: its words to the newest ask card (cards.ts)
+    talkCardStop: () => ipcRenderer.send('talk-card-stop'), // any key in the pill: that card's answer doesn't go
     talkClose: () => ipcRenderer.send('talk-close'),
   },
   // cards on screen (ask.html): the cards in, the page's height, a choice, ×, Close all and Open out (by each card's key)

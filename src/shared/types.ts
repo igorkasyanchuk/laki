@@ -904,6 +904,7 @@ export type Settings = {
   talkTo?: 'ai' // Q10: the talk key goes to Laki AI (unset: an agent, Q2's)
   talkKey?: string // its keys (unset: ui.tsx TALK_KEY)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
+  talkCards?: boolean // Settings › Voice › Answer cards: the talk key answers the newest ask card on screen (talk.ts cardPick; on only if true; AGENT_SETTINGS_NO, REMOTE_KEYS)
   recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
   background?: { file?: string; dim?: number; blur?: number } // Settings › Appearance › Background image: <data>/background/<file> (core's bgSet), how much the theme covers it (%) and its blur (px)
   modelEfforts?: Record<string, string> // the new-workspace page's effort last picked per model, by `<agent>:<model>` ('' the default model; '' effort: the model's own)

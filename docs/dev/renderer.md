@@ -674,6 +674,15 @@ are tested in `test/units-more.test.ts`.
   chained command, a path outside, another tool) on ⏎, `laki` (a question, plan, secret, several questions, a cut one,
   a risky command) never from the pill. ⏎ or the key again: main's `talk-answer` (only a tab the pill offered), the
   cards' `answer` with the first option (yes) or the last (no); Tab sends the words as a message; Esc drops it.
+  Answer cards first (Settings › Voice › Talk key's *Answer cards*, `settings.talkCards`, on only if true; the user's
+  alone: AGENT_SETTINGS_NO and REMOTE_KEYS; App's floats `talkCards`, the pill's `cards`): with an ask card on screen
+  (cards.ts' `cards`, the newest with a tab), main's `talk-card` maps the words to one of its tab's choices (talk.ts
+  `cardPick` on floats' `ask` and `held`: a number, said or as a word (SPOKEN's `n`, after `lead`'s option / number),
+  the label's exact words, a yes word to the first allow that isn't `standing`, a no word to `denyOf` with the words
+  after it as `say`, else nothing; refused: a secret, a plan, a cut or `risky` command, a standing choice), and the
+  card says *Heard "…": 1. Yes* (a 2 s bar, HEARD_MS) then answers as its click does (`answer` by n and label, with
+  `say`), or *click to answer (why)*, or that it's no choice. The pill shows the same; any key there or the talk key
+  sends `talk-card-stop`, and the card's own click or × stop it too. Unit test: test/ask.test.ts.
   `VOICE_MAX_MS`/`VOICE_SHORT_MS` as voice.ts'. Q10: Settings › Voice › Talk key's *It goes to* (`settings.talkTo`:
   `ai`; App's floats `talkAi` while Laki AI is on) makes Laki AI (`AI_TO`) the pill's first target, and Tab goes on to
   it either way while it's on (`talkNext`'s `ai`); sent to it, main's `aiTalk`: words that ask for the screen

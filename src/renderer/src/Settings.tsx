@@ -291,6 +291,7 @@ export type AppSettings = Paint & {
   tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
   tellKey?: string // its keys (unset: TELL_KEY)
   talkOn?: boolean // Q2: the talk key (unset: off)
+  talkCards?: boolean // Settings › Voice › Answer cards (types.ts Settings)
   talkKey?: string // its keys (unset: TALK_KEY)
   talkTo?: 'ai' // Q10: who it goes to: Laki AI (unset: an agent, Q2's)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
@@ -3086,6 +3087,9 @@ export function SettingsPage(p: {
                   </label>
                   <Switch className="switch-row" on={s.voice?.answers !== false} onChange={on => set({ voice: { ...s.voice, answers: on ? undefined : false } })}>
                     <Says title="Answer asks" hint="Say just yes or no (allow, deny, так, ні…) while an agent waits on a permission: the pill shows the ask, and ⏎ answers it. A plain command it answers by itself in 1.5 s; a question, a plan, a secret or a risky command stays for Laki's window. Tab sends your words as a message instead" />
+                  </Switch>
+                  <Switch className="switch-row" on={s.talkCards === true} onChange={on => set({ talkCards: on || undefined })}>
+                    <Says title="Answer cards" hint="While an ask's card is on screen, the key answers the newest one: say its number or its words, yes, or no and why. The card shows what it heard and answers in 2 s; any key stops it. A choice that holds from now on, a risky command, a secret or a plan: click those" />
                   </Switch>
                   {/* spoken answers: Laki AI's answer to a talk-key question, read out by the pill (shared/speak.ts) */}
                   <div className="row">

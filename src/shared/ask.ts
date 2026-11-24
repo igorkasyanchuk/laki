@@ -213,7 +213,7 @@ export const risky = (cmd: string) => RISKY.some(r => r.test(cmd))
 // a path out of the worktree: absolute, the home folder's, or up out of it (nearPath writes the worktree's as relative)
 const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$|[\s;&|)]))|\$\{?(HOME|TMPDIR)\b/ // $HOME and $TMPDIR are out of it too
 const FILES = /^(Bash|Edit|Write|MultiEdit|NotebookEdit|Read)$/ // what a path in its text is written or read
-const YES = /^(yes|allow|approve|proceed|run)\b/i
+export const YES = /^(yes|allow|approve|proceed|run)\b/i
 const NO = /^(no|deny|reject|cancel|don['’]t)\b/i
 // a plain yes … no menu: its first an allow of this one ask (never a standing permission: standing), its last a no,
 // and a no that holds for this ask only (plainNo: the last such; agy's last may be "No, and always deny …")
