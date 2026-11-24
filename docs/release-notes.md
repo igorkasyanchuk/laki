@@ -5,24 +5,21 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.
+- Telegram › What it sends › Only when I ask: nothing comes on its own; `/status`, `/screen` and the menu show what's going on, and the workspace you talk to there still sends its asks and when its turn ends.
+- The workers dock says what its workers spent, and has Allow N safe (their plain permission asks), Archive N done (the finished ones with nothing uncommitted) and Stop all, each asking first.
 - A scheduled task can run when one of your webhooks gets a signed POST (Or on an event › When a webhook comes), its body given to the agent as data, fenced.
 - The menu bar's Inbox shows an edit's diff, a *don't ask again* choice's rule (in the warning color when broad) and a command's *?*, as the cards on screen do.
 - The notch island can sit on the main screen or the screen your pointer is on (Settings › Extras › Floating bubbles › Screen), not only the built-in one.
-- Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.
 - The Reader's message box has a mic, on your phone's page too: an Answer only device may dictate now.
 - Allow all, Deny all and the hotkeys never pick Antigravity's choices that hold for the whole conversation or persist ("always grant", "always deny … (Persist to …)", Auto mode), and OpenCode's skills go under `$XDG_CONFIG_HOME` when you set it.
-- Telegram › What it sends › Only when I ask: nothing comes on its own; `/status`, `/screen` and the menu show what's going on, and the workspace you talk to there still sends its asks and when its turn ends.
 - A Markdown file's hover card in a terminal is twice as wide, its text at the size you read elsewhere.
-- The workers dock says what its workers spent, and has Allow N safe (their plain permission asks), Archive N done (the finished ones with nothing uncommitted) and Stop all, each asking first.
 - The bars' capsules light softly around the pointer, with their rim lit near it; ⌘K, Find a file and Search chats get the lit rim too, and ⌘K bends what's under its edges like a menu (Refraction).
 - Ship and Update refuse a worktree whose git folder holds a rebase step that runs a command or a submodule setting that names a program (what an agent's sandbox could leave there), and say which file to look at.
 - `laki restore` refuses a backup with a link, a hard link or a special file in it before it unpacks anything, and a webhook delivery sent again is still refused after Laki restarts.
 - Extensions' secret settings (tokens, API keys) are kept in the macOS Keychain too, moved out of their file as Laki starts; a secret with a line break stays in its own file.
 - Recording mode keeps a private workspace's activity (its turns, asks and terminal output) off agents' and your phone's connections too, not only its rows.
 - A message sent to Laki AI from your phone (remote access) while it was answering you now runs with your phone's limits, not with the rights of the ask it waited behind.
-
-## 0.62.0 · Nov 24, 2026
-
 - Laki's window and the phone page start lighter: each look's styles load when it's picked, so the first load's CSS went from 596 KB to 358 KB.
 - Needs you groups the same ask from several agents: one card with *×n*, each workspace's name, and each choice *for all n*; *Separately* splits it again. A risky command, a question, a plan or a secret always stays on its own card.
 - ✨ Improve my prompt on the New workspace page knows the project's files: it names real paths from the repo (an outline of its folders and key files) instead of guessing one.
