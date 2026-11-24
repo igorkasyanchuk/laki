@@ -71,6 +71,7 @@ case "$1 $2" in
   "issue list") f issues.json || exit 1 ;;
   "issue view") f issue.json || { echo "GraphQL: Could not resolve to an issue" >&2; exit 1; } ;;
   "api repos/"*"/actions/runs?"*) f held.json || echo '[]' ;; # a fork's PR: the ids of its runs held for approval (--jq's answer)
+  "api repos/"*"/issues/comments?"*) f comments.json || echo '[]' ;; # T4 comment: the repo's newest issue and PR comments
   "api repos/"*) f comment.json || { echo 'HTTP 422: Unprocessable Entity' >&2; exit 1; } ;;
   *) exit 1 ;;
 esac

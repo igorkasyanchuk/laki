@@ -79,7 +79,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" | --at "*/20 9-17 * * 1-5" | --on ci.failed|pr.opened|pr.review|issue.opened|push [--branch b] [--label l] [--by others|me|any] | --on webhook --hook <name> [--hook-event e] | --after <task> [--any] [--preset p] [--where new|same|folder|folder-new|parent|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] [--keep-runs 5] [--keep-empty] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" | --at "*/20 9-17 * * 1-5" | --on ci.failed|pr.opened|pr.review|issue.opened|push [--branch b] [--label l] [--by others|me|any] | --on comment [--word fix] [--login a,b] [--reply] | --on webhook --hook <name> [--hook-event e] | --after <task> [--any] [--preset p] [--where new|same|folder|folder-new|parent|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] [--only-if commits|prs:failing|prs:review|prs:any|issues[:label]|cmd:"…"] [--notify never|needs|always] [--missed skip|catchup] [--catch-until 10:00] [--keep-runs 5] [--keep-empty] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date; --only-if: run only when there's something
                                               to do (a skip is logged); {{check}}: what it found
@@ -497,7 +497,10 @@ there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a ru
 --no-setup: each new worktree without the project's setup script (new, and same's).
 {{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
 --on: instead of --when, a run on each GitHub event, read every few minutes: ci.failed (a CI run failing on --branch, its
-main unset), pr.opened, pr.review (--branch: PRs into it), issue.opened (--label), push (to --branch); --by others|me.
+main unset), pr.opened, pr.review (--branch: PRs into it), issue.opened (--label), push (to --branch); --by others|me;
+comment: a comment on an issue or PR whose first line is /laki (--word fix: /laki fix), by your gh login or one of
+--login's; its text after that fenced in the prompt, as data; on a PR its workspace is the PR's; --reply: the agent's
+last answer posted back as a comment (by your gh) as the turn ends. Only you can add a --login.
 {{event.title}}, {{event.url}}, {{event.number}}, {{event.branch}}, {{event.body}} in the prompt are its (the title and a webhook's body fenced, as data); at
 least 30 minutes apart, 10 a day; a fork's PR is held until laki schedule release <run> (or Run it in the app).
 --after: instead of --when, a run as another task's run ends done (its name or id; --any: however it ended), at once,

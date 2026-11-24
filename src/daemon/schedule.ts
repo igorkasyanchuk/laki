@@ -10,6 +10,7 @@ import { accountFor, usageWho } from './accounts.ts'
 import { addTab, branches, broadcast, byTab, cfgWait, changed, clients, findProject, findWs, firstLine, ghCount, git, input, log, onGitHub, presetNamed, prOf, projectArchived, run, save, send, slug, state, tabStatus, tabsOf, tail, tracked, turnEnds, turnWaits, wsArchive, wsLog, wsNew } from './core.ts'
 import { fillEvent, plain } from '../shared/fence.ts'
 import { quotaLow } from './pr.ts'
+import { redact } from './share.ts'
 import { dir, inRig } from './dir.ts'
 import { usage } from './usage.ts'
 import { meterView, statusLimits } from './meters.ts'
@@ -486,11 +487,11 @@ async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string;
 }
 
 // ---------- T4: a task on an event instead of a clock: CI failing on a branch, a PR opened or reviewed, an issue opened,
-// a push. Heard by eventTick (every 3 minutes, slow while idle; never while GitHub's quota is low, as the PR scans): one
+// a push, a /laki comment. Heard by eventTick (every 3 minutes, slow while idle; never while GitHub's quota is low, as the PR scans): one
 // gh call per project and kind a tick, shared by its tasks. A task's first read only notes what's there (marks, seen).
 // ponytail: GitHub projects on this Mac only (no SSH host's). webhook: not read but heard: a signed POST to one of
 // Settings › Webhooks (inbound.ts) runs the tasks naming it at once (scheduleHook), its body fenced as data
-export const EVENTS: TaskEvent[] = ['ci.failed', 'pr.opened', 'pr.review', 'issue.opened', 'push', 'webhook']
+export const EVENTS: TaskEvent[] = ['ci.failed', 'pr.opened', 'pr.review', 'issue.opened', 'push', 'webhook', 'comment']
 const EVENT_GAP = 30 // minutes between a task's runs (unset)
 const EVENT_DAY = 10 // runs a day at most (unset)
 const SEEN_KEPT = 50
@@ -519,6 +520,17 @@ function triggerOf(v: unknown, s: Schedule): TaskTrigger | undefined {
     const hookEvent = text('hookEvent')
     if (hookEvent && !/^[\w.:-]{1,60}$/.test(hookEvent)) throw new Error(`its event ${hookEvent}? a word as the webhook sends it (issues, push, Issue)`)
     return { event, hook, ...(hookEvent && { hookEvent }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
+  }
+  if (event === 'comment') {
+    // who may start it: your gh login, and these; word: the one after /laki that picks this task (/laki fix)
+    if (o.logins != null && !Array.isArray(o.logins)) throw new Error('logins? a list of GitHub logins')
+    const logins = [...new Set(((o.logins as unknown[] | undefined) ?? []).map(x => String(x).trim().replace(/^@/, '').toLowerCase()).filter(Boolean))]
+    const bad = logins.find(x => !/^[a-z\d](?:[a-z\d-]{0,38})$/.test(x))
+    if (bad) throw new Error(`login ${bad}? a GitHub login (letters, digits and -)`)
+    if (logins.length > 20) throw new Error('20 logins at most')
+    const word = text('word').replace(/^\/laki\s*/i, '').toLowerCase()
+    if (word && !/^[\w-]{1,30}$/.test(word)) throw new Error(`the word ${word}? one word after /laki (fix, review)`)
+    return { event, ...(logins.length && { logins }), ...(word && { word }), ...(o.reply === true && { reply: true }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
   }
   return { event, ...(branch && { branch }), ...(label && event === 'issue.opened' && { label }), ...(o.by && o.by !== 'any' && { by: o.by as 'others' | 'me' }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
 }
@@ -564,6 +576,26 @@ async function eventsOf(s: Schedule, p: Project, ask: Ask): Promise<TaskEventIn[
     const issues = await gh<R[]>(['issue', 'list', '--state', 'open', '--limit', '30', '--json', 'number,title,url,author', ...(t.label ? ['--label', t.label] : [])])
     marks.issue = Math.max(m?.issue ?? 0, ...issues.map(x => x.number))
     out = issues.filter(x => x.number > (m?.issue ?? Infinity) && whose(x.author?.login)).map(x => ({ id: `issue:${x.number}`, kind: t.event, words: `issue #${x.number} opened`, title: x.title, url: x.url, number: x.number }))
+  } else if (t.event === 'comment') {
+    // a comment on an issue or PR whose first line is /laki (and its word, when the task has one), by your gh login or
+    // one the task lists: the newest 100 of the repo (one call a project a tick), those after its mark.
+    // ponytail: over 100 comments between two reads (3 min) loses the oldest; review comments on a diff's lines aren't read
+    type C = { id: number; body?: string; user?: { login?: string }; html_url?: string; issue_url?: string; created_at?: string }
+    const all = await gh<C[]>(['api', 'repos/{owner}/{repo}/issues/comments?sort=created&direction=desc&per_page=100'])
+    const me = await ask('me', () => run('gh', ['api', 'user', '--jq', '.login'], { timeout: 10000 }).then(r => String(r.stdout).trim().toLowerCase()))
+    const who = new Set([me, ...(t.logins ?? [])].filter(Boolean))
+    marks.comment = all.reduce((a, c) => (c.created_at && c.created_at > a ? c.created_at : a), m?.comment ?? '')
+    for (const c of m?.comment ? all.filter(c => (c.created_at ?? '') > m.comment! && !seen.has(`comment:${c.id}`)) : []) {
+      const login = (c.user?.login ?? '').toLowerCase()
+      const said = commentSays(c.body ?? '', t.word)
+      const n = Number(/\/issues\/(\d+)$/.exec(c.issue_url ?? '')?.[1])
+      if (said === undefined || !who.has(login) || !n) continue
+      const isPr = /\/pull\/\d+/.test(c.html_url ?? '')
+      type V = { title?: string; url?: string; headRefName?: string; isCrossRepository?: boolean }
+      // its PR's branch and whether it's a fork's (unread: held, as a fork's); an issue's title
+      const v = await gh<V>([isPr ? 'pr' : 'issue', 'view', String(n), '--json', isPr ? 'title,url,headRefName,isCrossRepository' : 'title,url']).catch(() => undefined)
+      out.push({ id: `comment:${c.id}`, kind: t.event, words: `/laki on ${isPr ? 'PR' : 'issue'} #${n} by ${plain(login) || 'someone'}`, title: v?.title, url: v?.url || c.html_url?.split('#')[0], number: n, by: login, ...(said && { body: said }), ...(isPr && { pr: true, branch: v?.headRefName }), ...(isPr && v?.isCrossRepository !== false && { fork: true }) })
+    }
   } else {
     // a push: the branch's head on origin moved (who pushed isn't known here: by doesn't apply)
     const head = await ask(`head ${branch}`, () => git(p, 'ls-remote', 'origin', `refs/heads/${branch}`).then(o => o.split(/\s/)[0] || ''))
@@ -576,6 +608,20 @@ async function eventsOf(s: Schedule, p: Project, ask: Ask): Promise<TaskEventIn[
   cur.marks = marks
   cur.seen = [...(m ? (s.seen ?? []) : out.map(e => e.id)), ...fresh.map(e => e.id)].slice(-SEEN_KEPT)
   return fresh
+}
+
+// a comment's text for its task: undefined unless its first line is /laki (then its word, when the task has one); what
+// follows, the rest of the comment ('' when none)
+export function commentSays(body: string, word?: string) {
+  const m = /^\s*\/laki(?=\s|$)[ \t]*/i.exec(body)
+  if (!m) return undefined
+  let rest = body.slice(m[0].length)
+  if (word) {
+    const w = /^([\w-]+)(?=\s|$)[ \t]*/.exec(rest)
+    if (w?.[1].toLowerCase() !== word) return undefined
+    rest = rest.slice(w[0].length)
+  }
+  return rest.trim().slice(0, HOOK_BODY)
 }
 
 // one event: once per id (seen), a fork's held for your click, then its guards (the gap since its last run, runs a day)
@@ -810,6 +856,11 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
   const stamped = stamp(s.prompt.replaceAll('{{check}}', check), now)
   const prompt = o.event ? fillEvent(stamped, o.event) : stamped.replace(/\{\{event\.\w+\}\}/g, '') // Run now on an event's task: none
   const late = r.what
+  // a /laki comment on a PR: the PR's workspace (one linked to it, else a new one on its branch), for a task whose runs
+  // go to a workspace; reply: its agent's answer goes back to the issue or PR as its turn ends
+  const prUrl = o.event?.kind === 'comment' && o.event.pr && (s.ws === 'new' || s.ws === 'same') ? plain(o.event.url) : ''
+  const prWs = prUrl ? state.workspaces.find(w => w.project === s.project && !w.archived && w.prUrl === prUrl) : undefined
+  if (o.event?.kind === 'comment' && o.event.number && s.trigger?.reply) r.reply = o.event.number
   try {
     if (s.widget) {
       // an extension: fetched, or one of its actions run (on ones only)
@@ -825,7 +876,7 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
       Object.assign(r, { ws: run.ws, flow: run.id, state: 'running' }) // T1: its end, scheduleFlowEnded
       r.what = `${run.status === 'queued' ? 'queued' : 'started'} a run of ${s.workflow} (${run.id})` // past its at once: it waits its turn
-    } else if (s.ws === 'new' || s.ws === 'local-new' || (s.ws === 'same' && !sameOf(s))) {
+    } else if (!prWs && (s.ws === 'new' || s.ws === 'local-new' || (s.ws === 'same' && !sameOf(s)))) {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar (same: its first
       // run's, or one after its workspace was archived or deleted; the runs after go there)
       const title = wsTitle(s, now)
@@ -833,7 +884,8 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       if (s.ws === 'same' && sameMaking.has(s.id)) throw new Error('skipped: its first run is still making its workspace')
       if (s.ws === 'same') sameMaking.add(s.id)
       const pr = o.event?.kind.startsWith('pr.') && plain(o.event.url) // T4: a PR's event: the PR is its workspace's link
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }), ...(pr && { linked: pr, guessed: true }), ...(o.event && { outside: true }) }).finally(() => sameMaking.delete(s.id))
+      const onPr = s.ws !== 'local-new' && prUrl // a /laki comment on a PR: a worktree on its branch
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }), ...(onPr ? { pr: onPr } : pr && { linked: pr, guessed: true }), ...(o.event && { outside: true }) }).finally(() => sameMaking.delete(s.id))
       // on the task as it is now: one edited while its workspace was made is another object (scheduleSet replaces it), and
       // one moved elsewhere meanwhile takes none
       const cur = state.schedules?.find(x => x.id === s.id)
@@ -851,7 +903,7 @@ export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: bo
       r.what = `started in a new ${s.ws === 'local-new' ? 'session in its folder' : 'workspace'}, ${ws.id}${s.base ? `, off ${ws.base}` : ''}${s.ws === 'same' ? ': its next runs go there too' : ''}`
     } else {
       // its folder: the project's local workspace, made the first time (no worktree, no agent of its own)
-      const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : s.ws === 'same' ? sameOf(s)! : s.ws === 'parent' ? parentWs(s) : findWs(s.ws) // T9's parent: the run it ran after
+      const ws = prWs ?? (s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : s.ws === 'same' ? sameOf(s)! : s.ws === 'parent' ? parentWs(s) : findWs(s.ws)) // T9's parent: the run it ran after; a /laki comment's PR: its workspace
       if (ws.archived) throw new Error(`${ws.id} is archived`)
       r.ws = ws.id
       // ponytail: Start fresh opens a tab each run and closes none (an earlier run's chat may be yours now): close them yourself
@@ -1097,6 +1149,23 @@ const lowBattery = async () => {
   return !!m && Number(m[1]) < 20
 }
 
+// a /laki comment's run, its task's reply on: its agent's last answer posted to the issue or PR, once, by your gh
+// (secrets' shapes masked)
+function replyOn(r: ScheduleRun, text?: string) {
+  const n = r.reply!
+  delete r.reply
+  save()
+  const p = state.projects.find(x => x.id === r.project)
+  const body = redact(text?.trim() ?? '').slice(0, 4000)
+  if (!p || !body) return
+  const args = ['api', `repos/{owner}/{repo}/issues/${n}/comments`, '-f', `body=${body}`]
+  ghCount(args)
+  run('gh', args, { cwd: p.path, timeout: 30000 }).then(
+    () => log(`scheduled task ${r.schedule}: replied on #${n}`),
+    e => log(`scheduled task ${r.schedule}: its reply on #${n} not posted: ${firstLine(e)}`),
+  )
+}
+
 // ---------- T1: how a run ended: its tab's turns (core's turnEnds, turnWaits), the first day after it started; each
 // end again (it resumed, it ended again). A workflow's: its run's end (scheduleFlowEnded); an extension's: at once
 const OUTCOME_MS = 24 * 3600e3
@@ -1121,6 +1190,7 @@ async function runEnded(tab: Tab, st: RunState, text?: string, limit?: boolean) 
     if (st === 'done') goodRun(s)
   }
   if (was === 'running' || was === 'waiting') afterEnded(r) // T9: the tasks waiting on it, as the run first ends (a later turn in its tab is yours, not the run's)
+  if (st === 'done' && r.reply) replyOn(r, text)
   if (st === 'done' && was !== 'done') await emptyGone(r, d) // T5
   if (st !== 'waiting') lineNext() // T8: its place, to one waiting
 }

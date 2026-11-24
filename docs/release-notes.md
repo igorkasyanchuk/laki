@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Scheduled tasks can start on a `/laki` comment on an issue or PR (`/laki fix`), by you or the logins you list, and reply with the agent's answer.
 - Antigravity, Grok and OpenCode get your project's memory at start too, as Claude Code and Codex do; What it sees says how each one gets it.
 - Labs: HDR glow lights the edge glow and the newest Needs you card brighter than white on an HDR display, with a probe in Appearance to see whether yours can.
 - On a phone, the bottom bar is a floating glass capsule that folds to its icons as you scroll down and comes back as you scroll up.

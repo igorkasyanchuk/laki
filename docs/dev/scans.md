@@ -325,7 +325,7 @@ a draft, `any`), `issues` (`gh issue list`, a `label`: created since the task's 
 workspace; the run's `{{check}}` in its prompt is the command's first line, the PRs' or issues' numbers, the head.
 main.ts refuses `onlyIf.cmd` from an agent (`agentNo`), and remote access can't `scheduleSet` at all.
 
-On an event (T4, `trigger`: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`, `webhook`; `branch`, `label`, `by`
+On an event (T4, `trigger`: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`, `comment`, `webhook`; `branch`, `label`, `by`
 others|me, `gap` minutes, unset 30, `perDay`, unset 10; an agent's task only): no times (`when` '', an empty `rule`,
 no `next`). `webhook` (`hook`: one of `settings.inHooks` by name, `hookEvent` optional; any project, not only a GitHub
 one) isn't read: inbound.ts' `onRequest`, past the signature, replay and rate checks, calls `scheduleHook`, which runs
@@ -336,7 +336,14 @@ rule) reads each GitHub project on this Mac once per kind a tick, its tasks shar
 list --branch` (completed failures by run id; a `pull_request` run on the branch is a fork's), `gh pr list` (opened: a
 number past `marks.pr`; reviewed: a PR's newest `latestReviews` past `marks.reviews`; `branch`: the PR's base), `gh
 issue list` (past `marks.issue`, `--label`), `git ls-remote origin` (`push`: the head past `marks.head`); `by` asks `gh
-api user` once. A task's first read only sets `marks` and `seen`; a task on a project that isn't on GitHub here is
+api user` once; `comment` (`logins`, `word`, `reply`): `gh api repos/{owner}/{repo}/issues/comments` (the newest 100,
+issue and PR comments alike; past `marks.comment`, a created_at), each whose first line is `/laki` (and `word`:
+`commentSays`) by `gh api user`'s login or one of `logins`, then `gh pr view` (its title, branch and
+`isCrossRepository`: unread, held as a fork's) or `gh issue view` (its title) for it; `TaskEventIn.body` is the rest of
+the comment, `pr` set on a PR. Its run on a PR goes to the workspace linked to it, else a new one on its branch (wsNew
+`pr`), for `ws` new or same; `reply` sets the run's `reply` (the number), and `runEnded`'s first `done` posts its agent's
+last answer there (`replyOn`: `gh api …/issues/<n>/comments -f body=`, `redact`ed, 4,000 characters), once. main.ts'
+`agentNo` refuses an agent's `scheduleSet` that lists a login the task didn't have. A task's first read only sets `marks` and `seen`; a task on a project that isn't on GitHub here is
 refused. `onEvent`: once per id (`seen`, the last 50), the runs today first (held ones count: `perDay`), then a fork's
 is a `held` run (no workspace, a `scheduled` event once a gap at most; kept past the log's cap and the view's 50;
 `scheduleRelease`, the page's *Run it*, starts it in its place: yours only), then the gap since `last` (logged skips), then `runSchedule`'s `event`: its words before

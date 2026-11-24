@@ -69,6 +69,12 @@ line saying it's the outsider's text and data, never inline; its URL, number and
 (letters, digits, `/:.#-` and the like). A fork's PR, or a CI run of one, starts nothing: its run is held until you
 click *Run it* (an agent can't). At least 30 minutes between a task's runs and 10 a day, by default.
 
+A task on a `/laki` comment starts only on a comment whose first line is `/laki` (and the task's word), by your own gh
+login or a login the task lists; only you can add one (an agent's call is refused). The comment's text after `/laki`
+goes in fenced, under the same line, as data, never instructions. A fork's PR is held as above. Its comment ids are kept
+in the task (across restarts), so a comment starts it once. Its reply, when you turn it on, is posted by your gh, with
+secrets' shapes masked.
+
 ### Remote access: devices and PINs
 
 At a stable address (Tailscale, or My domain on your named tunnel) a page that opens remote access's link (and its PIN)

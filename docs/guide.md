@@ -1059,7 +1059,11 @@ run fails, saying so.
   log entry starts it (`laki schedule add <project> --on ci.failed …`, `laki schedule release <run>`). *When a webhook
   comes* names one of Settings › Webhooks (and, if you like, its event: `issues`, `push`, Linear's `Issue`): a signed
   POST to it runs the task at once, with the same gap and runs a day, and `{{event.body}}` is what it posted, given to
-  the agent fenced as an outsider's data (`--on webhook --hook <name> [--hook-event issues]`).
+  the agent fenced as an outsider's data (`--on webhook --hook <name> [--hook-event issues]`). *When someone comments
+  /laki*: a comment on an issue or PR whose first line is `/laki` (or `/laki fix`, with *its word* set) by you, or by a
+  login you list, starts it; `{{event.body}}` is the comment's text after that, fenced as data. On a PR it runs in that
+  PR's workspace (a fork's waits for *Run it*), and *replies with its answer* posts the agent's last answer back as a
+  comment, by your gh, as its turn ends (`--on comment [--word fix] [--login a,b] [--reply]`).
 - *Or after another task ends* (or type *after Nightly deps* as its time): a run as that task's run ends, at once:
   *when it ended done* (not failed, not waiting for you) or *however it ended*; 10 a day at most, and through the same
   queue, Only if, time limit and retries as any run. *In the workspace of the run it follows* (Where) goes on in that

@@ -1437,12 +1437,19 @@ function shiftTabNo(p: Params, tab: string, text: string, keep = true) {
 function text(v: unknown, what: string) {
   if (typeof v !== 'string') throw new Error(`${what} must be a string`)
 }
+// a /laki comment's task (T4): a login it lists that the task as it is doesn't
+const newLogin = (p: Params) => {
+  const was = new Set(core.state.schedules?.find(x => x.id === p?.id)?.trigger?.logins ?? [])
+  const t = p?.trigger as { logins?: unknown } | undefined
+  return Array.isArray(t?.logins) && t.logins.some(x => !was.has(String(x).trim().replace(/^@/, '').toLowerCase()))
+}
 function agentNo(method: string, p: Params) {
   if (method === 'input') text(p.data, 'data')
   if (method === 'send') text(p.text, 'text')
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || agentSettingsNo(p))) notAgent(p, 'change that setting')
   else if (method === 'scheduleSet' && (o => !!o && typeof o === 'object' && 'kind' in o && o.kind === 'cmd')(p?.onlyIf)) notAgent(p, "set a command as a scheduled task's run condition (it runs as the user)") // T3: the built-in conditions are fine
+  else if (method === 'scheduleSet' && newLogin(p)) notAgent(p, 'add a login that may start a scheduled task by a /laki comment') // its own gh login and the ones you listed are fine
   else if (method === 'scheduleSet' && p?.maxMinutes === 0 && core.state.schedules?.find(x => x.id === p.id)?.maxMinutes !== 0) notAgent(p, "turn off a scheduled task's time limit (settings.scheduleMaxMinutes is the user's too)") // T8: 1 to 1440 minutes is fine; a task already without one, sent back as it is, too
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined || p.inRepo !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : p.memory !== undefined ? 'memory list (laki memory add adds to it)' : 'notes and memory place (in its repo or in Laki)'}`)
