@@ -241,10 +241,13 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
           </Group>
           <Group title="What it sends" hint="Do not disturb, a muted tab or workspace and Recording mode hold here too">
             <div className="setting-box">
-              <Switch className="switch-row" on={tg?.waiting !== false} onChange={v => set({ waiting: v })}>
+              <Switch className="switch-row" on={tg?.pushOff === true} onChange={v => set({ pushOff: v })}>
+                <Says title="Only when I ask" hint="Nothing on its own: /status, /screen and the menu show what's going on. The workspace you talk to here still says when its turn ends, and a tab's bell still rings" />
+              </Switch>
+              <Switch className="switch-row" on={tg?.waiting !== false} disabled={tg?.pushOff === true} onChange={v => set({ waiting: v })}>
                 <Says title="An agent waits for you" hint="A permission prompt or a question, with what it asks" />
               </Switch>
-              <Switch className="switch-row" on={tg?.done !== false} onChange={v => set({ done: v })}>
+              <Switch className="switch-row" on={tg?.done !== false} disabled={tg?.pushOff === true} onChange={v => set({ done: v })}>
                 <Says title="An agent is done" hint="Silently: no sound, no buzz" />
               </Switch>
               <Switch className="switch-row" on={tg?.detail === 'titles'} onChange={v => set({ detail: v ? 'titles' : '' })}>

@@ -316,6 +316,32 @@ test('P3: TELEGRAM_OK is the whole of what a chat can do: never Stop, Ship, merg
   assert.equal(TELEGRAM_OK.wsNew, 'control')
 })
 
+test('Only when I ask (pushOff): nothing pushed on its own, commands still answer; the workspace you talk to still says its turn ended', async t => {
+  const { b, rig } = await paired(t)
+  await rig.rpc('telegramSet', { pushOff: true })
+  assert.equal((await rig.rpc('state')).telegram?.pushOff, true)
+  const { tab } = await claude(rig)
+  const from = b.of('sendMessage').length // the pairing's hello before
+  const pushes = () => b.of('sendMessage').slice(from).filter(c => /is done<\/b>|^<b>claude in .+ (needs you|waits|asks)/.test(c.body.text) || c.body.reply_markup?.inline_keyboard?.some((r: any) => r.some((k: any) => /^(1\. )?Yes/.test(k.text))))
+  const tabNow = async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  await until(async () => (await tabNow())?.status === 'waiting', 'it waits')
+  await sleep(500) // past LAKI_PUSH_WAIT_MS (0.15 s): a wait's push would have gone
+  const n = b.of('sendMessage').length
+  b.message('/status')
+  await until(() => b.of('sendMessage').length > n, 'its answer')
+  assert.match(b.of('sendMessage').at(-1)!.body.text, /Needs you · 1/, 'you look: it answers')
+  await rig.rpc('answer', { tab: tab.id, n: 1 })
+  await until(async () => (await tabNow())?.done, 'its turn ends')
+  await sleep(300) // a done push goes at once
+  assert.deepEqual(pushes().map(c => c.body.text), [], 'no ask, no done')
+  // talk to it from the chat: its turn's end comes back
+  b.message('hello')
+  const where = (await until(() => b.of('sendMessage').find(c => /Where should this go/.test(c.body.text)), 'where to'))!
+  b.tap(where.body.reply_markup.inline_keyboard.find((r: any) => r[0].text.startsWith('💬 '))[0].callback_data)
+  await until(() => b.of('sendMessage').some(c => /is done<\/b>/.test(c.body.text)), 'the talked-to turn ends: said')
+})
+
 test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /quiet at answer, titles only and Recording mode kept; /new only at control; limits; the log", async t => {
   const { b, rig } = await paired(t, { LAKI_TG_LIMITS: 'ws=1,send=2' })
   const menu = (await until(() => b.of('setMyCommands').at(-1), 'the menu'))!

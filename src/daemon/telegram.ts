@@ -848,7 +848,7 @@ const react = (m: TgMessage) => void out('setMessageReaction', { chat_id: chat()
 const ignore = () => ++ignored === 1 && setTimeout(() => (log(`telegram: ignored ${ignored} update(s) from someone else`), (ignored = 0)), 60_000).unref()
 
 // ---------- Settings › Telegram: the bot's token (checked with getMe), switches, Unpair; Send test
-export async function telegramSet(p: { token?: unknown; level?: unknown; off?: unknown; waiting?: unknown; done?: unknown; detail?: unknown; topics?: unknown; unpair?: unknown }) {
+export async function telegramSet(p: { token?: unknown; level?: unknown; off?: unknown; pushOff?: unknown; waiting?: unknown; done?: unknown; detail?: unknown; topics?: unknown; unpair?: unknown }) {
   const t = T()
   if (typeof p.token === 'string') {
     const tok = p.token.trim()
@@ -883,7 +883,7 @@ export async function telegramSet(p: { token?: unknown; level?: unknown; off?: u
     if (!t.bot.topics) throw new Error(`turn topics on for @${t.bot.username} in @BotFather first (its Bot Settings), then here`)
   }
   if (p.topics === true && t.notice?.startsWith('Topics are off')) t.notice = undefined
-  for (const k of ['off', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
+  for (const k of ['off', 'pushOff', 'waiting', 'done', 'topics'] as const) if (typeof p[k] === 'boolean') t[k] = p[k]
   if (p.off === false) t.notice = undefined // on again (Try again after a 409): its notice read
   if (p.detail !== undefined) t.detail = p.detail === 'titles' ? 'titles' : undefined
   if (p.unpair === true) commandsGone(), Object.assign(t, { user: undefined, threads: undefined, focus: undefined }), (pair = undefined), forget(), log('telegram: unpaired'), said('unpaired')

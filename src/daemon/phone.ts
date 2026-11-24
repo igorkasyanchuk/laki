@@ -25,13 +25,15 @@ export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording &&
 // U8: Do not disturb holds every push but an important workspace's ask (ask: a wait for you)
 const quiet = (ws?: Workspace, ask = false) => (state.dnd?.until ?? 0) > Date.now() && !(ask && ws?.important)
 // where a push goes: the webhook (Settings › Phone pushes) and Telegram (Settings › Telegram), each by its own When
-// (any: a workflow's, remote access's: not a turn's); bell: T16's one-time bell, whatever they say
+// (any: a workflow's, remote access's: not a turn's); bell: T16's one-time bell, whatever they say. Telegram's Only when
+// I ask (pushOff): none, but a bell and the end of a turn in the workspace you talk to there (ws: the push's)
 type To = { hook?: Webhook; tg: boolean }
-function to(kind: 'waiting' | 'done' | 'any', bell = false): To {
+function to(kind: 'waiting' | 'done' | 'any', bell = false, ws?: string): To {
   const w = state.settings?.webhook
   const t = state.telegram
   const on = (waiting?: boolean, done?: boolean) => bell || kind === 'any' || (kind === 'waiting' ? waiting !== false : !!done)
-  return { hook: pushOn(w) && on(w.waiting, w.done === true) ? w : undefined, tg: tgOn() && on(t?.waiting, t?.done !== false) }
+  const asked = !t?.pushOff || bell || (kind === 'done' && !!ws && t.focus === ws)
+  return { hook: pushOn(w) && on(w.waiting, w.done === true) ? w : undefined, tg: tgOn() && asked && on(t?.waiting, t?.done !== false) }
 }
 // a push to each: buttons (a nonce, kept in awaiting with what it asks) where taps come back (ask), Telegram's message
 // id kept with it for tgDone. tgTaps false: none on Telegram (remote access's Keep: never from Telegram)
@@ -51,7 +53,7 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = false) {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   if (quiet(ws, kind === 'waiting')) return // U8: Do not disturb: an important workspace's ask only
-  const t = to(kind, bell)
+  const t = to(kind, bell, tab.workspace)
   if ((!t.hook && !t.tg) || pushed.get(tab.id) === kind || (!bell && (tab.muted || ws?.muted)) || hidden(ws)) return
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something
