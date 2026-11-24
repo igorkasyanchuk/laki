@@ -1458,6 +1458,7 @@ function agentNo(method: string, p: Params) {
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined || p.inRepo !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : p.memory !== undefined ? 'memory list (laki memory add adds to it)' : 'notes and memory place (in its repo or in Laki)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
+  else if (method === 'projectSet' && p.muted !== undefined) notAgent(p, "mute or unmute a project (what reaches the user: theirs)")
   else if (method === 'wsSet' && p?.cap !== undefined && capRaises(p.id, p.cap)) notAgent(p, 'raise or remove a spend cap') // a lower one is fine
   else if ((method === 'projectSet' && p?.cap !== undefined) || (method === 'presetSave' && p.set && typeof p.set === 'object' && 'cap' in p.set)) notAgent(p, "change a project's or a profile's spend cap")
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'net' in p.set) notAgent(p, "change a profile's network (what its sandbox lets it reach)")

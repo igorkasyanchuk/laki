@@ -414,6 +414,9 @@ Unit test: test/speak.test.ts.
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
+Mute project (`project.muted`, projectSet's, the user's: AGENT_NO): core's `wsView` gives each of its workspaces
+`muted` and `mutedBy: 'project'`, so every check of a workspace's `muted` (the notify, the counts, the tray, cards) holds
+for ones made later too; phone.ts' `mutedWs` reads the project for pushes. Its workspaces' menu offers *Unmute its project*.
 T16's one-time bell (`tab.bell`, `tabBell`: the user's or a phone's, AGENT_NO; a workspace's sets its running agents',
 none running: its first agent's) rings once at its next ask (`told`), turn end, failure or limit (the `idle` case), or,
 when a Done check follows, at the check's end (verify.ts `say`; a failed check leaves it set): core's `ring` clears it

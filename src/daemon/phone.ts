@@ -50,11 +50,13 @@ function send(t: To, p: Push, ask?: Pick<Awaits, 'tab' | 'flow' | 'keep' | 'key'
       e => log(`telegram ${what}: ${e.message}`),
     )
 }
+// a muted workspace, or one of a muted project (Mute project)
+const mutedWs = (ws?: Workspace) => !!ws && (!!ws.muted || !!state.projects.find(p => p.id === ws.project)?.muted)
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = false) {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   if (quiet(ws, kind === 'waiting')) return // U8: Do not disturb: an important workspace's ask only
   const t = to(kind, bell, tab.workspace)
-  if ((!t.hook && !t.tg) || pushed.get(tab.id) === kind || (!bell && (tab.muted || ws?.muted)) || hidden(ws)) return
+  if ((!t.hook && !t.tg) || pushed.get(tab.id) === kind || (!bell && (tab.muted || mutedWs(ws))) || hidden(ws)) return
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
@@ -81,7 +83,7 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
 export function phoneLong(tab: Tab, text: string) {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   const t = to('any')
-  if ((!t.hook && !t.tg) || tab.muted || ws?.muted || hidden(ws) || quiet(ws)) return
+  if ((!t.hook && !t.tg) || tab.muted || mutedWs(ws) || hidden(ws) || quiet(ws)) return
   send(t, { event: 'long', workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, title: text })
 }
 
@@ -205,7 +207,7 @@ export function flowPhone(name: string, ws: string | undefined, what: string, te
 export function flowAsk(run: { id: string; name: string; ws?: string }, question: string, options: string[], show?: string) {
   const ws = run.ws ? state.workspaces.find(x => x.id === run.ws) : undefined
   const t = to('waiting')
-  if ((!t.hook && !t.tg) || ws?.muted || hidden(ws) || quiet(ws, true)) return
+  if ((!t.hook && !t.tg) || mutedWs(ws) || hidden(ws) || quiet(ws, true)) return
   const key = flowHooks.waitKey?.(run.id) // its block, question and choices, as phoneTick checks them
   const where = ws ? ws.name || ws.id : undefined
   send(t, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })) }, key ? { flow: run.id, key } : undefined, { what: run.name, tgTaps: false }) // Telegram: its choices as text (a workflow's answer isn't Telegram's)

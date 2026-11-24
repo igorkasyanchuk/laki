@@ -100,6 +100,14 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   await assert.rejects(rig.rpc('tabSet', { id: other.id, muted: true, from }), /an agent can't rename, color or mute a tab that isn't its own/)
   await rig.rpc('tabSet', { id: tab, name: 'mine', from })
   await rig.rpc('tabSet', { id: other.id, muted: true })
+  // Mute project: the user's; each of its workspaces muted in the view (mutedBy), one made later too
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, muted: true, from }), /an agent can't mute or unmute a project/)
+  await rig.rpc('projectSet', { id: p.id, muted: true })
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'two' })
+  const ws = (await rig.rpc('state')).workspaces.filter((w: any) => [one.id, two.id].includes(w.id))
+  assert.deepEqual(ws.map((w: any) => [w.muted, w.mutedBy]), [[true, 'project'], [true, 'project']])
+  await rig.rpc('projectSet', { id: p.id, muted: false })
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).muted, undefined)
 })
 
 test('S7: Recording mode: an agent gets no private workspace, its tabs or a private project; you do', async t => {

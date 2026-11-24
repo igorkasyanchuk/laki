@@ -2868,6 +2868,7 @@ html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the 
 .bare-drag { position: fixed; inset: 0 0 auto; height: 38px; pointer-events: none; } /* App's bare: no rail to move the window by */
 .app.bare .side-show { display: none; } /* nor a list to show */
 .project-sample { margin-left: 4px; }
+.project-muted { margin-left: var(--sp-1); color: var(--muted); display: inline-flex; }
 .welcome-checks .check-why { display: inline-flex; margin-left: var(--sp-2); vertical-align: middle; color: var(--muted); cursor: help; }
 .welcome-checks .check-why:hover, .welcome-checks .check-why:focus-visible { color: var(--fg); }
 /* Find a setting */

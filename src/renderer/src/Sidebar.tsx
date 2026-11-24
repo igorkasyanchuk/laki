@@ -744,6 +744,11 @@ export function Sidebar({ app }: { app: AppCtx }) {
               </span>
               <span className="project-name">{p.name}</span>
               {p.sample && <span className="tag project-sample" data-tip="Laki's sample repo: Remove sample in its menu">sample</span>}
+              {p.muted && (
+                <span className="project-muted" data-tip="Muted: no notifications, cards, pushes or Needs you count from its workspaces (⋯ › Unmute project)" aria-label="Muted">
+                  <Icon name="bellOff" size={12} />
+                </span>
+              )}
               {shut && mine.length > 0 && (
                 <>
                   {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}

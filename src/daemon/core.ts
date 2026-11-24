@@ -1051,6 +1051,7 @@ function wsView(w: Workspace) {
   const ticket = ticketOf(w.id)
   return {
     ...wsOut(w),
+    ...(!w.muted && state.projects.find(p => p.id === w.project)?.muted && { muted: true, mutedBy: 'project' as const }), // Mute project: every check of a workspace's muted holds
     spend: capView(w),
     setup: existsSync(setupMarker(w)),
     // what runs there
@@ -1586,7 +1587,7 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown }) {
+export function projectSet(ref: string, o: { muted?: boolean; name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown }) {
   const p = findProject(ref)
   if (o.cap !== undefined) p.cap = (c => (c.usd || c.tokens ? c : undefined))(capParse(o.cap)) // its new workspaces' spend cap (cap.ts); not an agent's (main.ts)
   // F15: Always ask for, the whole list as Settings has it (main.ts refuses it to agents and remote access): path globs
@@ -1617,6 +1618,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
   if (o.private !== undefined) p.private = o.private === true || undefined // Recording mode hides it and its workspaces
+  if (o.muted !== undefined) p.muted = o.muted === true || undefined // Mute project: wsView's muted for each of its workspaces
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   // its name in Laki; '' (the ⋯'s Rename, Settings' Name emptied): its folder's again, a host's with the host; Terminals' and Browsers' keep theirs
   if (typeof o.name === 'string' && (o.name.trim() || !p.kind)) p.name = Array.from(o.name.trim()).slice(0, 80).join('') || (p.host ? `${basename(p.path)} (${p.host})` : basename(p.path))

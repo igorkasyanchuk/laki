@@ -227,6 +227,7 @@ export type Project = {
   alwaysAsk?: string[] // F15: path globs an ask that touches one is never auto-answered for (shared/ask.ts alwaysAskOf): the user's only, never a phone's
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
   private?: boolean // Recording mode (settings.recording) hides it and its workspaces (veiled)
+  muted?: boolean // Mute project: none of its workspaces notifies, sounds, shows a card, pushes or counts in Needs you (wsView's muted, mutedBy), ones made later too; the user's (AGENT_NO)
   netAllow?: string[] // hosts a sandboxed agent's list (net: list) has here beyond netList's own: the user's alone (projectNetAllow, a card's Allow this domain)
   sample?: boolean // U4: Welcome's sample repo (<data>/sample, core.ts sampleNew): a tag on its head, Remove sample in its menu
 }
@@ -327,6 +328,7 @@ export type Workspace = {
   named?: true // you named it (renamed it, or typed its name as it was made): an agent's rename is refused unless you asked (laki rename --asked), a page's title never renames it
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
+  mutedBy?: 'project' // the view's: muted because its project is (Mute project), not on its own
   important?: boolean // its agents' asks and finishes as cards on screen, until answered or closed (main's addCard)
   private?: boolean // Recording mode (settings.recording) hides it (veiled); its project's private too
   pinned?: boolean // the sidebar shows it above the projects, under Pinned

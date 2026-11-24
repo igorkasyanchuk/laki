@@ -1464,7 +1464,9 @@ actions*) and Esc back to the box. A private workspace in Recording mode shows n
 
 A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
 notification; click it to jump there. Settings › General picks which (waiting, finished, usage limit) and the
-sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
+sound, or turns them off; a workspace's or tab's menu mutes just it, and a project's ⋯ › *Mute project* mutes all its
+workspaces (ones made later too: no notifications, sounds, cards, phone pushes or Needs you count; a muted mark by its
+name). The Dock icon counts the tabs that wait
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
 small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
