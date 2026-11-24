@@ -1647,3 +1647,13 @@ test("a Needs you card's morph: its names kept, a second click clears the first'
   n.name(null, 'x') // nothing to name (no ask bar, no tab): nothing kept
   assert.equal(n.size, 0)
 })
+
+test('a lifted drag: the copy hangs from where the pointer holds the item, inside its box', async () => {
+  const { liftAt } = await import('../src/renderer/src/text.ts')
+  const box = { left: 100, top: 50, width: 200, height: 32 }
+  assert.deepEqual(liftAt(box, 130, 60), { x: 30, y: 10 })
+  assert.deepEqual(liftAt(box, 100, 50), { x: 0, y: 0 })
+  assert.deepEqual(liftAt(box, 99, 49), { x: 0, y: 0 }, 'on its border, outside by a pixel: clamped in')
+  assert.deepEqual(liftAt(box, 400, 90), { x: 200, y: 32 })
+  assert.deepEqual(liftAt(box, 150.6, 66.4), { x: 51, y: 16 }, 'whole pixels')
+})

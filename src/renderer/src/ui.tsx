@@ -1,11 +1,11 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { Component, Fragment, memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { Component, Fragment, memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type DragEvent, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { inAim, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
+import { inAim, liftAt, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 import { morphOk, moving, namer } from './motion'
@@ -792,6 +792,38 @@ export const Kept = memo(
   (a, b) => a.deps.length === b.deps.length && a.deps.every((d, i) => Object.is(d, b.deps[i])),
 )
 
+// a dragged item lifted, as macOS lifts one: a copy of it (styles.css .lift: a little bigger and tilted, the deepest
+// shadow, its own corners, the panel's fill so glass doesn't show through) hangs from where it's held (text.ts liftAt),
+// and the item itself is a gap of its height (data-lifted) until it's dropped. Motion: None and Reduce motion: the
+// shadow only
+export function liftCopy(el: HTMLElement) {
+  const r = el.getBoundingClientRect()
+  const c = el.cloneNode(true) as HTMLElement
+  c.removeAttribute('id')
+  c.removeAttribute('data-lifted')
+  c.classList.add('lift')
+  c.setAttribute('aria-hidden', '')
+  Object.assign(c.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: getComputedStyle(el).borderRadius })
+  return c
+}
+// a native drag's (draggable, its dataTransfer): the copy as its drag image, off screen, gone the next frame; spread on
+// the element with its own onDragStart called after. Not for a file dragged out to Finder (its native file drag)
+export function useLift() {
+  return {
+    onDragStart: (e: DragEvent<HTMLElement>) => {
+      const el = e.currentTarget
+      const c = liftCopy(el)
+      Object.assign(c.style, { left: '-10000px', top: '-10000px' })
+      document.body.append(c)
+      const at = liftAt(el.getBoundingClientRect(), e.clientX, e.clientY)
+      e.dataTransfer.setDragImage(c, at.x, at.y)
+      requestAnimationFrame(() => c.remove())
+      el.dataset.lifted = ''
+    },
+    onDragEnd: (e: DragEvent<HTMLElement>) => void delete e.currentTarget.dataset.lifted, // dropped or not
+  }
+}
+
 export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const [over, setOver] = useState<RowDrop | null>(null)
   const dragged = useRef(false)
@@ -800,14 +832,19 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const start = (e: PE, kind: string, id: string, group = '', head = false) => {
     if (e.button !== 0) return
     const y0 = e.clientY
-    const list = (e.currentTarget as Element).closest('.side-scroll') // the list it's in: it scrolls near (or past) its edges
+    const row = e.currentTarget as HTMLElement
+    const list = row.closest('.side-scroll') // the list it's in: it scrolls near (or past) its edges
+    const at = liftAt(row.getBoundingClientRect(), e.clientX, e.clientY)
+    let lifted: HTMLElement | null = null // its lifted copy, following the pointer (liftCopy)
     let cur: RowDrop | null = null
     let moved = false
     dragged.current = false
     const move = (ev: PointerEvent) => {
       if (!moved && Math.abs(ev.clientY - y0) < 5) return
       if (!moved) list?.setAttribute('data-swiping', '') // useFlip waits it out
+      if (!moved) (lifted = liftCopy(row)), document.body.append(lifted), (row.dataset.lifted = '')
       moved = true
+      if (lifted) Object.assign(lifted.style, { left: `${ev.clientX - at.x}px`, top: `${ev.clientY - at.y}px` })
       document.getSelection()?.removeAllRanges()
       // near the list's top or bottom edge, or past it: it scrolls (ponytail: only as the pointer moves)
       const box = list?.getBoundingClientRect()
@@ -825,6 +862,8 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       list?.removeAttribute('data-swiping')
+      lifted?.remove()
+      delete row.dataset.lifted // its glide to the new place (useFlip) settles it
       setOver(null)
       dragged.current = moved // the click that ends a drag isn't one
       if (cur) done.current(cur)

@@ -198,3 +198,15 @@ test("a Needs you card's morph (::view-transition-*(*.need)) runs on the motion 
   })
   assert.ok(n >= 2, 'the group and its snapshots')
 })
+
+test('a lifted drag (.lift) is drawn from tokens: its shadow, fill and stacking; Motion: None and Reduce motion keep only the shadow', () => {
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+  const rule = /^\.lift \{([^}]*)\}/m.exec(css)?.[1] ?? ''
+  assert.match(rule, /box-shadow: var\(--lift-3\);/)
+  assert.match(rule, /background: var\(--panel\);/)
+  assert.match(rule, /z-index: var\(--z-drag\);/)
+  assert.doesNotMatch(rule, /#[0-9a-f]{3,8}\b|rgba?\(|\d+px/i, 'no raw colors or sizes')
+  assert.match(css, /html\[data-motion='none'\] \.lift \{ transform: none; \}/)
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.lift \{ transform: none; \} \}/)
+  assert.match(css, /\[data-lifted\] \{ visibility: hidden; \}/, 'the item a gap of its height, not gone')
+})

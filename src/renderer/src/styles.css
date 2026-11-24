@@ -1392,6 +1392,14 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .drop-line { position: fixed; z-index: var(--z-drag); pointer-events: none; background: var(--accent); border-radius: var(--r-xs); }
 .drag-ghost { position: fixed; z-index: var(--z-drag); pointer-events: none; display: flex; align-items: center; gap: var(--sp-3); max-width: 260px; padding: var(--sp-2) var(--sp-5); white-space: nowrap; overflow: hidden; background: var(--panel); color: var(--fg); border: 1px solid var(--accent); border-radius: var(--r-pill); font-size: var(--fs-2); opacity: 0.92; box-shadow: var(--lift-2); }
 .drag-ghost > span:not(.glyph) { overflow: hidden; text-overflow: ellipsis; }
+/* a dragged item lifted (ui.tsx liftCopy: a Board card's drag image, a sidebar row following the pointer; the tab's
+   drag pill too): a little bigger and tilted, the deepest shadow, the panel's fill so glass never shows through it, its
+   own corners (set inline); the item itself an empty gap of its height until it's dropped. Motion: None and Reduce
+   motion: the shadow only */
+.lift { box-sizing: border-box; margin: 0; z-index: var(--z-drag); pointer-events: none; background: var(--panel); box-shadow: var(--lift-3); transform: scale(1.03) rotate(2deg); }
+[data-lifted] { visibility: hidden; }
+html[data-motion='none'] .lift { transform: none; }
+@media (prefers-reduced-motion: reduce) { .lift { transform: none; } }
 
 /* prompt with images and dictation (PromptInput.tsx) */
 .form .field { display: flex; flex-direction: column; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-2); }

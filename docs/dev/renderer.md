@@ -1325,6 +1325,16 @@ Where: the artifacts gallery, the terminal's link card, an image diff (Changes, 
 Reader's pictures (a click on one not in a link opens it). styles.css: `::view-transition-group(zoom)` at `--t-slow` on
 `--spring-soft`, the old and new pictures `object-fit: cover` so a cropped thumbnail grows without a stretch.
 
+A dragged item lifts (ui.tsx `liftCopy`): a copy of it, `.lift` (scale 1.03, a 2° tilt, `--lift-3`, `--panel`'s fill so
+glass never shows through, its own corners inline), hangs from where the pointer holds it (text.ts `liftAt`) while the
+item is a gap of its height (`[data-lifted]`: `visibility: hidden`) until it's dropped; Motion: None and Reduce motion
+keep only the shadow. A native drag (`useLift`: `onDragStart` then the element's own, `onDragEnd`) uses the copy as its
+`setDragImage`, off screen and gone the next frame: the Board's to-do cards. A sidebar row (`useRowDrag`: workspaces,
+groups, projects) is a pointer drag: its copy is appended and follows the pointer, removed on release, the row's glide
+(`useFlip`) settling it. A tab's drag pill (Panes' `.drag-ghost`) is lifted too. Never a file dragged out to Finder
+(its native file drag). Not yet lifted: Builder's blocks, Schedules' group rows, Settings' rail order, the toolbar
+sheet, the diagram's tiles, Workflows' blocks and variables, the widgets' grid.
+
 A Needs you card opening its tab (a click or Enter on the card: Needs.tsx' `api.open(t, el)`, Sidebar's `cardMorph`):
 the card gets a name of its own (`need-<random>`, `view-transition-class: need`), the tab is opened in a view
 transition, then the tab's ask bar (`.ask-bar`) or, when the ask shows only in the terminal (the sidebar's card has

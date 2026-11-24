@@ -12,7 +12,7 @@ import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
 import { completeOf, FileChip, type Img, PromptInput } from './PromptInput'
 import { wsShown } from './text'
-import { Icon, IconButton, Page, TurnTime, act } from './ui'
+import { Icon, IconButton, Page, TurnTime, act, useLift } from './ui'
 import './board.css'
 
 export type BoardApi = {
@@ -38,6 +38,7 @@ const QUEUED: Record<QueueStatus, string> = { waiting: 'waiting', updating: 'upd
 
 export function BoardPage({ view, timers, going = {}, api, onClose }: { view: View; timers?: boolean; going?: Record<string, string>; api: BoardApi; onClose: () => void }) {
   const [pick, setPick] = useState('')
+  const lift = useLift() // a to-do card dragged: lifted, a gap where it was (ui.tsx)
   const projects = view.projects.filter(p => !p.kind) // Terminals and Browsers: no tasks
   const project = projects.some(p => p.id === pick) ? pick : (projects[0]?.id ?? '') // one picked, else the first (projects come and go)
   const [text, setText] = useState('')
@@ -81,7 +82,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
             Backlog <span className="board-count">{todos.length || ''}</span>
           </h3>
           {todos.map(t => (
-            <div key={t.id} className={`board-card todo ${starting.includes(t.id) ? 'busy' : ''}`} draggable onDragStart={e => e.dataTransfer.setData(TODO, t.id)}>
+            <div key={t.id} className={`board-card todo ${starting.includes(t.id) ? 'busy' : ''}`} draggable onDragStart={e => (lift.onDragStart(e), e.dataTransfer.setData(TODO, t.id))} onDragEnd={lift.onDragEnd}>
               {t.text && <div className="board-text">{t.text}</div>}
               {!!t.images?.some(isImage) && <Thumbs paths={t.images.filter(isImage)} />}
               {t.images?.filter(p => !isImage(p)).map(p => <FileChip key={p} path={p} />)}

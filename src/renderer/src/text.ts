@@ -1172,3 +1172,10 @@ export function rollCols(from: string, to: string) {
 // viewport to new lines without the animation (Viewport._sync). None with Motion: None or the system's Reduce motion
 export const SMOOTH_MS = 90
 export const smoothMs = (on: unknown, motion: unknown, reduced: boolean) => (on !== false && motion !== 'none' && !reduced ? SMOOTH_MS : 0)
+
+// a dragged item's lift (ui.tsx liftCopy): where in it the pointer holds it, inside its box (a press on its border
+// rounds in), so the copy hangs from the same spot
+export const liftAt = (box: { left: number; top: number; width: number; height: number }, x: number, y: number) => ({
+  x: Math.round(Math.min(Math.max(x - box.left, 0), box.width)),
+  y: Math.round(Math.min(Math.max(y - box.top, 0), box.height)),
+})

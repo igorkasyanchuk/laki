@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Dragging a sidebar row, a tab or a Board card lifts it, tilted with a shadow, a gap left where it was.
 - Opening a Needs you card flies it into its tab, where the ask is.
 - Terminals scroll smoothly as you scroll them, new output still following at once (Settings › Terminal › Smooth scrolling).
 - Counts roll digit by digit as they change (Needs you, the rail, the Review tab's +/−), and keep their width while they do.

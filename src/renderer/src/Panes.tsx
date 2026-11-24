@@ -172,7 +172,7 @@ export function Panes(p: {
         />
       ))}
       {p.drag && (
-        <div className="drag-ghost" style={{ left: Math.min(p.drag.x + 12, innerWidth - 272), top: Math.min(p.drag.y + 10, innerHeight - 32) /* in the window: 260 wide at most */ }}>
+        <div className="drag-ghost lift" style={{ left: Math.min(p.drag.x + 12, innerWidth - 272), top: Math.min(p.drag.y + 10, innerHeight - 32) /* in the window: 260 wide at most */ }}>
           {p.ghost}
         </div>
       )}
