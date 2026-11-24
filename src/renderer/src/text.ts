@@ -1190,3 +1190,8 @@ export function barFold(s: BarFold, e: { y: number } | 'focus'): BarFold {
   const down = s.down + (e.y - s.y)
   return { y: e.y, down, folded: s.folded || down >= BAR_FOLD_AT }
 }
+
+// Labs › HDR glow (settings.hdrGlow, off unless true): the newest Needs you card's ring and the window's edge glow drawn
+// brighter than white on a display with more range; never on one without it, nor with Reduce motion or Reduce
+// transparency (then they're as they always are)
+export const hdrOn = (setting: unknown, high: boolean, reducedMotion: boolean, reducedTransparency: boolean) => setting === true && high && !reducedMotion && !reducedTransparency

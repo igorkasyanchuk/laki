@@ -739,6 +739,14 @@ are tested in `test/units-more.test.ts`.
   Reader's `.reader-scroll` is a `data-find` too. ⌘F seeds the box with the selection (`text.ts` `seedOf`: one line, up
   to 1,000 characters): the terminal's (`getSelection`, not the match the bar itself selected, `hit`), else the page's
   inside the `[data-find]`.
+- **HDR glow** (Labs, settings.hdrGlow, on only if true; Settings › Appearance under Motion, with its probe: the
+  accent beside `color(srgb-linear 4 4 4)` under `dynamic-range-limit: no-limit`, white where there's no HDR):
+  App's `.app[data-hdr]` (text.ts `hdrOn`: the setting, `(dynamic-range: high)`, neither Reduce motion nor Reduce
+  transparency); styles.css draws the edge glow's line and the newest Needs you card's ring in `--hdr-wait`, the
+  waiting color ×2.5 in linear light (relative color syntax), under `dynamic-range-limit: no-limit`, inside the same
+  media guards. Electron 45 (Chromium 156) supports both; tried here on a Liquid Retina display only (it reports
+  `dynamic-range: high` with little headroom), so whether it's visibly brighter is for an XDR display's eye. The
+  floating bubbles keep their look.
 - **The edge glow** (settings.edgeGlow, on only if true: a new install's, core.ts `NEW_DEFAULTS`; Settings › General ›
   Notifications): App's root `.app` gets `data-glow` while nextStep.ts `waitsElsewhere(view, tab, front)`: an ask or a
   secret request waits in a tab that isn't the focused one, the window in use (`front`, as `html.away` goes), no Do not

@@ -169,6 +169,7 @@ export type AppSettings = Paint & {
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   dockBounce?: boolean // U15: the Dock icon bounces as a workspace starts waiting (unset: on)
   edgeGlow?: boolean // the window's edge glows while an ask waits in another tab (on only if true)
+  hdrGlow?: boolean // Labs: that glow and the newest Needs you card's ring brighter than white on an HDR display (text.ts hdrOn; on only if true)
   usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   quietMinutes?: number // U8: Quiet's default length in minutes (unset: 60)
@@ -2150,6 +2151,17 @@ export function SettingsPage(p: {
                   </select>
                   <Says title="Motion" hint="How much moves: menus and dialogs, rows growing in, the empty page's background" />
                 </label>
+                {/* Labs: HDR glow. The probe: the accent, and a white past SDR's (an extended-range srgb-linear color with
+                    dynamic-range-limit: no-limit), side by side: on an HDR (XDR) display the second is brighter than any
+                    white around it; on another, both look as they would */}
+                <Switch className="switch-row" on={s.hdrGlow === true} onChange={v => set({ hdrGlow: v })}>
+                  <Says title="HDR glow (Labs)" hint="On a display with HDR, the newest Needs you card's ring and the window's edge glow brighter than white. Not with Reduce motion or Reduce transparency" />
+                </Switch>
+                <div className="hdr-probe" aria-label="HDR probe: the accent, then a white brighter than SDR's where the display can show it">
+                  <span className="hdr-swatch" style={{ background: 'var(--accent)' }} />
+                  <span className="hdr-swatch hdr-bright" />
+                  <span className="muted small">{matchMedia('(dynamic-range: high)').matches ? 'This display has HDR: the right one should be the brightest white on screen' : 'This display has no HDR: both stay as they are'}</span>
+                </div>
                 <label className="switch-row" data-tip="The Board's empty columns, the strips of workspaces and of a review's files, a diagram's lanes">
                   <select value={s.vertText ?? ''} onChange={e => paint({ vertText: (e.target.value || undefined) as AppSettings['vertText'] })}>
                     {VERT.map(([v, name]) => (

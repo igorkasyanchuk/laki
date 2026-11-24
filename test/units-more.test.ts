@@ -1675,3 +1675,13 @@ test("a phone's bottom bar folds past 24px down, unfolds on any scroll up, at th
   assert.deepEqual(barFold({ y: 50, down: 50, folded: true }, { y: 0 }), { y: 0, down: 0, folded: false }, 'the top')
   assert.equal(barFold({ y: 0, down: 0, folded: false }, { y: -30 }).folded, false, "a bounce past the top (iOS' rubber band)")
 })
+
+test('Labs › HDR glow: only when it is on, the display has HDR, and neither Reduce motion nor Reduce transparency is', async () => {
+  const { hdrOn } = await import('../src/renderer/src/text.ts')
+  assert.equal(hdrOn(true, true, false, false), true)
+  assert.equal(hdrOn(undefined, true, false, false), false, 'off unless true')
+  assert.equal(hdrOn('yes', true, false, false), false)
+  assert.equal(hdrOn(true, false, false, false), false, 'an SDR display: as always')
+  assert.equal(hdrOn(true, true, true, false), false, 'Reduce motion')
+  assert.equal(hdrOn(true, true, false, true), false, 'Reduce transparency')
+})

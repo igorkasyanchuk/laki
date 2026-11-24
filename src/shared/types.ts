@@ -714,6 +714,7 @@ export type Settings = {
   glassSide?: number
   glassTerm?: number
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
+  hdrGlow?: boolean // Labs: the edge glow and the newest Needs you card's ring brighter than white on an HDR display (renderer text.ts hdrOn; on only if true)
   glassLevel?: 'clear' | 'regular' | 'tinted' // Glass › Strength, as macOS 26's: its floating surfaces at 56, 72 or 88% (unset or anything else: regular); none with Reduce transparency
   refraction?: boolean // menus bend what's under their edges where they blur (on unless false)
   glassGrain?: boolean // with glass, a fine noise over its floating surfaces, the sidebar and the splash (on unless false)

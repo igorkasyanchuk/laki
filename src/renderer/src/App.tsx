@@ -41,7 +41,7 @@ import { groupsOf, type Layout, move, tabsOf, fillRoles, type Role, rolesIn, typ
 import { parseLink } from './links'
 import { SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, edited, type FileContent, type FileList, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, type Thread } from './SidePanel'
-import { actionsFor, applySuggestions, forgeName, isStale, limitsCrossed, limitText, mentionsOf, needsSorted, pendingWords, prNo, rmVerdict, type RunAction, shortPath, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, forgeName, hdrOn, isStale, limitsCrossed, limitText, mentionsOf, needsSorted, pendingWords, prNo, rmVerdict, type RunAction, shortPath, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, paintTheme, css, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import type { Cloudflared, TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
@@ -2446,7 +2446,7 @@ export function App() {
       (minimized to the status bar, or off): no room kept for it */, '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the
       list pages' size (styles.css), as Settings'; the open page's own
       */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow phone-bar-on' : ''} ${bare ? 'bare' : ''} \
-${bridge && /Mac/.test(navigator.userAgent) && !narrow ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} data-glow={settings.edgeGlow === true && !narrow && waitsElsewhere(view, tab?.id, front) ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
+${bridge && /Mac/.test(navigator.userAgent) && !narrow ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''} ${fromSnap.current ? 'from-snap' : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} data-glow={settings.edgeGlow === true && !narrow && waitsElsewhere(view, tab?.id, front) ? '' : undefined} data-hdr={hdrOn(settings.hdrGlow, matchMedia('(dynamic-range: high)').matches, matchMedia('(prefers-reduced-motion: reduce)').matches, matchMedia('(prefers-reduced-transparency: reduce)').matches) ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
       {bare && <div className="bare-drag drag" aria-hidden="true" />}
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}

@@ -286,6 +286,21 @@ html.away ::selection { background: color-mix(in srgb, var(--fg) 16%, transparen
 @media (prefers-reduced-motion: reduce) { .app[data-glow]::after { animation: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 35%, transparent); } } /* still: a thin line */
 :root[data-motion='none'] .app[data-glow]::after { animation: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 35%, transparent); }
 :root.opaque .app[data-glow]::after { display: none; } /* a flat look */
+/* Labs › HDR glow (App's data-hdr: text.ts hdrOn): on a display with more range than SDR, the edge glow's line and the
+   newest Needs you card's ring in the waiting color brightened past white in linear light (×2.5, an extended-range
+   srgb-linear color), dynamic-range-limit: no-limit so the page may use the headroom; SDR, Reduce motion and Reduce
+   transparency: as above. ponytail: checked by eye only on an XDR display (none here), off unless turned on */
+@media (dynamic-range: high) and (prefers-reduced-motion: no-preference) and (prefers-reduced-transparency: no-preference) {
+  .app[data-hdr] { --hdr-wait: color(from var(--waiting) srgb-linear calc(r * 2.5) calc(g * 2.5) calc(b * 2.5)); }
+  .app[data-hdr][data-glow]::after { dynamic-range-limit: no-limit; box-shadow: inset 0 0 0 1px var(--hdr-wait), inset 0 0 24px color-mix(in srgb, var(--waiting) 22%, transparent); }
+  .app[data-hdr] .need[data-newest] { dynamic-range-limit: no-limit; box-shadow: var(--lift-1), inset 0 0 0 1px var(--hdr-wait); }
+}
+/* its probe (Settings › Appearance): the accent and a white past SDR's, side by side */
+:root { --sdr-white: #ffffff; } /* the brightest an SDR page draws: the probe's other swatch where there's no HDR */
+.hdr-probe { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; }
+.hdr-swatch { flex: none; width: var(--h-m); height: var(--h-m); border-radius: var(--r-m); border: 1px solid var(--line); }
+.hdr-bright { background: var(--sdr-white); }
+@media (dynamic-range: high) { .hdr-bright { background: color(srgb-linear 4 4 4); dynamic-range-limit: no-limit; } }
 @media (pointer: coarse) { .app[data-glow]::after { display: none; } } /* a phone */
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .sidebar[hidden] { display: none !important; } /* hidden, not unmounted: its video plays on */
