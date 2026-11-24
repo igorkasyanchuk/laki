@@ -232,7 +232,11 @@ Improve my prompt (`promptImprove { prompt, tab?, project? }`, ai.ts; Improve.ts
 (the New workspace page passes `improve`) and the Reader's box (ReaderApi's `improve`)): one `aiOnce` (`ask: 'Improve
 prompt'`, no tools) with the draft (8,000 characters), the tab's chat since its last New session (the Reader's `chatRead`,
 the newest 12,000 characters) and the project's memory (4,000), each between `<<<` `>>>` as data (`shared/improve.ts`
-`IMPROVE_SYSTEM`). `improvedOf` takes fences and quotes off and puts back on a last line any of the draft's @mentions,
+`IMPROVE_SYSTEM`). A new task (no tab: the New workspace page) adds a fourth, *The project's files*: `git ls-files` in
+the project (core's `exec`: an SSH host's too; 5 s, none when it fails) as `treeOf`'s outline in 4,000 characters (every
+top-level entry, a folder as `src/daemon/ (64 files)`, the rule files and manifests wherever they are, then deeper
+folders and files while they fit, shallowest first): file names only. The system prompt names only paths in the chat,
+the memory or that block; the answer's paths aren't checked against it (one may not exist yet). `improvedOf` takes fences and quotes off and puts back on a last line any of the draft's @mentions,
 links, code spans, `{{variables}}` and #numbers the answer dropped. The box's text is replaced by `execCommand('insertText')`,
 so ⌘Z undoes it; editing the box while it runs, a second click or Esc cancels (its answer is dropped). The user's and
 remote access's, never an agent's or a client's (as Ask me first).

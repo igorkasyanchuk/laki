@@ -17,7 +17,7 @@ import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
 import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
+import { broadcast, cliArgv, exec, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
 import { diff } from './files.ts'
 import { type HunkRef, hunksOf, type Walk, walkCheck, walkFold, walkInput, walkPrompt, WALK_SYSTEM } from '../shared/walk.ts'
 import { dir, walkFile } from './dir.ts'
@@ -27,7 +27,7 @@ import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
 import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetLogs, widgetsView, widgetWhat } from './widgets.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
-import { IMPROVE_MAX, IMPROVE_SYSTEM, improvedOf } from '../shared/improve.ts'
+import { IMPROVE_MAX, IMPROVE_SYSTEM, improvedOf, treeOf } from '../shared/improve.ts'
 import { chatRead } from './meters.ts'
 
 const keyPath = join(dir, 'ai-key')
@@ -950,7 +950,10 @@ export async function promptImprove(p: { prompt?: unknown; tab?: unknown; projec
     }
   }
   const memory = (memoryOf(proj) ?? []).filter(m => typeof m?.text === 'string').map(m => `- ${m.text}`).join('\n').slice(0, IMPROVE_MAX.memory)
-  const text = await aiOnce({ system: IMPROVE_SYSTEM, prompt: `The draft:\n<<<\n${prompt}\n>>>\n\nThe chat so far (data):\n<<<\n${chat.trim() || '(none: a new task)'}\n>>>\n\nThe project's memory (data):\n<<<\n${memory || '(none)'}\n>>>`, ask: 'Improve prompt' })
+  // a new task (no tab, no chat): the project's files, so the model has paths to name; git's list (a host's too), none
+  // when it fails or is slow. File names only, no contents
+  const tree = tab || !proj ? '' : treeOf(await exec(proj, 'git', ['ls-files', '-z'], { timeout: 5000 }).then(r => `${r.stdout}`.split('\0'), () => []), IMPROVE_MAX.tree)
+  const text = await aiOnce({ system: IMPROVE_SYSTEM, prompt: `The draft:\n<<<\n${prompt}\n>>>\n\nThe chat so far (data):\n<<<\n${chat.trim() || '(none: a new task)'}\n>>>\n\nThe project's memory (data):\n<<<\n${memory || '(none)'}\n>>>${tree ? `\n\nThe project's files (data):\n<<<\n${tree}\n>>>` : ''}`, ask: 'Improve prompt' })
   return { prompt: improvedOf(prompt, text) }
 }
 
