@@ -151,6 +151,14 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     permission: t => /permission/i.test(waits.current.get(t.id) ?? ''),
     review: t => (setDialog(null), setWsId(t.workspace), showPanel('changes'), narrow && setSideOpen(false)),
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
+    // ✕ (until: none: till it asks something new) and Snooze (a time): out of Needs you and the counts, with Undo
+    snooze: (t, until) => {
+      const name = wsName(live.find(w => w.id === t.workspace) ?? { id: t.workspace })
+      void call('tabSnooze', { tab: t.id, ...(until && { until }) }).then(
+        () => toast(until ? `${name}: snoozed till ${new Date(until).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : `${name}: out of Needs you till it asks something new`, () => void call('tabSnooze', { tab: t.id, until: null }).catch(() => {}), 'Undo', true, false, 5000),
+        e => toast((e as Error).message),
+      )
+    },
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
     rows: settings.finishedRows !== false && !narrow, // a phone: rows of its own (phone)

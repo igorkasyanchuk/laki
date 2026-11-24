@@ -28,7 +28,7 @@ import type { SayModal } from '../../shared/widget'
 import type { WorkflowItem } from '../../shared/workflow'
 import { Glyph } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
-import { badgeOf, needsTab, waitsElsewhere } from '../../shared/nextStep'
+import { badgeOf, counted, needsTab, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
@@ -624,7 +624,8 @@ export function App() {
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
   const hid = useRef(new Set<string>()) // Recording mode's hidden workspaces (veiled): their events say nothing
   const needing = view?.tabs.filter(needsYou) ?? []
-  const trayItems = [...needing.filter(t => t.status === 'waiting'), ...needing.filter(t => t.status !== 'waiting')].map(t => {
+  const countedNow = needing.filter(t => counted(t)) // Probably done ones: listed, counted nowhere
+  const trayItems = [...countedNow.filter(t => t.status === 'waiting'), ...countedNow.filter(t => t.status !== 'waiting')].map(t => {
     const w = view?.workspaces.find(w => w.id === t.workspace)
     const asks = t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') || 'waiting for you' : 'finished'
     return { tab: t.id, label: `${w ? wsName(w) : t.workspace} · ${t.name}: ${asks.replace(/\s+/g, ' ').slice(0, 60)}` }

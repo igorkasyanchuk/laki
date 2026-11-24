@@ -16,7 +16,8 @@ import { ProofList } from './Proof'
 import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
-import { ask, Elapsed, Icon, MidText, Num } from './ui'
+import { probablyDone, snoozeTimes } from '../../shared/nextStep'
+import { ask, Elapsed, Icon, MidText, Num, useMenu } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
@@ -29,6 +30,7 @@ export type NeedsApi = {
   permission: (t: TabView) => boolean // its last wait said "permission" (the turn event's text)
   review: (t: TabView) => void
   seen: (t: TabView) => void
+  snooze?: (t: TabView, until?: number) => void // ✕ (none: till it asks something new) and Snooze (a time): core.ts tabSnooze
   seenAll: (ts: TabView[]) => void // Earlier's Seen all
   name: (w: WorkspaceView) => string
   keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
@@ -97,6 +99,7 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   const [early, setEarly] = useState(unfolded)
   const [one, setOne] = useState('') // a phone's finished row tapped open (its tab and since when)
   const [apart, setApart] = useState<Set<string>>(new Set()) // groups shown Separately (by their asks and tabs: one that changes groups again)
+  const [oldOpen, setOldOpen] = useState(false) // Probably done unfolded
   const [errs, setErrs] = useState<Map<string, string>>(new Map()) // a group's answer that failed for a tab (its id and wait): its own card, with why
   if (!given.length) return null
   const g = phoneGroups(given)
@@ -104,8 +107,9 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   const counts = [g.asks.length && `${g.asks.length} to answer`, g.fails.length && `${g.fails.length} failed`, g.done.length && `${g.done.length} finished`].filter(Boolean).join(' · ')
   const allSeen = async () => (g.done.length <= 3 || (await ask(`Mark ${g.done.length} finished turns as seen?`, { text: 'They leave Needs you; each stays in its workspace.', ok: 'Mark as seen' }))) && api.seenAll(g.done.map(x => x.t))
   const now = Date.now()
-  const stale = items.filter(x => isStale(x.t, staleAfter, now))
-  const fresh = items.filter(x => !stale.includes(x))
+  const old = items.filter(x => probablyDone(x.t, now)) // Probably done: finished a day ago, unopened; counted nowhere
+  const stale = items.filter(x => !old.includes(x) && isStale(x.t, staleAfter, now))
+  const fresh = items.filter(x => !stale.includes(x) && !old.includes(x))
   const foldEarly = () => {
     setEarly(!early)
     try {
@@ -125,7 +129,7 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
   const card = (x: Need, old = false) => (k => <NeedCard key={`${k}${old ? ':old' : ''}`} {...x} err={errOf(x.t)} api={api} next={x.t.id === next} newest={x.t.id === newest} stale={old} {...(api.phone && { shown: one === k, show: () => setOne(o => (o === k ? '' : k)) })} />)(`${x.t.id}@${x.t.needAt ?? 0}`)
   return (
     <div className="project needs-list" role="group" aria-label="Needs you">
-      <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
+      <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length - old.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
         <span className="project-chev">
           <span className={`fold-chev${shut ? ' shut' : ''}`}><Icon name="chevron" size={12} /></span>
         </span>
@@ -133,7 +137,7 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
           <Icon name="inbox" size={12} />
         </span>
         <span className="project-name">Needs you</span>
-        {api.phone ? <span className="needs-counts">{counts}</span> : <span className="project-count"><Num value={items.length} /></span>}
+        {api.phone ? <span className="needs-counts">{counts}</span> : <span className="project-count"><Num value={items.length - old.length} /></span>}
         {many.length > 1 && api.bulk && (
           <span className="needs-bulk" onClick={e => e.stopPropagation()}>
             <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} aria-label={`Allow all (${many.length})`} title={`Allow all (${many.length})`} onClick={() => api.bulk!(many, true)}>
@@ -167,6 +171,18 @@ export function NeedsList({ items: given, shut, onFold, api, next, staleAfter = 
             </div>
           )}
           {early && stale.map(x => card(x, true))}
+          {old.length > 0 && (
+            <div className="need-earlier">
+              <button type="button" className="need-earlier-head" aria-expanded={oldOpen} onClick={() => setOldOpen(!oldOpen)} data-tip="Finished over a day ago and never opened: counted nowhere · click to show">
+                <span className={`fold-chev${oldOpen ? '' : ' shut'}`}><Icon name="chevron" size={12} /></span>
+                Probably done · {old.length}
+              </button>
+              <button type="button" className="need-all" onClick={() => api.seenAll(old.map(x => x.t))}>
+                Seen all
+              </button>
+            </div>
+          )}
+          {oldOpen && old.map(x => card(x, true))}
         </div>
       )}
     </div>
@@ -218,6 +234,7 @@ function NeedGroup({ items, choices, api, onApart, onFail }: { items: Need[]; ch
 }
 
 function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & { api: NeedsApi; next: boolean; newest?: boolean; stale: boolean; shown?: boolean; show?: () => void; err?: string }) {
+  const [menu, openMenu] = useMenu() // Snooze's times
   const [open, setOpen] = useState(!stale) // detail open for what needs you, a stale finish one line
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
@@ -274,9 +291,20 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
         </b>
         <span className="need-tab">{t.name}</span>
         {t.needAt && <Elapsed since={t.needAt} />}
+        {api.snooze && (
+          <>
+            <button type="button" className="need-x" aria-label="Not now" data-tip={waiting ? "Out of Needs you till it asks something new or works again (it still waits in its tab)" : 'Out of Needs you till its next turn'} onClick={e => (e.stopPropagation(), api.snooze!(t))}>
+              <Icon name="x" size={12} />
+            </button>
+            <button type="button" className="need-x" aria-label="Snooze" aria-haspopup="menu" data-tip="Snooze: back on time, or sooner if it asks something new" onClick={e => (e.stopPropagation(), openMenu(e, [{ head: 'Snooze till' }, ...snoozeTimes().map(s => ({ label: s.label, icon: 'clock' as const, sub: new Date(s.at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }), run: () => api.snooze!(t, s.at) })), null, { label: 'Open', icon: 'arrowRight' as const, run: () => api.open(t) }]))}>
+              <Icon name="clock" size={12} />
+            </button>
+          </>
+        )}
         <button type="button" className="need-chev" aria-expanded={open} aria-label={open ? 'Hide detail' : 'Show detail'} onClick={e => (e.stopPropagation(), setOpen(!open))}>
           <Icon name={open ? 'chevron' : 'chevronRight'} size={12} />
         </button>
+        {menu}
       </div>
       {!open ? null : waiting ? (
         <>

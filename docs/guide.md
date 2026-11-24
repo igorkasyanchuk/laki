@@ -355,7 +355,11 @@ selected workspace's PR is in the status bar.
   Changes) and *Seen* (clears its ●); it's one line by default (its workspace, its last words, how long ago; *Changes* and
   *Seen* on hover or focus), a click or Space opens it into its card, and a failed Done check, a plan limit, a sandbox's
   stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone always has rows). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
-  dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
+  dimmed; *Seen all* clears them). Ones finished over a day ago that you never opened fold under *Probably done*,
+  counted nowhere. On hover, a card's ✕ takes it out of Needs you and every count (the Dock's, the menu bar's, the
+  rail's) until it asks something new or works again (the agent still waits in its tab: an agent that says it waits
+  when it doesn't, too), with Undo; its clock snoozes it for an hour, this evening, tomorrow 9:00 or next week: back on
+  time, or sooner if it asks something new. The chevron at a card's end shows or hides its detail; anywhere else on it opens the
   tab; with a card focused, 1–9 answer and Enter opens. *No, and say why*: ⌥-click or long-press the choice that says no (or press N on the card) and a line opens under the choices; ⏎ answers no and gives the agent your words (Claude Code's and Codex's own *tell it what to do differently*, or the next message once it took the no), Esc closes it. The Reader's ask and the bar under a tab have it too. ⌘J goes through the same list, and the floating bubbles also
   take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
   (5, 15, 30 or 60 minutes, or never). With two or more permission asks waiting, its head has *Allow all (n)* and

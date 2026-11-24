@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Needs you: ✕ takes a row out till it asks something new, its clock snoozes it (an hour, this evening, tomorrow, next week), and finishes nobody opened for a day fold under Probably done, counted nowhere.
 - Laki AI from Telegram gets its own backend (Settings › AI › From Telegram), so it can answer and start work there while the Mac's runs claude or codex; full access as on the Mac takes a typed confirm.
 - Paste or drop a screenshot or a file into a review comment: the agent gets it with your words.
 - Save a Walk through as Markdown or HTML, or copy it as Markdown for a PR description.

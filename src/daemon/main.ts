@@ -466,6 +466,7 @@ const api = {
   reviewNotesSet: p => core.reviewNotesSet(p),
   tabDraft: p => core.tabDraft(p), // { tab, text? }: the Reader's unsent text
   failDismiss: p => core.failDismiss(p), // { tab }: the Reader's and Needs you's Dismiss
+  tabSnooze: p => core.tabSnooze(p), // { tab, until? }: Needs you's ✕ (none: until it asks something new) and Snooze (a time); null: back now
   projectNetAllow: p => core.projectNetAllow(p), // { project, host, rm? }: a sandboxed agent's network list here (the card's Allow this domain)
   wsRepair: p => core.wsRepair(p), // { ws, how: recreate | relink | forget }: T13, a broken worktree (the view's broken)
   tabBell: p => core.tabBell(p), // { id (a tab or a target) | ws, on }: T16's one-time bell (the user's, a phone's too)
@@ -871,7 +872,7 @@ const remoteNo = (method: string, p: Params) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
+const FROM = new Set(['tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
@@ -1357,7 +1358,7 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   reviewNotesGet: true, // R10: the Review tab's comments, read and kept from the phone too
   reviewNotesSet: true,
   voiceText: true, // the mic on the phone's prompt boxes (Reader's too): your words written down, nothing sent; Telegram's Answer has it
-  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess \
+  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen tabSnooze showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess \
 artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet \
 chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
   send: sendOk,
@@ -2288,6 +2289,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   // H4.5: idle, nobody looking: no client connected, or no window shown and no agent running (ticks.ts' slow and pause).
   // Not in the rig, where tests call with no window: LAKI_IDLE=1 tests it
   if (!inRig() || process.env.LAKI_IDLE === '1') ticks.setIdle(() => !core.clients.size || (![...core.clients].some(c => c.view?.shown !== false) && !core.state.tabs.some(t => core.rt.get(t.id)?.status === 'running')))
+  ticks.register('snoozeTick', 60000, () => core.snoozeTick(), { idle: 'keep' }) // Needs you's snoozes, back on time
   ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts, { idle: 'slow' })
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick()), { idle: 'slow' }) // LAKI_PR_BG: tests of the timer's own (bg) scans

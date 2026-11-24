@@ -13,7 +13,7 @@ import { RAIL_ITEMS, railSorted, type RowMark, rowMarkOn } from './settingsBase'
 import { ciText, type FixWhat, type PRAct, prState, REVIEW } from './Info'
 import { type Action, type Dialog, extOf, type Find, flowsOf, notesOf, type Place, type RailKind, settingsOf, specsOf, STATE_WORDS, STEP_ICON, tabGlyph, type Timer, type Watch, wsName } from './appCtx'
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react'
-import { nextStep, type Step } from '../../shared/nextStep'
+import { counted, nextStep, type Step } from '../../shared/nextStep'
 import { api, openExternal, pageNow } from './api'
 import { initials, spins } from './text'
 import { ICON_WIDTHS, iconLook, isIconName } from '../../shared/icons'
@@ -370,7 +370,7 @@ export function chromeOf(r: ChromeIn) {
   const phoneItems: BarItem[] = !narrow
     ? []
     : [
-        { key: 'projects', icon: RAIL[0][2], label: RAIL[0][1], on: !dialog, n: needing.length, run: () => (dialog ? (setDialog(null), setSideOpen(true)) : setSideOpen(o => !o)) },
+        { key: 'projects', icon: RAIL[0][2], label: RAIL[0][1], on: !dialog, n: needing.filter(t => counted(t)).length, run: () => (dialog ? (setDialog(null), setSideOpen(true)) : setSideOpen(o => !o)) },
         ...[...railShown, ...railSorted(railPages.filter(railOk), settings.railOrder).filter(x => railHide.includes(x.key))].flatMap(x => ('kind' in x ? [] : [x])),
         ...(aiOn(settings) ? [aiPage] : []),
         { key: 'settings', icon: 'gear', label: 'Settings', on: settingsOf(dialog), run: toSettings },

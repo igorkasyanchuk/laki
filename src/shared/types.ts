@@ -568,6 +568,7 @@ export type Tab = {
   queueHeld?: boolean // U8: Stop all agents stopped its turn: its queue waits for Resume queue (queueResume)
   color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
   muted?: boolean // no notifications from it
+  snoozed?: number // Needs you's ✕ and Snooze (tabSnooze): out of Needs you and every count until then (SNOOZE_NEXT: until something new), or sooner as it asks something new or starts a turn
   bell?: boolean // T16: its next ask or turn end told once, then off (core's ring, tabBell)
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
@@ -1567,7 +1568,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 226
+export const API = 227
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

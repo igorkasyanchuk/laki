@@ -2873,6 +2873,25 @@ export function unread(id: string) {
 }
 
 // and the other way: seen without a look (the Needs you list's Seen)
+// Needs you's ✕ (until: none: until it asks something new or starts a turn) and Snooze (until: a time, a week at most):
+// the tab out of Needs you and every count (nextStep.ts needsTab) till then; turn() clears it sooner, snoozeTick at its
+// time; null: back now. The user's (AGENT_NO)
+export const SNOOZE_NEXT = 8.64e15
+export function tabSnooze(p: { tab?: unknown; until?: unknown }) {
+  const t = findTab(String(p.tab ?? ''))
+  const u = p.until
+  if (u !== undefined && u !== null && (typeof u !== 'number' || !Number.isFinite(u) || u <= Date.now() || u > Date.now() + 8 * 864e5)) throw new Error('until: a time within a week, or none (until it asks something new)')
+  if (u === null) delete t.snoozed
+  else t.snoozed = typeof u === 'number' ? Math.round(u) : SNOOZE_NEXT
+  save()
+  changed()
+  return { snoozed: t.snoozed }
+}
+export function snoozeTick(now = Date.now()) {
+  const over = state.tabs.filter(t => t.snoozed && t.snoozed <= now)
+  for (const t of over) delete t.snoozed
+  if (over.length) (save(), changed())
+}
 export function seen(id: string) {
   findTab(id)
   rtOf(id).done = false
@@ -4718,6 +4737,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const now = at ?? Date.now() // the turn's working time (turnTook): by when each hook started
   if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
+  if (tab.snoozed && !late && (p.state === 'running' || (p.state === 'waiting' && was !== 'waiting'))) delete tab.snoozed // Needs you's ✕ or Snooze: back as it asks something new or works again
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
   // claude's Stop while subagents it started in the background still work: paused, not done (they report back as a new
   // turn, then its real Stop). Its ● and the done notice wait for that; sweepRunning leaves it running meanwhile

@@ -70,11 +70,28 @@ export function waitsElsewhere(v: Pick<View, 'workspaces' | 'tabs' | 'projects' 
 export function badgeOf(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | 'settings'>) {
   const w = veiled(v as View)
   const live = new Set(w.workspaces.filter(x => !x.muted && !x.archived).map(x => x.id))
-  return w.tabs.filter(t => needsTab(t) && !t.muted && live.has(t.workspace)).length
+  return w.tabs.filter(t => counted(t) && !t.muted && live.has(t.workspace)).length
 }
 // U5: the Board's columns, from the same rules: what the sidebar's Needs you counts (needsTab) is always in Answer, Review
 // or Fix, never in Working, Merge or Done. setup: its setup script runs
-export const needsTab = (t: TabView) => t.status === 'waiting' || !!t.secret || !!t.failed || (!!t.done && t.status === 'idle')
+export const needsTab = (t: TabView) => (t.status === 'waiting' || !!t.secret || !!t.failed || (!!t.done && t.status === 'idle')) && !snoozedNow(t)
+// Needs you's ✕ and Snooze (core.ts tabSnooze): out of the list and every count till then. Probably done: a finished
+// turn nobody opened for a day, folded under Needs you's Probably done, counted nowhere (counted: the Dock's, the menu
+// bar's, the rail's, the page's badge)
+export const snoozedNow = (t: Pick<TabView, 'snoozed'>, now = Date.now()) => (t.snoozed ?? 0) > now
+export const DONE_DAY = 864e5
+export const probablyDone = (t: TabView, now = Date.now()) => t.status !== 'waiting' && !t.secret && !t.failed && !!t.done && !!t.needAt && now - t.needAt > DONE_DAY
+export const counted = (t: TabView, now = Date.now()) => needsTab(t) && !probablyDone(t, now)
+// Snooze's times (Needs you's ⋯): an hour, this evening (18:00, before 17:00 only), tomorrow 9:00, next Monday 9:00
+export function snoozeTimes(now = new Date()): { label: string; at: number }[] {
+  const at = (days: number, h: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, h).getTime()
+  return [
+    { label: '1 hour', at: now.getTime() + 36e5 },
+    ...(now.getHours() < 17 ? [{ label: 'This evening', at: at(0, 18) }] : []),
+    { label: 'Tomorrow 9:00', at: at(1, 9) },
+    { label: 'Next week', at: at(((8 - now.getDay()) % 7) || 7, 9) },
+  ]
+}
 export const BOARD = [['working', 'Working'], ['answer', 'Answer'], ['review', 'Review'], ['fix', 'Fix'], ['merge', 'Merge'], ['done', 'Done']] as const
 export type BoardCol = (typeof BOARD)[number][0]
 export function boardCol(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): BoardCol {

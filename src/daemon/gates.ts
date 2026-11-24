@@ -10,7 +10,7 @@ const TICK = "move Laki's clock (its timers and tidies run on their own)"
 export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a report's page loads (the user's viewer asks)",
   artifactAllow: "let a report's page load from another host (the user does, in the viewer)",
   flowTrustDiff: "read the text the user allowed a workflow at (it would shape its change to it)",
-  askExplain: "explain the user's ask (an agent spends no Laki AI on its own asks)", reviewSteps: "walk the user through a diff (it spends the user's Laki AI)",
+  askExplain: "explain the user's ask (an agent spends no Laki AI on its own asks)", tabSnooze: "snooze or dismiss what's in the user's Needs you", reviewSteps: "walk the user through a diff (it spends the user's Laki AI)",
   aiCredits: "read Laki AI's OpenRouter credits and spend (the user's)", scheduleCopy: 'duplicate a scheduled task (the user does, in Scheduled tasks)',
   promptQuestions: "ask Laki AI what a task leaves open (the New workspace page's Ask me first: it spends the user's AI money)",
   promptImprove: "have Laki AI rewrite the user's draft (a prompt box's ✨: it spends the user's AI money)",
@@ -125,7 +125,7 @@ export const REMOTE_NO = new Set(['scheduleCopy', 'secretForget', 'gitTidy', 'go
   'widgetMock', 'widgetCheck', ...TICKS])
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of
 // REMOTE_KEYS, a share with no end, a project's scripts and auto-answer rules)
-export const REMOTE_OK = new Set(['artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
+export const REMOTE_OK = new Set(['tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
   'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'mcpSignIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentLog', 'diskUsage',
   'mergeQueueStart', 'mergeQueueStop', 'archivedKeep', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet',
   ...'ping state projectAdd sampleNew sampleRm projectRm projectArchive updateIdle agentModels projectSet memoryAdd memoryRm projectFile projectTrust branches csMachines wsNew quickNew wsRm wsPeek overlapCheck wsStat wsArchive doctor hooksSeen wsFan answer unread seen show showDone browse timer browseDone wsRestore wsFork tabNew layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompact \

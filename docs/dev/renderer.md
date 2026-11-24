@@ -332,6 +332,12 @@ are tested in `test/units-more.test.ts`.
     `settings.staleAfter` minutes ago by its `needAt`; unset `STALE_AFTER` 30, 0 never; waiting never). Needs.tsx folds
     the stale ones under *Earlier · n* (`laki.needsEarlier`: unfolded; *Seen all*: `seen` each, Undo `unread`), dimmed,
     one line; each card's chevron shows or hides its detail (open but for a stale one), the rest of it opens the tab.
+    Its ✕ and clock (NeedsApi `snooze`, Sidebar's: core.ts `tabSnooze`, the user's, AGENT_NO): `tab.snoozed` (none:
+    `SNOOZE_NEXT`, till it asks something new) and nextStep.ts `snoozeTimes`; `needsTab` leaves a `snoozedNow` tab out,
+    turn() clears it on a new ask (not a repeat of the one waiting) or a turn's start, `snoozeTick` (a minute) at its
+    time. *Probably done · n* (`probablyDone`: finished a day ago, `DONE_DAY`, unopened) is listed but `counted` leaves it
+    out of the Dock's, the menu bar's (tray.ts `stateOf`), the rail's and the page's badge (`badgeOf`). Unit test:
+    test/units-more.test.ts; the gate: test/agent-gates.test.ts.
     U8: its head's *Allow all (n)* / *Deny all* take shared/ask.ts `bulkOk`'s asks (claude's PermissionRequest: `tool`
     and `what`, the menu's first a yes and last a no or none read; never `risky`, a cut `what`, a secret, `steps`, or a
     file tool's path outside the worktree unless the tab's `sandbox` is on and not bypass), two or more; Sidebar's

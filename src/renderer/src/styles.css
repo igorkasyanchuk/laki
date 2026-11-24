@@ -597,6 +597,10 @@ html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:i
 .need-acts button { text-align: center; }
 /* each card's chevron shows or hides its detail; Earlier folds the stale finishes (done a while ago), dimmed */
 .need-chev { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin: -2px -4px -2px 0; padding: 0; border: 0; border-radius: var(--r-s); background: none; color: var(--muted); cursor: var(--cur-act); }
+.need-x { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin: -2px 0; padding: 0; border: 0; border-radius: var(--r-s); background: none; color: var(--muted); cursor: var(--cur-act); opacity: 0; }
+.need:is(:hover, :focus-within) .need-x, .need-x:focus-visible { opacity: 1; }
+.need-x:hover { color: var(--fg); background: var(--hover); }
+@media (hover: none) { .need-x { opacity: 1; } }
 .need-chev:hover { background: var(--hover); color: var(--fg); }
 .need.need-stale { opacity: 0.7; }
 .need-earlier { display: flex; align-items: center; gap: var(--sp-3); }

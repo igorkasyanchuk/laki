@@ -2,7 +2,7 @@
 // (macOS tints it for a light or dark menu bar and for the highlight from its alpha alone: no color), test/tray.test.ts
 // draws all four to PNGs. The renderer works out the state from its view (stateOf) and sends it with the badge.
 import { askScope, optLabel } from './ask.ts'
-import { needsTab } from './nextStep.ts'
+import { counted } from './nextStep.ts'
 import type { DigestRow, TabView, View } from './types.ts'
 
 export const TRAY_STATES = ['idle', 'working', 'waiting', 'blocked'] as const
@@ -16,7 +16,7 @@ export function stateOf(view: Pick<View, 'tabs' | 'workspaces'>, now = Date.now(
   const quiet = new Set(view.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
   const tabs = view.tabs.filter((t: TabView) => !t.muted && !quiet.has(t.workspace))
   const agents = tabs.filter(t => t.kind === 'agent')
-  const needs = tabs.filter(needsTab).length
+  const needs = tabs.filter(t => counted(t, now)).length
   const working = agents.filter(t => t.status === 'running').length
   const blocked = agents.filter(t => (!!t.limit && t.limit > now) || !!t.failed).length
   return { state: blocked ? 'blocked' : needs ? 'waiting' : working ? 'working' : 'idle', needs, working, blocked }

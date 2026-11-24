@@ -1731,3 +1731,21 @@ test("tgBackend: Laki AI's backend from Telegram: the Mac's API one, its own pic
   assert.equal(tgBackend({ ai: { backend: 'openrouter' }, tgAi: 'endpoint' }), 'endpoint')
   assert.ok(!AGENT_SETTINGS_OK.has('tgAi') && REMOTE_KEYS.test('tgAi'), "the user's: no agent, no phone changes it")
 })
+
+test("Needs you's ✕, Snooze and Probably done: out of the list and the counts; Snooze's times", async () => {
+  const { counted, needsTab, probablyDone, snoozeTimes, badgeOf } = await import('../src/shared/nextStep.ts')
+  const now = Date.now()
+  const ask = { id: 't', workspace: 'w', name: 'claude', status: 'waiting' } as any
+  assert.ok(needsTab(ask) && counted(ask))
+  assert.ok(!needsTab({ ...ask, snoozed: now + 60_000 }), 'snoozed: out')
+  assert.ok(needsTab({ ...ask, snoozed: now - 1 }), 'its time came: back')
+  const old = { ...ask, status: 'idle', done: true, needAt: now - 2 * 864e5 }
+  assert.ok(needsTab(old) && probablyDone(old) && !counted(old), 'a day-old unopened finish: listed, counted nowhere')
+  assert.ok(!probablyDone({ ...old, needAt: now - 3600e3 }) && !probablyDone({ ...old, failed: 'x' }))
+  assert.equal(badgeOf({ workspaces: [{ id: 'w' }], tabs: [ask, { ...ask, id: 'u', snoozed: now + 1e6 }, { ...old, id: 'v' }], projects: [], settings: {} } as any), 1)
+  const t = snoozeTimes(new Date(2026, 10, 25, 10, 30)) // a Wednesday morning
+  assert.deepEqual(t.map(x => x.label), ['1 hour', 'This evening', 'Tomorrow 9:00', 'Next week'])
+  assert.deepEqual(t.slice(1).map(x => new Date(x.at).toString().slice(0, 21)), [new Date(2026, 10, 25, 18), new Date(2026, 10, 26, 9), new Date(2026, 10, 30, 9)].map(d => d.toString().slice(0, 21)))
+  assert.deepEqual(snoozeTimes(new Date(2026, 10, 25, 19)).map(x => x.label), ['1 hour', 'Tomorrow 9:00', 'Next week'], 'no evening after 17:00')
+  assert.equal(new Date(snoozeTimes(new Date(2026, 10, 30, 8)).at(-1)!.at).getDate(), 7, 'on a Monday: the next one')
+})

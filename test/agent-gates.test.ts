@@ -107,6 +107,15 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   const ws = (await rig.rpc('state')).workspaces.filter((w: any) => [one.id, two.id].includes(w.id))
   assert.deepEqual(ws.map((w: any) => [w.muted, w.mutedBy]), [[true, 'project'], [true, 'project']])
   await rig.rpc('projectSet', { id: p.id, muted: false })
+  // Needs you's ✕ and Snooze: the user's; a time within a week, none (till it asks something new), null (back now)
+  await assert.rejects(rig.rpc('tabSnooze', { tab, from }), /an agent can't snooze or dismiss/)
+  await rig.rpc('tabSnooze', { tab })
+  assert.ok((await rig.rpc('state')).tabs.find((x: any) => x.id === tab).snoozed > Date.now() + 1e12, 'till something new')
+  const at = Date.now() + 3600e3
+  assert.equal((await rig.rpc('tabSnooze', { tab, until: at })).snoozed, at)
+  await assert.rejects(rig.rpc('tabSnooze', { tab, until: Date.now() + 30 * 864e5 }), /within a week/)
+  await rig.rpc('tabSnooze', { tab, until: null })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab).snoozed, undefined)
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).muted, undefined)
 })
 
