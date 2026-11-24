@@ -52,7 +52,7 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
   }, [peek.uri, n])
   // below the pointer, or above it in the screen's lower part; never off the window's right edge
   const low = peek.y > innerHeight * 0.55
-  const left = Math.max(8, Math.min(peek.x - 12, innerWidth - (kind === 'gh' ? 376 : 556)))
+  const left = Math.max(8, Math.min(peek.x - 12, innerWidth - (kind === 'gh' ? 376 : kind === 'md' ? 696 : 556)))
   const style = { left, ...(low ? { bottom: innerHeight - peek.y + 10 } : { top: peek.y + 12 }), ...({ '--ox': `${peek.x - left}px`, '--oy': low ? '100%' : '0px' } as CSSProperties) } // it grows from the pointer
   const [, owner, name, what, num] = GH_LINK.exec(peek.uri) ?? []
   const state = card && (card.draft && card.state === 'open' ? 'draft' : card.state)

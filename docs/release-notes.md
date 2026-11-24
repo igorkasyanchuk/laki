@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A Markdown file's hover card in a terminal is twice as wide, its text at the size you read elsewhere.
 - The workers dock says what its workers spent, and has Allow N safe (their plain permission asks), Archive N done (the finished ones with nothing uncommitted) and Stop all, each asking first.
 - The bars' capsules light softly around the pointer, with their rim lit near it; ⌘K, Find a file and Search chats get the lit rim too, and ⌘K bends what's under its edges like a menu (Refraction).
 - Ship and Update refuse a worktree whose git folder holds a rebase step that runs a command or a submodule setting that names a program (what an agent's sandbox could leave there), and say which file to look at.
