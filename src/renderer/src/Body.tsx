@@ -6,7 +6,8 @@ import { Backdrop } from './Backdrop'
 import { BrowserPane } from './Browser'
 import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, McpStrip, PlanStrip, QueueStrip, Ready, SecretStrip, ShowStrip, SignInStrip, StarLaki, Welcome, WorkersDock } from './panels'
 import { Glyph as ExtGlyph, inWs, status as extStatus, WidgetBody, WidgetPanel } from './Widgets'
-import { edited, type FileContent, FilePreview, type FilesRoot, SidePanel } from './SidePanel'
+import { edited, type FileContent, FilePreview, fileNoteText, type FilesRoot, SidePanel } from './SidePanel'
+import type { ReviewNote } from '../../shared/reviewNotes'
 import { Glyph, rollup } from './Glyph'
 import { ask, Icon, IconButton } from './ui'
 import { bulkAnswer } from './Needs'
@@ -222,6 +223,16 @@ export function bodyOf(app: AppCtx) {
               edit={previewed.edit}
               onEdit={edit => setOpenFiles(l => l.map(x => (x.ws === previewed.ws && fileKey(x) === fileKey(previewed) ? { ...x, edit } : x)))}
               save={(text, was, force) => api.call('fileWrite', { ws: ws.id, path: previewed.path, text, was, force })}
+              comment={
+                previewed.storage
+                  ? undefined
+                  : {
+                      agent: panelApi(ws).agents[0]?.name,
+                      // into the Review tab's Yours (its whole list, as the Review sets it): side RIGHT, quote as a diff line's
+                      add: c => api.call<{ notes?: ReviewNote[] }>('reviewNotesGet', { ws: ws.id }).then(r => api.call('reviewNotesSet', { ws: ws.id, notes: [...(r?.notes ?? []), { id: crypto.randomUUID(), path: c.path, line: c.line, ...(c.startLine && { startLine: c.startLine }), side: 'RIGHT', body: c.body, quote: ` ${c.quote}` }] })),
+                      send: c => panelApi(ws).toAgent(fileNoteText(c), true),
+                    }
+              }
             />
             )}
             </div>

@@ -618,6 +618,9 @@ selected workspace's PR is in the status bar.
   open ones first, resolved folded, a click goes to the line; then the PR's conversation and each review's summary
   (approved, changes requested), with a box under it whose *Comment* (⌘⏎) replies there, as you. Click a line to comment on it, or drag over lines for a range; *Add to the review*
   (⌘⏎) puts it in *Yours*, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*.
+  In the side panel's Files, a file's preview takes comments too, on code the branch didn't change: click a line's
+  number, or select part of a line (or several) and press *Comment*; *Add to the review* puts it in *Yours* with the
+  file, its lines and the words you picked, *Send to <agent>* sends it now.
   Paste or drop a screenshot or a file into a comment (here and in Changes): it shows as a chip under the words (× takes
   it out), and the agent gets each file's path with the comment. GitHub gets the words only (*Post on #n*, *Comment on
   PR*), with a note that the files went to the agent.

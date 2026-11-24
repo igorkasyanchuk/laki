@@ -2073,6 +2073,12 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .pv-edit:focus { border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .pv-line.at { background: color-mix(in srgb, var(--waiting) 18%, transparent); }
 .pv-n { display: inline-block; width: 48px; padding-right: var(--sp-5); text-align: right; color: var(--muted); opacity: 0.6; user-select: none; -webkit-user-select: none; }
+.pv-n[role=button] { cursor: var(--cur-act); }
+.pv-n[role=button]:hover { color: var(--accent); opacity: 1; }
+.pv-line.pv-picked { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pv-sel-comment { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: var(--sp-3); padding: 0 var(--sp-2); border-radius: var(--r-pill); font: inherit; font-size: var(--fs-1); white-space: nowrap; }
+.pv-comment { margin: var(--sp-1) var(--sp-3) var(--sp-2) 56px; white-space: normal; }
+.pv-quote { margin-bottom: var(--sp-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv-image { padding: var(--sp-6); display: flex; justify-content: center; background: repeating-conic-gradient(var(--panel) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px; min-height: 100%; }
 .img-diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-4); padding: var(--sp-4); }
 .img-side { margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }

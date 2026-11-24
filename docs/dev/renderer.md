@@ -1055,7 +1055,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Info (`PanelTab` `info`, first, any project: App passes `InfoTab` as
   `info`), Files (tree from the daemon's file list, search, new
   file/folder, changed files marked), Changes (the diff by file, each file's row sticky over its diff as it scrolls, Expand all / Collapse all (one button: collapse while any is open), each line with its old and new numbers from the
-  hunks; a click opens `CommentBox`: the PR, or the agent (a paste or drop: PromptInput's `keepFile`, imageSave or
+  hunks (the Files preview's own: FilePreview's `comment`, a line number's click or a selection's *Comment*: `FileNote`,
+  Body's `add` into `reviewNotesSet`'s list with side RIGHT, `send` as `fileNoteText` through `toAgent`); a click opens `CommentBox`: the PR, or the agent (a paste or drop: PromptInput's `keepFile`, imageSave or
   fileSave, its path a `📎 ` line of the text, reviewNotes.ts `attachments` drawn as chips; `forGitHub` leaves them out of
   what GitHub gets, counted); an image, `IMAGE`, is `ImageDiff`: `PanelApi.read` with `base`
   for before, as `<img>`, SVG too, a click for full size), Review (`PRSection` from `Info.tsx` with the open

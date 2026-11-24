@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Comment on any code in Files, not only the diff: a line's number or a selection, into your review or straight to the agent.
 - Mark a workspace Waiting on… (a deploy, a reply): a quiet ring on its row, its own Board column, out of Needs you until its agent asks or starts again; agents can say it too (`laki wait-on`).
 - Needs you: ✕ takes a row out till it asks something new, its clock snoozes it (an hour, this evening, tomorrow, next week), and finishes nobody opened for a day fold under Probably done, counted nowhere.
 - Laki AI from Telegram gets its own backend (Settings › AI › From Telegram), so it can answer and start work there while the Mac's runs claude or codex; full access as on the Mac takes a typed confirm.

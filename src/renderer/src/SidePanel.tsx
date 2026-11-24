@@ -1,7 +1,7 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
 // checks and review comments; a phone's screen (Simulator); a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { bridge } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
@@ -1530,6 +1530,9 @@ function CsvTable({ path, text, edit, onText, grid }: { path: string; text: stri
 
 
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
+// Comment on code in Files (FilePreview's comment): the file, its lines and the exact words picked
+export type FileNote = { path: string; line: number; startLine?: number; quote: string; body: string }
+export const fileNoteText = (c: FileNote) => `About ${c.path}, ${c.startLine ? `lines ${c.startLine}-${c.line}` : `line ${c.line}`}: \`${c.quote.replace(/\s+/g, ' ').replace(/`/g, "'").slice(0, 300)}\`\n\n${c.body}`
 export function FilePreview(p: {
   path: string
   line?: number
@@ -1544,13 +1547,39 @@ export function FilePreview(p: {
   onDefault?: () => void // a file it can't show: in its default app, the editor (else onOpen, unless readOnly), or Finder (the card's buttons)
   onEditor?: () => void
   onReveal?: () => void
+  // Comment on code (a file of the workspace's, not a kept one): a line number's click or a selection's Comment opens a
+  // box under it; add: into the Review tab's Yours (reviewNotes), send: to the workspace's agent, as a diff comment goes
+  comment?: { agent?: string; add: (c: FileNote) => Promise<unknown>; send: (c: FileNote) => Promise<unknown> }
 }) {
   const [f, setF] = useState<FileContent | null>(null)
+  const [at, setAt] = useState<{ from: number; to: number; quote: string; box?: boolean } | null>(null) // the lines a comment is on, its text
+  const [said, setSaid] = useState('')
+  const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [n, setN] = useState(0)
   const [saving, setSaving] = useState(false)
   const body = useRef<HTMLDivElement>(null)
   const area = useRef<HTMLTextAreaElement>(null)
+  const rawLines = useMemo(() => f?.text?.split('\n') ?? [], [f?.text])
+  // a selection inside the lines (a part of one, or several): its lines and its exact words; a click elsewhere drops it
+  const picked = () => {
+    const s = window.getSelection()
+    const text = s?.toString() ?? ''
+    if (!s || !text.trim() || s.rangeCount === 0) return void (at && !at.box && setAt(null)) // a plain click: the Comment button goes
+    const n = (node: unknown) => Number((node instanceof Element ? node : (node as Text | null)?.parentElement)?.closest<HTMLElement>('.pv-line')?.dataset.n ?? 0)
+    const [a, b] = [n(s.anchorNode), n(s.focusNode)].sort((x, y) => x - y)
+    if (a && b) setAt({ from: a, to: b, quote: text.replace(/\s+$/, '') })
+  }
+  const open = (from: number, to: number, quote: string) => (setSaid(''), setBusy(''), setAt({ from, to, quote, box: true }))
+  const go = (how: 'add' | 'send') => {
+    if (!at || !said.trim() || !p.comment) return
+    setBusy(how)
+    const c: FileNote = { path: p.path, line: at.to, ...(at.from !== at.to && { startLine: at.from }), quote: at.quote, body: said.trim() }
+    p.comment[how](c).then(
+      () => (setAt(null), setSaid(''), setBusy('')),
+      e => setBusy(String((e as Error)?.message ?? e)),
+    )
+  }
   const top = useRef(0) // where the lines were scrolled, kept into the edit and back
   const load = useRef(p.load)
   load.current = p.load
@@ -1714,10 +1743,38 @@ export function FilePreview(p: {
         {page?.cut && <div className="muted small pad">Showing the start of this sheet ({page.rows.length - 1} rows). Open it in its app for the rest.</div>}
         {f?.text !== undefined &&
           lines.map((l, i) => (
-            <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>
-              <span className="pv-n">{i + 1}</span>
-              {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
-            </div>
+            <Fragment key={i}>
+              <div className={`pv-line ${p.line === i + 1 ? 'at' : ''}${at && i + 1 >= at.from && i + 1 <= at.to ? ' pv-picked' : ''}`} data-n={i + 1} onMouseUp={p.comment ? picked : undefined}>
+                <span className="pv-n" {...(p.comment && { role: 'button', 'data-tip': 'Comment on this line', onClick: () => open(i + 1, i + 1, rawLines[i] ?? '') })}>
+                  {i + 1}
+                </span>
+                {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
+                {at && !at.box && at.to === i + 1 && (
+                  <button type="button" className="pv-sel-comment" onMouseDown={e => e.preventDefault()} onClick={() => setAt({ ...at, box: true })}>
+                    <Icon name="message" size={12} /> Comment
+                  </button>
+                )}
+              </div>
+              {at?.box && at.to === i + 1 && p.comment && (
+                <div className="dl-comment pv-comment" onMouseUp={e => e.stopPropagation()}>
+                  <div className="muted small mono pv-quote">{at.from === at.to ? `line ${at.from}` : `lines ${at.from}-${at.to}`}: {at.quote.length > 120 ? `${at.quote.slice(0, 120)}…` : at.quote}</div>
+                  <textarea autoFocus rows={3} value={said} placeholder="A comment on this code · ⌘⏎ adds it to the review" onChange={e => setSaid(e.target.value)} onKeyDown={e => (e.stopPropagation(), e.key === 'Escape' ? setAt(null) : e.key === 'Enter' && e.metaKey && go('add'))} />
+                  <div className="row">
+                    <button className="primary" disabled={!said.trim() || !!busy} onClick={() => go('add')}>
+                      Add to the review
+                    </button>
+                    <button disabled={!said.trim() || !!busy} onClick={() => go('send')}>
+                      Send to {p.comment.agent ?? 'the agent'}
+                    </button>
+                    {busy && busy !== 'add' && busy !== 'send' && <span className="warn small">{busy}</span>}
+                    <span className="grow" />
+                    <button className="link small" onClick={() => setAt(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Fragment>
           ))}
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
         {f && f.text === undefined && !f.image && !book && (
