@@ -340,8 +340,9 @@ no key outside `NEW_KEYS`, no mode that `neverAsks`, no `sandbox: false`; `agent
 `railPin`, `timer`, the reminders; the rest refused (*answer only from here …: do that on the Mac itself, or give this
 device full access there*). Every api method is in `ANSWER` or `ANSWER_NO`, checked as the daemon loads, so a new one is
 classified before any test runs. The HTTP `/rpc` of a remote page calls with a Conn of its own (`remote`, its `device`),
-and Laki AI's tools for a remote ask (`aiAsk`, `aiAnswer`'s rpc) go through that Conn's gates, REMOTE_NO and the level
-(ponytail: a message queued behind another's ask runs with that ask's). The page's view has `remote.level` (main.ts'
+and Laki AI's tools for a remote ask (`aiAsk`, `aiAnswer`'s rpc) go through that Conn's gates, REMOTE_NO and the level;
+a message queued behind another's ask keeps its sender's rpc and runs with it (ai.ts `drain`: one sender's in a row as
+one ask, main.ts `aiRpcOf` one rpc per caller: the Mac's, each remote socket's). The page's view has `remote.level` (main.ts'
 `send` adds it per remote connection; the Mac's view has none; a page that asks for patches, P2, gets them diffed
 against its own masked, leveled view): menus.ts keeps only the items that level may do (by
 label), the rail only the Board, the Calendar and AI, and the terminals take no keys (`api.answerOnly`,

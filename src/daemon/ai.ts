@@ -313,9 +313,10 @@ export function aiMayAlert(chat?: string) {
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
 type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean; shots?: string[]; queue?: Queued[] } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
 const threads = new Map<string, Thread>()
-// what you send while it answers (aiAsk queue): kept in memory, all of it the next ask as the answer ends (any end, Stop
-// too); aiUnqueue drops one first. ponytail: a restart forgets them
-type Queued = { text: string; images: string[]; context?: string }
+// what you send while it answers (aiAsk queue): kept in memory, the next ask as the answer ends (any end, Stop too);
+// aiUnqueue drops one first. rpc: its sender's own (your window's, a phone's with remote access's gates): it runs with
+// it, never with the ask it waited behind. ponytail: a restart forgets them
+type Queued = { text: string; images: string[]; context?: string; rpc: Rpc }
 const QUEUE_MAX = 10
 // the chats whose ask is at work, each its stop: one ask per chat, AI_AT_ONCE chats at a time (a new extension starts
 // while another builds); laki_ask's aiQuestion and aiPermission find theirs by the chat its tools pass (laki mcp's
@@ -517,7 +518,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   const t = thread(p.chat)
   if (p.queue && busy.has(t.id)) {
     if ((t.queue ??= []).length >= QUEUE_MAX) throw new Error(`${QUEUE_MAX} messages wait already: let it answer first`)
-    t.queue.push({ text: ask, images, context: typeof p.context === 'string' ? p.context : undefined })
+    t.queue.push({ text: ask, images, context: typeof p.context === 'string' ? p.context : undefined, rpc })
     changed(t)
     return { queued: t.queue.length }
   }
@@ -561,17 +562,27 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     try {
       logCall(call)
     } catch {}
-    drain(t, rpc)
+    drain(t)
   }
 }
-// what was sent while it worked (an ask, a Yes to several), all of it as one ask; refused before it asked (Laki AI off,
-// too many chats at work): said, not lost
-function drain(t: Thread, rpc: Rpc) {
-  const next = t.queue?.splice(0) ?? []
+// what was sent while it worked (an ask, a Yes to several): the first sender's in a row as one ask, with that sender's
+// rpc (one caller's: main.ts aiRpcOf), the rest after it ends; refused before it asked (Laki AI off, too many chats at
+// work): said, not lost, and the next sender's goes; another ask that took the chat first: they wait for its end
+function drain(t: Thread) {
+  const q = t.queue ?? []
+  const n = q.findIndex(x => x.rpc !== q[0].rpc)
+  const next = q.splice(0, n < 0 ? q.length : n)
   changed(t)
   if (!next.length) return
   const text = next.map(q => q.text).filter(Boolean).join('\n\n')
-  setImmediate(() => aiAsk({ chat: t.id, text, images: next.flatMap(q => q.images), context: next.findLast(q => q.context)?.context }, rpc).catch(e => t.chat.findLast(m => m.role === 'user')?.text === text || say(t, 'error', `Not sent (${(e as Error).message}): ${text}`)))
+  setImmediate(() =>
+    aiAsk({ chat: t.id, text, images: next.flatMap(q => q.images), context: next.findLast(q => q.context)?.context }, next[0].rpc).catch(e => {
+      if (t.chat.findLast(m => m.role === 'user')?.text === text) return // it asked: its end went on to the rest
+      if (busy.has(t.id)) return void ((t.queue ??= []).unshift(...next), changed(t))
+      say(t, 'error', `Not sent (${(e as Error).message}): ${text}`)
+      drain(t)
+    }),
+  )
 }
 // a message waiting for the answer to end, taken back (the composer's ✕)
 export function aiUnqueue(p: { chat?: string; i: number; text?: string }) {
@@ -1423,7 +1434,7 @@ async function answerMany(t: Thread, m: AiMsg, n: number, only: unknown, rpc: Rp
     return { done: ok.length, failed: no.length, kept }
   } finally {
     busy.delete(t.id)
-    drain(t, rpc)
+    drain(t)
   }
 }
 

@@ -532,7 +532,7 @@ const api = {
   reviewSteps: (p: In<typeof reviewSteps>) => reviewSteps(p), // R13: the Review tab's Walk through, by Laki AI; the user's and their phone's
   artifactHosts: (p: In<typeof artifactHosts>) => artifactHosts(p), // S18: what a report's page loads that its CSP blocks
   artifactAllow: (p: In<typeof artifactAllow>) => artifactAllow(p), // S18: Allow for this report
-  aiAsk: ({ from, ...p }, c) => (core.agentCaller(from) ? aiAsk(byAgent(from, p), asAgent(from)) : (core.promptKeep(p.text), aiAsk(p, (method, params) => call(method, params, c?.remote ? c : undefined) as Promise<any>))), // a remote ask's tools: the phone's gates (REMOTE_NO, D7's level). ponytail: a message queued behind another's ask runs with that one's // Laki's own AI (yours: its text in your prompts' history): its tools call this API here; from: whoCalls'
+  aiAsk: ({ from, ...p }, c) => (core.agentCaller(from) ? aiAsk(byAgent(from, p), asAgent(from)) : (core.promptKeep(p.text), aiAsk(p, aiRpcOf(c)))), // a remote ask's tools: the phone's gates (REMOTE_NO, D7's level), a queued one's too (its own rpc) // Laki's own AI (yours: its text in your prompts' history): its tools call this API here; from: whoCalls'
   aiUnqueue: p => aiUnqueue(p), // a message sent while it answered, taken back before it goes
   aiState: ({ from, ...p }) => (core.agentCaller(from) ? { ...aiState({ chat: agentChat(String(from.tab)) }), calls: [], totals: aiTotals([]) } : aiState(p)), // an agent's: its own chat (S2), not yours, your calls or what they cost; chat: a spec's or brainstorm's (planChat), else the AI page's
   aiShot: ({ from, ...p }) => aiShot(core.agentCaller(from) ? { ...p, chat: agentChat(String(from.tab)) } : p), // the skill's laki_screenshot: the screen, an app's window or the simulator, only while Laki AI works; an agent's call: its own chat's, never yours
@@ -540,7 +540,7 @@ const api = {
   aiHelp: p => aiHelp(p), // laki_help: Laki's guide, the parts a question is about
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
   aiPermission: p => (p.ext ? widgetPermission(p) : aiPermission(p)), // laki mcp's laki_permission (claude -p's permission prompt): Allow / Deny in the chat (an extension's: the app's dialog), waited for
-  aiAnswer: (p, c) => aiAnswer(p, (method, params) => call(method, params, c?.remote ? c : undefined) as Promise<any>), // the AI page's buttons: a removal is done here, on Yes
+  aiAnswer: (p, c) => aiAnswer(p, aiRpcOf(c)), // the AI page's buttons: a removal is done here, on Yes
   aiNew: ({ from, ...p }) => aiNew(core.agentCaller(from) ? { chat: agentChat(String(from.tab)) } : p), // an agent's: its own chat; the AI page's: the chat it ends kept among the earlier ones (aiChats)
   aiChats: () => aiChats(),
   aiOpen: p => aiOpen(p),
@@ -1193,6 +1193,12 @@ const takesFrom = (method: string) => FROM.has(method) || (RECORDED.has(method) 
 // agent's from (caller), as whoCalls gives the agent's own, and passes agentNo; so the asks (rm, another workspace's
 // tabs) and the refusals are the ones the agent's own call gets. Its message says who asked, and never waits in the
 // queue (a queued one runs with the rpc of the ask before it: yours)
+// Laki AI's tools as their asker calls: the Mac's (a window, the CLI) one rpc, each remote access socket its own (its
+// gates), the same one each time, so a message queued behind another's ask runs with its own sender's (ai.ts drain)
+// and one sender's in a row stay one ask
+const localAi = (method: string, params: unknown) => call(method, params) as Promise<any>
+const remoteAi = new WeakMap<core.Conn, typeof localAi>()
+const aiRpcOf = (c?: core.Conn) => (!c?.remote ? localAi : (remoteAi.get(c) ?? (r => (remoteAi.set(c, r), r))((method: string, params: unknown) => call(method, params, c) as Promise<any>)))
 const asAgent = (from: Params) => (method: string, params: Params) => {
   method = oldName(method)
   const me = { ws: from.ws, tab: from.tab }

@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- A message sent to Laki AI from your phone (remote access) while it was answering you now runs with your phone's limits, not with the rights of the ask it waited behind.
+
 ## 0.62.0 · Nov 24, 2026
 
 - Laki's window and the phone page start lighter: each look's styles load when it's picked, so the first load's CSS went from 596 KB to 358 KB.

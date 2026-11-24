@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { basename, join } from 'node:path'
 import { test } from 'node:test'
 import { aiRpc, findSessions, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
 import { aiTotals } from '../src/shared/types.ts'
-import { connect, fixtureWidgets, fresh, openrouter, reply, seen, sleep, until } from './helpers.ts'
+import { connect, fixtureWidgets, fresh, openrouter, reply, seen, sleep, tokenOf, until } from './helpers.ts'
 
 
 test("ai: Your endpoint: the same tool loop at its own URL with its own key, none of OpenRouter's parts, not priced; https or this Mac's http; the key never in the view", async t => {
@@ -416,6 +416,38 @@ test('ai: what you send while it answers waits (queue), and goes as one ask when
   assert.deepEqual(st.queue, [])
   assert.equal(st.chat.findLast((m: any) => m.role === 'user').text, 'and the drafts\n\nonly mine')
   assert.equal(or.hits.length, 2)
+})
+
+test("ai: a message queued behind another's ask runs with its own sender's gates: a phone's behind yours does only what remote access may", async t => {
+  const schedule = (project: string) => reply({ content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'laki_schedule_add', arguments: JSON.stringify({ project, when: 'every day at 9am', prompt: 'check the build' }) } }] })
+  const or = await openrouter(t, [{ slow: true }])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  or.answers.push(schedule(p.id), reply({ content: 'asked' }), schedule(p.id), reply({ content: 'made' }))
+  // the phone: remote access's page, its own token and origin (scheduleSet is the Mac's alone: REMOTE_NO)
+  const { port } = rig.info()
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  await rig.rpc('settingsSet', { remoteMail: 'me@x.dev' })
+  const on = await rig.rpc('remoteStart', { hours: 1 })
+  const url = `https://fake-${port}.trycloudflare.com`
+  const tok = (await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: tokenOf(on.link) }) }).then(r => r.json())).token
+  const phone = await connect(rig, url, tok, true)
+  t.after(() => phone.ws.close())
+  // yours runs (the Mac's rights); the phone's waits behind it, then goes with the phone's own
+  const first = rig.rpc('aiAsk', { text: 'my open PRs' }).catch(e => e)
+  await until(() => or.hits.length === 1, 'your ask')
+  assert.deepEqual(await phone.call('aiAsk', { text: 'schedule a daily build check', queue: true }), { queued: 1 })
+  await rig.rpc('aiStop')
+  assert.match(String(await first), /stopped/)
+  await until(async () => (await rig.rpc('aiState')).chat.at(-1)?.text === 'asked', "the phone's ask answered")
+  const told = JSON.stringify(or.hits[2].body.messages.at(-1))
+  assert.match(told, /not over remote access: do that on the Mac itself \(scheduleSet\)/, "the tool ran with the phone's gates")
+  assert.deepEqual((await rig.rpc('stateOwn')).schedules ?? [], [], 'nothing scheduled from the phone')
+  // the same ask from the Mac: made (the refusal was the phone's, not the tool's)
+  await rig.rpc('aiAsk', { text: 'schedule a daily build check' })
+  assert.equal((await rig.rpc('stateOwn')).schedules?.length, 1)
 })
 
 test("ai: Laki's skill asks with options, writes memory, and removes only on the user's Yes", async t => {
