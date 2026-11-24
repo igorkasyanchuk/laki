@@ -13,6 +13,14 @@ const loads = new Map<string, Promise<void>>()
 let now = ''
 let queue = Promise.resolve() // one file at a time: the sheets new after each are its own
 const on = () => sheets.forEach((ss, look) => ss.forEach(s => (s.disabled = look !== now)))
+// the look's own file among the sheets new since it was asked for: a lazy page's (Settings', Board's…) may land then too.
+// The build's <look>-<hash>.css, the dev server's <style data-vite-dev-id=…/looks/<look>.css>; none of those (another
+// naming): every new one, as before
+const ownOf = (look: string, fresh: CSSStyleSheet[]) => {
+  const re = new RegExp(`/${look.replace(/[^\w-]/g, '')}-[\\w-]{8}\\.css(\\?|$)`)
+  const own = fresh.filter(s => ((id: string | null | undefined) => (id ? id.endsWith(`/looks/${look}.css`) : re.test(s.href ?? '')))((s.ownerNode as Element | null)?.getAttribute?.('data-vite-dev-id')))
+  return own.length ? own : fresh
+}
 function load(look: string): Promise<void> {
   const file = FILES[`./looks/${look}.css`]
   if (!look || !file) return Promise.resolve()
@@ -21,7 +29,7 @@ function load(look: string): Promise<void> {
     p = queue = queue.then(async () => {
       const had = new Set(Array.from(document.styleSheets))
       await file().catch(() => {}) // Vite adds its stylesheet and waits for it
-      sheets.set(look, Array.from(document.styleSheets).filter(s => !had.has(s)))
+      sheets.set(look, ownOf(look, Array.from(document.styleSheets).filter(s => !had.has(s))))
       on()
     })
     loads.set(look, p)

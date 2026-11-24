@@ -28,7 +28,7 @@ test('secret values in Settings, a profile, a project and the push URL: in the K
   await rig.rpc('settingsSet', {
     env: { GH_TOKEN: SECRETS[0], PLAIN_NAME: 'plain-value' },
     presets: [{ name: 'tests', agent: 'command', cmd: 'exec cat', env: { OTHER_SECRET: SECRETS[2] } }],
-    webhook: { url: `https://ntfy.example.com/laki-topic?auth=${SECRETS[3]}`, format: 'ntfy' },
+    webhook: { url: `https://ntfy.example.com/laki-topic?auth=${SECRETS[3]}`, format: 'ntfy', answer: true, replyTopic: 'r1' },
   })
   await rig.rpc('projectSet', { id: p.id, config: { env: { API_KEY: SECRETS[1] } } })
   const disk = JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8'))
@@ -45,8 +45,14 @@ test('secret values in Settings, a profile, a project and the push URL: in the K
   // a tab gets them, now and after a restart (read back from the Keychain)
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'tests' })
   await echoed(rig, ws.id, `[${SECRETS[0]}|${SECRETS[1]}]`)
-  await rig.stop()
-  await rig.start()
+  // twice: the first start after it was written (the values null in state.json from then on) and one more
+  for (const _ of [1, 2]) {
+    await rig.stop()
+    await rig.start()
+    const hook = (await rig.rpc('stateOwn')).settings.webhook
+    assert.equal(hook.answer, true, "the push's answers stay on: its URL read back before it's checked")
+    assert.equal(hook.answerOff, undefined)
+  }
   await echoed(rig, ws.id, `[${SECRETS[0]}|${SECRETS[1]}]`)
   assert.match(await rig.rpc('diagnostics'), /env:GH_TOKEN in Keychain/)
   for (const s of SECRETS) assert.ok(!onDisk(rig.data).includes(s), `${s} still not in state.json after a restart`)

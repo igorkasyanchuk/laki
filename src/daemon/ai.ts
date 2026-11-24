@@ -951,8 +951,9 @@ export async function promptImprove(p: { prompt?: unknown; tab?: unknown; projec
   }
   const memory = (memoryOf(proj) ?? []).filter(m => typeof m?.text === 'string').map(m => `- ${m.text}`).join('\n').slice(0, IMPROVE_MAX.memory)
   // a new task (no tab, no chat): the project's files, so the model has paths to name; git's list (a host's too), none
-  // when it fails or is slow. File names only, no contents
-  const tree = tab || !proj ? '' : treeOf(await exec(proj, 'git', ['ls-files', '-z'], { timeout: 5000 }).then(r => `${r.stdout}`.split('\0'), () => []), IMPROVE_MAX.tree)
+  // when it fails or is slow (5 s in all: a host's ssh connect too). File names only, no contents
+  const listed = proj && !tab ? exec(proj, 'git', ['ls-files', '-z'], { timeout: 5000 }).then(r => `${r.stdout}`.split('\0'), () => []) : Promise.resolve([])
+  const tree = treeOf(await Promise.race([listed, new Promise<string[]>(ok => setTimeout(ok, 5000, []).unref())]), IMPROVE_MAX.tree)
   const text = await aiOnce({ system: IMPROVE_SYSTEM, prompt: `The draft:\n<<<\n${prompt}\n>>>\n\nThe chat so far (data):\n<<<\n${chat.trim() || '(none: a new task)'}\n>>>\n\nThe project's memory (data):\n<<<\n${memory || '(none)'}\n>>>${tree ? `\n\nThe project's files (data):\n<<<\n${tree}\n>>>` : ''}`, ask: 'Improve prompt' })
   return { prompt: improvedOf(prompt, text) }
 }
@@ -1053,7 +1054,8 @@ export async function reviewSteps(p: { ws: string; uncommitted?: boolean; again?
   const file = walkFile(ws.id)
   if (!p.again || p.kept) {
     const kept = walks.get(hash) ?? (file ? walkKept(readJson<Record<string, Walk>>(file)?.[hash], all) : undefined)
-    if (kept || p.kept) return kept ?? null
+    if (p.kept) return Promise.race([kept ?? null, null]) // one done only: a walk still asked for isn't waited on (the Ship sheet's draft)
+    if (kept) return kept
   }
   const w = walkInput(d.diff)
   const asked = w.hunks.length ? aiOnce({ system: WALK_SYSTEM, prompt: walkPrompt(w), ask: 'Walk through', json: true }) : Promise.resolve('')

@@ -251,4 +251,11 @@ test('groupAsks: one ask in several workspaces of a project is a group; never a 
   assert.deepEqual(groupAsks([cards[0]], c => c), [], 'one alone: no group')
   // the same words but another menu: apart
   assert.deepEqual(groupAsks([cards[0], card('x', 'shop', { ask: ask('npm test', { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }] }) })], c => c), [])
+  // an Edit's or Write's change is its diff, each tab's own: never one card for them; a held ask (an always-ask glob) neither
+  const edit = (id: string, diff: string) => card(id, 'shop', { ask: ask('src/config.ts', { tool: 'Edit', diff }) })
+  assert.deepEqual(groupAsks([edit('e1', '-a\n+b'), edit('e2', '-a\n+c')], c => c), [])
+  assert.deepEqual(groupAsks([card('w1', 'shop', { ask: ask('src/new.ts', { tool: 'Write' }) }), card('w2', 'shop', { ask: ask('src/new.ts', { tool: 'Write' }) })], c => c), [])
+  const read = (id: string, o: object = {}) => card(id, 'shop', { ask: ask('docs/guide.md', { tool: 'Read' }), ...o })
+  assert.equal(groupAsks([read('r1'), read('r2')], c => c).length, 1, 'a Read is its words')
+  assert.deepEqual(groupAsks([read('r1', { held: 'docs/**' }), read('r2', { held: 'docs/**' })], c => c), [])
 })

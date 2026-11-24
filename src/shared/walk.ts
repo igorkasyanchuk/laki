@@ -177,6 +177,13 @@ export function walkMd(w: Walk | null | undefined, mask: (s: string) => string =
   })
   return `${WALK_HEAD}\n\n${lines.join('\n')}`
 }
+// the walk without the hunks of these files (what a ship leaves uncommitted: its PR doesn't have them), a step left
+// with none gone
+export function walkWithout(w: Walk | null | undefined, files: Iterable<string>): Walk | null | undefined {
+  const out = new Set(files)
+  if (!w || !out.size) return w
+  return { ...w, steps: w.steps.map(s => ({ ...s, hunks: s.hunks.filter(h => !out.has(h.file)) })).filter(s => s.hunks.length) }
+}
 // a kept walk still worth sending: more than a quarter of the diff's hunks in Everything else means the steps are of
 // another change (the diff grew since)
 export const walkFresh = (w: Walk | null | undefined): w is Walk => {

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fileRisk, hunkKey, hunksOf, REST, riskOf, risksOf, type Walk, WALK_MAX, walkCheck, walkFold, walkFresh, walkInput, walkMd, walkPrompt, type WalkStep } from '../src/shared/walk.ts'
+import { fileRisk, hunkKey, hunksOf, REST, riskOf, risksOf, type Walk, WALK_MAX, walkCheck, walkFold, walkFresh, walkInput, walkMd, walkPrompt, walkWithout, type WalkStep } from '../src/shared/walk.ts'
 import { fresh, openrouter, reply, until } from './helpers.ts'
 
 const DIFF = [
@@ -253,6 +253,11 @@ test('walk: walkMd: a numbered step a line, "Title: why", its files under it onc
   const of = (named: number, rest: number) => w([{ title: 'A', why: '', hunks: Array.from({ length: named }, (_, i) => ({ file: 'a', start: i })) }, { title: REST, why: '', hunks: Array.from({ length: rest }, (_, i) => ({ file: 'b', start: i })), rest: true }])
   assert.equal(walkFresh(of(3, 1)), true)
   assert.equal(walkFresh(of(2, 1)), false)
+  // a ship that leaves files uncommitted: their hunks out, a step left with none gone
+  const two = w([{ title: 'A', why: '', hunks: [{ file: 'a', start: 1 }, { file: 'left', start: 1 }] }, { title: 'B', why: '', hunks: [{ file: 'left', start: 9 }] }])
+  assert.deepEqual(walkWithout(two, ['left'])?.steps.map(s => [s.title, s.hunks.map(h => h.file)]), [['A', ['a']]])
+  assert.equal(walkWithout(two, []), two)
+  assert.doesNotMatch(walkMd(walkWithout(two, ['left'])), /left/)
 })
 
 test("walk: Ship's reading order: shipDraft gives a kept walk's Markdown and never asks Laki AI; ship adds it to the PR's body only with walk: true", async t => {
@@ -288,7 +293,11 @@ test("walk: Ship's reading order: shipDraft gives a kept walk's Markdown and nev
     await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === tab.id)?.status === 'exited', 'ship done', 15000)
     return creates().at(-1)!
   }
-  assert.doesNotMatch(await shipped({ message: 'Add the table', body: 'my words' }), /How to read this/, 'not without walk: true')
-  assert.match(await shipped({ message: 'Again', body: 'my words', walk: true }), /--body my words\n\n## How to read this\n\n1\. Add the table/)
+  assert.doesNotMatch(await shipped({ message: 'Add the table', body: 'my words', files: ['db/migrate/001.sql'] }), /How to read this/, 'not without walk: true')
+  // README.md left uncommitted (not picked): its step isn't in the PR's reading order; the table's, committed before, is
+  const pr = await shipped({ message: 'Again', body: 'my words', walk: true, files: ['src/app.ts'] })
+  assert.match(pr, /--body my words\n\n## How to read this\n\n1\. Add the table/)
+  assert.match(pr, /2\. Use it/)
+  assert.doesNotMatch(pr, /Say so|README/, 'a file the PR leaves out: no step for it')
   assert.equal(or.hits.length, 1, 'ship asked Laki AI nothing')
 })

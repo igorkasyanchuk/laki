@@ -26,7 +26,7 @@ import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type T
   type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
-import { WALK_HEAD, walkFresh, walkMd } from '../shared/walk.ts'
+import { WALK_HEAD, walkFresh, walkMd, walkWithout } from '../shared/walk.ts'
 import { reviewSteps } from './ai.ts'
 import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
@@ -233,7 +233,7 @@ function scrubCopies() {
   for (const f of [...backups(), statePath + '.bak'])
     try {
       const s = envScrub(readFileSync(f, 'utf8'))
-      if (s) writeFileSync(f, s, { mode: 0o600 })
+      if (s) writeAtomic(f, s, 0o600) // a crash midway leaves the copy as it was, never half of one
     } catch {} // gone, or one that won't parse: left
 }
 const today = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -302,12 +302,13 @@ export function load() {
   // off dropped the key); Settings now always saves `on`
   const mc = state.settings?.memoryCompact as { on?: boolean; off?: boolean } | undefined
   if (mc && typeof mc === 'object' && typeof mc.on !== 'boolean') ((mc.on = false), delete mc.off)
+  // secret values out of state.json (envKeys.ts): read back from the Keychain; one still in it (state v1, a restored
+  // backup) moved into the Keychain, then state.json and its dated copies saved without it, now. Before anything reads
+  // them (the push's URL just below)
+  if (envRestore(state)) setImmediate(() => (save(), scrubCopies()))
   const hook = state.settings?.webhook
   if ((hook?.format as string) === 'telegram') tgMigrate(hook!) // Settings › Telegram since 0.60: its token to the Keychain, off state.json
-  else if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
-  // secret values out of state.json (envKeys.ts): read back from the Keychain; one still in it (state v1, a restored
-  // backup) moved into the Keychain, then state.json and its dated copies saved without it, now
-  if (envRestore(state)) setImmediate(() => (save(), scrubCopies()))
+  else if (hook?.answer && hook.url && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why; a URL the Keychain didn't give this time: left as it is
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
   if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
   state.cfgTrust = true
@@ -6112,8 +6113,9 @@ function proofOf(ws: Workspace, tree: string, stale: boolean) {
 }
 
 // the Review tab's kept Walk through (ai.ts reviewSteps' kept: never a model call) as a PR's reading order, masked:
-// only one of this diff (kept by its hash) that still covers it (walkFresh); none, '' (Laki AI never used too)
-const walkOf = async (ws: Workspace) => (w => (walkFresh(w) ? walkMd(w, redact) : ''))(await reviewSteps({ ws: ws.id, kept: true }).catch(() => null))
+// only one of this diff (kept by its hash) that still covers it (walkFresh); none, '' (Laki AI never used too). left:
+// the changed files the ship leaves uncommitted (not in its PR), out of the steps
+const walkOf = async (ws: Workspace, left: string[] = []) => (w => (walkFresh(w) ? walkMd(walkWithout(w, left), redact) : ''))(await reviewSteps({ ws: ws.id, kept: true }).catch(() => null))
 
 // U5: the Ship sheet's start: what ship would commit (each uncommitted file, +/−), the commits already on the branch,
 // and shipWords' title and body
@@ -6187,7 +6189,7 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   const given = o.body ?? filled
   const checked = mode === 'pr' && o.proof !== false && !given?.includes(PROOF_HEAD) ? proofOf(ws, tree, o.proof === true) : ''
   // the reading order only when asked for (walk: true; the daemon writes it, never the caller's text), after the proof
-  const walked = mode === 'pr' && o.walk === true && !given?.includes(WALK_HEAD) ? await walkOf(ws) : ''
+  const walked = mode === 'pr' && o.walk === true && !given?.includes(WALK_HEAD) ? await walkOf(ws, files ? (await changedIn(ws, all)).map(f => f.path).filter(p => !files.includes(p)) : []) : ''
   const body = checked || walked ? [(given ?? (await shipWords(ws)).body).trim(), checked, walked].filter(Boolean).join('\n\n') : given
   const prTitle = o.title?.trim() || (body?.trim() ? message.trim() : '') // a body without a title: the commit's message as it (--fill has no room for a body)
   const index = await turnIndex(ws, 'ship')

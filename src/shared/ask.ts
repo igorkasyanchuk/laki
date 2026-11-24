@@ -352,15 +352,18 @@ export function streakOf(a: { tool?: string; what?: string }, globs?: string[]):
 // Needs you's groups: waiting asks of one project that are one ask (streakOf's kind, the same words and the same
 // choices), several agents asking the same thing, as one card (Needs.tsx). Never a risky or chained command, a path out
 // of the worktree (streakOf has none for those), a question (no tool), one of several (steps), a plan, a secret ask;
+// only Bash and Read, whose words are the whole ask (an Edit's or Write's change is its diff, each tab's own, which the
+// group card doesn't show), never one an always-ask glob touches (held: its card says so);
 // choices: the menu's minus any that grants a standing rule (don't ask again: one click never makes that for n tabs).
 // Two or more in a group, in the order the first came. Pure: test/ask.test.ts
 // ponytail: the same words too, not only streakOf's kind: one card for npm test and npm test --watch would hide what differs
-export function groupAsks<T>(cards: readonly T[], of: (c: T) => { project: string; t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown } }) {
+const GROUP_TOOLS = ['Bash', 'Read']
+export function groupAsks<T>(cards: readonly T[], of: (c: T) => { project: string; t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown; held?: string } }) {
   const m = new Map<string, { key: string; items: T[]; choices: Ask['options'] }>()
   for (const c of cards) {
     const { project, t } = of(c)
     const a = t.ask
-    if (t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || a.steps || !a.options.length) continue
+    if (t.status !== 'waiting' || t.secret || t.planAsk || t.held || !a?.tool || !GROUP_TOOLS.includes(a.tool) || a.diff || a.steps || !a.options.length) continue
     const s = streakOf(a)
     if (!s) continue
     const choices = a.options.filter(o => !standing(o.label))
