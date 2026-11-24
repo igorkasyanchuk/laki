@@ -149,6 +149,7 @@ const button = (act: Act | 'plus', name: string) => {
 }
 
 document.body.dataset.mode = mode
+if (/Mac/.test(navigator.userAgent)) document.body.dataset.os = 'mac' // the talk pill's glass (floater.html: main gives its window vibrancy there)
 let hinted = false // the reply hint on a finished one's card: once per session
 if (mode === 'card') {
   islandPage()

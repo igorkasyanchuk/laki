@@ -1408,7 +1408,9 @@ Main's `quickWin` (its global hotkey `quick`: `bindKey`, Settings' `quickOn` and
 `QUICK_KEY` ⌥Space suggested, `quick-hotkey` IPC; the menu bar's *New Task…*; the bubbles' New task; `laki://quick`,
 which main opens itself): `panelWin({ window: 'quick' }, …, down 0.16)` (it and the new-workspace window get macOS's
 `popover` vibrancy, `visualEffectState: 'active'` and rounded corners unless Reduce transparency; NewWindow.tsx sets
-`html.panel-glass`: the page a 62% tint of `--panel` with a lit top edge), a `type: 'panel'` near the top of the screen
+`html.panel-glass`: the page a 62% tint of `--panel` with a lit top edge; the talk pill's window too, floater.ts' `talk`,
+its page `body[data-os='mac'] #talk` a 62% tint of `--bg` with the window's 12px corners under
+`prefers-reduced-transparency: no-preference`), a `type: 'panel'` near the top of the screen
 with the mouse, one at a time. `NewWindow.tsx` `QuickWindow`: `targetsOf(view)`: a new workspace in `LAST_NEW`'s project
 (else the first), each agent tab that waits or is idle (`send` with `whenIdle`, `agent`), Laki AI when `aiOn`; Tab or ⇧Tab
 in the box, or `@word ` at the start, turns the chip; `PromptInput` (⏎ sends: `wsNew` with the last picks when it's

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The talk pill is glass on a Mac, as the quick bar and New workspace windows are (solid with Reduce transparency).
 - Glass with the Window slider at 0 keeps the blur on menus, ⌘K, capsules and page heads: only a see-through main area turns it off.
 - A spend cap for a workspace: past it Laki stops its agents and asks whether to add more, stay stopped or remove it.
 - Scheduled tasks can start on a `/laki` comment on an issue or PR (`/laki fix`), by you or the logins you list, and reply with the agent's answer.

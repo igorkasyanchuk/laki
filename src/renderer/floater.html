@@ -99,6 +99,11 @@
       @keyframes t-pulse { 50% { opacity: 0.35; } }
       #talk.speaking .t-rec { background: var(--running); animation: t-pulse 1.2s ease-in-out infinite; } /* reading Laki AI's answer out */
       @media (prefers-reduced-motion: reduce) { #talk.speaking .t-rec { animation: none; } }
+      /* a Mac's pill over the window's popover material (main's talk(): vibrancy, its corners rounded): the theme's
+         background as a tint, a lit top edge, the window's corners; solid under Reduce transparency (main makes it solid too) */
+      @media (prefers-reduced-transparency: no-preference) {
+        body[data-os='mac'] #talk { background: color-mix(in srgb, var(--bg) 62%, transparent); border-color: color-mix(in srgb, var(--fg) 13%, transparent); border-radius: 12px; box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent); }
+      }
       .t-level { flex: none; width: 64px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 10%, var(--bg)); overflow: hidden; }
       .t-level > i { display: block; height: 100%; width: 0; background: var(--running); transition: width 0.06s; }
       .t-time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }

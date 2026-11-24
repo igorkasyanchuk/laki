@@ -3,7 +3,7 @@
 // whether Laki is in front (setFront), Fn's watch; main's floats IPC and the bubbles' own (each checks its window:
 // floater, card, menu, voice, talkW)
 import { AI_TO, NOTE_TO, SEL_SKIP, selectionOf, selLabel, talkDefault, talkShot, TODO_TO, withSelection } from '../shared/talk.ts'
-import { app, BrowserWindow, type BrowserWindowConstructorOptions, ipcMain, Menu, screen, session, systemPreferences, webContents } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions, ipcMain, Menu, nativeTheme, screen, session, systemPreferences, webContents } from 'electron'
 import { BROWSER, floatTimes, local, protectedKind } from './guards.ts'
 import { type CardEvent, type CardLife, cardQueue, cardRect, fullScreen, hasNotch, islandDisplay, type IslandOn, lifeStep, pillRect, type Pin, type PinEv, pinStep, type Rect } from '../shared/island.ts'
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
@@ -659,7 +659,10 @@ export function talk() {
   const sel = grabSelection() // first: the pill takes the focus as it shows
   const p = screen.getCursorScreenPoint()
   const d = screen.getDisplayNearestPoint(p).workArea
-  const w = (talkW = new BrowserWindow({ ...floatOpts(TALK.width, TALK.height), x: clamp(p.x + 14, d.x, d.x + d.width - TALK.width), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
+  // macOS's popover material behind the pill's tint (floater.html's #talk under prefers-reduced-transparency:
+  // no-preference), the window's corners rounded as the quick bar's; solid under Reduce transparency and off a Mac
+  const glass: BrowserWindowConstructorOptions = mac && !nativeTheme.prefersReducedTransparency ? { backgroundColor: '#00000000', vibrancy: 'popover', visualEffectState: 'active', roundedCorners: true } : {}
+  const w = (talkW = new BrowserWindow({ ...floatOpts(TALK.width, TALK.height), ...glass, x: clamp(p.x + 14, d.x, d.x + d.width - TALK.width), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
   const url = pageURL('floater.html', '#talk')
   pin(w, url)
   guardFloat('talk', w)
