@@ -2835,7 +2835,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
   agent, remote access or a trusted client can't change this section. *What it sends*: *Only when I ask* (off: on,
   nothing goes on its own and you look with `/status`, `/screen` and `/menu`; the workspace you talk to there still
-  says when its turn ends, and a tab's bell still rings), *An agent waits for you* (on), *An agent is done* (on,
+  sends its asks and when its turn ends, and a tab's bell still rings), *An agent waits for you* (on), *An agent is done* (on,
   silently), *Titles only* (who needs you, nothing off the screen). Do not disturb, a muted tab
   or workspace and Recording mode hold as for every push. Once a pushed ask is answered (from the phone or on the Mac)
   its message says so and its buttons go. How it works: Laki keeps one request open to Telegram (`api.telegram.org`)

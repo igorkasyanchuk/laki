@@ -608,7 +608,10 @@ async function nav(q: Tap, gap: boolean) {
     // two steps: what it merges, then Merge #n; a stale confirm (another PR since) is refused above
     if (kind === 'm1') return void (ans(), edit(`Merge <b>#${pr.number}</b> ${esc(cut(pr.title ?? '', 120))} into <code>${esc(pr.base ?? 'its base')}</code>?\nIts checks passed and GitHub would merge it now. It can't be undone from here.`, [[btn(`✅ Merge #${pr.number}`, `nav:m2:${a}:${pr.number}`)], [btn('Cancel', `nav:w:${a}`)]]))
     ans('Merging…')
-    const r = await act<{ merged?: boolean }>('prAct', { ws: w, act: 'merge' }).then(() => `Merged <b>#${pr.number}</b> in <b>${esc(wsName(w))}</b>.`, e => `Not merged: ${esc(scrub((e as Error).message))}`)
+    const r = await act<{ held?: { name?: string; why?: string }[] } | undefined>('prAct', { ws: w, act: 'merge' }).then(
+      h => (h?.held?.length ? `Not merged: ${esc(h.held.map(x => [x.name, x.why].filter(Boolean).join(': ')).join('; ') || 'an extension holds it')}` : `Merged <b>#${pr.number}</b> in <b>${esc(wsName(w))}</b>.`), // an extension's gate held it: not merged
+      e => `Not merged: ${esc(scrub((e as Error).message))}`,
+    )
     return void edit(r, [[btn('⬅ Back', `nav:w:${a}`)]])
   }
   if (kind === 's' || kind === 'd') {
@@ -849,7 +852,8 @@ async function command(c: string, arg: string, m: TgMessage) {
   if (c === 'stop') {
     // the push it replies to, else the workspace it names (or the one talked to): its agents' turns under way, each Esc
     const one = m.reply_to_message && tabFor(m, '')
-    const w = one ? one.workspace : arg ? state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())?.id : (f => (f && f !== AI && shownWs(f) ? f : undefined))(state.telegram?.focus)
+    // a reply to a push whose tab isn't shown (Recording mode) or known: which one, never the talked-to one instead
+    const w = one ? one.workspace : arg ? state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())?.id : m.reply_to_message ? undefined : (f => (f && f !== AI && shownWs(f) ? f : undefined))(state.telegram?.focus)
     if (!w) return void sayIn(m, 'Which one? Reply /stop to an agent\'s push, or /stop &lt;workspace&gt;.')
     return void sayIn(m, await stopIn(w, one || undefined))
   }

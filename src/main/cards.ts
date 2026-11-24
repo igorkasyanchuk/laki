@@ -124,7 +124,7 @@ export function inboxCards(items: unknown, was: Card[] = []): Card[] {
     const ask = i.kind === 'ask'
     const actions = ask && Array.isArray(i.options) ? i.options.slice(0, 9).filter((o: { n?: unknown; label?: unknown }) => Number.isInteger(o?.n) && typeof o.label === 'string').map((o: { n: number; label: string; scope?: unknown }) => ({ text: o.label.slice(0, 80), n: o.n, label: o.label, ...(typeof o.scope === 'string' && o.scope && { scope: o.scope.slice(0, 600) }) })) : []
     const c: Card = { key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions, ...(ask && str(i.diff, 4000) && { diff: str(i.diff, 4000) }), ...(ask && i.explain === true && { explain: true }) }
-    const old = c.explain ? was.find(x => x.key === c.key && x.body === c.body && x.said && x.said !== 'loading') : undefined
+    const old = c.explain ? was.find(x => x.key === c.key && x.body === c.body && x.said) : undefined // a ? under way too: its answer finds it (ask-explain)
     return [old ? { ...c, said: old.said } : c]
   })
 }
@@ -190,13 +190,14 @@ ipcMain.handle('ask-explain', async (e, key: unknown) => {
   const c = cardOf(e, key)
   if (!c?.explain || (c.said && !(typeof c.said === 'object' && 'err' in c.said))) return
   const send = () => (inboxSender(e) ? sendInbox() : sendCards())
+  const now = () => cardOf(e, key) ?? c // the Inbox's list is made again as the view changes: the card there now
   c.said = 'loading'
   send()
   try {
     const r = (await rpc('askExplain', { tab: c.tab })) as { does?: unknown; outside?: unknown; undo?: unknown; cut?: unknown }
-    c.said = typeof r?.does === 'string' ? { does: r.does.slice(0, 200), outside: r.outside === true, undo: String(r.undo), cut: r.cut === true } : { err: 'no answer' }
+    now().said = typeof r?.does === 'string' ? { does: r.does.slice(0, 200), outside: r.outside === true, undo: String(r.undo), cut: r.cut === true } : { err: 'no answer' }
   } catch (err) {
-    c.said = { err: (err as Error).message }
+    now().said = { err: (err as Error).message }
   }
   send()
 })

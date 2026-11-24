@@ -357,7 +357,17 @@ test("Control: /stop a turn; a green PR's Merge asked twice on its card; the gat
   b.tap(m1.callback_data)
   const confirm = (await until(() => b.of('editMessageText').find(c => /^Merge <b>#9<\/b> Fix the total into <code>main<\/code>\?/.test(c.body.text)), 'asked first'))!
   assert.equal(merges(), 0, 'nothing merged on the first tap')
-  b.tap(confirm.body.reply_markup.inline_keyboard[0][0].callback_data)
+  // an extension's merge gate holds it: said so, never "Merged"
+  mkdirSync(join(rig.data, 'widgets', 'hold'), { recursive: true })
+  writeFileSync(join(rig.data, 'widgets', 'hold', 'widget.json'), JSON.stringify({ name: 'Hold', actions: { check: { run: `echo '{"ok": false, "why": "deploy first"}'; exit 1`, gate: ['merge'] } } }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'hold', on: true })
+  const yes = confirm.body.reply_markup.inline_keyboard[0][0].callback_data
+  b.tap(yes)
+  await until(() => b.of('editMessageText').some(c => c.body.text === 'Not merged: Hold: deploy first'), 'held, said')
+  assert.equal(merges(), 0)
+  await rig.rpc('widgetSet', { id: 'hold', on: false })
+  b.tap(yes)
   await until(() => b.of('editMessageText').some(c => /^Merged <b>#9<\/b>/.test(c.body.text)), 'merged')
   assert.equal(merges(), 1)
   const log = () => readFileSync(join(rig.data, 'telegram-log.jsonl'), 'utf8')
@@ -398,6 +408,9 @@ test('Only when I ask (pushOff): nothing pushed on its own, commands still answe
   const where = (await until(() => b.of('sendMessage').find(c => /Where should this go/.test(c.body.text)), 'where to'))!
   b.tap(where.body.reply_markup.inline_keyboard.find((r: any) => r[0].text.startsWith('💬 '))[0].callback_data)
   await until(() => b.of('sendMessage').some(c => /is done<\/b>/.test(c.body.text)), 'the talked-to turn ends: said')
+  // and its asks: you talk to it, so what it asks you comes
+  await rig.rpc('input', { tab: tab.id, data: 'menu\r' })
+  await until(() => b.of('sendMessage').some(c => /waiting for you<\/b>/.test(c.body.text) && c.body.reply_markup?.inline_keyboard?.length), "the talked-to agent's ask, with its buttons")
 })
 
 test("P3: commands: the level's menu for this chat; /status, /screen, /diff, /quiet at answer, titles only and Recording mode kept; /new only at control; limits; the log", async t => {
