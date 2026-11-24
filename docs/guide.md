@@ -1053,7 +1053,10 @@ run fails, saying so.
   label), a push. Laki reads them every few minutes; at least 30 minutes apart, 10 runs a day. `{{event.title}}`,
   `{{event.url}}`, `{{event.number}}` and `{{event.branch}}` in the prompt are its (the title goes to the agent as the
   outsider's text, never as an instruction), and a PR's run is linked to that PR. A fork's PR is held: *Run it* on its
-  log entry starts it (`laki schedule add <project> --on ci.failed …`, `laki schedule release <run>`).
+  log entry starts it (`laki schedule add <project> --on ci.failed …`, `laki schedule release <run>`). *When a webhook
+  comes* names one of Settings › Webhooks (and, if you like, its event: `issues`, `push`, Linear's `Issue`): a signed
+  POST to it runs the task at once, with the same gap and runs a day, and `{{event.body}}` is what it posted, given to
+  the agent fenced as an outsider's data (`--on webhook --hook <name> [--hook-event issues]`).
 - *Or after another task ends* (or type *after Nightly deps* as its time): a run as that task's run ends, at once:
   *when it ended done* (not failed, not waiting for you) or *however it ended*; 10 a day at most, and through the same
   queue, Only if, time limit and retries as any run. *In the workspace of the run it follows* (Where) goes on in that

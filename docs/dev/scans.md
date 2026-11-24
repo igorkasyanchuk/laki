@@ -325,9 +325,13 @@ a draft, `any`), `issues` (`gh issue list`, a `label`: created since the task's 
 workspace; the run's `{{check}}` in its prompt is the command's first line, the PRs' or issues' numbers, the head.
 main.ts refuses `onlyIf.cmd` from an agent (`agentNo`), and remote access can't `scheduleSet` at all.
 
-On an event (T4, `trigger`: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`; `branch`, `label`, `by`
+On an event (T4, `trigger`: `ci.failed`, `pr.opened`, `pr.review`, `issue.opened`, `push`, `webhook`; `branch`, `label`, `by`
 others|me, `gap` minutes, unset 30, `perDay`, unset 10; an agent's task only): no times (`when` '', an empty `rule`,
-no `next`). `eventTick` (3 minutes, slow while idle; `LAKI_EVENT_TICK_MS`; skipped while `quotaLow`, the PR scans'
+no `next`). `webhook` (`hook`: one of `settings.inHooks` by name, `hookEvent` optional; any project, not only a GitHub
+one) isn't read: inbound.ts' `onRequest`, past the signature, replay and rate checks, calls `scheduleHook`, which runs
+each task on that hook (a project's hook: that project's tasks only; its event, when named) through `onEvent` (gap, runs
+a day) with its body (`HOOK_BODY` 8,000 characters) as `TaskEventIn.body`, fenced by `fillEvent` under `untrusted`
+(`{{event.body}}`: "(its body, below)"); `eventTick` leaves those tasks out. `eventTick` (3 minutes, slow while idle; `LAKI_EVENT_TICK_MS`; skipped while `quotaLow`, the PR scans'
 rule) reads each GitHub project on this Mac once per kind a tick, its tasks sharing the answer (`ask`'s memo): `gh run
 list --branch` (completed failures by run id; a `pull_request` run on the branch is a fork's), `gh pr list` (opened: a
 number past `marks.pr`; reviewed: a PR's newest `latestReviews` past `marks.reviews`; `branch`: the PR's base), `gh

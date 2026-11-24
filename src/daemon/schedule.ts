@@ -299,7 +299,8 @@ export function scheduleSet(o: ScheduleIn & { archived?: boolean; dependents?: '
   const trig = aft ? undefined : triggerOf(s.trigger, s) // after another task: its old event goes (one trigger a task)
   const what = (t?: TaskTrigger) => JSON.stringify([t?.event, t?.branch, t?.label])
   if (!trig || what(trig) !== what(old?.trigger)) delete s.marks, delete s.seen
-  if (trig && (proj.host || proj.kind || proj.git === false || !onGitHub(proj.path))) throw new Error(`on an event: ${proj.name} isn't a GitHub repository on this Mac (its origin), so there's nothing to hear`)
+  if (trig?.event === 'webhook' && proj.kind) throw new Error(`on a webhook: ${proj.name} isn't a project an agent works in`) // heard by Laki, on every project
+  else if (trig && trig.event !== 'webhook' && (proj.host || proj.kind || proj.git === false || !onGitHub(proj.path))) throw new Error(`on an event: ${proj.name} isn't a GitHub repository on this Mac (its origin), so there's nothing to hear`)
   if (trig) Object.assign(s, { trigger: trig, when: '', rule: { days: [], times: [] } })
   else delete s.trigger
   if (aft) Object.assign(s, { after: aft, when: '', rule: { days: [], times: [] } })
@@ -487,8 +488,9 @@ async function onlyIfCheck(s: Schedule): Promise<{ skip?: string; check: string;
 // ---------- T4: a task on an event instead of a clock: CI failing on a branch, a PR opened or reviewed, an issue opened,
 // a push. Heard by eventTick (every 3 minutes, slow while idle; never while GitHub's quota is low, as the PR scans): one
 // gh call per project and kind a tick, shared by its tasks. A task's first read only notes what's there (marks, seen).
-// ponytail: GitHub projects on this Mac only (no SSH host's); an incoming webhook (inHooks) doesn't feed them yet
-export const EVENTS: TaskEvent[] = ['ci.failed', 'pr.opened', 'pr.review', 'issue.opened', 'push']
+// ponytail: GitHub projects on this Mac only (no SSH host's). webhook: not read but heard: a signed POST to one of
+// Settings › Webhooks (inbound.ts) runs the tasks naming it at once (scheduleHook), its body fenced as data
+export const EVENTS: TaskEvent[] = ['ci.failed', 'pr.opened', 'pr.review', 'issue.opened', 'push', 'webhook']
 const EVENT_GAP = 30 // minutes between a task's runs (unset)
 const EVENT_DAY = 10 // runs a day at most (unset)
 const SEEN_KEPT = 50
@@ -510,6 +512,14 @@ function triggerOf(v: unknown, s: Schedule): TaskTrigger | undefined {
   }
   const gap = num('gap', 1440, 'minutes between its runs? 0 to 1440')
   const perDay = num('perDay', 100, 'runs a day at most? 1 to 100')
+  if (event === 'webhook') {
+    const hook = text('hook')
+    const names = (state.settings?.inHooks ?? []).map(h => h.name)
+    if (!names.includes(hook)) throw new Error(names.length ? `which webhook? ${names.join(', ')}` : 'add a webhook first: Settings › Webhooks (laki hook add)')
+    const hookEvent = text('hookEvent')
+    if (hookEvent && !/^[\w.:-]{1,60}$/.test(hookEvent)) throw new Error(`its event ${hookEvent}? a word as the webhook sends it (issues, push, Issue)`)
+    return { event, hook, ...(hookEvent && { hookEvent }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
+  }
   return { event, ...(branch && { branch }), ...(label && event === 'issue.opened' && { label }), ...(o.by && o.by !== 'any' && { by: o.by as 'others' | 'me' }), ...(gap !== undefined && { gap }), ...(perDay !== undefined && { perDay }) }
 }
 
@@ -591,8 +601,20 @@ async function onEvent(s: Schedule, ev: TaskEventIn, now: number) {
 }
 
 let eventBusy = false
+// a signed webhook (inbound.ts, after its signature, replay and rate checks): each task on it (and on its event, when it
+// names one) runs as an event's would, its gap and runs a day kept; a hook of a project's only that project's tasks
+export function scheduleHook(name: string, event: string, body: unknown, project?: string, now = Date.now()) {
+  const text = (typeof body === 'string' ? body : JSON.stringify(body, null, 1)).slice(0, HOOK_BODY)
+  for (const s of state.schedules ?? []) {
+    const t = s.trigger
+    if (t?.event !== 'webhook' || t.hook !== name || !s.on || s.archived || projectArchived(s.project) || (project && s.project !== project) || (t.hookEvent && t.hookEvent !== event)) continue
+    const ev: TaskEventIn = { id: `hook:${name}:${randomUUID().slice(0, 8)}`, kind: 'webhook', words: `webhook ${name}${event ? ` (${event})` : ''}`, ...(text && { body: text }) }
+    void onEvent(s, ev, now).catch(e => log(`scheduled task ${s.id}: ${(e as Error).message}`))
+  }
+}
+const HOOK_BODY = 8000 // a webhook's body in the prompt, at most
 export async function eventTick(now = Date.now()) {
-  const on = (state.schedules ?? []).filter(s => s.trigger && s.on && !s.archived && !projectArchived(s.project))
+  const on = (state.schedules ?? []).filter(s => s.trigger && s.trigger.event !== 'webhook' && s.on && !s.archived && !projectArchived(s.project)) // a webhook's: heard, not read
   if (!on.length || eventBusy || (await quotaLow(now))) return
   eventBusy = true
   const memo = new Map<string, Promise<unknown>>()

@@ -13,6 +13,7 @@ import { changed, findProject, firstLine, ghCount, git, log, onGitHub, run, save
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { dir } from './dir.ts'
 import { quotaLow } from './pr.ts'
+import { scheduleHook } from './schedule.ts'
 import { hookPublish } from './remote.ts'
 import { register } from './ticks.ts'
 import { listened, widgetEvent } from './widgetEvents.ts'
@@ -159,6 +160,7 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
     const event = String(req.headers['x-github-event'] ?? (body && typeof body === 'object' ? ((body as any).type ?? (body as any).action ?? '') : ''))
     const p = hook.project ? state.projects.find(x => x.id === hook.project) : undefined
     widgetEvent('webhook', { name, event, body, ...(p && { project: { id: p.id, name: p.name } }) }, undefined, undefined, { from: { agent: 'webhook' } })
+    scheduleHook(name, event, body, p?.id, now) // scheduled tasks on this webhook: its body fenced in their prompt
     answer(res, 202, { ok: true })
   })
 }

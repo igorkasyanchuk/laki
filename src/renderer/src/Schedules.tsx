@@ -34,8 +34,8 @@ const ONLY: [string, string][] = [['commits', 'new commits on its base'], ['prs:
 const onlyKey = (o?: OnlyIf) => (!o ? '' : o.kind === 'prs' ? `prs:${o.what}` : o.kind)
 const onlyWords = (o?: OnlyIf) => (!o ? 'always runs' : `only if ${o.kind === 'issues' && o.label ? `new issues labeled ${o.label}` : o.kind === 'cmd' ? `\`${o.cmd.slice(0, 40)}\` says so` : (ONLY.find(x => x[0] === onlyKey(o))?.[1] ?? o.kind)}`)
 // T4: what a task can start on, in words
-const EVENT_WORDS: [TaskEvent, string, IconName][] = [['ci.failed', 'CI fails', 'x'], ['pr.opened', 'a PR is opened', 'pr'], ['pr.review', 'a PR gets a review', 'pr'], ['issue.opened', 'an issue is opened', 'alertCircle'], ['push', 'someone pushes', 'fork']]
-export const triggerWords = (t: TaskTrigger) => `when ${EVENT_WORDS.find(x => x[0] === t.event)?.[1] ?? t.event}${t.branch ? ` ${t.event.startsWith('pr.') ? 'into' : 'on'} ${t.branch}` : t.event === 'ci.failed' || t.event === 'push' ? ' on its main branch' : ''}${t.label ? `, labeled ${t.label}` : ''}${t.by === 'others' ? ', by others' : t.by === 'me' ? ', by me' : ''}`
+const EVENT_WORDS: [TaskEvent, string, IconName][] = [['ci.failed', 'CI fails', 'x'], ['pr.opened', 'a PR is opened', 'pr'], ['pr.review', 'a PR gets a review', 'pr'], ['issue.opened', 'an issue is opened', 'alertCircle'], ['push', 'someone pushes', 'fork'], ['webhook', 'a webhook comes', 'zap']]
+export const triggerWords = (t: TaskTrigger) => t.event === 'webhook' ? `when webhook ${t.hook ?? '?'}${t.hookEvent ? ` (${t.hookEvent})` : ''} comes` : `when ${EVENT_WORDS.find(x => x[0] === t.event)?.[1] ?? t.event}${t.branch ? ` ${t.event.startsWith('pr.') ? 'into' : 'on'} ${t.branch}` : t.event === 'ci.failed' || t.event === 'push' ? ' on its main branch' : ''}${t.label ? `, labeled ${t.label}` : ''}${t.by === 'others' ? ', by others' : t.by === 'me' ? ', by me' : ''}`
 const KEEPS = [1, 2, 3, 5, 10, 0] // T5: a task's run workspaces kept (0: all)
 const LIMITS = [15, 30, 45, 60, 120, 240, 0] // T8: a run's time limit, minutes of its agent's working time (0: none)
 const AT_ONCE = [1, 2, 3, 5, 0] // T8: runs going at once (0: no cap)
@@ -288,9 +288,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     setSpot(undefined)
   }, [spot, form?.id])
   const setTrigger = (k: Partial<TaskTrigger>) => setForm(f => (f?.trigger ? { ...f, trigger: { ...f.trigger, ...k } } : f))
+  const hooks = (view.settings.inHooks ?? []).map(h => h.name) // Settings › Webhooks: what a webhook task may name
+  const hookMenu = (e: React.MouseEvent) => openMenu(e, hooks.map(h => ({ label: h, icon: 'zap', hint: form?.trigger?.hook === h ? ON : undefined, run: () => setTrigger({ hook: h }) }) as MenuItem))
   const eventMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      ...EVENT_WORDS.map(([k, words, icon]) => ({ label: `When ${words}`, icon, hint: form?.trigger?.event === k ? ON : undefined, run: () => setTrigger({ event: k }) }) as MenuItem),
+      ...EVENT_WORDS.map(([k, words, icon]) => (k === 'webhook' ? { label: `When ${words}`, icon, hint: form?.trigger?.event === k ? ON : hooks.length ? undefined : 'Settings › Webhooks first', disabled: !hooks.length, run: () => setTrigger({ event: k, hook: form?.trigger?.hook ?? hooks[0], branch: undefined, label: undefined, by: undefined }) } : { label: `When ${words}`, icon, hint: form?.trigger?.event === k ? ON : undefined, run: () => setTrigger({ event: k }) }) as MenuItem),
       null,
       { label: 'At times instead', icon: 'clock', run: () => set({ trigger: undefined }) },
     ])
@@ -580,7 +582,19 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                     <span className="nw-chip-text">{triggerWords(form.trigger!)}</span>
                     <Icon name="chevron" size={11} />
                   </button>
-                  {form.trigger!.event === 'issue.opened' ? (
+                  {form.trigger!.event === 'webhook' ? (
+                    <>
+                      <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Which of Settings › Webhooks" onClick={hookMenu}>
+                        <Icon name="zap" />
+                        <span className="nw-chip-text">{form.trigger!.hook ?? 'a webhook'}</span>
+                        <Icon name="chevron" size={11} />
+                      </button>
+                      <label className="nw-chip" data-tip="Only this event of it, as it sends it (issues, push; Linear's Issue). Empty, every event">
+                        <Icon name="activity" />
+                        <input className="nw-chip-input" value={form.trigger!.hookEvent ?? ''} aria-label="Its event" placeholder="any event" spellCheck={false} onChange={e => setTrigger({ hookEvent: e.target.value || undefined })} />
+                      </label>
+                    </>
+                  ) : form.trigger!.event === 'issue.opened' ? (
                     <label className="nw-chip" data-tip="Only issues with this label (empty: any)">
                       <Icon name="tag" />
                       <input className="nw-chip-input" value={form.trigger!.label ?? ''} aria-label="Label" placeholder="any label" spellCheck={false} onChange={e => setTrigger({ label: e.target.value })} />
@@ -591,7 +605,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                       <input className="nw-chip-input" value={form.trigger!.branch ?? ''} aria-label="Branch" placeholder={form.trigger!.event.startsWith('pr.') ? 'into any branch' : 'its main branch'} spellCheck={false} onChange={e => setTrigger({ branch: e.target.value })} />
                     </label>
                   )}
-                  {form.trigger!.event !== 'push' && form.trigger!.event !== 'ci.failed' && (
+                  {form.trigger!.event !== 'push' && form.trigger!.event !== 'ci.failed' && form.trigger!.event !== 'webhook' && (
                     <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose PRs, reviews or issues" onClick={byMenu}>
                       <Icon name="user" />
                       <span className="nw-chip-text">{form.trigger!.by === 'others' ? 'by others' : form.trigger!.by === 'me' ? 'by me' : 'by anyone'}</span>
@@ -600,7 +614,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   )}
                 </div>
                 <div className="schedule-preview muted">
-                  <Icon name="check" /> One run an event, {form.trigger!.gap ?? 30} minutes apart at least, {form.trigger!.perDay ?? 10} a day at most; a fork's PR waits for your click. {'{{event.title}}'}, {'{{event.url}}'}, {'{{event.number}}'} and {'{{event.branch}}'} in the prompt are its
+                  <Icon name="check" /> One run an event, {form.trigger!.gap ?? 30} minutes apart at least, {form.trigger!.perDay ?? 10} a day at most{form.trigger!.event === 'webhook' ? <>, at once as a signed one comes; {'{{event.body}}'} in the prompt is what it posted (fenced, as data: never instructions)</> : <>; a fork's PR waits for your click. {'{{event.title}}'}, {'{{event.url}}'}, {'{{event.number}}'} and {'{{event.branch}}'} in the prompt are its</>}
                 </div>
               </>
             ) : form.after ? (

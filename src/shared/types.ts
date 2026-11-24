@@ -1176,12 +1176,13 @@ export type RunState = 'running' | 'done' | 'waiting' | 'failed' | 'stopped'
 // T4: what a task can start on: CI failing on a branch, a PR opened, a PR's review, an issue opened, a push to a branch;
 // branch (unset: the repo's main), label (issues), by (whose: others, me, any; unset any); gap: minutes between its runs
 // (unset 30), perDay: runs a day at most (unset 10)
-export type TaskEvent = 'ci.failed' | 'pr.opened' | 'pr.review' | 'issue.opened' | 'push'
-export type TaskTrigger = { event: TaskEvent; branch?: string; label?: string; by?: 'others' | 'me' | 'any'; gap?: number; perDay?: number }
+export type TaskEvent = 'ci.failed' | 'pr.opened' | 'pr.review' | 'issue.opened' | 'push' | 'webhook'
+// webhook: hook, one of Settings › Webhooks (inbound.ts) by its name; hookEvent, only that event of it (X-GitHub-Event, a body's type or action)
+export type TaskTrigger = { event: TaskEvent; branch?: string; label?: string; by?: 'others' | 'me' | 'any'; gap?: number; perDay?: number; hook?: string; hookEvent?: string }
 export type TaskMarks = { pr?: number; issue?: number; head?: string; reviews?: Record<string, string> }
 // one event a task heard: its id (once per id), words for the log, GitHub's fields (title: outsiders' text, fenced in the
 // prompt), fork: a fork's PR (held for your click, T4.3)
-export type TaskEventIn = { id: string; kind: TaskEvent; words: string; title?: string; url?: string; number?: number; branch?: string; by?: string; fork?: boolean }
+export type TaskEventIn = { id: string; kind: TaskEvent; words: string; title?: string; url?: string; number?: number; branch?: string; by?: string; fork?: boolean; body?: string /* a webhook's: what its sender posted, fenced as data */ }
 export type TaskNotify = 'never' | 'needs' | 'always'
 // T9: after another task's run ends: done (it ended done: not failed, not waiting for you) or any (however it ended);
 // perDay: runs a day at most (unset 10)

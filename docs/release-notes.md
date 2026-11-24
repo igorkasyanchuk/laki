@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A scheduled task can run when one of your webhooks gets a signed POST (Or on an event › When a webhook comes), its body given to the agent as data, fenced.
 - The menu bar's Inbox shows an edit's diff, a *don't ask again* choice's rule (in the warning color when broad) and a command's *?*, as the cards on screen do.
 - The notch island can sit on the main screen or the screen your pointer is on (Settings › Extras › Floating bubbles › Screen), not only the built-in one.
 - Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.
