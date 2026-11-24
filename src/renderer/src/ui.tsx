@@ -858,9 +858,11 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
       cur = target && target !== id && r ? { kind, id, target, after: into || (!onHead && ev.clientY > r.top + r.height / 2), into } : null
       setOver(cur)
     }
-    const up = () => {
+    const up = (ev?: Event) => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      if (ev?.type === 'pointercancel') cur = null // the system took the gesture (a scroll): nothing dropped
       list?.removeAttribute('data-swiping')
       lifted?.remove()
       delete row.dataset.lifted // its glide to the new place (useFlip) settles it
@@ -870,6 +872,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
   // the class a row gets while something would drop next to it
   const at = (kind: string, id: string) => (over?.kind === kind && over.target === id ? (over.into ? 'drop-into' : over.after ? 'drop-after' : 'drop-before') : '')

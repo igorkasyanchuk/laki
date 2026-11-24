@@ -165,7 +165,7 @@ const flagsIn = (usage: string) => {
   const m: Record<string, Set<string>> = {}
   let cur: string[] = []
   for (const line of usage.split('\n')) {
-    const c = /^  laki ([a-z]+)/.exec(line)
+    const c = /^  laki ([a-z]+(?:-[a-z]+)?)/.exec(line)
     if (c) cur = [c[1], ...[...line.matchAll(/\| ([a-z]+) [<[]/g)].map(x => x[1])]
     else if (!/^\s{6,}/.test(line)) cur = []
     for (const k of cur) {
@@ -208,7 +208,7 @@ export const subsOf = (cmd: string, usage = USAGE) =>
 // laki completion's words, read off USAGE as it runs (a new command needs no edit): the commands, each one's
 // subcommands and options, and what its first argument names (a workspace, a project: laki _complete asks the daemon)
 export function completionWords(usage = USAGE) {
-  const commands = [...new Set([...usage.matchAll(/^ {2}laki ([a-z]+)/gm)].map(m => m[1]))]
+  const commands = [...new Set([...usage.matchAll(/^ {2}laki ([a-z]+(?:-[a-z]+)?)/gm)].map(m => m[1]))]
   const flags = flagsIn(usage)
   const names: Record<string, 'ws' | 'project'> = {}
   for (const [, c, arg] of usage.matchAll(/^ {2}laki ([a-z]+) (?:[a-z]+ )?<([a-z]+)/gm)) if (!names[c]) { if (/^(ws|workspace|target)$/.test(arg)) names[c] = 'ws'; else if (arg === 'project') names[c] = 'project' }

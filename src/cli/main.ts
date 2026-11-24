@@ -80,6 +80,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'limits' && a === '--agent') flags.agent = argv[++i] ?? '' // laki limits' only
   else if (!textOnly && args[0] === 'events' && ['--ws', '--type', '--once'].includes(a)) a === '--ws' ? wsRefs.push(argv[++i] ?? '') : a === '--once' ? (flags.once = true) : (flags.type = argv[++i] ?? '') // laki events' only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
+  else if (!textOnly && args[0] === 'wait-on' && a === '--done') flags.done = true // laki wait-on's only
   else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
   else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only

@@ -35,6 +35,13 @@ test('cli: project add, new, ls, send, screen, rm (--json)', async t => {
   const ws = JSON.parse(r.out)
   assert.equal(ws.branch, 'laki/cli-ws')
   assert.equal(ws.noSetup, true)
+  // laki wait-on: one line, out of Needs you; --done ends it (a flag, never the words)
+  r = await rig.cli('wait-on', 'CI on main', '--ws', ws.id)
+  assert.equal(r.code, 0, r.err)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).waitingOn.text, 'CI on main')
+  r = await rig.cli('wait-on', '--done', '--ws', ws.id)
+  assert.equal(r.code, 0, r.err)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).waitingOn, undefined)
   // agents read it: no settings, env or project config in it
   await rig.rpc('settingsSet', { env: { SECRET: 'from-settings' }, webhook: { url: 'https://hook.example/bot-token' } })
   await rig.rpc('projectSet', { id: proj.id, config: { env: { SECRET: 'from-project' } } })
