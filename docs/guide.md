@@ -923,7 +923,10 @@ email address only, unless you leave the email out on purpose (below).
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
 *Merged*; with its last answer, its PR and checks, and its turn's time when timers are on (Terminals and Browsers
 aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on hover) to open, archive or delete it;
-*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *Backlog* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots and files in, they go with it) for a project, then ▷ (or drag it onto another
+*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). A workspace you marked *Waiting on…* (its ⋯:
+one line, "staging deploy", "Anna's reply"; an agent's `laki wait-on`) sits in *Waiting on*, with a half-filled ring on
+its sidebar row and what it waits on in the row's hover card, out of Needs you and every count until its agent asks
+something or starts again (*Not waiting any more* ends it sooner). *Backlog* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots and files in, they go with it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
 **AI** (on unless Settings › *AI* turns it off, where you pick how it runs; *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
@@ -3176,6 +3179,7 @@ laki name backend                                       # in an agent's tab: oth
 laki agents                                             # the named agents: where, which agent, what they're doing
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
 laki wait fix-the-login dark --timeout 20m              # until neither's agent works: a line each; exit 0 idle, 2 one asks, 3 timed out
+laki wait-on "CI on main"                                # (in an agent's tab) its workspace waits on that: out of Needs you till it asks or starts again; --done: over
 laki --version                                          # this CLI's version, and the daemon's when it runs
 laki doctor                                             # git, gh, the agents, hooks: ✓ ● ✗ and a fix each; exit 1 on a ✗
 laki doctor --bundle | pbcopy                           # diagnostics for a bug report (redacted): Help › Copy diagnostics too

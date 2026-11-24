@@ -2,7 +2,7 @@
 // (macOS tints it for a light or dark menu bar and for the highlight from its alpha alone: no color), test/tray.test.ts
 // draws all four to PNGs. The renderer works out the state from its view (stateOf) and sends it with the badge.
 import { askScope, optLabel } from './ask.ts'
-import { counted } from './nextStep.ts'
+import { counted, heard } from './nextStep.ts'
 import type { DigestRow, TabView, View } from './types.ts'
 
 export const TRAY_STATES = ['idle', 'working', 'waiting', 'blocked'] as const
@@ -13,7 +13,7 @@ export type TrayInfo = { state: TrayState; needs: number; working: number; block
 // plan limit, or a turn ended on an error) over waiting (one needs you: asks, a secret, finished unseen) over working (one
 // runs) over idle. ponytail: blocked first, since it waits on more than a click; the count still says how many need you
 export function stateOf(view: Pick<View, 'tabs' | 'workspaces'>, now = Date.now()): TrayInfo {
-  const quiet = new Set(view.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
+  const quiet = new Set(view.workspaces.filter(w => !heard(w)).map(w => w.id))
   const tabs = view.tabs.filter((t: TabView) => !t.muted && !quiet.has(t.workspace))
   const agents = tabs.filter(t => t.kind === 'agent')
   const needs = tabs.filter(t => counted(t, now)).length
@@ -42,7 +42,7 @@ export function dockProgress(view: Pick<View, 'tabs' | 'mergeQueues'> & { flows?
 // archived workspace or tab, nor in Do not disturb unless it's important (its ask comes as a card then, as notify's).
 // was: the workspaces that waited the view before (null: the first view, nothing bounces); now: this view's
 export function bounceOf(was: ReadonlySet<string> | null, view: Pick<View, 'tabs' | 'workspaces' | 'settings' | 'dnd'>, front: boolean) {
-  const quiet = new Set(view.workspaces.filter(w => w.muted || w.archived || (!!view.dnd && !w.important)).map(w => w.id))
+  const quiet = new Set(view.workspaces.filter(w => !heard(w) || (!!view.dnd && !w.important)).map(w => w.id))
   const now = new Set(view.tabs.filter(t => t.status === 'waiting' && !t.muted && !quiet.has(t.workspace)).map(t => t.workspace))
   return { now, bounce: !!was && !front && view.settings.dockBounce !== false && [...now].some(w => !was.has(w)) }
 }

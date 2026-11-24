@@ -28,7 +28,7 @@ import type { SayModal } from '../../shared/widget'
 import type { WorkflowItem } from '../../shared/workflow'
 import { Glyph } from './Glyph'
 import { shortcutOf } from '../../shared/pwa'
-import { badgeOf, counted, needsTab, waitsElsewhere } from '../../shared/nextStep'
+import { badgeOf, counted, heard, needsTab, waitsElsewhere } from '../../shared/nextStep'
 import { bounceOf, dockProgress, inboxOf, NEEDS, quietSummary, stateOf } from '../../shared/tray'
 import { flushDraft, type ReaderApi, readable } from './Reader'
 import type { SpendView } from './Spend'
@@ -618,7 +618,7 @@ export function App() {
     return () => ts.forEach(clearTimeout)
   }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
-  const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
+  const quiet = new Set(view?.workspaces.filter(w => !heard(w)).map(w => w.id)) // muted, archived, Waiting on…
   const needsYou = (t: TabView) => needsTab(t) && !t.muted && !quiet.has(t.workspace)
   // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)

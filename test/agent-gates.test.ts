@@ -115,6 +115,11 @@ test("S3, S6, S11: an agent merges no PR, flips no PR switch, changes no voice, 
   assert.equal((await rig.rpc('tabSnooze', { tab, until: at })).snoozed, at)
   await assert.rejects(rig.rpc('tabSnooze', { tab, until: Date.now() + 30 * 864e5 }), /within a week/)
   await rig.rpc('tabSnooze', { tab, until: null })
+  // Waiting on…: its own workspace's, an agent's too; one line, out of the counts (nextStep.ts heard); null: over
+  await rig.rpc('wsSet', { id: one.id, waitingOn: '  CI on   main ', from })
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).waitingOn.text, 'CI on main')
+  await rig.rpc('wsSet', { id: one.id, waitingOn: null })
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).waitingOn, undefined)
   assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab).snoozed, undefined)
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === one.id).muted, undefined)
 })

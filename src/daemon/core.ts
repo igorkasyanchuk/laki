@@ -2974,7 +2974,7 @@ export function tabBell(o: { id?: string; ws?: string; on?: unknown }) {
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean; cap?: unknown }) {
+export function wsSet(o: { waitingOn?: string | null; id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean; cap?: unknown }) {
   const w = findWs(o.id)
   if (o.cap !== undefined) capSet(w, capParse(o.cap)) // cap.ts; an agent's only a lower one (main.ts' agentNo)
   // a name you gave it stays: an agent's rename is refused unless you asked for it (asked: laki rename --asked), a
@@ -2993,6 +2993,11 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
   if (typeof o.unrelate === 'string') unrelate(w, o.unrelate) // the info panel's ✕ on a related link: one at a time
+  // Waiting on… (its ⋯, laki wait-on): one line, '' or null none; turn() clears it as its agent asks or starts anew
+  if (o.waitingOn !== undefined) {
+    const text = typeof o.waitingOn === 'string' ? o.waitingOn.replace(/\s+/g, ' ').trim().slice(0, 120) : ''
+    w.waitingOn = text ? { text, at: Date.now() } : undefined
+  }
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined && !(o.auto && w.named)) {
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
@@ -4738,6 +4743,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (tab.snoozed && !late && (p.state === 'running' || (p.state === 'waiting' && was !== 'waiting'))) delete tab.snoozed // Needs you's ✕ or Snooze: back as it asks something new or works again
+  const wsOf = !late && ((p.state === 'running' && was !== 'running') || (p.state === 'waiting' && was !== 'waiting')) ? state.workspaces.find(w => w.id === tab.workspace) : undefined
+  if (wsOf?.waitingOn) delete wsOf.waitingOn // Waiting on…: over as its agent starts a turn or asks something new
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
   // claude's Stop while subagents it started in the background still work: paused, not done (they report back as a new
   // turn, then its real Stop). Its ● and the done notice wait for that; sweepRunning leaves it running meanwhile

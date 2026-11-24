@@ -1749,3 +1749,14 @@ test("Needs you's ✕, Snooze and Probably done: out of the list and the counts;
   assert.deepEqual(snoozeTimes(new Date(2026, 10, 25, 19)).map(x => x.label), ['1 hour', 'Tomorrow 9:00', 'Next week'], 'no evening after 17:00')
   assert.equal(new Date(snoozeTimes(new Date(2026, 10, 30, 8)).at(-1)!.at).getDate(), 7, 'on a Monday: the next one')
 })
+
+test('Waiting on…: a workspace out of the counts and in its own Board column', async () => {
+  const { badgeOf, boardCol, heard } = await import('../src/shared/nextStep.ts')
+  const w = { id: 'w', name: 'web', project: 'p' } as any
+  const tabs = [{ id: 't', workspace: 'w', name: 'claude', kind: 'agent', status: 'waiting' }] as any
+  assert.ok(heard(w) && !heard({ ...w, waitingOn: { text: 'CI', at: 1 } }))
+  assert.equal(badgeOf({ workspaces: [w], tabs, projects: [], settings: {} } as any), 1)
+  assert.equal(badgeOf({ workspaces: [{ ...w, waitingOn: { text: 'CI', at: 1 } }], tabs, projects: [], settings: {} } as any), 0)
+  assert.equal(boardCol({ ...w, waitingOn: { text: 'CI', at: 1 } }, tabs), 'waiting')
+  assert.equal(boardCol(w, tabs), 'answer')
+})

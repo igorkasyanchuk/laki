@@ -783,6 +783,15 @@ async function main() {
       const wsName = (id: string) => v.workspaces.find(w => w.id === id)?.name ?? id
       return out(named.map(t => ({ name: `@${t.alias}`, tab: t.id, workspace: t.workspace, agent: t.preset, status: t.status })), named.map(t => `@${t.alias}  ${t.preset ?? t.kind}  ${t.status}  ${wsName(t.workspace)}/${t.name}  (${t.workspace}/${t.id})`).join('\n') || 'no agent has a name yet (laki name <name> in its tab)')
     }
+    case 'wait-on': {
+      // laki wait-on "<what>" [--ws <ws>] | --done: its workspace ($LAKI_WORKSPACE) out of Needs you and the counts till
+      // its agent asks something or starts a turn again (wsSet's waitingOn)
+      const ws = (flags.ws as string) || process.env.LAKI_WORKSPACE
+      const text = flags.done ? '' : rest.join(' ').trim()
+      if (!ws || (!flags.done && !text)) throw new Error('usage: laki wait-on "<what>" [--ws <ws>] | --done (in a Laki tab: its workspace)')
+      await rpc('wsSet', { id: ws, waitingOn: text || null, from: caller() })
+      return out({ ok: true, waitingOn: text || null }, text ? `${ws} waits on ${text}` : `${ws} isn't waiting on anything`)
+    }
     case 'wait': {
       // A5: laki wait <ws>[/<tab>]… [--timeout 20m]: until none of their agents works; exit 0 idle, 2 one waits, 3 timed out
       const r = await waitTabs(rpcAny, rest, parseWait(flags.timeout))

@@ -32,7 +32,7 @@ export type BoardApi = {
 const TODO = 'text/x-laki-todo' // a dragged to-do's id
 const isImage = (p: string) => /\/images\/[^/]+$/.test(p) // imageSave's (<data>/images/…), else fileSave's (<data>/files/<id>/<name>)
 
-const TIPS: Record<BoardCol, string> = { working: 'An agent works, or its setup runs', answer: 'An agent asks you, or stopped', review: 'An agent finished: look at what it changed, then ship', fix: 'A failing check, CI, conflicts or a review asking for changes', merge: 'A PR open: its CI and reviews, then merge', done: 'Nothing left: merged, closed or untouched' }
+const TIPS: Record<BoardCol, string> = { waiting: 'Waiting on something (its ⋯ › Waiting on…, laki wait-on): back as its agent asks or starts again', working: 'An agent works, or its setup runs', answer: 'An agent asks you, or stopped', review: 'An agent finished: look at what it changed, then ship', fix: 'A failing check, CI, conflicts or a review asking for changes', merge: 'A PR open: its CI and reviews, then merge', done: 'Nothing left: merged, closed or untouched' }
 const merged = (ws: { w: WorkspaceView }[]) => ws.map(c => c.w).filter(w => w.kind === 'worktree' && w.pr?.state === 'MERGED')
 const QUEUED: Record<QueueStatus, string> = { waiting: 'waiting', updating: 'updating', checking: 'checks', merged: 'merged', stopped: 'stopped' }
 

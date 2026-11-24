@@ -2747,6 +2747,7 @@ button[data-scope='broad'] .choice-rule, button[data-scope='broad'] .choice-plai
 .sched-run.live:hover { background: var(--hover); }
 .sched-more { align-self: flex-start; }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
+.ws-waiting-on { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); background: linear-gradient(90deg, var(--muted) 50%, transparent 50%); align-self: center; } /* Waiting on…: a quiet half-filled ring */
 /* Collision radar: other workspaces (or the base) whose changes meet this one's; a click: its menu */
 .ws-radar { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; color: var(--tc-orange); font-size: var(--fs-1); font-variant-numeric: tabular-nums; cursor: var(--cur-act); border-radius: var(--r-s); }
 .ws-radar:hover { background: var(--hover); }

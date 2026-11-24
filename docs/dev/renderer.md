@@ -338,6 +338,9 @@ are tested in `test/units-more.test.ts`.
     time. *Probably done · n* (`probablyDone`: finished a day ago, `DONE_DAY`, unopened) is listed but `counted` leaves it
     out of the Dock's, the menu bar's (tray.ts `stateOf`), the rail's and the page's badge (`badgeOf`). Unit test:
     test/units-more.test.ts; the gate: test/agent-gates.test.ts.
+    Waiting on… (menus.ts' wsMenu, `laki wait-on`: wsSet's `waitingOn`, one line; core's turn() ends it on a turn's start or
+    a new ask): nextStep.ts `heard` leaves its workspace out of Needs you and every count, the row a `.ws-waiting-on` ring
+    and a hover line, the Board its own column (`boardCol`'s `waiting`).
     U8: its head's *Allow all (n)* / *Deny all* take shared/ask.ts `bulkOk`'s asks (claude's PermissionRequest: `tool`
     and `what`, the menu's first a yes and last a no or none read; never `risky`, a cut `what`, a secret, `steps`, or a
     file tool's path outside the worktree unless the tab's `sandbox` is on and not bypass), two or more; Sidebar's

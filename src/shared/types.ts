@@ -328,6 +328,7 @@ export type Workspace = {
   named?: true // you named it (renamed it, or typed its name as it was made): an agent's rename is refused unless you asked (laki rename --asked), a page's title never renames it
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
+  waitingOn?: { text: string; at: number } // Waiting on… (wsSet's waitingOn, laki wait-on): what it waits on, out of Needs you and the counts (nextStep.ts heard) until its agent asks something new or starts a turn
   mutedBy?: 'project' // the view's: muted because its project is (Mute project), not on its own
   important?: boolean // its agents' asks and finishes as cards on screen, until answered or closed (main's addCard)
   private?: boolean // Recording mode (settings.recording) hides it (veiled); its project's private too

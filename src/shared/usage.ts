@@ -60,6 +60,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
   laki wait <ws>[/<tab>]… [--timeout 20m] [--json]   until none of their agents works, then a line each: idle (its
                                               last answer) or waiting (what it asks); exit 0 all idle, 2 one waits, 3 timed out
+  laki wait-on "<what>" [--ws ws] | --done    your workspace waits on something (CI, a deploy, a reply): out of the
+                                              user's Needs you till you ask or start again; --done: not any more
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki update --when-idle [--off]             update Laki once no agent works or asks: the app, then its daemon
   laki secret <what it is>                    in an agent's tab: the user types a token on a masked card; prints only

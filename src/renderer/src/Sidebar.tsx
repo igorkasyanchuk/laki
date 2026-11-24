@@ -301,6 +301,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <Icon name="bellOff" size={11} />
           </span>
         )}
+        {w.waitingOn && (
+          <span className="ws-mark ws-waiting-on" data-tip={`Waiting on: ${w.waitingOn.text} · out of Needs you till its agent asks or starts again`} aria-label={`Waiting on ${w.waitingOn.text}`} />
+        )}
         {w.important && !w.muted && (
           <span className="ws-mark" data-tip="Important: its asks and finishes as cards on screen">
             <Icon name="alertCircle" size={11} />
@@ -446,6 +449,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
       w.race && 'in a race: ⋯ › Compare the race',
       wt.some(t => t.bell) && 'a bell: told once when it next finishes or asks',
+      w.waitingOn && `waiting on ${w.waitingOn.text}`,
       w.muted && 'notifications muted',
       w.important && !w.muted && 'important: cards on screen',
       w.pending && `${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`,

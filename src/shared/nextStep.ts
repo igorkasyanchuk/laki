@@ -61,7 +61,7 @@ export function reviewQueue(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | '
 export function waitsElsewhere(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | 'settings' | 'dnd'>, focusedTab: string | null | undefined, focused: boolean) {
   if (!focused || v.dnd) return false
   const w = veiled(v as View)
-  const live = new Set(w.workspaces.filter(x => !x.muted && !x.archived).map(x => x.id))
+  const live = new Set(w.workspaces.filter(heard).map(x => x.id))
   return w.tabs.some(t => (t.status === 'waiting' || !!t.secret) && t.id !== focusedTab && !t.muted && live.has(t.workspace))
 }
 // the remote page's icon badge (navigator.setAppBadge: the page's, and Web Push's payload for its service worker): what
@@ -69,7 +69,7 @@ export function waitsElsewhere(v: Pick<View, 'workspaces' | 'tabs' | 'projects' 
 // and one not in the view aside
 export function badgeOf(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | 'settings'>) {
   const w = veiled(v as View)
-  const live = new Set(w.workspaces.filter(x => !x.muted && !x.archived).map(x => x.id))
+  const live = new Set(w.workspaces.filter(heard).map(x => x.id))
   return w.tabs.filter(t => counted(t) && !t.muted && live.has(t.workspace)).length
 }
 // U5: the Board's columns, from the same rules: what the sidebar's Needs you counts (needsTab) is always in Answer, Review
@@ -78,6 +78,8 @@ export const needsTab = (t: TabView) => (t.status === 'waiting' || !!t.secret ||
 // Needs you's ✕ and Snooze (core.ts tabSnooze): out of the list and every count till then. Probably done: a finished
 // turn nobody opened for a day, folded under Needs you's Probably done, counted nowhere (counted: the Dock's, the menu
 // bar's, the rail's, the page's badge)
+// a workspace Needs you and the counts hear from: not muted, archived or Waiting on… something
+export const heard = (w: Pick<WorkspaceView, 'muted' | 'archived' | 'waitingOn'>) => !w.muted && !w.archived && !w.waitingOn
 export const snoozedNow = (t: Pick<TabView, 'snoozed'>, now = Date.now()) => (t.snoozed ?? 0) > now
 export const DONE_DAY = 864e5
 export const probablyDone = (t: TabView, now = Date.now()) => t.status !== 'waiting' && !t.secret && !t.failed && !!t.done && !!t.needAt && now - t.needAt > DONE_DAY
@@ -92,10 +94,11 @@ export function snoozeTimes(now = new Date()): { label: string; at: number }[] {
     { label: 'Next week', at: at(((8 - now.getDay()) % 7) || 7, 9) },
   ]
 }
-export const BOARD = [['working', 'Working'], ['answer', 'Answer'], ['review', 'Review'], ['fix', 'Fix'], ['merge', 'Merge'], ['done', 'Done']] as const
+export const BOARD = [['working', 'Working'], ['answer', 'Answer'], ['review', 'Review'], ['fix', 'Fix'], ['merge', 'Merge'], ['waiting', 'Waiting on'], ['done', 'Done']] as const
 export type BoardCol = (typeof BOARD)[number][0]
 export function boardCol(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): BoardCol {
   const mine = tabs.filter(t => t.workspace === w.id)
+  if (w.waitingOn) return 'waiting' // Waiting on…: its line on the card; a new ask or turn clears it
   if (mine.some(t => t.status === 'waiting' || t.secret || t.failed)) return 'answer'
   const needs = mine.some(needsTab) // a finish you haven't looked at
   const st = nextStep(w, tabs, o)
