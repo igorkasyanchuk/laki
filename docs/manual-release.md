@@ -129,8 +129,10 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 2. **Checks**: `npm ci`, `npm run typecheck`, `npm test`.
 3. **Version**: `npm version <bump>` and `scripts/notes.ts` (`## Next` becomes `## <v> · <date>`). If anything fails
    from here until the commit, `package.json`, `package-lock.json` and the notes are put back.
-4. **macOS**: node-pty's Intel binary beside this Mac's (as `pack:x64`), `electron-vite build`, then one
-   `electron-builder --mac dmg zip --arm64 --x64` into `dist/release/<v>`. With the Developer ID: hardened runtime,
+4. **macOS**: node-pty's Intel binary beside this Mac's (as `pack:x64`), `electron-vite build`, `npm run test:ui` (the
+   real window walked page by page and through the risky flows: it shows on your screen for about half a minute; a
+   failure stops the release before anything is signed, its screenshots in `dist/ui-smoke`; `LAKI_SKIP_UI=1` skips it,
+   loudly), then one `electron-builder --mac dmg zip --arm64 --x64` into `dist/release/<v>`. With the Developer ID: hardened runtime,
    [build/entitlements.mac.plist](../build/entitlements.mac.plist), notarized, the ticket stapled to each app.
 5. **Verify**: `codesign --verify --deep --strict`; signed, also `spctl -a` (Gatekeeper's "Notarized Developer ID")
    and `stapler validate`.

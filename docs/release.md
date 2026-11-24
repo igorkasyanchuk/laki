@@ -31,7 +31,9 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    npm run pack:x64   # the Intel app from an Apple silicon Mac: dist/mac/Laki.app
    ```
    A disk image to hand out: `npm run dmg` (`scripts/dmg.sh`) runs `npm run check` and the dependency audit (step 3),
-   bumps the minor version (`npm version minor`, no tag), builds, holds the window's first load to its budget
+   builds and walks the real window (`npm run test:ui`: it shows on your screen for about half a minute; a failure
+   stops it before the version moves, its screenshots in `dist/ui-smoke`; `LAKI_SKIP_UI=1` skips it, loudly), bumps the
+   minor version (`npm version minor`, no tag), builds, holds the window's first load to its budget
    (`npm run size`: package.json's `lakiSize`, 3% allowed; `-- --write` raises it on purpose), builds the unpacked app
    (`electron-builder --dir`), runs `scripts/pack-smoke.sh` on it (step 5; from a shell that isn't a terminal, under
    `script -q`, its log's tail shown when it fails), and only then writes `dist/release/Laki-<version>-arm64.dmg`

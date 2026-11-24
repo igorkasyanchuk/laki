@@ -3,7 +3,8 @@
 # built and smoke-tested (scripts/pack-smoke.sh: its daemon, CLI and hooks inside the bundle, a window), and only then
 # the dmg, from that same app (--prepackaged): what was tested is what ships. A failed step stops it: exit non-zero,
 # package.json, package-lock.json and the release notes as they were, no partial dmg, no smoke daemon left running.
-# LAKI_SKIP_AUDIT=1 and LAKI_SKIP_SMOKE=1 skip those, loudly. macOS only (the Linux build: npm run pack:linux).
+# The window is walked first (npm run test:ui), before the version moves. LAKI_SKIP_AUDIT=1, LAKI_SKIP_SMOKE=1 and
+# LAKI_SKIP_UI=1 skip those, loudly. macOS only (the Linux build: npm run pack:linux).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
@@ -17,6 +18,14 @@ npm run check
 if [ "${LAKI_SKIP_AUDIT:-}" = 1 ]; then loud "LAKI_SKIP_AUDIT=1: the dependency audit is SKIPPED"; else npm run audit:deps; fi
 echo "The oldest security shortcuts (npm run debt -- --old):" # never fails the build
 npm run -s debt -- --old 2> /dev/null | grep '  security  ' | head -3 || true
+# the real window walked page by page and through the risky flows (scripts/ui-smoke.ts), before the version moves
+if [ "${LAKI_SKIP_UI:-}" = 1 ]; then
+  loud "LAKI_SKIP_UI=1: the window is NOT smoke-tested (npm run test:ui)"
+else
+  npx electron-vite build
+  echo "npm run test:ui: Laki's window shows on your screen for about half a minute"
+  npm run test:ui || { loud "the window's smoke test failed: no dmg. Its screenshots: $ROOT/dist/ui-smoke"; exit 1; }
+fi
 T=$(mktemp -d "${TMPDIR:-/tmp}/laki-dmg.XXXXXX")
 H=$T/smoke # pack-smoke's own HOME and LAKI_HOME (never ~/.laki)
 

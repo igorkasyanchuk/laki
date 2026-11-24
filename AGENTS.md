@@ -25,9 +25,9 @@ npm run size                      # the window's first load (index.html's script
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
-npm run dmg                       # scripts/dmg.sh: check, audit:deps, minor version +1, the app built, pack-smoke on it, then dist/release/Laki-<version>-arm64.dmg from that app (the user's ask: every dmg); a failed step: no dmg, version as it was; LAKI_SKIP_SMOKE=1, LAKI_SKIP_AUDIT=1 skip loudly
+npm run dmg                       # scripts/dmg.sh: check, audit:deps, test:ui (before the version moves), minor version +1, the app built, pack-smoke on it, then dist/release/Laki-<version>-arm64.dmg from that app (the user's ask: every dmg); a failed step: no dmg, version as it was; LAKI_SKIP_SMOKE=1, LAKI_SKIP_AUDIT=1, LAKI_SKIP_UI=1 skip loudly
 npm run audit:deps                # scripts/audit.ts: npm audit of what ships, high or critical fails unless scripts/audit-allow.json allows it (until a date); build tools' warn; offline warns unless LAKI_AUDIT_STRICT=1 (release.sh)
-npm run release                   # every platform from this Mac to a draft on the public releases repo (docs/manual-release.md)
+npm run release                   # every platform from this Mac to a draft on the public releases repo, test:ui after its build and before signing (LAKI_SKIP_UI=1 skips loudly; docs/manual-release.md)
 npm run dev                       # Electron + renderer dev server on :5199
 ```
 

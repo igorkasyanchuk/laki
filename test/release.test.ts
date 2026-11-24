@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -48,4 +48,20 @@ test('the dependency audit (scripts/audit.ts auditOf): a high production advisor
   const expired = auditOf(npm, [old], now)
   assert.deepEqual([expired.fail.map(f => f.package), expired.expired], [['ws'], [old]])
   assert.deepEqual(auditOf(npm, [{ ...old, package: 'qs', until: '2027-01-01' }], now).fail.length, 1, 'an allowance is for its package')
+})
+
+test('the window is a gate: release.sh and dmg.sh run npm run test:ui before signing or the version bump, LAKI_SKIP_UI=1 skips it loudly', () => {
+  const release = readFileSync(join(root, 'scripts/release.sh'), 'utf8')
+  const dmg = readFileSync(join(root, 'scripts/dmg.sh'), 'utf8')
+  for (const [name, s, before] of [['release.sh', release, 'npx electron-builder --mac dmg zip'], ['dmg.sh', dmg, 'npm version minor']] as const) {
+    const ui = s.indexOf('npm run test:ui ||')
+    assert.ok(ui > 0, `${name} runs npm run test:ui, its failure stopping it`)
+    assert.ok(ui < s.indexOf(before), `${name}: test:ui before ${before}`)
+    assert.match(s, /"\$\{LAKI_SKIP_UI:-\}" = 1 \]; then\n\s+(loud "|printf '\\n\\033\[1;31m!!! )LAKI_SKIP_UI=1: the window is NOT smoke-tested/, `${name}: LAKI_SKIP_UI=1 skips it, loudly`)
+    assert.match(s, /shows on your screen for about half a minute/, `${name} says the window will show`)
+    assert.match(s, /dist\/ui-smoke/, `${name} says where the screenshots are`)
+  }
+  assert.ok(release.indexOf('npm run build\n') < release.indexOf('npm run test:ui ||'), 'release.sh: the build first')
+  assert.ok(dmg.indexOf('npm run check') < dmg.indexOf('npm run test:ui ||'), 'dmg.sh: after check')
+  assert.ok(dmg.indexOf('npx electron-vite build') < dmg.indexOf('npm run test:ui ||'), 'dmg.sh: built before it')
 })

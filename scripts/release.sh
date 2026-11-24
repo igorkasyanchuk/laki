@@ -1,7 +1,7 @@
 #!/bin/bash
 # A release from this Mac to every platform (docs/manual-release.md): the checks, a new version, macOS arm64 and x64
 # (signed and notarized with the Developer ID in the Keychain), Linux arm64 and x64 AppImages (Docker), each one
-# smoke-tested, then a draft release on the public releases repo (package.json's build.publish). Nothing goes live
+# smoke-tested (and the window walked first: npm run test:ui, LAKI_SKIP_UI=1 skips it, loudly), then a draft release on the public releases repo (package.json's build.publish). Nothing goes live
 # until `publish`.
 #   scripts/release.sh [minor|patch|major|<x.y.z>] [--no-upload] [--adhoc] [--skip=mac-x64,linux-x64,…] [--any-branch]
 #   scripts/release.sh upload <x.y.z>     upload dist/release/<x.y.z> to its draft (again, after a failed upload)
@@ -262,6 +262,13 @@ if [ ${#MAC[@]} -gt 0 ]; then
     npm i --no-save --force --no-audit --no-fund "@lydell/node-pty-darwin-x64@$(node -p "require('./node_modules/@lydell/node-pty/package.json').version")"
   fi
   npm run build
+  # the real window walked page by page and through the risky flows (scripts/ui-smoke.ts), before anything is signed
+  if [ "${LAKI_SKIP_UI:-}" = 1 ]; then
+    printf '\n\033[1;31m!!! LAKI_SKIP_UI=1: the window is NOT smoke-tested (npm run test:ui)\033[0m\n\n'
+  else
+    say "Smoke test: the window (npm run test:ui: Laki's window shows on your screen for about half a minute)"
+    npm run test:ui || die "the window's smoke test failed: no release. Its screenshots: $ROOT/dist/ui-smoke"
+  fi
   npx electron-builder --mac dmg zip "${MAC[@]}" "${SIGN[@]}" --publish never "-c.directories.output=$OUT"
   for app in "$OUT"/mac*/Laki.app; do
     codesign --verify --deep --strict "$app"
