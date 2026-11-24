@@ -26,7 +26,10 @@ import { applyTheme, LESS_CLEAR, macApp, type Paint, paintKey, paintOf, transpar
 import { ask, AskHost, askText, Icon, IconButton, keep, load, Tips, Toasts, useMenu } from './ui'
 import { handOff } from './tell'
 import { cloudVoice, voiceStart } from './voice'
-import { imagesVia, insertMenus } from './Widgets'
+import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, WidgetPanel } from './Widgets'
+import type { WidgetApi } from './Widgets'
+import { placesOf } from '../../shared/types'
+import { whenOk } from '../../shared/widgetSchema'
 
 // no glass, no see-through sidebar: the window has no blur behind it
 const paint = (p: Paint) => applyTheme(p, true)
@@ -364,8 +367,10 @@ export function QuickWindow() {
 // shows, with the facts it says. Changes, Files, Review, Preview, Simulator, Side chat and Info work here; a file opens
 // in its preview here; comments go to the workspace's agent. What only the app does (a PR's merge, close or approve, Fix,
 // a check's log, the PR switches, rename, attach, going to a workspace) goes to the app window, which comes forward.
-// Its tab is its own (laki.panelWinTab); Back in Laki (or closing it) puts the panel back there
-// ponytail: no extensions' panel tabs, the Preview's element picking and screenshots here (main's capture: the app window's)
+// Its tab is its own (laki.panelWinTab); Back in Laki (or closing it) puts the panel back there. Its extensions' panel
+// tabs draw here (their full view, page, Laki commands and laki:// links: the app window's); the Preview's pick and
+// screenshot go to the agent tab the app window shows (says.active), else the workspace's first.
+// ponytail: an extension's dialog (say's modal) shows only its toast here
 const PANEL_TAB = 'laki.panelWinTab'
 export function PanelWindow() {
   const view = useView()
@@ -389,7 +394,7 @@ export function PanelWindow() {
   )
   if (!w || !says?.info) return <div className="tab-window panel-window">{head}<div className="muted pad">{says ? 'No workspace open in Laki’s window.' : 'Waiting for Laki’s window…'}</div></div>
   const ws = w.id
-  const agentTabs = view.tabs.filter(t => t.workspace === ws && t.kind === 'agent' && t.status !== 'exited')
+  const agentTabs = view.tabs.filter(t => t.workspace === ws && t.kind === 'agent' && t.status !== 'exited').sort((a, b) => Number(b.id === says.active) - Number(a.id === says.active)) // the app window's on screen first
   const preview = (path: string, line?: number, storage?: boolean) => setShown(s => ({ path, line, storage, n: (s?.n ?? 0) + 1 }))
   const revertOk = (file: string, part?: string, uncommitted?: boolean) => ask(part ? `Revert ${part} in ${file.split('/').pop()}?` : `Revert ${file.split('/').pop()}?`, { text: `Back to how it is ${uncommitted ? 'in the last commit' : `on ${w.base ?? 'the base'}`}. Nothing is committed; Undo is in the toast.${agentTabs.some(t => t.status === 'running') ? ' Its agent is working here: it may write it again.' : ''}`, ok: 'Revert', danger: true })
   const redo = (id: string, then?: () => void) => api.call('hunkRedo', { ws, id }).then(() => (then?.(), done('Back as it was')), fail)
@@ -469,6 +474,30 @@ export function PanelWindow() {
       : undefined,
   }
   const side = agentTabs[0]
+  // the workspace's extensions with a panel tab (as the app window's: Chrome.tsx ownWidgets), their calls the daemon's,
+  // what only App does asked of it
+  const extApi: WidgetApi = {
+    store: (id, op, key, value, at) => api.call('widgetStore', { id, op, key, value, ws: at }),
+    render: (id, full, sample, cells, at, turn) => api.call<string | null>('widgetRender', { id, full, ...(sample && { sample }), ...(cells && { cells }), ws: at, ...(turn && { turn }) }),
+    run: (id, at) => api.call('widgetRun', { id, ws: at }),
+    open: url => (/^laki:\/\//i.test(url) ? appDo({ op: 'link', url }) : openExternal(url)),
+    copy: text => void navigator.clipboard.writeText(text).then(() => done('Copied')),
+    full: (id, at) => appDo({ op: 'ext', id, ws: at ?? ws }),
+    close: () => {},
+    action: (id, action, arg, label, at) =>
+      api.call<{ ok: boolean; error?: string; fail?: { hint?: string }; open?: string; send?: string; toast?: string }>('widgetAction', { id, action, arg, ws: at }).then(
+        r => (!r.ok ? (toast(`${label || action} failed: ${r.fail?.hint ?? r.error}`), false as const) : (r.open && extApi.open(r.open), r.send && void api.call('send', { target: agentTabs[0]?.id ?? ws, text: r.send, whenIdle: true }), r.toast && done(r.toast), undefined)),
+        e => (toast(`${label || action} failed: ${(e as Error).message}`), false as const),
+      ),
+    say: (_id, s) => void (s.toast && done(s.toast)),
+    do: (x, cmd, label) => appDo({ op: 'extDo', id: x.id, cmd, label }),
+    settings: (id, key) => appDo({ op: 'ext', id: id ?? '', page: true, key }),
+  }
+  const whenHere = { projectName: view.projects.find(p => p.id === w.project)?.name, agents: view.tabs.filter(t => t.workspace === ws && t.kind === 'agent').map(t => t.status) }
+  const ext = (view.widgets ?? [])
+    .map(x => inWs(x, ws))
+    .filter(x => x.on && placesOf(x).includes('panel') && (!x.project || x.project === w.project) && !x.hidden && whenOk(x.when, w, whenHere))
+    .map(x => ({ id: `ext:${x.id}` as const, label: x.name, icon: <ExtGlyph w={x} size={14} />, body: <WidgetPanel w={x} api={extApi} /> }))
   return (
     <div className="tab-window panel-window">
       {shown ? (
@@ -507,6 +536,7 @@ export function PanelWindow() {
           root={w.storage ? root : 'ws'}
           onRoot={setRoot}
           side={side && <SideChat key={side.id} tab={side} onSent={done} />}
+          ext={ext}
           info={
             <InfoTab
               w={says.info}

@@ -31,6 +31,9 @@ test('main guards: only the app window’s main frame on the app’s own page is
   assert.equal(pageIs(undefined, 'new'), false)
   assert.equal(pageIs('app://laki/ask.html?window=inbox', 'inbox'), true, "the menu bar's Inbox")
   assert.equal(pageIs('app://laki/ask.html', 'inbox'), false, 'the cards on screen are not the Inbox')
+  // the side panel's own window (shots.ts' capture: its Preview's screenshot): its page by name, nothing else
+  assert.equal(pageIs(`${page}?window=panel`, 'panel'), true)
+  for (const u of [`${page}?window=panels`, `${page}?window=new`, 'https://example.com/?window=panel']) assert.equal(pageIs(u, 'panel') && fromApp({ type: 'window', main: true, url: u }), false, u)
 })
 
 test('S9: the token only to index.html’s pages; app:// requests stay in out/renderer', () => {

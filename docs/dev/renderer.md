@@ -711,14 +711,17 @@ are tested in `test/units-more.test.ts`.
   main for a plain window (not a panel: it can go to another screen) loading `?window=panel`, `NewWindow.tsx`
   `PanelWindow`. Its bounds, and `open` (true at quit: reopened as the app window asks `panel-floating` on load), in
   userData's `panel.json`. `panelWin.ts`: the app window's `usePanelHost` posts `{ say: { ws, info (infoOf), git, sim,
-  turn } }` on a BroadcastChannel (`laki.panel`) after each render it changed, answers the window's `hello`, and runs its
-  `do`s (`act` prAct, `fix`, `log`, `auto` setAuto, `rename`, `attach`, `go`, `sees`) with `window.focus()` first;
+  turn, active } }` (active: its agent tab on screen) on a BroadcastChannel (`laki.panel`) after each render it changed, answers the window's `hello`, and runs its
+  `do`s (`act` prAct, `fix`, `log`, `auto` setAuto, `rename`, `attach`, `go`, `sees`; an extension's `ext` full view or
+  page, `extDo` Laki command, `link` laki:// link, through its `widgetApi`) with `window.focus()` first;
   `showPanel` while out switches that window's tab (`tab`). App's `panelShown` is false while out; main's `closed` sends
   `panel-floating` false and App opens its panel again. The window's own panelApi (`PanelWindow` `papi`: the daemon's
   calls, its own toasts, asks and a small file menu, a file's preview in place of the panel), its tab
   `laki.panelWinTab`. Main lets it `open-external`, `quick-look`, `drag-out`, `reveal`, `open-path`, `menu-popup`,
-  `accent` and `scrollbars` (`from(e, …, 'panel')`). No extensions' panel tabs there, and the Preview's Pick and
-  screenshots stay the app window's (main's `capture`). test:ui's `panel-window` and `panel-back` steps.
+  `accent` and `scrollbars` (`from(e, …, 'panel')`), and `capture` (shots.ts: its own Preview's webview, `from(e,
+  'panel')` and the webview's host checked). Its extensions' panel tabs as the app window's (`ext`, `extApi`: the
+  daemon's calls, the rest `do`s; a dialog an extension says shows only its toast there), and the Preview's Pick and
+  screenshot go to `active` first (`agentTabs` sorted). test:ui's `panel-window` and `panel-back` steps.
 - **The global hotkey** (`settings.hotkeyOn`, unset on; `hotkey`, unset `HOTKEY` ⌃⌥⌘L, keyLabel's text): App sends it
   to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`
   through `bindKey`, `keys.open`; it shows the app's window), Settings' `HotkeyField` too, which says when another app (or

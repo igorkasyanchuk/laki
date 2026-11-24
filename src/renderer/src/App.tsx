@@ -1374,10 +1374,13 @@ export function App() {
   // the side panel in a window of its own (panelWin.ts): what it shows there, its asks for what only App does (this
   // window comes forward for their dialogs), and the panel back here once it closes
   const panelHost = usePanelHost(
-    () => (ws && view ? { ws: ws.id, info: infoOf(ws), git, sim: project?.config?.simulator ?? settings.simulator === true, turn: view.tabs.some(t => t.workspace === ws.id && t.changes) } : { ws: null }),
+    () => (ws && view ? { ws: ws.id, info: infoOf(ws), git, sim: project?.config?.simulator ?? settings.simulator === true, turn: view.tabs.some(t => t.workspace === ws.id && t.changes), ...(tab?.kind === 'agent' && tab.workspace === ws.id && { active: tab.id }) } : { ws: null }),
     d => {
       window.focus()
       if (d.op === 'sees') return setDialog({ sees: d.agent, in: d.project })
+      if (d.op === 'link') return widgetApi.open(d.url)
+      if (d.op === 'ext') return d.page ? widgetApi.settings(d.id, d.key) : widgetApi.full(d.id, d.ws)
+      if (d.op === 'extDo') return void (x => x && widgetApi.do(x, d.cmd, d.label))(viewRef.current?.widgets?.find(x => x.id === d.id))
       const w = viewRef.current?.workspaces.find(x => x.id === d.ws)
       if (!w) return
       if (d.op === 'act') void prAct(w, d.act, d.method)

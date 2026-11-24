@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The side panel in its own window has your extensions' tabs, and the Preview's pick and screenshot there go to the agent you're looking at.
 - *What will this do?* explains Codex's, Antigravity's and Grok's command asks and bigger file changes too.
 - Frosted: the terminal sits in a rounded well that fades under the tab bar, the rail and sidebar catch the pointer's light, and the selected rail icon is drawn a little bolder.
 - Messages waiting for Laki AI's answer are kept through a restart and go once Laki is back.

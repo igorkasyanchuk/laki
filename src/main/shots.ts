@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { floater, placeFloater } from './floater.ts'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { pageURL, quickW, sendShot, show, win } from './index.ts'
+import { from, pageURL, quickW, sendShot, show, win } from './index.ts'
 
 export let shooting = false // a screenshot under way: the drop and its card stay out of it
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels; a
@@ -100,8 +100,10 @@ ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
 })
 ipcMain.on('annotate-cancel', e => annot && e.sender === annot.webContents && annot.destroy())
 
-// the preview pane's screenshot: a webview of this window's, as a PNG in base64
+// the preview pane's screenshot: a webview of this window's (the app window's, or the side panel's own window's), as a
+// PNG in base64
 ipcMain.handle('capture', async (e, id: number) => {
+  if (!from(e, 'panel')) throw new Error('not the app window or the side panel')
   const wc = webContents.fromId(id)
   if (!wc || wc.getType() !== 'webview' || wc.hostWebContents !== e.sender) throw new Error('no such preview')
   const img = await wc.capturePage()

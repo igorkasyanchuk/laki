@@ -147,7 +147,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **A tab in its own window**: a tab's right click › *Float in its own window* (⌘K too): its terminal, live, in a small
   window over every app, as big as you drag it; its ✕ puts it back.
 - **The side panel in its own window**: the window button in the panel's head (or ⌘K's *Move the side panel to its own
-  window*): Changes, Files, Review, Preview, the Simulator and Info in a window of their own, say the diff on the big
+  window*): Changes, Files, Review, Preview, the Simulator, Info and your extensions' panel tabs in a window of their own, say the diff on the big
   screen while the agents stay on the laptop. It follows the workspace Laki's window shows; a comment on a line goes
   to that workspace's agent; a file opens in its preview there. A PR's Merge, Fix or a check's log brings Laki's
   window forward for its confirm. It keeps its own tab and where you put it, opens again at the next start if it was
