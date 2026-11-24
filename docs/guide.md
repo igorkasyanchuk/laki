@@ -2622,7 +2622,7 @@ a click away; one from before keeps its own).
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
   Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name; each font picker, here and in Appearance, shows every name in its own typeface, with a filter on top), font size (every tab's; ⌘+ / ⌘− / ⌘0 change one tab's, which keeps it),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
-  cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Inset panes* (each pane a rounded card with a margin around it), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
+  cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Inset panes* (each pane a rounded card with a margin around it), *Smooth scrolling* (on by default: your scrolling glides, a wheel, Page Up and Down, a jump to the end, while new output follows at once; not with Motion: None or Reduce motion), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
   ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
   Editing has them; on by default), *A file path clicked* (in a terminal's text: Laki's preview at its line, the

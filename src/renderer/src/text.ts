@@ -1166,3 +1166,9 @@ export function rollCols(from: string, to: string) {
   const d = (c: string) => c >= '0' && c <= '9'
   return [...b].map((c, i) => ({ from: a[i], to: c, rolls: a[i] !== c && (d(a[i]) || a[i] === ' ') && (d(c) || c === ' ') }))
 }
+
+// Settings › Terminal › Smooth scrolling (termSmooth, on unless false): xterm's smoothScrollDuration, its glide for your
+// scrolling (a wheel, ⇞ ⇟, a jump to the end). Output at the bottom follows at once either way: xterm 6 syncs the
+// viewport to new lines without the animation (Viewport._sync). None with Motion: None or the system's Reduce motion
+export const SMOOTH_MS = 90
+export const smoothMs = (on: unknown, motion: unknown, reduced: boolean) => (on !== false && motion !== 'none' && !reduced ? SMOOTH_MS : 0)

@@ -1615,3 +1615,14 @@ test('rollCols: which positions of a number roll (digits, one coming or going) a
   assert.equal(rolls('$4.10', '$12.00'), 'ssr=r=') // right-aligned: a $ comes in and $→1 swap, 4→2 and 1→0 roll, the dot stays
   assert.equal(rolls('42', '42'), '==')
 })
+
+test("Smooth scrolling: xterm's glide unless it's off, Motion is None or the system asks for reduced motion", async () => {
+  const { smoothMs, SMOOTH_MS } = await import('../src/renderer/src/text.ts') // settingsBase' termLook passes it to every terminal (the floated tab's, the phone's: they take termLook too)
+  assert.equal(SMOOTH_MS, 90)
+  assert.equal(smoothMs(undefined, undefined, false), 90, 'on unless false')
+  assert.equal(smoothMs(true, 'high', false), 90)
+  assert.equal(smoothMs(true, 'low', false), 90)
+  assert.equal(smoothMs(false, 'high', false), 0, 'off')
+  assert.equal(smoothMs(true, 'none', false), 0, 'Motion: None')
+  assert.equal(smoothMs(true, 'high', true), 0, 'Reduce motion')
+})

@@ -158,6 +158,7 @@ export const FIND: [string, string, string?][] = [
   ['terminal', 'Cursor style', 'block bar underline'],
   ['terminal', 'Padding', 'tiny minimal roomy space around margin inner edge'],
   ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
+  ['terminal', 'Smooth scrolling', 'glide animate animation smooth scroll wheel page up down motion'],
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
   ['terminal', 'Recent pictures on a terminal', 'image screenshot paste drop chips thumbnail picture reveal finder'],

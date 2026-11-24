@@ -123,6 +123,7 @@ export type AppSettings = Paint & {
   cursorBlink?: boolean
   termPad?: 'tiny' | 'normal' | 'roomy' // the space around a terminal's text (unset: normal)
   scrollSpeed?: number // lines per wheel step, xterm's scrollSensitivity (unset: SCROLL)
+  termSmooth?: boolean // Smooth scrolling: your scrolling glides (settingsBase smoothMs; unset: on)
   templates?: Template[] // prompt templates: {{prompt}}, {{project}}, {{base}}
   actions?: RunAction[] // Run ▾'s actions, with each project's
   env?: Record<string, string> // every session's
@@ -470,7 +471,7 @@ function TermPreview({ s }: { s: AppSettings }) {
 }
 
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
-const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', paneInset: false, dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
+const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', paneInset: false, dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, termSmooth: true, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
 
@@ -2822,6 +2823,9 @@ export function SettingsPage(p: {
               <Group title="Keyboard, mouse and clipboard">
                 <div className="setting-box">
                   {row('Scroll speed', 'With ⌥: three times that', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm\u2019s' : ''}`)}
+                  <Switch className="switch-row" on={s.termSmooth !== false} onChange={v => set({ termSmooth: v })}>
+                    <Says title="Smooth scrolling" hint="Your scrolling glides (a wheel, Page Up and Down, a jump to the end); new output follows at once. Not with Motion: None or Reduce motion" />
+                  </Switch>
                   <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
                     <Says title="Copy selected text" hint="What you select is on the clipboard, no ⌘C needed" />
                   </Switch>

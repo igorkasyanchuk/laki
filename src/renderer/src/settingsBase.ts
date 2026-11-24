@@ -1,5 +1,6 @@
 // E8: what the rest of the app reads of Settings (the window, the terminal, the sidebar's rows, the rail, a link's
 // section), without the Settings page: that loads as it opens (Dialogs.tsx' lazy pages). Settings.tsx re-exports it
+import { smoothMs } from './text'
 import type { FontWeight } from '@xterm/xterm'
 import { SECTIONS } from '../../shared/settingsMap'
 import { aiOn, type Design, flowsOn, specsOn } from '../../shared/types'
@@ -71,6 +72,7 @@ export const termLook = (s: AppSettings) => ({
   cursorBlink: s.cursorBlink !== false,
   scrollSensitivity: s.scrollSpeed ?? SCROLL,
   fastScrollSensitivity: (s.scrollSpeed ?? SCROLL) * 3, // with ⌥
+  smoothScrollDuration: smoothMs(s.termSmooth, s.motion, !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
 })
 
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)

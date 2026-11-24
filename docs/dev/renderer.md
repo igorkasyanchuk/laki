@@ -981,7 +981,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or a new one); `VarChips` under a
   template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable in at the cursor of the field
   just before them (in a `.preset` card, shown only while it has the focus); presets, `EnvField` (KEY=value lines), fonts,
-  `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`), `termPad` (*Padding*: `.app[data-pad]`, the `.term`'s inset and the preview's padding; tiny on a phone too, roomy not) with a live preview
+  `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`, the floated tab's and the phone's too; `smoothScrollDuration`: text.ts `smoothMs`, 90 ms unless *Smooth scrolling* is off, Motion: None or Reduce motion; output at the bottom follows at once anyway: xterm 6's `Viewport._sync` sets the position without the animation), `termPad` (*Padding*: `.app[data-pad]`, the `.term`'s inset and the preview's padding; tiny on a phone too, roomy not) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight, a ☆ on each (`favThemes`: Favorites, a group first, each one still in All themes too);
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's (`radius`
   also as `--rs`, which every fixed px radius in looks/ and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
