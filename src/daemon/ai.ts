@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { helpFind, helpParts, type HelpPart } from '../shared/help.ts'
 import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
-import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, tgBackend, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, exec, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
 import { diff } from './files.ts'
@@ -357,7 +357,7 @@ function thread(id = ''): Thread {
   return t
 }
 // the AI page's chat as the daemon starts: what was waiting in it goes (main.ts)
-export const aiResume = () => void thread('')
+export const aiResume = () => void (Array.isArray(readJson<{ queued?: unknown }>(chatPath)?.queued) && thread('')) // only with something queued: else it loads as it's first asked for
 function changed(t: Thread) {
   t.chat = t.chat.slice(-KEEP)
   const queued = t.queue?.filter(q => q.rpc === aiHooks.local).map(({ text, images, context }) => ({ text, images, ...(context && { context }) }))
@@ -519,7 +519,10 @@ export function aiState(p: { chat?: string } = {}) {
 
 type Run = { text: string; model: string; calls: number; in: number; out: number; cached?: number; cost?: number }
 // r: what the ask spent so far, kept when it fails too
-type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run }
+type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run; backend: AiBackend }
+// Telegram's asks' rpc (main.ts tgHooks: telegram.ts' act): such an ask, queued too, takes Settings › AI › From
+// Telegram's backend (types.ts tgBackend), not the Mac's
+export const tgRpcs = new WeakSet<Rpc>()
 
 // chat: a spec's or brainstorm's (planChat), else the AI page's; one that ended starts again, empty
 // context: where the user is as they ask (the floating chat's: the page, workspace and tab), for the model only: the
@@ -538,7 +541,8 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     return { queued: t.queue.length }
   }
   refuseBusy(t)
-  const backend: AiBackend = s.backend ?? 'openrouter'
+  const backend = tgRpcs.has(rpc) ? tgBackend(state.settings) : (s.backend ?? 'openrouter')
+  if (!backend) throw new Error(`Laki AI on ${s.backend} doesn't answer from Telegram: Settings › AI › From Telegram picks its backend`)
   if (backend === 'openrouter' && !hasKey()) throw new Error('no OpenRouter API key: Settings › AI')
   if (backend === 'endpoint') target(backend) // its URL and model set, before anything is said
   if (t.ended) fresh(t)
@@ -558,7 +562,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   const t0 = Date.now()
   const r: Run = { text: '', model: backend === 'endpoint' ? state.settings?.aiEndpoint?.model || backend : s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
   const where = typeof p.context === 'string' ? p.context.trim().slice(0, CONTEXT_MAX) : ''
-  const o: Opts = { t, ask: where ? `${ask || 'See the image.'}\n\n[Where the user is in Laki as they ask this: ${where}]` : ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
+  const o: Opts = { backend, t, ask: where ? `${ask || 'See the image.'}\n\n[Where the user is in Laki as they ask this: ${where}]` : ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
   const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120), from: t.id.startsWith('widget:') ? 'extensions' : AGENT_CHAT.test(t.id) ? 'agents' : t.id ? 'specs' : 'chat' }
   try {
     await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o)) // openrouter: Your endpoint's too
@@ -747,7 +751,7 @@ const QUIET_MS = Number(process.env.LAKI_AI_QUIET_MS) || 120_000
 
 async function openrouter(o: Opts) {
   const s = state.settings?.ai ?? {}
-  const at = target() // OpenRouter, or Your endpoint
+  const at = target(o.backend) // OpenRouter, or Your endpoint (Telegram's may differ from the Mac's)
   const model = at.model
   const mark = at.or && cachesByMark(model)
   const list = toolsFor(o.rpc, o.t.id)

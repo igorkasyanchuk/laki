@@ -1,12 +1,12 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, type Agent, type AgentCli, type AgentContext, AGENT_NAMES, skillNotes, type AgentUsage, AI_CONTEXT_MAX, MEMORY_HOW, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
+import { type TgAi, type Account, type AccountAgent, type AccountView, type Agent, type AgentCli, type AgentContext, AGENT_NAMES, skillNotes, type AgentUsage, AI_CONTEXT_MAX, MEMORY_HOW, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { heardText, micTest, TEST_MS, useLevel } from './voice'
 import { SILENCES } from '../../shared/talk'
 import { api, bridge } from './api'
 import { Group, Says } from './SettingsKit'
-import { Icon, IconButton, Switch } from './ui'
+import { askText, Icon, IconButton, Switch } from './ui'
 import { BACKENDS, money, tokens } from './Ai'
 import { mostRoom } from './Usage'
 import { shortPath } from './text'
@@ -416,7 +416,7 @@ function EndpointFields({ api, endpoint, onEndpoint, has }: { api: AiApi; endpoi
   )
 }
 
-export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChange, endpoint, onEndpoint, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; next: boolean; onNext: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; endpoint?: { url: string; model: string }; onEndpoint?: (e: { url: string; model: string }) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
+export function AiSection({ tgAi, onTgAi, api, ai, glow, onGlow, next, onNext, presets, onChange, endpoint, onEndpoint, imageDays, onImageDays }: { tgAi?: TgAi; onTgAi: (v: TgAi | undefined) => void; api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; next: boolean; onNext: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; endpoint?: { url: string; model: string }; onEndpoint?: (e: { url: string; model: string }) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
   const [st, setSt] = useState<{ key: boolean; endpointKey?: boolean; totals: AiTotals }>()
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
@@ -491,6 +491,25 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
           {(backend === 'claude' || backend === 'codex') && !preset && ' Another account: a profile on it (Agents & profiles), then pick it here; none: the default account.'}
         </p>
         {backend === 'endpoint' && <EndpointFields api={api} endpoint={endpoint} onEndpoint={onEndpoint} has={st?.endpointKey} />}
+        {/* From Telegram (types.ts tgBackend): its own backend; the Mac's claude or codex only past a typed confirm */}
+        <label className="switch-row">
+          <select
+            value={tgAi ?? ''}
+            onChange={async e => {
+              const v = e.target.value as TgAi | ''
+              if (v !== 'mac') return onTgAi(v || undefined)
+              e.target.value = tgAi ?? ''
+              const typed = await askText('Full access from Telegram?', { text: `Laki AI on ${BACKENDS[backend]} reads any file on this Mac and calls Laki as you, past Telegram's Answer and Control levels. Anyone who has your Telegram chat (your phone, your account) could too. Type FULL ACCESS to turn it on.`, placeholder: 'FULL ACCESS', ok: 'Turn on' })
+              if (typed?.trim().toUpperCase() === 'FULL ACCESS') onTgAi('mac')
+            }}
+          >
+            <option value="">{backend === 'claude' || backend === 'codex' ? "Doesn't answer" : `As here (${BACKENDS[backend]})`}</option>
+            <option value="openrouter">{BACKENDS.openrouter}</option>
+            <option value="endpoint">{BACKENDS.endpoint}</option>
+            {(backend === 'claude' || backend === 'codex' || tgAi === 'mac') && <option value="mac">{`${BACKENDS[backend]}, as here: full access…`}</option>}
+          </select>
+          <Says title="From Telegram" hint={tgAi === 'mac' ? `Full access: Laki AI from your Telegram chat runs as on this Mac (${BACKENDS[backend]}), with your rights and files` : "Laki AI's backend for asks from your Telegram chat (Settings › Telegram): OpenRouter or Your endpoint act only as far as the chat's level lets them, starting new work at Control"} />
+        </label>
         {backend !== 'endpoint' && <label>
           Model
           <input

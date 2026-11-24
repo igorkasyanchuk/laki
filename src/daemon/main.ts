@@ -12,7 +12,7 @@ import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
-import { aiHooks, aiResume, askExplain, reviewSteps, promptQuestions, promptImprove, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
+import { aiHooks, aiResume, tgRpcs, askExplain, reviewSteps, promptQuestions, promptImprove, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
@@ -1394,8 +1394,8 @@ for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, 
 // Telegram's (telegram.ts tgHooks.call): only TELEGRAM_OK's methods, at the level each needs, with ANSWER's checks of
 // what a call says (an agent tab's whole message, never a ! line; no say), then as the user's own call
 for (const k of Object.keys(TELEGRAM_OK)) if (!Object.hasOwn(api, k)) throw new Error(`TELEGRAM_OK's ${k} isn't a method of api`)
-tgMod.tgHooks.ai = (p, rpc) => aiAsk(p, rpc) // Laki AI from the chat: its tools through rpc, telegram.ts' act (this gate)
-tgMod.tgHooks.aiPick = (p, rpc) => aiAnswer(p, rpc) as Promise<{ text?: string }> // a tap on its laki_ask's button: a plain question's pick, its next answer
+tgMod.tgHooks.ai = (p, rpc) => (tgRpcs.add(rpc), aiAsk(p, rpc)) // Laki AI from the chat: its tools through rpc, telegram.ts' act (this gate); its backend Settings › AI › From Telegram's
+tgMod.tgHooks.aiPick = (p, rpc) => (tgRpcs.add(rpc), aiAnswer(p, rpc)) as Promise<{ text?: string }> // a tap on its laki_ask's button: a plain question's pick, its next answer
 // its open laki_ask: the AI page's chat's last message, a plain question not answered yet (one Laki acts on: the Mac's)
 tgMod.tgHooks.aiAsked = () => (m => (m?.ask && m.ask.picked === undefined && !m.ask.act && !m.ask.perm ? { id: m.ask.id, text: m.text, options: m.ask.options } : undefined))(aiState({}).chat.at(-1))
 // what a Telegram call may say beyond its method: one tab's Stop, never every turn; prAct's merge, never another act or force

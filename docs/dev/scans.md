@@ -532,8 +532,10 @@ AI page's chat with `AI_WHERE` as its context and `act` as its rpc, so each tool
 level, the limits, What Telegram did); `sendChatAction` typing every 4.5 s, the answer as `mdToTg` (3,500 characters,
 redacted); one ask at a time; its `laki_ask` (`aiQuestion`, TELEGRAM_OK at answer, never one with an `act`: main.ts'
 `TG_SAYS`) as a button per answer (`tgHooks.aiAsked`: the chat's open plain question once its turn ends), a tap
-(`nav:q:<id>:<n>`) its pick through `tgHooks.aiPick` (`aiAnswer`, with `AI_WHERE`), the question edited to say it; refused with a claude or codex backend (`aiNo`: their tools call Laki as you, through laki
-mcp) and with Titles only. A message that replies to nothing and isn't in a topic: a pending ➕ New task's (`newIn`, 10
+(`nav:q:<id>:<n>`) its pick through `tgHooks.aiPick` (`aiAnswer`, with `AI_WHERE`), the question edited to say it. Its backend: types.ts `tgBackend` (settings `tgAi`, Settings › AI › From Telegram; the
+user's: AGENT_SETTINGS_NO, REMOTE_KEYS): main.ts marks Telegram's rpc (`tgRpcs`, ai.ts), and aiAsk (its queue and
+aiPick's too) takes it over the Mac's, `Opts.backend` to `target`; none (the Mac's claude or codex, tgAi unset) refused
+(`aiNo`: their Read and laki mcp act as you), `mac` (a typed FULL ACCESS) runs them anyway; refused with Titles only. A message that replies to nothing and isn't in a topic: a pending ➕ New task's (`newIn`, 10
 minutes: `started`, `wsNew` then talked to), else the workspace you talk to (`state.telegram.focus`: a card's 💬 Talk
 here, `/talk <workspace>`; `/talk off`; gone with the workspace, Unpair or another bot), else *Where should this go?*
 (`whereTo`: the words kept 10 minutes under a key, `pend`; a button per agent's workspace, the newest six, and at

@@ -906,6 +906,7 @@ export type Settings = {
   talkTo?: 'ai' // Q10: the talk key goes to Laki AI (unset: an agent, Q2's)
   talkKey?: string // its keys (unset: ui.tsx TALK_KEY)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
+  tgAi?: TgAi // Settings › AI › From Telegram: Laki AI's backend for the chat (tgBackend); mac: the Mac's own, full access (typed confirm)
   talkCards?: boolean // Settings › Voice › Answer cards: the talk key answers the newest ask card on screen (talk.ts cardPick; on only if true; AGENT_SETTINGS_NO, REMOTE_KEYS)
   recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
   background?: { file?: string; dim?: number; blur?: number } // Settings › Appearance › Background image: <data>/background/<file> (core's bgSet), how much the theme covers it (%) and its blur (px)
@@ -1039,6 +1040,17 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex' | 'endpoint' // endpoi
 export type AiSettings = { show?: boolean; on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean; alerts?: boolean } // alerts: it may send laki_alert on its own (off: only when you ask in the chat or Your instructions name alerts: ai.ts aiMayAlert); efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const aiOn = (s?: { ai?: AiSettings }) => s?.ai?.on !== false // Settings › AI: on unless turned off
+// Settings › AI › From Telegram (settings.tgAi): Laki AI's backend for an ask from the Telegram chat. Unset: the Mac's
+// when it's OpenRouter or Your endpoint (their tools go through the chat's gate), none with claude or codex (their Read
+// and laki mcp act as you). mac: the Mac's own whatever it is, full access, turned on by a typed confirm (the user's:
+// AGENT_SETTINGS_NO, REMOTE_KEYS). Pure: test/units-more.test.ts
+export type TgAi = 'openrouter' | 'endpoint' | 'mac'
+export function tgBackend(s?: { ai?: AiSettings; tgAi?: TgAi }): AiBackend | undefined {
+  const mac = s?.ai?.backend ?? 'openrouter'
+  if (s?.tgAi === 'mac') return mac
+  if (s?.tgAi === 'openrouter' || s?.tgAi === 'endpoint') return s.tgAi
+  return mac === 'claude' || mac === 'codex' ? undefined : mac
+}
 // an ask's command in plain words (the daemon's askExplain, the ? on an ask's card): what it does, a sentence; outside:
 // it reaches past the workspace's folder or the network; undo: whether what it changes can be put back
 export type AskExplained = { does: string; outside: boolean; undo: 'yes' | 'no' | 'partly'; cut?: true } // cut: the model read only the command's start (past 2,000 characters), so undo is never yes

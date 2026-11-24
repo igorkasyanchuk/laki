@@ -10,7 +10,7 @@ import { readFileSync, rmSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { readCapped, writeAtomic } from '../shared/conn.ts'
 import { esc, mdToTg } from '../shared/tgmd.ts'
-import type { Tab, Telegram, TelegramView, TgLevel, Webhook } from '../shared/types.ts'
+import { type Tab, type Telegram, type TelegramView, type TgLevel, tgBackend, type Webhook } from '../shared/types.ts'
 import { LIMITS, limitsOf } from './clients.ts'
 import { changed, fileSave, imageSave, log, prs, resolveTarget, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
@@ -676,7 +676,7 @@ function aiNo() {
   const b = state.settings?.ai?.backend
   if (!levelAtLeast('answer')) return 'This chat gets pushes only now (Settings › Telegram)'
   if (state.settings?.ai?.on === false) return 'Laki AI is off: Settings › AI, on your Mac'
-  if (b === 'claude' || b === 'codex') return `Laki AI on ${b} doesn't answer from Telegram: pick OpenRouter or Your endpoint in Settings › AI`
+  if (!tgBackend(state.settings)) return `Laki AI on ${b} doesn't answer from Telegram: Settings › AI › From Telegram picks OpenRouter or Your endpoint for it (or, at full access, ${b} as on your Mac)`
   return state.telegram?.detail === 'titles' ? "Titles only is on: Laki AI's answers could carry what's on a screen" : ''
 }
 // a tool's call from Laki AI in the chat: act's gate, and never about a workspace or project the chat doesn't show

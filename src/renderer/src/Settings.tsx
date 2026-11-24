@@ -8,7 +8,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -291,6 +291,7 @@ export type AppSettings = Paint & {
   tellOn?: boolean // Q7: show and tell's global hotkey (unset: off)
   tellKey?: string // its keys (unset: TELL_KEY)
   talkOn?: boolean // Q2: the talk key (unset: off)
+  tgAi?: TgAi // Settings › AI › From Telegram (types.ts Settings)
   talkCards?: boolean // Settings › Voice › Answer cards (types.ts Settings)
   talkKey?: string // its keys (unset: TALK_KEY)
   talkTo?: 'ai' // Q10: who it goes to: Laki AI (unset: an agent, Q2's)
@@ -3051,7 +3052,7 @@ export function SettingsPage(p: {
               </div>
             </>
           )}
-          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} endpoint={s.aiEndpoint} onEndpoint={aiEndpoint => set({ aiEndpoint })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
+          {sec === 'ai' && p.ai && <AiSection tgAi={s.tgAi} onTgAi={tgAi => set({ tgAi })} api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} endpoint={s.aiEndpoint} onEndpoint={aiEndpoint => set({ aiEndpoint })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'voice' && bridge?.talkKey && (
             <Group title="Talk key">

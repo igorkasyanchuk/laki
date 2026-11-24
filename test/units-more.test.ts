@@ -1718,3 +1718,16 @@ test("Proof card's Compare: a PNG's pixels (zlib, each row filter) and the perce
   assert.match(src, /role="group" aria-label="How to compare"/)
   assert.match(src, /clipPath: `inset\(0 \$\{100 - x\}% 0 0\)`/)
 })
+
+test("tgBackend: Laki AI's backend from Telegram: the Mac's API one, its own pick, the Mac's CLI one only at full access", async () => {
+  const { tgBackend } = await import('../src/shared/types.ts')
+  const { AGENT_SETTINGS_OK, REMOTE_KEYS } = await import('../src/daemon/gates.ts')
+  assert.equal(tgBackend({}), 'openrouter')
+  assert.equal(tgBackend({ ai: { backend: 'endpoint' } }), 'endpoint')
+  assert.equal(tgBackend({ ai: { backend: 'claude' } }), undefined, 'claude -p: none unless picked')
+  assert.equal(tgBackend({ ai: { backend: 'codex' }, tgAi: 'openrouter' }), 'openrouter')
+  assert.equal(tgBackend({ ai: { backend: 'claude' }, tgAi: 'endpoint' }), 'endpoint')
+  assert.equal(tgBackend({ ai: { backend: 'claude' }, tgAi: 'mac' }), 'claude', 'full access: as on the Mac')
+  assert.equal(tgBackend({ ai: { backend: 'openrouter' }, tgAi: 'endpoint' }), 'endpoint')
+  assert.ok(!AGENT_SETTINGS_OK.has('tgAi') && REMOTE_KEYS.test('tgAi'), "the user's: no agent, no phone changes it")
+})

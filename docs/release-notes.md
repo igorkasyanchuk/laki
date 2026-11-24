@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki AI from Telegram gets its own backend (Settings › AI › From Telegram), so it can answer and start work there while the Mac's runs claude or codex; full access as on the Mac takes a typed confirm.
 - Paste or drop a screenshot or a file into a review comment: the agent gets it with your words.
 - Save a Walk through as Markdown or HTML, or copy it as Markdown for a PR description.
 - Copy a table from an answer as Markdown, CSV or HTML: its button shows on hover.

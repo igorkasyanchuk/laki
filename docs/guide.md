@@ -2845,7 +2845,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Voice's cloud and shown back as 🎙 first) to that workspace's agent, no reply needed, until `/talk off` (`/talk
   <workspace>` picks one by name); 🤖 *Laki AI* (in `/menu`, or `/ai [question]`) sends your messages, voice notes and
   photos to Laki AI (the AI page's chat, on the Mac too), whose tools do only what the chat may (read, message an agent, at
-  Control start a workspace), not with Settings › AI's claude or codex backend nor *Titles only*; a message with nowhere
+  Control start a workspace), not with *Titles only*. Its backend is Settings › AI › *From Telegram*: unset, the Mac's
+  when that's OpenRouter or Your endpoint, none with claude or codex; pick OpenRouter or Your endpoint for the chat alone
+  (Laki AI stays on claude or codex on the Mac), or *claude, as here: full access…*: Laki AI from the chat then reads
+  any file and calls Laki as you, past the chat's level, after you type FULL ACCESS (an agent or a phone can't turn it
+  on). A message with nowhere
   to go asks *Where should this go?* with Laki AI's button and one per agent;
   agents' Markdown comes as bold, code and links) or *Control* (also `/new <project> <task>` and a project's ➕ *New
   task*: the next message, typed or said, is the new workspace's task (a screenshot or a file with a caption: the
