@@ -180,6 +180,7 @@ test("inboxOf: an ask as the cards on screen have it: an Edit's diff, a command'
   ]
   const [edit, cmd] = inboxOf(view(tabs, ws), undefined, true)
   assert.equal(edit.diff, '-old\n+new')
+  assert.equal(cmd.at, 1, "which ask it is: an explanation is that one's")
   assert.equal(edit.explain, undefined, 'an Edit has no ? (a command has)')
   assert.equal(cmd.explain, true)
   assert.deepEqual(cmd.options!.map(o => o.scope), [undefined, "Yes, and don't ask again for: rm *", undefined], 'the standing one carries its words: the card shows its rule, broad in the warning color')

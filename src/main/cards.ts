@@ -71,7 +71,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 // no focus taken, a click lands at once), stacked, the newest on top. key: one per tab (its ask, its finish: the newer
 // replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
 // waiting), any card until it's opened or closed (×, Close all)
-export type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
+export type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info' | 'alert'; at: number; title: string; body: string; diff?: string; origin?: string; actions: NoteAction[]; error?: string; explain?: boolean; said?: Said; askAt?: number /* the Inbox's: which ask (an explanation is its own) */ } // explain: a command ask's ?; said: what Laki AI made of it (ask-explain)
 type Said = 'loading' | { err: string } | { does: string; outside: boolean; undo: string; cut?: boolean }
 const CARD_W = 380
 export let cards: Card[] = []
@@ -123,8 +123,8 @@ export function inboxCards(items: unknown, was: Card[] = []): Card[] {
     if (!i || typeof i !== 'object' || typeof i.tab !== 'string') return []
     const ask = i.kind === 'ask'
     const actions = ask && Array.isArray(i.options) ? i.options.slice(0, 9).filter((o: { n?: unknown; label?: unknown }) => Number.isInteger(o?.n) && typeof o.label === 'string').map((o: { n: number; label: string; scope?: unknown }) => ({ text: o.label.slice(0, 80), n: o.n, label: o.label, ...(typeof o.scope === 'string' && o.scope && { scope: o.scope.slice(0, 600) }) })) : []
-    const c: Card = { key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions, ...(ask && str(i.diff, 4000) && { diff: str(i.diff, 4000) }), ...(ask && i.explain === true && { explain: true }) }
-    const old = c.explain ? was.find(x => x.key === c.key && x.body === c.body && x.said) : undefined // a ? under way too: its answer finds it (ask-explain)
+    const c: Card = { key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions, ...(ask && str(i.diff, 4000) && { diff: str(i.diff, 4000) }), ...(ask && i.explain === true && { explain: true }), ...(ask && Number.isFinite(i.at) && { askAt: i.at }) }
+    const old = c.explain && c.askAt ? was.find(x => x.key === c.key && x.askAt === c.askAt && x.said) : undefined // the same ask's, a ? under way too: its answer finds it (ask-explain)
     return [old ? { ...c, said: old.said } : c]
   })
 }
@@ -190,7 +190,7 @@ ipcMain.handle('ask-explain', async (e, key: unknown) => {
   const c = cardOf(e, key)
   if (!c?.explain || (c.said && !(typeof c.said === 'object' && 'err' in c.said))) return
   const send = () => (inboxSender(e) ? sendInbox() : sendCards())
-  const now = () => cardOf(e, key) ?? c // the Inbox's list is made again as the view changes: the card there now
+  const now = () => (x => (x && x.askAt === c.askAt ? x : c))(cardOf(e, key)) // the Inbox's list is made again as the view changes: the card there now, while it's the same ask
   c.said = 'loading'
   send()
   try {

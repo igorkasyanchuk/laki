@@ -119,7 +119,8 @@ export function trayBitmap(state: TrayState, o: { quiet?: boolean; drop?: boolea
 // most; muted and archived workspaces aside, as the Dock's count
 // an ask's as the cards on screen have it: its Edit's or Write's diff, explain (a command's ?, Laki AI on), each standing
 // choice's scope (its words, whole: the card shows the rule and warns on a broad one)
-export type InboxItem = { tab: string; title: string; body: string; kind: 'ask' | 'working'; options?: { n: number; label: string; scope?: string }[]; diff?: string; explain?: boolean }
+// at: the ask's own time (Ask.at): which ask a card is, as a tab asks one after another (an explanation is that ask's)
+export type InboxItem = { tab: string; title: string; body: string; kind: 'ask' | 'working'; options?: { n: number; label: string; scope?: string }[]; diff?: string; explain?: boolean; at?: number }
 export const INBOX_ASKS = 9
 export const INBOX_WORKING = 3
 export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: string) => string | undefined = () => undefined, explain = false): InboxItem[] {
@@ -130,7 +131,7 @@ export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: str
     .filter(t => t.status === 'waiting')
     .sort((a, b) => (a.needAt ?? 0) - (b.needAt ?? 0))
     .slice(0, INBOX_ASKS)
-    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.ask?.question || said(t.id) || 'Waiting for you').replace(/\s+/g, ' ').slice(0, 300), kind: 'ask', ...(t.ask?.options.length && { options: t.ask.options.slice(0, 9).map(o => (s => ({ n: o.n, label: o.label.slice(0, 80), ...(s && { scope: optLabel(t.ask!, o) }) }))(askScope(optLabel(t.ask!, o), t.preset))) }), ...(t.ask?.diff && { diff: t.ask.diff }), ...(explain && t.ask?.tool === 'Bash' && { explain: true }) }))
+    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.ask?.question || said(t.id) || 'Waiting for you').replace(/\s+/g, ' ').slice(0, 300), kind: 'ask', ...(t.ask?.options.length && { options: t.ask.options.slice(0, 9).map(o => (s => ({ n: o.n, label: o.label.slice(0, 80), ...(s && { scope: optLabel(t.ask!, o) }) }))(askScope(optLabel(t.ask!, o), t.preset))) }), ...(t.ask?.diff && { diff: t.ask.diff }), ...(explain && t.ask?.tool === 'Bash' && { explain: true }), ...(t.ask?.at && { at: t.ask.at }) }))
   const working = tabs
     .filter(t => t.status === 'running')
     .slice(0, INBOX_WORKING)
