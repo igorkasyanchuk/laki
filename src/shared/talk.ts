@@ -1,7 +1,9 @@
 // Q2: the talk key's pill (main's talkWin, floater.ts talkPage): who a recording goes to, pure (test/talk.test.ts)
 import { SECRETS } from './secrets.ts'
 import type { Ask } from './types.ts'
-import { denyOf, risky, sayable, standing, YES } from './ask.ts'
+import { denyOf, risky, sayable, standing } from './ask.ts'
+
+const ALLOW = /^(yes|allow|approve)\b/i // a plain allow: what a spoken yes picks (cardPick)
 
 // a recording's limits, the app's mic and hold Fn's too (voice.ts): it stops by itself after MAX; shorter than SHORT,
 // nothing to write down
@@ -220,7 +222,7 @@ export function cardPick(text: string, t: { status?: string; ask?: Pick<Ask, 'op
   const n = words.length === 1 ? num(words[0]) : words.length === 2 && sets.some(s => s.lead?.includes(words[0])) ? num(words[1]) : 0
   let o = n ? a.options.find(x => x.n === n) : a.options.find(x => wordsOf(x.label).join(' ') === said)
   let say = ''
-  if (!o && sets.some(s => s.yes.includes(said))) o = a.options.find(x => YES.test(x.label) && !standing(x.label))
+  if (!o && sets.some(s => s.yes.includes(said))) o = a.options.find(x => ALLOW.test(x.label) && !standing(x.label)) // not a question's Run… or Proceed…
   if (!o) {
     const no = sets.flatMap(s => s.no).sort((x, y) => y.length - x.length).find(w => said === w || said.startsWith(`${w} `))
     if (no) {

@@ -2976,7 +2976,7 @@ export function tabBell(o: { id?: string; ws?: string; on?: unknown }) {
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
 export function wsSet(o: { waitingOn?: string | null; id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean; cap?: unknown }) {
   const w = findWs(o.id)
-  if (o.cap !== undefined) capSet(w, capParse(o.cap)) // cap.ts; an agent's only a lower one (main.ts' agentNo)
+  const cap = o.cap !== undefined ? capParse(o.cap) : undefined // its error before anything changes
   // a name you gave it stays: an agent's rename is refused unless you asked for it (asked: laki rename --asked), a
   // Browsers page's title (auto) passes it by
   const agent = o.name !== undefined && !!agentCaller(o.from)
@@ -2993,6 +2993,7 @@ export function wsSet(o: { waitingOn?: string | null; id: string; color?: string
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
   if (typeof o.unrelate === 'string') unrelate(w, o.unrelate) // the info panel's ✕ on a related link: one at a time
+  if (cap) capSet(w, cap) // cap.ts; an agent's only a lower one (main.ts' agentNo)
   // Waiting on… (its ⋯, laki wait-on): one line, '' or null none; turn() clears it as its agent asks or starts anew
   if (o.waitingOn !== undefined) {
     const text = typeof o.waitingOn === 'string' ? o.waitingOn.replace(/\s+/g, ' ').trim().slice(0, 120) : ''

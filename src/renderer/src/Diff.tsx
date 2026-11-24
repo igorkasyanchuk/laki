@@ -688,12 +688,14 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
   const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: forGitHub(text) }))
   // a pasted or dropped picture or file: kept by the daemon (imageSave, fileSave), its path a 📎 line of the comment
   const [keeping, setKeeping] = useState(0)
+  const latest = useRef(text) // what's typed now: each path goes onto it, not onto the text as the drop found it
+  latest.current = text
   const attach = (fs: File[]) => {
     if (!fs.length) return false
     setKeeping(k => k + fs.length)
     for (const f of fs)
       void keepFile(f, (data, ext) => daemon.call<string>('imageSave', { data, ext }), (data, name) => daemon.call<string>('fileSave', { data, name }))
-        .then(r => setText(`${text.replace(/\s+$/, '')}\n${ATTACH}${r.path}`.replace(/^\n/, '')), e => setErr(`${f.name}: ${(e as Error).message}`))
+        .then(r => setText((latest.current = `${latest.current.replace(/\s+$/, '')}\n${ATTACH}${r.path}`.replace(/^\n/, ''))), e => setErr(`${f.name}: ${(e as Error).message}`))
         .finally(() => setKeeping(k => k - 1))
     return true
   }

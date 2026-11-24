@@ -97,6 +97,7 @@ const stopped = new Map<string, number>() // tab → the capOver its Esc was for
 function stopTurns(w: Workspace, now = Date.now()) {
   for (const t of agents(w)) {
     const r = rtOf(t.id)
+    if (r.status !== 'running') stopped.delete(t.id) // its Esc took: a turn it starts anyway (typed in its terminal) is stopped too
     if (r.status !== 'running' || !sessions.get(t.id) || sessions.get(t.id)!.exited || stopped.get(t.id) === w.capOver) continue
     if (r.inTool && now - r.inTool < TOOL_WAIT) continue // its tool call ends first (capToolEnd)
     stop(t, w)

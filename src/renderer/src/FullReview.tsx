@@ -371,6 +371,15 @@ export function FullReview({ ws, project, base, branch, pr, linked, empty, workt
     )
     return () => ((on = false), notesFlush())
   }, [ws])
+  // a comment added from the Files preview (Body's laki-note): into this window's copy, which the next save writes whole
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ ws: string; note: ReviewNote }>).detail
+      if (d?.ws === ws) setNotes(ns => (ns.some(n => n.id === d.note.id) ? ns : [...ns, d.note]))
+    }
+    addEventListener('laki-note', on)
+    return () => removeEventListener('laki-note', on)
+  }, [ws])
   // a sent comment's turn ended (the daemon's reviewNotesTurn): what it found, onto this window's copy
   useEffect(() => {
     if (!notesAt) return

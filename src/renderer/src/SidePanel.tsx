@@ -1554,7 +1554,8 @@ export function FilePreview(p: {
   const [f, setF] = useState<FileContent | null>(null)
   const [at, setAt] = useState<{ from: number; to: number; quote: string; box?: boolean } | null>(null) // the lines a comment is on, its text
   const [said, setSaid] = useState('')
-  const [busy, setBusy] = useState('')
+  const [busy, setBusy] = useState('') // add or send under way
+  const [noteErr, setNoteErr] = useState('')
   const [err, setErr] = useState('')
   const [n, setN] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -1570,14 +1571,15 @@ export function FilePreview(p: {
     const [a, b] = [n(s.anchorNode), n(s.focusNode)].sort((x, y) => x - y)
     if (a && b) setAt({ from: a, to: b, quote: text.replace(/\s+$/, '') })
   }
-  const open = (from: number, to: number, quote: string) => (setSaid(''), setBusy(''), setAt({ from, to, quote, box: true }))
+  const open = (from: number, to: number, quote: string) => (setSaid(''), setBusy(''), setNoteErr(''), setAt({ from, to, quote, box: true }))
   const go = (how: 'add' | 'send') => {
     if (!at || !said.trim() || !p.comment) return
     setBusy(how)
+    setNoteErr('')
     const c: FileNote = { path: p.path, line: at.to, ...(at.from !== at.to && { startLine: at.from }), quote: at.quote, body: said.trim() }
     p.comment[how](c).then(
       () => (setAt(null), setSaid(''), setBusy('')),
-      e => setBusy(String((e as Error)?.message ?? e)),
+      e => (setBusy(''), setNoteErr(String((e as Error)?.message ?? e))),
     )
   }
   const top = useRef(0) // where the lines were scrolled, kept into the edit and back
@@ -1750,7 +1752,7 @@ export function FilePreview(p: {
                 </span>
                 {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
                 {at && !at.box && at.to === i + 1 && (
-                  <button type="button" className="pv-sel-comment" onMouseDown={e => e.preventDefault()} onClick={() => setAt({ ...at, box: true })}>
+                  <button type="button" className="pv-sel-comment" onMouseDown={e => e.preventDefault()} onClick={() => open(at.from, at.to, at.quote)}>
                     <Icon name="message" size={12} /> Comment
                   </button>
                 )}
@@ -1766,7 +1768,7 @@ export function FilePreview(p: {
                     <button disabled={!said.trim() || !!busy} onClick={() => go('send')}>
                       Send to {p.comment.agent ?? 'the agent'}
                     </button>
-                    {busy && busy !== 'add' && busy !== 'send' && <span className="warn small">{busy}</span>}
+                    {noteErr && <span className="warn small">{noteErr}</span>}
                     <span className="grow" />
                     <button className="link small" onClick={() => setAt(null)}>
                       Cancel

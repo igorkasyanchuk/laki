@@ -24,6 +24,7 @@ export function pngPixels(buf: Buffer): { w: number; h: number; px: Uint8Array }
   let ok = false
   let rgba = false
   const idat: Buffer[] = []
+  try {
   for (let i = 8; i + 8 <= buf.length; ) {
     const len = buf.readUInt32BE(i)
     const t = buf.toString('latin1', i + 4, i + 8)
@@ -32,6 +33,9 @@ export function pngPixels(buf: Buffer): { w: number; h: number; px: Uint8Array }
     else if (t === 'IDAT') idat.push(d)
     else if (t === 'IEND') break
     i += 12 + len
+  }
+  } catch {
+    return // cut short or not a PNG we read: no badge
   }
   if (!ok) return
   const bpp = rgba ? 4 : 3

@@ -229,7 +229,11 @@ export function bodyOf(app: AppCtx) {
                   : {
                       agent: panelApi(ws).agents[0]?.name,
                       // into the Review tab's Yours (its whole list, as the Review sets it): side RIGHT, quote as a diff line's
-                      add: c => api.call<{ notes?: ReviewNote[] }>('reviewNotesGet', { ws: ws.id }).then(r => api.call('reviewNotesSet', { ws: ws.id, notes: [...(r?.notes ?? []), { id: crypto.randomUUID(), path: c.path, line: c.line, ...(c.startLine && { startLine: c.startLine }), side: 'RIGHT', body: c.body, quote: ` ${c.quote}` }] })),
+                      add: c => {
+                        const note: ReviewNote = { id: crypto.randomUUID(), path: c.path, line: c.line, ...(c.startLine && { startLine: c.startLine }), side: 'RIGHT', body: c.body, quote: ` ${c.quote}` }
+                        // an open Review tab takes it too (FullReview's laki-note), so its next save keeps it
+                        return api.call<{ notes?: ReviewNote[] }>('reviewNotesGet', { ws: ws.id }).then(r => api.call('reviewNotesSet', { ws: ws.id, notes: [...(r?.notes ?? []), note] })).then(() => void window.dispatchEvent(new CustomEvent('laki-note', { detail: { ws: ws.id, note } })))
+                      },
                       send: c => panelApi(ws).toAgent(fileNoteText(c), true),
                     }
               }

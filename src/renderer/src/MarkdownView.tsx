@@ -338,12 +338,12 @@ function MdTable({ b }: { b: Table }) {
     const done = () => (setCopied(as), setTimeout(() => setCopied(''), 1500))
     const text = tableAs(b, as === 'html' ? 'md' : as)
     const put = as === 'html' ? navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([tableAs(b, 'html')], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]) : navigator.clipboard.writeText(text)
-    void put.then(done, () => {})
+    void put.then(done, () => (setCopied('no'), setTimeout(() => setCopied(''), 2000))) // the clipboard refused (a page without its permission)
   }
   return (
     <div className="md-table">
-      <button type="button" className="md-table-copy" aria-label={copied ? 'Copied' : 'Copy the table'} data-tip="Copy the table: Markdown, CSV or HTML" onClick={e => openMenu(e, [{ label: 'Copy as Markdown', icon: 'copy', run: () => copy('md') }, { label: 'Copy as CSV', icon: 'copy', tip: 'For Numbers or a spreadsheet', run: () => copy('csv') }, { label: 'Copy as HTML', icon: 'copy', tip: 'Pastes as a table in Mail, Docs, Notion or Word', run: () => copy('html') }], 'right')}>
-        <Icon name={copied ? 'check' : 'copy'} size={12} />
+      <button type="button" className="md-table-copy" aria-label={copied === 'no' ? 'Not copied: the clipboard refused' : copied ? 'Copied' : 'Copy the table'} data-tip={copied === 'no' ? 'Not copied: the clipboard refused' : 'Copy the table: Markdown, CSV or HTML'} onClick={e => openMenu(e, [{ label: 'Copy as Markdown', icon: 'copy', run: () => copy('md') }, { label: 'Copy as CSV', icon: 'copy', tip: 'For Numbers or a spreadsheet', run: () => copy('csv') }, { label: 'Copy as HTML', icon: 'copy', tip: 'Pastes as a table in Mail, Docs, Notion or Word', run: () => copy('html') }], 'right')}>
+        <Icon name={copied === 'no' ? 'x' : copied ? 'check' : 'copy'} size={12} />
       </button>
       <table>
         <thead>
