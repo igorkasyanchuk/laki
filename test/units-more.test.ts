@@ -1657,3 +1657,21 @@ test('a lifted drag: the copy hangs from where the pointer holds the item, insid
   assert.deepEqual(liftAt(box, 400, 90), { x: 200, y: 32 })
   assert.deepEqual(liftAt(box, 150.6, 66.4), { x: 51, y: 16 }, 'whole pixels')
 })
+
+test("a phone's bottom bar folds past 24px down, unfolds on any scroll up, at the top and on a focus inside it", async () => {
+  const { barFold, BAR_FOLD_AT } = await import('../src/renderer/src/text.ts')
+  let s = { y: 0, down: 0, folded: false }
+  for (const y of [5, 12, 20]) s = barFold(s, { y })
+  assert.equal(s.folded, false, '20px down: not yet')
+  s = barFold(s, { y: BAR_FOLD_AT })
+  assert.equal(s.folded, true, `${BAR_FOLD_AT}px down: folded`)
+  s = barFold(s, { y: 400 })
+  assert.equal(s.folded, true, 'further down: still')
+  s = barFold(s, { y: 399 })
+  assert.deepEqual(s, { y: 399, down: 0, folded: false }, 'any scroll up unfolds it')
+  s = barFold(barFold(s, { y: 410 }), { y: 430 })
+  assert.equal(s.folded, true, 'down again past the threshold from where it turned')
+  assert.equal(barFold(s, 'focus').folded, false, "the keyboard's focus in it")
+  assert.deepEqual(barFold({ y: 50, down: 50, folded: true }, { y: 0 }), { y: 0, down: 0, folded: false }, 'the top')
+  assert.equal(barFold({ y: 0, down: 0, folded: false }, { y: -30 }).folded, false, "a bounce past the top (iOS' rubber band)")
+})

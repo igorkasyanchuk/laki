@@ -1179,3 +1179,14 @@ export const liftAt = (box: { left: number; top: number; width: number; height: 
   x: Math.round(Math.min(Math.max(x - box.left, 0), box.width)),
   y: Math.round(Math.min(Math.max(y - box.top, 0), box.height)),
 })
+
+// a phone's bottom bar (Phone.tsx): folded to its icons once the page has scrolled BAR_FOLD_AT px down since it last
+// went up; any scroll up, the top, or a focus inside the bar unfolds it
+export const BAR_FOLD_AT = 24
+export type BarFold = { y: number; down: number; folded: boolean }
+export function barFold(s: BarFold, e: { y: number } | 'focus'): BarFold {
+  if (e === 'focus') return { ...s, down: 0, folded: false }
+  if (e.y <= 0 || e.y < s.y) return { y: Math.max(0, e.y), down: 0, folded: false }
+  const down = s.down + (e.y - s.y)
+  return { y: e.y, down, folded: s.folded || down >= BAR_FOLD_AT }
+}

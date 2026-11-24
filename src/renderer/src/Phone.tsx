@@ -1,8 +1,11 @@
 // A phone's (App's .narrow, ≤640px) bottom tab bar and its More sheet, and the drawer's swipes. The bar: the first four
 // of the rail's items (Projects first, with the Needs you count) and More, five equal columns, each an icon over its
-// label, 49px high plus the bottom safe area; hidden while the keyboard is up (main.tsx' html[data-kb]) or a dialog
-// covers the page (styles.css). More: a sheet with the rest, AI and Settings, and Quiet
-import { useEffect, useState } from 'react'
+// label, a floating glass capsule 49px high over the bottom safe area; as a page scrolls down it folds to its icons
+// (data-folded: text.ts barFold), up, at the top or with the keyboard's focus in it it unfolds. Hidden while the
+// keyboard is up (main.tsx' html[data-kb]) or a dialog covers the page (styles.css). More: a sheet with the rest, AI
+// and Settings, and Quiet
+import { useEffect, useRef, useState } from 'react'
+import { barFold, type BarFold } from './text'
 import { hhmm, quietChoices } from '../../shared/tray'
 import type { IconName } from './ui'
 import { Icon, Num } from './ui'
@@ -25,6 +28,21 @@ export function PhoneBar({ items, quiet }: { items: BarItem[]; quiet: QuietApi }
     return () => window.removeEventListener('keydown', k, true)
   }, [more])
   const go = (x: BarItem) => (setMore(false), x.run())
+  // any scroller's scroll (capture: scroll doesn't bubble; passive), each scroller its own baseline; not the bar's or
+  // More's own
+  const [folded, setFolded] = useState(false)
+  const fold = useRef<{ s: BarFold; at: EventTarget | null }>({ s: { y: 0, down: 0, folded: false }, at: null })
+  const step = (e: { y: number } | 'focus') => setFolded((fold.current.s = barFold(fold.current.s, e)).folded)
+  useEffect(() => {
+    const on = (e: Event) => {
+      const el = e.target instanceof Element ? e.target : document.scrollingElement
+      if (!el || el.closest('.phone-bar, .phone-sheet')) return
+      if (el !== fold.current.at) (fold.current.at = el), (fold.current.s = { ...fold.current.s, y: el.scrollTop })
+      step({ y: el.scrollTop })
+    }
+    document.addEventListener('scroll', on, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', on, true)
+  }, [])
   const cell = (x: BarItem) => (
     <button key={x.key} type="button" className={`pb-item ${x.on ? 'on' : ''}`} aria-current={x.on ? 'page' : undefined} aria-label={x.n ? `${x.label}: ${x.n}` : x.label} onClick={() => go(x)}>
       <span className="pb-icon">
@@ -36,7 +54,7 @@ export function PhoneBar({ items, quiet }: { items: BarItem[]; quiet: QuietApi }
   )
   return (
     <>
-      <nav className="phone-bar" aria-label="Pages">
+      <nav className="phone-bar" aria-label="Pages" data-folded={folded ? '' : undefined} onFocus={() => step('focus')}>
         {head.map(cell)}
         <button type="button" className={`pb-item ${moreOn || more ? 'on' : ''}`} aria-current={moreOn ? 'page' : undefined} aria-expanded={more} aria-label={moreN ? `More: ${moreN}` : 'More'} onClick={() => setMore(m => !m)}>
           <span className="pb-icon">

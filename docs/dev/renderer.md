@@ -422,8 +422,14 @@ are tested in `test/units-more.test.ts`.
   events, not a mouse's; `.drawer-edge`, a 20px strip at the left, to open; the sidebar or its scrim to close; the
   direction settled at 10px, 60px to act), `PhoneBar` (App's `phoneItems`: Projects with `needing`'s count, the rail's
   pages in `railOrder` then the hidden ones, AI, Settings; `BAR_FIT` 4 shown and More's sheet, with Quiet's choices:
-  tray.ts `quietChoices`); the bar's `--pbar` (49px + `--safe-b`) pads `.app` and ends the drawer, scrim, status bar
-  and toasts above it; `html[data-kb]` or an `.overlay` in the app hides it. The histNav arrows and the foot's Schedule,
+  tray.ts `quietChoices`); the bar is a floating capsule (the floating surface's `--surface-bg`, `--surface-blur`,
+  `--surface-edge`, `--surface-lift`: solid with Reduce transparency, a flat look or glass), `--sp-5` in from the sides
+  at `--pbar-at` (the larger of `--sp-5` and `--safe-b`), 49px; its `--pbar` (49px, `--sp-3`, `--pbar-at`) pads
+  `.app` (the last row and the terminal end clear of it: a terminal can't scroll under it) and ends the drawer, scrim,
+  status bar and toasts above it. As any scroller (a capture-phase passive scroll listener, each scroller its own
+  baseline; not the bar's or More's) goes 24px down it folds (`data-folded`: icons only, narrower, its items' names and
+  44px kept; text.ts `barFold`, test/units-more.test.ts), unfolding on any scroll up, at the top or a focus inside it;
+  the soft spring, none with Reduce motion or Motion: None; `html[data-kb]` or an `.overlay` in the app hides it. The histNav arrows and the foot's Schedule,
   Board, AI and Settings aren't drawn on a phone (the bar has them). `.app.narrow` clips: a row wider than the phone
   (the side panel's tools now scroll) would widen the layout viewport and take fixed bars off screen. Needs.tsx'
   `phone`: `phoneGroups` (asks, `failedNeed`, the rest), the head's counts (under 460px, the `needs-head` container: a line of their own under the name, whole; Allow all and Deny all stay at the right; under 280px those are icons), finished ones always rows, `one` open at a

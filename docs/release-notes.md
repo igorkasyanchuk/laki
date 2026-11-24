@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- On a phone, the bottom bar is a floating glass capsule that folds to its icons as you scroll down and comes back as you scroll up.
 - Dragging a sidebar row, a tab or a Board card lifts it, tilted with a shadow, a gap left where it was.
 - Opening a Needs you card flies it into its tab, where the ask is.
 - Terminals scroll smoothly as you scroll them, new output still following at once (Settings › Terminal › Smooth scrolling).
