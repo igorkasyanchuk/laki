@@ -56,10 +56,11 @@ test('no more any in src than test/any-baseline.txt', () => {
 
 // T14: the api table's handlers whose params are typed ((p: In<typeof fn>), or a shape of their own): their calls get
 // params and results checked. Never fewer than this floor (raise it as more are typed; lower it only on purpose)
-const TYPED_MIN = 49
+const TYPED_MIN = 74
 test(`main.ts' api: ${TYPED_MIN} handlers with typed params at least`, () => {
   const table = read('src/daemon/main.ts').split('\nconst api = {')[1].split('\n} satisfies Record<string, Handler>')[0]
-  const n = table.match(/^  \w+: (async )?\(p: (In<typeof [\w.]+>|\{[^}]*\})\) =>/gm)?.length ?? 0
+  // (p: In<typeof fn>), (p: { … }), ({ caller, ...p }: In<…> & { … }), (p: Parameters<…>[1]): a type after the params
+  const n = table.match(/^  \w+: (async )?\((p|\{[^}]*\}): (In<typeof [\w.]+>|\{[^}]*\}|Parameters<typeof \w+>\[\d\])[^)]*\) =>/gm)?.length ?? 0
   assert.ok(n >= TYPED_MIN, `${n} handlers with typed params, the floor ${TYPED_MIN}: type the params of the one you changed (p: In<typeof fn>), or lower TYPED_MIN on purpose`)
 })
 

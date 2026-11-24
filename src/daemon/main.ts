@@ -588,13 +588,13 @@ const api = {
   prComment: (p: In<typeof prMod.prComment>) => prMod.prComment(p),
   prReview: (p: In<typeof prMod.prReview>) => prMod.prReview(p),
   issueList: p => prMod.issueList(p),
-  prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, head: p.head, force: p.force === true, from: p.from }),
+  prAct: (p: In<typeof prMod.prAct>) => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, head: p.head, force: p.force === true, from: p.from }),
   mergeQueueStart: p => prMod.mergeQueueStart({ wss: p.wss }), // the user's only (gates.ts AGENT_NO): each PR's project allows merging, its merge gates apply
   mergeQueueStop: p => prMod.mergeQueueStop({ project: p.project }),
   usageDays: async () => (async u => ({ ...u, ai: await aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
-  prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review
+  prDraft: (p: In<typeof prMod.prDraft>) => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review
   prLabels: (p: { ws: string }) => prMod.prLabels(p.ws),
   ghCard: p => prMod.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
   prLabel: (p: In<typeof prMod.prLabel>) => prMod.prLabel(p),
@@ -673,11 +673,11 @@ const api = {
   view: (p, c) => c && (core.setView(c, p), alertsSeen(c)),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
-  scheduleSet: ({ from, ...p }) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
-  scheduleRm: async p => (await rmAsk(p, `remove the scheduled task ${String(p.id ?? '')}`, 'It runs no more.'), scheduleMod.scheduleRm(p.id, p.dependents)),
-  scheduleRun: p => (notAgent(p, 'run a scheduled task now'), scheduleMod.scheduleRun(p.id)),
+  scheduleSet: ({ from, ...p }: In<typeof scheduleMod.scheduleSet>) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
+  scheduleRm: async (p: { id: string; dependents?: 'off'; from?: unknown }) => (await rmAsk(p, `remove the scheduled task ${String(p.id ?? '')}`, 'It runs no more.'), scheduleMod.scheduleRm(p.id, p.dependents)),
+  scheduleRun: (p: { id: string; from?: unknown }) => (notAgent(p, 'run a scheduled task now'), scheduleMod.scheduleRun(p.id)),
   scheduleCopy: (p: { id: string }) => scheduleMod.scheduleCopy(p?.id), // Duplicate: off, … (copy), no runs
-  scheduleTick: p => scheduleMod.scheduleTick(p.now), // tests move the clock
+  scheduleTick: (p: { now?: number }) => scheduleMod.scheduleTick(p.now), // tests move the clock
   eventTick: p => scheduleMod.eventTick(p.now), // T4: tasks on events
   scheduleRelease: (p: In<typeof scheduleMod.scheduleRelease>) => (notAgent(p, "start a fork's held run (the user does: Run it)"), scheduleMod.scheduleRelease(p)),
   pendingTick: p => scheduleMod.pendingTick(p.now),
@@ -767,7 +767,7 @@ const api = {
   planFile: (p: In<typeof planFile>) => planFile(p),
   planUpload: (p: In<typeof planUpload>) => planUpload(p),
   planWrite: (p: In<typeof planWrite>) => planWrite(p), // MCP's and Laki AI's laki_plan_write: never the editor's own files
-  planRm: async p => {
+  planRm: async (p: In<typeof planRm> & { name?: string }) => {
     await rmAsk(p, `delete the ${p.kind === 'brainstorm' ? 'brainstorm' : 'spec'} ${String(p.slug ?? p.name ?? '').slice(0, 80)}`, "Its folder and its chat go: it can't be brought back.") // S5: an agent's asks you
     const chat = planChat({ ...p, project: core.findProject(p.project).id }) // chats are by the project's id
     planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
@@ -793,23 +793,23 @@ const api = {
   proofShot: p => proofShot(p), // the Proof card's screenshot: the app's Preview
   checkStop: p => checkStop(p),
   flowList: (p: In<typeof flowList>) => flowList(p), // workflows: workflow.ts
-  flowSave: ({ caller, ...p }) => flowSave(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's tab: marked, never trusted
-  flowTrust: ({ caller, ...p }) => { // the editor's Allow: a project's workflow as the sheet showed it; never an agent's (it'd let its own file run)
+  flowSave: ({ caller, ...p }: In<typeof flowSave> & { caller?: { ws?: unknown; tab?: unknown } }) => flowSave(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's tab: marked, never trusted
+  flowTrust: ({ caller, ...p }: In<typeof flowTrust> & { caller?: { ws?: unknown; tab?: unknown } }) => { // the editor's Allow: a project's workflow as the sheet showed it; never an agent's (it'd let its own file run)
     if (core.agentCaller(caller)) throw new Error("an agent can't trust a workflow: it's the user's (ask them)")
     return flowTrust(p)
   },
-  flowPause: ({ caller, ...p }) => { // Turn on again (or pause): the user's; an agent's would let a failing one start itself again
+  flowPause: ({ caller, ...p }: In<typeof flowPause> & { caller?: { ws?: unknown; tab?: unknown } }) => { // Turn on again (or pause): the user's; an agent's would let a failing one start itself again
     if (core.agentCaller(caller)) throw new Error("an agent can't pause or turn on a workflow: it's the user's (ask them)")
     return flowPause(p)
   },
-  flowRm: ({ caller, ...p }) => flowRm(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // the app's Delete: to the trash, a toast's Undo is flowRestore; an agent's: back as an agent's
-  flowRestore: ({ caller, ...p }) => flowRestore(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's: marked its own, as its save is
+  flowRm: ({ caller, ...p }: In<typeof flowRm> & { caller?: { ws?: unknown; tab?: unknown } }) => flowRm(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // the app's Delete: to the trash, a toast's Undo is flowRestore; an agent's: back as an agent's
+  flowRestore: ({ caller, ...p }: In<typeof flowRestore> & { caller?: { ws?: unknown; tab?: unknown } }) => flowRestore(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's: marked its own, as its save is
   flowTrash: () => flowTrash(), // laki flow trash
-  flowTrashTidy: p => flowTrashTidy(p.now), // tests move the clock
+  flowTrashTidy: (p: { now?: number }) => flowTrashTidy(p.now), // tests move the clock
   flowHistory: (p: In<typeof flowHistory>) => flowHistory(p), // the editor's History…: its versions, or one's text (at)
-  flowRevert: ({ caller, ...p }) => flowRevert(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // #14: an agent's is its save: marked, never trusted
-  flowStart: ({ caller, ...p }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
-  flowEvent: ({ caller, ...p }) => flowEvent(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false, agent: core.callerAgent(caller) } : p), // tried as if on an event: an agent's try is an agent's event
+  flowRevert: ({ caller, ...p }: In<typeof flowRevert> & { caller?: { ws?: unknown; tab?: unknown } }) => flowRevert(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // #14: an agent's is its save: marked, never trusted
+  flowStart: ({ caller, ...p }: In<typeof flowStart> & { caller?: { ws?: unknown; tab?: unknown } }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
+  flowEvent: ({ caller, ...p }: In<typeof flowEvent> & { caller?: { ws?: unknown; tab?: unknown } }) => flowEvent(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false, agent: core.callerAgent(caller) } : p), // tried as if on an event: an agent's try is an agent's event
   flowStop: (p: In<typeof flowStop>) => flowStop(p),
   flowHold: (p: In<typeof flowHold>) => (p?.on === false && notAgent(p, 'resume a workflow run the user paused'), flowHold(p)), // Pause after this block (on: true), Resume (on: false): the user's
   flowFirst: (p: In<typeof flowFirst>) => (notAgent(p, 'move a workflow run ahead of the queue'), flowFirst(p)), // Run First: a queued run goes next
@@ -818,7 +818,7 @@ const api = {
   flowGet: (p: In<typeof flowGet>) => flowGet(p),
   flowTrustDiff: (p: In<typeof flowTrustDiff>) => flowTrustDiff(p), // the trust sheet: what you allowed and what's there now; the user's
   flowForget: (p: In<typeof flowForget>) => flowForget(p),
-  flowTick: p => flowTick(p.now), // tests move the clock
+  flowTick: (p: { now?: number }) => flowTick(p.now), // tests move the clock
   flowExport: (p: In<typeof flowExport>) => flowExport(p), // W10: a workflow as a clean file to share: its text, what changed, the inputs
   flowImport: (p: In<typeof flowImport>) => flowImport(p), // W10: read one: its inputs, what it would do; nothing saved or run
   flowImportSave: (p: In<typeof flowImportSave>) => flowImportSave(p), // W10: saved as yours with its inputs, turned off
@@ -826,14 +826,14 @@ const api = {
   termAnswer: p => termAnswer(p), // S1: Allow this terminal / Deny, from the app's window only (call's check)
   termList: () => core.termList(), // S1: the terminals allowed (Settings › Security › Terminals), the app's window only
   termRevoke: p => (r => (log(`a terminal revoked: ${String(p?.key).split(':')[0]}`), r))(core.termRevoke(p?.key)), // its next call asks again
-  clientAdd: p => clientAsk('add', p), // T1: a trusted client, once you say yes in Laki's window
-  clientRotate: p => clientAsk('rotate', p), // a new token (its scopes too), asked the same way
-  clientRm: p => (c => (log(`trusted client ${c.label}: revoked`), clientLogMod.clientLogDrop(c.id), c))(clientsMod.clientRm(p.id)), // at once: no ask, it only takes away
+  clientAdd: (p: Parameters<typeof clientAsk>[1]) => clientAsk('add', p), // T1: a trusted client, once you say yes in Laki's window
+  clientRotate: (p: Parameters<typeof clientAsk>[1]) => clientAsk('rotate', p), // a new token (its scopes too), asked the same way
+  clientRm: (p: { id: string; from?: unknown }) => (c => (log(`trusted client ${c.label}: revoked`), clientLogMod.clientLogDrop(c.id), c))(clientsMod.clientRm(p.id)), // at once: no ask, it only takes away
   clientList: () => clientsMod.clientList().map(c => ({ ...c, use: clientUseOf(c), today: clientLogMod.callsToday(c.id) })),
   remoteKeep: p => remoteMod.remoteKeep(typeof p?.now === 'number' ? p.now : undefined), // T10: its idle clock starts over (the window's line, the push's Keep)
-  clientLog: p => ({ lines: p.id ? clientLogMod.clientLogOf(clientsMod.clientFind(p.id).id, p.refused === true).slice(0, 2000) : [], unknown: clientLogMod.unknownTokens() }), // T12: { id, refused? }: what it did, newest first; calls with a token nobody has today // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
+  clientLog: (p: { id?: string; refused?: boolean }) => ({ lines: p.id ? clientLogMod.clientLogOf(clientsMod.clientFind(p.id).id, p.refused === true).slice(0, 2000) : [], unknown: clientLogMod.unknownTokens() }), // T12: { id, refused? }: what it did, newest first; calls with a token nobody has today // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
   clientAnswer: (p: In<typeof clientAnswer>) => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
-  clientWho: p => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
+  clientWho: (p: { byClient?: string }) => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
 } satisfies Record<string, Handler>
 export type Api = typeof api

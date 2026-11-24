@@ -161,7 +161,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf' | 'trigger' | 'keep' | 'emptyGone' | 'maxMinutes' | 'after'>>
+type Nulls<T> = { [K in keyof T]?: T[K] | null } // the page's: null clears a field, as ''
+type ScheduleIn = Nulls<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh' | 'notify' | 'missed' | 'catchUntil' | 'onlyIf' | 'trigger' | 'keep' | 'emptyGone' | 'maxMinutes' | 'after'>>
 const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh', 'notify', 'missed', 'catchUntil', 'onlyIf', 'trigger', 'keep', 'emptyGone', 'maxMinutes', 'after'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)

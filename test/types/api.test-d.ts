@@ -19,6 +19,17 @@ export async function typed() {
   await rpc('flowStop', {})
   // @ts-expect-error: prThreads' all is a boolean
   await rpc('prThreads', { ws: 'x', all: 'yes' })
+  // @ts-expect-error: scheduleRun needs a task's id, a string
+  await rpc('scheduleRun', { id: 7 })
+  // @ts-expect-error: prDraft's draft is a boolean
+  await rpc('prDraft', { ws: 'x', draft: 'yes' })
+  // @ts-expect-error: flowRevert needs the version's at
+  await rpc('flowRevert', { id: 'w' })
+  // @ts-expect-error: clientLog's refused is a boolean
+  await rpc('clientLog', { id: 'c', refused: 'yes' })
+  // @ts-expect-error: planRm needs its kind and slug
+  await rpc('planRm', { project: 'p' })
+  await rpc('flowStart', { again: 'run-1' }) // a run again: no workflow needed
   const plans = await rpc('planList', { project: 'p' }) // its result: Plan[]
   return [n, view, plans.length]
 }

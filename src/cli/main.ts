@@ -906,17 +906,18 @@ async function main() {
         if (typeof flags.after === 'string') flags.when = `after ${flags.after}${flags.any ? ', any' : ''}` // T9: its name or id, the daemon finds it
         if (!flags.when && !flags.on) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" (or --at "*/20 9-17 * * 1-5") <prompt>, on an event: --on ci.failed, or after a task: --after <task> [--any]')
         const str = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined)
-        const trigger = str('on') && { event: str('on'), ...(str('branch') && { branch: str('branch') }), ...(str('label') && { label: str('label') }), ...(str('by') && { by: str('by') }) } // T4
+        const trigger = (str('on') && { event: str('on'), ...(str('branch') && { branch: str('branch') }), ...(str('label') && { label: str('label') }), ...(str('by') && { by: str('by') }) }) as Schedule['trigger'] // T4: the daemon checks its event and filters
         const keepRuns = str('keep-runs')
         if (keepRuns !== undefined && !/^\d+$/.test(keepRuns)) throw new Error('--keep-runs? a number (0: all)')
         const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
         const only = typeof flags['only-if'] === 'string' ? flags['only-if'] : ''
         const [kind, ...more] = only.split(':')
         const arg = more.join(':')
-        const onlyIf = !only ? undefined : kind === 'cmd' ? { kind, cmd: arg } : kind === 'prs' ? { kind, what: arg || 'any' } : kind === 'issues' ? { kind, ...(arg && { label: arg }) } : { kind }
+        const onlyIf = (!only ? undefined : kind === 'cmd' ? { kind, cmd: arg } : kind === 'prs' ? { kind, what: arg || 'any' } : kind === 'issues' ? { kind, ...(arg && { label: arg }) } : { kind }) as Schedule['onlyIf'] // the daemon checks its kind and words
         const until = typeof flags['catch-until'] === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(flags['catch-until'].trim()) : null
         if (flags['catch-until'] && !until) throw new Error('--catch-until? a time of day: 10:00')
-        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, fresh: !!flags.fresh || undefined, name: flags.name, prompt: flags.prompt || words.join(' '), ...(onlyIf && { onlyIf }), ...(flags.notify && { notify: flags.notify }), ...(flags.missed && { missed: flags.missed }), ...(until && { catchUntil: Number(until[1]) * 60 + Number(until[2]) }), ...(trigger && { trigger }), ...(keepRuns !== undefined && { keep: Number(keepRuns) }), ...(flags['keep-empty'] && { emptyGone: false }) })
+        const v = (f: string) => (typeof flags[f] === 'string' ? (flags[f] as string) : undefined) // VALUED's: a string each
+        const s = await rpc('scheduleSet', { project: id, when: v('when'), preset: v('preset'), ws: where, base: v('base'), noSetup: !!flags['no-setup'] || undefined, fresh: !!flags.fresh || undefined, name: v('name'), prompt: v('prompt') || words.join(' '), ...(onlyIf && { onlyIf }), ...(flags.notify && { notify: v('notify') as Schedule['notify'] }), ...(flags.missed && { missed: v('missed') as Schedule['missed'] }), ...(until && { catchUntil: Number(until[1]) * 60 + Number(until[2]) }), ...(trigger && { trigger }), ...(keepRuns !== undefined && { keep: Number(keepRuns) }), ...(flags['keep-empty'] && { emptyGone: false }) })
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)

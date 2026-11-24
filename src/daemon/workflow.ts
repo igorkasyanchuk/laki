@@ -487,7 +487,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string; tab?: string; simulate?: { from?: string; answers?: Record<string, string | string[]> } } // simulate (W7): simStart's; evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
+type Start = { workflow?: string /* none: again's or from's run says it */; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string; tab?: string; simulate?: { from?: string; answers?: Record<string, string | string[]> } } // simulate (W7): simStart's; evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
 
 // the tab you picked in Run: an agent tab of the run's workspace, alive (picked() refuses a workspace a live run has);
 // its agent's blocks that run in the run's session (session: run) go to it, as `run:<preset>` keys. Never an agent's
@@ -535,6 +535,7 @@ export async function flowStart(o: Start) {
   if (o.tab && !o.ws) o = { ...o, ws: mine!.workspace }
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
+  if (!o.workflow) throw new Error('which workflow? (or again: a run)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
   if (wf.source === 'builtin') throw template(wf.name)
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
@@ -630,6 +631,7 @@ function simStart(o: Start) {
   const ws = o.ws ? findWs(o.ws) : undefined
   const project = ws?.project ?? o.project
   if (!project) throw new Error('which project? (or a workspace: ws)')
+  if (!o.workflow) throw new Error('which workflow?')
   const wf = flowFind({ id: o.workflow, source: o.source, project })
   if (wf.source === 'builtin') throw template(wf.name)
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
