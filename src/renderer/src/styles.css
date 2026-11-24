@@ -140,14 +140,14 @@ html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 /* V17: Refraction (Settings › Appearance › Window, html.lens: on unless false): a menu bends what's under its edges, as
    thick glass does: main.tsx' #laki-lens before its blur, a lit top and a shade along the bottom. Only where menus blur:
    not in glass (floats solid there: a backdrop-filter over the native blur flickers), a flat look, Reduce transparency
-   or Motion: None; the plain blur stays where url() isn't taken. Menus only, not toasts or the bars' groups: each lensed
+   or Motion: None; the plain blur stays where url() isn't taken. Menus and ⌘K only, not toasts or the bars' groups: each lensed
    surface costs about 1 ms of GPU a frame (12 at once over a printing terminal: 29 ms frames, 17 without), and the bars'
    are always on screen. A menu with a filter or submenus (.rich, often tall) keeps its plain blur. ponytail: a plain
    menu of many items can pass 400px tall; cap it by class if the lens costs there */
 @media (prefers-reduced-transparency: no-preference) {
-  html.lens:not(.opaque, .glass, [data-motion='none']) .menu:not(.rich) { box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--surface-lift); }
+  html.lens:not(.opaque, .glass, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--surface-lift); }
   @supports (backdrop-filter: url(#a)) {
-    html.lens:not(.opaque, .glass, [data-motion='none']) .menu:not(.rich) { backdrop-filter: url(#laki-lens) var(--surface-blur); }
+    html.lens:not(.opaque, .glass, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { backdrop-filter: url(#laki-lens) var(--surface-blur); } /* ⌘K's and the finders' too: open a moment, as a menu is */
   }
 }
 button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-4); cursor: var(--cur-act); }
@@ -2040,7 +2040,7 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .img-zoom { position: fixed; inset: 0; z-index: var(--z-tip); display: flex; align-items: safe center; justify-content: safe center; overflow: auto; background: rgba(0, 0, 0, 0.82); cursor: zoom-out; }
 .img-zoom img { flex: none; max-width: none; }
 .pv-image img { max-width: 100%; object-fit: contain; align-self: flex-start; }
-.finder { width: 620px; max-width: calc(100vw - 32px); align-self: flex-start; overflow: hidden; display: flex; flex-direction: column; }
+.finder { position: relative; width: 620px; max-width: calc(100vw - 32px); align-self: flex-start; overflow: hidden; display: flex; flex-direction: column; }
 .finder > input { border: none; border-bottom: 1px solid var(--line); border-radius: 0; padding: var(--sp-5) var(--sp-5); font-size: var(--fs-4); background: none; }
 .ff-list { max-height: 52vh; overflow-y: auto; padding: var(--sp-2); }
 .ff-item { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-m); cursor: var(--cur-act); white-space: nowrap; overflow: hidden; color: var(--fg); font-size: var(--fs-3); }
@@ -4052,8 +4052,13 @@ html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
 html.glass { --cap-bg: color-mix(in srgb, var(--panel) 90%, transparent); --cap-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
 .capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-spec), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
-.capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle var(--sp-6) at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent); opacity: 0; transition: opacity 0.2s; }
+.capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle 110px at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent 70%); opacity: 0; transition: opacity 0.2s; } /* the pointer's light: a soft pool, wider than the capsule is tall */
 .capsule[data-lit]::after { opacity: 1; }
+/* its rim lit near the pointer (a capsule's, ⌘K's, Find a file's and Search chats'): the same light through a 1px ring (the box minus its content box).
+   --glass-light is none where the glass is (html.opaque, html.away, Motion: None, Reduce transparency) */
+:is(.capsule, .finder, .modal.palette)::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: radial-gradient(circle 90px at var(--mx, 50%) var(--my, 0%), var(--glass-light), transparent 70%); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; opacity: 0; transition: opacity 0.2s; }
+:is(.capsule, .finder, .modal.palette)[data-lit]::before { opacity: 1; }
+.modal.palette { position: relative; } /* its rim's ring sits on it */
 .term-wrap .capsule { --cap-blur: none; background: var(--panel); }
 /* the tab bar's buttons and the Terminal / Reader switch: a capsule each, a gap around it */
 .actions.capsule { gap: 0; padding: var(--sp-1); margin: 0 var(--sp-2) 0 var(--sp-3); }

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The bars' capsules light softly around the pointer, with their rim lit near it; ⌘K, Find a file and Search chats get the lit rim too, and ⌘K bends what's under its edges like a menu (Refraction).
 - Ship and Update refuse a worktree whose git folder holds a rebase step that runs a command or a submodule setting that names a program (what an agent's sandbox could leave there), and say which file to look at.
 - `laki restore` refuses a backup with a link, a hard link or a special file in it before it unpacks anything, and a webhook delivery sent again is still refused after Laki restarts.
 - Extensions' secret settings (tokens, API keys) are kept in the macOS Keychain too, moved out of their file as Laki starts; a secret with a line break stays in its own file.

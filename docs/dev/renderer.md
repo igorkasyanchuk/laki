@@ -1249,7 +1249,11 @@ Capsules (V11, macOS 26's glass): styles.css' `.capsule` (not `.glass`: that's `
 `--cap-bg` (the floating surface's fill, `--surface-a`: the same contrast holds), `--cap-blur` (`blur(20px)
 saturate(1.7)`), the surface's hairline, `--cap-hi` (a lit top edge), `--r-pill` (square in the Square look). Opaque
 in `html.opaque` and under Reduce transparency; in glass nearly opaque without a blur; inside `.term-wrap` never a
-blur. On: TabBar's two `.actions` groups, App's `reader-switch`, the Reader's `.rd-box` (its field borderless in it,
+blur. The pointer's light (ui.tsx' one `pointermove`: `data-lit`, `--mx`, `--my` on the capsule, `.finder` or
+`.modal.palette` under it): `::after` a 110px pool of `--glass-light`, `::before` the same light through a 1px ring
+(`mask-composite: exclude`), on ⌘K and the finders too; none where `--glass-light` is (opaque, away, Motion: None,
+Reduce transparency). Refraction's lens (`#laki-lens`) is on menus and ⌘K (`.modal.palette`), the finders: open a
+moment, never the bars' always-on groups (each lensed surface ~1 ms of GPU a frame). On: TabBar's two `.actions` groups, App's `reader-switch`, the Reader's `.rd-box` (its field borderless in it,
 its focus ring the capsule's, corners `min(--r-pill, 23px)` as it grows), and the status bar's two `.sb-group`s (left:
 the workspace's; right: ports, limits and the rest; `:empty` draws none), the bar itself transparent. The scroll edge:
 ui.tsx `ScrollEdge`, a 1px sentinel as the scroller's first child, one `IntersectionObserver` (root: the scroller)

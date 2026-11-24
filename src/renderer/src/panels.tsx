@@ -27,7 +27,7 @@ import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, File
 // at once leave it set; never for one inside the sidebar or the main area (a page's: they'd sink with it)
 let sheets = 0
 const modals: object[] = [] // the open Modals, the newest last: Esc closes that one alone
-export function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
+export function Modal({ title, onClose, children, wide, loose, className = '' }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean; className?: string }) {
   const typed = useRef(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => (modals.push(box), () => void (i => i >= 0 && modals.splice(i, 1))(modals.indexOf(box))), [])
@@ -57,7 +57,7 @@ export function Modal({ title, onClose, children, wide, loose }: { title: string
   const outside = () => (typed.current && !loose ? box.current?.animate([{ scale: 1 }, { scale: 1.02 }, { scale: 1 }], { duration: 200, easing: 'ease-out' }) : onClose())
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && outside()}>
-      <div ref={box} tabIndex={-1} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title} onInput={() => (typed.current = true)}>
+      <div ref={box} tabIndex={-1} className={`modal ${wide ? 'wide' : ''} ${className}`} role="dialog" aria-label={title} onInput={() => (typed.current = true)}>
         <div className="modal-title">
           <span className="grow">{title}</span>
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />

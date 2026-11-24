@@ -130,7 +130,7 @@ export function Palette({ items, onClose, forName, view }: { items: PaletteItem[
   }
   let n = 0
   return (
-    <Modal title="Go to" onClose={onClose} wide loose>
+    <Modal title="Go to" onClose={onClose} wide loose className="palette">
       {step && (
         <div className="palette-crumb">
           <button className="ghost" onClick={back} aria-label="Back">
