@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.62.0 · Nov 24, 2026
 
 - Laki's window and the phone page start lighter: each look's styles load when it's picked, so the first load's CSS went from 596 KB to 358 KB.
 - Needs you groups the same ask from several agents: one card with *×n*, each workspace's name, and each choice *for all n*; *Separately* splits it again. A risky command, a question, a plan or a secret always stays on its own card.
